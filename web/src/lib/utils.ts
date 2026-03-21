@@ -72,48 +72,6 @@ export function safeJsonParse<T>(raw: string | null | undefined): T | null {
   }
 }
 
-import type { MessageSource } from "./types";
-
-/**
- * Parse source label and clean content from Pi-formatted user messages.
- * Formats: `[WhatsApp] User (ref:XXXXX): text`, `[Web] User: "text"`, `[Hook: EventName] text`
- */
-export function parseUserMessageSource(
-  content: string,
-  metadata?: { source?: string },
-): {
-  source: MessageSource;
-  cleanContent: string;
-} {
-  // Legacy format: [WhatsApp] User (ref:XXXXX): text
-  const waMatch = content.match(
-    /^\[WhatsApp\] User(?:\s*\(ref:[^)]*\))?:\s*(.*)/s,
-  );
-  if (waMatch) return { source: "whatsapp", cleanContent: waMatch[1] };
-
-  // Legacy format: [Web] User: "text"
-  const webMatch = content.match(/^\[Web\] User:\s*"(.*)"/s);
-  if (webMatch) return { source: "web", cleanContent: webMatch[1] };
-
-  // Hook messages (unchanged format)
-  const hookMatch = content.match(/^\[Hook(?::\s*[^\]]+)?\]\s*(.*)/s);
-  if (hookMatch) return { source: "hook", cleanContent: hookMatch[1] };
-
-  // Cron messages: [Cron stale session check] ..., [Cron idle check] ...
-  const cronMatch = content.match(/^\[Cron\s[^\]]*\]\s*(.*)/s);
-  if (cronMatch) return { source: "cron", cleanContent: cronMatch[1] };
-
-  // Legacy cron: [Cron] text
-  const cronLegacy = content.match(/^\[Cron\]\s*(.*)/s);
-  if (cronLegacy) return { source: "cron", cleanContent: cronLegacy[1] };
-
-  // Clean messages (no prefix): use metadata for source attribution
-  if (metadata?.source === "whatsapp" || metadata?.source === "hook" || metadata?.source === "cron") {
-    return { source: metadata.source, cleanContent: content };
-  }
-
-  return { source: "web", cleanContent: content };
-}
 
 export function extractToolName(event: unknown): string {
   if (typeof event === "object" && event !== null) {

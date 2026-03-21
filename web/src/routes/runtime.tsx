@@ -75,10 +75,9 @@ function RuntimePage() {
               <div className="flex items-center justify-between">
                 <CardTitle>Pi Agent</CardTitle>
                 <Badge
-                  variant={status.pi?.busy ? "success" : "default"}
+                  variant={status.pi?.default?.busy ? "success" : "default"}
                 >
-                  {status.pi?.state ??
-                    (status.pi?.busy ? "active" : "idle")}
+                  {status.pi?.default?.busy ? "active" : "idle"}
                 </Badge>
               </div>
             </CardHeader>
@@ -86,20 +85,63 @@ function RuntimePage() {
               <div className="grid grid-cols-3 gap-4">
                 <MetaItem
                   label="Session ID"
-                  value={status.pi?.sessionId ?? ""}
+                  value={status.pi?.default?.sessionId ?? ""}
                   mono
                 />
                 <MetaItem
                   label="Messages"
-                  value={String(status.pi?.messageCount ?? 0)}
+                  value={String(status.pi?.default?.messageCount ?? 0)}
                 />
                 <MetaItem
                   label="Queue depth"
-                  value={String(status.pi?.queueDepth ?? 0)}
+                  value={String(status.pi?.default?.queueDepth ?? 0)}
                 />
               </div>
             </CardContent>
           </Card>
+
+          {/* Pi Orchestrators */}
+          {(status.pi?.orchestrators?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pi Orchestrators</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {status.pi!.orchestrators!.map((o) => (
+                    <div
+                      key={o.sessionId}
+                      className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {o.workstreamName ?? o.workstreamId}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {o.sessionId.slice(0, 12)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MetaItem
+                          label="Messages"
+                          value={String(o.messageCount)}
+                        />
+                        <MetaItem
+                          label="Queue"
+                          value={String(o.queueDepth)}
+                        />
+                        <Badge
+                          variant={o.busy ? "success" : "default"}
+                        >
+                          {o.busy ? "active" : "idle"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Control Surface */}
           <Card>

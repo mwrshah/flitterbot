@@ -106,6 +106,7 @@ export class AutonomaWsClient {
     text: string,
     deliveryMode: string,
     images?: Array<{ data: string; mimeType: string }>,
+    targetSessionId?: string,
   ): Promise<void> {
     if (
       !this.socket ||
@@ -115,6 +116,7 @@ export class AutonomaWsClient {
     }
     const payload: Record<string, unknown> = { type: "message", text, deliveryMode };
     if (images?.length) payload.images = images;
+    if (targetSessionId) payload.targetSessionId = targetSessionId;
     this.socket.send(JSON.stringify(payload));
   }
 

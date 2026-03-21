@@ -12,7 +12,8 @@ import type {
   DeliveryMode,
   ImageAttachment,
 } from "~/lib/types";
-import { createId, extractToolName, parseUserMessageSource } from "~/lib/utils";
+import type { MessageSource } from "~/lib/types";
+import { createId, extractToolName } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import { PiMessageList } from "./PiMessageList";
@@ -51,7 +52,7 @@ function connectionVariant(
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
-export function ChatPanel() {
+export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
   const { apiClient, wsClient } = useControlSurface();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
@@ -105,7 +106,7 @@ export function ChatPanel() {
   useEffect(() => {
     let cancelled = false;
     void apiClient
-      .getPiHistory()
+      .getPiHistory(undefined, piSessionId)
       .then((history) => {
         if (cancelled) return;
         setTimeline((current) => [...history.items, ...current]);
@@ -115,11 +116,21 @@ export function ChatPanel() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, scrollToBottom]);
+  }, [apiClient, piSessionId, scrollToBottom]);
 
   // WebSocket events
   useEffect(() => {
     const unsubscribe = wsClient.subscribe((message) => {
+      // Filter events by sessionId when viewing a specific Pi session
+      if (
+        piSessionId &&
+        "sessionId" in message &&
+        message.sessionId &&
+        message.sessionId !== piSessionId
+      ) {
+        return;
+      }
+
       if (message.type === "connected") {
         addPill({
           id: "ws-connected",
@@ -172,15 +183,14 @@ export function ChatPanel() {
 
         if (message.role === "user") {
           if (content.trim()) {
-            const parsed = parseUserMessageSource(content);
             setTimeline((current) => [
               ...current,
               {
                 id: createId("user"),
                 kind: "message",
                 role: "user",
-                content: parsed.cleanContent,
-                source: parsed.source,
+                content,
+                source: (message.source as MessageSource) ?? "web",
                 createdAt: message.timestamp ?? new Date().toISOString(),
               },
             ]);
@@ -274,7 +284,7 @@ export function ChatPanel() {
       unsubscribe();
       unsubscribeConnection();
     };
-  }, [wsClient]);
+  }, [wsClient, piSessionId]);
 
   // Track whether the user is at the bottom of the scroll container
   const handleScroll = useCallback(() => {
@@ -333,13 +343,14 @@ export function ChatPanel() {
     // No optimistic update — wait for the server's decorated message via WebSocket.
 
     try {
-      await wsClient.sendMessage(text || "(image)", deliveryMode, images);
+      await wsClient.sendMessage(text || "(image)", deliveryMode, images, piSessionId);
     } catch {
       const response = await apiClient.queueMessage({
         text: text || "(image)",
         source: "web",
         deliveryMode,
         images,
+        targetSessionId: piSessionId,
       });
       addPill({
         id: createId("http-queued"),

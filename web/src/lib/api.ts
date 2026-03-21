@@ -61,6 +61,7 @@ export function createAutonomaApiClient(
       source: string;
       deliveryMode: string;
       images?: Array<{ data: string; mimeType: string }>;
+      targetSessionId?: string;
     }) =>
       request<QueueMessageResponse>("/message", {
         method: "POST",
@@ -73,10 +74,15 @@ export function createAutonomaApiClient(
         body: JSON.stringify({ text }),
       }),
 
-    getPiHistory: (surface?: "input") =>
-      request<PiHistoryResponse>(
-        surface ? `/api/pi/history?surface=${surface}` : "/api/pi/history",
-      ),
+    getPiHistory: (surface?: "input", piSessionId?: string) => {
+      const params = new URLSearchParams();
+      if (surface) params.set("surface", surface);
+      if (piSessionId) params.set("piSessionId", piSessionId);
+      const qs = params.toString();
+      return request<PiHistoryResponse>(
+        qs ? `/api/pi/history?${qs}` : "/api/pi/history",
+      );
+    },
 
     startWhatsApp: () =>
       request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),

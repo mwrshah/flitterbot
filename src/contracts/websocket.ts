@@ -12,6 +12,7 @@ export interface WebSocketClientMessageEvent {
   text: string;
   deliveryMode?: DeliveryMode;
   images?: ImageAttachment[];
+  targetSessionId?: string;
 }
 
 export type ControlSurfaceWebSocketClientEvent = WebSocketClientMessageEvent;
@@ -61,6 +62,7 @@ export interface MessageEndWebSocketEvent {
   sessionId?: string;
   role: "user" | "assistant";
   content: string;
+  source?: string;
   timestamp?: string;
 }
 

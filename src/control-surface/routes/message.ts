@@ -23,9 +23,12 @@ export async function handleMessageRoute(runtime: ControlSurfaceRuntime, req: ht
   const deliveryMode: DeliveryMode = body.deliveryMode === "steer" ? "steer" : "followUp";
   const formatted = formatInboundMessage(body.text, source, body.metadata);
 
-  // Router: classify human messages against workstreams (hooks/cron bypass)
+  // Direct-targeted session (web UI tab input) — skip router
   let workstreamMeta: Record<string, unknown> = {};
-  if (source === "web" || source === "whatsapp") {
+  if (body.targetSessionId) {
+    workstreamMeta._targetSessionId = body.targetSessionId;
+  } else if (source === "web" || source === "whatsapp") {
+    // Router: classify human messages against workstreams (hooks/cron bypass)
     const classification = await routeMessage(runtime, body.text);
     if (classification) {
       workstreamMeta = classification.metadata;

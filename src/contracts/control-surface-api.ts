@@ -8,7 +8,7 @@ import type {
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
 
-export type MessageSource = "whatsapp" | "hook" | "cron" | "web";
+export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init";
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
@@ -80,6 +80,15 @@ export interface PiMultiSessionStatus {
   orchestrators: PiOrchestratorStatus[];
 }
 
+export interface WorkstreamSummary {
+  id: string;
+  name: string;
+  repoPath?: string;
+  worktreePath?: string;
+  sessionCount: number;
+  createdAt: string;
+}
+
 export interface StatusResponse {
   ok: true;
   pid: number;
@@ -87,6 +96,7 @@ export interface StatusResponse {
   pi: PiMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
+  workstreams?: WorkstreamSummary[];
 }
 
 export interface MessageRequest {
@@ -95,6 +105,7 @@ export interface MessageRequest {
   metadata?: Record<string, unknown>;
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
+  targetSessionId?: string;
 }
 
 export interface MessageResponse {
@@ -141,6 +152,7 @@ export interface PiHistoryMessageItem {
   kind: "message";
   role: "user" | "assistant" | "system";
   content: string;
+  source?: string;
   blocks?: Array<
     | { type: "text"; text: string }
     | { type: "thinking"; thinking: string }

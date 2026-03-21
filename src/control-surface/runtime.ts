@@ -4,6 +4,7 @@ import net from "node:net";
 import crypto from "node:crypto";
 import type http from "node:http";
 import { loadConfig, type AutonomaConfig } from "../config/load-config.ts";
+import { formatSourcePrefix } from "./pi/source-prefix.ts";
 import type {
 	ClaudeSessionListItem as SessionListItem,
 	ControlSurfaceWebSocketClientEvent,
@@ -110,6 +111,13 @@ export class ControlSurfaceRuntime {
 		this.startMaintenanceLoop();
 		clearAllHealthFlags(this.blackboard);
 		this.log(`runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`);
+
+		// Bootstrap Pi agent with startup skills
+		this.enqueue({
+			text: "/load2-w",
+			source: "init",
+			metadata: { via: "startup" },
+		});
 	}
 
 	async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {
@@ -329,6 +337,17 @@ export class ControlSurfaceRuntime {
 			};
 		});
 
+		const openWorkstreams = listOpenWorkstreams(this.blackboard);
+		const sessionCountByWorkstream = new Map<string, number>();
+		for (const session of this.getSessionList()) {
+			if (session.workstreamId) {
+				sessionCountByWorkstream.set(
+					session.workstreamId,
+					(sessionCountByWorkstream.get(session.workstreamId) ?? 0) + 1,
+				);
+			}
+		}
+
 		return {
 			ok: true,
 			pid: process.pid,
@@ -351,6 +370,14 @@ export class ControlSurfaceRuntime {
 				requiresManualAuth: whatsapp.requiresManualAuth,
 			},
 			blackboard: blackboardStatus,
+			workstreams: openWorkstreams.map((ws) => ({
+				id: ws.id,
+				name: ws.name,
+				repoPath: ws.repo_path ?? undefined,
+				worktreePath: ws.worktree_path ?? undefined,
+				sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
+				createdAt: ws.created_at,
+			})),
 		};
 	}
 
@@ -403,6 +430,14 @@ export class ControlSurfaceRuntime {
 	 */
 	private resolveTargetSession(input: EnqueueInput, item: QueueItem): ManagedPiSession {
 		const meta = input.metadata;
+
+		// Direct-targeted session (web UI tab input) — bypass all routing
+		const targetSessionId = meta?._targetSessionId as string | undefined;
+		if (targetSessionId) {
+			const target = this.sessionManager.getByPiSessionId(targetSessionId);
+			if (target) return target;
+			// Session not found — fall through to normal routing
+		}
 
 		// Cron always goes to default
 		if (input.source === "cron") {
@@ -848,9 +883,13 @@ export class ControlSurfaceRuntime {
 		if (!data || typeof data !== "object") return;
 		const payload = data as ControlSurfaceWebSocketClientEvent;
 		if (payload.type === "message" && typeof payload.text === "string") {
-			// Route through classifier
+			const targetSessionId = typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
+
+			// Skip router when message targets a specific Pi session (direct tab input)
 			let routerMeta: Record<string, unknown> = {};
-			if (this.config.geminiApiKey) {
+			if (targetSessionId) {
+				routerMeta._targetSessionId = targetSessionId;
+			} else if (this.config.geminiApiKey) {
 				try {
 					const { classifyMessage } = await import("./router/classify.ts");
 					const result = await classifyMessage(payload.text, this.blackboard, this.config.geminiApiKey, this.config.projectsDir);
@@ -917,7 +956,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
 	const agentManaged = payload.agent_managed === true || payload.agentManaged === true || payload.agent_managed === 1 || payload.agentManaged === 1;
 	const lastAssistantText = pickString(payload, ["lastAssistantText"]);
 	const lines = [
-		`[Hook: ${humanizeHookEvent(eventName)}] ${hookVerb(eventName)}`,
+		`${formatSourcePrefix("hook", false)}${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
 		sessionId ? `Session ID: ${sessionId}` : undefined,
 		project ? `Project: ${project}` : undefined,
 		cwd ? `CWD: ${cwd}` : undefined,

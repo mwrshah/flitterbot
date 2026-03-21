@@ -11,7 +11,7 @@ import type {
   ToolCall,
 } from "@mariozechner/pi-ai";
 import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment, MessageSource } from "./types";
-import { parseUserMessageSource } from "./utils";
+
 
 function stringifyResult(value: unknown): string {
   if (value == null) return "";
@@ -56,15 +56,12 @@ export function timelineToAgentMessages(
     if (item.kind === "divider") continue;
 
     if (item.kind === "message" && item.role === "user") {
-      // Parse source label from formatted content and attach as metadata
-      const parsed = item.source
-        ? { source: item.source, cleanContent: item.content }
-        : parseUserMessageSource(item.content);
+      const source = item.source ?? "web";
       const images = item.images;
-      let content: string | (TextContent | ImageContent)[] = parsed.cleanContent;
+      let content: string | (TextContent | ImageContent)[] = item.content;
       if (images?.length) {
         content = [
-          { type: "text", text: parsed.cleanContent },
+          { type: "text", text: item.content },
           ...images.map((img: ImageAttachment) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType })),
         ];
       }
@@ -72,7 +69,7 @@ export function timelineToAgentMessages(
         role: "user",
         content,
         timestamp: new Date(item.createdAt).getTime(),
-        source: parsed.source,
+        source,
       } as AgentMessage & { source: MessageSource });
       continue;
     }

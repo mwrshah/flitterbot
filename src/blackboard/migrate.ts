@@ -274,7 +274,7 @@ function applyV6Migration(db: DatabaseSync): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS messages (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'pi_outbound')),
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'pi_outbound')),
           direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
           content TEXT NOT NULL,
           sender TEXT,
@@ -320,6 +320,43 @@ function applyV7Migration(db: DatabaseSync): void {
   }
 }
 
+function applyV8Migration(db: DatabaseSync): void {
+  // Add 'init' to the messages source CHECK constraint.
+  // SQLite doesn't support ALTER CHECK — recreate the table.
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      CREATE TABLE messages_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'pi_outbound')),
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          content TEXT NOT NULL,
+          sender TEXT,
+          workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO messages_new SELECT * FROM messages;
+      DROP TABLE messages;
+      ALTER TABLE messages_new RENAME TO messages;
+
+      CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_workstream ON messages(workstream_id);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (8);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+  db.exec("PRAGMA foreign_keys=ON;");
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -353,6 +390,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 7) {
     applyV7Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 8) {
+    applyV8Migration(db);
   }
 
   return getSchemaVersion(db);

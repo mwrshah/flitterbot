@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 7;
+export const BLACKBOARD_SCHEMA_VERSION = 8;
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
 export type PiSessionStatus = "active" | "waiting_for_user" | "waiting_for_sessions" | "ended" | "crashed";
@@ -69,7 +69,7 @@ export interface WhatsAppMessageRow {
   processed_at: string | null;
 }
 
-export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "pi_outbound";
+export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "pi_outbound";
 export type UnifiedMessageDirection = "inbound" | "outbound";
 
 export interface MessageRow {
@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'pi_outbound')),
+    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'pi_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,

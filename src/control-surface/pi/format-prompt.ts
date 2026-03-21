@@ -1,12 +1,13 @@
 import type { QueueItem } from "../queue/turn-queue.ts";
+import { formatSourcePrefix } from "./source-prefix.ts";
 
 /**
  * Produce the final prompt string for session.prompt().
- * Clean user text gets a structured <context /> header for the default agent;
- * orchestrators and hook/cron sources pass through unchanged.
+ * Every message gets a `[source] ` prefix so the agent knows the origin.
+ * Hook and cron messages already carry their own bracket prefix.
  */
 export function formatPromptWithContext(item: QueueItem, role: "default" | "orchestrator"): string {
-	// Hook and cron messages are already formatted content — pass through
+	// Hook and cron messages already have [hook] / [cron] prefix
 	if (item.source === "hook" || item.source === "cron") {
 		return item.text;
 	}
@@ -16,16 +17,6 @@ export function formatPromptWithContext(item: QueueItem, role: "default" | "orch
 		return item.text;
 	}
 
-	// Default agent: prepend structured context header
-	const attrs: string[] = [];
-	attrs.push(`source="${item.source}"`);
-
-	const meta = item.metadata;
-	if (meta) {
-		if (typeof meta.workstream_name === "string") attrs.push(`workstream="${meta.workstream_name}"`);
-		if (typeof meta.workstream_id === "string") attrs.push(`workstream_id="${meta.workstream_id}"`);
-		if (typeof meta.router_action === "string") attrs.push(`action="${meta.router_action}"`);
-	}
-
-	return `<context ${attrs.join(" ")} />\n\n${item.text}`;
+	// Default agent: prepend [source] User: prefix
+	return `${formatSourcePrefix(item.source, true)}${item.text}`;
 }

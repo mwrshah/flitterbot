@@ -1,6 +1,6 @@
 /* ── Chat timeline ── */
 
-export type MessageSource = "web" | "whatsapp" | "hook" | "cron";
+export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init";
 
 export type ImageAttachment = {
   data: string;
@@ -137,11 +137,21 @@ export type StatusResponse = {
     managedByControlSurface?: boolean;
   };
   pi?: {
-    sessionId?: string;
-    busy?: boolean;
-    queueDepth?: number;
-    messageCount?: number;
-    state?: string;
+    default?: {
+      sessionId?: string;
+      busy?: boolean;
+      queueDepth?: number;
+      messageCount?: number;
+      state?: string;
+    };
+    orchestrators?: Array<{
+      sessionId: string;
+      workstreamId: string;
+      workstreamName?: string;
+      messageCount: number;
+      queueDepth: number;
+      busy: boolean;
+    }>;
   };
   workstreams?: WorkstreamSummary[];
 };
@@ -202,12 +212,14 @@ export type WsMessage =
   | { type: "message_queued"; itemId: string; queueDepth: number }
   | { type: "queue_item_start"; item: { id: string; source: string } }
   | { type: "queue_item_end"; itemId: string; error?: string }
-  | { type: "text_delta"; delta: string }
+  | { type: "text_delta"; delta: string; sessionId?: string }
   | {
       type: "message_end";
       role: string;
       content?: string;
+      source?: string;
       timestamp?: string;
+      sessionId?: string;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
@@ -218,7 +230,8 @@ export type WsMessage =
       isError?: boolean;
       event?: unknown;
       timestamp?: string;
+      sessionId?: string;
     }
-  | { type: "turn_end" }
+  | { type: "turn_end"; sessionId?: string }
   | { type: "pi_surfaced"; content: string; timestamp?: string }
   | { type: "error"; message: string };

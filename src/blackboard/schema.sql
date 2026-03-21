@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'pi_outbound')),
+    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'pi_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,

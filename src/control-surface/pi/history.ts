@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { createReadStream } from "node:fs";
 import readline from "node:readline";
 import type { PiHistoryItem, PiHistoryMessageItem, PiHistoryResponse } from "../../contracts/index.ts";
+import { extractSourcePrefix } from "./source-prefix.ts";
 
 type PiHistoryMode = "agent" | "input";
 
@@ -34,6 +35,7 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
+
 function pushMessage(
   items: PiHistoryItem[],
   id: string,
@@ -43,11 +45,20 @@ function pushMessage(
   suffix = "message",
   blocks?: PiHistoryMessageBlock[],
 ): void {
-  const normalized = content.trim();
+  let normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );
   if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
+
+  // Extract source from <context source="..." /> tag on user messages
+  let source: string | undefined;
+  if (role === "user") {
+    const extracted = extractSourcePrefix(normalized);
+    source = extracted.source;
+    normalized = extracted.cleanContent.trim();
+  }
+
   const item: PiHistoryMessageItem = {
     id: `${id}:${suffix}`,
     kind: "message",
@@ -55,6 +66,7 @@ function pushMessage(
     content: normalized,
     createdAt,
   };
+  if (source) item.source = source;
   if (normalizedBlocks && normalizedBlocks.length > 0) {
     item.blocks = normalizedBlocks;
   }
@@ -192,10 +204,20 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
  * Strip everything except user messages and the final surfaced assistant message per turn.
  * This mirrors the WhatsApp / InputSurface live path: no tools, no system messages.
  */
+function stripThinkingFromMessage(item: PiHistoryItem): PiHistoryItem {
+  if (item.kind !== "message" || item.role !== "assistant") return item;
+  const msg = item as PiHistoryMessageItem;
+  if (!msg.blocks?.length) return item;
+  const textBlocks = msg.blocks.filter((b) => b.type === "text");
+  if (textBlocks.length === 0) return item;
+  const textOnly = textBlocks.map((b) => (b as { type: "text"; text: string }).text).join("\n\n");
+  return { ...msg, content: textOnly, blocks: textBlocks };
+}
+
 function keepOnlySurfaced(items: PiHistoryItem[]): PiHistoryItem[] {
-  return keepOnlySurfacedAssistant(items).filter(
-    (item) => item.kind === "message" && (item.role === "user" || item.role === "assistant"),
-  );
+  return keepOnlySurfacedAssistant(items)
+    .filter((item) => item.kind === "message" && (item.role === "user" || item.role === "assistant"))
+    .map(stripThinkingFromMessage);
 }
 
 function shapeHistoryItems(items: PiHistoryItem[], mode: PiHistoryMode): PiHistoryItem[] {

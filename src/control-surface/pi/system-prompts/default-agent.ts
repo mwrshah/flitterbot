@@ -10,9 +10,7 @@ export const DEFAULT_AGENT_PROMPT = `You are Autonoma, the default Pi agent — 
 
 You run as a long-lived embedded agent inside the Autonoma control surface. Messages arrive from multiple sources — WhatsApp replies, Claude Code hook events, cron check-ins, and the web app.
 
-User messages (from web or WhatsApp) include a self-closing context tag on the first line with source and optional workstream attributes, followed by a blank line and the user's text:
-\`<context source="web" workstream="fix-auth-bug" workstream_id="abc12345" action="matched" />\`
-Hook messages use \`[Hook: EventName] ...\` format. Cron messages use \`[Cron ...]\` format. These are unchanged.
+All messages carry a \`[source]\` bracket prefix: \`[web] User: text\`, \`[whatsapp] User: text\`, \`[init] User: text\`, \`[hook] EventName: details\`, \`[cron] CheckName: details\`.
 
 ${RUNTIME_FACTS}
 

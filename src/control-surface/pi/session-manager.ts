@@ -35,16 +35,31 @@ export class PiSessionManager {
 	private defaultSession?: ManagedPiSession;
 	private readonly orchestrators = new Map<string, ManagedPiSession>();
 	private readonly byPiSessionId = new Map<string, ManagedPiSession>();
+	private readonly config: AutonomaConfig;
+	private readonly blackboard: BlackboardDatabase;
+	private readonly wsHub: WebSocketHub;
+	private readonly runtimeInstanceId: string;
+	private readonly startedAt: number;
+	private readonly processCallback: ProcessQueueItemCallback;
+	private readonly log: (message: string) => void;
 
 	constructor(
-		private readonly config: AutonomaConfig,
-		private readonly blackboard: BlackboardDatabase,
-		private readonly wsHub: WebSocketHub,
-		private readonly runtimeInstanceId: string,
-		private readonly startedAt: number,
-		private readonly processCallback: ProcessQueueItemCallback,
-		private readonly log: (message: string) => void,
-	) {}
+		config: AutonomaConfig,
+		blackboard: BlackboardDatabase,
+		wsHub: WebSocketHub,
+		runtimeInstanceId: string,
+		startedAt: number,
+		processCallback: ProcessQueueItemCallback,
+		log: (message: string) => void,
+	) {
+		this.config = config;
+		this.blackboard = blackboard;
+		this.wsHub = wsHub;
+		this.runtimeInstanceId = runtimeInstanceId;
+		this.startedAt = startedAt;
+		this.processCallback = processCallback;
+		this.log = log;
+	}
 
 	getDefault(): ManagedPiSession {
 		if (!this.defaultSession) throw new Error("Default Pi session not initialized");
@@ -199,10 +214,27 @@ export class PiSessionManager {
 		const def = this.defaultSession;
 		if (!def) return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
 
+		// Walk backwards from the end, collecting raw messages until we have
+		// enough user+assistant messages to yield 20 surfaced items.
+		// Always skip index 0 (bootstrap/init message).
+		const allMessages = def.session.messages as Array<Record<string, unknown>>;
+		let surfacedCount = 0;
+		let startIdx = allMessages.length;
+		for (let i = allMessages.length - 1; i >= 1; i--) {
+			const role = allMessages[i].role;
+			if (role === "user" || role === "assistant") surfacedCount++;
+			if (surfacedCount >= 20) {
+				startIdx = i;
+				break;
+			}
+		}
+		if (surfacedCount < 20) startIdx = 1; // use everything except index 0
+		const tail = allMessages.slice(startIdx);
+
 		const history = readPiHistoryFromMessages(
 			def.piSessionId,
 			def.session.sessionFile ?? null,
-			def.session.messages,
+			tail,
 			"input",
 		);
 
@@ -220,7 +252,7 @@ export class PiSessionManager {
 		const contextLines: string[] = [];
 		for (const item of recent) {
 			if (item.kind !== "message") continue;
-			const text = stripTransportPrefixes(item.content);
+			const text = stripWorkstreamPrefix(item.content);
 			if (item.role === "user") {
 				contextLines.push(`User: ${text}`);
 			} else if (item.role === "assistant") {
@@ -231,6 +263,7 @@ export class PiSessionManager {
 		const wsPrefix = `[Workstream: "${workstreamName}" (${workstreamId})] [NEW]`;
 		const parts = [
 			`${wsPrefix}\n${currentMessage}`,
+			`IMPORTANT: Before processing the prior context below, run /load2-w to load essential skills.`,
 			`<prior_context>\n${contextLines.join("\n")}\n</prior_context>`,
 			`${wsPrefix}\n${currentMessage}`,
 		];
@@ -322,13 +355,6 @@ function findInitCoupletEnd(items: PiHistoryItem[]): number {
  * Strip transport prefixes like [Web] User: "...", [WhatsApp] User: "...",
  * and workstream prefixes like [Workstream: ...] from context entries.
  */
-function stripTransportPrefixes(text: string): string {
-	let result = text;
-	// Strip [Web] User: "..." or [WhatsApp] User: "..." wrapping
-	result = result.replace(/^\[(?:Web|WhatsApp)\]\s*(?:User|Assistant):\s*"?/i, "");
-	// Strip trailing quote if present
-	result = result.replace(/"$/, "");
-	// Strip workstream prefix
-	result = result.replace(/^\[Workstream:\s*"[^"]*"\s*\([^)]*\)\]\s*(?:\[(?:NEW|RESUMED)\]\s*)?/i, "");
-	return result.trim();
+function stripWorkstreamPrefix(text: string): string {
+	return text.replace(/^\[Workstream:\s*"[^"]*"\s*\([^)]*\)\]\s*(?:\[(?:NEW|RESUMED)\]\s*)?/i, "").trim();
 }

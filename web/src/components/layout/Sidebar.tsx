@@ -122,9 +122,9 @@ export function Sidebar({
   });
 
   const status = statusQuery.data;
-  const piState = status?.pi?.state ?? (status?.pi?.busy ? "active" : "idle");
+  const piState = status?.pi?.default?.busy ? "active" : "idle";
   const waStatus = status?.whatsapp.status ?? "unknown";
-  const queueDepth = status?.pi?.queueDepth ?? 0;
+  const queueDepth = status?.pi?.default?.queueDepth ?? 0;
   const workstreams = status?.workstreams ?? [];
 
   return (

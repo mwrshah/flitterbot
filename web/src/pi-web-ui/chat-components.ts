@@ -642,6 +642,7 @@ const SOURCE_STYLES: Record<string, SourceMeta> = {
   whatsapp: { label: "WhatsApp", cssClass: "source-badge-whatsapp" },
   hook: { label: "Hook", cssClass: "source-badge-hook" },
   cron: { label: "Cron", cssClass: "source-badge-cron" },
+  init: { label: "Init", cssClass: "source-badge-init" },
   web: { label: "Web", cssClass: "source-badge-web" },
 };
 

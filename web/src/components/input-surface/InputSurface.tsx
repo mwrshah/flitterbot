@@ -16,7 +16,7 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { createId, parseUserMessageSource } from "~/lib/utils";
+import { createId } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
@@ -40,6 +40,7 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   web: "bg-orange-400",
   hook: "bg-violet-500",
   cron: "bg-cyan-500",
+  init: "bg-gray-400",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -47,6 +48,7 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   web: "Web",
   hook: "Hook",
   cron: "Cron",
+  init: "Init",
 };
 
 function formatTime(iso: string): string {
@@ -68,15 +70,12 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 
     if (item.kind === "message" && item.role === "user") {
       const msg = item as ChatTimelineMessage;
-      const parsed = msg.source
-        ? { source: msg.source, cleanContent: msg.content }
-        : parseUserMessageSource(msg.content);
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
-        source: parsed.source,
-        content: parsed.cleanContent,
+        source: msg.source ?? "web",
+        content: msg.content,
       });
       continue;
     }
@@ -290,15 +289,14 @@ export function InputSurface() {
         const content = message.content || "";
         if (message.role === "user") {
           if (content.trim()) {
-            const parsed = parseUserMessageSource(content);
             setTimeline((current) => [
               ...current,
               {
                 id: createId("user"),
                 kind: "message",
                 role: "user",
-                content: parsed.cleanContent,
-                source: parsed.source,
+                content,
+                source: (message.source as MessageSource) ?? "web",
                 createdAt: message.timestamp ?? new Date().toISOString(),
               },
             ]);

@@ -147,6 +147,7 @@ export function subscribeToPiSession(
           sessionId: session.sessionId,
           role,
           content,
+          source: role === "user" ? state.getSnapshot().currentItem?.source : undefined,
           timestamp: extractTimestamp(event.message, now),
         };
         broadcast(wsHub, payload);
