@@ -192,6 +192,18 @@ export class ControlSurfaceRuntime {
 
 		// Route to the correct session's queue
 		const target = this.resolveTargetSession(input, item);
+
+		// Steer bypass: if the queue is busy and the session is actively streaming,
+		// deliver the steer directly to the running session instead of waiting in the queue.
+		if (item.deliveryMode === "steer" && target.queue.isBusy() && target.session.isStreaming) {
+			this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy, session streaming)`);
+			void target.session.prompt(formatPromptWithContext(item, target.role), {
+				streamingBehavior: "steer",
+				images: item.images,
+			});
+			return { ok: true, queued: true, queueDepth: target.queue.getDepth(), item };
+		}
+
 		const queueDepth = target.queue.enqueue(item);
 		this.log(`queued ${item.source} item ${item.id} → ${target.role}${target.workstreamId ? ` ws=${target.workstreamId}` : ""} depth=${queueDepth}`);
 
