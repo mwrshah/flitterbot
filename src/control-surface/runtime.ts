@@ -19,7 +19,7 @@ import type {
 import { openBlackboard, pingBlackboard, type BlackboardDatabase } from "../blackboard/db.ts";
 import { executeCloseWorkstream } from "./tools/close-workstream.ts";
 import { executeCreateWorktree } from "./tools/create-worktree.ts";
-import { resetAllWorkstreams } from "../blackboard/queries/workstreams.ts";
+import { listOpenWorkstreams, resetAllWorkstreams } from "../blackboard/queries/workstreams.ts";
 import {
 	touchPiPrompt,
 	updatePiSessionStatus,
@@ -199,9 +199,23 @@ export class ControlSurfaceRuntime {
 			if (!agentManaged && !isOwnPiSession) {
 				return { ok: true, filtered: true };
 			}
+			const cwd = pickString(payload, ["cwd"]);
+			let piSessionIdValue = pickString(payload, ["pi_session_id", "piSessionId", "AUTONOMA_PI_SESSION_ID"]);
+			let workstreamIdValue = pickString(payload, ["workstream_id", "workstreamId", "AUTONOMA_WORKSTREAM_ID"]);
+			if (cwd && !piSessionIdValue && !workstreamIdValue) {
+				const openWorkstreams = listOpenWorkstreams(this.blackboard);
+				const matchingWs = openWorkstreams.find(ws => ws.worktree_path && cwd.startsWith(ws.worktree_path));
+				if (matchingWs) {
+					const orchestrator = this.sessionManager.getByWorkstream(matchingWs.id);
+					if (orchestrator) {
+						piSessionIdValue = orchestrator.piSessionId;
+						workstreamIdValue = matchingWs.id;
+					}
+				}
+			}
 			insertSession(this.blackboard, {
 				session_id: sessionId,
-				cwd: pickString(payload, ["cwd"]),
+				cwd,
 				model: pickString(payload, ["model"]),
 				permission_mode: pickString(payload, ["permission_mode", "permissionMode"]),
 				source: pickString(payload, ["source"]),
@@ -211,8 +225,8 @@ export class ControlSurfaceRuntime {
 				tmux_session: pickString(payload, ["tmux_session", "tmuxSession", "AUTONOMA_TMUX_SESSION"]),
 				task_description: pickString(payload, ["task_description", "taskDescription", "AUTONOMA_TASK_DESCRIPTION"]),
 				todoist_task_id: pickString(payload, ["todoist_task_id", "todoistTaskId", "AUTONOMA_TODOIST_TASK_ID"]),
-				pi_session_id: pickString(payload, ["pi_session_id", "piSessionId", "AUTONOMA_PI_SESSION_ID"]),
-				workstream_id: pickString(payload, ["workstream_id", "workstreamId", "AUTONOMA_WORKSTREAM_ID"]),
+				pi_session_id: piSessionIdValue,
+				workstream_id: workstreamIdValue,
 			});
 		} else {
 			if (!isOwnPiSession) {
@@ -249,11 +263,21 @@ export class ControlSurfaceRuntime {
 		if (piSessionIdFromPayload) {
 			targetQueue = this.sessionManager.getByPiSessionId(piSessionIdFromPayload);
 		}
+		const ccSession = !targetQueue ? getSessionById(this.blackboard, sessionId) : undefined;
 		if (!targetQueue) {
 			// Fall back: look up pi_session_id from the sessions table
-			const ccSession = getSessionById(this.blackboard, sessionId);
 			if (ccSession?.piSessionId) {
 				targetQueue = this.sessionManager.getByPiSessionId(ccSession.piSessionId);
+			}
+		}
+		if (!targetQueue) {
+			const ccCwd = ccSession?.cwd || pickString(payload, ['cwd']);
+			if (ccCwd) {
+				const openWorkstreams = listOpenWorkstreams(this.blackboard);
+				const matchingWs = openWorkstreams.find(ws => ws.worktree_path && ccCwd.startsWith(ws.worktree_path));
+				if (matchingWs) {
+					targetQueue = this.sessionManager.getByWorkstream(matchingWs.id);
+				}
 			}
 		}
 		if (!targetQueue) {
