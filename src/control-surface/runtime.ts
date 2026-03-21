@@ -105,6 +105,16 @@ export class ControlSurfaceRuntime {
 		}
 
 		await this.sessionManager.createDefault(this.createCustomTools("default"));
+
+		// Rehydrate orchestrator sessions for open workstreams persisted in SQLite
+		const openWorkstreams = listOpenWorkstreams(this.blackboard);
+		for (const ws of openWorkstreams) {
+			await this.sessionManager.createOrchestrator(ws.id, ws.name, ws.repo_path ?? undefined, this.createCustomTools('orchestrator', ws.id));
+		}
+		if (openWorkstreams.length > 0) {
+			this.log(`rehydrated ${openWorkstreams.length} orchestrator(s) for open workstreams`);
+		}
+
 		await this.ensureWhatsAppDaemon();
 		await this.refreshWhatsAppStatus();
 		this.startMaintenanceLoop();
