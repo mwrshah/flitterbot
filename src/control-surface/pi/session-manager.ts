@@ -12,6 +12,7 @@ import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
 import { TurnQueue, type QueueItem } from "../queue/turn-queue.ts";
 import { readPiHistoryFromMessages } from "./history.ts";
+import type { PiHistoryItem } from "../../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import type { OrchestratorContext } from "./system-prompts/index.ts";
 
@@ -205,8 +206,12 @@ export class PiSessionManager {
 			"input",
 		);
 
+		// Skip the init couplet (init user message + assistant response)
+		const initEndIdx = findInitCoupletEnd(history.items);
+		const postInit = history.items.slice(initEndIdx);
+
 		// Take last 20 items
-		const recent = history.items.slice(-20);
+		const recent = postInit.slice(-20);
 		if (recent.length === 0) {
 			return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
 		}
@@ -295,6 +300,22 @@ export class PiSessionManager {
 
 		return managed;
 	}
+}
+
+/**
+ * Find the end of the init couplet in shaped history items.
+ * The init couplet is the first user message (e.g. "[init] User: /load2-w")
+ * and its assistant response (e.g. "Skills loaded: ...").
+ * Returns the index after the first assistant text message, or 0 if not found.
+ */
+function findInitCoupletEnd(items: PiHistoryItem[]): number {
+	for (let i = 0; i < items.length; i++) {
+		const item = items[i];
+		if (item.kind === "message" && item.role === "assistant" && item.content.trim()) {
+			return i + 1;
+		}
+	}
+	return 0;
 }
 
 /**
