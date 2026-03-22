@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import {
@@ -11,6 +11,9 @@ import { PiMessageList } from "./PiMessageList";
 import { PiStreamingMessage } from "./PiStreamingMessage";
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
+
+const emptySubscribe = () => () => {};
+const useIsClient = () => useSyncExternalStore(emptySubscribe, () => true, () => false);
 
 function connectionLabel(state: ConnectionState): string {
   switch (state) {
@@ -58,6 +61,7 @@ export function ChatPanel({
   connectionState,
   onSendMessage,
 }: ChatPanelProps) {
+  const isClient = useIsClient();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
@@ -158,9 +162,11 @@ export function ChatPanel({
               ))}
             </div>
           )}
-          <Badge variant={connectionVariant(connectionState)}>
-            {connectionLabel(connectionState)}
-          </Badge>
+          {isClient && (
+            <Badge variant={connectionVariant(connectionState)}>
+              {connectionLabel(connectionState)}
+            </Badge>
+          )}
         </div>
       </div>
 
