@@ -41,6 +41,13 @@ export class TurnQueue {
     if (this.stopped) {
       throw new Error("turn queue is stopped");
     }
+
+    // Steer messages bypass the queue and interrupt the current turn immediately
+    if (item.deliveryMode === "steer" && this.processing) {
+      void this.processItem(item).catch(() => {});
+      return this.items.length;
+    }
+
     this.items.push(item);
     this.emitDepth();
     void this.pump();
