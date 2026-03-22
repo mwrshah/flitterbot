@@ -31,8 +31,6 @@ export async function callGroqClassify(
 	apiKey: string,
 	prompt: string,
 ): Promise<ClassifyResult> {
-	console.log("[router] Groq classify prompt:\n%s", prompt);
-
 	const client = getClient(apiKey);
 
 	const response = await client.chat.completions.create({
@@ -48,7 +46,6 @@ export async function callGroqClassify(
 	});
 
 	const text = response.choices[0]?.message?.content;
-	console.log("[router] Groq raw response: %s", text ?? "(empty)");
 
 	if (!text) {
 		console.error("[router] Groq response missing content");
@@ -71,7 +68,7 @@ export async function callGroqClassify(
 		is_work_message: Boolean(parsed.is_work_message),
 		reasoning: parsed.reasoning || "",
 	};
-	console.log("[router] Groq classify result: %o", result);
+	console.log("── [router] classification ──\n%s\n── [/router] ──", JSON.stringify(result, null, 2));
 	return result;
 }
 

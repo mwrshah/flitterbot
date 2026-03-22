@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { getRouteApi } from "@tanstack/react-router";
 import type { StatusResponse } from "~/lib/types";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
@@ -24,7 +24,8 @@ export function WhatsAppControls({
 }: {
   status?: StatusResponse;
 }) {
-  const { apiClient } = useControlSurface();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
 
   const startMutation = useMutation({

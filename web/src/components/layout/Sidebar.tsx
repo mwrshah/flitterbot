@@ -1,6 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, getRouteApi } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
 import type { ConnectionState } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -111,7 +110,8 @@ export function Sidebar({
   connectionState: ConnectionState;
   onOpenSettings: () => void;
 }) {
-  const { apiClient } = useControlSurface();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
 
   const statusQuery = useQuery({
     queryKey: ["status"],

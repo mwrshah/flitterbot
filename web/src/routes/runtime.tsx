@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
 import { formatDuration } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
@@ -38,7 +37,7 @@ function MetaItem({
 }
 
 function RuntimePage() {
-  const { apiClient } = useControlSurface();
+  const { apiClient } = Route.useRouteContext();
 
   const statusQuery = useQuery({
     queryKey: ["status"],

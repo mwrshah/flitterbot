@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { getRouteApi } from "@tanstack/react-router";
 import type { TranscriptItem } from "~/lib/types";
 import { cn, formatDateTime, prettifyJson } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
@@ -109,7 +109,8 @@ function TranscriptRow({ item }: { item: TranscriptItem }) {
 }
 
 export function TranscriptViewer({ sessionId }: { sessionId: string }) {
-  const { apiClient } = useControlSurface();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
 
   const query = useInfiniteQuery({
     queryKey: ["transcript", sessionId],

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { TranscriptViewer } from "~/components/sessions/TranscriptViewer";
-import { useControlSurface } from "~/hooks/use-control-surface";
 import { cn } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import type { SessionSummary } from "~/lib/types";
@@ -30,7 +29,7 @@ function statusVariant(
 
 function WorkstreamSessionsPage() {
   const { workstreamId } = Route.useParams();
-  const { apiClient } = useControlSurface();
+  const { apiClient } = Route.useRouteContext();
   const [layout, setLayout] = useState<LayoutMode>("grid");
 
   const sessionsQuery = useQuery({

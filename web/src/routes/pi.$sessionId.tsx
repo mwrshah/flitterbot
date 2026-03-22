@@ -1,22 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat/ChatPanel";
-import { usePiSession } from "./pi.route";
+import { fetchPiHistory } from "~/server/pi";
+import { mergeTimelines } from "./pi.route";
+import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import type { ChatTimelineItem } from "~/lib/types";
 
 export const Route = createFileRoute("/pi/$sessionId")({
+  loader: async ({ params }) => {
+    const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } });
+    return { history: items as ChatTimelineItem[] };
+  },
+  errorComponent: ({ error }) => (
+    <div className="flex items-center justify-center h-full p-8 text-destructive">
+      <p>Failed to load session history: {String(error)}</p>
+    </div>
+  ),
   component: PiSessionRoute,
 });
 
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
-  const { getSessionState, sendMessage, connectionState } = usePiSession();
-  const session = getSessionState(sessionId);
+  const { history } = Route.useLoaderData();
+  const snapshot = usePiSessionStore();
+  const accum = piSessionStore.getSessionAccum(sessionId);
+  const sendMessage = piSessionStore.getSendMessage();
 
   return (
     <ChatPanel
-      timeline={session.timeline}
-      streamingText={session.streamingText}
-      statusPills={session.statusPills}
-      connectionState={connectionState}
+      timeline={mergeTimelines(history, accum.appendedItems)}
+      streamingText={accum.streamingText}
+      statusPills={accum.statusPills}
+      connectionState={snapshot.connectionState}
       onSendMessage={(text, deliveryMode, images) =>
         sendMessage(text, deliveryMode, images, sessionId)
       }

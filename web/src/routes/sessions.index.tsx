@@ -1,14 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { SessionList } from "~/components/sessions/SessionList";
-import { useControlSurface } from "~/hooks/use-control-surface";
 
 export const Route = createFileRoute("/sessions/")({
   component: SessionsIndexPage,
 });
 
 function SessionsIndexPage() {
-  const { apiClient } = useControlSurface();
+  const { apiClient } = Route.useRouteContext();
 
   const sessionsQuery = useQuery({
     queryKey: ["sessions"],

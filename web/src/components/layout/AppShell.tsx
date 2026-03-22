@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "@tanstack/react-router";
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { Outlet, getRouteApi } from "@tanstack/react-router";
 import type { ConnectionState } from "~/lib/types";
 import { Sidebar } from "./Sidebar";
 import { SettingsDrawer } from "./SettingsDrawer";
 
+const rootApi = getRouteApi("__root__");
+
 export function AppShell() {
-  const { wsClient } = useControlSurface();
+  const { wsClient } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     wsClient.connectionState,

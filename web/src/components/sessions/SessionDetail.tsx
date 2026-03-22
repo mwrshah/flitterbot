@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { getRouteApi } from "@tanstack/react-router";
 import type {
   SessionDetail as SessionDetailType,
   TmuxSessionInspection,
@@ -53,7 +53,8 @@ export function SessionDetail({
   session: SessionDetailType;
   tmux?: TmuxSessionInspection | null;
 }) {
-  const { apiClient } = useControlSurface();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [resultMessage, setResultMessage] = useState<string | null>(null);

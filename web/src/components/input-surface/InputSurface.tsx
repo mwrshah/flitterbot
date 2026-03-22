@@ -7,7 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { getRouteApi } from "@tanstack/react-router";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -231,7 +231,8 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 /* ── Main Component ── */
 
 export function InputSurface() {
-  const { apiClient, wsClient } = useControlSurface();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient, wsClient } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");

@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SessionDetail } from "~/components/sessions/SessionDetail";
 import { SessionList } from "~/components/sessions/SessionList";
 import { TranscriptViewer } from "~/components/sessions/TranscriptViewer";
-import { useControlSurface } from "~/hooks/use-control-surface";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
   component: SessionDetailPage,
@@ -11,7 +10,7 @@ export const Route = createFileRoute("/sessions/$sessionId")({
 
 function SessionDetailPage() {
   const { sessionId } = Route.useParams();
-  const { apiClient } = useControlSurface();
+  const { apiClient } = Route.useRouteContext();
 
   const sessionsQuery = useQuery({
     queryKey: ["sessions"],

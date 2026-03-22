@@ -1,3 +1,13 @@
+/* ── JSON-safe value (no `unknown`) ── */
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 /* ── Chat timeline ── */
 
 export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init";
@@ -27,8 +37,8 @@ export type ChatTimelineTool = {
   tool: string;
   phase: "start" | "end";
   toolUseId?: string;
-  args?: unknown;
-  result?: unknown;
+  args?: JsonValue;
+  result?: JsonValue;
   isError?: boolean;
   createdAt: string;
 };

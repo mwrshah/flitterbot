@@ -1,7 +1,10 @@
-import { useControlSurface } from "~/hooks/use-control-surface";
+import { getRouteApi } from "@tanstack/react-router";
 import { useTheme } from "~/hooks/use-theme";
+import { useSettings } from "~/lib/settings-store";
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Input";
+
+const rootApi = getRouteApi("__root__");
 
 const themeOptions = [
   { value: "light" as const, label: "Light", icon: "☀️" },
@@ -16,7 +19,9 @@ export function SettingsDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  const { settings, updateSettings } = useControlSurface();
+  const { settingsStore } = rootApi.useRouteContext();
+  const settings = useSettings(settingsStore);
+  const updateSettings = settingsStore.set;
   const { theme, setTheme } = useTheme();
 
   if (!open) return null;
