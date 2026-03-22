@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useControlSurface } from "~/hooks/use-control-surface";
 import {
   timelineToAgentMessages,
   buildStreamingAssistantMessage,
@@ -7,19 +6,16 @@ import {
 } from "~/lib/pi-web-ui-bridge";
 import type {
   ChatTimelineItem,
-  ChatTimelineTool,
   ConnectionState,
   DeliveryMode,
   ImageAttachment,
 } from "~/lib/types";
-import type { MessageSource } from "~/lib/types";
-import { createId, extractToolName } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import { PiMessageList } from "./PiMessageList";
 import { PiStreamingMessage } from "./PiStreamingMessage";
 
-const initialTimeline: ChatTimelineItem[] = [];
+type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 function connectionLabel(state: ConnectionState): string {
   switch (state) {
@@ -50,34 +46,32 @@ function connectionVariant(
   }
 }
 
-type StatusPill = { id: string; label: string; variant?: "info" | "error" };
+type ChatPanelProps = {
+  timeline: ChatTimelineItem[];
+  streamingText: string | null;
+  statusPills: StatusPill[];
+  connectionState: ConnectionState;
+  onSendMessage: (
+    text: string,
+    deliveryMode: DeliveryMode,
+    images?: ImageAttachment[],
+  ) => Promise<void>;
+};
 
-export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
-  const { apiClient, wsClient } = useControlSurface();
+export function ChatPanel({
+  timeline,
+  streamingText,
+  statusPills,
+  connectionState,
+  onSendMessage,
+}: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
-
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const [timeline, setTimeline] = useState<ChatTimelineItem[]>(initialTimeline);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    wsClient.connectionState,
-  );
   const [isSending, setIsSending] = useState(false);
-  const [streamingText, setStreamingText] = useState<string | null>(null);
-  const [statusPills, setStatusPills] = useState<StatusPill[]>([]);
-  const activeAssistantId = useRef<string | null>(null);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
-
-  const addPill = (pill: StatusPill) =>
-    setStatusPills((prev) => {
-      const next = [...prev.filter((p) => p.id !== pill.id), pill];
-      return next.slice(-6);
-    });
-
-  const removePill = (id: string) =>
-    setStatusPills((prev) => prev.filter((p) => p.id !== id));
 
   const agentMessages = useMemo(
     () => timelineToAgentMessages(timeline),
@@ -93,188 +87,6 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
     () => (streamingText ? buildStreamingAssistantMessage(streamingText) : null),
     [streamingText],
   );
-
-  // Scroll viewport to bottom (used on mount and after history hydration)
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = viewportRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  }, []);
-
-  // Hydrate from history on mount, then scroll to bottom
-  useEffect(() => {
-    let cancelled = false;
-    void apiClient
-      .getPiHistory(undefined, piSessionId)
-      .then((history) => {
-        if (cancelled) return;
-        setTimeline((current) => [...history.items, ...current]);
-        scrollToBottom();
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, piSessionId, scrollToBottom]);
-
-  // Subscribe to this Pi session's events on the server
-  useEffect(() => {
-    if (!piSessionId) return;
-    wsClient.subscribeSession(piSessionId);
-    return () => {
-      wsClient.unsubscribeSession(piSessionId);
-    };
-  }, [wsClient, piSessionId]);
-
-  // WebSocket events
-  useEffect(() => {
-    const unsubscribe = wsClient.subscribe((message) => {
-      if (message.type === "connected") {
-        addPill({
-          id: "ws-connected",
-          label: `WS ${message.clientId.slice(0, 8)}`,
-        });
-        return;
-      }
-
-      if (message.type === "queue_item_start") {
-        const sourceLabel =
-          message.item.source === "whatsapp" ? "WhatsApp" :
-          message.item.source === "hook" ? "Hook" :
-          message.item.source === "cron" ? "Cron" : "Web";
-        addPill({
-          id: `processing-${message.item.id}`,
-          label: `Processing ${sourceLabel} message`,
-          variant: message.item.source !== "web" ? "info" : undefined,
-        });
-        return;
-      }
-
-      if (message.type === "queue_item_end") {
-        removePill(`processing-${message.itemId}`);
-        if (message.error) {
-          addPill({
-            id: `error-${message.itemId}`,
-            label: message.error,
-            variant: "error",
-          });
-        }
-        return;
-      }
-
-      if (message.type === "text_delta") {
-        setStreamingText((prev) => (prev ?? "") + message.delta);
-        return;
-      }
-
-      if (message.type === "message_end") {
-        const content = message.content || "";
-
-        if (message.role === "user") {
-          if (content.trim()) {
-            setTimeline((current) => [
-              ...current,
-              {
-                id: createId("user"),
-                kind: "message",
-                role: "user",
-                content,
-                source: (message.source as MessageSource) ?? "web",
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ]);
-          }
-          return;
-        }
-
-        setStreamingText(null);
-        activeAssistantId.current = null;
-        if (content.trim()) {
-          setTimeline((current) => [
-            ...current,
-            {
-              id: createId("assistant"),
-              kind: "message",
-              role: "assistant",
-              content,
-              createdAt: message.timestamp ?? new Date().toISOString(),
-            },
-          ]);
-        }
-        return;
-      }
-
-      if (
-        message.type === "tool_execution_start" ||
-        message.type === "tool_execution_end"
-      ) {
-        const eventRecord =
-          message.event && typeof message.event === "object"
-            ? (message.event as Record<string, unknown>)
-            : undefined;
-
-        const toolEvent: ChatTimelineTool = {
-          id: createId("tool"),
-          kind: "tool",
-          tool: message.tool || extractToolName(message.event),
-          phase: message.type === "tool_execution_start" ? "start" : "end",
-          toolUseId: message.toolUseId,
-          args:
-            message.type === "tool_execution_start"
-              ? (message.args ??
-                eventRecord?.arguments ??
-                eventRecord?.args ??
-                eventRecord?.toolArguments)
-              : undefined,
-          result:
-            message.type === "tool_execution_end"
-              ? (message.result ??
-                eventRecord?.result ??
-                eventRecord?.output ??
-                eventRecord?.toolResult)
-              : undefined,
-          isError:
-            message.type === "tool_execution_end"
-              ? message.isError
-              : undefined,
-          createdAt: message.timestamp ?? new Date().toISOString(),
-        };
-        setTimeline((current) => [...current, toolEvent]);
-        return;
-      }
-
-      if (message.type === "turn_end") {
-        setStreamingText(null);
-        activeAssistantId.current = null;
-        setTimeline((current) => [
-          ...current,
-          {
-            id: createId("divider-turn-end"),
-            kind: "divider",
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        return;
-      }
-
-      if (message.type === "error") {
-        addPill({
-          id: createId("error"),
-          label: message.message,
-          variant: "error",
-        });
-      }
-    });
-
-    const unsubscribeConnection = wsClient.subscribeConnection(
-      setConnectionState,
-    );
-    return () => {
-      unsubscribe();
-      unsubscribeConnection();
-    };
-  }, [wsClient, piSessionId]);
 
   // Track whether the user is at the bottom of the scroll container
   const handleScroll = useCallback(() => {
@@ -298,6 +110,14 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
     if (!el || !isAtBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [agentMessages, streamingText, timeline]);
+
+  // Scroll to bottom on mount
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const el = viewportRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, []);
 
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -330,18 +150,8 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
     setPendingImages([]);
     isAtBottomRef.current = true;
 
-    // No optimistic update — wait for the server's decorated message via WebSocket.
-
     try {
-      await wsClient.sendMessage(text || "(image)", deliveryMode, images, piSessionId);
-    } catch {
-      await apiClient.sendMessage({
-        text: text || "(image)",
-        source: "web",
-        deliveryMode,
-        images,
-        targetSessionId: piSessionId,
-      });
+      await onSendMessage(text || "(image)", deliveryMode, images);
     } finally {
       setIsSending(false);
     }
