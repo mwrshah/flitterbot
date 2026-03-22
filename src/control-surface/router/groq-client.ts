@@ -27,49 +27,73 @@ export type ClassifyResult = {
 	reasoning: string;
 };
 
+const MAX_RETRIES = 3;
+
 export async function callGroqClassify(
 	apiKey: string,
 	prompt: string,
 ): Promise<ClassifyResult> {
 	const client = getClient(apiKey);
 
-	const response = await client.chat.completions.create({
-		model: MODEL_ID,
-		max_tokens: 1024,
-		response_format: { type: "json_object" },
-		messages: [
-			{
-				role: "user",
-				content: prompt,
-			},
-		],
-	});
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+		try {
+			const response = await client.chat.completions.create({
+				model: MODEL_ID,
+				max_tokens: 1024,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "user",
+						content: prompt,
+					},
+				],
+			});
 
-	const text = response.choices[0]?.message?.content;
+			const text = response.choices[0]?.message?.content;
 
-	if (!text) {
-		console.error("[router] Groq response missing content");
-		return { workstream_id: null, new_workstream_name: null, is_work_message: false, reasoning: "" };
+			if (!text) {
+				console.warn("[router] Groq response missing content (attempt %d/%d)", attempt, MAX_RETRIES);
+				lastError = new Error("Groq response missing content");
+				continue;
+			}
+
+			let parsed: ClassifyResult;
+			try {
+				parsed = JSON.parse(text) as ClassifyResult;
+			} catch (parseError) {
+				console.warn(
+					"[router] Failed to parse Groq JSON (attempt %d/%d): %s",
+					attempt, MAX_RETRIES,
+					parseError instanceof Error ? parseError.message : String(parseError),
+				);
+				lastError = parseError;
+				continue;
+			}
+
+			const result = {
+				workstream_id: parsed.workstream_id || null,
+				new_workstream_name: parsed.new_workstream_name || null,
+				is_work_message: Boolean(parsed.is_work_message),
+				reasoning: parsed.reasoning || "",
+			};
+			if (attempt > 1) {
+				console.log("[router] Groq classification succeeded on attempt %d", attempt);
+			}
+			console.log("── [router] classification ──\n%s\n── [/router] ──", JSON.stringify(result, null, 2));
+			return result;
+		} catch (apiError) {
+			console.warn(
+				"[router] Groq API error (attempt %d/%d): %s",
+				attempt, MAX_RETRIES,
+				apiError instanceof Error ? apiError.message : String(apiError),
+			);
+			lastError = apiError;
+		}
 	}
 
-	let parsed: ClassifyResult;
-	try {
-		parsed = JSON.parse(text) as ClassifyResult;
-	} catch (error) {
-		console.error(
-			`[router] Failed to parse Groq response as JSON: ${error instanceof Error ? error.message : String(error)}`,
-		);
-		return { workstream_id: null, new_workstream_name: null, is_work_message: false, reasoning: "" };
-	}
-
-	const result = {
-		workstream_id: parsed.workstream_id || null,
-		new_workstream_name: parsed.new_workstream_name || null,
-		is_work_message: Boolean(parsed.is_work_message),
-		reasoning: parsed.reasoning || "",
-	};
-	console.log("── [router] classification ──\n%s\n── [/router] ──", JSON.stringify(result, null, 2));
-	return result;
+	// All retries exhausted
+	throw lastError;
 }
 
 /** Reset cached client (for testing or key rotation). */
