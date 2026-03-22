@@ -272,7 +272,7 @@ export class PiSessionManager {
 	}
 
 	private formatWorkstreamMessage(message: string, name: string, id: string): string {
-		return `[Workstream: "${name}" (${id})] [NEW]\n${message}`;
+		return `[Workstream: "${name}" (${id})] [NEW]\n${message}\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
 	}
 
 	private buildManagedSession(

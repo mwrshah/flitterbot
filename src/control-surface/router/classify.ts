@@ -133,7 +133,7 @@ ${projectBlock}
 8. Use the recent conversation snippets to understand context when deciding if the message relates to an existing workstream. Agent messages show what the assistant last said to the user — short/ambiguous user replies (e.g. "yes", "sure", "do it") are almost certainly responding to the workstream that sent the most recent agent message (marked with "← last agent response").
 9. Session management commands (kill tmux, close sessions, check status, restart daemon, close tmux windows, quit claude) are NOT work — set is_work_message to false. These are infrastructure meta-operations.
 10. Cron health-check messages (containing "Cron idle check", "Cron stale session check", or similar automated system messages) are NOT work — set is_work_message to false.
-11. Workstreams are about repository-scoped coding/engineering work (features, bugs, investigations in a project), not meta-operations on the Autonoma system itself or general task management.
+11. Workstreams are about repository-scoped coding/engineering work (features, bugs, investigations in a project) — including work on Autonoma's own code (prompts, router, session manager, etc.), since Autonoma is itself a known project. Rules 9-10 already exclude session management commands and cron checks; everything else that changes code in a known project IS work.
 
 ## Response format
 Respond with ONLY a JSON object containing four fields: workstream_id, new_workstream_name, is_work_message, and reasoning. No other text or explanation. Example:

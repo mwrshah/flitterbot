@@ -325,6 +325,9 @@ export function InputSurface() {
       }
     });
 
+    // Subscribe to ALL sessions so the server delivers session-scoped events
+    // (message_end, pi_surfaced) to this client. Without this, hub.ts skips
+    // clients with zero subscriptions.
     wsClient.subscribeSession("*");
 
     const unsubscribeConnection = wsClient.subscribeConnection(
