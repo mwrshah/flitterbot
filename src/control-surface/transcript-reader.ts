@@ -1,17 +1,14 @@
 import fs from "node:fs";
 
-const DEFAULT_TAIL_BYTES = 20_000;
-const DEFAULT_MAX_CHARS = 500;
+const DEFAULT_TAIL_BYTES = 50_000;
 
 /**
  * Extract the last assistant text from a CC transcript JSONL file.
  * Reads only the tail of the file (last `maxBytes`) to avoid loading multi-MB transcripts.
- * Returns the text content capped at `maxChars`, or undefined if not found.
  */
 export function extractLastAssistantText(
 	transcriptPath: string,
 	maxBytes: number = DEFAULT_TAIL_BYTES,
-	maxChars: number = DEFAULT_MAX_CHARS,
 ): string | undefined {
 	let fd: number | undefined;
 	try {
@@ -46,7 +43,7 @@ export function extractLastAssistantText(
 			const text = extractTextFromContent(message.content);
 			if (!text) continue;
 
-			return text.length > maxChars ? text.slice(0, maxChars) + "..." : text;
+			return text;
 		}
 
 		return undefined;
