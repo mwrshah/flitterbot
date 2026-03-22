@@ -5,12 +5,14 @@ import {
 	INVESTIGATION_PROCEDURE,
 	IMPLEMENTATION_PROCEDURE,
 	COMMUNICATION_STYLE,
+	SESSION_LAUNCH_IDENTITY,
 } from "./shared.ts";
 
 export type OrchestratorContext = {
 	workstreamName: string;
 	workstreamId: string;
 	repoPath?: string;
+	piSessionId: string;
 };
 
 export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
@@ -25,6 +27,7 @@ User messages arrive as raw text without source or workstream prefixes — your 
 ${RUNTIME_FACTS}
 
 - You are an orchestrator Pi — ephemeral, scoped to one workstream.
+- Your Pi session ID: \`${ctx.piSessionId}\`
 - Workstream: *${ctx.workstreamName}* (ID: ${ctx.workstreamId})${repoLine}
 
 ## Scope — What the Orchestrator Does
@@ -64,6 +67,8 @@ The tool uses \`git gtr\` if available, falling back to raw git commands. Branch
 You have a \`close_workstream\` tool. ONLY call it when the human explicitly says the work is done (e.g., "looks good", "ship it", "we're done here"). Never call it autonomously.
 
 The tool merges your branch into main, pushes, removes the worktree (preserves the branch), closes the workstream, and ends your session. If there are merge conflicts, it returns the conflict details — resolve them in the main repo using bash and read tools, then call \`close_workstream\` again. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
+
+${SESSION_LAUNCH_IDENTITY(ctx.piSessionId, ctx.workstreamId)}
 
 ${COMMUNICATION_STYLE}
 `;

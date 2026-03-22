@@ -15,8 +15,11 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
 import type { AutonomaConfig } from "../../config/load-config.ts";
-import { DEFAULT_AGENT_PROMPT, buildOrchestratorPrompt } from "./system-prompts/index.ts";
+import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "./system-prompts/index.ts";
 import type { OrchestratorContext } from "./system-prompts/index.ts";
+
+/** Orchestrator context as provided by the caller — piSessionId is injected internally. */
+type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
 
 const HOME = os.homedir();
 const WORKING_DIR = path.join(HOME, "development");
@@ -27,12 +30,19 @@ type CreateAutonomaAgentOptions = {
 	config: AutonomaConfig;
 	customTools: Array<any>;
 	role?: PiRole;
-	orchestratorContext?: OrchestratorContext;
+	orchestratorContext?: OrchestratorInput;
 };
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
 	const { config, customTools, role = "default", orchestratorContext } = options;
-	const systemPrompt = resolveSystemPrompt(role, orchestratorContext);
+
+	// Create SessionManager early so we can read the piSessionId before building the prompt.
+	// SessionManager generates its sessionId in the constructor (via newSession()),
+	// and createAgentSession reuses this same instance — so the IDs match.
+	const sessionManager = SessionManager.create(WORKING_DIR, config.controlSurfaceSessionsDir);
+	const piSessionId = sessionManager.getSessionId();
+
+	const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
 	ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
 	// Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
 	// ~/.autonoma/control-surface/agent/auth.json is symlinked here, but if someone
@@ -70,7 +80,7 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
 		tools: [createReadTool(WORKING_DIR), createBashTool(WORKING_DIR), createGrepTool(WORKING_DIR)],
 		customTools,
 		resourceLoader,
-		sessionManager: SessionManager.create(WORKING_DIR, config.controlSurfaceSessionsDir),
+		sessionManager,
 		settingsManager,
 		authStorage,
 		modelRegistry,
@@ -85,12 +95,12 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
 	};
 }
 
-function resolveSystemPrompt(role: PiRole, ctx?: OrchestratorContext): string {
+function resolveSystemPrompt(role: PiRole, piSessionId: string, ctx?: OrchestratorInput): string {
 	if (role === "orchestrator") {
 		if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-		return buildOrchestratorPrompt(ctx);
+		return buildOrchestratorPrompt({ ...ctx, piSessionId });
 	}
-	return DEFAULT_AGENT_PROMPT;
+	return buildDefaultAgentPrompt(piSessionId);
 }
 
 function ensurePromptFile(promptPath: string, content: string): void {

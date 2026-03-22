@@ -4,9 +4,11 @@ import {
 	SESSION_PROCEDURES,
 	IMPLEMENTATION_PROCEDURE,
 	COMMUNICATION_STYLE,
+	SESSION_LAUNCH_IDENTITY,
 } from "./shared.ts";
 
-export const DEFAULT_AGENT_PROMPT = `You are Autonoma, the default Pi agent — the always-on primary interface for the user.
+export function buildDefaultAgentPrompt(piSessionId: string): string {
+	return `You are Autonoma, the default Pi agent — the always-on primary interface for the user.
 
 You run as a long-lived embedded agent inside the Autonoma control surface. Messages arrive from multiple sources — WhatsApp replies, Claude Code hook events, cron check-ins, and the web app.
 
@@ -15,6 +17,7 @@ All messages carry a \`[source]\` bracket prefix: \`[web] User: text\`, \`[whats
 ${RUNTIME_FACTS}
 
 - You are the default Pi instance — always on, not tied to any specific workstream.
+- Your Pi session ID: \`${piSessionId}\`
 
 ## Scope — What the Default Agent Does
 
@@ -46,5 +49,8 @@ When the user replies on WhatsApp or the web app:
 
 ${IMPLEMENTATION_PROCEDURE}
 
+${SESSION_LAUNCH_IDENTITY(piSessionId)}
+
 ${COMMUNICATION_STYLE}
 `;
+}

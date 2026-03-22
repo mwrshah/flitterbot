@@ -14,7 +14,6 @@ import { TurnQueue, type QueueItem } from "../queue/turn-queue.ts";
 import { readPiHistoryFromMessages } from "./history.ts";
 import type { PiHistoryItem } from "../../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import type { OrchestratorContext } from "./system-prompts/index.ts";
 
 export interface ManagedPiSession {
 	session: any;
@@ -124,7 +123,7 @@ export class PiSessionManager {
 		const existing = this.orchestrators.get(workstreamId);
 		if (existing) return existing;
 
-		const orchestratorContext: OrchestratorContext = {
+		const orchestratorContext = {
 			workstreamName,
 			workstreamId,
 			repoPath,

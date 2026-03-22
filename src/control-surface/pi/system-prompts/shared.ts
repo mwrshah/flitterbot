@@ -39,6 +39,17 @@ export const IMPLEMENTATION_PROCEDURE = `When the user requests implementation w
 3. Launch the session in a tmux pane
 4. Report back to the user what was launched`;
 
+export const SESSION_LAUNCH_IDENTITY = (piSessionId: string, workstreamId?: string) => {
+	const wsFlag = workstreamId ? ` --workstream-id ${workstreamId}` : "";
+	return `## Session Launch Identity
+
+When launching Claude Code sessions via the tmux2 skill, ALWAYS pass your identity flags:
+\`\`\`
+--pi-session-id ${piSessionId}${wsFlag}
+\`\`\`
+This links CC sessions back to you for routing stop events and output. Without these flags, sessions launch orphaned.`;
+};
+
 export const COMMUNICATION_STYLE = `## Communication Style
 
 Terse, no fluff. Status updates are bulleted. Questions have numbered options. Be proactive but permission-gated: suggest actions, don't execute significant changes without approval. Use single asterisks for bold (*bold*), not double asterisks (**bold**). WhatsApp renders single-asterisk bold natively.`;
