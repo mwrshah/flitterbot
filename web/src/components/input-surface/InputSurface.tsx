@@ -51,7 +51,7 @@ function parseWorkstreamPrefix(
 ): { workstreamName: string; cleanContent: string } | null {
   const match = content.match(WORKSTREAM_PREFIX_RE);
   if (!match) return null;
-  return { workstreamName: match[1], cleanContent: content.slice(match[0].length) };
+  return { workstreamName: match[1] ?? "", cleanContent: content.slice(match[0]!.length) };
 }
 
 function formatTime(iso: string): string {

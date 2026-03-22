@@ -255,7 +255,7 @@ export class PiSessionManager {
     let surfacedCount = 0;
     let startIdx = allMessages.length;
     for (let i = allMessages.length - 1; i >= 1; i--) {
-      const role = allMessages[i].role;
+      const role = allMessages[i]!.role;
       if (role === "user" || role === "assistant") surfacedCount++;
       if (surfacedCount >= 20) {
         startIdx = i;
@@ -382,7 +382,7 @@ export class PiSessionManager {
 function findInitCoupletEnd(items: PiHistoryItem[]): number {
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item.kind === "message" && item.role === "assistant" && item.content.trim()) {
+    if (item && item.kind === "message" && item.role === "assistant" && item.content.trim()) {
       return i + 1;
     }
   }

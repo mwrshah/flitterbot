@@ -115,6 +115,13 @@ export interface PiSurfacedWebSocketEvent {
   workstreamName?: string;
 }
 
+export interface WorkstreamsChangedWebSocketEvent {
+  type: "workstreams_changed";
+  reason: "created" | "reopened" | "closed";
+  workstreamId: string;
+  workstreamName?: string;
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -124,4 +131,5 @@ export type ControlSurfaceWebSocketServerEvent =
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionEndWebSocketEvent
   | TurnEndWebSocketEvent
-  | PiSurfacedWebSocketEvent;
+  | PiSurfacedWebSocketEvent
+  | WorkstreamsChangedWebSocketEvent;

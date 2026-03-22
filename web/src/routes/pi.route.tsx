@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Badge } from "~/components/ui/Badge";
@@ -59,18 +59,27 @@ export function mergeTimelines(
 
 function PiLayoutRoute() {
   const { apiClient, wsClient } = Route.useRouteContext();
+  const queryClient = useQueryClient();
 
   // Reset the store on mount so we start fresh
   useEffect(() => {
     resetPiSessionStore();
   }, []);
 
-  // Status query — seeded by loader, polls client-side
+  // Status query — seeded by loader, invalidated via WebSocket
   const statusQuery = useQuery({
     ...statusQueryOptions,
-    refetchInterval: 5_000,
     retry: 1,
   });
+
+  // Invalidate status query when workstreams change via WebSocket
+  useEffect(() => {
+    return wsClient.subscribe((message: WsMessage) => {
+      if (message.type === "workstreams_changed") {
+        queryClient.invalidateQueries({ queryKey: ["status"] });
+      }
+    });
+  }, [wsClient, queryClient]);
 
   const orchestrators = statusQuery.data?.pi?.orchestrators ?? [];
   const defaultPi = statusQuery.data?.pi?.default;

@@ -197,8 +197,8 @@ export function subscribeToPiSession(
           broadcast(
             wsHub,
             isLast
-              ? pendingAssistantMessages[i]
-              : { ...pendingAssistantMessages[i], intermediate: true },
+              ? pendingAssistantMessages[i]!
+              : { ...pendingAssistantMessages[i]!, intermediate: true },
           );
         }
         pendingAssistantMessages.length = 0;

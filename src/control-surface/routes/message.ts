@@ -69,6 +69,14 @@ async function routeMessage(
     if (result.workstream) {
       meta.workstream_id = result.workstream.id;
       meta.workstream_name = result.workstream.name;
+      if (result.action === "created" || result.action === "reopened") {
+        runtime.wsHub.broadcast({
+          type: "workstreams_changed",
+          reason: result.action,
+          workstreamId: result.workstream.id,
+          workstreamName: result.workstream.name,
+        });
+      }
     }
     return { metadata: meta };
   } catch (error) {

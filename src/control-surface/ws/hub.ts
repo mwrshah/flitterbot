@@ -199,8 +199,8 @@ function decodeFrame(
   buffer: Buffer,
 ): { opcode: number; payload: Buffer; bytesConsumed: number } | undefined {
   if (buffer.length < 2) return undefined;
-  const first = buffer[0];
-  const second = buffer[1];
+  const first = buffer[0]!;
+  const second = buffer[1]!;
   const opcode = first & 0x0f;
   const masked = (second & 0x80) !== 0;
   let offset = 2;
@@ -222,7 +222,7 @@ function decodeFrame(
     const mask = buffer.subarray(offset, offset + 4);
     const decoded = Buffer.alloc(payload.length);
     for (let index = 0; index < payload.length; index += 1) {
-      decoded[index] = payload[index] ^ mask[index % 4];
+      decoded[index] = payload[index]! ^ mask[index % 4]!;
     }
     payload = decoded;
   }

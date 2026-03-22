@@ -58,7 +58,7 @@ export function MessageInput({
       const match = value.match(/^\/(\S*)$/);
       if (match && skills?.length) {
         setPickerOpen(true);
-        setPickerFilter(match[1]);
+        setPickerFilter(match[1] ?? "");
         setSelectedSkill("");
       } else {
         setPickerOpen(false);
@@ -84,7 +84,7 @@ export function MessageInput({
         if (selectedSkill) {
           handleSkillSelect(selectedSkill);
         } else if (filteredSkills.length > 0) {
-          handleSkillSelect(filteredSkills[0].name);
+          handleSkillSelect(filteredSkills[0]!.name);
         }
         return;
       }
@@ -98,7 +98,7 @@ export function MessageInput({
           nextIndex = currentIndex > 0 ? currentIndex - 1 : filteredSkills.length - 1;
         }
         if (filteredSkills[nextIndex]) {
-          setSelectedSkill(filteredSkills[nextIndex].name);
+          setSelectedSkill(filteredSkills[nextIndex]!.name);
         }
         return;
       }

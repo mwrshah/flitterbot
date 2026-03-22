@@ -692,7 +692,7 @@ export class ControlSurfaceRuntime {
           timestamp: new Date().toISOString(),
           sessionId: managed.piSessionId,
           workstreamId: managed.workstreamId ?? undefined,
-          workstreamName: managed.workstreamName,
+          workstreamName: managed.workstreamName ?? undefined,
         });
       } catch (error) {
         this.log(
@@ -874,6 +874,13 @@ export class ControlSurfaceRuntime {
             piSessId,
             params.workstream_id,
           );
+          if (result.ok) {
+            this.wsHub.broadcast({
+              type: "workstreams_changed",
+              reason: "closed",
+              workstreamId: params.workstream_id,
+            });
+          }
           return { content: [{ type: "text", text: result.message }], details: result };
         },
       });
@@ -1054,6 +1061,14 @@ export class ControlSurfaceRuntime {
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;
             routerMeta.workstream_name = result.workstream.name;
+            if (result.action === "created" || result.action === "reopened") {
+              this.wsHub.broadcast({
+                type: "workstreams_changed",
+                reason: result.action,
+                workstreamId: result.workstream.id,
+                workstreamName: result.workstream.name,
+              });
+            }
           }
         } catch (error) {
           this.log(

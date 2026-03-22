@@ -75,6 +75,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
         <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static inline script for theme flash prevention
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem("autonoma-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light":t;if(d==="dark")document.documentElement.classList.add("dark");document.documentElement.style.colorScheme=d})()`,
           }}

@@ -200,7 +200,7 @@ export async function persistInboundMessage(
   db: SqlDatabase,
   message: WAMessage,
 ): Promise<{ body?: string; contextRef?: string; rowId?: number }> {
-  const waMessageId = message.key.id;
+  const waMessageId = message.key.id ?? undefined;
   const remoteJid = message.key.remoteJid ?? resolveRecipientJid();
 
   // Extract body first — no DB needed for this check

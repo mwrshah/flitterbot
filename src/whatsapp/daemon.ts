@@ -404,7 +404,7 @@ class WhatsAppDaemon {
       await delay(config.typingDelayMs);
       const result = await this.socket?.sendMessage(remoteJid, { text });
       await this.socket?.sendPresenceUpdate("paused", remoteJid);
-      return { id: result?.key.id };
+      return { id: result?.key.id ?? undefined };
     };
 
     try {

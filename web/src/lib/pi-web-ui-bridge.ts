@@ -54,6 +54,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
   for (let i = 0; i < timeline.length; i++) {
     if (consumed.has(i)) continue;
     const item = timeline[i];
+    if (!item) continue;
 
     if (item.kind === "divider") continue;
 
@@ -86,6 +87,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
       const toolCalls: ToolCall[] = [];
       for (let j = i + 1; j < timeline.length; j++) {
         const next = timeline[j];
+        if (!next) break;
         if (next.kind === "message" || next.kind === "divider") break;
         if (next.kind === "tool" && next.phase === "start" && next.toolUseId) {
           toolCalls.push({

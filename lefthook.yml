@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    audit-ts:
+      run: npm run audit:ts

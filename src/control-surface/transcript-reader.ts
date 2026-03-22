@@ -26,7 +26,7 @@ export function extractLastAssistantText(
     const lines = chunk.split("\n");
 
     for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
+      const line = lines[i]!.trim();
       if (!line) continue;
 
       let obj: Record<string, unknown>;

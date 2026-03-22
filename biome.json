@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["src/**/*.ts", "web/src/**/*.ts", "web/src/**/*.tsx"]
+    "includes": ["src/**/*.ts", "web/src/**/*.ts", "web/src/**/*.tsx", "!web/src/routeTree.gen.ts"]
   },
   "formatter": {
     "enabled": true,
@@ -30,7 +30,7 @@
         "useExhaustiveDependencies": "off"
       },
       "suspicious": {
-        "noExplicitAny": "off",
+        "noExplicitAny": "warn",
         "noEmptyInterface": "off",
         "noControlCharactersInRegex": "off",
         "noArrayIndexKey": "off",
@@ -42,7 +42,7 @@
         "noNonNullAssertion": "off"
       },
       "security": {
-        "noDangerouslySetInnerHtml": "off"
+        "noDangerouslySetInnerHtml": "error"
       }
     }
   },

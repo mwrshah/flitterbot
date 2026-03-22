@@ -132,8 +132,8 @@ export function executeCreateWorktree(
         if (lines[i] === `branch refs/heads/${resolvedBranch}`) {
           // worktree path is a few lines before (the "worktree <path>" line)
           for (let j = i; j >= 0; j--) {
-            if (lines[j].startsWith("worktree ")) {
-              const existingPath = lines[j].slice("worktree ".length);
+            if (lines[j]!.startsWith("worktree ")) {
+              const existingPath = lines[j]!.slice("worktree ".length);
               enrichWorkstream(blackboard, workstreamId, repoPath, existingPath);
               return {
                 ok: true,

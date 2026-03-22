@@ -17,7 +17,7 @@ export function extractSourcePrefix(content: string): { source?: string; cleanCo
   const match = content.match(SOURCE_PREFIX_RE);
   if (!match) return { cleanContent: content };
   return {
-    source: match[1].toLowerCase(),
+    source: match[1]!.toLowerCase(),
     cleanContent: content.slice(match[0].length),
   };
 }

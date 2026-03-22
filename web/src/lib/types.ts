@@ -238,4 +238,10 @@ export type WsMessage =
       sessionId?: string;
       workstreamName?: string;
     }
+  | {
+      type: "workstreams_changed";
+      reason: "created" | "reopened" | "closed";
+      workstreamId: string;
+      workstreamName?: string;
+    }
   | { type: "error"; message: string };

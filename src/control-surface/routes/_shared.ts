@@ -19,6 +19,7 @@ export function sendJson(res: http.ServerResponse, statusCode: number, body: unk
 function getBearerToken(header?: string | string[]): string | undefined {
   if (!header) return undefined;
   const value = Array.isArray(header) ? header[0] : header;
+  if (!value) return undefined;
   const match = value.match(/^Bearer\s+(.+)$/i);
   return match?.[1];
 }

@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
-import type { ConnectionState } from "~/lib/types";
+import { useEffect } from "react";
+import type { ConnectionState, WsMessage } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
@@ -89,14 +90,23 @@ export function Sidebar({
   onOpenSettings: () => void;
 }) {
   const rootApi = getRouteApi("__root__");
-  const { apiClient } = rootApi.useRouteContext();
+  const { apiClient, wsClient } = rootApi.useRouteContext();
+  const queryClient = useQueryClient();
 
   const statusQuery = useQuery({
     queryKey: ["status"],
     queryFn: () => apiClient.getStatus(),
-    refetchInterval: (query) => (query.state.error ? 30_000 : 5_000),
     retry: 1,
   });
+
+  // Invalidate status query when workstreams change via WebSocket
+  useEffect(() => {
+    return wsClient.subscribe((message: WsMessage) => {
+      if (message.type === "workstreams_changed") {
+        queryClient.invalidateQueries({ queryKey: ["status"] });
+      }
+    });
+  }, [wsClient, queryClient]);
 
   const status = statusQuery.data;
   const piState = status?.pi?.default?.busy ? "active" : "idle";

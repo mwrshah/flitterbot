@@ -73,7 +73,7 @@ function listDaemonPids(): number[] {
         const match = line.match(/^(\d+)\s+(.*)$/);
         if (!match) return [];
         const pid = Number(match[1]);
-        const command = match[2];
+        const command = match[2]!;
         if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return [];
         return [...candidates].some((candidate) => command.includes(candidate)) ? [pid] : [];
       });
