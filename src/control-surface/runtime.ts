@@ -20,7 +20,7 @@ import type {
 import { openBlackboard, pingBlackboard, type BlackboardDatabase } from "../blackboard/db.ts";
 import { executeCloseWorkstream } from "./tools/close-workstream.ts";
 import { executeCreateWorktree } from "./tools/create-worktree.ts";
-import { listOpenWorkstreams, resetAllWorkstreams } from "../blackboard/queries/workstreams.ts";
+import { getActivePiSessionId, listOpenWorkstreams, resetAllWorkstreams } from "../blackboard/queries/workstreams.ts";
 import {
 	touchPiPrompt,
 	updatePiSessionStatus,
@@ -394,6 +394,7 @@ export class ControlSurfaceRuntime {
 				name: ws.name,
 				repoPath: ws.repo_path ?? undefined,
 				worktreePath: ws.worktree_path ?? undefined,
+				piSessionId: getActivePiSessionId(this.blackboard, ws.id),
 				sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
 				createdAt: ws.created_at,
 			})),

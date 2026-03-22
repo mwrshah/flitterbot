@@ -82,6 +82,7 @@ export interface WorkstreamSummary {
   name: string;
   repoPath?: string;
   worktreePath?: string;
+  piSessionId?: string;
   sessionCount: number;
   createdAt: string;
 }
