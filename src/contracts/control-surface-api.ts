@@ -41,7 +41,6 @@ export interface PiRuntimeStatus {
 
 export interface ClaudeSessionListItem {
   sessionId: string;
-  launchId: string | null;
   tmuxSession: string | null;
   cwd: string;
   project: string;

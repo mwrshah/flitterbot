@@ -34,7 +34,6 @@ export interface WorkstreamRow {
 
 export interface ClaudeSessionRow {
   session_id: string;
-  launch_id: string | null;
   tmux_session: string | null;
   cwd: string;
   project: string;

@@ -35,7 +35,6 @@ export interface LaunchClaudeSessionInput {
 }
 
 export interface LaunchClaudeSessionResult {
-  launchId: string;
   tmuxSession: string;
   cwd: string;
   delivery: TmuxDeliveryMethod;

@@ -45,7 +45,6 @@ function enrichPayload(payload) {
   const env = process.env;
   if (env.AUTONOMA_AGENT_MANAGED === "1") {
     payload.agent_managed = true;
-    if (env.AUTONOMA_LAUNCH_ID) payload.launch_id = env.AUTONOMA_LAUNCH_ID;
     if (env.AUTONOMA_TMUX_SESSION) payload.tmux_session = env.AUTONOMA_TMUX_SESSION;
     if (env.AUTONOMA_TASK_DESCRIPTION) payload.task_description = env.AUTONOMA_TASK_DESCRIPTION;
     if (env.AUTONOMA_TODOIST_TASK_ID) payload.todoist_task_id = env.AUTONOMA_TODOIST_TASK_ID;

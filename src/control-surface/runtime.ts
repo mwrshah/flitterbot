@@ -251,7 +251,6 @@ export class ControlSurfaceRuntime {
 				source: pickString(payload, ["source"]),
 				transcript_path: pickString(payload, ["transcript_path", "transcriptPath"]),
 				agent_managed: agentManaged,
-				launch_id: pickString(payload, ["launch_id", "launchId", "AUTONOMA_LAUNCH_ID"]),
 				tmux_session: pickString(payload, ["tmux_session", "tmuxSession", "AUTONOMA_TMUX_SESSION"]),
 				task_description: pickString(payload, ["task_description", "taskDescription", "AUTONOMA_TASK_DESCRIPTION"]),
 				todoist_task_id: pickString(payload, ["todoist_task_id", "todoistTaskId", "AUTONOMA_TODOIST_TASK_ID"]),

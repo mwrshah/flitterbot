@@ -13,7 +13,6 @@ export interface SessionStartPayload {
   source?: string;
   transcript_path?: string;
   agent_managed?: boolean;
-  launch_id?: string;
   tmux_session?: string;
   task_description?: string;
   todoist_task_id?: string;
@@ -59,7 +58,6 @@ function minutesAgo(now: number, value: string | null | undefined): number | nul
 function mapSessionRow(row: ClaudeSessionRow): SessionListItem {
   return {
     sessionId: row.session_id,
-    launchId: row.launch_id,
     tmuxSession: row.tmux_session,
     cwd: row.cwd,
     project: row.project,
@@ -250,7 +248,6 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
        pi_session_id, workstream_id, started_at, last_event_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(session_id) DO UPDATE SET
-       launch_id = COALESCE(excluded.launch_id, sessions.launch_id),
        tmux_session = COALESCE(excluded.tmux_session, sessions.tmux_session),
        cwd = excluded.cwd,
        project = excluded.project,
@@ -272,7 +269,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
        last_event_at = MAX(sessions.last_event_at, excluded.last_event_at)`,
   ).run(
     payload.session_id,
-    textOrNull(payload.launch_id),
+    null,
     textOrNull(payload.tmux_session),
     cwd,
     project,

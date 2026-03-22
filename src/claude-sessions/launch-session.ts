@@ -16,20 +16,20 @@ function slugifySessionName(value: string): string {
     .slice(0, 40);
 }
 
-function buildSessionName(input: LaunchClaudeSessionInput, launchId: string): string {
+function buildSessionName(input: LaunchClaudeSessionInput): string {
+  const fallback = `autonoma-${randomUUID().slice(0, 8)}`;
   if (input.sessionName?.trim()) {
-    return slugifySessionName(input.sessionName) || `autonoma-${launchId.slice(0, 8)}`;
+    return slugifySessionName(input.sessionName) || fallback;
   }
 
   const base = input.taskDescription?.trim() || path.basename(input.cwd) || "claude";
   const slug = slugifySessionName(base);
-  return slug ? `auto-${slug}` : `autonoma-${launchId.slice(0, 8)}`;
+  return slug ? `auto-${slug}` : fallback;
 }
 
-function buildClaudeCommand(input: LaunchClaudeSessionInput, launchId: string, tmuxSession: string): string {
+function buildClaudeCommand(input: LaunchClaudeSessionInput, tmuxSession: string): string {
   const envPairs: Array<[string, string]> = [
     ["AUTONOMA_AGENT_MANAGED", "1"],
-    ["AUTONOMA_LAUNCH_ID", launchId],
     ["AUTONOMA_TMUX_SESSION", tmuxSession],
     ["AUTONOMA_TASK_DESCRIPTION", input.taskDescription ?? ""],
     ["AUTONOMA_TODOIST_TASK_ID", input.todoistTaskId ?? ""],
@@ -49,9 +49,8 @@ function buildClaudeCommand(input: LaunchClaudeSessionInput, launchId: string, t
 }
 
 export async function launchClaudeSession(input: LaunchClaudeSessionInput): Promise<LaunchClaudeSessionResult> {
-  const launchId = randomUUID();
-  const tmuxSession = await ensureUniqueTmuxSessionName(buildSessionName(input, launchId));
-  const command = buildClaudeCommand(input, launchId, tmuxSession);
+  const tmuxSession = await ensureUniqueTmuxSessionName(buildSessionName(input));
+  const command = buildClaudeCommand(input, tmuxSession);
 
   await createDetachedTmuxSession(tmuxSession, input.cwd, command);
   await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -67,7 +66,6 @@ export async function launchClaudeSession(input: LaunchClaudeSessionInput): Prom
   }
 
   return {
-    launchId,
     tmuxSession,
     cwd: input.cwd,
     delivery: "tmux_send_keys",
