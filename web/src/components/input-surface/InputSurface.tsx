@@ -309,6 +309,9 @@ export function InputSurface() {
       }
 
       if (message.type === "message_end") {
+        // Skip intermediate assistant messages (pre-tool-call fragments within a turn)
+        if (message.intermediate) return;
+
         const content = message.content || "";
         if (message.role === "user") {
           if (content.trim()) {

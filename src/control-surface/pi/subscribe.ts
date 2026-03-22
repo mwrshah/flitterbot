@@ -115,6 +115,10 @@ export function subscribeToPiSession(
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
 ): () => void {
+  // Deferred assistant messages: accumulate during a turn, flush on turn_end.
+  // Earlier ones get broadcast with intermediate: true; only the last one is final.
+  const pendingAssistantMessages: MessageEndWebSocketEvent[] = [];
+
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
     // FR-3: Only set 'active' during turns. Post-turn transitions (waiting_for_user/waiting_for_sessions)
@@ -150,7 +154,13 @@ export function subscribeToPiSession(
           source: role === "user" ? state.getSnapshot().currentItem?.source : undefined,
           timestamp: extractTimestamp(event.message, now),
         };
-        broadcast(wsHub, payload);
+
+        if (role === "assistant") {
+          // Defer — accumulate until turn_end so we can mark intermediate vs final
+          pendingAssistantMessages.push(payload);
+        } else {
+          broadcast(wsHub, payload);
+        }
         break;
       }
       case "tool_execution_start": {
@@ -181,6 +191,16 @@ export function subscribeToPiSession(
         break;
       }
       case "turn_end": {
+        // Flush deferred assistant messages: all but last are intermediate
+        for (let i = 0; i < pendingAssistantMessages.length; i++) {
+          const isLast = i === pendingAssistantMessages.length - 1;
+          broadcast(wsHub, isLast
+            ? pendingAssistantMessages[i]
+            : { ...pendingAssistantMessages[i], intermediate: true },
+          );
+        }
+        pendingAssistantMessages.length = 0;
+
         const payload: TurnEndWebSocketEvent = {
           type: "turn_end",
           sessionId: session.sessionId,

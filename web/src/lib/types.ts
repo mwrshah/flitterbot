@@ -228,6 +228,7 @@ export type WsMessage =
       source?: string;
       timestamp?: string;
       sessionId?: string;
+      intermediate?: boolean;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";

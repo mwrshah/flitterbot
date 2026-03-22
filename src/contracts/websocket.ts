@@ -73,6 +73,9 @@ export interface MessageEndWebSocketEvent {
   content: string;
   source?: string;
   timestamp?: string;
+  /** True for assistant messages that precede tool calls within a turn.
+   *  Only the final assistant message in a turn is broadcast without this flag. */
+  intermediate?: boolean;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
