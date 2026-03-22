@@ -325,12 +325,15 @@ export function InputSurface() {
       }
     });
 
+    wsClient.subscribeSession("*");
+
     const unsubscribeConnection = wsClient.subscribeConnection(
       setConnectionState,
     );
     return () => {
       unsubscribe();
       unsubscribeConnection();
+      wsClient.unsubscribeSession("*");
     };
   }, [wsClient]);
 

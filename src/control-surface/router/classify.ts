@@ -126,13 +126,14 @@ ${projectBlock}
 1. If the message clearly relates to an existing open workstream, return its id.
 2. If the message starts new work (a task, bug, feature, investigation, etc.) that doesn't match any open workstream, set new_workstream_name to a short descriptive name (2-5 words, lowercase, dash-separated).
 3. If the message is casual conversation, a greeting, a question about the assistant itself, or otherwise not work-related, set is_work_message to false and leave both ids null.
-4. When in doubt between matching an existing workstream and creating a new one, prefer matching the existing one.
-5. A message that references a known project by name should be matched to an existing workstream for that project if one exists, or trigger a new workstream if not.
-6. If the message relates to a recently closed workstream, return its id. Do not create a duplicate workstream for recently completed work.
-7. Use the recent conversation snippets to understand context when deciding if the message relates to an existing workstream. Agent messages show what the assistant last said to the user — short/ambiguous user replies (e.g. "yes", "sure", "do it") are almost certainly responding to the workstream that sent the most recent agent message (marked with "← last agent response").
-8. Session management commands (kill tmux, close sessions, check status, restart daemon, close tmux windows, quit claude) are NOT work — set is_work_message to false. These are infrastructure meta-operations.
-9. Cron health-check messages (containing "Cron idle check", "Cron stale session check", or similar automated system messages) are NOT work — set is_work_message to false.
-10. Workstreams are about repository-scoped coding/engineering work (features, bugs, investigations in a project), not meta-operations on the Autonoma system itself or general task management.
+4. If the user explicitly asks to start/open/create a new workstream (e.g. "start a new workstream", "open a new workstream for this", "create a separate workstream"), ALWAYS create a new workstream regardless of whether the topic overlaps with an existing one. User intent overrides matching heuristics.
+5. When in doubt between matching an existing workstream and creating a new one, prefer matching the existing one.
+6. A message that references a known project by name should be matched to an existing workstream for that project if one exists, or trigger a new workstream if not.
+7. If the message relates to a recently closed workstream, return its id. Do not create a duplicate workstream for recently completed work.
+8. Use the recent conversation snippets to understand context when deciding if the message relates to an existing workstream. Agent messages show what the assistant last said to the user — short/ambiguous user replies (e.g. "yes", "sure", "do it") are almost certainly responding to the workstream that sent the most recent agent message (marked with "← last agent response").
+9. Session management commands (kill tmux, close sessions, check status, restart daemon, close tmux windows, quit claude) are NOT work — set is_work_message to false. These are infrastructure meta-operations.
+10. Cron health-check messages (containing "Cron idle check", "Cron stale session check", or similar automated system messages) are NOT work — set is_work_message to false.
+11. Workstreams are about repository-scoped coding/engineering work (features, bugs, investigations in a project), not meta-operations on the Autonoma system itself or general task management.
 
 ## Response format
 Respond with ONLY a JSON object containing four fields: workstream_id, new_workstream_name, is_work_message, and reasoning. No other text or explanation. Example:
