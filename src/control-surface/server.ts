@@ -26,6 +26,8 @@ const server = http.createServer(async (req, res) => {
 	try {
 		await routeRequest(req, res);
 	} catch (error) {
+		const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+		runtime.log(`unhandled route error: ${detail}`);
 		const message = error instanceof Error ? error.message : String(error);
 		sendJson(res, 500, { ok: false, error: message });
 	}

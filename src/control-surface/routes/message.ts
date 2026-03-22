@@ -67,7 +67,8 @@ async function routeMessage(
       meta.workstream_name = result.workstream.name;
     }
     return { metadata: meta };
-  } catch {
+  } catch (error) {
+    console.error("[router] classification failed:", error instanceof Error ? error.message : String(error));
     return null;
   }
 }

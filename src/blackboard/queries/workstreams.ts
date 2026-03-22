@@ -35,7 +35,7 @@ export function enrichWorkstream(db: BlackboardDatabase, workstreamId: string, r
 export function getActivePiSessionId(db: BlackboardDatabase, workstreamId: string): string | undefined {
 	const row = db
 		.prepare(
-			`SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? AND status != 'ended' ORDER BY created_at DESC LIMIT 1`,
+			`SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,
 		)
 		.get(workstreamId) as { pi_session_id: string } | undefined;
 	return row?.pi_session_id;
