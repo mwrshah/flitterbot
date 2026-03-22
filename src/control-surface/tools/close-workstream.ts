@@ -1,6 +1,5 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
 import { endPiSession } from "../../blackboard/queries/pi-sessions.ts";
 import { markSessionEnded } from "../../blackboard/queries/sessions.ts";
@@ -12,22 +11,12 @@ type CloseWorkstreamResult = {
   workstreamId: string;
   message: string;
   conflicts?: string[];
-  worktreeRemoved?: boolean;
   merged?: boolean;
   pushed?: boolean;
 };
 
 function exec(cmd: string, cwd: string, timeoutMs = 30_000): string {
   return execSync(cmd, { cwd, timeout: timeoutMs, stdio: "pipe" }).toString().trim();
-}
-
-function hasGtr(cwd: string): boolean {
-  try {
-    exec("git gtr version", cwd, 5_000);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function inferBranchFromWorktree(worktreePath: string): string | null {
@@ -132,35 +121,6 @@ function pushMain(repoPath: string): boolean {
   }
 }
 
-function removeWithGtr(repoPath: string, branch: string): boolean {
-  try {
-    execSync(`git gtr rm ${branch} --yes`, { cwd: repoPath, timeout: 15_000, stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function removeWithRawGit(worktreePath: string): boolean {
-  try {
-    execSync(`git worktree remove ${JSON.stringify(worktreePath)}`, {
-      timeout: 15_000,
-      stdio: "pipe",
-    });
-    return true;
-  } catch {
-    try {
-      execSync(`git worktree remove --force ${JSON.stringify(worktreePath)}`, {
-        timeout: 15_000,
-        stdio: "pipe",
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
 export async function executeCloseWorkstream(
   blackboard: BlackboardDatabase,
   piSessionId: string,
@@ -223,19 +183,7 @@ export async function executeCloseWorkstream(
     }
   }
 
-  // Step 2: Remove worktree (branch preserved for history)
-  let worktreeRemoved = false;
-  if (worktreePath && fs.existsSync(worktreePath)) {
-    const effectiveRepo = repoPath || path.resolve(worktreePath, "..");
-    if (branch && hasGtr(effectiveRepo)) {
-      worktreeRemoved = removeWithGtr(effectiveRepo, branch);
-    }
-    if (!worktreeRemoved) {
-      worktreeRemoved = removeWithRawGit(worktreePath);
-    }
-  }
-
-  // Step 3: Close workstream and end Pi session
+  // Step 2: Close workstream and end Pi session (worktree left on disk)
   closeWorkstream(blackboard, workstreamId);
   endPiSession(blackboard, piSessionId, "ended", "workstream_closed");
 
@@ -243,13 +191,11 @@ export async function executeCloseWorkstream(
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
   if (merged) parts.push("Branch merged to main.");
   if (pushed) parts.push("Pushed to origin.");
-  if (worktreeRemoved) parts.push("Worktree removed (branch preserved).");
 
   return {
     ok: true,
     workstreamId,
     message: parts.join(" "),
-    worktreeRemoved,
     merged,
     pushed,
   };
@@ -260,7 +206,7 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
     name: "close_workstream",
     label: "Close Workstream",
     description:
-      "Close the current workstream. Merges the branch into main, pushes, removes the worktree (preserves the branch), closes the workstream, and ends this orchestrator session. If there are merge conflicts, returns the conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.",
+      "Close the current workstream. Merges the branch into main, pushes, closes the workstream, and ends this orchestrator session. The worktree is left on disk. If there are merge conflicts, returns the conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.",
     parameters: {
       type: "object",
       properties: {
