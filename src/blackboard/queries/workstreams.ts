@@ -32,6 +32,15 @@ export function enrichWorkstream(db: BlackboardDatabase, workstreamId: string, r
 	).run(repoPath, worktreePath ?? null, workstreamId);
 }
 
+export function getActivePiSessionId(db: BlackboardDatabase, workstreamId: string): string | undefined {
+	const row = db
+		.prepare(
+			`SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? AND status != 'ended' ORDER BY created_at DESC LIMIT 1`,
+		)
+		.get(workstreamId) as { pi_session_id: string } | undefined;
+	return row?.pi_session_id;
+}
+
 export function closeWorkstream(db: BlackboardDatabase, workstreamId: string): void {
 	db.prepare(
 		`UPDATE workstreams
