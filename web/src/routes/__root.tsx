@@ -2,11 +2,15 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type * as React from "react";
+import { useEffect } from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { AppShell } from "~/components/layout/AppShell";
 import { NotFound } from "~/components/NotFound";
 import type { AutonomaApiClient } from "~/lib/api";
+import type { WsMessage } from "~/lib/types";
+import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { AutonomaWsClient } from "~/lib/ws";
 import piWebUiCss from "~/pi-web-ui.css?url";
@@ -19,6 +23,9 @@ export const Route = createRootRouteWithContext<{
   wsClient: AutonomaWsClient;
   settingsStore: SettingsStore;
 }>()({
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -62,6 +69,18 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
+  const { wsClient } = Route.useRouteContext();
+  const queryClient = useQueryClient();
+
+  // Invalidate status query when workstreams change via WebSocket — single listener for all consumers
+  useEffect(() => {
+    return wsClient.subscribe((message: WsMessage) => {
+      if (message.type === "workstreams_changed") {
+        queryClient.invalidateQueries({ queryKey: ["status"] });
+      }
+    });
+  }, [wsClient, queryClient]);
+
   return (
     <RootDocument>
       <AppShell />

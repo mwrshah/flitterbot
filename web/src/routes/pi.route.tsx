@@ -1,8 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
+import { statusQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
   ChatTimelineTool,
@@ -11,29 +12,16 @@ import type {
   ImageAttachment,
   JsonValue,
   MessageSource,
-  StatusResponse,
   WsMessage,
 } from "~/lib/types";
 import { cn, createId, extractToolName } from "~/lib/utils";
-import { fetchPiStatus } from "~/server/pi";
-
-/* ── Status query options (shared between loader and component) ── */
-
-const statusQueryOptions = {
-  queryKey: ["status"] as const,
-  queryFn: async () => {
-    const res = await fetchPiStatus();
-    return res as unknown as StatusResponse;
-  },
-  staleTime: 3_000,
-};
 
 export const Route = createFileRoute("/pi")({
   head: () => ({
     meta: [{ title: "Autonoma — Pi Agent" }],
   }),
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(statusQueryOptions);
+    await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
   },
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
@@ -59,27 +47,17 @@ export function mergeTimelines(
 
 function PiLayoutRoute() {
   const { apiClient, wsClient } = Route.useRouteContext();
-  const queryClient = useQueryClient();
 
   // Reset the store on mount so we start fresh
   useEffect(() => {
     resetPiSessionStore();
   }, []);
 
-  // Status query — seeded by loader, invalidated via WebSocket
+  // Status query — seeded by loader, invalidated via WebSocket (listener in root route)
   const statusQuery = useQuery({
-    ...statusQueryOptions,
+    ...statusQueryOptions(apiClient),
     retry: 1,
   });
-
-  // Invalidate status query when workstreams change via WebSocket
-  useEffect(() => {
-    return wsClient.subscribe((message: WsMessage) => {
-      if (message.type === "workstreams_changed") {
-        queryClient.invalidateQueries({ queryKey: ["status"] });
-      }
-    });
-  }, [wsClient, queryClient]);
 
   const orchestrators = statusQuery.data?.pi?.orchestrators ?? [];
   const defaultPi = statusQuery.data?.pi?.default;
