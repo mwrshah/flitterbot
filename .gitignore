@@ -35,9 +35,16 @@ venv/
 # Logs
 *.log
 
-# SQLite
-db.sqlite3
-db.sqlite3-journal
+# Databases (SQLite, etc.)
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.s3db
+*.sdb
+*-journal
+*-wal
+*-shm
 
 # Editor / IDE
 .cursorignore
