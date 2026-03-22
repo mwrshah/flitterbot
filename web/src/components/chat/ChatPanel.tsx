@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
@@ -62,6 +64,13 @@ export function ChatPanel({
   onSendMessage,
 }: ChatPanelProps) {
   const isClient = useIsClient();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
+  const { data: skillsData } = useQuery({
+    queryKey: ["skills"],
+    queryFn: () => apiClient.listSkills(),
+    staleTime: 5 * 60 * 1000,
+  });
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
@@ -190,6 +199,7 @@ export function ChatPanel({
         pendingImages={pendingImages}
         onAddImages={addImageFiles}
         onRemoveImage={removeImage}
+        skills={skillsData?.items}
         rows={2}
       />
     </div>
