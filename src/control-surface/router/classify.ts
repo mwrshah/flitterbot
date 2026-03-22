@@ -1,119 +1,104 @@
 import fs from "node:fs";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
-import {
-  type ConversationSnippet,
-  getRecentConversationByWorkstream,
-} from "../../blackboard/queries/messages.ts";
-import {
-  getWorkstreamByName,
-  insertWorkstream,
-  listOpenWorkstreams,
-  listRecentlyClosedWorkstreams,
-  reopenWorkstream,
-} from "../../blackboard/queries/workstreams.ts";
 import type { WorkstreamRow } from "../../contracts/index.ts";
-import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
+import { listOpenWorkstreams, listRecentlyClosedWorkstreams, insertWorkstream, reopenWorkstream, getWorkstreamByName } from "../../blackboard/queries/workstreams.ts";
+import { callGroqClassify, type ClassifyResult } from "./groq-client.ts";
+import { getRecentConversationByWorkstream, type ConversationSnippet } from "../../blackboard/queries/messages.ts";
 
 export type ClassificationResult = {
-  workstream: WorkstreamRow | null;
-  isWorkMessage: boolean;
-  action: "matched" | "created" | "reopened" | "none";
+	workstream: WorkstreamRow | null;
+	isWorkMessage: boolean;
+	action: "matched" | "created" | "reopened" | "none";
 };
 
 function listProjectDirs(projectsDir: string): string[] {
-  try {
-    if (!fs.existsSync(projectsDir)) return [];
-    return fs
-      .readdirSync(projectsDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith("."))
-      .map((d) => d.name);
-  } catch {
-    return [];
-  }
+	try {
+		if (!fs.existsSync(projectsDir)) return [];
+		return fs
+			.readdirSync(projectsDir, { withFileTypes: true })
+			.filter((d) => d.isDirectory() && !d.name.startsWith("."))
+			.map((d) => d.name);
+	} catch {
+		return [];
+	}
 }
 
 function formatWorkstreamLine(ws: WorkstreamRow, label?: string): string {
-  const suffix = label ? ` ${label}` : "";
-  return `- id: "${ws.id}", name: "${ws.name}"${suffix}${ws.repo_path ? `, repo: ${ws.repo_path}` : ""}`;
+	const suffix = label ? ` ${label}` : "";
+	return `- id: "${ws.id}", name: "${ws.name}"${suffix}${ws.repo_path ? `, repo: ${ws.repo_path}` : ""}`;
 }
 
 function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  if (diffMs < 0) return "just now";
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "yesterday" : `${days}d ago`;
+	const diffMs = Date.now() - new Date(iso).getTime();
+	if (diffMs < 0) return "just now";
+	const mins = Math.floor(diffMs / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return days === 1 ? "yesterday" : `${days}d ago`;
 }
 
 function collapseNewlines(text: string): string {
-  return text.replace(/\n/g, " ").trim();
+	return text.replace(/\n/g, " ").trim();
 }
 
 function findLastAgentResponseWorkstream(
-  recentConversation: Map<string, ConversationSnippet[]>,
+	recentConversation: Map<string, ConversationSnippet[]>,
 ): string | null {
-  let latestWsId: string | null = null;
-  let latestTime = "";
-  for (const [wsId, snippets] of recentConversation) {
-    for (const s of snippets) {
-      if (s.direction === "outbound" && s.created_at > latestTime) {
-        latestTime = s.created_at;
-        latestWsId = wsId;
-      }
-    }
-  }
-  return latestWsId;
+	let latestWsId: string | null = null;
+	let latestTime = "";
+	for (const [wsId, snippets] of recentConversation) {
+		for (const s of snippets) {
+			if (s.direction === "outbound" && s.created_at > latestTime) {
+				latestTime = s.created_at;
+				latestWsId = wsId;
+			}
+		}
+	}
+	return latestWsId;
 }
 
 function formatWorkstreamWithConversation(
-  ws: WorkstreamRow,
-  snippets: ConversationSnippet[] | undefined,
-  isLastAgentResponse: boolean,
+	ws: WorkstreamRow,
+	snippets: ConversationSnippet[] | undefined,
+	isLastAgentResponse: boolean,
 ): string {
-  const marker = isLastAgentResponse ? " ← last agent response" : "";
-  const header = formatWorkstreamLine(ws, marker || undefined);
-  if (!snippets || snippets.length === 0) return header;
+	const marker = isLastAgentResponse ? " ← last agent response" : "";
+	const header = formatWorkstreamLine(ws, marker || undefined);
+	if (!snippets || snippets.length === 0) return header;
 
-  const messageLines = snippets.map((s) => {
-    const label = s.direction === "outbound" ? "Agent" : "User";
-    return `    [${s.source}] ${label}: ${collapseNewlines(s.content)} (${relativeTime(s.created_at)})`;
-  });
-  return `${header}\n${messageLines.join("\n")}`;
+	const messageLines = snippets.map((s) => {
+		const label = s.direction === "outbound" ? "Agent" : "User";
+		return `    [${s.source}] ${label}: ${collapseNewlines(s.content)} (${relativeTime(s.created_at)})`;
+	});
+	return `${header}\n${messageLines.join("\n")}`;
 }
 
 function buildClassificationPrompt(
-  message: string,
-  workstreams: WorkstreamRow[],
-  recentlyClosed: WorkstreamRow[],
-  recentConversation: Map<string, ConversationSnippet[]>,
-  projects: string[],
+	message: string,
+	workstreams: WorkstreamRow[],
+	recentlyClosed: WorkstreamRow[],
+	recentConversation: Map<string, ConversationSnippet[]>,
+	projects: string[],
 ): string {
-  const latestAgentWsId = findLastAgentResponseWorkstream(recentConversation);
-  const workstreamBlock =
-    workstreams.length > 0
-      ? workstreams
-          .map((ws) =>
-            formatWorkstreamWithConversation(
-              ws,
-              recentConversation.get(ws.id),
-              ws.id === latestAgentWsId,
-            ),
-          )
-          .join("\n")
-      : "(none open)";
+	const latestAgentWsId = findLastAgentResponseWorkstream(recentConversation);
+	const workstreamBlock =
+		workstreams.length > 0
+			? workstreams.map((ws) =>
+				formatWorkstreamWithConversation(ws, recentConversation.get(ws.id), ws.id === latestAgentWsId),
+			).join("\n")
+			: "(none open)";
 
-  const closedBlock =
-    recentlyClosed.length > 0
-      ? recentlyClosed.map((ws) => formatWorkstreamLine(ws, "[closed]")).join("\n")
-      : "(none)";
+	const closedBlock =
+		recentlyClosed.length > 0
+			? recentlyClosed.map((ws) => formatWorkstreamLine(ws, "[closed]")).join("\n")
+			: "(none)";
 
-  const projectBlock = projects.length > 0 ? projects.join(", ") : "(none)";
+	const projectBlock = projects.length > 0 ? projects.join(", ") : "(none)";
 
-  return `You are a message classifier for a software development assistant.
+	return `You are a message classifier for a software development assistant.
 
 Given a user message, classify it against open workstreams and known projects.
 
@@ -155,67 +140,62 @@ ${message}`;
 }
 
 export async function classifyMessage(
-  message: string,
-  db: BlackboardDatabase,
-  apiKey: string,
-  projectsDir: string,
+	message: string,
+	db: BlackboardDatabase,
+	apiKey: string,
+	projectsDir: string,
 ): Promise<ClassificationResult> {
-  const workstreams = listOpenWorkstreams(db);
-  const recentlyClosed = listRecentlyClosedWorkstreams(db, 6);
-  const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
-  const projects = listProjectDirs(projectsDir);
-  const prompt = buildClassificationPrompt(
-    message,
-    workstreams,
-    recentlyClosed,
-    recentConversation,
-    projects,
-  );
+	const workstreams = listOpenWorkstreams(db);
+	const recentlyClosed = listRecentlyClosedWorkstreams(db, 6);
+	const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
+	const projects = listProjectDirs(projectsDir);
+	const prompt = buildClassificationPrompt(message, workstreams, recentlyClosed, recentConversation, projects);
+	console.log("── [router] classification prompt ──\n%s\n── [/router prompt] ──", prompt);
 
-  let result: ClassifyResult;
-  try {
-    result = await callGroqClassify(apiKey, prompt);
-  } catch (error) {
-    // If classification fails, pass through as non-work (don't block the message)
-    console.error(
-      `[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return { workstream: null, isWorkMessage: false, action: "none" };
-  }
+	let result: ClassifyResult;
+	try {
+		result = await callGroqClassify(apiKey, prompt);
+	} catch (error) {
+		// If classification fails, pass through as non-work (don't block the message)
+		console.error(
+			`[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return { workstream: null, isWorkMessage: false, action: "none" };
+	}
 
-  if (!result.is_work_message) {
-    return { workstream: null, isWorkMessage: false, action: "none" };
-  }
+	if (!result.is_work_message) {
+		return { workstream: null, isWorkMessage: false, action: "none" };
+	}
 
-  // Try to match existing open workstream
-  if (result.workstream_id) {
-    const existing = workstreams.find((ws) => ws.id === result.workstream_id);
-    if (existing) {
-      return { workstream: existing, isWorkMessage: true, action: "matched" };
-    }
+	// Try to match existing open workstream
+	if (result.workstream_id) {
+		const existing = workstreams.find((ws) => ws.id === result.workstream_id);
+		if (existing) {
+			return { workstream: existing, isWorkMessage: true, action: "matched" };
+		}
 
-    // Check if it matches a recently closed workstream — reopen it
-    const closed = recentlyClosed.find((ws) => ws.id === result.workstream_id);
-    if (closed) {
-      const reopened = reopenWorkstream(db, closed.id);
-      if (reopened) {
-        return { workstream: reopened, isWorkMessage: true, action: "reopened" };
-      }
-    }
+		// Check if it matches a recently closed workstream — reopen it
+		const closed = recentlyClosed.find((ws) => ws.id === result.workstream_id);
+		if (closed) {
+			const reopened = reopenWorkstream(db, closed.id);
+			if (reopened) {
+				return { workstream: reopened, isWorkMessage: true, action: "reopened" };
+			}
+		}
 
-    // LLM returned an id that doesn't exist — fall through to create
-  }
+		// LLM returned an id that doesn't exist — fall through to create
+	}
 
-  // Create new workstream (dedup: reuse existing open workstream with same name)
-  if (result.new_workstream_name) {
-    const existing = getWorkstreamByName(db, result.new_workstream_name);
-    if (existing && existing.status === "open") {
-      return { workstream: existing, isWorkMessage: true, action: "matched" };
-    }
-    const created = insertWorkstream(db, result.new_workstream_name);
-    return { workstream: created, isWorkMessage: true, action: "created" };
-  }
+	// Create new workstream (dedup: reuse existing open workstream with same name)
+	if (result.new_workstream_name) {
+		const existing = getWorkstreamByName(db, result.new_workstream_name);
+		if (existing && existing.status === "open") {
+			return { workstream: existing, isWorkMessage: true, action: "matched" };
+		}
+		const created = insertWorkstream(db, result.new_workstream_name);
+		return { workstream: created, isWorkMessage: true, action: "created" };
+	}
 
-  // Work message but no workstream assignment
-  return { workstream: null, isWorkMessage: true, action: "none" };
+	// Work message but no workstream assignment
+	return { workstream: null, isWorkMessage: true, action: "none" };
 }
