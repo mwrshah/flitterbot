@@ -40,52 +40,40 @@ function relativeTime(iso: string): string {
 	return days === 1 ? "yesterday" : `${days}d ago`;
 }
 
-function truncate(text: string, maxLen: number): string {
-	const oneLine = text.replace(/\n/g, " ").trim();
-	return oneLine.length <= maxLen ? oneLine : oneLine.slice(0, maxLen - 1) + "…";
+function collapseNewlines(text: string): string {
+	return text.replace(/\n/g, " ").trim();
 }
 
-function formatSnippetLabel(s: ConversationSnippet): string {
-	if (s.direction === "outbound") return "Agent";
-	return "User";
-}
-
-function buildConversationBlock(
-	workstreams: WorkstreamRow[],
+function findLastAgentResponseWorkstream(
 	recentConversation: Map<string, ConversationSnippet[]>,
-): string {
-	// Cap at 5 most recently active workstreams
-	const withConversation = workstreams
-		.filter((ws) => recentConversation.has(ws.id))
-		.slice(0, 5);
-
-	if (withConversation.length === 0) return "";
-
-	// Find the most recent agent message across all workstreams
-	let latestAgentWsId: string | null = null;
-	let latestAgentTime = "";
+): string | null {
+	let latestWsId: string | null = null;
+	let latestTime = "";
 	for (const [wsId, snippets] of recentConversation) {
 		for (const s of snippets) {
-			if (s.direction === "outbound" && s.created_at > latestAgentTime) {
-				latestAgentTime = s.created_at;
-				latestAgentWsId = wsId;
+			if (s.direction === "outbound" && s.created_at > latestTime) {
+				latestTime = s.created_at;
+				latestWsId = wsId;
 			}
 		}
 	}
+	return latestWsId;
+}
 
-	const sections = withConversation.map((ws) => {
-		const snippets = recentConversation.get(ws.id)!;
-		const lines = snippets.map((s) => {
-			const label = formatSnippetLabel(s);
-			return `- [${s.source}] ${label}: "${truncate(s.content, 100)}" (${relativeTime(s.created_at)})`;
-		});
-		const heading = ws.id === latestAgentWsId
-			? `### ${ws.name} (${ws.id.slice(0, 8)}) ← last agent response`
-			: `### ${ws.name} (${ws.id.slice(0, 8)})`;
-		return `${heading}\n${lines.join("\n")}`;
+function formatWorkstreamWithConversation(
+	ws: WorkstreamRow,
+	snippets: ConversationSnippet[] | undefined,
+	isLastAgentResponse: boolean,
+): string {
+	const marker = isLastAgentResponse ? " ← last agent response" : "";
+	const header = formatWorkstreamLine(ws, marker || undefined);
+	if (!snippets || snippets.length === 0) return header;
+
+	const messageLines = snippets.map((s) => {
+		const label = s.direction === "outbound" ? "Agent" : "User";
+		return `    [${s.source}] ${label}: ${collapseNewlines(s.content)} (${relativeTime(s.created_at)})`;
 	});
-
-	return `\n## Recent conversation per workstream\n${sections.join("\n\n")}\n`;
+	return `${header}\n${messageLines.join("\n")}`;
 }
 
 function buildClassificationPrompt(
@@ -95,12 +83,13 @@ function buildClassificationPrompt(
 	recentConversation: Map<string, ConversationSnippet[]>,
 	projects: string[],
 ): string {
+	const latestAgentWsId = findLastAgentResponseWorkstream(recentConversation);
 	const workstreamBlock =
 		workstreams.length > 0
-			? workstreams.map((ws) => formatWorkstreamLine(ws)).join("\n")
+			? workstreams.map((ws) =>
+				formatWorkstreamWithConversation(ws, recentConversation.get(ws.id), ws.id === latestAgentWsId),
+			).join("\n")
 			: "(none open)";
-
-	const conversationBlock = buildConversationBlock(workstreams, recentConversation);
 
 	const closedBlock =
 		recentlyClosed.length > 0
@@ -115,7 +104,7 @@ Given a user message, classify it against open workstreams and known projects.
 
 ## Open workstreams
 ${workstreamBlock}
-${conversationBlock}
+
 ## Recently closed workstreams (last 6 hours)
 ${closedBlock}
 
@@ -158,7 +147,7 @@ export async function classifyMessage(
 ): Promise<ClassificationResult> {
 	const workstreams = listOpenWorkstreams(db);
 	const recentlyClosed = listRecentlyClosedWorkstreams(db, 6);
-	const recentConversation = getRecentConversationByWorkstream(db, 12, 5);
+	const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
 	const projects = listProjectDirs(projectsDir);
 	const prompt = buildClassificationPrompt(message, workstreams, recentlyClosed, recentConversation, projects);
 
