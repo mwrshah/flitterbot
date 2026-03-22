@@ -156,6 +156,7 @@ export class PiSessionManager {
 			thinkingLevel: this.config.piThinkingLevel,
 			startedAt: new Date().toISOString(),
 			lastEventAt: new Date().toISOString(),
+			workstreamId,
 		});
 
 		this.orchestrators.set(workstreamId, managed);

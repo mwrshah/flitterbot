@@ -18,6 +18,7 @@ type PiSessionRecord = {
   last_event_at: string;
   ended_at?: string;
   end_reason?: string;
+  workstream_id?: string;
 };
 
 export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
@@ -38,8 +39,9 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        last_prompt_at,
        last_event_at,
        ended_at,
-       end_reason
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       end_reason,
+       workstream_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(pi_session_id) DO UPDATE SET
        role = excluded.role,
        status = excluded.status,
@@ -55,7 +57,8 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        last_prompt_at = COALESCE(excluded.last_prompt_at, pi_sessions.last_prompt_at),
        last_event_at = MAX(pi_sessions.last_event_at, excluded.last_event_at),
        ended_at = COALESCE(excluded.ended_at, pi_sessions.ended_at),
-       end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason)`
+       end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
+       workstream_id = COALESCE(excluded.workstream_id, pi_sessions.workstream_id)`
   ).run(
     session.pi_session_id,
     session.role,
@@ -73,6 +76,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
     session.last_event_at,
     session.ended_at ?? null,
     session.end_reason ?? null,
+    session.workstream_id ?? null,
   );
 }
 

@@ -357,6 +357,24 @@ function applyV8Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=ON;");
 }
 
+function applyV9Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      ALTER TABLE pi_sessions ADD COLUMN workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_pi_sessions_workstream ON pi_sessions(workstream_id);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (9);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -395,6 +413,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 8) {
     applyV8Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 9) {
+    applyV9Migration(db);
   }
 
   return getSchemaVersion(db);

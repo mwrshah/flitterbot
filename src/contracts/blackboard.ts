@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 8;
+export const BLACKBOARD_SCHEMA_VERSION = 9;
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
 export type PiSessionStatus = "active" | "waiting_for_user" | "waiting_for_sessions" | "ended" | "crashed";
@@ -167,8 +167,11 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     last_prompt_at DATETIME,
     last_event_at DATETIME NOT NULL,
     ended_at DATETIME,
-    end_reason TEXT
+    end_reason TEXT,
+    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_pi_sessions_workstream ON pi_sessions(workstream_id);
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -770,7 +770,7 @@ export class ControlSurfaceRuntime {
 					if (!piSessId) {
 						return { content: [{ type: "text", text: "Error: Orchestrator session not found" }], details: {} };
 					}
-					const result = executeCloseWorkstream(this.blackboard, piSessId, params.workstream_id);
+					const result = await executeCloseWorkstream(this.blackboard, piSessId, params.workstream_id);
 					return { content: [{ type: "text", text: result.message }], details: result };
 				},
 			});

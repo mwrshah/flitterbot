@@ -4,6 +4,8 @@ import path from "node:path";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
 import { getWorkstreamById, closeWorkstream } from "../../blackboard/queries/workstreams.ts";
 import { endPiSession } from "../../blackboard/queries/pi-sessions.ts";
+import { markSessionEnded } from "../../blackboard/queries/sessions.ts";
+import { killTmuxSession } from "../../claude-sessions/tmux.ts";
 
 type CloseWorkstreamResult = {
   ok: boolean;
@@ -142,17 +144,36 @@ function removeWithRawGit(worktreePath: string): boolean {
   }
 }
 
-export function executeCloseWorkstream(
+export async function executeCloseWorkstream(
   blackboard: BlackboardDatabase,
   piSessionId: string,
   workstreamId: string,
-): CloseWorkstreamResult {
+): Promise<CloseWorkstreamResult> {
   const workstream = getWorkstreamById(blackboard, workstreamId);
   if (!workstream) {
     return { ok: false, workstreamId, message: `Workstream ${workstreamId} not found` };
   }
   if (workstream.status !== "open") {
     return { ok: false, workstreamId, message: `Workstream ${workstreamId} is already closed` };
+  }
+
+  // Step 0: Kill active CC sessions belonging to this workstream
+  const activeSessions = blackboard
+    .prepare(
+      `SELECT session_id, tmux_session
+       FROM sessions
+       WHERE workstream_id = ?
+         AND status IN ('working', 'idle')`,
+    )
+    .all(workstreamId) as { session_id: string; tmux_session: string | null }[];
+
+  let sessionsKilled = 0;
+  for (const session of activeSessions) {
+    if (session.tmux_session) {
+      await killTmuxSession(session.tmux_session);
+    }
+    markSessionEnded(blackboard, session.session_id, "workstream_closed");
+    sessionsKilled++;
   }
 
   const worktreePath = workstream.worktree_path;
@@ -200,6 +221,7 @@ export function executeCloseWorkstream(
   endPiSession(blackboard, piSessionId, "ended", "workstream_closed");
 
   const parts = [`Workstream "${workstream.name}" closed.`];
+  if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
   if (merged) parts.push("Branch merged to main.");
   if (pushed) parts.push("Pushed to origin.");
   if (worktreeRemoved) parts.push("Worktree removed (branch preserved).");
@@ -229,7 +251,7 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
       additionalProperties: false,
     },
     execute: async (_toolCallId: string, params: any) => {
-      const result = executeCloseWorkstream(blackboard, piSessionId, params.workstream_id);
+      const result = await executeCloseWorkstream(blackboard, piSessionId, params.workstream_id);
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
