@@ -13,6 +13,7 @@ export class AutonomaWsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 3000;
   private static readonly MAX_RECONNECT_DELAY = 30000;
+  private activeSubscriptions = new Set<string>();
 
   constructor(getSettings: () => ControlSurfaceSettings) {
     this.getSettings = getSettings;
@@ -48,6 +49,10 @@ export class AutonomaWsClient {
     this.socket.onopen = () => {
       this.reconnectDelay = 3000;
       this.setConnectionState("connected");
+      // Re-subscribe to all active sessions after reconnect
+      for (const sessionId of this.activeSubscriptions) {
+        this.socket?.send(JSON.stringify({ type: "subscribe", sessionId }));
+      }
     };
 
     this.socket.onmessage = (event) => {
@@ -118,6 +123,20 @@ export class AutonomaWsClient {
     if (images?.length) payload.images = images;
     if (targetSessionId) payload.targetSessionId = targetSessionId;
     this.socket.send(JSON.stringify(payload));
+  }
+
+  subscribeSession(sessionId: string): void {
+    this.activeSubscriptions.add(sessionId);
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: "subscribe", sessionId }));
+    }
+  }
+
+  unsubscribeSession(sessionId: string): void {
+    this.activeSubscriptions.delete(sessionId);
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: "unsubscribe", sessionId }));
+    }
   }
 
   subscribe(fn: WsSubscriber): () => void {

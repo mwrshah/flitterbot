@@ -118,19 +118,18 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
     };
   }, [apiClient, piSessionId, scrollToBottom]);
 
+  // Subscribe to this Pi session's events on the server
+  useEffect(() => {
+    if (!piSessionId) return;
+    wsClient.subscribeSession(piSessionId);
+    return () => {
+      wsClient.unsubscribeSession(piSessionId);
+    };
+  }, [wsClient, piSessionId]);
+
   // WebSocket events
   useEffect(() => {
     const unsubscribe = wsClient.subscribe((message) => {
-      // Filter events by sessionId when viewing a specific Pi session
-      if (
-        piSessionId &&
-        "sessionId" in message &&
-        message.sessionId &&
-        message.sessionId !== piSessionId
-      ) {
-        return;
-      }
-
       if (message.type === "connected") {
         addPill({
           id: "ws-connected",

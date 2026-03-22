@@ -23,7 +23,7 @@
     "typescript-eslint": "^8.56.1"
   },
   "dependencies": {
-    "@google/genai": "^1.46.0",
+    "openai": "^5.8.2",
     "@mariozechner/pi-ai": "^0.57.1",
     "@mariozechner/pi-coding-agent": "^0.57.1",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",

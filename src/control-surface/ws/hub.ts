@@ -12,6 +12,7 @@ export type WebSocketClient = {
   id: string;
   socket: net.Socket;
   buffer: Buffer;
+  subscriptions: Set<string>;
 };
 
 type WebSocketMessageHandler = (
@@ -59,6 +60,7 @@ export class WebSocketHub {
       id: crypto.randomUUID(),
       socket,
       buffer: head && head.length > 0 ? Buffer.from(head) : Buffer.alloc(0),
+      subscriptions: new Set(),
     };
     this.clients.set(client.id, client);
     socket.on("data", (chunk) => {
@@ -76,10 +78,31 @@ export class WebSocketHub {
   }
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
+    const sessionId = "sessionId" in payload ? (payload as any).sessionId as string | undefined : undefined;
     const frame = encodeFrame(JSON.stringify(payload));
     for (const client of this.clients.values()) {
-      client.socket.write(frame);
+      // No sessionId on event → global event, deliver to all
+      if (!sessionId) {
+        client.socket.write(frame);
+        continue;
+      }
+      // Client has no subscriptions → skip (they haven't subscribed to anything)
+      if (client.subscriptions.size === 0) continue;
+      // Wildcard or matching subscription
+      if (client.subscriptions.has("*") || client.subscriptions.has(sessionId)) {
+        client.socket.write(frame);
+      }
     }
+  }
+
+  subscribeClient(clientId: string, sessionId: string): void {
+    const client = this.clients.get(clientId);
+    if (client) client.subscriptions.add(sessionId);
+  }
+
+  unsubscribeClient(clientId: string, sessionId: string): void {
+    const client = this.clients.get(clientId);
+    if (client) client.subscriptions.delete(sessionId);
   }
 
   send(clientId: string, payload: ControlSurfaceWebSocketServerEvent): void {

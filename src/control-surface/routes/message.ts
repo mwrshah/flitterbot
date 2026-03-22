@@ -7,6 +7,7 @@ import type {
 } from "../../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { classifyMessage } from "../router/classify.ts";
+import { resolveGroqApiKey } from "../router/groq-client.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
 export async function handleMessageRoute(runtime: ControlSurfaceRuntime, req: http.IncomingMessage, res: http.ServerResponse) {
@@ -51,11 +52,12 @@ async function routeMessage(
   runtime: ControlSurfaceRuntime,
   rawText: string,
 ): Promise<{ metadata: Record<string, unknown> } | null> {
-  const { geminiApiKey, projectsDir } = runtime.config;
-  if (!geminiApiKey) return null;
+  const { projectsDir } = runtime.config;
 
   try {
-    const result = await classifyMessage(rawText, runtime.blackboard, geminiApiKey, projectsDir);
+    const apiKey = resolveGroqApiKey();
+    if (!apiKey) return null;
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, projectsDir);
     const meta: Record<string, unknown> = {
       router_action: result.action,
       router_is_work: result.isWorkMessage,

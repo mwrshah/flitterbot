@@ -209,9 +209,9 @@ export type SkillsListResponse = {
 
 export type WsMessage =
   | { type: "connected"; clientId: string }
-  | { type: "message_queued"; itemId: string; queueDepth: number }
-  | { type: "queue_item_start"; item: { id: string; source: string } }
-  | { type: "queue_item_end"; itemId: string; error?: string }
+  | { type: "message_queued"; itemId: string; queueDepth: number; sessionId?: string }
+  | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
+  | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
   | { type: "text_delta"; delta: string; sessionId?: string }
   | {
       type: "message_end";
@@ -233,5 +233,5 @@ export type WsMessage =
       sessionId?: string;
     }
   | { type: "turn_end"; sessionId?: string }
-  | { type: "pi_surfaced"; content: string; timestamp?: string }
+  | { type: "pi_surfaced"; content: string; timestamp?: string; sessionId?: string }
   | { type: "error"; message: string };

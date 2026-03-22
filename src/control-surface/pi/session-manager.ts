@@ -304,6 +304,7 @@ export class PiSessionManager {
 				this.wsHub.broadcast({
 					type: "queue_item_start",
 					item,
+					sessionId: managed.piSessionId,
 					...(workstreamId ? { workstreamId } : {}),
 				} as any);
 			},
@@ -324,6 +325,7 @@ export class PiSessionManager {
 					type: "queue_item_end",
 					itemId: item.id,
 					error: error instanceof Error ? error.message : error ? String(error) : undefined,
+					sessionId: managed.piSessionId,
 					...(workstreamId ? { workstreamId } : {}),
 				} as any);
 			},

@@ -623,6 +623,7 @@ export class ControlSurfaceRuntime {
 					type: "pi_surfaced",
 					content: finalText,
 					timestamp: new Date().toISOString(),
+					sessionId: managed.piSessionId,
 					workstreamId: managed.workstreamId ?? undefined,
 				});
 			} catch (error) {
@@ -904,6 +905,14 @@ export class ControlSurfaceRuntime {
 	): Promise<void> {
 		if (!data || typeof data !== "object") return;
 		const payload = data as ControlSurfaceWebSocketClientEvent;
+		if (payload.type === "subscribe" && typeof (payload as any).sessionId === "string") {
+			this.wsHub.subscribeClient(client.id, (payload as any).sessionId);
+			return;
+		}
+		if (payload.type === "unsubscribe" && typeof (payload as any).sessionId === "string") {
+			this.wsHub.unsubscribeClient(client.id, (payload as any).sessionId);
+			return;
+		}
 		if (payload.type === "message" && typeof payload.text === "string") {
 			const targetSessionId = typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
 
@@ -911,10 +920,13 @@ export class ControlSurfaceRuntime {
 			let routerMeta: Record<string, unknown> = {};
 			if (targetSessionId) {
 				routerMeta._targetSessionId = targetSessionId;
-			} else if (this.config.geminiApiKey) {
+			} else {
 				try {
 					const { classifyMessage } = await import("./router/classify.ts");
-					const result = await classifyMessage(payload.text, this.blackboard, this.config.geminiApiKey, this.config.projectsDir);
+					const { resolveGroqApiKey } = await import("./router/groq-client.ts");
+					const apiKey = resolveGroqApiKey();
+					if (!apiKey) throw new Error("No Groq API key available");
+					const result = await classifyMessage(payload.text, this.blackboard, apiKey, this.config.projectsDir);
 					routerMeta = { router_action: result.action, router_is_work: result.isWorkMessage };
 					if (result.workstream) {
 						routerMeta.workstream_id = result.workstream.id;

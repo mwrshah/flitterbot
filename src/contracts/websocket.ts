@@ -15,7 +15,20 @@ export interface WebSocketClientMessageEvent {
   targetSessionId?: string;
 }
 
-export type ControlSurfaceWebSocketClientEvent = WebSocketClientMessageEvent;
+export interface WebSocketClientSubscribeEvent {
+  type: "subscribe";
+  sessionId: string;
+}
+
+export interface WebSocketClientUnsubscribeEvent {
+  type: "unsubscribe";
+  sessionId: string;
+}
+
+export type ControlSurfaceWebSocketClientEvent =
+  | WebSocketClientMessageEvent
+  | WebSocketClientSubscribeEvent
+  | WebSocketClientUnsubscribeEvent;
 
 export interface ConnectedWebSocketEvent {
   type: "connected";
@@ -35,6 +48,7 @@ type QueuedTurnSummary = {
 export interface QueueItemStartWebSocketEvent {
   type: "queue_item_start";
   item: QueuedTurnSummary;
+  sessionId?: string;
   workstreamId?: string;
 }
 
@@ -42,6 +56,7 @@ export interface QueueItemEndWebSocketEvent {
   type: "queue_item_end";
   itemId: string;
   error?: string;
+  sessionId?: string;
   workstreamId?: string;
 }
 
@@ -49,6 +64,7 @@ export interface MessageQueuedWebSocketEvent {
   type: "message_queued";
   itemId: string;
   queueDepth: number;
+  sessionId?: string;
 }
 
 export interface TextDeltaWebSocketEvent {
@@ -98,6 +114,7 @@ export interface PiSurfacedWebSocketEvent {
   type: "pi_surfaced";
   content: string;
   timestamp?: string;
+  sessionId?: string;
   workstreamId?: string;
 }
 

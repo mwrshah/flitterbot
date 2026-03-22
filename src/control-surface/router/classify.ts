@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
 import type { WorkstreamRow } from "../../contracts/index.ts";
 import { listOpenWorkstreams, listRecentlyClosedWorkstreams, insertWorkstream, reopenWorkstream } from "../../blackboard/queries/workstreams.ts";
-import { callGeminiClassify, type GeminiClassifyResult } from "./gemini-client.ts";
+import { callGroqClassify, type ClassifyResult } from "./groq-client.ts";
 import { getRecentConversationByWorkstream, type ConversationSnippet } from "../../blackboard/queries/messages.ts";
 
 export type ClassificationResult = {
@@ -134,6 +134,17 @@ ${projectBlock}
 9. Cron health-check messages (containing "Cron idle check", "Cron stale session check", or similar automated system messages) are NOT work — set is_work_message to false.
 10. Workstreams are about repository-scoped coding/engineering work (features, bugs, investigations in a project), not meta-operations on the Autonoma system itself or general task management.
 
+## Response format
+Respond with ONLY a JSON object containing four fields: workstream_id, new_workstream_name, is_work_message, and reasoning. No other text or explanation. Example:
+\`\`\`json
+{
+  "is_work_message": true,
+  "workstream_id": null,
+  "new_workstream_name": "input-surface-websocket-investigation",
+  "reasoning": "New investigation into websocket streaming issue distinct from existing steer-type workstream"
+}
+\`\`\`
+
 ## User message
 ${message}`;
 }
@@ -141,7 +152,7 @@ ${message}`;
 export async function classifyMessage(
 	message: string,
 	db: BlackboardDatabase,
-	geminiApiKey: string,
+	apiKey: string,
 	projectsDir: string,
 ): Promise<ClassificationResult> {
 	const workstreams = listOpenWorkstreams(db);
@@ -150,13 +161,13 @@ export async function classifyMessage(
 	const projects = listProjectDirs(projectsDir);
 	const prompt = buildClassificationPrompt(message, workstreams, recentlyClosed, recentConversation, projects);
 
-	let result: GeminiClassifyResult;
+	let result: ClassifyResult;
 	try {
-		result = await callGeminiClassify(geminiApiKey, prompt);
+		result = await callGroqClassify(apiKey, prompt);
 	} catch (error) {
-		// If Gemini fails, pass through as non-work (don't block the message)
+		// If classification fails, pass through as non-work (don't block the message)
 		console.error(
-			`[router] Gemini classification failed: ${error instanceof Error ? error.message : String(error)}`,
+			`[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 		return { workstream: null, isWorkMessage: false, action: "none" };
 	}
@@ -181,7 +192,7 @@ export async function classifyMessage(
 			}
 		}
 
-		// Gemini returned an id that doesn't exist — fall through to create
+		// LLM returned an id that doesn't exist — fall through to create
 	}
 
 	// Create new workstream
