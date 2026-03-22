@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
@@ -252,7 +260,11 @@ export function InputSurface() {
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [timeline, setTimeline] = useState<ChatTimelineItem[]>([]);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(wsClient.connectionState);
+  const connectionState = useSyncExternalStore(
+    useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
+    useCallback(() => wsClient.connectionState, [wsClient]),
+    () => "disconnected" as ConnectionState,
+  );
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
@@ -348,10 +360,8 @@ export function InputSurface() {
     // clients with zero subscriptions.
     wsClient.subscribeSession("*");
 
-    const unsubscribeConnection = wsClient.subscribeConnection(setConnectionState);
     return () => {
       unsubscribe();
-      unsubscribeConnection();
       wsClient.unsubscribeSession("*");
     };
   }, [wsClient]);
