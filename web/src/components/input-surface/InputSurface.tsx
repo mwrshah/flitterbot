@@ -395,7 +395,7 @@ export function InputSurface() {
     try {
       await wsClient.sendMessage(text || "(image)", deliveryMode, images);
     } catch {
-      await apiClient.queueMessage({
+      await apiClient.sendMessage({
         text: text || "(image)",
         source: "web",
         deliveryMode,

@@ -92,10 +92,6 @@ function RuntimePage() {
                   label="Messages"
                   value={String(status.pi?.default?.messageCount ?? 0)}
                 />
-                <MetaItem
-                  label="Queue depth"
-                  value={String(status.pi?.default?.queueDepth ?? 0)}
-                />
               </div>
             </CardContent>
           </Card>
@@ -125,10 +121,6 @@ function RuntimePage() {
                         <MetaItem
                           label="Messages"
                           value={String(o.messageCount)}
-                        />
-                        <MetaItem
-                          label="Queue"
-                          value={String(o.queueDepth)}
                         />
                         <Badge
                           variant={o.busy ? "success" : "default"}

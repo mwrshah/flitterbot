@@ -38,15 +38,11 @@ function PiAgentPage() {
         <TabsTrigger value="default">
           Default
           {defaultPi?.busy && <Badge variant="success">active</Badge>}
-          {(defaultPi?.queueDepth ?? 0) > 0 && (
-            <Badge variant="muted">{defaultPi!.queueDepth}</Badge>
-          )}
         </TabsTrigger>
         {orchestrators.map((o) => (
           <TabsTrigger key={o.sessionId} value={o.sessionId}>
             {o.workstreamName ?? o.workstreamId}
             {o.busy && <Badge variant="success">active</Badge>}
-            {o.queueDepth > 0 && <Badge variant="muted">{o.queueDepth}</Badge>}
           </TabsTrigger>
         ))}
       </TabsList>

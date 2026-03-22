@@ -298,7 +298,6 @@ export class PiSessionManager {
 		const processCallback = this.processCallback;
 		managed.queue = new TurnQueue({
 			process: (item) => processCallback(managed, item),
-			onDepthChange: (depth) => state.setQueueDepth(depth),
 			onItemStart: (item) => {
 				state.setBusy(true, item);
 				this.wsHub.broadcast({

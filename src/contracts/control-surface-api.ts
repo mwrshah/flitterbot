@@ -36,7 +36,6 @@ export interface PiRuntimeStatus {
   sessionFile: string | null;
   messageCount: number;
   lastPromptAt: string | null;
-  queueDepth: number;
   busy: boolean;
 }
 
@@ -71,7 +70,6 @@ export interface PiOrchestratorStatus {
   workstreamId: string;
   workstreamName: string | null;
   messageCount: number;
-  queueDepth: number;
   busy: boolean;
 }
 
@@ -110,8 +108,6 @@ export interface MessageRequest {
 
 export interface MessageResponse {
   ok: boolean;
-  queued: boolean;
-  queueDepth: number;
 }
 
 export interface ClaudeHookPayload {
@@ -132,10 +128,8 @@ export interface ClaudeHookPayload {
 
 export interface HookResponse {
   ok: boolean;
-  queued?: boolean;
   filtered?: boolean;
   bookkeeping?: boolean;
-  queueDepth?: number;
 }
 
 export interface SessionsListResponse {

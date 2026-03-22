@@ -15,7 +15,6 @@ export type QueueItem = {
 
 type TurnQueueOptions = {
   process: (item: QueueItem) => Promise<void>;
-  onDepthChange?: (depth: number) => void;
   onItemStart?: (item: QueueItem) => void;
   onItemEnd?: (item: QueueItem, error?: unknown) => void;
 };
@@ -23,7 +22,6 @@ type TurnQueueOptions = {
 export class TurnQueue {
   private readonly items: QueueItem[] = [];
   private readonly processItem: TurnQueueOptions["process"];
-  private readonly onDepthChange?: TurnQueueOptions["onDepthChange"];
   private readonly onItemStart?: TurnQueueOptions["onItemStart"];
   private readonly onItemEnd?: TurnQueueOptions["onItemEnd"];
   private processing = false;
@@ -32,12 +30,11 @@ export class TurnQueue {
 
   constructor(options: TurnQueueOptions) {
     this.processItem = options.process;
-    this.onDepthChange = options.onDepthChange;
     this.onItemStart = options.onItemStart;
     this.onItemEnd = options.onItemEnd;
   }
 
-  enqueue(item: QueueItem): number {
+  enqueue(item: QueueItem): void {
     if (this.stopped) {
       throw new Error("turn queue is stopped");
     }
@@ -45,13 +42,11 @@ export class TurnQueue {
     // Steer messages bypass the queue and interrupt the current turn immediately
     if (item.deliveryMode === "steer" && this.processing) {
       void this.processItem(item).catch(() => {});
-      return this.items.length;
+      return;
     }
 
     this.items.push(item);
-    this.emitDepth();
     void this.pump();
-    return this.items.length;
   }
 
   getDepth(): number {
@@ -70,17 +65,12 @@ export class TurnQueue {
     this.stopped = true;
   }
 
-  private emitDepth(): void {
-    this.onDepthChange?.(this.items.length);
-  }
-
   private async pump(): Promise<void> {
     if (this.processing || this.stopped) return;
     this.processing = true;
     while (!this.stopped && this.items.length > 0) {
       const item = this.items.shift()!;
       this.currentItem = item;
-      this.emitDepth();
       this.onItemStart?.(item);
       try {
         await this.processItem(item);
@@ -92,6 +82,5 @@ export class TurnQueue {
       }
     }
     this.processing = false;
-    this.emitDepth();
   }
 }

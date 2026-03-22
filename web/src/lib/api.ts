@@ -1,7 +1,7 @@
 import type {
   DirectMessageResponse,
   PiHistoryResponse,
-  QueueMessageResponse,
+  SendMessageResponse,
   SessionDetailResponse,
   SessionListResponse,
   SkillsListResponse,
@@ -56,14 +56,14 @@ export function createAutonomaApiClient(
       );
     },
 
-    queueMessage: (body: {
+    sendMessage: (body: {
       text: string;
       source: string;
       deliveryMode: string;
       images?: Array<{ data: string; mimeType: string }>;
       targetSessionId?: string;
     }) =>
-      request<QueueMessageResponse>("/message", {
+      request<SendMessageResponse>("/message", {
         method: "POST",
         body: JSON.stringify(body),
       }),

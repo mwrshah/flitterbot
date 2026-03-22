@@ -36,7 +36,7 @@ export async function handleMessageRoute(runtime: ControlSurfaceRuntime, req: ht
     }
   }
 
-  const queued = runtime.enqueue({
+  runtime.enqueue({
     text: formatted,
     source,
     metadata: { ...body.metadata, ...workstreamMeta },
@@ -44,7 +44,7 @@ export async function handleMessageRoute(runtime: ControlSurfaceRuntime, req: ht
     images: Array.isArray(body.images) ? body.images : undefined,
   });
 
-  const response: MessageResponse = { ok: true, queued: true, queueDepth: queued.queueDepth };
+  const response: MessageResponse = { ok: true };
   return sendJson(res, 200, response);
 }
 

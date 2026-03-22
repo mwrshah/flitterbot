@@ -124,7 +124,6 @@ export function Sidebar({
   const status = statusQuery.data;
   const piState = status?.pi?.default?.busy ? "active" : "idle";
   const waStatus = status?.whatsapp.status ?? "unknown";
-  const queueDepth = status?.pi?.default?.queueDepth ?? 0;
   const workstreams = status?.workstreams ?? [];
 
   return (
@@ -166,13 +165,6 @@ export function Sidebar({
           label="WS"
           value={connectionState}
         />
-        {queueDepth > 0 && (
-          <StatusDot
-            color="bg-amber-500"
-            label="Queue"
-            value={String(queueDepth)}
-          />
-        )}
       </div>
 
       {/* Navigation */}

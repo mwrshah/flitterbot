@@ -138,14 +138,6 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
         return;
       }
 
-      if (message.type === "message_queued") {
-        addPill({
-          id: `queued-${message.itemId}`,
-          label: `Queued (${message.queueDepth})`,
-        });
-        return;
-      }
-
       if (message.type === "queue_item_start") {
         const sourceLabel =
           message.item.source === "whatsapp" ? "WhatsApp" :
@@ -161,7 +153,6 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
 
       if (message.type === "queue_item_end") {
         removePill(`processing-${message.itemId}`);
-        removePill(`queued-${message.itemId}`);
         if (message.error) {
           addPill({
             id: `error-${message.itemId}`,
@@ -344,16 +335,12 @@ export function ChatPanel({ piSessionId }: { piSessionId?: string } = {}) {
     try {
       await wsClient.sendMessage(text || "(image)", deliveryMode, images, piSessionId);
     } catch {
-      const response = await apiClient.queueMessage({
+      await apiClient.sendMessage({
         text: text || "(image)",
         source: "web",
         deliveryMode,
         images,
         targetSessionId: piSessionId,
-      });
-      addPill({
-        id: createId("http-queued"),
-        label: `Queued via HTTP (${response.queueDepth})`,
       });
     } finally {
       setIsSending(false);

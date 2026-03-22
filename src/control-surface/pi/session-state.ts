@@ -14,7 +14,6 @@ export class PiSessionState {
 	private snapshot: PiRuntimeSnapshot = {
 		messageCount: 0,
 		busy: false,
-		queueDepth: 0,
 	};
 
 	initialize(sessionId: string, sessionFile: string | undefined, messageCount: number): void {
@@ -22,10 +21,6 @@ export class PiSessionState {
 		this.snapshot.sessionFile = sessionFile;
 		this.snapshot.messageCount = messageCount;
 		this.snapshot.lastEventAt = new Date().toISOString();
-	}
-
-	setQueueDepth(queueDepth: number): void {
-		this.snapshot.queueDepth = queueDepth;
 	}
 
 	notePrompt(messageCount: number): string {

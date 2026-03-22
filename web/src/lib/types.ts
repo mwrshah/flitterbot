@@ -140,7 +140,6 @@ export type StatusResponse = {
     default?: {
       sessionId?: string;
       busy?: boolean;
-      queueDepth?: number;
       messageCount?: number;
       state?: string;
     };
@@ -149,7 +148,6 @@ export type StatusResponse = {
       workstreamId: string;
       workstreamName?: string;
       messageCount: number;
-      queueDepth: number;
       busy: boolean;
     }>;
   };
@@ -178,9 +176,8 @@ export type SessionDetailResponse = {
   tmux?: TmuxSessionInspection | null;
 };
 
-export type QueueMessageResponse = {
+export type SendMessageResponse = {
   ok: boolean;
-  queueDepth: number;
 };
 
 export type DirectMessageResponse = {
@@ -209,7 +206,6 @@ export type SkillsListResponse = {
 
 export type WsMessage =
   | { type: "connected"; clientId: string }
-  | { type: "message_queued"; itemId: string; queueDepth: number; sessionId?: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
   | { type: "text_delta"; delta: string; sessionId?: string }

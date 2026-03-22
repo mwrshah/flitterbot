@@ -60,13 +60,6 @@ export interface QueueItemEndWebSocketEvent {
   workstreamId?: string;
 }
 
-export interface MessageQueuedWebSocketEvent {
-  type: "message_queued";
-  itemId: string;
-  queueDepth: number;
-  sessionId?: string;
-}
-
 export interface TextDeltaWebSocketEvent {
   type: "text_delta";
   sessionId?: string;
@@ -122,7 +115,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
-  | MessageQueuedWebSocketEvent
   | TextDeltaWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent

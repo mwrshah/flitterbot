@@ -162,7 +162,7 @@ export class ControlSurfaceRuntime {
 	/**
 	 * Route a message to the correct Pi session's queue based on classification metadata.
 	 */
-	enqueue(input: EnqueueInput): { ok: true; queued: true; queueDepth: number; item: QueueItem } {
+	enqueue(input: EnqueueInput): { ok: true; item: QueueItem } {
 		const images = input.images?.map((img) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType }));
 		const item: QueueItem = {
 			id: crypto.randomUUID(),
@@ -201,13 +201,13 @@ export class ControlSurfaceRuntime {
 				streamingBehavior: "steer",
 				images: item.images,
 			});
-			return { ok: true, queued: true, queueDepth: target.queue.getDepth(), item };
+			return { ok: true, item };
 		}
 
-		const queueDepth = target.queue.enqueue(item);
-		this.log(`queued ${item.source} item ${item.id} → ${target.role}${target.workstreamId ? ` ws=${target.workstreamId}` : ""} depth=${queueDepth}`);
+		target.queue.enqueue(item);
+		this.log(`enqueued ${item.source} item ${item.id} → ${target.role}${target.workstreamId ? ` ws=${target.workstreamId}` : ""}`);
 
-		return { ok: true, queued: true, queueDepth, item };
+		return { ok: true, item };
 	}
 
 	handleHook(eventName: string, payload: Record<string, unknown>): HookResponse {
@@ -275,7 +275,7 @@ export class ControlSurfaceRuntime {
 		}
 
 		if (normalized !== "stop") {
-			return { ok: true, queued: false, bookkeeping: true };
+			return { ok: true, bookkeeping: true };
 		}
 
 		// Extract last assistant message from the CC session transcript for Pi context
@@ -336,9 +336,9 @@ export class ControlSurfaceRuntime {
 			this.log(`message persist failed: ${error instanceof Error ? error.message : String(error)}`);
 		}
 
-		const queueDepth = targetQueue.queue.enqueue(hookItem);
-		this.log(`queued hook stop item ${hookItem.id} → ${targetQueue.role}${targetQueue.workstreamId ? ` ws=${targetQueue.workstreamId}` : ""} depth=${queueDepth}`);
-		return { ok: true, queued: true, queueDepth };
+		targetQueue.queue.enqueue(hookItem);
+		this.log(`enqueued hook stop item ${hookItem.id} → ${targetQueue.role}${targetQueue.workstreamId ? ` ws=${targetQueue.workstreamId}` : ""}`);
+		return { ok: true };
 	}
 
 	getStatus(): StatusResponse {
@@ -354,7 +354,6 @@ export class ControlSurfaceRuntime {
 				workstreamId: o.workstreamId!,
 				workstreamName: o.workstreamName,
 				messageCount: o.session?.messages?.length ?? snap.messageCount,
-				queueDepth: snap.queueDepth,
 				busy: snap.busy,
 			};
 		});
@@ -380,7 +379,6 @@ export class ControlSurfaceRuntime {
 					sessionFile: defSnapshot.sessionFile ?? null,
 					messageCount: def.session?.messages?.length ?? defSnapshot.messageCount,
 					lastPromptAt: defSnapshot.lastPromptAt ?? null,
-					queueDepth: defSnapshot.queueDepth,
 					busy: defSnapshot.busy,
 				},
 				orchestrators: orchestratorStatuses,
@@ -937,7 +935,7 @@ export class ControlSurfaceRuntime {
 				}
 			}
 
-			const queued = this.enqueue({
+			this.enqueue({
 				text: payload.text,
 				source: "web",
 				metadata: { via: "ws", ...routerMeta },
@@ -945,7 +943,6 @@ export class ControlSurfaceRuntime {
 				deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
 				images: Array.isArray(payload.images) ? payload.images : undefined,
 			});
-			this.wsHub.send(client.id, { type: "message_queued", itemId: queued.item.id, queueDepth: queued.queueDepth });
 
 			// Mirror web user message to WhatsApp for complete conversation record
 			try {
