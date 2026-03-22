@@ -48,19 +48,9 @@ export function reopenWorkstream(db: BlackboardDatabase, workstreamId: string): 
 }
 
 export function resetAllWorkstreams(db: BlackboardDatabase): number {
-	const open = db.prepare("SELECT COUNT(*) as count FROM workstreams WHERE status = 'open'").get() as { count: number };
-	db.prepare(
-		`UPDATE workstreams
-		 SET status = 'closed', closed_at = datetime('now')
-		 WHERE status = 'open'`,
-	).run();
-	// Unlink sessions from closed workstreams
-	db.prepare(
-		`UPDATE sessions SET workstream_id = NULL WHERE workstream_id IN (
-		   SELECT id FROM workstreams WHERE status = 'closed'
-		 )`,
-	).run();
-	return open.count;
+	const count = db.prepare("SELECT COUNT(*) as count FROM workstreams").get() as { count: number };
+	db.prepare("DELETE FROM workstreams").run();
+	return count.count;
 }
 
 export function listRecentlyClosedWorkstreams(db: BlackboardDatabase, withinHours: number): WorkstreamRow[] {
