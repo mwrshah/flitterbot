@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat/ChatPanel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type { ChatTimelineItem } from "~/lib/types";
@@ -7,8 +7,15 @@ import { mergeTimelines } from "./pi.route";
 
 export const Route = createFileRoute("/pi/$sessionId")({
   loader: async ({ params }) => {
-    const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } });
-    return { history: items as ChatTimelineItem[] };
+    try {
+      const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } });
+      return { history: items as ChatTimelineItem[] };
+    } catch (error) {
+      if (error instanceof Error && /404|not found/i.test(error.message)) {
+        throw redirect({ to: "/pi/default" });
+      }
+      throw error;
+    }
   },
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
