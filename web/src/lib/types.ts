@@ -28,6 +28,7 @@ export type ChatTimelineMessage = {
   >;
   images?: ImageAttachment[];
   source?: MessageSource;
+  workstreamName?: string;
   createdAt: string;
 };
 
@@ -239,5 +240,5 @@ export type WsMessage =
       sessionId?: string;
     }
   | { type: "turn_end"; sessionId?: string }
-  | { type: "pi_surfaced"; content: string; timestamp?: string; sessionId?: string }
+  | { type: "pi_surfaced"; content: string; timestamp?: string; sessionId?: string; workstreamName?: string }
   | { type: "error"; message: string };

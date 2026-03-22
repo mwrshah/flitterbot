@@ -623,6 +623,7 @@ export class ControlSurfaceRuntime {
 					timestamp: new Date().toISOString(),
 					sessionId: managed.piSessionId,
 					workstreamId: managed.workstreamId ?? undefined,
+					workstreamName: managed.workstreamName,
 				});
 			} catch (error) {
 				this.log(`auto-surface to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`);

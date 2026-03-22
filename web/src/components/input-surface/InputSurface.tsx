@@ -30,7 +30,7 @@ type SurfaceEntry = {
   | { kind: "inbound"; source: MessageSource; content: string }
   | { kind: "outbound"; channel: "whatsapp" | "all"; content: string }
   | { kind: "hook"; eventName: string; detail: string }
-  | { kind: "pi-response"; content: string }
+  | { kind: "pi-response"; content: string; workstreamName?: string }
 );
 
 /* ── Helpers ── */
@@ -86,6 +86,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         timestamp: item.createdAt,
         kind: "pi-response",
         content: item.content,
+        workstreamName: item.workstreamName,
       });
       continue;
     }
@@ -187,6 +188,11 @@ function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response
         </div>
       </div>
       <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
+        {entry.workstreamName && (
+          <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
+            {entry.workstreamName}
+          </span>
+        )}
         <LitMarkdownBlock content={entry.content} />
       </div>
     </div>
@@ -318,6 +324,7 @@ export function InputSurface() {
               kind: "message",
               role: "assistant",
               content: message.content,
+              workstreamName: message.workstreamName,
               createdAt: message.timestamp ?? new Date().toISOString(),
             },
           ]);
