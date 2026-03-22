@@ -9,9 +9,10 @@ const rootApi = getRouteApi("__root__");
 export function AppShell() {
   const { wsClient } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(wsClient.connectionState);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
 
   useEffect(() => {
+    setConnectionState(wsClient.connectionState);
     return wsClient.subscribeConnection(setConnectionState);
   }, [wsClient]);
 
