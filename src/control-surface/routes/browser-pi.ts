@@ -1,8 +1,8 @@
 import type http from "node:http";
-import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { PiHistoryItem, PiHistoryResponse } from "../../contracts/index.ts";
-import type { ControlSurfaceRuntime } from "../runtime.ts";
+import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
+import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
 async function readSessionHistory(
@@ -12,7 +12,10 @@ async function readSessionHistory(
   const snapshot = managed.state.getSnapshot();
   if (!snapshot.sessionId) return [];
 
-  if (managed.session?.sessionId === snapshot.sessionId && Array.isArray(managed.session.messages)) {
+  if (
+    managed.session?.sessionId === snapshot.sessionId &&
+    Array.isArray(managed.session.messages)
+  ) {
     const body = readPiHistoryFromMessages(
       snapshot.sessionId,
       snapshot.sessionFile ?? null,
@@ -42,7 +45,11 @@ export async function handleBrowserPiHistoryRoute(
   // When input surface requests history with no specific session, aggregate all
   if (historyMode === "input" && !piSessionId) {
     const allSessions: ManagedPiSession[] = [];
-    try { allSessions.push(runtime.sessionManager.getDefault()); } catch { /* no default yet */ }
+    try {
+      allSessions.push(runtime.sessionManager.getDefault());
+    } catch {
+      /* no default yet */
+    }
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
     const allItems: PiHistoryItem[] = [];

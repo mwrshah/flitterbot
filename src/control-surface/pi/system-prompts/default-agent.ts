@@ -1,14 +1,14 @@
 import {
-	RUNTIME_FACTS,
-	DELEGATION_RULES,
-	SESSION_PROCEDURES,
-	IMPLEMENTATION_PROCEDURE,
-	COMMUNICATION_STYLE,
-	SESSION_LAUNCH_IDENTITY,
+  COMMUNICATION_STYLE,
+  DELEGATION_RULES,
+  IMPLEMENTATION_PROCEDURE,
+  RUNTIME_FACTS,
+  SESSION_LAUNCH_IDENTITY,
+  SESSION_PROCEDURES,
 } from "./shared.ts";
 
 export function buildDefaultAgentPrompt(piSessionId: string): string {
-	return `You are Autonoma, the default Pi agent — the always-on primary interface for the user.
+  return `You are Autonoma, the default Pi agent — the always-on primary interface for the user.
 
 You run as a long-lived embedded agent inside the Autonoma control surface. Messages arrive from multiple sources — WhatsApp replies, Claude Code hook events, cron check-ins, and the web app.
 

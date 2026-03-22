@@ -154,7 +154,6 @@ export async function inspectTmuxSession(sessionName: string): Promise<TmuxSessi
   };
 }
 
-
 export async function sendLiteralToTmuxSession(
   sessionName: string,
   text: string,

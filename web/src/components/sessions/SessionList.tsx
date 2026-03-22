@@ -33,8 +33,7 @@ export function SessionList({
   for (const session of items) {
     if (session.workstreamName && session.workstreamId) {
       const key = session.workstreamName;
-      if (!grouped.has(key))
-        grouped.set(key, { id: session.workstreamId, sessions: [] });
+      if (!grouped.has(key)) grouped.set(key, { id: session.workstreamId, sessions: [] });
       grouped.get(key)!.sessions.push(session);
     } else {
       unlinked.push(session);
@@ -46,18 +45,12 @@ export function SessionList({
       {title && (
         <div>
           <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          {description && (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {description}
-            </p>
-          )}
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
         </div>
       )}
 
       {items.length === 0 && (
-        <p className="text-sm text-muted-foreground py-8 text-center">
-          No sessions found.
-        </p>
+        <p className="text-sm text-muted-foreground py-8 text-center">No sessions found.</p>
       )}
 
       {/* Workstream groups */}
@@ -73,11 +66,7 @@ export function SessionList({
 
       {/* Unlinked sessions */}
       {unlinked.length > 0 && grouped.size > 0 && (
-        <SessionGroup
-          label="Unlinked"
-          sessions={unlinked}
-          selectedSessionId={selectedSessionId}
-        />
+        <SessionGroup label="Unlinked" sessions={unlinked} selectedSessionId={selectedSessionId} />
       )}
 
       {/* If no workstream grouping exists, show flat list */}
@@ -123,9 +112,7 @@ function SessionGroup({
             {label}
           </p>
         )}
-        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-          {sessions.length}
-        </span>
+        <span className="text-[10px] text-muted-foreground/60 tabular-nums">{sessions.length}</span>
       </div>
       <div className="space-y-1">
         {sessions.map((session) => (
@@ -140,13 +127,7 @@ function SessionGroup({
   );
 }
 
-function SessionRow({
-  session,
-  selected,
-}: {
-  session: SessionSummary;
-  selected: boolean;
-}) {
+function SessionRow({ session, selected }: { session: SessionSummary; selected: boolean }) {
   return (
     <Link
       to="/sessions/$sessionId"
@@ -159,12 +140,7 @@ function SessionRow({
       )}
     >
       {/* Status dot */}
-      <span
-        className={cn(
-          "w-2 h-2 rounded-full shrink-0",
-          statusDotColor(session.status),
-        )}
-      />
+      <span className={cn("w-2 h-2 rounded-full shrink-0", statusDotColor(session.status))} />
 
       {/* Main info */}
       <div className="flex-1 min-w-0">
@@ -172,23 +148,17 @@ function SessionRow({
           <span className="text-sm font-medium text-foreground truncate">
             {session.taskDescription || session.sessionId}
           </span>
-          <span className="text-[10px] text-muted-foreground/60 shrink-0">
-            {session.status}
-          </span>
+          <span className="text-[10px] text-muted-foreground/60 shrink-0">{session.status}</span>
         </div>
         {session.project && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {session.project}
-          </p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{session.project}</p>
         )}
       </div>
 
       {/* Meta */}
       <div className="text-right shrink-0">
         {session.tmuxSession && (
-          <p className="text-[10px] font-mono text-muted-foreground/60">
-            {session.tmuxSession}
-          </p>
+          <p className="text-[10px] font-mono text-muted-foreground/60">{session.tmuxSession}</p>
         )}
         <p className="text-[10px] text-muted-foreground/50">
           {formatRelativeTime(session.lastEventAt)}

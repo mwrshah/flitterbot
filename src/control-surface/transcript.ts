@@ -23,7 +23,9 @@ function firstString(value: unknown): string | null {
   }
 
   if (Array.isArray(value)) {
-    const values = value.map((item) => firstString(item)).filter((item): item is string => Boolean(item));
+    const values = value
+      .map((item) => firstString(item))
+      .filter((item): item is string => Boolean(item));
     return values.length > 0 ? values.join("\n") : null;
   }
 
@@ -47,8 +49,9 @@ function firstString(value: unknown): string | null {
 }
 
 function detectToolStatus(record: Record<string, unknown>): TranscriptToolStatus | null {
-  const candidate = [record.status, record.tool_status, record.toolStatus]
-    .find((value) => typeof value === "string" && value.trim()) as string | undefined;
+  const candidate = [record.status, record.tool_status, record.toolStatus].find(
+    (value) => typeof value === "string" && value.trim(),
+  ) as string | undefined;
 
   if (!candidate) {
     return null;
@@ -57,7 +60,11 @@ function detectToolStatus(record: Record<string, unknown>): TranscriptToolStatus
   const normalized = candidate.toLowerCase();
   if (normalized.includes("start")) return "started";
   if (normalized.includes("fail") || normalized.includes("error")) return "failed";
-  if (normalized.includes("complete") || normalized.includes("finish") || normalized.includes("success")) {
+  if (
+    normalized.includes("complete") ||
+    normalized.includes("finish") ||
+    normalized.includes("success")
+  ) {
     return "completed";
   }
   return null;
@@ -71,20 +78,25 @@ function normalizeTranscriptItem(
   parsed: unknown,
 ): TranscriptNormalizedItem {
   const record = asRecord(parsed);
-  const rawType = [record.event_name, record.type, record.kind, record.event]
-    .find((value) => typeof value === "string" && value.trim()) as string | undefined;
-  const role = [record.role, record.sender, record.author]
-    .find((value) => value === "user" || value === "assistant" || value === "system") as
-    | "user"
-    | "assistant"
-    | "system"
-    | undefined;
-  const timestamp = [record.timestamp, record.ts, record.time, record.created_at, record.createdAt]
-    .find((value) => typeof value === "string" && value.trim()) as string | undefined;
-  const toolName = [record.tool_name, record.toolName, record.name]
-    .find((value) => typeof value === "string" && value.trim()) as string | undefined;
-  const toolUseId = [record.tool_use_id, record.toolUseId, record.id]
-    .find((value) => typeof value === "string" && value.trim()) as string | undefined;
+  const rawType = [record.event_name, record.type, record.kind, record.event].find(
+    (value) => typeof value === "string" && value.trim(),
+  ) as string | undefined;
+  const role = [record.role, record.sender, record.author].find(
+    (value) => value === "user" || value === "assistant" || value === "system",
+  ) as "user" | "assistant" | "system" | undefined;
+  const timestamp = [
+    record.timestamp,
+    record.ts,
+    record.time,
+    record.created_at,
+    record.createdAt,
+  ].find((value) => typeof value === "string" && value.trim()) as string | undefined;
+  const toolName = [record.tool_name, record.toolName, record.name].find(
+    (value) => typeof value === "string" && value.trim(),
+  ) as string | undefined;
+  const toolUseId = [record.tool_use_id, record.toolUseId, record.id].find(
+    (value) => typeof value === "string" && value.trim(),
+  ) as string | undefined;
   const text = firstString(record) ?? rawLine;
   const toolStatus = detectToolStatus(record);
   const isError = Boolean(record.error) || toolStatus === "failed";
@@ -182,7 +194,9 @@ export async function readTranscriptPage(
         parsed = { type: "raw", text: trimmed };
       }
 
-      items.push(normalizeTranscriptItem(sessionId, transcriptPath, lineNumber + 1, trimmed, parsed));
+      items.push(
+        normalizeTranscriptItem(sessionId, transcriptPath, lineNumber + 1, trimmed, parsed),
+      );
       lineNumber += 1;
     }
   } finally {

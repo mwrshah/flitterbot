@@ -40,8 +40,8 @@ export const IMPLEMENTATION_PROCEDURE = `When the user requests implementation w
 4. Report back to the user what was launched`;
 
 export const SESSION_LAUNCH_IDENTITY = (piSessionId: string, workstreamId?: string) => {
-	const wsFlag = workstreamId ? ` --workstream-id ${workstreamId}` : "";
-	return `## Session Launch Identity
+  const wsFlag = workstreamId ? ` --workstream-id ${workstreamId}` : "";
+  return `## Session Launch Identity
 
 When launching Claude Code sessions via the tmux2 skill, ALWAYS pass your identity flags:
 \`\`\`

@@ -8,26 +8,23 @@
     "web:dev": "pnpm --dir web run dev",
     "web:build": "pnpm --dir web run build",
     "audit": "npm run audit:ts && npm run audit:py && npm run audit:shell",
-    "audit:ts": "eslint \"src/**/*.ts\" \"web/src/**/*.{ts,tsx}\" && knip --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints && knip --directory web --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints",
-    "audit:ts:fix": "eslint --fix \"src/**/*.ts\" \"web/src/**/*.{ts,tsx}\" && pnpm run audit:ts",
+    "audit:ts": "biome check src/ web/src/ && tsc --noEmit && tsc --noEmit -p web/tsconfig.json && knip --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints && knip --directory web --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints",
+    "audit:ts:fix": "biome check --fix src/ web/src/ && pnpm run audit:ts",
     "audit:py": "uv run ruff check .autonoma/scripts && uv run vulture .autonoma/scripts --min-confidence 100",
     "audit:shell": "find .autonoma -type f \\( -name '*.sh' -o -path '.autonoma/bin/autonoma-up' -o -path '.autonoma/bin/autonoma-wa' \\) -print0 | xargs -0 -n1 bash -n && node --check .autonoma/install.mjs && node --check .autonoma/uninstall.mjs"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "^2.4.8",
     "@types/node": "^22.19.15",
-    "eslint": "^10.0.3",
-    "eslint-plugin-unused-imports": "^4.4.1",
-    "globals": "^17.4.0",
     "knip": "^5.86.0",
-    "typescript-eslint": "^8.56.1"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "openai": "^5.8.2",
     "@mariozechner/pi-ai": "^0.57.1",
     "@mariozechner/pi-coding-agent": "^0.57.1",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "dotenv": "^17.3.1",
+    "openai": "^5.8.2",
     "pino": "^10.3.1",
     "qrcode-terminal": "^0.12.0",
     "tailwindcss": "^4.2.1"

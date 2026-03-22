@@ -1,5 +1,5 @@
-import type { BlackboardDatabase } from "../db.ts";
 import type { PiSessionStatus } from "../../contracts/index.ts";
+import type { BlackboardDatabase } from "../db.ts";
 
 type PiSessionRecord = {
   pi_session_id: string;
@@ -58,7 +58,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        last_event_at = MAX(pi_sessions.last_event_at, excluded.last_event_at),
        ended_at = COALESCE(excluded.ended_at, pi_sessions.ended_at),
        end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
-       workstream_id = COALESCE(excluded.workstream_id, pi_sessions.workstream_id)`
+       workstream_id = COALESCE(excluded.workstream_id, pi_sessions.workstream_id)`,
   ).run(
     session.pi_session_id,
     session.role,
@@ -90,24 +90,26 @@ export function markPreviousPiSessionsInactive(
     status?: Extract<PiSessionStatus, "ended" | "crashed">;
   },
 ): number {
-  const result = db.prepare(
-    `UPDATE pi_sessions
+  const result = db
+    .prepare(
+      `UPDATE pi_sessions
      SET status = ?,
          ended_at = ?,
          end_reason = ?,
          last_event_at = MAX(last_event_at, ?)
      WHERE role = ?
        AND status IN ('active', 'waiting_for_user', 'waiting_for_sessions')
-       AND (? IS NULL OR runtime_instance_id != ?)`
-  ).run(
-    options.status ?? "ended",
-    options.endedAt,
-    options.endReason,
-    options.endedAt,
-    options.role,
-    options.runtimeInstanceId ?? null,
-    options.runtimeInstanceId ?? null,
-  );
+       AND (? IS NULL OR runtime_instance_id != ?)`,
+    )
+    .run(
+      options.status ?? "ended",
+      options.endedAt,
+      options.endReason,
+      options.endedAt,
+      options.role,
+      options.runtimeInstanceId ?? null,
+      options.runtimeInstanceId ?? null,
+    );
 
   return Number(result.changes ?? 0);
 }
@@ -116,7 +118,10 @@ export function touchPiSessionPrompt(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<PiSessionStatus, "active" | "waiting_for_user" | "waiting_for_sessions"> = "active",
+  status: Extract<
+    PiSessionStatus,
+    "active" | "waiting_for_user" | "waiting_for_sessions"
+  > = "active",
 ): void {
   db.prepare(
     `UPDATE pi_sessions
@@ -125,7 +130,7 @@ export function touchPiSessionPrompt(
          status = ?,
          ended_at = NULL,
          end_reason = NULL
-     WHERE pi_session_id = ?`
+     WHERE pi_session_id = ?`,
   ).run(timestamp, timestamp, status, piSessionId);
 }
 
@@ -133,7 +138,10 @@ export function touchPiSessionEvent(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<PiSessionStatus, "active" | "waiting_for_user" | "waiting_for_sessions"> = "active",
+  status: Extract<
+    PiSessionStatus,
+    "active" | "waiting_for_user" | "waiting_for_sessions"
+  > = "active",
 ): void {
   db.prepare(
     `UPDATE pi_sessions
@@ -141,14 +149,18 @@ export function touchPiSessionEvent(
          status = ?,
          ended_at = NULL,
          end_reason = NULL
-     WHERE pi_session_id = ?`
+     WHERE pi_session_id = ?`,
   ).run(timestamp, status, piSessionId);
 }
 
 export function closePiSession(
   db: BlackboardDatabase,
   piSessionId: string,
-  options: { status?: Extract<PiSessionStatus, "ended" | "crashed">; endedAt: string; endReason: string },
+  options: {
+    status?: Extract<PiSessionStatus, "ended" | "crashed">;
+    endedAt: string;
+    endReason: string;
+  },
 ): void {
   db.prepare(
     `UPDATE pi_sessions
@@ -156,6 +168,12 @@ export function closePiSession(
          ended_at = ?,
          end_reason = ?,
          last_event_at = MAX(last_event_at, ?)
-     WHERE pi_session_id = ?`
-  ).run(options.status ?? "ended", options.endedAt, options.endReason, options.endedAt, piSessionId);
+     WHERE pi_session_id = ?`,
+  ).run(
+    options.status ?? "ended",
+    options.endedAt,
+    options.endReason,
+    options.endedAt,
+    piSessionId,
+  );
 }

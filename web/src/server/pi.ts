@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { ChatTimelineItem, StatusResponse } from "~/lib/types";
 
-const BASE_URL =
-  process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
+const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
 
 async function piRequest(path: string): Promise<unknown> {

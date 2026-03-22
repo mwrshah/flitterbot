@@ -22,10 +22,7 @@ export type ChatTimelineMessage = {
   kind: "message";
   role: "user" | "assistant" | "system";
   content: string;
-  blocks?: Array<
-    | { type: "text"; text: string }
-    | { type: "thinking"; thinking: string }
-  >;
+  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
   images?: ImageAttachment[];
   source?: MessageSource;
   workstreamName?: string;
@@ -50,19 +47,11 @@ export type ChatTimelineDivider = {
   createdAt: string;
 };
 
-export type ChatTimelineItem =
-  | ChatTimelineMessage
-  | ChatTimelineTool
-  | ChatTimelineDivider;
+export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool | ChatTimelineDivider;
 
 /* ── Connection ── */
 
-export type ConnectionState =
-  | "connected"
-  | "connecting"
-  | "reconnecting"
-  | "stub"
-  | "disconnected";
+export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
 
 export type DeliveryMode = "followUp" | "steer";
 
@@ -242,5 +231,11 @@ export type WsMessage =
       sessionId?: string;
     }
   | { type: "turn_end"; sessionId?: string }
-  | { type: "pi_surfaced"; content: string; timestamp?: string; sessionId?: string; workstreamName?: string }
+  | {
+      type: "pi_surfaced";
+      content: string;
+      timestamp?: string;
+      sessionId?: string;
+      workstreamName?: string;
+    }
   | { type: "error"; message: string };

@@ -3,7 +3,11 @@ import type { StopResponse } from "../../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
-export function handleStopRoute(runtime: ControlSurfaceRuntime, req: http.IncomingMessage, res: http.ServerResponse) {
+export function handleStopRoute(
+  runtime: ControlSurfaceRuntime,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+) {
   if (!requireBearer(req, runtime.config.controlSurfaceToken)) {
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }

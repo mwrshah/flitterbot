@@ -1,12 +1,10 @@
+import type { ClaudeSessionStatus } from "./blackboard.ts";
 import type {
-  ClaudeSessionStatus,
-} from "./blackboard.ts";
-import type { TranscriptPageResponse } from "./transcript.ts";
-import type {
-  TmuxDeliveryMethod,
   SendMessageToTmuxSessionFailureReason,
+  TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
+import type { TranscriptPageResponse } from "./transcript.ts";
 
 export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init";
 export type DeliveryMode = "followUp" | "steer";
@@ -147,10 +145,7 @@ export interface PiHistoryMessageItem {
   role: "user" | "assistant" | "system";
   content: string;
   source?: string;
-  blocks?: Array<
-    | { type: "text"; text: string }
-    | { type: "thinking"; thinking: string }
-  >;
+  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
   createdAt: string;
 }
 

@@ -4,9 +4,9 @@ import { BLACKBOARD_SCHEMA_SQL, BLACKBOARD_SCHEMA_VERSION } from "../contracts/i
 const LATEST_BLACKBOARD_SCHEMA_VERSION = BLACKBOARD_SCHEMA_VERSION;
 
 function hasTable(db: DatabaseSync, tableName: string): boolean {
-  const row = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName) as
-    | { name?: string }
-    | undefined;
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(tableName) as { name?: string } | undefined;
   return Boolean(row?.name);
 }
 
@@ -14,7 +14,9 @@ function getSchemaVersion(db: DatabaseSync): number {
   if (!hasTable(db, "schema_migrations")) {
     return 0;
   }
-  const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations").get() as {
+  const row = db
+    .prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations")
+    .get() as {
     version: number;
   };
   return Number(row.version ?? 0);
@@ -27,7 +29,9 @@ function hasLegacyMarkers(db: DatabaseSync): boolean {
   if (hasTable(db, "agents") || !hasTable(db, "pi_sessions")) {
     return true;
   }
-  const row = db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'running'").get() as {
+  const row = db
+    .prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'running'")
+    .get() as {
     count: number;
   };
   return Number(row.count ?? 0) > 0;
@@ -160,7 +164,9 @@ function applyV4Migration(db: DatabaseSync): void {
     `);
 
     // Add workstream_id column to sessions
-    db.exec("ALTER TABLE sessions ADD COLUMN workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL;");
+    db.exec(
+      "ALTER TABLE sessions ADD COLUMN workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL;",
+    );
 
     // Recreate pi_sessions with updated status CHECK constraint
     db.exec(`
@@ -211,11 +217,15 @@ function applyV5Migration(db: DatabaseSync): void {
 
   try {
     // 1. Add pi_session_id to sessions
-    db.exec("ALTER TABLE sessions ADD COLUMN pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL;");
+    db.exec(
+      "ALTER TABLE sessions ADD COLUMN pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL;",
+    );
     db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);");
 
     // 2. Add status + closed_at to workstreams
-    db.exec("ALTER TABLE workstreams ADD COLUMN status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed'));");
+    db.exec(
+      "ALTER TABLE workstreams ADD COLUMN status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed'));",
+    );
     db.exec("ALTER TABLE workstreams ADD COLUMN closed_at TEXT;");
 
     // 3. Recreate pi_sessions without 'idle' in CHECK constraint, migrate idle → waiting_for_user
@@ -382,7 +392,9 @@ export function migrateBlackboard(db: DatabaseSync): number {
   if (version === 0) {
     // Fresh database — apply full schema at once
     applyFullSchema(db);
-    db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)").run(LATEST_BLACKBOARD_SCHEMA_VERSION);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)").run(
+      LATEST_BLACKBOARD_SCHEMA_VERSION,
+    );
     return LATEST_BLACKBOARD_SCHEMA_VERSION;
   }
 

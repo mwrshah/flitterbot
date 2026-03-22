@@ -40,7 +40,7 @@ export function createPiSessionStore(): PiSessionStore {
   let sessions = new Map<string, SessionAccum>();
   let connectionState: ConnectionState = "disconnected";
   let sendMessageFn: PiSessionStore["getSendMessage"] = () => async () => {};
-  let listeners = new Set<() => void>();
+  const listeners = new Set<() => void>();
   let snapshot: PiSessionSnapshot = { sessions, connectionState };
 
   function notify() {
@@ -79,7 +79,9 @@ export function createPiSessionStore(): PiSessionStore {
     addPill,
     removePill,
     getSendMessage: () => sendMessageFn(),
-    setSendMessage: (fn) => { sendMessageFn = fn; },
+    setSendMessage: (fn) => {
+      sendMessageFn = fn;
+    },
     getConnectionState: () => connectionState,
     setConnectionState: (state) => {
       connectionState = state;
@@ -87,7 +89,9 @@ export function createPiSessionStore(): PiSessionStore {
     },
     subscribe: (fn) => {
       listeners.add(fn);
-      return () => { listeners.delete(fn); };
+      return () => {
+        listeners.delete(fn);
+      };
     },
     getSnapshot: () => snapshot,
   };

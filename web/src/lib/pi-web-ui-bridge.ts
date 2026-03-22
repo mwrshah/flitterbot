@@ -10,8 +10,12 @@ import type {
   ThinkingContent,
   ToolCall,
 } from "@mariozechner/pi-ai";
-import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment, MessageSource } from "./types";
-
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ImageAttachment,
+  MessageSource,
+} from "./types";
 
 function stringifyResult(value: unknown): string {
   if (value == null) return "";
@@ -43,9 +47,7 @@ function assistantBlocksToContent(message: ChatTimelineMessage): AssistantMessag
  * Processes timeline strictly in chronological order so tool calls
  * appear inline where they occurred, not dumped at the end.
  */
-export function timelineToAgentMessages(
-  timeline: ChatTimelineItem[],
-): AgentMessage[] {
+export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMessage[] {
   const messages: AgentMessage[] = [];
   const consumed = new Set<number>(); // indices consumed by look-ahead
 
@@ -62,7 +64,11 @@ export function timelineToAgentMessages(
       if (images?.length) {
         content = [
           { type: "text", text: item.content },
-          ...images.map((img: ImageAttachment) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType })),
+          ...images.map((img: ImageAttachment) => ({
+            type: "image" as const,
+            data: img.data,
+            mimeType: img.mimeType,
+          })),
         ];
       }
       messages.push({
@@ -108,12 +114,14 @@ export function timelineToAgentMessages(
       // Orphan tool start (no preceding assistant message) — emit in place
       messages.push({
         role: "assistant",
-        content: [{
-          type: "toolCall",
-          id: item.toolUseId,
-          name: item.tool,
-          arguments: (item.args as Record<string, any>) ?? {},
-        }],
+        content: [
+          {
+            type: "toolCall",
+            id: item.toolUseId,
+            name: item.tool,
+            arguments: (item.args as Record<string, any>) ?? {},
+          },
+        ],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);
@@ -130,7 +138,6 @@ export function timelineToAgentMessages(
         isError: item.isError ?? false,
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);
-      continue;
     }
   }
 
@@ -140,9 +147,7 @@ export function timelineToAgentMessages(
 /**
  * Derive the set of toolUseIds that have started but not yet ended.
  */
-export function pendingToolCallsFromTimeline(
-  timeline: ChatTimelineItem[],
-): Set<string> {
+export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<string> {
   const started = new Set<string>();
   const ended = new Set<string>();
   for (const item of timeline) {
@@ -159,9 +164,7 @@ export function pendingToolCallsFromTimeline(
  * Build a streaming AssistantMessage from partial text for the
  * <assistant-message> web component.
  */
-export function buildStreamingAssistantMessage(
-  text: string,
-): AssistantMessage {
+export function buildStreamingAssistantMessage(text: string): AssistantMessage {
   return {
     role: "assistant",
     content: [{ type: "text", text }],

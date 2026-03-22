@@ -1,10 +1,13 @@
+import type {
+  SendMessageToTmuxSessionResult as DirectInjectionResult,
+  TmuxUiState,
+} from "../contracts/index.ts";
 import {
   inspectTmuxSession,
   prepareClaudeInput,
   sendEnterToTmuxSession,
   sendLiteralToTmuxSession,
 } from "./tmux.ts";
-import type { SendMessageToTmuxSessionResult as DirectInjectionResult, TmuxUiState } from "../contracts/index.ts";
 
 function snapshotMeaningfullyChanged(before: string, after: string): boolean {
   return before.replace(/\s+/g, " ").trim() !== after.replace(/\s+/g, " ").trim();
@@ -41,7 +44,12 @@ export async function sendMessageToClaudeSession(
   await sendEnterToTmuxSession(sessionName);
 
   if (!verifyInference) {
-    return { ok: true, delivery: "tmux_send_keys", retries: 0, uiState: await currentUiState(sessionName) };
+    return {
+      ok: true,
+      delivery: "tmux_send_keys",
+      retries: 0,
+      uiState: await currentUiState(sessionName),
+    };
   }
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {

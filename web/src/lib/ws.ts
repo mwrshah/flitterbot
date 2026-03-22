@@ -97,10 +97,7 @@ export class AutonomaWsClient {
     if (this.reconnectTimer) return;
     this.setConnectionState("reconnecting");
     const delay = this.reconnectDelay;
-    this.reconnectDelay = Math.min(
-      this.reconnectDelay * 2,
-      AutonomaWsClient.MAX_RECONNECT_DELAY,
-    );
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, AutonomaWsClient.MAX_RECONNECT_DELAY);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
@@ -113,10 +110,7 @@ export class AutonomaWsClient {
     images?: Array<{ data: string; mimeType: string }>,
     targetSessionId?: string,
   ): Promise<void> {
-    if (
-      !this.socket ||
-      this.socket.readyState !== WebSocket.OPEN
-    ) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
     const payload: Record<string, unknown> = { type: "message", text, deliveryMode };

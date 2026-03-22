@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import { Command } from "cmdk";
+import { useMemo } from "react";
 import type { SkillListItem } from "~/lib/types";
 
 type SkillPickerProps = {
@@ -19,7 +19,7 @@ export function SkillPicker({
   selectedValue,
   onSelectedValueChange,
   onSelect,
-  onClose,
+  onClose: _onClose,
 }: SkillPickerProps) {
   const filtered = useMemo(() => {
     if (!filter) return skills;
@@ -50,12 +50,8 @@ export function SkillPicker({
               onSelect={() => onSelect(skill.name)}
               className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
             >
-              <span className="font-mono text-foreground shrink-0">
-                /{skill.name}
-              </span>
-              <span className="text-xs text-muted-foreground truncate">
-                {skill.description}
-              </span>
+              <span className="font-mono text-foreground shrink-0">/{skill.name}</span>
+              <span className="text-xs text-muted-foreground truncate">{skill.description}</span>
             </Command.Item>
           ))}
         </Command.List>

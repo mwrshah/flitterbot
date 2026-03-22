@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat/ChatPanel";
-import { fetchPiHistory } from "~/server/pi";
-import { mergeTimelines } from "./pi.route";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type { ChatTimelineItem } from "~/lib/types";
+import { fetchPiHistory } from "~/server/pi";
+import { mergeTimelines } from "./pi.route";
 
 export const Route = createFileRoute("/pi/default")({
   loader: async () => {

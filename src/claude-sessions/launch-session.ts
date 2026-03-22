@@ -43,12 +43,15 @@ function buildClaudeCommand(input: LaunchClaudeSessionInput, tmuxSession: string
   const extraArgs = extraArgsList.map(shellEscape).join(" ");
   const argsSuffix = extraArgs ? ` ${extraArgs}` : "";
   const dangerousFlag = "--dangerously-skip-permissions";
-  const hasDangerousFlag = claudeCommand.includes(dangerousFlag) || extraArgsList.includes(dangerousFlag);
+  const hasDangerousFlag =
+    claudeCommand.includes(dangerousFlag) || extraArgsList.includes(dangerousFlag);
   const permissionSuffix = hasDangerousFlag ? "" : ` ${dangerousFlag}`;
   return `env ${envPrefix} ${claudeCommand}${permissionSuffix}${argsSuffix}`;
 }
 
-export async function launchClaudeSession(input: LaunchClaudeSessionInput): Promise<LaunchClaudeSessionResult> {
+export async function launchClaudeSession(
+  input: LaunchClaudeSessionInput,
+): Promise<LaunchClaudeSessionResult> {
   const tmuxSession = await ensureUniqueTmuxSessionName(buildSessionName(input));
   const command = buildClaudeCommand(input, tmuxSession);
 
@@ -62,7 +65,9 @@ export async function launchClaudeSession(input: LaunchClaudeSessionInput): Prom
   });
 
   if (!delivery.ok) {
-    throw new Error(`Claude launched in tmux session ${tmuxSession}, but initial prompt delivery failed: ${(delivery as { reason?: string }).reason}`);
+    throw new Error(
+      `Claude launched in tmux session ${tmuxSession}, but initial prompt delivery failed: ${(delivery as { reason?: string }).reason}`,
+    );
   }
 
   return {

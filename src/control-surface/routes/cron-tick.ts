@@ -1,10 +1,10 @@
 import type http from "node:http";
-import type { CronTickResponse } from "../../contracts/index.ts";
-import type { ControlSurfaceRuntime } from "../runtime.ts";
-import { requireBearer, sendJson } from "./_shared.ts";
 import { getActiveHealthFlags } from "../../blackboard/queries/health-flags.ts";
 import { markStaleSessions } from "../../blackboard/queries/sessions.ts";
+import type { CronTickResponse } from "../../contracts/index.ts";
 import { formatSourcePrefix } from "../pi/source-prefix.ts";
+import type { ControlSurfaceRuntime } from "../runtime.ts";
+import { requireBearer, sendJson } from "./_shared.ts";
 
 const CRON_PREFIX = formatSourcePrefix("cron", false);
 const STALE_PROMPT_PREFIX = `${CRON_PREFIX}Stale session check:`;
@@ -15,7 +15,11 @@ const IDLE_PROMPT =
   "for an idle Claude session, consider continuing it. If parallel Claude Code work would help, " +
   "prepare a concrete suggestion and ask the user for confirmation before launching anything significant.";
 
-function skip(res: http.ServerResponse, reason: CronTickResponse["reason"], flags?: string[]): void {
+function skip(
+  res: http.ServerResponse,
+  reason: CronTickResponse["reason"],
+  flags?: string[],
+): void {
   const body: CronTickResponse = { ok: true, action: "skipped", reason };
   if (flags?.length) body.flags = flags;
   sendJson(res, 200, body);
@@ -51,7 +55,11 @@ export function handleCronTickRoute(
   // Gate 4: No active circuit breakers
   const activeFlags = getActiveHealthFlags(runtime.blackboard);
   if (activeFlags.length > 0) {
-    return skip(res, "circuit_breaker", activeFlags.map((f) => f.flag));
+    return skip(
+      res,
+      "circuit_breaker",
+      activeFlags.map((f) => f.flag),
+    );
   }
 
   // Gate 5: Classify sessions and enqueue appropriate prompt

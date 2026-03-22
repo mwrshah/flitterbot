@@ -1,11 +1,11 @@
 import {
-  readDaemonPid,
-  isProcessAlive,
-  startDaemonProcess,
-  waitForDaemonReady,
   getDaemonStatus,
-  stopDaemonProcess,
+  isProcessAlive,
+  readDaemonPid,
   runForegroundDaemonProcess,
+  startDaemonProcess,
+  stopDaemonProcess,
+  waitForDaemonReady,
 } from "./process.ts";
 import { sendWhatsAppViaDaemon } from "./send.ts";
 
@@ -70,7 +70,7 @@ async function run(): Promise<void> {
       const contextRef = takeFlag(args, "--context");
       const text = args.join(" ").trim();
       if (!text) {
-        throw new Error("Usage: autonoma-wa send \"message\" [--context ref]");
+        throw new Error('Usage: autonoma-wa send "message" [--context ref]');
       }
 
       const result = await sendWhatsAppViaDaemon({ text, contextRef });

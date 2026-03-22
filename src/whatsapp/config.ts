@@ -92,13 +92,17 @@ export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
     return toWhatsAppJid(config.recipientJid);
   }
 
-  throw new Error(`Missing recipient configuration. Set recipientJid in ${path.join(getWhatsAppHome(), "config.json")}.`);
+  throw new Error(
+    `Missing recipient configuration. Set recipientJid in ${path.join(getWhatsAppHome(), "config.json")}.`,
+  );
 }
 
 export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string {
   const value = config.pairingPhoneNumber ?? config.recipientJid;
   if (!value) {
-    throw new Error("Missing pairing phone number. Set pairingPhoneNumber in ~/.autonoma/whatsapp/config.json.");
+    throw new Error(
+      "Missing pairing phone number. Set pairingPhoneNumber in ~/.autonoma/whatsapp/config.json.",
+    );
   }
 
   return normalizePhoneNumber(value.replace(/@s\.whatsapp\.net$/, ""));

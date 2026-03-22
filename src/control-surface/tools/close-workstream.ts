@@ -2,9 +2,9 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
-import { getWorkstreamById, closeWorkstream } from "../../blackboard/queries/workstreams.ts";
 import { endPiSession } from "../../blackboard/queries/pi-sessions.ts";
 import { markSessionEnded } from "../../blackboard/queries/sessions.ts";
+import { closeWorkstream, getWorkstreamById } from "../../blackboard/queries/workstreams.ts";
 import { killTmuxSession } from "../../claude-sessions/tmux.ts";
 
 type CloseWorkstreamResult = {
@@ -40,7 +40,11 @@ function inferBranchFromWorktree(worktreePath: string): string | null {
 
 function isBranchAncestorOf(repoPath: string, branch: string, target: string): boolean {
   try {
-    execSync(`git merge-base --is-ancestor ${branch} ${target}`, { cwd: repoPath, timeout: 10_000, stdio: "pipe" });
+    execSync(`git merge-base --is-ancestor ${branch} ${target}`, {
+      cwd: repoPath,
+      timeout: 10_000,
+      stdio: "pipe",
+    });
     return true;
   } catch {
     return false;
@@ -56,14 +60,9 @@ function getConflictedFiles(repoPath: string): string[] {
   }
 }
 
-type MergeResult =
-  | { ok: true }
-  | { ok: false; conflicts: string[]; message: string };
+type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
 
-function mergeToMain(
-  repoPath: string,
-  branch: string,
-): MergeResult {
+function mergeToMain(repoPath: string, branch: string): MergeResult {
   // Fetch latest
   try {
     exec("git fetch origin", repoPath);
@@ -80,7 +79,11 @@ function mergeToMain(
   try {
     exec("git checkout main", repoPath);
   } catch (error: any) {
-    return { ok: false, conflicts: [], message: `Failed to checkout main: ${error.stderr?.toString().trim() || error.message}` };
+    return {
+      ok: false,
+      conflicts: [],
+      message: `Failed to checkout main: ${error.stderr?.toString().trim() || error.message}`,
+    };
   }
 
   // Pull latest main
@@ -99,7 +102,11 @@ function mergeToMain(
     const conflicts = getConflictedFiles(repoPath);
     if (conflicts.length > 0) {
       // Abort the failed merge so the repo isn't left in a dirty state
-      try { exec("git merge --abort", repoPath); } catch { /* ignore */ }
+      try {
+        exec("git merge --abort", repoPath);
+      } catch {
+        /* ignore */
+      }
       return {
         ok: false,
         conflicts,
@@ -107,7 +114,11 @@ function mergeToMain(
       };
     }
     // Non-conflict merge failure
-    try { exec("git merge --abort", repoPath); } catch { /* ignore */ }
+    try {
+      exec("git merge --abort", repoPath);
+    } catch {
+      /* ignore */
+    }
     return { ok: false, conflicts: [], message: "Merge failed (non-conflict error)" };
   }
 }
@@ -132,11 +143,17 @@ function removeWithGtr(repoPath: string, branch: string): boolean {
 
 function removeWithRawGit(worktreePath: string): boolean {
   try {
-    execSync(`git worktree remove ${JSON.stringify(worktreePath)}`, { timeout: 15_000, stdio: "pipe" });
+    execSync(`git worktree remove ${JSON.stringify(worktreePath)}`, {
+      timeout: 15_000,
+      stdio: "pipe",
+    });
     return true;
   } catch {
     try {
-      execSync(`git worktree remove --force ${JSON.stringify(worktreePath)}`, { timeout: 15_000, stdio: "pipe" });
+      execSync(`git worktree remove --force ${JSON.stringify(worktreePath)}`, {
+        timeout: 15_000,
+        stdio: "pipe",
+      });
       return true;
     } catch {
       return false;
@@ -193,7 +210,9 @@ export async function executeCloseWorkstream(
         return {
           ok: false,
           workstreamId,
-          message: mergeResult.message + ". Resolve conflicts in the main repo, then call close_workstream again.",
+          message:
+            mergeResult.message +
+            ". Resolve conflicts in the main repo, then call close_workstream again.",
           conflicts: mergeResult.conflicts,
         };
       }

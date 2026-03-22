@@ -1,5 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { UnifiedMessageDirection, MessageRow, UnifiedMessageSource } from "../../contracts/index.ts";
+import type {
+  MessageRow,
+  UnifiedMessageDirection,
+  UnifiedMessageSource,
+} from "../../contracts/index.ts";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
 
@@ -21,18 +25,22 @@ export function insertMessage(db: SqlDatabase, input: InsertMessageInput): Messa
   const createdAt = timestamp(input.createdAt);
   const metadataJson = input.metadata ? JSON.stringify(input.metadata) : null;
 
-  const result = db.prepare(
-    `INSERT INTO messages (source, direction, content, sender, workstream_id, metadata, created_at)
+  const result = db
+    .prepare(
+      `INSERT INTO messages (source, direction, content, sender, workstream_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    input.source,
-    input.direction,
-    input.content,
-    input.sender ?? null,
-    input.workstreamId ?? null,
-    metadataJson,
-    createdAt,
-  );
+    )
+    .run(
+      input.source,
+      input.direction,
+      input.content,
+      input.sender ?? null,
+      input.workstreamId ?? null,
+      metadataJson,
+      createdAt,
+    );
 
-  return db.prepare("SELECT * FROM messages WHERE id = ?").get(Number(result.lastInsertRowid)) as unknown as MessageRow;
+  return db
+    .prepare("SELECT * FROM messages WHERE id = ?")
+    .get(Number(result.lastInsertRowid)) as unknown as MessageRow;
 }

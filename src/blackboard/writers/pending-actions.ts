@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { PendingActionRow } from "../../contracts/index.ts";
-import { getPendingActionByContextRef, getLatestPendingAction } from "../queries/whatsapp.ts";
+import { getLatestPendingAction, getPendingActionByContextRef } from "../queries/whatsapp.ts";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
 
@@ -20,7 +20,10 @@ function timestamp(value?: string): string {
   return value ?? new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-export function createPendingAction(db: SqlDatabase, input: CreatePendingActionInput): PendingActionRow {
+export function createPendingAction(
+  db: SqlDatabase,
+  input: CreatePendingActionInput,
+): PendingActionRow {
   const actionId = input.actionId ?? randomUUID();
   const contextRef = input.contextRef ?? actionId;
   const createdAt = timestamp(input.createdAt);
@@ -36,7 +39,7 @@ export function createPendingAction(db: SqlDatabase, input: CreatePendingActionI
       related_todoist_task_id,
       status,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   ).run(
     actionId,
     input.channel,
@@ -48,7 +51,9 @@ export function createPendingAction(db: SqlDatabase, input: CreatePendingActionI
     createdAt,
   );
 
-  return db.prepare("SELECT * FROM pending_actions WHERE action_id = ?").get(actionId) as unknown as PendingActionRow;
+  return db
+    .prepare("SELECT * FROM pending_actions WHERE action_id = ?")
+    .get(actionId) as unknown as PendingActionRow;
 }
 
 export function resolvePendingActionByContextRef(
@@ -68,10 +73,12 @@ export function resolvePendingActionByContextRef(
      SET status = 'resolved',
          resolved_at = ?,
          resolution_payload = ?
-     WHERE action_id = ?`
+     WHERE action_id = ?`,
   ).run(effectiveResolvedAt, JSON.stringify(resolutionPayload), action.action_id);
 
-  return db.prepare("SELECT * FROM pending_actions WHERE action_id = ?").get(action.action_id) as unknown as PendingActionRow;
+  return db
+    .prepare("SELECT * FROM pending_actions WHERE action_id = ?")
+    .get(action.action_id) as unknown as PendingActionRow;
 }
 
 export function resolveLatestPendingAction(

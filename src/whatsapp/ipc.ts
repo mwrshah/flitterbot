@@ -1,5 +1,5 @@
-import { createServer, Socket } from "node:net";
 import { rmSync } from "node:fs";
+import { createServer, Socket } from "node:net";
 import type { DaemonCommand, DaemonResponse } from "../contracts/index.ts";
 import { getWhatsAppSocketPath } from "./paths.ts";
 

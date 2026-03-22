@@ -72,7 +72,6 @@ export function safeJsonParse<T>(raw: string | null | undefined): T | null {
   }
 }
 
-
 export function extractToolName(event: unknown): string {
   if (typeof event === "object" && event !== null) {
     const record = event as Record<string, unknown>;

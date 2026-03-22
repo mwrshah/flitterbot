@@ -1,17 +1,18 @@
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import makeWASocket, {
   Browsers,
+  type ConnectionState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
-  type ConnectionState,
   type WAMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import path from "node:path";
-import { openBlackboard, type BlackboardDatabase } from "../blackboard/db.ts";
-import { loadConfig } from "../config/load-config.ts";
+import pino from "pino";
+import qrcode from "qrcode-terminal";
+import { type BlackboardDatabase, openBlackboard } from "../blackboard/db.ts";
 import { createPendingAction } from "../blackboard/writers/pending-actions.ts";
 import {
   createOutboundPendingMessage,
@@ -19,11 +20,7 @@ import {
   markWhatsAppMessageFailed,
   markWhatsAppMessageSent,
 } from "../blackboard/writers/whatsapp-writer.ts";
-import { ensureAuthDirectories, backupAuthState, hasStoredAuthState, restoreAuthStateBackup } from "./auth.ts";
-import { loadWhatsAppConfig, resolvePairingPhoneNumber, resolveRecipientJid, ensureWhatsAppHome } from "./config.ts";
-import { createIpcServer } from "./ipc.ts";
-import { getWhatsAppAuthDir, getWhatsAppLogPath, getWhatsAppPidPath, getWhatsAppSocketPath } from "./paths.ts";
-import { getInboundMessageRejectionReason, persistInboundMessage } from "./receive.ts";
+import { loadConfig } from "../config/load-config.ts";
 import type {
   DaemonCommand,
   DaemonResponse,
@@ -31,8 +28,26 @@ import type {
   WhatsAppConnectionStatus,
   WhatsAppDaemonRuntimeStatus as WhatsAppDaemonStatus,
 } from "../contracts/index.ts";
-import pino from "pino";
-import qrcode from "qrcode-terminal";
+import {
+  backupAuthState,
+  ensureAuthDirectories,
+  hasStoredAuthState,
+  restoreAuthStateBackup,
+} from "./auth.ts";
+import {
+  ensureWhatsAppHome,
+  loadWhatsAppConfig,
+  resolvePairingPhoneNumber,
+  resolveRecipientJid,
+} from "./config.ts";
+import { createIpcServer } from "./ipc.ts";
+import {
+  getWhatsAppAuthDir,
+  getWhatsAppLogPath,
+  getWhatsAppPidPath,
+  getWhatsAppSocketPath,
+} from "./paths.ts";
+import { getInboundMessageRejectionReason, persistInboundMessage } from "./receive.ts";
 
 const logger = pino({ level: process.env.AUTONOMA_WA_LOG_LEVEL ?? "info" });
 
@@ -141,7 +156,11 @@ class WhatsAppDaemon {
           status: "stopped",
         };
       case "send":
-        return await this.handleSendCommand(command.text, command.contextRef, command.pendingAction);
+        return await this.handleSendCommand(
+          command.text,
+          command.contextRef,
+          command.pendingAction,
+        );
       default:
         return {
           ok: false,
@@ -287,7 +306,9 @@ class WhatsAppDaemon {
 
     this.lastDisconnectAt = timestamp();
     const code = getDisconnectCode(update);
-    this.lastError = update.lastDisconnect?.error ? formatError(update.lastDisconnect.error) : undefined;
+    this.lastError = update.lastDisconnect?.error
+      ? formatError(update.lastDisconnect.error)
+      : undefined;
 
     if (this.shuttingDown) {
       this.status = "stopped";
@@ -300,13 +321,17 @@ class WhatsAppDaemon {
       createPendingAction(this.db, {
         channel: "internal",
         kind: "whatsapp_auth_expired",
-        promptText: "WhatsApp auth expired. Run `autonoma-wa auth` in a terminal to re-link the session.",
+        promptText:
+          "WhatsApp auth expired. Run `autonoma-wa auth` in a terminal to re-link the session.",
       });
       logger.warn(this.lastError);
       return;
     }
 
-    if ((code === DisconnectReason.restartRequired || code === 515) && !this.immediateReconnectUsed) {
+    if (
+      (code === DisconnectReason.restartRequired || code === 515) &&
+      !this.immediateReconnectUsed
+    ) {
       this.immediateReconnectUsed = true;
       this.reconnectAttempt += 1;
       this.status = "reconnecting";
@@ -368,7 +393,9 @@ class WhatsAppDaemon {
       });
       resolvedContextRef = action.context_ref ?? action.action_id;
       if (resolvedContextRef !== pending.context_ref) {
-        this.db.prepare("UPDATE whatsapp_messages SET context_ref = ? WHERE id = ?").run(resolvedContextRef, pending.id);
+        this.db
+          .prepare("UPDATE whatsapp_messages SET context_ref = ? WHERE id = ?")
+          .run(resolvedContextRef, pending.id);
       }
     }
 

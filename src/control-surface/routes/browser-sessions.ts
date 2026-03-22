@@ -1,10 +1,7 @@
 import type http from "node:http";
 import { getSessionById } from "../../blackboard/queries/sessions.ts";
 import { inspectTmuxSession } from "../../claude-sessions/tmux.ts";
-import type {
-  SessionDetailResponse,
-  SessionsListResponse,
-} from "../../contracts/index.ts";
+import type { SessionDetailResponse, SessionsListResponse } from "../../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 

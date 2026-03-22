@@ -61,5 +61,3 @@ export async function sendWhatsAppViaDaemon(
     throw error;
   }
 }
-
-

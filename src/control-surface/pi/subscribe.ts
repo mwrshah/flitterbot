@@ -7,8 +7,8 @@ import type {
   ToolExecutionStartWebSocketEvent,
   TurnEndWebSocketEvent,
 } from "../../contracts/index.ts";
-import type { PiSessionState } from "./session-state.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
+import type { PiSessionState } from "./session-state.ts";
 
 type PiSessionSubscriptionEvent =
   | {
@@ -194,9 +194,11 @@ export function subscribeToPiSession(
         // Flush deferred assistant messages: all but last are intermediate
         for (let i = 0; i < pendingAssistantMessages.length; i++) {
           const isLast = i === pendingAssistantMessages.length - 1;
-          broadcast(wsHub, isLast
-            ? pendingAssistantMessages[i]
-            : { ...pendingAssistantMessages[i], intermediate: true },
+          broadcast(
+            wsHub,
+            isLast
+              ? pendingAssistantMessages[i]
+              : { ...pendingAssistantMessages[i], intermediate: true },
           );
         }
         pendingAssistantMessages.length = 0;

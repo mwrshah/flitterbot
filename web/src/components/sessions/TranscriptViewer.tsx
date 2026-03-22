@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import type { TranscriptItem } from "~/lib/types";
-import { cn, formatDateTime, prettifyJson } from "~/lib/utils";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "~/components/ui/Badge";
-import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { Button } from "~/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/Card";
+import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import type { TranscriptItem } from "~/lib/types";
+import { cn, formatDateTime, prettifyJson } from "~/lib/utils";
 
 function LitMarkdownBlock({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,9 +16,13 @@ function LitMarkdownBlock({ content }: { content: string }) {
   useEffect(() => {
     let cancelled = false;
     ensurePiWebUiReady()
-      .then(() => { if (!cancelled) setReady(true); })
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -46,9 +50,7 @@ function TranscriptRow({ item }: { item: TranscriptItem }) {
         )}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-medium text-foreground">
-            {item.role}
-          </span>
+          <span className="text-xs font-medium text-foreground">{item.role}</span>
           <span className="text-[10px] text-muted-foreground/60">
             {formatDateTime(item.timestamp ?? undefined)}
           </span>
@@ -63,12 +65,8 @@ function TranscriptRow({ item }: { item: TranscriptItem }) {
       <div className="rounded-lg border border-border p-3">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium">
-              {item.toolName || item.title || "tool"}
-            </span>
-            <Badge variant="muted">
-              {item.kind === "tool_call" ? "call" : "result"}
-            </Badge>
+            <span className="text-xs font-medium">{item.toolName || item.title || "tool"}</span>
+            <Badge variant="muted">{item.kind === "tool_call" ? "call" : "result"}</Badge>
           </div>
           <span className="text-[10px] text-muted-foreground/60">
             {formatDateTime(item.timestamp ?? undefined)}
@@ -91,9 +89,7 @@ function TranscriptRow({ item }: { item: TranscriptItem }) {
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium">
-          {item.title || item.rawType || item.kind}
-        </span>
+        <span className="text-xs font-medium">{item.title || item.rawType || item.kind}</span>
         <span className="text-[10px] text-muted-foreground/60">
           {formatDateTime(item.timestamp ?? undefined)}
         </span>
@@ -115,8 +111,7 @@ export function TranscriptViewer({ sessionId }: { sessionId: string }) {
   const query = useInfiniteQuery({
     queryKey: ["transcript", sessionId],
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) =>
-      apiClient.getTranscript(sessionId, pageParam, 25),
+    queryFn: ({ pageParam }) => apiClient.getTranscript(sessionId, pageParam, 25),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 
@@ -130,22 +125,14 @@ export function TranscriptViewer({ sessionId }: { sessionId: string }) {
       <CardContent>
         <div className="space-y-2">
           {query.isPending && (
-            <p className="text-sm text-muted-foreground">
-              Loading transcript...
-            </p>
+            <p className="text-sm text-muted-foreground">Loading transcript...</p>
           )}
-          {query.isError && (
-            <p className="text-sm text-destructive">
-              Failed to load transcript.
-            </p>
-          )}
+          {query.isError && <p className="text-sm text-destructive">Failed to load transcript.</p>}
           {items.map((item) => (
             <TranscriptRow key={item.id} item={item} />
           ))}
           {!query.isPending && items.length === 0 && (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No transcript items.
-            </p>
+            <p className="text-sm text-muted-foreground py-4 text-center">No transcript items.</p>
           )}
         </div>
 
@@ -164,9 +151,7 @@ export function TranscriptViewer({ sessionId }: { sessionId: string }) {
             </Button>
           ) : (
             items.length > 0 && (
-              <span className="text-[10px] text-muted-foreground/50">
-                End of preview
-              </span>
+              <span className="text-[10px] text-muted-foreground/50">End of preview</span>
             )
           )}
         </div>

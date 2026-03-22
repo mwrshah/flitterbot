@@ -2,8 +2,9 @@
  * React wrapper for pi-web-ui's <assistant-message> to show the
  * currently streaming assistant response.
  */
-import { useEffect, useRef, useState } from "react";
+
 import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { useEffect, useRef, useState } from "react";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 
 export function PiStreamingMessage({

@@ -28,7 +28,12 @@ export class WebSocketHub {
     this.onMessage = onMessage;
   }
 
-  handleUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer | undefined, expectedToken: string): boolean {
+  handleUpgrade(
+    req: http.IncomingMessage,
+    socket: net.Socket,
+    head: Buffer | undefined,
+    expectedToken: string,
+  ): boolean {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (url.pathname !== CONTROL_SURFACE_WS_PATH) return false;
     const token = url.searchParams.get("token") ?? getBearerToken(req.headers.authorization);
@@ -78,7 +83,8 @@ export class WebSocketHub {
   }
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
-    const sessionId = "sessionId" in payload ? (payload as any).sessionId as string | undefined : undefined;
+    const sessionId =
+      "sessionId" in payload ? ((payload as any).sessionId as string | undefined) : undefined;
     const frame = encodeFrame(JSON.stringify(payload));
     for (const client of this.clients.values()) {
       // No sessionId on event → global event, deliver to all
@@ -189,7 +195,9 @@ function encodeCloseFrame(): Buffer {
   return Buffer.from([0x88, 0x00]);
 }
 
-function decodeFrame(buffer: Buffer): { opcode: number; payload: Buffer; bytesConsumed: number } | undefined {
+function decodeFrame(
+  buffer: Buffer,
+): { opcode: number; payload: Buffer; bytesConsumed: number } | undefined {
   if (buffer.length < 2) return undefined;
   const first = buffer[0];
   const second = buffer[1];

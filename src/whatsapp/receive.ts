@@ -3,10 +3,17 @@ import type { WAMessage } from "@whiskeysockets/baileys";
 import pino from "pino";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
+
+import {
+  getLatestOutboundMessage,
+  getWhatsAppMessageByWaMessageId,
+} from "../blackboard/queries/whatsapp.ts";
+import {
+  insertInboundWhatsAppMessage,
+  resolveInboundContextRef,
+} from "../blackboard/writers/whatsapp-writer.ts";
 import { loadConfig } from "../config/load-config.ts";
 import { resolveRecipientJid } from "./config.ts";
-import { getLatestOutboundMessage, getWhatsAppMessageByWaMessageId } from "../blackboard/queries/whatsapp.ts";
-import { resolveInboundContextRef, insertInboundWhatsAppMessage } from "../blackboard/writers/whatsapp-writer.ts";
 
 const logger = pino({ level: process.env.AUTONOMA_WA_LOG_LEVEL ?? "info" });
 const OUTBOUND_ECHO_WINDOW_MS = 5_000;
@@ -40,11 +47,13 @@ function unwrapMessageContent(message: WAMessage): Record<string, unknown> | und
 
   while (content) {
     const nested =
-      (content.ephemeralMessage as { message?: Record<string, unknown> } | undefined)?.message
-      ?? (content.viewOnceMessage as { message?: Record<string, unknown> } | undefined)?.message
-      ?? (content.viewOnceMessageV2 as { message?: Record<string, unknown> } | undefined)?.message
-      ?? (content.viewOnceMessageV2Extension as { message?: Record<string, unknown> } | undefined)?.message
-      ?? (content.documentWithCaptionMessage as { message?: Record<string, unknown> } | undefined)?.message;
+      (content.ephemeralMessage as { message?: Record<string, unknown> } | undefined)?.message ??
+      (content.viewOnceMessage as { message?: Record<string, unknown> } | undefined)?.message ??
+      (content.viewOnceMessageV2 as { message?: Record<string, unknown> } | undefined)?.message ??
+      (content.viewOnceMessageV2Extension as { message?: Record<string, unknown> } | undefined)
+        ?.message ??
+      (content.documentWithCaptionMessage as { message?: Record<string, unknown> } | undefined)
+        ?.message;
 
     if (!nested) {
       break;
@@ -72,12 +81,12 @@ function extractConversationBody(message: WAMessage): string | undefined {
   }
 
   return (
-    content.conversation
-    ?? content.extendedTextMessage?.text
-    ?? content.imageMessage?.caption
-    ?? content.videoMessage?.caption
-    ?? content.documentMessage?.caption
-    ?? undefined
+    content.conversation ??
+    content.extendedTextMessage?.text ??
+    content.imageMessage?.caption ??
+    content.videoMessage?.caption ??
+    content.documentMessage?.caption ??
+    undefined
   )?.trim();
 }
 
@@ -91,10 +100,10 @@ function extractQuotedWaMessageId(message: WAMessage): string | undefined {
     | undefined;
 
   return (
-    content?.extendedTextMessage?.contextInfo?.stanzaId
-    ?? content?.imageMessage?.contextInfo?.stanzaId
-    ?? content?.videoMessage?.contextInfo?.stanzaId
-    ?? undefined
+    content?.extendedTextMessage?.contextInfo?.stanzaId ??
+    content?.imageMessage?.contextInfo?.stanzaId ??
+    content?.videoMessage?.contextInfo?.stanzaId ??
+    undefined
   );
 }
 
@@ -242,9 +251,11 @@ export async function persistInboundMessage(
 
   // Persist to blackboard as a secondary concern
   try {
-
     const quotedWaMessageId = extractQuotedWaMessageId(message);
-    const contextRef = resolveInboundContextRef(db, { quotedWaMessageId, fallbackChannel: "whatsapp" });
+    const contextRef = resolveInboundContextRef(db, {
+      quotedWaMessageId,
+      fallbackChannel: "whatsapp",
+    });
     const row = insertInboundWhatsAppMessage(db, { waMessageId, remoteJid, body, contextRef });
 
     logger.info(

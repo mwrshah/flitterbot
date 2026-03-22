@@ -1,18 +1,13 @@
-import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import type {
-  SessionDetail as SessionDetailType,
-  TmuxSessionInspection,
-} from "~/lib/types";
-import { cn, formatDateTime, safeJsonParse } from "~/lib/utils";
+import { type FormEvent, useState } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/Card";
+import type { SessionDetail as SessionDetailType, TmuxSessionInspection } from "~/lib/types";
+import { cn, formatDateTime, safeJsonParse } from "~/lib/utils";
 
-function statusVariant(
-  status: string,
-): "success" | "default" | "warning" | "muted" {
+function statusVariant(status: string): "success" | "default" | "warning" | "muted" {
   switch (status) {
     case "working":
       return "success";
@@ -25,15 +20,7 @@ function statusVariant(
   }
 }
 
-function MetaItem({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
@@ -60,8 +47,7 @@ export function SessionDetail({
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (text: string) =>
-      apiClient.sendDirectSessionMessage(session.sessionId, text),
+    mutationFn: (text: string) => apiClient.sendDirectSessionMessage(session.sessionId, text),
     onSuccess: (result) => {
       if (result.ok) {
         void queryClient.invalidateQueries({
@@ -99,32 +85,18 @@ export function SessionDetail({
                 {session.taskDescription || session.sessionId}
               </CardTitle>
               {session.project && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {session.project}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">{session.project}</p>
               )}
             </div>
-            <Badge variant={statusVariant(session.status)}>
-              {session.status}
-            </Badge>
+            <Badge variant={statusVariant(session.status)}>{session.status}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
             <MetaItem label="Tmux" value={session.tmuxSession ?? ""} mono />
-            <MetaItem
-              label="Last event"
-              value={formatDateTime(session.lastEventAt)}
-            />
-            <MetaItem
-              label="Started"
-              value={formatDateTime(session.startedAt)}
-            />
-            <MetaItem
-              label="Transcript"
-              value={session.transcriptPath ?? ""}
-              mono
-            />
+            <MetaItem label="Last event" value={formatDateTime(session.lastEventAt)} />
+            <MetaItem label="Started" value={formatDateTime(session.startedAt)} />
+            <MetaItem label="Transcript" value={session.transcriptPath ?? ""} mono />
             <MetaItem label="CWD" value={session.cwd ?? ""} mono />
             <MetaItem label="Model" value={session.model ?? ""} />
           </div>
@@ -139,28 +111,11 @@ export function SessionDetail({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
-              <MetaItem
-                label="Exists"
-                value={tmux.exists ? "yes" : "no"}
-              />
-              <MetaItem
-                label="Attached"
-                value={tmux.attached ? "yes" : "no"}
-              />
-              <MetaItem
-                label="Pane state"
-                value={tmux.pane?.uiState ?? ""}
-              />
-              <MetaItem
-                label="Command"
-                value={tmux.pane?.currentCommand ?? ""}
-                mono
-              />
-              <MetaItem
-                label="Target"
-                value={tmux.pane?.target ?? ""}
-                mono
-              />
+              <MetaItem label="Exists" value={tmux.exists ? "yes" : "no"} />
+              <MetaItem label="Attached" value={tmux.attached ? "yes" : "no"} />
+              <MetaItem label="Pane state" value={tmux.pane?.uiState ?? ""} />
+              <MetaItem label="Command" value={tmux.pane?.currentCommand ?? ""} mono />
+              <MetaItem label="Target" value={tmux.pane?.target ?? ""} mono />
               <MetaItem
                 label="Pane PID"
                 value={tmux.pane?.panePid != null ? String(tmux.pane.panePid) : ""}
@@ -193,11 +148,7 @@ export function SessionDetail({
               <p className="text-[10px] text-muted-foreground/50">
                 Idle sessions can inject. Busy or stale sessions fail closed.
               </p>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={mutation.isPending || !draft.trim()}
-              >
+              <Button type="submit" size="sm" disabled={mutation.isPending || !draft.trim()}>
                 {mutation.isPending ? "Sending..." : "Send"}
               </Button>
             </div>
@@ -218,27 +169,16 @@ export function SessionDetail({
         <CardContent>
           <div className="space-y-2">
             {session.recentEvents.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No recent events.
-              </p>
+              <p className="text-sm text-muted-foreground">No recent events.</p>
             )}
             {session.recentEvents.map((event) => {
-              const parsed = safeJsonParse<Record<string, unknown>>(
-                event.payload,
-              );
+              const parsed = safeJsonParse<Record<string, unknown>>(event.payload);
               return (
-                <div
-                  key={event.id}
-                  className="rounded-lg border border-border p-3 space-y-2"
-                >
+                <div key={event.id} className="rounded-lg border border-border p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {event.event_name}
-                      </span>
-                      {event.tool_name && (
-                        <Badge variant="muted">{event.tool_name}</Badge>
-                      )}
+                      <span className="text-sm font-medium">{event.event_name}</span>
+                      {event.tool_name && <Badge variant="muted">{event.tool_name}</Badge>}
                     </div>
                     <span className="text-[10px] text-muted-foreground/60">
                       {formatDateTime(event.timestamp)}

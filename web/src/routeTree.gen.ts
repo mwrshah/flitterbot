@@ -8,270 +8,268 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as RuntimeRouteImport } from './routes/runtime'
-import { Route as SessionsRouteRouteImport } from './routes/sessions.route'
-import { Route as PiRouteRouteImport } from './routes/pi.route'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
-import { Route as PiIndexRouteImport } from './routes/pi.index'
-import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as PiDefaultRouteImport } from './routes/pi.default'
-import { Route as PiSessionIdRouteImport } from './routes/pi.$sessionId'
-import { Route as SessionsWorkstreamWorkstreamIdRouteImport } from './routes/sessions.workstream.$workstreamId'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as PiSessionIdRouteImport } from "./routes/pi.$sessionId";
+import { Route as PiDefaultRouteImport } from "./routes/pi.default";
+import { Route as PiIndexRouteImport } from "./routes/pi.index";
+import { Route as PiRouteRouteImport } from "./routes/pi.route";
+import { Route as RuntimeRouteImport } from "./routes/runtime";
+import { Route as SessionsSessionIdRouteImport } from "./routes/sessions.$sessionId";
+import { Route as SessionsIndexRouteImport } from "./routes/sessions.index";
+import { Route as SessionsRouteRouteImport } from "./routes/sessions.route";
+import { Route as SessionsWorkstreamWorkstreamIdRouteImport } from "./routes/sessions.workstream.$workstreamId";
 
 const RuntimeRoute = RuntimeRouteImport.update({
-  id: '/runtime',
-  path: '/runtime',
+  id: "/runtime",
+  path: "/runtime",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SessionsRouteRoute = SessionsRouteRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
+  id: "/sessions",
+  path: "/sessions",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PiRouteRoute = PiRouteRouteImport.update({
-  id: '/pi',
-  path: '/pi',
+  id: "/pi",
+  path: "/pi",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SessionsIndexRoute = SessionsIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => SessionsRouteRoute,
-} as any)
+} as any);
 const PiIndexRoute = PiIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => PiRouteRoute,
-} as any)
+} as any);
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
-  id: '/$sessionId',
-  path: '/$sessionId',
+  id: "/$sessionId",
+  path: "/$sessionId",
   getParentRoute: () => SessionsRouteRoute,
-} as any)
+} as any);
 const PiDefaultRoute = PiDefaultRouteImport.update({
-  id: '/default',
-  path: '/default',
+  id: "/default",
+  path: "/default",
   getParentRoute: () => PiRouteRoute,
-} as any)
+} as any);
 const PiSessionIdRoute = PiSessionIdRouteImport.update({
-  id: '/$sessionId',
-  path: '/$sessionId',
+  id: "/$sessionId",
+  path: "/$sessionId",
   getParentRoute: () => PiRouteRoute,
-} as any)
-const SessionsWorkstreamWorkstreamIdRoute =
-  SessionsWorkstreamWorkstreamIdRouteImport.update({
-    id: '/workstream/$workstreamId',
-    path: '/workstream/$workstreamId',
-    getParentRoute: () => SessionsRouteRoute,
-  } as any)
+} as any);
+const SessionsWorkstreamWorkstreamIdRoute = SessionsWorkstreamWorkstreamIdRouteImport.update({
+  id: "/workstream/$workstreamId",
+  path: "/workstream/$workstreamId",
+  getParentRoute: () => SessionsRouteRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/pi': typeof PiRouteRouteWithChildren
-  '/sessions': typeof SessionsRouteRouteWithChildren
-  '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/pi/': typeof PiIndexRoute
-  '/sessions/': typeof SessionsIndexRoute
-  '/sessions/workstream/$workstreamId': typeof SessionsWorkstreamWorkstreamIdRoute
+  "/": typeof IndexRoute;
+  "/pi": typeof PiRouteRouteWithChildren;
+  "/sessions": typeof SessionsRouteRouteWithChildren;
+  "/runtime": typeof RuntimeRoute;
+  "/pi/$sessionId": typeof PiSessionIdRoute;
+  "/pi/default": typeof PiDefaultRoute;
+  "/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  "/pi/": typeof PiIndexRoute;
+  "/sessions/": typeof SessionsIndexRoute;
+  "/sessions/workstream/$workstreamId": typeof SessionsWorkstreamWorkstreamIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/pi': typeof PiIndexRoute
-  '/sessions': typeof SessionsIndexRoute
-  '/sessions/workstream/$workstreamId': typeof SessionsWorkstreamWorkstreamIdRoute
+  "/": typeof IndexRoute;
+  "/runtime": typeof RuntimeRoute;
+  "/pi/$sessionId": typeof PiSessionIdRoute;
+  "/pi/default": typeof PiDefaultRoute;
+  "/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  "/pi": typeof PiIndexRoute;
+  "/sessions": typeof SessionsIndexRoute;
+  "/sessions/workstream/$workstreamId": typeof SessionsWorkstreamWorkstreamIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/pi': typeof PiRouteRouteWithChildren
-  '/sessions': typeof SessionsRouteRouteWithChildren
-  '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/pi/': typeof PiIndexRoute
-  '/sessions/': typeof SessionsIndexRoute
-  '/sessions/workstream/$workstreamId': typeof SessionsWorkstreamWorkstreamIdRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/pi": typeof PiRouteRouteWithChildren;
+  "/sessions": typeof SessionsRouteRouteWithChildren;
+  "/runtime": typeof RuntimeRoute;
+  "/pi/$sessionId": typeof PiSessionIdRoute;
+  "/pi/default": typeof PiDefaultRoute;
+  "/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  "/pi/": typeof PiIndexRoute;
+  "/sessions/": typeof SessionsIndexRoute;
+  "/sessions/workstream/$workstreamId": typeof SessionsWorkstreamWorkstreamIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/pi'
-    | '/sessions'
-    | '/runtime'
-    | '/pi/$sessionId'
-    | '/pi/default'
-    | '/sessions/$sessionId'
-    | '/pi/'
-    | '/sessions/'
-    | '/sessions/workstream/$workstreamId'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/pi"
+    | "/sessions"
+    | "/runtime"
+    | "/pi/$sessionId"
+    | "/pi/default"
+    | "/sessions/$sessionId"
+    | "/pi/"
+    | "/sessions/"
+    | "/sessions/workstream/$workstreamId";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/runtime'
-    | '/pi/$sessionId'
-    | '/pi/default'
-    | '/sessions/$sessionId'
-    | '/pi'
-    | '/sessions'
-    | '/sessions/workstream/$workstreamId'
+    | "/"
+    | "/runtime"
+    | "/pi/$sessionId"
+    | "/pi/default"
+    | "/sessions/$sessionId"
+    | "/pi"
+    | "/sessions"
+    | "/sessions/workstream/$workstreamId";
   id:
-    | '__root__'
-    | '/'
-    | '/pi'
-    | '/sessions'
-    | '/runtime'
-    | '/pi/$sessionId'
-    | '/pi/default'
-    | '/sessions/$sessionId'
-    | '/pi/'
-    | '/sessions/'
-    | '/sessions/workstream/$workstreamId'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/pi"
+    | "/sessions"
+    | "/runtime"
+    | "/pi/$sessionId"
+    | "/pi/default"
+    | "/sessions/$sessionId"
+    | "/pi/"
+    | "/sessions/"
+    | "/sessions/workstream/$workstreamId";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  PiRouteRoute: typeof PiRouteRouteWithChildren
-  SessionsRouteRoute: typeof SessionsRouteRouteWithChildren
-  RuntimeRoute: typeof RuntimeRoute
+  IndexRoute: typeof IndexRoute;
+  PiRouteRoute: typeof PiRouteRouteWithChildren;
+  SessionsRouteRoute: typeof SessionsRouteRouteWithChildren;
+  RuntimeRoute: typeof RuntimeRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/runtime': {
-      id: '/runtime'
-      path: '/runtime'
-      fullPath: '/runtime'
-      preLoaderRoute: typeof RuntimeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sessions': {
-      id: '/sessions'
-      path: '/sessions'
-      fullPath: '/sessions'
-      preLoaderRoute: typeof SessionsRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pi': {
-      id: '/pi'
-      path: '/pi'
-      fullPath: '/pi'
-      preLoaderRoute: typeof PiRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sessions/': {
-      id: '/sessions/'
-      path: '/'
-      fullPath: '/sessions/'
-      preLoaderRoute: typeof SessionsIndexRouteImport
-      parentRoute: typeof SessionsRouteRoute
-    }
-    '/pi/': {
-      id: '/pi/'
-      path: '/'
-      fullPath: '/pi/'
-      preLoaderRoute: typeof PiIndexRouteImport
-      parentRoute: typeof PiRouteRoute
-    }
-    '/sessions/$sessionId': {
-      id: '/sessions/$sessionId'
-      path: '/$sessionId'
-      fullPath: '/sessions/$sessionId'
-      preLoaderRoute: typeof SessionsSessionIdRouteImport
-      parentRoute: typeof SessionsRouteRoute
-    }
-    '/pi/default': {
-      id: '/pi/default'
-      path: '/default'
-      fullPath: '/pi/default'
-      preLoaderRoute: typeof PiDefaultRouteImport
-      parentRoute: typeof PiRouteRoute
-    }
-    '/pi/$sessionId': {
-      id: '/pi/$sessionId'
-      path: '/$sessionId'
-      fullPath: '/pi/$sessionId'
-      preLoaderRoute: typeof PiSessionIdRouteImport
-      parentRoute: typeof PiRouteRoute
-    }
-    '/sessions/workstream/$workstreamId': {
-      id: '/sessions/workstream/$workstreamId'
-      path: '/workstream/$workstreamId'
-      fullPath: '/sessions/workstream/$workstreamId'
-      preLoaderRoute: typeof SessionsWorkstreamWorkstreamIdRouteImport
-      parentRoute: typeof SessionsRouteRoute
-    }
+    "/runtime": {
+      id: "/runtime";
+      path: "/runtime";
+      fullPath: "/runtime";
+      preLoaderRoute: typeof RuntimeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/sessions": {
+      id: "/sessions";
+      path: "/sessions";
+      fullPath: "/sessions";
+      preLoaderRoute: typeof SessionsRouteRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pi": {
+      id: "/pi";
+      path: "/pi";
+      fullPath: "/pi";
+      preLoaderRoute: typeof PiRouteRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/sessions/": {
+      id: "/sessions/";
+      path: "/";
+      fullPath: "/sessions/";
+      preLoaderRoute: typeof SessionsIndexRouteImport;
+      parentRoute: typeof SessionsRouteRoute;
+    };
+    "/pi/": {
+      id: "/pi/";
+      path: "/";
+      fullPath: "/pi/";
+      preLoaderRoute: typeof PiIndexRouteImport;
+      parentRoute: typeof PiRouteRoute;
+    };
+    "/sessions/$sessionId": {
+      id: "/sessions/$sessionId";
+      path: "/$sessionId";
+      fullPath: "/sessions/$sessionId";
+      preLoaderRoute: typeof SessionsSessionIdRouteImport;
+      parentRoute: typeof SessionsRouteRoute;
+    };
+    "/pi/default": {
+      id: "/pi/default";
+      path: "/default";
+      fullPath: "/pi/default";
+      preLoaderRoute: typeof PiDefaultRouteImport;
+      parentRoute: typeof PiRouteRoute;
+    };
+    "/pi/$sessionId": {
+      id: "/pi/$sessionId";
+      path: "/$sessionId";
+      fullPath: "/pi/$sessionId";
+      preLoaderRoute: typeof PiSessionIdRouteImport;
+      parentRoute: typeof PiRouteRoute;
+    };
+    "/sessions/workstream/$workstreamId": {
+      id: "/sessions/workstream/$workstreamId";
+      path: "/workstream/$workstreamId";
+      fullPath: "/sessions/workstream/$workstreamId";
+      preLoaderRoute: typeof SessionsWorkstreamWorkstreamIdRouteImport;
+      parentRoute: typeof SessionsRouteRoute;
+    };
   }
 }
 
 interface PiRouteRouteChildren {
-  PiSessionIdRoute: typeof PiSessionIdRoute
-  PiDefaultRoute: typeof PiDefaultRoute
-  PiIndexRoute: typeof PiIndexRoute
+  PiSessionIdRoute: typeof PiSessionIdRoute;
+  PiDefaultRoute: typeof PiDefaultRoute;
+  PiIndexRoute: typeof PiIndexRoute;
 }
 
 const PiRouteRouteChildren: PiRouteRouteChildren = {
   PiSessionIdRoute: PiSessionIdRoute,
   PiDefaultRoute: PiDefaultRoute,
   PiIndexRoute: PiIndexRoute,
-}
+};
 
-const PiRouteRouteWithChildren =
-  PiRouteRoute._addFileChildren(PiRouteRouteChildren)
+const PiRouteRouteWithChildren = PiRouteRoute._addFileChildren(PiRouteRouteChildren);
 
 interface SessionsRouteRouteChildren {
-  SessionsSessionIdRoute: typeof SessionsSessionIdRoute
-  SessionsIndexRoute: typeof SessionsIndexRoute
-  SessionsWorkstreamWorkstreamIdRoute: typeof SessionsWorkstreamWorkstreamIdRoute
+  SessionsSessionIdRoute: typeof SessionsSessionIdRoute;
+  SessionsIndexRoute: typeof SessionsIndexRoute;
+  SessionsWorkstreamWorkstreamIdRoute: typeof SessionsWorkstreamWorkstreamIdRoute;
 }
 
 const SessionsRouteRouteChildren: SessionsRouteRouteChildren = {
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SessionsIndexRoute: SessionsIndexRoute,
   SessionsWorkstreamWorkstreamIdRoute: SessionsWorkstreamWorkstreamIdRoute,
-}
+};
 
 const SessionsRouteRouteWithChildren = SessionsRouteRoute._addFileChildren(
   SessionsRouteRouteChildren,
-)
+);
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PiRouteRoute: PiRouteRouteWithChildren,
   SessionsRouteRoute: SessionsRouteRouteWithChildren,
   RuntimeRoute: RuntimeRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }

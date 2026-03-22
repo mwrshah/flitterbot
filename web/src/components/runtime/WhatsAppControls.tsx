@@ -1,13 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import type { StatusResponse } from "~/lib/types";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/Card";
+import type { StatusResponse } from "~/lib/types";
 
-function statusVariant(
-  status: string,
-): "success" | "warning" | "muted" {
+function statusVariant(status: string): "success" | "warning" | "muted" {
   switch (status) {
     case "connected":
       return "success";
@@ -19,11 +17,7 @@ function statusVariant(
   }
 }
 
-export function WhatsAppControls({
-  status,
-}: {
-  status?: StatusResponse;
-}) {
+export function WhatsAppControls({ status }: { status?: StatusResponse }) {
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
@@ -55,18 +49,14 @@ export function WhatsAppControls({
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
                 Daemon PID
               </p>
-              <p className="text-sm font-mono">
-                {status?.whatsapp.pid ?? "—"}
-              </p>
+              <p className="text-sm font-mono">{status?.whatsapp.pid ?? "—"}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
                 Managed by
               </p>
               <p className="text-sm">
-                {status?.whatsapp.managedByControlSurface
-                  ? "control surface"
-                  : "unknown"}
+                {status?.whatsapp.managedByControlSurface ? "control surface" : "unknown"}
               </p>
             </div>
           </div>
@@ -75,9 +65,7 @@ export function WhatsAppControls({
             <Button
               size="sm"
               disabled={
-                startMutation.isPending ||
-                waStatus === "connected" ||
-                waStatus === "starting"
+                startMutation.isPending || waStatus === "connected" || waStatus === "starting"
               }
               onClick={() => startMutation.mutate()}
             >
@@ -94,15 +82,9 @@ export function WhatsAppControls({
           </div>
 
           {startMutation.error && (
-            <p className="text-xs text-destructive">
-              Failed to start daemon.
-            </p>
+            <p className="text-xs text-destructive">Failed to start daemon.</p>
           )}
-          {stopMutation.error && (
-            <p className="text-xs text-destructive">
-              Failed to stop daemon.
-            </p>
-          )}
+          {stopMutation.error && <p className="text-xs text-destructive">Failed to stop daemon.</p>}
 
           <p className="text-[10px] text-muted-foreground/50">
             Auth stays terminal-driven in v1. Browser only controls start/stop.

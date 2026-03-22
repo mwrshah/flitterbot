@@ -4,8 +4,9 @@
  * Imperatively manages the Lit element lifecycle since custom elements
  * need property (not attribute) assignment for complex types like arrays.
  */
-import { useEffect, useRef, useState } from "react";
+
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import { useEffect, useRef, useState } from "react";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 
 export function PiMessageList({
@@ -79,7 +80,11 @@ export function PiMessageList({
   }
 
   if (!ready) {
-    return <div className="muted tiny" style={{ padding: "1rem" }}>Loading chat UI…</div>;
+    return (
+      <div className="muted tiny" style={{ padding: "1rem" }}>
+        Loading chat UI…
+      </div>
+    );
   }
 
   return <div ref={containerRef} style={{ minHeight: "2rem" }} />;

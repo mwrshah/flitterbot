@@ -21,6 +21,9 @@ export async function handleDirectSessionMessageRoute(
     return sendJson(response, 400, { ok: false, error: "text is required" });
   }
 
-  const result: DirectSessionMessageResponse = await runtime.directSessionMessage(sessionId, body.text);
+  const result: DirectSessionMessageResponse = await runtime.directSessionMessage(
+    sessionId,
+    body.text,
+  );
   return sendJson(response, result.ok ? 200 : 409, result);
 }

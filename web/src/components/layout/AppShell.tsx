@@ -1,17 +1,15 @@
+import { getRouteApi, Outlet } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Outlet, getRouteApi } from "@tanstack/react-router";
 import type { ConnectionState } from "~/lib/types";
-import { Sidebar } from "./Sidebar";
 import { SettingsDrawer } from "./SettingsDrawer";
+import { Sidebar } from "./Sidebar";
 
 const rootApi = getRouteApi("__root__");
 
 export function AppShell() {
   const { wsClient } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    wsClient.connectionState,
-  );
+  const [connectionState, setConnectionState] = useState<ConnectionState>(wsClient.connectionState);
 
   useEffect(() => {
     return wsClient.subscribeConnection(setConnectionState);
@@ -19,19 +17,13 @@ export function AppShell() {
 
   return (
     <div className="grid grid-cols-[240px_1fr] h-screen overflow-hidden">
-      <Sidebar
-        connectionState={connectionState}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+      <Sidebar connectionState={connectionState} onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="flex flex-col min-h-0 overflow-hidden">
         <Outlet />
       </main>
 
-      <SettingsDrawer
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

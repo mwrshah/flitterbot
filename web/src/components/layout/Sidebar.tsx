@@ -1,17 +1,9 @@
-import { Link, useRouterState, getRouteApi } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import type { ConnectionState } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
-function NavItem({
-  to,
-  label,
-  icon,
-}: {
-  to: string;
-  label: string;
-  icon: React.ReactNode;
-}) {
+function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -27,32 +19,18 @@ function NavItem({
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
       )}
     >
-      <span className="shrink-0 w-4 h-4 flex items-center justify-center">
-        {icon}
-      </span>
+      <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
     </Link>
   );
 }
 
-function StatusDot({
-  color,
-  label,
-  value,
-}: {
-  color: string;
-  label: string;
-  value: string;
-}) {
+function StatusDot({ color, label, value }: { color: string; label: string; value: string }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", color)} />
-      <span className="text-xs text-sidebar-foreground/50 shrink-0">
-        {label}
-      </span>
-      <span className="text-xs text-sidebar-foreground/80 truncate">
-        {value}
-      </span>
+      <span className="text-xs text-sidebar-foreground/50 shrink-0">{label}</span>
+      <span className="text-xs text-sidebar-foreground/80 truncate">{value}</span>
     </div>
   );
 }
@@ -116,8 +94,7 @@ export function Sidebar({
   const statusQuery = useQuery({
     queryKey: ["status"],
     queryFn: () => apiClient.getStatus(),
-    refetchInterval: (query) =>
-      query.state.error ? 30_000 : 5_000,
+    refetchInterval: (query) => (query.state.error ? 30_000 : 5_000),
     retry: 1,
   });
 
@@ -132,13 +109,9 @@ export function Sidebar({
       <div className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-sidebar-primary flex items-center justify-center">
-            <span className="text-xs font-bold text-sidebar-primary-foreground">
-              A
-            </span>
+            <span className="text-xs font-bold text-sidebar-primary-foreground">A</span>
           </div>
-          <span className="text-sm font-semibold text-sidebar-foreground">
-            Autonoma
-          </span>
+          <span className="text-sm font-semibold text-sidebar-foreground">Autonoma</span>
         </div>
       </div>
 
@@ -160,11 +133,7 @@ export function Sidebar({
           label="WA"
           value={waStatus}
         />
-        <StatusDot
-          color={connectionColor(connectionState)}
-          label="WS"
-          value={connectionState}
-        />
+        <StatusDot color={connectionColor(connectionState)} label="WS" value={connectionState} />
       </div>
 
       {/* Navigation */}

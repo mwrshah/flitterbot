@@ -1,7 +1,10 @@
-import fs from "node:fs";
-import { createReadStream } from "node:fs";
+import fs, { createReadStream } from "node:fs";
 import readline from "node:readline";
-import type { PiHistoryItem, PiHistoryMessageItem, PiHistoryResponse } from "../../contracts/index.ts";
+import type {
+  PiHistoryItem,
+  PiHistoryMessageItem,
+  PiHistoryResponse,
+} from "../../contracts/index.ts";
 import { extractSourcePrefix } from "./source-prefix.ts";
 
 type PiHistoryMode = "agent" | "input";
@@ -25,7 +28,10 @@ function isoTimestamp(...candidates: unknown[]): string {
 function firstText(value: unknown): string | undefined {
   if (typeof value === "string" && value.trim()) return value;
   if (Array.isArray(value)) {
-    const joined = value.map((item) => firstText(item)).filter((item): item is string => Boolean(item)).join("\n");
+    const joined = value
+      .map((item) => firstText(item))
+      .filter((item): item is string => Boolean(item))
+      .join("\n");
     return joined.trim() ? joined : undefined;
   }
   if (!value || typeof value !== "object") return undefined;
@@ -34,7 +40,6 @@ function firstText(value: unknown): string | undefined {
     .map((item) => firstText(item))
     .find((item): item is string => Boolean(item));
 }
-
 
 function pushMessage(
   items: PiHistoryItem[],
@@ -103,7 +108,9 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, `message-${messageIndex}`, [...messageBlocks]);
+    pushMessage(items, messageId, role, contentText, createdAt, `message-${messageIndex}`, [
+      ...messageBlocks,
+    ]);
     messageBlocks.length = 0;
     messageIndex += 1;
   };
@@ -137,14 +144,18 @@ function parseMessageContent(
         createdAt,
       });
       toolIndex += 1;
-      continue;
     }
   }
 
   flushMessage();
 }
 
-function parseMessageRecord(messageRecord: Record<string, unknown>, createdAt: string, messageId: string, items: PiHistoryItem[]): void {
+function parseMessageRecord(
+  messageRecord: Record<string, unknown>,
+  createdAt: string,
+  messageId: string,
+  items: PiHistoryItem[],
+): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
@@ -162,7 +173,8 @@ function parseMessageRecord(messageRecord: Record<string, unknown>, createdAt: s
           ? messageRecord.toolName
           : "unknown_tool",
       phase: "end",
-      toolUseId: typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : undefined,
+      toolUseId:
+        typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : undefined,
       result: messageRecord.details ?? resultText,
       isError: Boolean(messageRecord.isError),
       createdAt,
@@ -216,7 +228,9 @@ function stripThinkingFromMessage(item: PiHistoryItem): PiHistoryItem {
 
 function keepOnlySurfaced(items: PiHistoryItem[]): PiHistoryItem[] {
   return keepOnlySurfacedAssistant(items)
-    .filter((item) => item.kind === "message" && (item.role === "user" || item.role === "assistant"))
+    .filter(
+      (item) => item.kind === "message" && (item.role === "user" || item.role === "assistant"),
+    )
     .map(stripThinkingFromMessage);
 }
 
@@ -230,7 +244,8 @@ function parseHistoryLine(line: string, lineNumber: number, items: PiHistoryItem
 
   const messageRecord = asRecord(parsed.message);
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
-  const messageId = typeof parsed.id === "string" && parsed.id.trim() ? parsed.id : `line-${lineNumber}`;
+  const messageId =
+    typeof parsed.id === "string" && parsed.id.trim() ? parsed.id : `line-${lineNumber}`;
   parseMessageRecord(messageRecord, createdAt, messageId, items);
 }
 
@@ -245,7 +260,8 @@ export function readPiHistoryFromMessages(
   messages.forEach((message, index) => {
     const record = asRecord(message);
     const createdAt = isoTimestamp(record.timestamp);
-    const messageId = typeof record.id === "string" && record.id.trim() ? record.id : `memory-${index}`;
+    const messageId =
+      typeof record.id === "string" && record.id.trim() ? record.id : `memory-${index}`;
     parseMessageRecord(record, createdAt, messageId, items);
   });
 

@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { formatDuration } from "~/lib/utils";
+import { createFileRoute } from "@tanstack/react-router";
+import { WhatsAppControls } from "~/components/runtime/WhatsAppControls";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/Card";
-import { WhatsAppControls } from "~/components/runtime/WhatsAppControls";
+import { formatDuration } from "~/lib/utils";
 
 export const Route = createFileRoute("/runtime")({
   head: () => ({
@@ -13,25 +13,13 @@ export const Route = createFileRoute("/runtime")({
   component: RuntimePage,
 });
 
-function MetaItem({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
         {label}
       </p>
-      <p
-        className={`text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}
-      >
-        {value || "—"}
-      </p>
+      <p className={`text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</p>
     </div>
   );
 }
@@ -42,8 +30,7 @@ function RuntimePage() {
   const statusQuery = useQuery({
     queryKey: ["status"],
     queryFn: () => apiClient.getStatus(),
-    refetchInterval: (query) =>
-      query.state.error ? 30_000 : 5_000,
+    refetchInterval: (query) => (query.state.error ? 30_000 : 5_000),
     retry: 1,
   });
 
@@ -53,18 +40,12 @@ function RuntimePage() {
     <div className="flex-1 overflow-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-sm font-semibold text-foreground">Runtime</h1>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => statusQuery.refetch()}
-        >
+        <Button variant="ghost" size="sm" onClick={() => statusQuery.refetch()}>
           Refresh
         </Button>
       </div>
 
-      {statusQuery.isPending && (
-        <p className="text-sm text-muted-foreground">Loading status...</p>
-      )}
+      {statusQuery.isPending && <p className="text-sm text-muted-foreground">Loading status...</p>}
 
       {status && (
         <>
@@ -73,24 +54,15 @@ function RuntimePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Pi Agent</CardTitle>
-                <Badge
-                  variant={status.pi?.default?.busy ? "success" : "default"}
-                >
+                <Badge variant={status.pi?.default?.busy ? "success" : "default"}>
                   {status.pi?.default?.busy ? "active" : "idle"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
-                <MetaItem
-                  label="Session ID"
-                  value={status.pi?.default?.sessionId ?? ""}
-                  mono
-                />
-                <MetaItem
-                  label="Messages"
-                  value={String(status.pi?.default?.messageCount ?? 0)}
-                />
+                <MetaItem label="Session ID" value={status.pi?.default?.sessionId ?? ""} mono />
+                <MetaItem label="Messages" value={String(status.pi?.default?.messageCount ?? 0)} />
               </div>
             </CardContent>
           </Card>
@@ -117,13 +89,8 @@ function RuntimePage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <MetaItem
-                          label="Messages"
-                          value={String(o.messageCount)}
-                        />
-                        <Badge
-                          variant={o.busy ? "success" : "default"}
-                        >
+                        <MetaItem label="Messages" value={String(o.messageCount)} />
+                        <Badge variant={o.busy ? "success" : "default"}>
                           {o.busy ? "active" : "idle"}
                         </Badge>
                       </div>
@@ -139,21 +106,13 @@ function RuntimePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Control Surface</CardTitle>
-                <Badge variant="muted">
-                  {status.source ?? "live"}
-                </Badge>
+                <Badge variant="muted">{status.source ?? "live"}</Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
-                <MetaItem
-                  label="PID"
-                  value={status.pid != null ? String(status.pid) : ""}
-                />
-                <MetaItem
-                  label="Uptime"
-                  value={formatDuration(status.uptime)}
-                />
+                <MetaItem label="PID" value={status.pid != null ? String(status.pid) : ""} />
+                <MetaItem label="Uptime" value={formatDuration(status.uptime)} />
                 <MetaItem label="Blackboard" value={status.blackboard} />
               </div>
             </CardContent>

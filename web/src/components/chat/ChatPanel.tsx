@@ -1,17 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import {
-  timelineToAgentMessages,
-  buildStreamingAssistantMessage,
-  pendingToolCallsFromTimeline,
-} from "~/lib/pi-web-ui-bridge";
-import type {
-  ChatTimelineItem,
-  ConnectionState,
-  DeliveryMode,
-  ImageAttachment,
-} from "~/lib/types";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
+import {
+  buildStreamingAssistantMessage,
+  pendingToolCallsFromTimeline,
+  timelineToAgentMessages,
+} from "~/lib/pi-web-ui-bridge";
+import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./PiMessageList";
 import { PiStreamingMessage } from "./PiStreamingMessage";
 
@@ -32,9 +27,7 @@ function connectionLabel(state: ConnectionState): string {
   }
 }
 
-function connectionVariant(
-  state: ConnectionState,
-): "success" | "warning" | "muted" | "default" {
+function connectionVariant(state: ConnectionState): "success" | "warning" | "muted" | "default" {
   switch (state) {
     case "connected":
       return "success";
@@ -73,15 +66,9 @@ export function ChatPanel({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
 
-  const agentMessages = useMemo(
-    () => timelineToAgentMessages(timeline),
-    [timeline],
-  );
+  const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
-  const pendingToolCalls = useMemo(
-    () => pendingToolCallsFromTimeline(timeline),
-    [timeline],
-  );
+  const pendingToolCalls = useMemo(() => pendingToolCallsFromTimeline(timeline), [timeline]);
 
   const streamingMessage = useMemo(
     () => (streamingText ? buildStreamingAssistantMessage(streamingText) : null),
@@ -93,8 +80,7 @@ export function ChatPanel({
     const el = viewportRef.current;
     if (!el) return;
     const threshold = 50;
-    isAtBottomRef.current =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+    isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
   }, []);
 
   useEffect(() => {
@@ -166,10 +152,7 @@ export function ChatPanel({
           {statusPills.length > 0 && (
             <div className="flex items-center gap-1.5">
               {statusPills.map((pill) => (
-                <Badge
-                  key={pill.id}
-                  variant={pill.variant === "error" ? "error" : "muted"}
-                >
+                <Badge key={pill.id} variant={pill.variant === "error" ? "error" : "muted"}>
                   {pill.label}
                 </Badge>
               ))}
@@ -182,19 +165,13 @@ export function ChatPanel({
       </div>
 
       {/* Message area — fills all available space */}
-      <div
-        ref={viewportRef}
-        className="flex-1 overflow-auto px-6 py-4 space-y-3"
-      >
+      <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
         <PiMessageList
           messages={agentMessages}
           isStreaming={streamingText !== null}
           pendingToolCalls={pendingToolCalls}
         />
-        <PiStreamingMessage
-          message={streamingMessage}
-          visible={streamingText !== null}
-        />
+        <PiStreamingMessage message={streamingMessage} visible={streamingText !== null} />
       </div>
 
       <MessageInput

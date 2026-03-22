@@ -1,15 +1,12 @@
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
-import {
-  getInjectionEligibility,
-  getSessionById,
-} from "../../blackboard/queries/sessions.ts";
-import type { AutonomaConfig } from "../../config/load-config.ts";
-import type { DirectSessionMessageFailureReason, DirectSessionMessageResponse } from "../../contracts/index.ts";
+import { getInjectionEligibility, getSessionById } from "../../blackboard/queries/sessions.ts";
 import { sendMessageToClaudeSession } from "../../claude-sessions/send-message.ts";
-import {
-  inspectTmuxSession,
-  tmuxSessionExists,
-} from "../../claude-sessions/tmux.ts";
+import { inspectTmuxSession, tmuxSessionExists } from "../../claude-sessions/tmux.ts";
+import type { AutonomaConfig } from "../../config/load-config.ts";
+import type {
+  DirectSessionMessageFailureReason,
+  DirectSessionMessageResponse,
+} from "../../contracts/index.ts";
 
 type SessionControlContext = {
   blackboard: BlackboardDatabase;

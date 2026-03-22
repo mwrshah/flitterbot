@@ -40,7 +40,6 @@ export interface LaunchClaudeSessionResult {
   delivery: TmuxDeliveryMethod;
 }
 
-
 export type SendMessageToTmuxSessionFailureReason =
   | "tmux_session_missing"
   | "no_live_claude"
@@ -59,4 +58,3 @@ export type SendMessageToTmuxSessionResult =
       retries?: number;
       uiState: TmuxUiState;
     };
-

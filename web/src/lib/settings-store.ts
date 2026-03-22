@@ -18,11 +18,8 @@ function loadSettings(): ControlSurfaceSettings {
       const parsed = JSON.parse(raw) as Partial<ControlSurfaceSettings>;
       return {
         baseUrl:
-          parsed.baseUrl ||
-          import.meta.env.VITE_AUTONOMA_BASE_URL ||
-          "http://127.0.0.1:18820",
-        token:
-          parsed.token || import.meta.env.VITE_AUTONOMA_TOKEN || "",
+          parsed.baseUrl || import.meta.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820",
+        token: parsed.token || import.meta.env.VITE_AUTONOMA_TOKEN || "",
         useStubFallback: parsed.useStubFallback ?? true,
       };
     }
@@ -31,8 +28,7 @@ function loadSettings(): ControlSurfaceSettings {
   }
 
   return {
-    baseUrl:
-      import.meta.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820",
+    baseUrl: import.meta.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820",
     token: import.meta.env.VITE_AUTONOMA_TOKEN || "",
     useStubFallback: true,
   };
@@ -40,11 +36,9 @@ function loadSettings(): ControlSurfaceSettings {
 
 export type SettingsStore = ReturnType<typeof createSettingsStore>;
 
-export function createSettingsStore(
-  onSettingsChange?: (settings: ControlSurfaceSettings) => void,
-) {
+export function createSettingsStore(onSettingsChange?: (settings: ControlSurfaceSettings) => void) {
   let settings = loadSettings();
-  let listeners = new Set<() => void>();
+  const listeners = new Set<() => void>();
 
   function get(): ControlSurfaceSettings {
     return settings;

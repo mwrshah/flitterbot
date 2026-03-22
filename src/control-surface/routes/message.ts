@@ -5,12 +5,16 @@ import type {
   MessageResponse,
   MessageSource,
 } from "../../contracts/index.ts";
-import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { classifyMessage } from "../router/classify.ts";
 import { resolveGroqApiKey } from "../router/groq-client.ts";
+import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
-export async function handleMessageRoute(runtime: ControlSurfaceRuntime, req: http.IncomingMessage, res: http.ServerResponse) {
+export async function handleMessageRoute(
+  runtime: ControlSurfaceRuntime,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+) {
   if (!requireBearer(req, runtime.config.controlSurfaceToken)) {
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
@@ -68,7 +72,10 @@ async function routeMessage(
     }
     return { metadata: meta };
   } catch (error) {
-    console.error("[router] classification failed:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "[router] classification failed:",
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
@@ -84,7 +91,11 @@ function normalizeSource(source?: string): MessageSource {
   }
 }
 
-function formatInboundMessage(text: string, source: MessageSource, _metadata?: Record<string, unknown>): string {
+function formatInboundMessage(
+  text: string,
+  source: MessageSource,
+  _metadata?: Record<string, unknown>,
+): string {
   // Hook and cron messages are structured content — pass through unchanged
   if (source === "cron" || source === "hook") {
     return text;

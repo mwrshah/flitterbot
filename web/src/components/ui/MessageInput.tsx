@@ -1,7 +1,14 @@
-import { useRef, useState, useCallback, type FormEvent, type ClipboardEvent, type DragEvent } from "react";
-import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
-import { Button } from "~/components/ui/Button";
+import {
+  type ClipboardEvent,
+  type DragEvent,
+  type FormEvent,
+  useCallback,
+  useRef,
+  useState,
+} from "react";
 import { SkillPicker } from "~/components/input-surface/SkillPicker";
+import { Button } from "~/components/ui/Button";
+import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
   draft: string;
@@ -39,22 +46,26 @@ export function MessageInput({
   const [pickerFilter, setPickerFilter] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
 
-  const filteredSkills = skills?.filter((s) => {
-    if (!pickerFilter) return true;
-    return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
-  }) ?? [];
+  const filteredSkills =
+    skills?.filter((s) => {
+      if (!pickerFilter) return true;
+      return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
+    }) ?? [];
 
-  const handleDraftChange = useCallback((value: string) => {
-    onDraftChange(value);
-    const match = value.match(/^\/(\S*)$/);
-    if (match && skills?.length) {
-      setPickerOpen(true);
-      setPickerFilter(match[1]);
-      setSelectedSkill("");
-    } else {
-      setPickerOpen(false);
-    }
-  }, [onDraftChange, skills]);
+  const handleDraftChange = useCallback(
+    (value: string) => {
+      onDraftChange(value);
+      const match = value.match(/^\/(\S*)$/);
+      if (match && skills?.length) {
+        setPickerOpen(true);
+        setPickerFilter(match[1]);
+        setSelectedSkill("");
+      } else {
+        setPickerOpen(false);
+      }
+    },
+    [onDraftChange, skills],
+  );
 
   function handleSkillSelect(name: string) {
     onDraftChange(`/${name} `);
@@ -192,7 +203,21 @@ export function MessageInput({
             className="absolute left-2.5 top-3.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded p-0.5"
             title="Attach image"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+            </svg>
           </button>
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
@@ -220,11 +245,7 @@ export function MessageInput({
                 Steer
               </button>
             </div>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSending || !canSend}
-            >
+            <Button type="submit" size="sm" disabled={isSending || !canSend}>
               {isSending ? "Sending…" : "Send"}
             </Button>
           </div>

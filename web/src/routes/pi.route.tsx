@@ -1,18 +1,21 @@
-import { useCallback, useEffect } from "react";
-import { Link, Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Badge } from "~/components/ui/Badge";
+import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
+import type {
+  ChatTimelineItem,
+  ChatTimelineTool,
+  ConnectionState,
+  DeliveryMode,
+  ImageAttachment,
+  JsonValue,
+  MessageSource,
+  StatusResponse,
+  WsMessage,
+} from "~/lib/types";
+import { cn, createId, extractToolName } from "~/lib/utils";
 import { fetchPiStatus } from "~/server/pi";
-import type { ChatTimelineItem, ChatTimelineTool, ConnectionState, JsonValue, StatusResponse, WsMessage } from "~/lib/types";
-import type { MessageSource, DeliveryMode, ImageAttachment } from "~/lib/types";
-import { createId, extractToolName } from "~/lib/utils";
-import { cn } from "~/lib/utils";
-import {
-  piSessionStore,
-  resetPiSessionStore,
-  emptyAccum,
-  type SessionAccum,
-} from "~/lib/pi-session-store";
 
 /* ── Status query options (shared between loader and component) ── */
 
@@ -90,10 +93,7 @@ function PiLayoutRoute() {
     const store = piSessionStore;
 
     const unsubscribe = wsClient.subscribe((message: WsMessage) => {
-      const sessionId =
-        "sessionId" in message && message.sessionId
-          ? message.sessionId
-          : "default";
+      const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : "default";
 
       if (message.type === "connected") {
         store.addPill("default", {
@@ -105,9 +105,13 @@ function PiLayoutRoute() {
 
       if (message.type === "queue_item_start") {
         const sourceLabel =
-          message.item.source === "whatsapp" ? "WhatsApp" :
-          message.item.source === "hook" ? "Hook" :
-          message.item.source === "cron" ? "Cron" : "Web";
+          message.item.source === "whatsapp"
+            ? "WhatsApp"
+            : message.item.source === "hook"
+              ? "Hook"
+              : message.item.source === "cron"
+                ? "Cron"
+                : "Web";
         store.addPill(sessionId, {
           id: `processing-${message.item.id}`,
           label: `Processing ${sourceLabel} message`,
@@ -181,10 +185,7 @@ function PiLayoutRoute() {
         return;
       }
 
-      if (
-        message.type === "tool_execution_start" ||
-        message.type === "tool_execution_end"
-      ) {
+      if (message.type === "tool_execution_start" || message.type === "tool_execution_end") {
         const eventRecord =
           message.event && typeof message.event === "object"
             ? (message.event as Record<string, unknown>)
@@ -198,22 +199,19 @@ function PiLayoutRoute() {
           toolUseId: message.toolUseId,
           args:
             message.type === "tool_execution_start"
-              ? (message.args ??
-                eventRecord?.arguments ??
-                eventRecord?.args ??
-                eventRecord?.toolArguments) as JsonValue | undefined
+              ? ((message.args ??
+                  eventRecord?.arguments ??
+                  eventRecord?.args ??
+                  eventRecord?.toolArguments) as JsonValue | undefined)
               : undefined,
           result:
             message.type === "tool_execution_end"
-              ? (message.result ??
-                eventRecord?.result ??
-                eventRecord?.output ??
-                eventRecord?.toolResult) as JsonValue | undefined
+              ? ((message.result ??
+                  eventRecord?.result ??
+                  eventRecord?.output ??
+                  eventRecord?.toolResult) as JsonValue | undefined)
               : undefined,
-          isError:
-            message.type === "tool_execution_end"
-              ? message.isError
-              : undefined,
+          isError: message.type === "tool_execution_end" ? message.isError : undefined,
           createdAt: message.timestamp ?? new Date().toISOString(),
         };
         store.updateSession(sessionId, (s) => ({

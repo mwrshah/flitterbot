@@ -47,15 +47,10 @@ function SessionDetailPage() {
             <p className="text-sm text-muted-foreground">Loading detail...</p>
           )}
           {detailQuery.isError && (
-            <p className="text-sm text-destructive">
-              Failed to load session detail.
-            </p>
+            <p className="text-sm text-destructive">Failed to load session detail.</p>
           )}
           {detailQuery.data && (
-            <SessionDetail
-              session={detailQuery.data.session}
-              tmux={detailQuery.data.tmux}
-            />
+            <SessionDetail session={detailQuery.data.session} tmux={detailQuery.data.tmux} />
           )}
           <TranscriptViewer sessionId={sessionId} />
         </section>

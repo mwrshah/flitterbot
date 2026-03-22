@@ -1,9 +1,9 @@
-import type { BlackboardDatabase } from "../db.ts";
 import type { AutonomaConfig } from "../../config/load-config.ts";
 import type {
-  ClaudeSessionListItem as SessionListItem,
   ClaudeSessionRow,
+  ClaudeSessionListItem as SessionListItem,
 } from "../../contracts/index.ts";
+import type { BlackboardDatabase } from "../db.ts";
 
 export interface SessionStartPayload {
   session_id: string;
@@ -99,13 +99,17 @@ export function listSessions(db: BlackboardDatabase): SessionListItem[] {
   return rows.map(mapSessionRow);
 }
 
-
 export function getSessionById(db: BlackboardDatabase, sessionId: string): SessionListItem | null {
-  const row = db.prepare("SELECT * FROM sessions WHERE session_id = ?").get(sessionId) as unknown as ClaudeSessionRow | undefined;
+  const row = db.prepare("SELECT * FROM sessions WHERE session_id = ?").get(sessionId) as unknown as
+    | ClaudeSessionRow
+    | undefined;
   return row ? mapSessionRow(row) : null;
 }
 
-export function getSessionByTmuxSession(db: BlackboardDatabase, tmuxSession: string): SessionListItem | null {
+export function getSessionByTmuxSession(
+  db: BlackboardDatabase,
+  tmuxSession: string,
+): SessionListItem | null {
   const row = db
     .prepare(
       `SELECT *
@@ -187,12 +191,17 @@ export function markStaleSessions(
 ): SessionListItem[] {
   const candidates = findStaleCandidates(db, stallMinutes, toolTimeoutMinutes);
   for (const session of candidates) {
-    db.prepare(`UPDATE sessions SET status = 'stale' WHERE session_id = ? AND status = 'working'`).run(session.sessionId);
+    db.prepare(
+      `UPDATE sessions SET status = 'stale' WHERE session_id = ? AND status = 'working'`,
+    ).run(session.sessionId);
   }
   return candidates;
 }
 
-export function findIdleCleanupCandidates(db: BlackboardDatabase, idleBeforeIsoOrHours: string | number): SessionListItem[] {
+export function findIdleCleanupCandidates(
+  db: BlackboardDatabase,
+  idleBeforeIsoOrHours: string | number,
+): SessionListItem[] {
   let rows: ClaudeSessionRow[];
   if (typeof idleBeforeIsoOrHours === "string") {
     rows = db
@@ -302,7 +311,10 @@ export function updateSessionStop(db: BlackboardDatabase, sessionId: string): vo
   ).run(ts, ts, sessionId);
 }
 
-export function getActiveManagedSessionsByPi(db: BlackboardDatabase, piSessionId: string): SessionListItem[] {
+export function getActiveManagedSessionsByPi(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): SessionListItem[] {
   const rows = db
     .prepare(
       `SELECT *
@@ -316,7 +328,10 @@ export function getActiveManagedSessionsByPi(db: BlackboardDatabase, piSessionId
   return rows.map(mapSessionRow);
 }
 
-export function countActiveManagedSessionsByPi(db: BlackboardDatabase, piSessionId: string): number {
+export function countActiveManagedSessionsByPi(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): number {
   const row = db
     .prepare(
       `SELECT COUNT(*) AS count
@@ -328,4 +343,3 @@ export function countActiveManagedSessionsByPi(db: BlackboardDatabase, piSession
     .get(piSessionId) as { count: number };
   return Number(row.count);
 }
-

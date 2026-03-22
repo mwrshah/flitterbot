@@ -8,95 +8,101 @@ let cachedClient: OpenAI | null = null;
  * Resolve Groq API key from GROQ_API_KEY environment variable.
  */
 export function resolveGroqApiKey(): string | undefined {
-	return process.env.GROQ_API_KEY;
+  return process.env.GROQ_API_KEY;
 }
 
 function getClient(apiKey: string): OpenAI {
-	if (cachedClient) return cachedClient;
-	cachedClient = new OpenAI({
-		apiKey,
-		baseURL: "https://api.groq.com/openai/v1",
-	});
-	return cachedClient;
+  if (cachedClient) return cachedClient;
+  cachedClient = new OpenAI({
+    apiKey,
+    baseURL: "https://api.groq.com/openai/v1",
+  });
+  return cachedClient;
 }
 
 export type ClassifyResult = {
-	workstream_id: string | null;
-	new_workstream_name: string | null;
-	is_work_message: boolean;
-	reasoning: string;
+  workstream_id: string | null;
+  new_workstream_name: string | null;
+  is_work_message: boolean;
+  reasoning: string;
 };
 
 const MAX_RETRIES = 3;
 
-export async function callGroqClassify(
-	apiKey: string,
-	prompt: string,
-): Promise<ClassifyResult> {
-	const client = getClient(apiKey);
+export async function callGroqClassify(apiKey: string, prompt: string): Promise<ClassifyResult> {
+  const client = getClient(apiKey);
 
-	let lastError: unknown;
-	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-		try {
-			const response = await client.chat.completions.create({
-				model: MODEL_ID,
-				max_tokens: 1024,
-				response_format: { type: "json_object" },
-				messages: [
-					{
-						role: "user",
-						content: prompt,
-					},
-				],
-			});
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model: MODEL_ID,
+        max_tokens: 1024,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
 
-			const text = response.choices[0]?.message?.content;
+      const text = response.choices[0]?.message?.content;
 
-			if (!text) {
-				console.warn("[router] Groq response missing content (attempt %d/%d)", attempt, MAX_RETRIES);
-				lastError = new Error("Groq response missing content");
-				continue;
-			}
+      if (!text) {
+        console.warn(
+          "[router] Groq response missing content (attempt %d/%d)",
+          attempt,
+          MAX_RETRIES,
+        );
+        lastError = new Error("Groq response missing content");
+        continue;
+      }
 
-			let parsed: ClassifyResult;
-			try {
-				parsed = JSON.parse(text) as ClassifyResult;
-			} catch (parseError) {
-				console.warn(
-					"[router] Failed to parse Groq JSON (attempt %d/%d): %s",
-					attempt, MAX_RETRIES,
-					parseError instanceof Error ? parseError.message : String(parseError),
-				);
-				lastError = parseError;
-				continue;
-			}
+      let parsed: ClassifyResult;
+      try {
+        parsed = JSON.parse(text) as ClassifyResult;
+      } catch (parseError) {
+        console.warn(
+          "[router] Failed to parse Groq JSON (attempt %d/%d): %s",
+          attempt,
+          MAX_RETRIES,
+          parseError instanceof Error ? parseError.message : String(parseError),
+        );
+        lastError = parseError;
+        continue;
+      }
 
-			const result = {
-				workstream_id: parsed.workstream_id || null,
-				new_workstream_name: parsed.new_workstream_name || null,
-				is_work_message: Boolean(parsed.is_work_message),
-				reasoning: parsed.reasoning || "",
-			};
-			if (attempt > 1) {
-				console.log("[router] Groq classification succeeded on attempt %d", attempt);
-			}
-			console.log("── [router] classification ──\n%s\n── [/router] ──", JSON.stringify(result, null, 2));
-			return result;
-		} catch (apiError) {
-			console.warn(
-				"[router] Groq API error (attempt %d/%d): %s",
-				attempt, MAX_RETRIES,
-				apiError instanceof Error ? apiError.message : String(apiError),
-			);
-			lastError = apiError;
-		}
-	}
+      const result = {
+        workstream_id: parsed.workstream_id || null,
+        new_workstream_name: parsed.new_workstream_name || null,
+        is_work_message: Boolean(parsed.is_work_message),
+        reasoning: parsed.reasoning || "",
+      };
+      if (attempt > 1) {
+        console.log("[router] Groq classification succeeded on attempt %d", attempt);
+      }
+      console.log(
+        "── [router] classification ──\n%s\n── [/router] ──",
+        JSON.stringify(result, null, 2),
+      );
+      return result;
+    } catch (apiError) {
+      console.warn(
+        "[router] Groq API error (attempt %d/%d): %s",
+        attempt,
+        MAX_RETRIES,
+        apiError instanceof Error ? apiError.message : String(apiError),
+      );
+      lastError = apiError;
+    }
+  }
 
-	// All retries exhausted
-	throw lastError;
+  // All retries exhausted
+  throw lastError;
 }
 
 /** Reset cached client (for testing or key rotation). */
 export function resetGroqClient(): void {
-	cachedClient = null;
+  cachedClient = null;
 }

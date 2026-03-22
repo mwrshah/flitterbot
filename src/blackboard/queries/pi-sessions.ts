@@ -1,3 +1,4 @@
+import type { PiSessionStatus as PersistedPiSessionStatus } from "../../contracts/index.ts";
 import type { BlackboardDatabase } from "../db.ts";
 import {
   closePiSession,
@@ -6,7 +7,6 @@ import {
   touchPiSessionPrompt,
   upsertPiSession as writePiSession,
 } from "../writers/pi-session-writer.ts";
-import type { PiSessionStatus as PersistedPiSessionStatus } from "../../contracts/index.ts";
 
 type UpsertPiSessionInput = {
   piSessionId: string;
@@ -66,7 +66,10 @@ export function touchPiPrompt(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<PersistedPiSessionStatus, "active" | "waiting_for_user" | "waiting_for_sessions"> = "active",
+  status: Extract<
+    PersistedPiSessionStatus,
+    "active" | "waiting_for_user" | "waiting_for_sessions"
+  > = "active",
 ): void {
   touchPiSessionPrompt(db, piSessionId, timestamp, status);
 }
@@ -75,7 +78,10 @@ export function touchPiEvent(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<PersistedPiSessionStatus, "active" | "waiting_for_user" | "waiting_for_sessions"> = "active",
+  status: Extract<
+    PersistedPiSessionStatus,
+    "active" | "waiting_for_user" | "waiting_for_sessions"
+  > = "active",
 ): void {
   touchPiSessionEvent(db, piSessionId, timestamp, status);
 }

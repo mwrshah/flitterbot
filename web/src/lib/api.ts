@@ -17,9 +17,7 @@ export type ControlSurfaceSettings = {
 
 export type AutonomaApiClient = ReturnType<typeof createAutonomaApiClient>;
 
-export function createAutonomaApiClient(
-  getSettings: () => ControlSurfaceSettings,
-) {
+export function createAutonomaApiClient(getSettings: () => ControlSurfaceSettings) {
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const { baseUrl, token } = getSettings();
     const url = `${baseUrl.replace(/\/$/, "")}${path}`;
@@ -44,16 +42,10 @@ export function createAutonomaApiClient(
     getSessionDetail: (sessionId: string) =>
       request<SessionDetailResponse>(`/api/sessions/${sessionId}`),
 
-    getTranscript: (
-      sessionId: string,
-      cursor?: string,
-      limit = 25,
-    ) => {
+    getTranscript: (sessionId: string, cursor?: string, limit = 25) => {
       const params = new URLSearchParams({ limit: String(limit) });
       if (cursor) params.set("cursor", cursor);
-      return request<TranscriptPage>(
-        `/api/sessions/${sessionId}/transcript?${params}`,
-      );
+      return request<TranscriptPage>(`/api/sessions/${sessionId}/transcript?${params}`);
     },
 
     sendMessage: (body: {
@@ -79,16 +71,12 @@ export function createAutonomaApiClient(
       if (surface) params.set("surface", surface);
       if (piSessionId) params.set("piSessionId", piSessionId);
       const qs = params.toString();
-      return request<PiHistoryResponse>(
-        qs ? `/api/pi/history?${qs}` : "/api/pi/history",
-      );
+      return request<PiHistoryResponse>(qs ? `/api/pi/history?${qs}` : "/api/pi/history");
     },
 
-    startWhatsApp: () =>
-      request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),
+    startWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),
 
-    stopWhatsApp: () =>
-      request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
+    stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
   };

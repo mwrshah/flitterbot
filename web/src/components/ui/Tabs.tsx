@@ -21,13 +21,7 @@ type TabsProps = React.HTMLAttributes<HTMLDivElement> & {
   onValueChange: (value: string) => void;
 };
 
-export function Tabs({
-  value,
-  onValueChange,
-  className,
-  children,
-  ...props
-}: TabsProps) {
+export function Tabs({ value, onValueChange, className, children, ...props }: TabsProps) {
   const ctx = React.useMemo(() => ({ value, onValueChange }), [value, onValueChange]);
   return (
     <TabsContext.Provider value={ctx}>
@@ -40,10 +34,7 @@ export function Tabs({
 
 /* ── TabsList ── */
 
-export function TabsList({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+export function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       role="tablist"
@@ -62,12 +53,7 @@ type TabsTriggerProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   value: string;
 };
 
-export function TabsTrigger({
-  value,
-  className,
-  children,
-  ...props
-}: TabsTriggerProps) {
+export function TabsTrigger({ value, className, children, ...props }: TabsTriggerProps) {
   const { value: selected, onValueChange } = useTabs();
   const active = selected === value;
 
@@ -98,11 +84,7 @@ type TabsContentProps = React.HTMLAttributes<HTMLDivElement> & {
   value: string;
 };
 
-export function TabsContent({
-  value,
-  className,
-  ...props
-}: TabsContentProps) {
+export function TabsContent({ value, className, ...props }: TabsContentProps) {
   const { value: selected } = useTabs();
   if (selected !== value) return null;
 

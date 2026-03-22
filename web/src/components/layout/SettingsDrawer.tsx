@@ -1,8 +1,8 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { useTheme } from "~/hooks/use-theme";
-import { useSettings } from "~/lib/settings-store";
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Input";
+import { useTheme } from "~/hooks/use-theme";
+import { useSettings } from "~/lib/settings-store";
 
 const rootApi = getRouteApi("__root__");
 
@@ -12,13 +12,7 @@ const themeOptions = [
   { value: "system" as const, label: "System", icon: "💻" },
 ];
 
-export function SettingsDrawer({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);
   const updateSettings = settingsStore.set;
@@ -29,10 +23,7 @@ export function SettingsDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-50 flex flex-col shadow-xl">
@@ -76,27 +67,19 @@ export function SettingsDrawer({
               Control Surface
             </h3>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">
-                Base URL
-              </label>
+              <label className="text-xs text-muted-foreground">Base URL</label>
               <Input
                 value={settings.baseUrl}
-                onChange={(e) =>
-                  updateSettings({ baseUrl: e.target.value })
-                }
+                onChange={(e) => updateSettings({ baseUrl: e.target.value })}
                 placeholder="http://127.0.0.1:18820"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">
-                Bearer token
-              </label>
+              <label className="text-xs text-muted-foreground">Bearer token</label>
               <Input
                 type="password"
                 value={settings.token}
-                onChange={(e) =>
-                  updateSettings({ token: e.target.value })
-                }
+                onChange={(e) => updateSettings({ token: e.target.value })}
                 placeholder="controlSurfaceToken"
               />
             </div>
@@ -111,9 +94,7 @@ export function SettingsDrawer({
                 }
                 className="rounded border-border"
               />
-              <span className="text-xs">
-                Use stub fallback when localhost unavailable
-              </span>
+              <span className="text-xs">Use stub fallback when localhost unavailable</span>
             </label>
           </section>
         </div>

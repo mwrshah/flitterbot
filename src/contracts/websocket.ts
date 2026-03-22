@@ -112,6 +112,7 @@ export interface PiSurfacedWebSocketEvent {
   timestamp?: string;
   sessionId?: string;
   workstreamId?: string;
+  workstreamName?: string;
 }
 
 export type ControlSurfaceWebSocketServerEvent =

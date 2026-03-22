@@ -21,18 +21,18 @@ import { html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { marked } from "marked";
 import createElement from "lucide/dist/esm/createElement.js";
 import Check from "lucide/dist/esm/icons/check.js";
 import ChevronRight from "lucide/dist/esm/icons/chevron-right.js";
 import Code from "lucide/dist/esm/icons/code.js";
 import Copy from "lucide/dist/esm/icons/copy.js";
-import FileText from "lucide/dist/esm/icons/file-text.js";
 import FilePen from "lucide/dist/esm/icons/file-pen.js";
+import FileText from "lucide/dist/esm/icons/file-text.js";
 import FolderOpen from "lucide/dist/esm/icons/folder-open.js";
 import MessageSquare from "lucide/dist/esm/icons/message-square.js";
 import Search from "lucide/dist/esm/icons/search.js";
 import SquareTerminal from "lucide/dist/esm/icons/square-terminal.js";
+import { marked } from "marked";
 
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("typescript", typescript);
@@ -80,7 +80,9 @@ function formatUsage(usage?: Usage): string {
 
 function iconSvg(iconNode: unknown, size: "sm" | "md" = "md", className = ""): string {
   const classes = size === "sm" ? "w-4 h-4" : "w-5 h-5";
-  const el = createElement(iconNode as any, { class: `${classes}${className ? ` ${className}` : ""}` });
+  const el = createElement(iconNode as any, {
+    class: `${classes}${className ? ` ${className}` : ""}`,
+  });
   return el.outerHTML;
 }
 
@@ -154,10 +156,13 @@ export class MarkdownBlock extends LitElement {
     const parsed = marked.parse(this.content, { async: false, renderer }) as string;
 
     const withCodeBlocks = parsed
-      .replace(/<pre><code class="language-([^"]+)">([\s\S]+?)<\/code><\/pre>/g, (_m, language, code) => {
-        const decoded = decodeHtmlEntities(code);
-        return `<code-block code="${encodeUtf8Base64(decoded)}" language="${language}"></code-block>`;
-      })
+      .replace(
+        /<pre><code class="language-([^"]+)">([\s\S]+?)<\/code><\/pre>/g,
+        (_m, language, code) => {
+          const decoded = decodeHtmlEntities(code);
+          return `<code-block code="${encodeUtf8Base64(decoded)}" language="${language}"></code-block>`;
+        },
+      )
       .replace(/<pre><code>([\s\S]+?)<\/code><\/pre>/g, (_m, code) => {
         const decoded = decodeHtmlEntities(code);
         return `<code-block code="${encodeUtf8Base64(decoded)}" language="text"></code-block>`;
@@ -199,9 +204,10 @@ export class CodeBlock extends LitElement {
 
   override render() {
     const decodedCode = decodeUtf8Base64(this.code);
-    const highlighted = this.language && hljs.getLanguage(this.language)
-      ? hljs.highlight(decodedCode, { language: this.language }).value
-      : hljs.highlightAuto(decodedCode).value;
+    const highlighted =
+      this.language && hljs.getLanguage(this.language)
+        ? hljs.highlight(decodedCode, { language: this.language }).value
+        : hljs.highlightAuto(decodedCode).value;
     const displayLanguage = this.language || "plaintext";
 
     return html`
@@ -329,9 +335,11 @@ export class ThinkingBlock extends LitElement {
             ${this.isExpanded ? i18n("Hide") : i18n("Show")}
           </span>
         </button>
-        ${this.isExpanded
-          ? html`<div class="pl-4 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
-          : ""}
+        ${
+          this.isExpanded
+            ? html`<div class="pl-4 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
+            : ""
+        }
       </div>
     `;
   }
@@ -364,31 +372,36 @@ function renderDefaultTool(
       : i18n("Tool Call");
 
   const prettyParams = prettyValue(params);
-  const textOutput = result?.content
-    ?.filter((content) => content.type === "text")
-    .map((content: any) => content.text)
-    .join("\n") || i18n("(no output)");
+  const textOutput =
+    result?.content
+      ?.filter((content) => content.type === "text")
+      .map((content: any) => content.text)
+      .join("\n") || i18n("(no output)");
   const prettyOutput = prettyValue(textOutput);
 
   return html`
     <div class="space-y-3">
       ${renderToolHeader(Code, stateText)}
-      ${prettyParams.content
-        ? html`
+      ${
+        prettyParams.content
+          ? html`
             <div>
               <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Input")}</div>
               <code-block .code=${encodeUtf8Base64(prettyParams.content)} language=${prettyParams.language}></code-block>
             </div>
           `
-        : ""}
-      ${result
-        ? html`
+          : ""
+      }
+      ${
+        result
+          ? html`
             <div>
               <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Output")}</div>
               <code-block .code=${encodeUtf8Base64(prettyOutput.content)} language=${prettyOutput.language}></code-block>
             </div>
           `
-        : ""}
+          : ""
+      }
     </div>
   `;
 }
@@ -397,14 +410,16 @@ function renderBashTool(
   params: unknown,
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
-  const command = typeof params === "object" && params && "command" in (params as Record<string, unknown>)
-    ? String((params as Record<string, unknown>).command ?? "")
-    : "";
+  const command =
+    typeof params === "object" && params && "command" in (params as Record<string, unknown>)
+      ? String((params as Record<string, unknown>).command ?? "")
+      : "";
 
-  const output = result?.content
-    ?.filter((content) => content.type === "text")
-    .map((content: any) => content.text)
-    .join("\n") || "";
+  const output =
+    result?.content
+      ?.filter((content) => content.type === "text")
+      .map((content: any) => content.text)
+      .join("\n") || "";
 
   const combined = command ? `> ${command}${output ? `\n\n${output}` : ""}` : output;
 
@@ -421,10 +436,12 @@ function paramRecord(params: unknown): Record<string, unknown> {
 }
 
 function resultText(result: ToolResultMessageType | undefined): string {
-  return result?.content
-    ?.filter((c) => c.type === "text")
-    .map((c: any) => c.text)
-    .join("\n") || "";
+  return (
+    result?.content
+      ?.filter((c) => c.type === "text")
+      .map((c: any) => c.text)
+      .join("\n") || ""
+  );
 }
 
 function truncateLines(text: string, max: number): { lines: string; truncated: boolean } {
@@ -450,16 +467,18 @@ function renderEditTool(
   return html`
     <div class="space-y-2">
       ${renderToolHeader(FilePen, `Editing ${filePath}`)}
-      ${diffLines.length
-        ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${diffLines.map(
-            (l) =>
-              l.startsWith("- ")
-                ? html`<span class="text-red-400">${l}\n</span>`
-                : l.startsWith("+ ")
-                  ? html`<span class="text-green-400">${l}\n</span>`
-                  : html`${l}\n`,
-          )}</pre>`
-        : ""}
+      ${
+        diffLines.length
+          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${diffLines.map(
+              (l) =>
+                l.startsWith("- ")
+                  ? html`<span class="text-red-400">${l}\n</span>`
+                  : l.startsWith("+ ")
+                    ? html`<span class="text-green-400">${l}\n</span>`
+                    : html`${l}\n`,
+            )}</pre>`
+          : ""
+      }
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
@@ -495,9 +514,11 @@ function renderReadTool(
   return html`
     <div class="space-y-2">
       ${renderToolHeader(FileText, `Reading ${filePath}`)}
-      ${output
-        ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`
-        : ""}
+      ${
+        output
+          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`
+          : ""
+      }
       ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
     </div>
   `;
@@ -515,18 +536,17 @@ function renderGrepTool(
   return html`
     <div class="space-y-2">
       ${renderToolHeader(Search, `grep ${pattern} ${path}`)}
-      ${output
-        ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
-        : ""}
+      ${
+        output
+          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
+          : ""
+      }
       ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
     </div>
   `;
 }
 
-function renderLsTool(
-  params: unknown,
-  result: ToolResultMessageType | undefined,
-): TemplateResult {
+function renderLsTool(params: unknown, result: ToolResultMessageType | undefined): TemplateResult {
   const p = paramRecord(params);
   const path = String(p.path ?? p.directory ?? ".");
   const output = resultText(result);
@@ -534,9 +554,11 @@ function renderLsTool(
   return html`
     <div class="space-y-2">
       ${renderToolHeader(FolderOpen, `ls ${path}`)}
-      ${output
-        ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
-        : ""}
+      ${
+        output
+          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
+          : ""
+      }
     </div>
   `;
 }
@@ -551,11 +573,13 @@ function renderSendToUserTool(
   return html`
     <div class="space-y-2">
       ${renderToolHeader(MessageSquare, i18n("Notifying user"))}
-      ${text
-        ? html`<div class="rounded-lg border border-border px-3 py-2 text-sm">
+      ${
+        text
+          ? html`<div class="rounded-lg border border-border px-3 py-2 text-sm">
             <markdown-block .content=${text}></markdown-block>
           </div>`
-        : ""}
+          : ""
+      }
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
@@ -661,10 +685,13 @@ export class UserMessage extends LitElement {
   }
 
   override render() {
-    const contentArr = typeof this.message.content === "string"
-      ? [{ type: "text" as const, text: this.message.content }]
-      : this.message.content;
-    const textContent = contentArr.find((chunk) => chunk.type === "text") as TextContent | undefined;
+    const contentArr =
+      typeof this.message.content === "string"
+        ? [{ type: "text" as const, text: this.message.content }]
+        : this.message.content;
+    const textContent = contentArr.find((chunk) => chunk.type === "text") as
+      | TextContent
+      | undefined;
     const imageBlocks = contentArr.filter((chunk) => chunk.type === "image") as ImageContent[];
 
     const source = (this.message as any).source as string | undefined;
@@ -673,22 +700,30 @@ export class UserMessage extends LitElement {
     return html`
       <div class="flex justify-start mx-4">
         <div>
-          ${meta
-            ? html`<div class="text-[10px] font-medium mb-1 ${meta.cssClass}">${meta.label}</div>`
-            : ""}
+          ${
+            meta
+              ? html`<div class="text-[10px] font-medium mb-1 ${meta.cssClass}">${meta.label}</div>`
+              : ""
+          }
           <div class="user-message-container py-2 px-4 rounded-xl">
             ${textContent?.text ? html`<markdown-block .content=${textContent.text}></markdown-block>` : ""}
-            ${imageBlocks.length > 0 ? html`
+            ${
+              imageBlocks.length > 0
+                ? html`
               <div class="flex flex-wrap gap-2 ${textContent?.text ? "mt-2" : ""}">
-                ${imageBlocks.map((img) => html`
+                ${imageBlocks.map(
+                  (img) => html`
                   <img
                     src="data:${img.mimeType};base64,${img.data}"
                     alt="Attached image"
                     class="rounded-lg max-w-[240px] max-h-[240px] object-contain"
                   />
-                `)}
+                `,
+                )}
               </div>
-            ` : ""}
+            `
+                : ""
+            }
           </div>
         </div>
       </div>
@@ -731,9 +766,11 @@ export class ToolMessageDebugView extends LitElement {
         </div>
         <div>
           <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Result")}</div>
-          ${this.hasResult
-            ? html`<code-block .code=${encodeUtf8Base64(output.content)} language=${output.language}></code-block>`
-            : html`<div class="text-xs text-muted-foreground">${i18n("(no result)")}</div>`}
+          ${
+            this.hasResult
+              ? html`<code-block .code=${encodeUtf8Base64(output.content)} language=${output.language}></code-block>`
+              : html`<div class="text-xs text-muted-foreground">${i18n("(no result)")}</div>`
+          }
         </div>
       </div>
     `;
@@ -764,14 +801,14 @@ export class ToolMessage extends LitElement {
   override render() {
     const toolName = this.tool?.name || this.toolCall.name;
     const effectiveResult = this.aborted
-      ? {
+      ? ({
           role: "toolResult",
           isError: true,
           content: [],
           toolCallId: this.toolCall.id,
           toolName: this.toolCall.name,
           timestamp: Date.now(),
-        } as ToolResultMessageType
+        } as ToolResultMessageType)
       : this.result;
     const summary = summarizeToolCall(
       toolName,
@@ -858,21 +895,27 @@ export class AssistantMessage extends LitElement {
     return html`
       <div>
         ${orderedParts.length ? html`<div class="px-4 flex flex-col gap-3">${orderedParts}</div>` : ""}
-        ${this.message.usage && !this.isStreaming
-          ? this.onCostClick
-            ? html`<div class="px-4 mt-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${formatUsage(this.message.usage)}</div>`
-            : html`<div class="px-4 mt-2 text-xs text-muted-foreground">${formatUsage(this.message.usage)}</div>`
-          : ""}
-        ${this.message.stopReason === "error" && this.message.errorMessage
-          ? html`
+        ${
+          this.message.usage && !this.isStreaming
+            ? this.onCostClick
+              ? html`<div class="px-4 mt-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${formatUsage(this.message.usage)}</div>`
+              : html`<div class="px-4 mt-2 text-xs text-muted-foreground">${formatUsage(this.message.usage)}</div>`
+            : ""
+        }
+        ${
+          this.message.stopReason === "error" && this.message.errorMessage
+            ? html`
               <div class="mx-4 mt-3 p-3 bg-destructive/10 text-destructive rounded-lg text-sm overflow-hidden">
                 <strong>${i18n("Error:")}</strong> ${this.message.errorMessage}
               </div>
             `
-          : ""}
-        ${this.message.stopReason === "aborted"
-          ? html`<span class="text-sm text-destructive italic">${i18n("Request aborted")}</span>`
-          : ""}
+            : ""
+        }
+        ${
+          this.message.stopReason === "aborted"
+            ? html`<span class="text-sm text-destructive italic">${i18n("Request aborted")}</span>`
+            : ""
+        }
       </div>
     `;
   }
@@ -902,7 +945,10 @@ export class MessageList extends LitElement {
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
       if ((message as any).role === "toolResult") {
-        resultByCallId.set((message as ToolResultMessageType).toolCallId, message as ToolResultMessageType);
+        resultByCallId.set(
+          (message as ToolResultMessageType).toolCallId,
+          message as ToolResultMessageType,
+        );
       }
     }
 
@@ -950,7 +996,11 @@ export class MessageList extends LitElement {
   override render() {
     const items = this.buildRenderItems();
     return html`<div class="flex flex-col gap-3">
-      ${repeat(items, (item) => item.key, (item) => item.template)}
+      ${repeat(
+        items,
+        (item) => item.key,
+        (item) => item.template,
+      )}
     </div>`;
   }
 }

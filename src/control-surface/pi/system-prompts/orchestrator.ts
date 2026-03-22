@@ -1,24 +1,24 @@
 import {
-	RUNTIME_FACTS,
-	DELEGATION_RULES,
-	SESSION_PROCEDURES,
-	INVESTIGATION_PROCEDURE,
-	IMPLEMENTATION_PROCEDURE,
-	COMMUNICATION_STYLE,
-	SESSION_LAUNCH_IDENTITY,
+  COMMUNICATION_STYLE,
+  DELEGATION_RULES,
+  IMPLEMENTATION_PROCEDURE,
+  INVESTIGATION_PROCEDURE,
+  RUNTIME_FACTS,
+  SESSION_LAUNCH_IDENTITY,
+  SESSION_PROCEDURES,
 } from "./shared.ts";
 
 export type OrchestratorContext = {
-	workstreamName: string;
-	workstreamId: string;
-	repoPath?: string;
-	piSessionId: string;
+  workstreamName: string;
+  workstreamId: string;
+  repoPath?: string;
+  piSessionId: string;
 };
 
 export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
-	const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
+  const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
 
-	return `You are Autonoma, a workstream orchestrator Pi agent managing a single workstream.
+  return `You are Autonoma, a workstream orchestrator Pi agent managing a single workstream.
 
 You run as an ephemeral embedded agent inside the Autonoma control surface, scoped to one workstream. Messages arrive from multiple sources — WhatsApp replies, Claude Code hook events, cron check-ins, and the web app.
 

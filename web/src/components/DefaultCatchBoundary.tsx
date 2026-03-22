@@ -1,21 +1,21 @@
-import type { MouseEvent } from 'react'
 import {
   ErrorComponent,
+  type ErrorComponentProps,
   Link,
   rootRouteId,
   useMatch,
   useRouter,
-  type ErrorComponentProps,
-} from '@tanstack/react-router'
+} from "@tanstack/react-router";
+import type { MouseEvent } from "react";
 
 export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
-  const router = useRouter()
+  const router = useRouter();
   const isRoot = useMatch({
     strict: false,
     select: (state) => state.id === rootRouteId,
-  })
+  });
 
-  console.error(error)
+  console.error(error);
 
   return (
     <div className="app-shell">
@@ -31,18 +31,18 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
               onClick={
                 !isRoot
                   ? (event: MouseEvent<HTMLAnchorElement>) => {
-                      event.preventDefault()
-                      window.history.back()
+                      event.preventDefault();
+                      window.history.back();
                     }
                   : undefined
               }
               to="/"
             >
-              {isRoot ? 'Home' : 'Go back'}
+              {isRoot ? "Home" : "Go back"}
             </Link>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

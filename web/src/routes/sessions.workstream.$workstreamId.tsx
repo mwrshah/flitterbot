@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { TranscriptViewer } from "~/components/sessions/TranscriptViewer";
-import { cn } from "~/lib/utils";
 import { Badge } from "~/components/ui/Badge";
 import type { SessionSummary } from "~/lib/types";
+import { cn } from "~/lib/utils";
 
 export const Route = createFileRoute("/sessions/workstream/$workstreamId")({
   component: WorkstreamSessionsPage,
@@ -12,9 +12,7 @@ export const Route = createFileRoute("/sessions/workstream/$workstreamId")({
 
 type LayoutMode = "grid" | "stacked";
 
-function statusVariant(
-  status: string,
-): "success" | "default" | "warning" | "muted" {
+function statusVariant(status: string): "success" | "default" | "warning" | "muted" {
   switch (status) {
     case "working":
       return "success";
@@ -39,11 +37,8 @@ function WorkstreamSessionsPage() {
   });
 
   const allSessions = sessionsQuery.data?.items ?? [];
-  const sessions = allSessions.filter(
-    (s) => s.workstreamId === workstreamId,
-  );
-  const workstreamName =
-    sessions[0]?.workstreamName ?? workstreamId;
+  const sessions = allSessions.filter((s) => s.workstreamId === workstreamId);
+  const workstreamName = sessions[0]?.workstreamName ?? workstreamId;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -56,9 +51,7 @@ function WorkstreamSessionsPage() {
           >
             &larr; Sessions
           </Link>
-          <h1 className="text-lg font-semibold text-foreground">
-            {workstreamName}
-          </h1>
+          <h1 className="text-lg font-semibold text-foreground">{workstreamName}</h1>
           <span className="text-sm text-muted-foreground">
             {sessions.length} session{sessions.length !== 1 && "s"}
           </span>
@@ -129,9 +122,7 @@ function SessionTranscriptPanel({ session }: { session: SessionSummary }) {
       {/* Panel header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card">
         <div className="flex items-center gap-2 min-w-0">
-          <Badge variant={statusVariant(session.status)}>
-            {session.status}
-          </Badge>
+          <Badge variant={statusVariant(session.status)}>{session.status}</Badge>
           <Link
             to="/sessions/$sessionId"
             params={{ sessionId: session.sessionId }}
@@ -141,9 +132,7 @@ function SessionTranscriptPanel({ session }: { session: SessionSummary }) {
           </Link>
         </div>
         {session.project && (
-          <span className="text-xs text-muted-foreground shrink-0">
-            {session.project}
-          </span>
+          <span className="text-xs text-muted-foreground shrink-0">{session.project}</span>
         )}
       </div>
 

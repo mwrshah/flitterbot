@@ -1,13 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "~/components/ui/Badge";
+import { MessageInput } from "~/components/ui/MessageInput";
+import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -17,9 +13,6 @@ import type {
   MessageSource,
 } from "~/lib/types";
 import { createId } from "~/lib/utils";
-import { Badge } from "~/components/ui/Badge";
-import { MessageInput } from "~/components/ui/MessageInput";
-import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 
 /* ── Types ── */
 
@@ -53,7 +46,9 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
 
 const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
 
-function parseWorkstreamPrefix(content: string): { workstreamName: string; cleanContent: string } | null {
+function parseWorkstreamPrefix(
+  content: string,
+): { workstreamName: string; cleanContent: string } | null {
   const match = content.match(WORKSTREAM_PREFIX_RE);
   if (!match) return null;
   return { workstreamName: match[1], cleanContent: content.slice(match[0].length) };
@@ -131,9 +126,7 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
             {parsed.workstreamName}
           </span>
         )}
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {displayContent}
-        </p>
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
       </div>
     </div>
   );
@@ -146,7 +139,9 @@ function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
         <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
         <div className="flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${isWhatsApp ? "bg-emerald-500" : "bg-blue-500"}`} />
+          <span
+            className={`w-2 h-2 rounded-full ${isWhatsApp ? "bg-emerald-500" : "bg-blue-500"}`}
+          />
           <span className="text-[10px] font-medium text-muted-foreground">
             {isWhatsApp ? "WA Out" : "Notify"}
           </span>
@@ -154,14 +149,10 @@ function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }
       </div>
       <div
         className={`flex-1 min-w-0 rounded-lg border px-3 py-2 ${
-          isWhatsApp
-            ? "border-emerald-500/25 bg-emerald-500/5"
-            : "border-blue-500/25 bg-blue-500/5"
+          isWhatsApp ? "border-emerald-500/25 bg-emerald-500/5" : "border-blue-500/25 bg-blue-500/5"
         }`}
       >
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {entry.content}
-        </p>
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{entry.content}</p>
       </div>
     </div>
   );
@@ -175,9 +166,13 @@ function LitMarkdownBlock({ content }: { content: string }) {
   useEffect(() => {
     let cancelled = false;
     ensurePiWebUiReady()
-      .then(() => { if (!cancelled) setReady(true); })
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -228,9 +223,7 @@ function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
       <div className="flex-1 min-w-0 rounded-lg border border-violet-500/25 bg-violet-500/5 px-3 py-2">
         <p className="text-xs font-medium text-muted-foreground mb-1">{entry.eventName}</p>
         {entry.detail && (
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {entry.detail}
-          </p>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{entry.detail}</p>
         )}
       </div>
     </div>
@@ -259,9 +252,7 @@ export function InputSurface() {
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [timeline, setTimeline] = useState<ChatTimelineItem[]>([]);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    wsClient.connectionState,
-  );
+  const [connectionState, setConnectionState] = useState<ConnectionState>(wsClient.connectionState);
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
@@ -357,9 +348,7 @@ export function InputSurface() {
     // clients with zero subscriptions.
     wsClient.subscribeSession("*");
 
-    const unsubscribeConnection = wsClient.subscribeConnection(
-      setConnectionState,
-    );
+    const unsubscribeConnection = wsClient.subscribeConnection(setConnectionState);
     return () => {
       unsubscribe();
       unsubscribeConnection();
@@ -371,8 +360,7 @@ export function InputSurface() {
   const handleScroll = useCallback(() => {
     const el = viewportRef.current;
     if (!el) return;
-    isAtBottomRef.current =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
+    isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
   }, []);
 
   useEffect(() => {
@@ -434,13 +422,17 @@ export function InputSurface() {
   }
 
   const connectionLabel =
-    connectionState === "connected" ? "Live" :
-    connectionState === "connecting" || connectionState === "reconnecting" ? "Connecting" :
-    "Offline";
+    connectionState === "connected"
+      ? "Live"
+      : connectionState === "connecting" || connectionState === "reconnecting"
+        ? "Connecting"
+        : "Offline";
   const connectionVariant =
-    connectionState === "connected" ? "success" as const :
-    connectionState === "connecting" || connectionState === "reconnecting" ? "warning" as const :
-    "muted" as const;
+    connectionState === "connected"
+      ? ("success" as const)
+      : connectionState === "connecting" || connectionState === "reconnecting"
+        ? ("warning" as const)
+        : ("muted" as const);
 
   return (
     <div className="flex flex-col h-full">
@@ -454,10 +446,7 @@ export function InputSurface() {
       </div>
 
       {/* Activity feed */}
-      <div
-        ref={viewportRef}
-        className="flex-1 overflow-auto px-6 py-4 space-y-3"
-      >
+      <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
         {entries.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground/50">No activity yet</p>

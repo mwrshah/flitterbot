@@ -14,14 +14,14 @@
 const SOURCE_PREFIX_RE = /^\[(web|whatsapp|init|hook|cron)\]\s(?:User:\s)?/i;
 
 export function extractSourcePrefix(content: string): { source?: string; cleanContent: string } {
-	const match = content.match(SOURCE_PREFIX_RE);
-	if (!match) return { cleanContent: content };
-	return {
-		source: match[1].toLowerCase(),
-		cleanContent: content.slice(match[0].length),
-	};
+  const match = content.match(SOURCE_PREFIX_RE);
+  if (!match) return { cleanContent: content };
+  return {
+    source: match[1].toLowerCase(),
+    cleanContent: content.slice(match[0].length),
+  };
 }
 
 export function formatSourcePrefix(source: string, isUser: boolean): string {
-	return isUser ? `[${source}] User: ` : `[${source}] `;
+  return isUser ? `[${source}] User: ` : `[${source}] `;
 }

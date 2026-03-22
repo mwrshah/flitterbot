@@ -1,20 +1,19 @@
 export const BLACKBOARD_SCHEMA_VERSION = 9;
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
-export type PiSessionStatus = "active" | "waiting_for_user" | "waiting_for_sessions" | "ended" | "crashed";
+export type PiSessionStatus =
+  | "active"
+  | "waiting_for_user"
+  | "waiting_for_sessions"
+  | "ended"
+  | "crashed";
 export type WorkstreamStatus = "open" | "closed";
 export type WhatsAppMessageDirection = "inbound" | "outbound";
 export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "processed" | "failed";
 export type PendingActionStatus = "pending" | "resolved" | "expired" | "canceled";
-export type HookEventName =
-  | "SessionStart"
-  | "Stop"
-  | "SessionEnd";
+export type HookEventName = "SessionStart" | "Stop" | "SessionEnd";
 
-export type HookRouteEventName =
-  | "session-start"
-  | "stop"
-  | "session-end";
+export type HookRouteEventName = "session-start" | "stop" | "session-end";
 
 export const ROUTE_EVENT_TO_HOOK_EVENT: Record<HookRouteEventName, HookEventName> = {
   "session-start": "SessionStart",
