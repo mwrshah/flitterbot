@@ -51,6 +51,14 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   init: "Init",
 };
 
+const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
+
+function parseWorkstreamPrefix(content: string): { workstreamName: string; cleanContent: string } | null {
+  const match = content.match(WORKSTREAM_PREFIX_RE);
+  if (!match) return null;
+  return { workstreamName: match[1], cleanContent: content.slice(match[0].length) };
+}
+
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, {
@@ -103,6 +111,9 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 /* ── Entry Renderers ── */
 
 function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
+  const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
+  const displayContent = parsed ? parsed.cleanContent : entry.content;
+
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -115,8 +126,13 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
         </div>
       </div>
       <div className="flex-1 min-w-0 rounded-lg border border-border bg-card px-3 py-2">
+        {parsed && (
+          <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
+            {parsed.workstreamName}
+          </span>
+        )}
         <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {entry.content}
+          {displayContent}
         </p>
       </div>
     </div>
