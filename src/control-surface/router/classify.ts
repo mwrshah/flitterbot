@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type { BlackboardDatabase } from "../../blackboard/db.ts";
 import type { WorkstreamRow } from "../../contracts/index.ts";
-import { listOpenWorkstreams, listRecentlyClosedWorkstreams, insertWorkstream, reopenWorkstream } from "../../blackboard/queries/workstreams.ts";
+import { listOpenWorkstreams, listRecentlyClosedWorkstreams, insertWorkstream, reopenWorkstream, getWorkstreamByName } from "../../blackboard/queries/workstreams.ts";
 import { callGroqClassify, type ClassifyResult } from "./groq-client.ts";
 import { getRecentConversationByWorkstream, type ConversationSnippet } from "../../blackboard/queries/messages.ts";
 
@@ -185,8 +185,12 @@ export async function classifyMessage(
 		// LLM returned an id that doesn't exist — fall through to create
 	}
 
-	// Create new workstream
+	// Create new workstream (dedup: reuse existing open workstream with same name)
 	if (result.new_workstream_name) {
+		const existing = getWorkstreamByName(db, result.new_workstream_name);
+		if (existing && existing.status === "open") {
+			return { workstream: existing, isWorkMessage: true, action: "matched" };
+		}
 		const created = insertWorkstream(db, result.new_workstream_name);
 		return { workstream: created, isWorkMessage: true, action: "created" };
 	}
