@@ -180,14 +180,6 @@ function PiLayoutRoute() {
         return;
       }
 
-      if (message.type === "message_queued") {
-        addPill(sessionId, {
-          id: `queued-${message.itemId}`,
-          label: `Queued (${message.queueDepth})`,
-        });
-        return;
-      }
-
       if (message.type === "queue_item_start") {
         const sourceLabel =
           message.item.source === "whatsapp" ? "WhatsApp" :
@@ -203,7 +195,6 @@ function PiLayoutRoute() {
 
       if (message.type === "queue_item_end") {
         removePill(sessionId, `processing-${message.itemId}`);
-        removePill(sessionId, `queued-${message.itemId}`);
         if (message.error) {
           addPill(sessionId, {
             id: `error-${message.itemId}`,
@@ -352,17 +343,12 @@ function PiLayoutRoute() {
       try {
         await wsClient.sendMessage(text, deliveryMode, images, targetSessionId);
       } catch {
-        const response = await apiClient.queueMessage({
+        await apiClient.sendMessage({
           text,
           source: "web",
           deliveryMode,
           images,
           targetSessionId,
-        });
-        const sessionId = targetSessionId ?? "default";
-        addPill(sessionId, {
-          id: createId("http-queued"),
-          label: `Queued via HTTP (${response.queueDepth})`,
         });
       }
     },
@@ -386,9 +372,6 @@ function PiLayoutRoute() {
           <TabLink to="/pi/default" active={pathname === "/pi/default" || pathname === "/pi"}>
             Default
             {defaultPi?.busy && <Badge variant="success">active</Badge>}
-            {(defaultPi?.queueDepth ?? 0) > 0 && (
-              <Badge variant="muted">{defaultPi!.queueDepth}</Badge>
-            )}
           </TabLink>
           {orchestrators.map((o) => (
             <TabLink
@@ -398,7 +381,6 @@ function PiLayoutRoute() {
             >
               {o.workstreamName ?? o.workstreamId}
               {o.busy && <Badge variant="success">active</Badge>}
-              {o.queueDepth > 0 && <Badge variant="muted">{o.queueDepth}</Badge>}
             </TabLink>
           ))}
         </div>
