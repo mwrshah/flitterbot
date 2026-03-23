@@ -184,6 +184,11 @@ async function gracefulInterruptTmuxSession(sessionName: string): Promise<void> 
   await runTmux(["send-keys", "-t", target, "C-c"]);
 }
 
+/**
+ * Quit Claude Code running in a tmux session without destroying the session.
+ * Sends Ctrl+C twice (Claude's quit sequence) and waits for the process to exit.
+ * The tmux session remains alive and FREE for reuse.
+ */
 export async function killTmuxSession(sessionName: string): Promise<void> {
   if (!(await tmuxSessionExists(sessionName))) {
     return;
@@ -191,15 +196,9 @@ export async function killTmuxSession(sessionName: string): Promise<void> {
 
   const inspection = await inspectTmuxSession(sessionName);
   if (inspection.pane?.currentCommand === "claude") {
-    try {
-      await gracefulInterruptTmuxSession(sessionName);
-      await new Promise((resolve) => setTimeout(resolve, 750));
-    } catch {
-      // fall through to force kill
-    }
+    await gracefulInterruptTmuxSession(sessionName);
+    await new Promise((resolve) => setTimeout(resolve, 750));
   }
-
-  await runTmux(["kill-session", "-t", sessionName]);
 }
 
 export async function createDetachedTmuxSession(
