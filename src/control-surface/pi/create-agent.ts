@@ -21,7 +21,6 @@ import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../../prompts/
 type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
 
 const HOME = os.homedir();
-const WORKING_DIR = path.join(HOME, "development");
 
 type PiRole = "default" | "orchestrator";
 
@@ -34,11 +33,12 @@ type CreateAutonomaAgentOptions = {
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const { config, customTools, role = "default", orchestratorContext } = options;
+  const workingDir = config.projectsDir;
 
   // Create SessionManager early so we can read the piSessionId before building the prompt.
   // SessionManager generates its sessionId in the constructor (via newSession()),
   // and createAgentSession reuses this same instance — so the IDs match.
-  const sessionManager = SessionManager.create(WORKING_DIR, config.controlSurfaceSessionsDir);
+  const sessionManager = SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
   const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
@@ -60,7 +60,7 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const modelRegistry = new ModelRegistry(authStorage, path.join(agentDir, "models.json"));
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
-    cwd: WORKING_DIR,
+    cwd: workingDir,
     agentDir,
     settingsManager,
     additionalSkillPaths: [path.join(HOME, ".agents", "skills")].filter((entry) =>
@@ -76,11 +76,11 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   }
 
   const created = await createAgentSession({
-    cwd: WORKING_DIR,
+    cwd: workingDir,
     agentDir,
     model,
     thinkingLevel: config.piThinkingLevel,
-    tools: [createReadTool(WORKING_DIR), createBashTool(WORKING_DIR), createGrepTool(WORKING_DIR)],
+    tools: [createReadTool(workingDir), createBashTool(workingDir), createGrepTool(workingDir)],
     customTools,
     resourceLoader,
     sessionManager,

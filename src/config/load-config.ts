@@ -77,7 +77,7 @@ export function loadConfig(): AutonomaConfig {
   const whatsappDaemonPath = expandHome(
     String(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js"),
   );
-  const projectsDir = raw.projectsDir ? expandHome(String(raw.projectsDir)) : "";
+  const projectsDir = expandHome(String(raw.projectsDir ?? "~/development"));
   const wipeWorkstreamsOnStart = Boolean(
     raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1",
   );
@@ -122,6 +122,7 @@ export function loadConfig(): AutonomaConfig {
     controlSurfacePromptPath: promptPath,
   };
 
+  ensureDir(projectsDir);
   ensureDir(controlSurfaceDir);
   ensureDir(sessionsDir);
   ensureDir(agentDir);
