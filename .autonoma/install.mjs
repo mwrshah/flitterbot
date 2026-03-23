@@ -534,6 +534,14 @@ async function bootstrapConfig() {
   configAfter.whatsappPidPath = configAfter.whatsappPidPath || "~/.autonoma/whatsapp/daemon.pid";
   configAfter.whatsappCliPath = configAfter.whatsappCliPath || "~/.autonoma/whatsapp/cli.js";
   configAfter.whatsappDaemonPath = configAfter.whatsappDaemonPath || "~/.autonoma/whatsapp/daemon.js";
+  if (configAfter.whatsappEnabled === undefined) configAfter.whatsappEnabled = true;
+  if (configAfter.wipeWorkstreamsOnStart === undefined) configAfter.wipeWorkstreamsOnStart = false;
+  if (!configAfter.projectsDir) {
+    const entered = await promptString(
+      "Projects directory (absolute path where your repos live, e.g. ~/Documents/coded-programs): ",
+    );
+    if (entered) configAfter.projectsDir = entered;
+  }
   if (!configAfter.claudeCliCommand || configAfter.claudeCliCommand === "claude") {
     configAfter.claudeCliCommand = "claude --dangerously-skip-permissions";
   }
@@ -585,6 +593,17 @@ function syncWebEnv(config) {
 // ---------------------------------------------------------------------------
 // WhatsApp config bootstrap
 // ---------------------------------------------------------------------------
+async function promptString(promptText) {
+  if (AUTO_YES || DRY_RUN) return "";
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(promptText, (answer) => {
+      rl.close();
+      resolve(answer.replace(/[\t\r\n]/g, "").trim());
+    });
+  });
+}
+
 async function promptWhatsappPhone(promptText) {
   if (AUTO_YES || DRY_RUN) return "";
   const rl = createInterface({ input: process.stdin, output: process.stdout });

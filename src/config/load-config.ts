@@ -77,7 +77,7 @@ export function loadConfig(): AutonomaConfig {
   const whatsappDaemonPath = expandHome(
     String(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js"),
   );
-  const projectsDir = expandHome(String(raw.projectsDir ?? "~/development"));
+  const projectsDir = raw.projectsDir ? expandHome(String(raw.projectsDir)) : "";
   const wipeWorkstreamsOnStart = Boolean(
     raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1",
   );
@@ -149,6 +149,7 @@ export function loadConfig(): AutonomaConfig {
     claudeCliCommand: config.claudeCliCommand,
     projectsDir: config.projectsDir,
     wipeWorkstreamsOnStart: config.wipeWorkstreamsOnStart,
+    whatsappEnabled: config.whatsappEnabled,
   };
 
   fs.writeFileSync(CONFIG_PATH, `${JSON.stringify(nextPersisted, null, 2)}\n`, "utf8");
