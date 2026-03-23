@@ -14,8 +14,8 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import type { AutonomaConfig } from "../../config/load-config.ts";
-import type { OrchestratorContext } from "./system-prompts/index.ts";
-import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "./system-prompts/index.ts";
+import type { OrchestratorContext } from "../../prompts/index.ts";
+import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../../prompts/index.ts";
 
 /** Orchestrator context as provided by the caller — piSessionId is injected internally. */
 type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
