@@ -19,6 +19,7 @@ import {
 import {
   getActivePiSessionId,
   listOpenWorkstreams,
+  listRecentlyClosedWorkstreams,
   resetAllWorkstreams,
 } from "../blackboard/queries/workstreams.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
@@ -409,6 +410,7 @@ export class ControlSurfaceRuntime {
     });
 
     const openWorkstreams = listOpenWorkstreams(this.blackboard);
+    const closedWorkstreams = listRecentlyClosedWorkstreams(this.blackboard, 24);
     const sessionCountByWorkstream = new Map<string, number>();
     for (const session of this.getSessionList()) {
       if (session.workstreamId) {
@@ -440,15 +442,29 @@ export class ControlSurfaceRuntime {
         requiresManualAuth: whatsapp.requiresManualAuth,
       },
       blackboard: blackboardStatus,
-      workstreams: openWorkstreams.map((ws) => ({
-        id: ws.id,
-        name: ws.name,
-        repoPath: ws.repo_path ?? undefined,
-        worktreePath: ws.worktree_path ?? undefined,
-        piSessionId: getActivePiSessionId(this.blackboard, ws.id),
-        sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
-        createdAt: ws.created_at,
-      })),
+      workstreams: [
+        ...openWorkstreams.map((ws) => ({
+          id: ws.id,
+          name: ws.name,
+          status: 'open' as const,
+          repoPath: ws.repo_path ?? undefined,
+          worktreePath: ws.worktree_path ?? undefined,
+          piSessionId: getActivePiSessionId(this.blackboard, ws.id),
+          sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
+          createdAt: ws.created_at,
+        })),
+        ...closedWorkstreams.map((ws) => ({
+          id: ws.id,
+          name: ws.name,
+          status: 'closed' as const,
+          closedAt: ws.closed_at ?? undefined,
+          repoPath: ws.repo_path ?? undefined,
+          worktreePath: ws.worktree_path ?? undefined,
+          piSessionId: getActivePiSessionId(this.blackboard, ws.id),
+          sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
+          createdAt: ws.created_at,
+        })),
+      ],
     };
   }
 

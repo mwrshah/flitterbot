@@ -78,6 +78,8 @@ export interface PiMultiSessionStatus {
 export interface WorkstreamSummary {
   id: string;
   name: string;
+  status: 'open' | 'closed';
+  closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
   piSessionId?: string;
