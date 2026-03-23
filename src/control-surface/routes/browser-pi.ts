@@ -55,6 +55,13 @@ export async function handleBrowserPiHistoryRoute(
     const allItems: PiHistoryItem[] = [];
     for (const session of allSessions) {
       const items = await readSessionHistory(session, historyMode);
+      if (session.workstreamName) {
+        for (const item of items) {
+          if (item.kind === "message") {
+            item.workstreamName = session.workstreamName;
+          }
+        }
+      }
       allItems.push(...items);
     }
 
@@ -75,6 +82,13 @@ export async function handleBrowserPiHistoryRoute(
   }
 
   const items = await readSessionHistory(targetSession, historyMode);
+  if (targetSession.workstreamName) {
+    for (const item of items) {
+      if (item.kind === "message") {
+        item.workstreamName = targetSession.workstreamName;
+      }
+    }
+  }
   const snapshot = targetSession.state.getSnapshot();
   const body: PiHistoryResponse = {
     sessionId: snapshot.sessionId ?? null,

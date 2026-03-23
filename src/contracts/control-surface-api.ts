@@ -148,6 +148,7 @@ export interface PiHistoryMessageItem {
   content: string;
   source?: string;
   blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
+  workstreamName?: string;
   createdAt: string;
 }
 
