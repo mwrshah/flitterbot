@@ -1,14 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import {
@@ -16,6 +8,7 @@ import {
   pendingToolCallsFromTimeline,
   timelineToAgentMessages,
 } from "~/lib/pi-web-ui-bridge";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./PiMessageList";
 import { PiStreamingMessage } from "./PiStreamingMessage";
@@ -89,8 +82,7 @@ export function ChatPanel({
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const isAtBottomRef = useRef(true);
+  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
@@ -100,53 +92,6 @@ export function ChatPanel({
     () => (streamingText ? buildStreamingAssistantMessage(streamingText) : null),
     [streamingText],
   );
-
-  // Track whether the user is at the bottom of the scroll container
-  const handleScroll = useCallback(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const threshold = 50;
-    isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
-  }, []);
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
-  // Auto-scroll only when user is already at the bottom
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el || !isAtBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [agentMessages, streamingText, timeline]);
-
-  // Scroll to bottom on mount + when async content (Lit web components) expands the viewport
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-
-    // Initial scroll
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-
-    // ResizeObserver catches async Lit web component renders that expand scrollHeight
-    // after the React effects have already fired
-    const ro = new ResizeObserver(() => {
-      if (isAtBottomRef.current) {
-        el.scrollTop = el.scrollHeight;
-      }
-    });
-    // Observe the viewport's children — when their size changes, we scroll
-    for (const child of el.children) {
-      ro.observe(child);
-    }
-
-    return () => ro.disconnect();
-  }, []);
 
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -177,7 +122,7 @@ export function ChatPanel({
     setIsSending(true);
     setDraft("");
     setPendingImages([]);
-    isAtBottomRef.current = true;
+    engageAndScroll();
 
     try {
       await onSendMessage(text || "(image)", deliveryMode, images);

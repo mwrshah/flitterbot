@@ -9,6 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
@@ -340,8 +341,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     refetchOnWindowFocus: false,
   });
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const isAtBottomRef = useRef(true);
+  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, appendedItems),
@@ -424,50 +424,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     };
   }, [wsClient]);
 
-  // Scroll tracking
-  const handleScroll = useCallback(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
-  }, []);
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el || !isAtBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [entries]);
-
-  // Scroll to bottom on mount + when async content (Lit web components) expands the viewport
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-
-    // Initial scroll
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-
-    // ResizeObserver catches async Lit web component renders that expand scrollHeight
-    // after the React effects have already fired
-    const ro = new ResizeObserver(() => {
-      if (isAtBottomRef.current) {
-        el.scrollTop = el.scrollHeight;
-      }
-    });
-    for (const child of el.children) {
-      ro.observe(child);
-    }
-
-    return () => ro.disconnect();
-  }, []);
-
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
@@ -497,7 +453,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     setIsSending(true);
     setDraft("");
     setPendingImages([]);
-    isAtBottomRef.current = true;
+    engageAndScroll();
 
     try {
       await wsClient.sendMessage(text || "(image)", deliveryMode, images);
