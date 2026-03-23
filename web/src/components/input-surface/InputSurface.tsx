@@ -444,6 +444,14 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     el.scrollTop = el.scrollHeight;
   }, [entries]);
 
+  // Scroll to bottom on mount (after DOM layout)
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const el = viewportRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, []);
+
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
