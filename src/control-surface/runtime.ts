@@ -378,7 +378,7 @@ export class ControlSurfaceRuntime {
         source: "hook",
         content: text,
         sender: "system",
-        workstreamId: targetQueue.workstreamId,
+        workstreamId: targetQueue.workstreamId ?? undefined,
         metadata: { event: normalized, ...payload },
       });
     } catch (error) {
@@ -446,7 +446,7 @@ export class ControlSurfaceRuntime {
         ...openWorkstreams.map((ws) => ({
           id: ws.id,
           name: ws.name,
-          status: 'open' as const,
+          status: "open" as const,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
           piSessionId: getActivePiSessionId(this.blackboard, ws.id),
@@ -456,7 +456,7 @@ export class ControlSurfaceRuntime {
         ...closedWorkstreams.map((ws) => ({
           id: ws.id,
           name: ws.name,
-          status: 'closed' as const,
+          status: "closed" as const,
           closedAt: ws.closed_at ?? undefined,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
@@ -1105,9 +1105,7 @@ export class ControlSurfaceRuntime {
 
       // Mirror web user message to WhatsApp for complete conversation record
       try {
-        const wsLabel = routerMeta.workstream_name
-          ? `[${routerMeta.workstream_name}] `
-          : "";
+        const wsLabel = routerMeta.workstream_name ? `[${routerMeta.workstream_name}] ` : "";
         await this.sendWhatsAppCommand({
           command: "send",
           text: `${wsLabel}*User (web):*\n---\n${payload.text}`,

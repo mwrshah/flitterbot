@@ -1,17 +1,17 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type * as React from "react";
 import { useEffect } from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { AppShell } from "~/components/layout/AppShell";
 import { NotFound } from "~/components/NotFound";
 import type { AutonomaApiClient } from "~/lib/api";
-import type { WsMessage } from "~/lib/types";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
+import type { WsMessage } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
 import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";

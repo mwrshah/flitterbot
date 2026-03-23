@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -102,8 +102,10 @@ export function Sidebar({
   const piState = status?.pi?.default?.busy ? "active" : "idle";
   const waStatus = status?.whatsapp.status ?? "unknown";
   const allWorkstreams = status?.workstreams ?? [];
-  const openWorkstreams = allWorkstreams.filter((ws: WorkstreamSummary) => ws.status === 'open');
-  const closedWorkstreams = allWorkstreams.filter((ws: WorkstreamSummary) => ws.status === 'closed');
+  const openWorkstreams = allWorkstreams.filter((ws: WorkstreamSummary) => ws.status === "open");
+  const closedWorkstreams = allWorkstreams.filter(
+    (ws: WorkstreamSummary) => ws.status === "closed",
+  );
   const [showClosed, setShowClosed] = useState(false);
 
   return (
@@ -160,7 +162,9 @@ export function Sidebar({
                   <Link
                     key={ws.id}
                     to={ws.piSessionId ? "/pi/$sessionId" : "/sessions/workstream/$workstreamId"}
-                    params={ws.piSessionId ? { sessionId: ws.piSessionId } : { workstreamId: ws.id }}
+                    params={
+                      ws.piSessionId ? { sessionId: ws.piSessionId } : { workstreamId: ws.id }
+                    }
                     className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
                   >
                     <span className="truncate">{ws.name}</span>

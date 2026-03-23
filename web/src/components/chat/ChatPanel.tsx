@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Badge } from "~/components/ui/Badge";
 import { MessageInput } from "~/components/ui/MessageInput";
 import {
@@ -15,7 +23,12 @@ import { PiStreamingMessage } from "./PiStreamingMessage";
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 const emptySubscribe = () => () => {};
-const useIsClient = () => useSyncExternalStore(emptySubscribe, () => true, () => false);
+const useIsClient = () =>
+  useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
 function connectionLabel(state: ConnectionState): string {
   switch (state) {
