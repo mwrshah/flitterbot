@@ -2,11 +2,10 @@ import type http from "node:http";
 import { getActiveHealthFlags } from "../../blackboard/queries/health-flags.ts";
 import { markStaleSessions } from "../../blackboard/queries/sessions.ts";
 import type { CronTickResponse } from "../../contracts/index.ts";
-import { formatSourcePrefix } from "../pi/source-prefix.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
-const CRON_PREFIX = formatSourcePrefix("cron", false);
+const CRON_PREFIX = "[cron] ";
 const STALE_PROMPT_PREFIX = `${CRON_PREFIX}Stale session check:`;
 const IDLE_PROMPT =
   `${CRON_PREFIX}Idle check: All tracked Claude Code sessions appear stopped or idle. ` +

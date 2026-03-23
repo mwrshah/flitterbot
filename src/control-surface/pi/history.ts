@@ -5,7 +5,6 @@ import type {
   PiHistoryMessageItem,
   PiHistoryResponse,
 } from "../../contracts/index.ts";
-import { extractSourcePrefix } from "./source-prefix.ts";
 
 type PiHistoryMode = "agent" | "input";
 
@@ -56,14 +55,6 @@ function pushMessage(
   );
   if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
 
-  // Extract source from <context source="..." /> tag on user messages
-  let source: string | undefined;
-  if (role === "user") {
-    const extracted = extractSourcePrefix(normalized);
-    source = extracted.source;
-    normalized = extracted.cleanContent.trim();
-  }
-
   const item: PiHistoryMessageItem = {
     id: `${id}:${suffix}`,
     kind: "message",
@@ -71,7 +62,6 @@ function pushMessage(
     content: normalized,
     createdAt,
   };
-  if (source) item.source = source;
   if (normalizedBlocks && normalizedBlocks.length > 0) {
     item.blocks = normalizedBlocks;
   }

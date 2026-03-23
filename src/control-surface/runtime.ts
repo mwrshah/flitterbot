@@ -46,7 +46,6 @@ import {
 } from "../whatsapp/process.ts";
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
-import { formatSourcePrefix } from "./pi/source-prefix.ts";
 import type { QueueItem, QueueSource } from "./queue/turn-queue.ts";
 import { executeCloseWorkstream } from "./tools/close-workstream.ts";
 import { executeCreateWorktree } from "./tools/create-worktree.ts";
@@ -1194,7 +1193,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     payload.agentManaged === 1;
   const lastAssistantText = pickString(payload, ["lastAssistantText"]);
   const lines = [
-    `${formatSourcePrefix("hook", false)}${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
+    `[hook] ${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
     project ? `Project: ${project}` : undefined,
     cwd ? `CWD: ${cwd}` : undefined,

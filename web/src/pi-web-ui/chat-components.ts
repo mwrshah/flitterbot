@@ -660,20 +660,8 @@ function summarizeToolCall(
   };
 }
 
-type SourceMeta = { label: string; cssClass: string };
-
-const SOURCE_STYLES: Record<string, SourceMeta> = {
-  whatsapp: { label: "WhatsApp", cssClass: "source-badge-whatsapp" },
-  hook: { label: "Hook", cssClass: "source-badge-hook" },
-  cron: { label: "Cron", cssClass: "source-badge-cron" },
-  init: { label: "Init", cssClass: "source-badge-init" },
-  web: { label: "Web", cssClass: "source-badge-web" },
-};
-
 export class UserMessage extends LitElement {
-  @property({ type: Object }) message!:
-    | (UserMessageWithAttachments & { source?: string })
-    | (UserMessageType & { source?: string });
+  @property({ type: Object }) message!: UserMessageWithAttachments | UserMessageType;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -694,17 +682,9 @@ export class UserMessage extends LitElement {
       | undefined;
     const imageBlocks = contentArr.filter((chunk) => chunk.type === "image") as ImageContent[];
 
-    const source = this.message.source;
-    const meta = source && source !== "web" ? SOURCE_STYLES[source] : undefined;
-
     return html`
       <div class="flex justify-start mx-4">
         <div>
-          ${
-            meta
-              ? html`<div class="text-[10px] font-medium mb-1 ${meta.cssClass}">${meta.label}</div>`
-              : ""
-          }
           <div class="user-message-container py-2 px-4 rounded-xl">
             ${textContent?.text ? html`<markdown-block .content=${textContent.text}></markdown-block>` : ""}
             ${
