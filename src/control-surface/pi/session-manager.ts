@@ -296,8 +296,7 @@ export class PiSessionManager {
 
     const wsPrefix = `[Workstream: "${workstreamName}" (${workstreamId})] [NEW]`;
     const parts = [
-      `${wsPrefix}\n${currentMessage}`,
-      `IMPORTANT: Before processing the prior context below, run /load2-w to load essential skills.`,
+      `IMPORTANT: Before processing the task below, run /load2-w to load essential skills.`,
       `<prior_context>\n${contextLines.join("\n")}\n</prior_context>`,
       `${wsPrefix}\n${currentMessage}`,
     ];
