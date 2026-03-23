@@ -46,6 +46,7 @@ import {
   getWhatsAppLogPath,
   getWhatsAppPidPath,
   getWhatsAppSocketPath,
+  getWhatsAppStatusSignalPath,
 } from "./paths.ts";
 import { getInboundMessageRejectionReason, persistInboundMessage } from "./receive.ts";
 
@@ -274,6 +275,16 @@ class WhatsAppDaemon {
     }
   }
 
+  private signalStatusChange(): void {
+    try {
+      writeFileSync(getWhatsAppStatusSignalPath(), `${this.status}\n${Date.now()}\n`, {
+        mode: 0o600,
+      });
+    } catch {
+      // non-critical — runtime will still pick up the change on next poll
+    }
+  }
+
   private async onConnectionUpdate(update: Partial<ConnectionState>): Promise<void> {
     if (update.qr && this.options.authMode && !this.options.pairingCode) {
       console.log("\nScan this QR code with WhatsApp:\n");
@@ -287,6 +298,7 @@ class WhatsAppDaemon {
       this.reconnectAttempt = 0;
       this.immediateReconnectUsed = false;
       this.lastError = undefined;
+      this.signalStatusChange();
       logger.info("WhatsApp connected");
 
       if (this.options.authMode) {
@@ -318,6 +330,7 @@ class WhatsAppDaemon {
     if (code === DisconnectReason.loggedOut || code === 401) {
       this.status = "logged_out";
       this.lastError = this.lastError ?? "WhatsApp auth expired. Run `autonoma-wa auth`.";
+      this.signalStatusChange();
       createPendingAction(this.db, {
         channel: "internal",
         kind: "whatsapp_auth_expired",
@@ -335,6 +348,7 @@ class WhatsAppDaemon {
       this.immediateReconnectUsed = true;
       this.reconnectAttempt += 1;
       this.status = "reconnecting";
+      this.signalStatusChange();
       logger.warn("WhatsApp restart required; reconnecting immediately");
       await this.connect();
       return;
@@ -342,6 +356,7 @@ class WhatsAppDaemon {
 
     this.reconnectAttempt += 1;
     this.status = "reconnecting";
+    this.signalStatusChange();
     const backoffMs = Math.min(30_000, 1000 * 2 ** Math.max(0, this.reconnectAttempt - 1));
     logger.warn({ backoffMs, code }, "WhatsApp disconnected; scheduling reconnect");
     await delay(backoffMs);
@@ -462,6 +477,7 @@ class WhatsAppDaemon {
 
     rmSync(getWhatsAppSocketPath(), { force: true });
     rmSync(getWhatsAppPidPath(), { force: true });
+    rmSync(getWhatsAppStatusSignalPath(), { force: true });
     try {
       this.db.close();
     } catch {

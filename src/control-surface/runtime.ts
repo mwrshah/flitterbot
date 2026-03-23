@@ -38,6 +38,7 @@ import type {
   StatusResponse,
 } from "../contracts/index.ts";
 import { sendDaemonCommand } from "../whatsapp/ipc.ts";
+import { getWhatsAppStatusSignalPath } from "../whatsapp/paths.ts";
 import {
   getDaemonStatus,
   startDaemonProcess,
@@ -75,6 +76,7 @@ export class ControlSurfaceRuntime {
   server?: http.Server;
   private stopping = false;
   private maintenanceTimer?: NodeJS.Timeout;
+  private whatsappStatusWatcher?: fs.FSWatcher;
   private whatsappStatusCache: {
     status: ControlSurfaceWhatsAppStatus;
     pid?: number;
@@ -138,6 +140,7 @@ export class ControlSurfaceRuntime {
 
     await this.ensureWhatsAppDaemon();
     await this.refreshWhatsAppStatus();
+    this.watchWhatsAppStatusSignal();
     this.startMaintenanceLoop();
     clearAllHealthFlags(this.blackboard);
     this.log(
@@ -157,6 +160,7 @@ export class ControlSurfaceRuntime {
     this.stopping = true;
     this.log(`runtime stopping: ${reason}`);
     if (this.maintenanceTimer) clearInterval(this.maintenanceTimer);
+    this.unwatchWhatsAppStatusSignal();
     this.sessionManager.disposeAll();
     try {
       await this.stopWhatsAppDaemon();
@@ -262,7 +266,9 @@ export class ControlSurfaceRuntime {
     if (normalized === "session-start") {
       const agentManaged = payload.agent_managed === true || payload.agent_managed === 1;
       if (!agentManaged && !isOwnPiSession) {
-        this.log(`hook session-start: filtered session_id=${sessionId}, not agent_managed and not own pi session`);
+        this.log(
+          `hook session-start: filtered session_id=${sessionId}, not agent_managed and not own pi session`,
+        );
         return { ok: true, filtered: true };
       }
       const cwd = pickString(payload, ["cwd"]);
@@ -315,7 +321,9 @@ export class ControlSurfaceRuntime {
       if (!isOwnPiSession) {
         const known = getSessionById(this.blackboard, sessionId);
         if (!known) {
-          this.log(`hook ${normalized}: filtered session_id=${sessionId}, not own pi session and not known session`);
+          this.log(
+            `hook ${normalized}: filtered session_id=${sessionId}, not own pi session and not known session`,
+          );
           return { ok: true, filtered: true };
         }
       }
@@ -353,7 +361,9 @@ export class ControlSurfaceRuntime {
     if (piSessionIdFromPayload) {
       targetQueue = this.sessionManager.getByPiSessionId(piSessionIdFromPayload);
       if (targetQueue) {
-        this.log(`hook stop: session_id=${sessionId} resolved queue via payload pi_session_id=${piSessionIdFromPayload}`);
+        this.log(
+          `hook stop: session_id=${sessionId} resolved queue via payload pi_session_id=${piSessionIdFromPayload}`,
+        );
       }
     }
     const ccSession = !targetQueue ? getSessionById(this.blackboard, sessionId) : undefined;
@@ -362,7 +372,9 @@ export class ControlSurfaceRuntime {
       if (ccSession?.piSessionId) {
         targetQueue = this.sessionManager.getByPiSessionId(ccSession.piSessionId);
         if (targetQueue) {
-          this.log(`hook stop: session_id=${sessionId} resolved queue via sessions table pi_session_id=${ccSession.piSessionId}`);
+          this.log(
+            `hook stop: session_id=${sessionId} resolved queue via sessions table pi_session_id=${ccSession.piSessionId}`,
+          );
         }
       }
     }
@@ -376,7 +388,9 @@ export class ControlSurfaceRuntime {
         if (matchingWs) {
           targetQueue = this.sessionManager.getByWorkstream(matchingWs.id);
           if (targetQueue) {
-            this.log(`hook stop: session_id=${sessionId} resolved queue via cwd match workstream_id=${matchingWs.id}`);
+            this.log(
+              `hook stop: session_id=${sessionId} resolved queue via cwd match workstream_id=${matchingWs.id}`,
+            );
           }
         }
       }
@@ -534,6 +548,7 @@ export class ControlSurfaceRuntime {
     await startDaemonProcess();
     const daemon = await waitForDaemonReady();
     this.whatsappStatusCache = this.mapDaemonStatus(daemon);
+    this.watchWhatsAppStatusSignal();
     this.broadcastStatusChanged("whatsapp");
     return { ok: true, ...this.whatsappStatusCache };
   }
@@ -816,9 +831,7 @@ export class ControlSurfaceRuntime {
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: any) => {
-          const { insertWorkstream } = await import(
-            "../blackboard/queries/workstreams.ts"
-          );
+          const { insertWorkstream } = await import("../blackboard/queries/workstreams.ts");
           const ws = insertWorkstream(this.blackboard, params.name);
           this.log(`default agent created workstream "${params.name}" (${ws.id})`);
 
@@ -1025,6 +1038,32 @@ export class ControlSurfaceRuntime {
     }
   }
 
+  private watchWhatsAppStatusSignal(): void {
+    this.unwatchWhatsAppStatusSignal();
+    const signalPath = getWhatsAppStatusSignalPath();
+    const dir = path.dirname(signalPath);
+    const basename = path.basename(signalPath);
+    try {
+      this.whatsappStatusWatcher = fs.watch(dir, (_, filename) => {
+        if (filename !== basename) return;
+        void this.refreshWhatsAppStatus();
+      });
+      this.whatsappStatusWatcher.on("error", () => {
+        // directory may not exist yet — watcher will be retried on next daemon start
+        this.unwatchWhatsAppStatusSignal();
+      });
+    } catch {
+      // directory doesn't exist yet — will be created when daemon starts
+    }
+  }
+
+  private unwatchWhatsAppStatusSignal(): void {
+    if (this.whatsappStatusWatcher) {
+      this.whatsappStatusWatcher.close();
+      this.whatsappStatusWatcher = undefined;
+    }
+  }
+
   private broadcastStatusChanged(subsystem: string): void {
     this.wsHub.broadcast({
       type: "status_changed",
@@ -1133,11 +1172,7 @@ export class ControlSurfaceRuntime {
           const { resolveGroqApiKey } = await import("./router/groq-client.ts");
           const apiKey = resolveGroqApiKey();
           if (!apiKey) throw new Error("No Groq API key available");
-          const result = await classifyMessage(
-            payload.text,
-            this.blackboard,
-            apiKey,
-          );
+          const result = await classifyMessage(payload.text, this.blackboard, apiKey);
           routerMeta = { router_action: result.action };
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;
@@ -1186,8 +1221,7 @@ function extractFinalAssistantMessage(
     const messageId =
       typeof msg.id === "string" && (msg.id as string).trim() ? (msg.id as string) : undefined;
     const content = msg.content;
-    if (typeof content === "string" && content.trim())
-      return { text: content.trim(), messageId };
+    if (typeof content === "string" && content.trim()) return { text: content.trim(), messageId };
     if (Array.isArray(content)) {
       const textParts = content
         .filter((block: any) => block?.type === "text" && typeof block.text === "string")

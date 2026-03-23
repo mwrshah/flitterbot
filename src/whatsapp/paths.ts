@@ -28,3 +28,7 @@ export function getWhatsAppPidPath(): string {
 export function getWhatsAppLogPath(): string {
   return path.join(getWhatsAppHome(), "logs", "daemon.log");
 }
+
+export function getWhatsAppStatusSignalPath(): string {
+  return path.join(getWhatsAppHome(), "status.signal");
+}
