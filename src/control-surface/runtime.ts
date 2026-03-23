@@ -1089,9 +1089,12 @@ export class ControlSurfaceRuntime {
 
       // Mirror web user message to WhatsApp for complete conversation record
       try {
+        const wsLabel = routerMeta.workstream_name
+          ? `[${routerMeta.workstream_name}] `
+          : "";
         await this.sendWhatsAppCommand({
           command: "send",
-          text: `*User (web):*\n---\n${payload.text}`,
+          text: `${wsLabel}*User (web):*\n---\n${payload.text}`,
           contextRef: null,
         });
       } catch (error) {
