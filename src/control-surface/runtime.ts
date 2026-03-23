@@ -18,6 +18,7 @@ import {
 } from "../blackboard/queries/sessions.ts";
 import {
   getActivePiSessionId,
+  getLatestPiSessionId,
   listOpenWorkstreams,
   listRecentlyClosedWorkstreams,
   resetAllWorkstreams,
@@ -464,7 +465,7 @@ export class ControlSurfaceRuntime {
           closedAt: ws.closed_at ?? undefined,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
-          piSessionId: getActivePiSessionId(this.blackboard, ws.id),
+          piSessionId: getLatestPiSessionId(this.blackboard, ws.id),
           sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
           createdAt: ws.created_at,
         })),
