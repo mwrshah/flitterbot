@@ -543,7 +543,7 @@ export class ControlSurfaceRuntime {
    * Resolve which ManagedPiSession should handle this message.
    * May lazily create an orchestrator if needed.
    */
-  private resolveTargetSession(input: EnqueueInput, item: QueueItem): ManagedPiSession {
+  private resolveTargetSession(input: EnqueueInput, _item: QueueItem): ManagedPiSession {
     const meta = input.metadata;
 
     // Direct-targeted session (web UI tab input) — bypass all routing
@@ -551,7 +551,6 @@ export class ControlSurfaceRuntime {
     if (targetSessionId) {
       const target = this.sessionManager.getByPiSessionId(targetSessionId);
       if (target) return target;
-      // Session not found — fall through to normal routing
     }
 
     // Cron always goes to default
@@ -559,45 +558,14 @@ export class ControlSurfaceRuntime {
       return this.sessionManager.getDefault();
     }
 
-    // Non-work messages go to default
-    if (!meta?.router_is_work || meta.router_action === "none") {
-      return this.sessionManager.getDefault();
+    // Router matched an existing workstream — route to its orchestrator if running
+    const workstreamId = meta?.workstream_id as string | undefined;
+    if (workstreamId && meta?.router_action === "matched") {
+      const existing = this.sessionManager.getByWorkstream(workstreamId);
+      if (existing) return existing;
     }
 
-    const workstreamId = meta.workstream_id as string | undefined;
-    if (!workstreamId) {
-      return this.sessionManager.getDefault();
-    }
-
-    const action = meta.router_action as string;
-    const workstreamName = (meta.workstream_name as string) ?? workstreamId;
-
-    // Check for existing orchestrator
-    const existing = this.sessionManager.getByWorkstream(workstreamId);
-    if (existing) {
-      return existing;
-    }
-
-    // Need to spawn orchestrator — but we can't await here since resolveTargetSession is sync.
-    // Instead, enqueue to default and spawn async. The next message will route correctly.
-    // Actually, we need to handle this properly. Let's spawn synchronously by queuing
-    // a special first message after creation. We'll use a different approach:
-    // queue to default now, but trigger orchestrator creation and re-route.
-    //
-    // Better approach: since enqueue is called from async contexts (handleWebSocketMessage,
-    // handleMessageRoute), we can make spawning lazy. For now, route to default and
-    // the processQueueItem will check and spawn if needed.
-    //
-    // Store spawn intent in item metadata for processQueueItem to handle
-    if (action === "created" || action === "reopened" || action === "matched") {
-      item.metadata = {
-        ...item.metadata,
-        _spawnOrchestrator: true,
-        _workstreamId: workstreamId,
-        _workstreamName: workstreamName,
-      };
-    }
-
+    // Everything else goes to the default agent (which can create workstreams via tool)
     return this.sessionManager.getDefault();
   }
 
@@ -607,52 +575,6 @@ export class ControlSurfaceRuntime {
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
     const session = managed.session;
     if (!session) throw new Error("Pi session not initialized");
-
-    // Check if this item needs to spawn an orchestrator and re-route
-    if (item.metadata?._spawnOrchestrator) {
-      const wsId = item.metadata._workstreamId as string;
-      const wsName = item.metadata._workstreamName as string;
-
-      // Clean spawn metadata
-      const cleanMeta = { ...item.metadata };
-      delete cleanMeta._spawnOrchestrator;
-      delete cleanMeta._workstreamId;
-      delete cleanMeta._workstreamName;
-      item.metadata = cleanMeta;
-
-      try {
-        const orchestrator = await this.sessionManager.createOrchestrator(
-          wsId,
-          wsName,
-          undefined,
-          this.createCustomTools("orchestrator", wsId),
-        );
-
-        // Build context-transfer prompt and enqueue to orchestrator
-        const contextPrompt = this.sessionManager.buildContextTransferPrompt(
-          item.text,
-          wsName,
-          wsId,
-        );
-
-        const reroutedItem: QueueItem = {
-          ...item,
-          text: contextPrompt,
-          metadata: { ...item.metadata },
-        };
-
-        orchestrator.queue.enqueue(reroutedItem);
-        this.log(
-          `re-routed item ${item.id} to new orchestrator for workstream "${wsName}" (${wsId})`,
-        );
-        return; // Don't process on default agent
-      } catch (error) {
-        this.log(
-          `orchestrator spawn failed for ${wsId}, falling through to default: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        // Fall through to process on default agent
-      }
-    }
 
     const piSessionId = session.sessionId;
 
@@ -855,7 +777,98 @@ export class ControlSurfaceRuntime {
           };
         },
       },
-      {
+    ];
+
+    if (role === "default") {
+      tools.push({
+        name: "create_workstream",
+        label: "Create Workstream",
+        description:
+          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. Optionally enqueue an initial message onto the new workstream.",
+        parameters: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description:
+                "Short descriptive name, 2-5 words, lowercase, dash-separated (e.g. 'fix-auth-token-refresh')",
+            },
+            message: {
+              type: "string",
+              description:
+                "Initial message to enqueue onto the new workstream. Should describe what the orchestrator needs to do — include context, spec paths, constraints.",
+            },
+          },
+          required: ["name"],
+          additionalProperties: false,
+        },
+        execute: async (_toolCallId: string, params: any) => {
+          const { insertWorkstream } = await import(
+            "../blackboard/queries/workstreams.ts"
+          );
+          const ws = insertWorkstream(this.blackboard, params.name);
+          this.log(`default agent created workstream "${params.name}" (${ws.id})`);
+
+          try {
+            const orchestrator = await this.sessionManager.createOrchestrator(
+              ws.id,
+              ws.name,
+              undefined,
+              this.createCustomTools("orchestrator", ws.id),
+            );
+
+            this.wsHub.broadcast({
+              type: "workstreams_changed",
+              reason: "created",
+              workstreamId: ws.id,
+              workstreamName: ws.name,
+            });
+
+            if (params.message) {
+              const contextPrompt = this.sessionManager.buildContextTransferPrompt(
+                params.message,
+                ws.name,
+                ws.id,
+              );
+              orchestrator.queue.enqueue({
+                id: `ws-init-${ws.id}`,
+                text: contextPrompt,
+                source: "web",
+                metadata: {
+                  workstream_id: ws.id,
+                  workstream_name: ws.name,
+                },
+                receivedAt: new Date().toISOString(),
+              });
+              this.log(`enqueued initial message onto workstream "${ws.name}" (${ws.id})`);
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Workstream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${params.message ? " and initial message enqueued" : ""}.`,
+                },
+              ],
+              details: { workstreamId: ws.id, workstreamName: ws.name },
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Workstream "${ws.name}" created (ID: ${ws.id}) but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              details: { workstreamId: ws.id, error: true },
+            };
+          }
+        },
+      });
+    }
+
+    if (role === "orchestrator") {
+      tools.push({
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
@@ -882,10 +895,8 @@ export class ControlSurfaceRuntime {
           );
           return { content: [{ type: "text", text: result.message }], details: result };
         },
-      },
-    ];
+      });
 
-    if (role === "orchestrator") {
       const closeWsId = workstreamId;
       tools.push({
         name: "close_workstream",
@@ -1107,20 +1118,11 @@ export class ControlSurfaceRuntime {
             payload.text,
             this.blackboard,
             apiKey,
-            this.config.projectsDir,
           );
-          routerMeta = { router_action: result.action, router_is_work: result.isWorkMessage };
+          routerMeta = { router_action: result.action };
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;
             routerMeta.workstream_name = result.workstream.name;
-            if (result.action === "created" || result.action === "reopened") {
-              this.wsHub.broadcast({
-                type: "workstreams_changed",
-                reason: result.action,
-                workstreamId: result.workstream.id,
-                workstreamName: result.workstream.name,
-              });
-            }
           }
         } catch (error) {
           this.log(

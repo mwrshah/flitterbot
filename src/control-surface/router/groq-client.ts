@@ -22,8 +22,6 @@ function getClient(apiKey: string): OpenAI {
 
 export type ClassifyResult = {
   workstream_id: string | null;
-  new_workstream_name: string | null;
-  is_work_message: boolean;
   reasoning: string;
 };
 
@@ -75,8 +73,6 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
 
       const result = {
         workstream_id: parsed.workstream_id || null,
-        new_workstream_name: parsed.new_workstream_name || null,
-        is_work_message: Boolean(parsed.is_work_message),
         reasoning: parsed.reasoning || "",
       };
       if (attempt > 1) {

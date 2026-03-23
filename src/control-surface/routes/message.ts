@@ -56,27 +56,16 @@ async function routeMessage(
   runtime: ControlSurfaceRuntime,
   rawText: string,
 ): Promise<{ metadata: Record<string, unknown> } | null> {
-  const { projectsDir } = runtime.config;
-
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, projectsDir);
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey);
     const meta: Record<string, unknown> = {
       router_action: result.action,
-      router_is_work: result.isWorkMessage,
     };
     if (result.workstream) {
       meta.workstream_id = result.workstream.id;
       meta.workstream_name = result.workstream.name;
-      if (result.action === "created" || result.action === "reopened") {
-        runtime.wsHub.broadcast({
-          type: "workstreams_changed",
-          reason: result.action,
-          workstreamId: result.workstream.id,
-          workstreamName: result.workstream.name,
-        });
-      }
     }
     return { metadata: meta };
   } catch (error) {
