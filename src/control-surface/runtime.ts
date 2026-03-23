@@ -377,6 +377,7 @@ export class ControlSurfaceRuntime {
         source: "hook",
         content: text,
         sender: "system",
+        workstreamId: targetQueue.workstreamId,
         metadata: { event: normalized, ...payload },
       });
     } catch (error) {
