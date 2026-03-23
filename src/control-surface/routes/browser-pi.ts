@@ -126,6 +126,21 @@ export async function handleBrowserPiHistoryRoute(
     : runtime.sessionManager.getDefault();
 
   if (!targetSession) {
+    // Session not in memory — fall back to reading history from disk (e.g. closed workstreams)
+    if (piSessionId) {
+      const row = runtime.blackboard
+        .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
+        .get(piSessionId) as { session_file: string | null } | undefined;
+      if (row?.session_file) {
+        const diskBody = await readPiHistory(piSessionId, row.session_file, historyMode);
+        const body: PiHistoryResponse = {
+          sessionId: piSessionId,
+          sessionFile: row.session_file,
+          items: diskBody.items,
+        };
+        return sendJson(response, 200, body);
+      }
+    }
     const body: PiHistoryResponse = { sessionId: piSessionId, sessionFile: null, items: [] };
     return sendJson(response, 200, body);
   }
