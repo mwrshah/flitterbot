@@ -944,7 +944,7 @@ export class MessageList extends LitElement {
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
-      if ((message as any).role === "toolResult") {
+      if ((message as unknown as { role: string }).role === "toolResult") {
         resultByCallId.set(
           (message as ToolResultMessageType).toolCallId,
           message as ToolResultMessageType,
@@ -956,7 +956,7 @@ export class MessageList extends LitElement {
     let index = 0;
 
     for (const msg of this.messages) {
-      const role = (msg as any).role;
+      const role = (msg as unknown as { role: string }).role;
       if (role === "artifact" || role === "toolResult") {
         continue;
       }
