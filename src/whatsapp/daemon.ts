@@ -207,9 +207,25 @@ class WhatsAppDaemon {
       syncFullHistory: false,
     });
 
+    // Build the set of JIDs we accept inbound messages from.
+    // Includes the configured phone JID and the account's LID (Linked Identity)
+    // since Baileys may deliver self-chat messages using either format.
+    // Rebuilt on each creds.update so the LID stays current.
+    const allowedJids = new Set<string>([recipientJid]);
+    const rebuildAllowedJids = () => {
+      const lidRaw = state.creds.me?.lid;
+      if (lidRaw) {
+        // Strip device suffix (e.g. "278567367778515:33@lid" → "278567367778515@lid")
+        allowedJids.add(lidRaw.replace(/:\d+@/, "@"));
+      }
+      logger.info({ allowedJids: [...allowedJids] }, "accepted inbound JIDs");
+    };
+    rebuildAllowedJids();
+
     this.socket.ev.on("creds.update", async () => {
       await saveCreds();
       backupAuthState();
+      rebuildAllowedJids();
     });
 
     this.socket.ev.on("connection.update", async (update) => {
@@ -223,15 +239,15 @@ class WhatsAppDaemon {
       }
 
       for (const message of upsert.messages as WAMessage[]) {
-        const rejectionReason = getInboundMessageRejectionReason(message);
-        if (rejectionReason || message.key.remoteJid !== recipientJid) {
+        const rejectionReason = getInboundMessageRejectionReason(message, allowedJids);
+        if (rejectionReason) {
           logger.info(
             {
               upsertType: upsert.type,
               waMessageId: message.key.id,
               remoteJid: message.key.remoteJid,
               fromMe: message.key.fromMe,
-              rejectionReason: rejectionReason ?? `unexpected_remote_jid:${message.key.remoteJid}`,
+              rejectionReason,
             },
             "filtered inbound WhatsApp message before persistence",
           );

@@ -26,7 +26,7 @@ export function getWhatsAppPidPath(): string {
 }
 
 export function getWhatsAppLogPath(): string {
-  return path.join(getWhatsAppHome(), "logs", "daemon.log");
+  return path.join(homedir(), ".autonoma", "logs", "whatsapp-daemon.log");
 }
 
 export function getWhatsAppStatusSignalPath(): string {

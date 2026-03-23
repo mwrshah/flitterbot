@@ -107,19 +107,26 @@ function extractQuotedWaMessageId(message: WAMessage): string | undefined {
   );
 }
 
-export function getInboundMessageRejectionReason(message: WAMessage): string | undefined {
+export function getInboundMessageRejectionReason(
+  message: WAMessage,
+  allowedJids?: Set<string>,
+): string | undefined {
   const remoteJid = message.key.remoteJid;
   if (!remoteJid) {
     return "missing_remote_jid";
   }
-  if (remoteJid !== resolveRecipientJid()) {
+  const accepted = allowedJids ?? new Set([resolveRecipientJid()]);
+  if (!accepted.has(remoteJid)) {
     return `unexpected_remote_jid:${remoteJid}`;
   }
   return undefined;
 }
 
-export function shouldAcceptInboundMessage(message: WAMessage): boolean {
-  return getInboundMessageRejectionReason(message) === undefined;
+export function shouldAcceptInboundMessage(
+  message: WAMessage,
+  allowedJids?: Set<string>,
+): boolean {
+  return getInboundMessageRejectionReason(message, allowedJids) === undefined;
 }
 
 async function forwardInboundToControlSurface(input: {
