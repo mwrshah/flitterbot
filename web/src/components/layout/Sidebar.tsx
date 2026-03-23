@@ -184,8 +184,10 @@ export function Sidebar({
                 {closedWorkstreams.map((ws) => (
                   <Link
                     key={ws.id}
-                    to="/sessions/workstream/$workstreamId"
-                    params={{ workstreamId: ws.id }}
+                    to={ws.piSessionId ? "/pi/$sessionId" : "/sessions/workstream/$workstreamId"}
+                    params={
+                      ws.piSessionId ? { sessionId: ws.piSessionId } : { workstreamId: ws.id }
+                    }
                     className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
                   >
                     <span className="truncate">{ws.name}</span>
