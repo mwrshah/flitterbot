@@ -81,6 +81,8 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 
     if (item.kind === "message" && item.role === "user") {
       const msg = item as ChatTimelineMessage;
+      const source = msg.source ?? "web";
+      if (source !== "web" && source !== "whatsapp") continue;
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
@@ -362,6 +364,8 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
 
         const content = message.content || "";
         if (message.role === "user") {
+          const source = (message.source as MessageSource) ?? "web";
+          if (source !== "web" && source !== "whatsapp") return;
           if (content.trim()) {
             const id = message.messageId ? `${message.messageId}:message` : createId("user");
             setAppendedItems((current) => {
@@ -373,7 +377,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
                   kind: "message",
                   role: "user",
                   content,
-                  source: (message.source as MessageSource) ?? "web",
+                  source,
                   workstreamName: message.workstreamName,
                   createdAt: message.timestamp ?? new Date().toISOString(),
                 },
