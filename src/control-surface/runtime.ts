@@ -975,7 +975,14 @@ export class ControlSurfaceRuntime {
   }
 
   private async refreshWhatsAppStatus(): Promise<void> {
+    const prev = this.whatsappStatusCache.status;
     this.whatsappStatusCache = this.mapDaemonStatus(await getDaemonStatus());
+    if (this.whatsappStatusCache.status !== prev) {
+      this.wsHub.broadcast({
+        type: "whatsapp_status_changed",
+        status: this.whatsappStatusCache.status,
+      });
+    }
   }
 
   private async ensureWhatsAppDaemon(): Promise<void> {

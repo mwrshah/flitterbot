@@ -250,4 +250,5 @@ export type WsMessage =
       workstreamId: string;
       workstreamName?: string;
     }
+  | { type: "whatsapp_status_changed"; status: string }
   | { type: "error"; message: string };
