@@ -84,9 +84,13 @@ function PiLayoutRoute() {
     ? [...openOrchestrators, ephemeralOrchestrator]
     : openOrchestrators;
 
-  // Subscribe to all orchestrator sessions
+  // Subscribe to default agent + all orchestrator sessions
+  const defaultSessionId = defaultPi?.sessionId;
   useEffect(() => {
     const sessionIds = allOrchestrators.map((o) => o.sessionId);
+    if (defaultSessionId) {
+      sessionIds.push(defaultSessionId);
+    }
     for (const id of sessionIds) {
       wsClient.subscribeSession(id);
     }
@@ -95,7 +99,7 @@ function PiLayoutRoute() {
         wsClient.unsubscribeSession(id);
       }
     };
-  }, [wsClient, allOrchestrators.map((o) => o.sessionId).join(",")]);
+  }, [wsClient, defaultSessionId, allOrchestrators.map((o) => o.sessionId).join(",")]);
 
   // WebSocket event subscription — routes events to correct session via store
   useEffect(() => {

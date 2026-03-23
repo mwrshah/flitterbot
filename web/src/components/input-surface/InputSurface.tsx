@@ -444,12 +444,28 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     el.scrollTop = el.scrollHeight;
   }, [entries]);
 
-  // Scroll to bottom on mount (after DOM layout)
+  // Scroll to bottom on mount + when async content (Lit web components) expands the viewport
   useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+
+    // Initial scroll
     requestAnimationFrame(() => {
-      const el = viewportRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      el.scrollTop = el.scrollHeight;
     });
+
+    // ResizeObserver catches async Lit web component renders that expand scrollHeight
+    // after the React effects have already fired
+    const ro = new ResizeObserver(() => {
+      if (isAtBottomRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    for (const child of el.children) {
+      ro.observe(child);
+    }
+
+    return () => ro.disconnect();
   }, []);
 
   function addImageFiles(files: FileList | File[]) {
