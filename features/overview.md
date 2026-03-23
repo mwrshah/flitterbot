@@ -62,6 +62,7 @@ Pi is reactive in v1 — triggered by human messages and Claude Code hook events
 | 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys messaging. Daemon maintains connection; forwards inbound to control surface and stores history in the blackboard. |
 | 5 | [Web App](web-app/FEATURE.md) | Browser client: chat with Pi, Pi session drill-down, Claude Code session drill-down with transcripts, direct session messaging, WhatsApp health indicator. |
 | 6 | [Cron Scheduler](cron-scheduler/FEATURE.md) | *Deferred to post-v1.* Periodic state check and recovery loop. Will wake Pi for idle/stale classification and Todoist-driven work discovery once Pi has orchestration logic. |
+| 7 | [Pi Agent Tools](pi-agent/FEATURE.md) | Custom tools given to Pi agents, role-gated by type (default vs orchestrator). Covers query_blackboard, reload_resources, create_workstream, create_worktree, close_workstream, and new tool specs. |
 
 ## Dependency Order
 
