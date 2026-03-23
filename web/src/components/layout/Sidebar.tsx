@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -106,7 +105,6 @@ export function Sidebar({
   const closedWorkstreams = allWorkstreams.filter(
     (ws: WorkstreamSummary) => ws.status === "closed",
   );
-  const [showClosed, setShowClosed] = useState(false);
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
@@ -179,36 +177,24 @@ export function Sidebar({
 
           {closedWorkstreams.length > 0 && (
             <div className={openWorkstreams.length > 0 ? "mt-3" : ""}>
-              <button
-                onClick={() => setShowClosed(!showClosed)}
-                className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-sidebar-foreground/30 font-medium mb-2 hover:text-sidebar-foreground/50 transition-colors"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  className={cn("w-3 h-3 transition-transform", showClosed && "rotate-90")}
-                >
-                  <path d="M6 4l4 4-4 4" />
-                </svg>
+              <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/30 font-medium mb-2">
                 Recently closed
-              </button>
-              {showClosed && (
-                <div className="space-y-1">
-                  {closedWorkstreams.map((ws) => (
-                    <Link
-                      key={ws.id}
-                      to="/sessions/workstream/$workstreamId"
-                      params={{ workstreamId: ws.id }}
-                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
-                    >
-                      <span className="truncate">{ws.name}</span>
-                      <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
-                        {ws.sessionCount}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              </p>
+              <div className="space-y-1">
+                {closedWorkstreams.map((ws) => (
+                  <Link
+                    key={ws.id}
+                    to="/sessions/workstream/$workstreamId"
+                    params={{ workstreamId: ws.id }}
+                    className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
+                  >
+                    <span className="truncate">{ws.name}</span>
+                    <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
+                      {ws.sessionCount}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
         </div>
