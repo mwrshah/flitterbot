@@ -250,4 +250,5 @@ export type WsMessage =
       workstreamId: string;
       workstreamName?: string;
     }
+  | { type: "status_changed"; subsystem: string; timestamp: string }
   | { type: "error"; message: string };

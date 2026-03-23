@@ -128,6 +128,13 @@ export interface WorkstreamsChangedWebSocketEvent {
   workstreamName?: string;
 }
 
+export interface StatusChangedWebSocketEvent {
+  type: "status_changed";
+  /** Which subsystem changed — e.g. 'whatsapp', 'pi', 'blackboard' */
+  subsystem: string;
+  timestamp: string;
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -138,4 +145,5 @@ export type ControlSurfaceWebSocketServerEvent =
   | ToolExecutionEndWebSocketEvent
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent
-  | WorkstreamsChangedWebSocketEvent;
+  | WorkstreamsChangedWebSocketEvent
+  | StatusChangedWebSocketEvent;

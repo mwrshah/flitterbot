@@ -82,7 +82,7 @@ function RootComponent() {
   // Invalidate status query when workstreams change via WebSocket — single listener for all consumers
   useEffect(() => {
     return wsClient.subscribe((message: WsMessage) => {
-      if (message.type === "workstreams_changed") {
+      if (message.type === "workstreams_changed" || message.type === "status_changed") {
         queryClient.invalidateQueries({ queryKey: ["status"] });
       }
     });
