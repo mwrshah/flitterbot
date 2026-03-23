@@ -525,12 +525,14 @@ export class ControlSurfaceRuntime {
     await startDaemonProcess();
     const daemon = await waitForDaemonReady();
     this.whatsappStatusCache = this.mapDaemonStatus(daemon);
+    this.broadcastStatusChanged("whatsapp");
     return { ok: true, ...this.whatsappStatusCache };
   }
 
   async stopWhatsAppDaemon(): Promise<RuntimeWhatsAppStopResponse> {
     const daemon = await stopDaemonProcess();
     this.whatsappStatusCache = this.mapDaemonStatus(daemon);
+    this.broadcastStatusChanged("whatsapp");
     return { ok: true, ...this.whatsappStatusCache };
   }
 
@@ -994,11 +996,16 @@ export class ControlSurfaceRuntime {
     const prev = this.whatsappStatusCache.status;
     this.whatsappStatusCache = this.mapDaemonStatus(await getDaemonStatus());
     if (this.whatsappStatusCache.status !== prev) {
-      this.wsHub.broadcast({
-        type: "whatsapp_status_changed",
-        status: this.whatsappStatusCache.status,
-      });
+      this.broadcastStatusChanged("whatsapp");
     }
+  }
+
+  private broadcastStatusChanged(subsystem: string): void {
+    this.wsHub.broadcast({
+      type: "status_changed",
+      subsystem,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   private async ensureWhatsAppDaemon(): Promise<void> {

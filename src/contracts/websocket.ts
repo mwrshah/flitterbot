@@ -128,9 +128,11 @@ export interface WorkstreamsChangedWebSocketEvent {
   workstreamName?: string;
 }
 
-export interface WhatsAppStatusChangedWebSocketEvent {
-  type: "whatsapp_status_changed";
-  status: string;
+export interface StatusChangedWebSocketEvent {
+  type: "status_changed";
+  /** Which subsystem changed — e.g. 'whatsapp', 'pi', 'blackboard' */
+  subsystem: string;
+  timestamp: string;
 }
 
 export type ControlSurfaceWebSocketServerEvent =
@@ -144,4 +146,4 @@ export type ControlSurfaceWebSocketServerEvent =
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
-  | WhatsAppStatusChangedWebSocketEvent;
+  | StatusChangedWebSocketEvent;
