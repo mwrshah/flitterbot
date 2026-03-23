@@ -4,6 +4,7 @@ import { WhatsAppControls } from "~/components/runtime/WhatsAppControls";
 import { Badge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/Card";
+import { statusQueryOptions } from "~/lib/queries";
 import { formatDuration } from "~/lib/utils";
 
 export const Route = createFileRoute("/runtime")({
@@ -28,8 +29,7 @@ function RuntimePage() {
   const { apiClient } = Route.useRouteContext();
 
   const statusQuery = useQuery({
-    queryKey: ["status"],
-    queryFn: () => apiClient.getStatus(),
+    ...statusQueryOptions(apiClient),
     refetchInterval: (query) => (query.state.error ? 30_000 : 5_000),
     retry: 1,
   });

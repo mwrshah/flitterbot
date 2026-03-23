@@ -94,10 +94,11 @@ function RootComponent() {
       const prev = prevConnectionRef.current;
       prevConnectionRef.current = state;
       if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
+        queryClient.invalidateQueries();
         router.invalidate();
       }
     });
-  }, [wsClient, router]);
+  }, [wsClient, router, queryClient]);
 
   return (
     <RootDocument>
