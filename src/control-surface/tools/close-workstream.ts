@@ -67,11 +67,15 @@ function mergeToMain(repoPath: string, branch: string): MergeResult {
   // Checkout main
   try {
     exec("git checkout main", repoPath);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error
+        ? error.message
+        : String(error);
     return {
       ok: false,
       conflicts: [],
-      message: `Failed to checkout main: ${error.stderr?.toString().trim() || error.message}`,
+      message: `Failed to checkout main: ${msg}`,
     };
   }
 

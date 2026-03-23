@@ -80,7 +80,7 @@ function formatUsage(usage?: Usage): string {
 
 function iconSvg(iconNode: unknown, size: "sm" | "md" = "md", className = ""): string {
   const classes = size === "sm" ? "w-4 h-4" : "w-5 h-5";
-  const el = createElement(iconNode as any, {
+  const el = createElement(iconNode as Parameters<typeof createElement>[0], {
     class: `${classes}${className ? ` ${className}` : ""}`,
   });
   return el.outerHTML;
@@ -375,7 +375,7 @@ function renderDefaultTool(
   const textOutput =
     result?.content
       ?.filter((content) => content.type === "text")
-      .map((content: any) => content.text)
+      .map((content) => content.text)
       .join("\n") || i18n("(no output)");
   const prettyOutput = prettyValue(textOutput);
 
@@ -418,7 +418,7 @@ function renderBashTool(
   const output =
     result?.content
       ?.filter((content) => content.type === "text")
-      .map((content: any) => content.text)
+      .map((content) => content.text)
       .join("\n") || "";
 
   const combined = command ? `> ${command}${output ? `\n\n${output}` : ""}` : output;
@@ -439,7 +439,7 @@ function resultText(result: ToolResultMessageType | undefined): string {
   return (
     result?.content
       ?.filter((c) => c.type === "text")
-      .map((c: any) => c.text)
+      .map((c) => c.text)
       .join("\n") || ""
   );
 }
@@ -694,7 +694,7 @@ export class UserMessage extends LitElement {
       | undefined;
     const imageBlocks = contentArr.filter((chunk) => chunk.type === "image") as ImageContent[];
 
-    const source = (this.message as any).source as string | undefined;
+    const source = this.message.source;
     const meta = source && source !== "web" ? SOURCE_STYLES[source] : undefined;
 
     return html`
@@ -754,7 +754,7 @@ export class ToolMessageDebugView extends LitElement {
     const output = prettyValue(
       this.result?.content
         ?.filter((content) => content.type === "text")
-        .map((content: any) => content.text)
+        .map((content) => content.text)
         .join("\n") || "",
     );
 
@@ -783,7 +783,7 @@ if (!customElements.get("tool-message-debug")) {
 
 export class ToolMessage extends LitElement {
   @property({ type: Object }) toolCall!: ToolCall;
-  @property({ type: Object }) tool?: AgentTool<any>;
+  @property({ type: Object }) tool?: AgentTool;
   @property({ type: Object }) result?: ToolResultMessageType;
   @property({ type: Boolean }) pending = false;
   @property({ type: Boolean }) aborted = false;
@@ -844,7 +844,7 @@ if (!customElements.get("tool-message")) {
 
 export class AssistantMessage extends LitElement {
   @property({ type: Object }) message!: AssistantMessageType;
-  @property({ type: Array }) tools?: AgentTool<any>[];
+  @property({ type: Array }) tools?: AgentTool[];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
   @property({ type: Boolean }) hideToolCalls = false;
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;

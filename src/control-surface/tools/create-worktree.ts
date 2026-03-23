@@ -179,11 +179,15 @@ export function executeCreateWorktree(
       message: `Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}`,
       usedGtr: useGtr,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error
+        ? error.message
+        : String(error);
     return {
       ok: false,
       workstreamId,
-      message: `Failed to create worktree: ${error.stderr?.toString().trim() || error.message}`,
+      message: `Failed to create worktree: ${msg}`,
       usedGtr: useGtr,
     };
   }
