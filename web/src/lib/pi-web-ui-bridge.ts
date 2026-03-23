@@ -94,7 +94,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
             type: "toolCall",
             id: next.toolUseId,
             name: next.tool,
-            arguments: (next.args as Record<string, any>) ?? {},
+            arguments: (next.args as Record<string, unknown>) ?? {},
           });
           consumed.add(j);
         }
@@ -121,7 +121,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
             type: "toolCall",
             id: item.toolUseId,
             name: item.tool,
-            arguments: (item.args as Record<string, any>) ?? {},
+            arguments: (item.args as Record<string, unknown>) ?? {},
           },
         ],
         stopReason: "endTurn",

@@ -32,7 +32,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
       containerRef.current.appendChild(el);
       elementRef.current = el;
     }
-    (elementRef.current as any).content = content;
+    (elementRef.current as HTMLElement & { content: string }).content = content;
   }, [ready, content]);
 
   return <div ref={containerRef} />;

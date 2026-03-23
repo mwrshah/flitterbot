@@ -23,8 +23,7 @@ async function piRequest(path: string): Promise<unknown> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyJson = any;
+type AnyJson = unknown;
 
 export const fetchPiHistory = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId?: string }) => input)
