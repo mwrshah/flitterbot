@@ -88,7 +88,8 @@ ${workstreamBlock}
 1. If the message clearly relates to an existing open workstream, return its id.
 2. If the message does not match any open workstream, return workstream_id: null. The default agent will handle it.
 3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the workstream with the most recent agent message (marked with "← last agent response").
-4. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
+4. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
+5. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
 
 ## Response format
 Respond with ONLY a JSON object containing two fields: workstream_id and reasoning. No other text or explanation. Example:
