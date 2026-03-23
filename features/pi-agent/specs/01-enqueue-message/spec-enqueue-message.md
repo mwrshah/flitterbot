@@ -20,7 +20,7 @@ Use `sessionManager.getByWorkstream(workstreamId)` to find the running orchestra
 ### FR5: Enqueue message to orchestrator's TurnQueue
 Call `orchestrator.queue.enqueue()` with a `QueueItem`:
 - `id`: generated unique ID (e.g. `enq-msg-${uuid}`)
-- `text`: the message content, formatted with workstream context via `buildContextTransferPrompt()` or a simpler prefix if context transfer is not needed
+- `text`: the message content, formatted with workstream prefix via `buildWorkstreamPrompt()`
 - `source`: `"web"` (internal routing — matches how `create_workstream` enqueues its initial message)
 - `metadata`: include `workstream_id` and `workstream_name`
 - `receivedAt`: ISO timestamp

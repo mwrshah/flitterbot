@@ -44,29 +44,9 @@ Hook events (Stop/SessionEnd) look up `pi_session_id` from the CC session record
 
 Cron ticks always route to the default agent.
 
-### Context transfer on orchestrator creation
+### Initial prompt on orchestrator creation
 
-When the router creates a new workstream, the user has been conversing with the default agent. The new orchestrator needs that conversational context. Since the SDK's `createAgentSession()` does not support initial messages, context transfer happens via a **first-prompt context injection**:
-
-1. Extract the default agent's last 20 messages in `"input"` mode (surfaced only — user + final assistant text per turn, no tools/system). That's roughly 10 user/assistant couplets.
-2. Strip transport prefixes (`[Web] User:`, `[WhatsApp] User:`, quote wrapping) — these are mirroring labels, not meaningful to an orchestrator. Keep only raw user text and raw assistant text.
-3. Format with the current user message at top and bottom, prior context in XML tags in the middle:
-   ```
-   [Workstream: "fix-auth-bug" (abc12345)] [NEW]
-   ok for project autonoma please fix the auth bug
-
-   <prior_context>
-   User: can you check my pending tasks
-   Assistant: Here are 5 pending tasks: ...
-   User: ok for project autonoma please fix the auth bug
-   </prior_context>
-
-   [Workstream: "fix-auth-bug" (abc12345)] [NEW]
-   ok for project autonoma please fix the auth bug
-   ```
-4. The current message appears three times by design: as the outer prompt (top and bottom, with workstream prefix) and as the last entry in `<prior_context>` (showing its place in the conversation flow). The workstream prefix stays on the outer message but NOT in the `<prior_context>` entries.
-
-This requires no SDK changes. The runtime already formats message prefixes; a context-transfer block is a natural extension.
+When the router creates a new workstream, the first prompt to the orchestrator is formatted with a workstream prefix and the user's message. The default Pi agent passes all relevant context via the initial message itself — no separate context transfer is needed.
 
 ### Classification improvements
 
@@ -152,31 +132,9 @@ For Stop events:
 
 For SessionStart/SessionEnd (bookkeeping only, not forwarded to Pi): no routing change needed — they write to SQLite directly.
 
-### FR-4: Context transfer on orchestrator creation
+### FR-4: Initial prompt on orchestrator creation
 
-When `PiSessionManager.createOrchestrator()` is called because the router created or reopened a workstream:
-
-1. Read the default agent's last 20 messages via `readPiHistoryFromMessages(sessionId, sessionFile, session.messages, "input")`. The `"input"` mode returns surfaced-only items: user messages + final assistant text per turn, no tools or system messages. 20 messages ≈ 10 user/assistant couplets.
-2. Strip transport prefixes from context entries — remove `[Web] User: "..."`, `[WhatsApp] User: "..."` wrapping and workstream prefixes (`[Workstream: ...]`). These are runtime transport labels for WhatsApp mirroring; the orchestrator needs only raw conversational text.
-3. Format the first prompt with the current message at top and bottom, prior context in XML tags:
-   ```
-   [Workstream: "fix-auth-bug" (abc12345)] [NEW]
-   ok for project autonoma please fix the auth bug
-
-   <prior_context>
-   User: can you check my pending tasks
-   Assistant: Here are 5 pending tasks: ...
-   User: ok for project autonoma please fix the auth bug
-   </prior_context>
-
-   [Workstream: "fix-auth-bug" (abc12345)] [NEW]
-   ok for project autonoma please fix the auth bug
-   ```
-4. This formatted text becomes the first prompt to the new orchestrator session.
-
-**Intentional repetition**: The current user message appears three times — as the outer prompt (top and bottom, with workstream prefix) and as the last entry in `<prior_context>` (showing its position in the conversation flow). This is by design: the outer message is the actionable prompt; the context block shows the conversational thread that led to it.
-
-**Context window**: Flat count of 20 messages from the default agent's `session.messages`. No time window, no token budget. If the default session has fewer than 20 messages, use all of them.
+When `PiSessionManager.createOrchestrator()` is called because the router created or reopened a workstream, format the first prompt using `buildWorkstreamPrompt()` with the workstream prefix and the user's current message. The default Pi agent includes all relevant context in its initial message — no separate context transfer block is needed.
 
 ### FR-5: Default agent role changes
 

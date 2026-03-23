@@ -6,11 +6,9 @@ import {
   upsertPiSession,
 } from "../../blackboard/queries/pi-sessions.ts";
 import type { AutonomaConfig } from "../../config/load-config.ts";
-import type { PiHistoryItem } from "../../contracts/index.ts";
 import { type QueueItem, TurnQueue } from "../queue/turn-queue.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
-import { readPiHistoryFromMessages } from "./history.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
 
@@ -238,71 +236,14 @@ export class PiSessionManager {
   }
 
   /**
-   * Build context-transfer prompt for a new orchestrator from the default agent's recent history.
+   * Build the initial prompt for a new orchestrator workstream.
    */
-  buildContextTransferPrompt(
+  buildWorkstreamPrompt(
     currentMessage: string,
     workstreamName: string,
     workstreamId: string,
   ): string {
-    const def = this.defaultSession;
-    if (!def) return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
-
-    // Walk backwards from the end, collecting raw messages until we have
-    // enough user+assistant messages to yield 20 surfaced items.
-    // Always skip index 0 (bootstrap/init message).
-    const allMessages = def.session.messages as Array<Record<string, unknown>>;
-    let surfacedCount = 0;
-    let startIdx = allMessages.length;
-    for (let i = allMessages.length - 1; i >= 1; i--) {
-      const role = allMessages[i]!.role;
-      if (role === "user" || role === "assistant") surfacedCount++;
-      if (surfacedCount >= 20) {
-        startIdx = i;
-        break;
-      }
-    }
-    if (surfacedCount < 20) startIdx = 1; // use everything except index 0
-    const tail = allMessages.slice(startIdx);
-
-    const history = readPiHistoryFromMessages(
-      def.piSessionId,
-      def.session.sessionFile ?? null,
-      tail,
-      "input",
-    );
-
-    // Skip the init couplet (init user message + assistant response)
-    const initEndIdx = findInitCoupletEnd(history.items);
-    const postInit = history.items.slice(initEndIdx);
-
-    // Take last 20 items
-    const recent = postInit.slice(-20);
-    if (recent.length === 0) {
-      return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
-    }
-
-    // Build prior_context block
-    const contextLines: string[] = [];
-    for (const item of recent) {
-      if (item.kind !== "message") continue;
-      const text = stripWorkstreamPrefix(item.content);
-      if (item.role === "user") {
-        contextLines.push(`User: ${text}`);
-      } else if (item.role === "assistant") {
-        contextLines.push(`Assistant: ${text}`);
-      }
-    }
-
-    const wsPrefix = `[Workstream: "${workstreamName}" (${workstreamId})] [NEW]`;
-    const parts = [
-      `${wsPrefix}\n${currentMessage}`,
-      `IMPORTANT: Before processing the prior context below, run /load2-w to load essential skills.`,
-      `<prior_context>\n${contextLines.join("\n")}\n</prior_context>`,
-      `${wsPrefix}\n${currentMessage}`,
-    ];
-
-    return parts.join("\n\n");
+    return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
   }
 
   private formatWorkstreamMessage(message: string, name: string, id: string): string {
@@ -373,28 +314,3 @@ export class PiSessionManager {
   }
 }
 
-/**
- * Find the end of the init couplet in shaped history items.
- * The init couplet is the first user message (e.g. "[init] User: /load2-w")
- * and its assistant response (e.g. "Skills loaded: ...").
- * Returns the index after the first assistant text message, or 0 if not found.
- */
-function findInitCoupletEnd(items: PiHistoryItem[]): number {
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item && item.kind === "message" && item.role === "assistant" && item.content.trim()) {
-      return i + 1;
-    }
-  }
-  return 0;
-}
-
-/**
- * Strip transport prefixes like [Web] User: "...", [WhatsApp] User: "...",
- * and workstream prefixes like [Workstream: ...] from context entries.
- */
-function stripWorkstreamPrefix(text: string): string {
-  return text
-    .replace(/^\[Workstream:\s*"[^"]*"\s*\([^)]*\)\]\s*(?:\[(?:NEW|RESUMED)\]\s*)?/i, "")
-    .trim();
-}

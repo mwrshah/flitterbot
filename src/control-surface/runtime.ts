@@ -851,14 +851,14 @@ export class ControlSurfaceRuntime {
             });
 
             if (params.message) {
-              const contextPrompt = this.sessionManager.buildContextTransferPrompt(
+              const prompt = this.sessionManager.buildWorkstreamPrompt(
                 params.message,
                 ws.name,
                 ws.id,
               );
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
-                text: contextPrompt,
+                text: prompt,
                 source: "web",
                 metadata: {
                   workstream_id: ws.id,
