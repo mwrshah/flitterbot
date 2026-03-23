@@ -214,6 +214,7 @@ export type WsMessage =
   | { type: "text_delta"; delta: string; sessionId?: string }
   | {
       type: "message_end";
+      messageId?: string;
       role: string;
       content?: string;
       source?: string;
@@ -235,6 +236,7 @@ export type WsMessage =
   | { type: "turn_end"; sessionId?: string }
   | {
       type: "pi_surfaced";
+      messageId?: string;
       content: string;
       timestamp?: string;
       sessionId?: string;
