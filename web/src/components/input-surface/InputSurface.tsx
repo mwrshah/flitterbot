@@ -265,7 +265,7 @@ function mergeTimelines(
   return [...loaderItems, ...unique];
 }
 
-export function InputSurface({ loaderTimeline }: { loaderTimeline: ChatTimelineItem[] }) {
+export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");

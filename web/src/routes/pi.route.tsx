@@ -132,12 +132,13 @@ function PiLayoutRoute() {
 
         if (message.role === "user") {
           if (content.trim()) {
+            const id = message.messageId ? `${message.messageId}:message` : createId("user");
             store.updateSession(sessionId, (s) => ({
               ...s,
               appendedItems: [
                 ...s.appendedItems,
                 {
-                  id: createId("user"),
+                  id,
                   kind: "message",
                   role: "user",
                   content,
@@ -150,6 +151,9 @@ function PiLayoutRoute() {
           return;
         }
 
+        const assistantId = message.messageId
+          ? `${message.messageId}:message`
+          : createId("assistant");
         store.updateSession(sessionId, (s) => {
           const next: SessionAccum = {
             ...s,
@@ -159,7 +163,7 @@ function PiLayoutRoute() {
             next.appendedItems = [
               ...s.appendedItems,
               {
-                id: createId("assistant"),
+                id: assistantId,
                 kind: "message",
                 role: "assistant",
                 content,

@@ -95,6 +95,12 @@ function extractMessageText(message: unknown): string | undefined {
   return parts.trim().length > 0 ? parts : undefined;
 }
 
+function extractMessageId(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  const id = (message as Record<string, unknown>).id;
+  return typeof id === "string" && id.trim() ? id : undefined;
+}
+
 function extractTimestamp(message: unknown, fallback: string): string {
   if (!message || typeof message !== "object") return fallback;
 
@@ -149,6 +155,7 @@ export function subscribeToPiSession(
         const payload: MessageEndWebSocketEvent = {
           type: "message_end",
           sessionId: session.sessionId,
+          messageId: extractMessageId(event.message),
           role,
           content,
           source: role === "user" ? state.getSnapshot().currentItem?.source : undefined,
