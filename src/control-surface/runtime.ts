@@ -891,6 +891,111 @@ export class ControlSurfaceRuntime {
           }
         },
       });
+
+      tools.push({
+        name: "enqueue_message",
+        label: "Enqueue Message",
+        description:
+          "Send a message to an existing orchestrator running on an open workstream. Use to forward user follow-ups, delegate context, or nudge an orchestrator. Does NOT create a workstream or spawn an orchestrator — use create_workstream for that.",
+        parameters: {
+          type: "object",
+          properties: {
+            workstream_id: {
+              type: "string",
+              description: "ID of the target workstream",
+            },
+            message: {
+              type: "string",
+              description:
+                "Message content to deliver to the orchestrator. Include relevant context.",
+            },
+          },
+          required: ["workstream_id", "message"],
+          additionalProperties: false,
+        },
+        execute: async (_toolCallId: string, params: any) => {
+          const { getWorkstreamById } = await import(
+            "../blackboard/queries/workstreams.ts"
+          );
+          const ws = getWorkstreamById(this.blackboard, params.workstream_id);
+          if (!ws) {
+            return {
+              content: [
+                { type: "text", text: `Workstream not found: ${params.workstream_id}` },
+              ],
+              details: { error: true },
+            };
+          }
+          if (ws.status !== "open") {
+            return {
+              content: [{ type: "text", text: `Workstream is closed: ${ws.name}` }],
+              details: { error: true },
+            };
+          }
+
+          const orchestrator = this.sessionManager.getByWorkstream(ws.id);
+          if (!orchestrator) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `No running orchestrator for workstream: ${ws.name}`,
+                },
+              ],
+              details: { error: true },
+            };
+          }
+
+          const formattedText = `[Workstream: "${ws.name}" (${ws.id})]\n${params.message}`;
+
+          orchestrator.queue.enqueue({
+            id: `enq-msg-${crypto.randomUUID()}`,
+            text: formattedText,
+            source: "web",
+            metadata: {
+              workstream_id: ws.id,
+              workstream_name: ws.name,
+            },
+            receivedAt: new Date().toISOString(),
+          });
+
+          try {
+            persistInboundMessage(this.blackboard, {
+              source: "web",
+              content: params.message,
+              sender: "system",
+              workstreamId: ws.id,
+              metadata: {
+                workstream_id: ws.id,
+                workstream_name: ws.name,
+                enqueued_by: "enqueue_message_tool",
+              },
+            });
+          } catch (error) {
+            this.log(
+              `enqueue_message persist failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+
+          this.log(
+            `enqueued message onto workstream "${ws.name}" (${ws.id}), queue depth: ${orchestrator.queue.getDepth()}`,
+          );
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Message enqueued to workstream "${ws.name}" (queue depth: ${orchestrator.queue.getDepth()}).`,
+              },
+            ],
+            details: {
+              workstreamId: ws.id,
+              workstreamName: ws.name,
+              queueDepth: orchestrator.queue.getDepth(),
+            },
+          };
+        },
+      });
     }
 
     if (role === "orchestrator") {
