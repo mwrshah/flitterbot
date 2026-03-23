@@ -11,6 +11,8 @@ export type QueueItem = {
   webClientId?: string;
   deliveryMode?: DeliveryMode;
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
+  workstreamId?: string;
+  workstreamName?: string;
 };
 
 type TurnQueueOptions = {

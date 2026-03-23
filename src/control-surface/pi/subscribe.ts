@@ -152,14 +152,17 @@ export function subscribeToPiSession(
           break;
         }
 
+        const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
         const payload: MessageEndWebSocketEvent = {
           type: "message_end",
           sessionId: session.sessionId,
           messageId: extractMessageId(event.message),
           role,
           content,
-          source: role === "user" ? state.getSnapshot().currentItem?.source : undefined,
+          source: currentItem?.source,
           timestamp: extractTimestamp(event.message, now),
+          workstreamId: currentItem?.workstreamId,
+          workstreamName: currentItem?.workstreamName,
         };
 
         if (role === "assistant") {

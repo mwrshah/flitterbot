@@ -226,6 +226,8 @@ export class ControlSurfaceRuntime {
       return { ok: true, item };
     }
 
+    item.workstreamId = target.workstreamId ?? undefined;
+    item.workstreamName = target.workstreamName ?? undefined;
     target.queue.enqueue(item);
     this.log(
       `enqueued ${item.source} item ${item.id} → ${target.role}${target.workstreamId ? ` ws=${target.workstreamId}` : ""}`,
@@ -370,6 +372,8 @@ export class ControlSurfaceRuntime {
       metadata: { event: normalized, ...payload },
       receivedAt: new Date().toISOString(),
       deliveryMode: "followUp",
+      workstreamId: targetQueue.workstreamId ?? undefined,
+      workstreamName: targetQueue.workstreamName ?? undefined,
     };
 
     // Persist inbound

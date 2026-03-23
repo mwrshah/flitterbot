@@ -221,6 +221,8 @@ export type WsMessage =
       timestamp?: string;
       sessionId?: string;
       intermediate?: boolean;
+      workstreamId?: string;
+      workstreamName?: string;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
