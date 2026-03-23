@@ -48,7 +48,7 @@ async function runOptionalTmux(args: string[]): Promise<string | null> {
 }
 
 function getPrimaryTarget(sessionName: string): string {
-  return `${sessionName}:0.0`;
+  return sessionName;
 }
 
 function warmInferenceColor(r: number, b: number): boolean {
