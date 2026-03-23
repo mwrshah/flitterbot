@@ -53,6 +53,19 @@ export function getActivePiSessionId(
   return row?.pi_session_id;
 }
 
+/** Returns the most recent pi_session_id for a workstream, regardless of session status. */
+export function getLatestPiSessionId(
+  db: BlackboardDatabase,
+  workstreamId: string,
+): string | undefined {
+  const row = db
+    .prepare(
+      `SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? ORDER BY started_at DESC LIMIT 1`,
+    )
+    .get(workstreamId) as { pi_session_id: string } | undefined;
+  return row?.pi_session_id;
+}
+
 export function closeWorkstream(db: BlackboardDatabase, workstreamId: string): void {
   db.prepare(
     `UPDATE workstreams
