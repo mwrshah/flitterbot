@@ -1,5 +1,9 @@
 import type http from "node:http";
 import type { PiHistoryItem, PiHistoryResponse } from "../../contracts/index.ts";
+import {
+  getLatestPiSessionId,
+  listRecentlyClosedWorkstreams,
+} from "../../blackboard/queries/workstreams.ts";
 import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -71,16 +75,43 @@ export async function handleBrowserPiHistoryRoute(
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
     const allItems: PiHistoryItem[] = [];
+    const processedSessionIds = new Set<string>();
+
     for (const session of allSessions) {
+      const snapshot = session.state.getSnapshot();
+      if (snapshot.sessionId) processedSessionIds.add(snapshot.sessionId);
+
       const items = await readSessionHistory(session, historyMode);
-      if (session.workstreamName) {
-        for (const item of items) {
-          if (item.kind === "message") {
-            item.workstreamName = session.workstreamName;
-          }
+      const sessionPrefix = snapshot.sessionId ?? "default";
+      for (const item of items) {
+        item.id = `${sessionPrefix}:${item.id}`;
+        if (session.workstreamName && item.kind === "message") {
+          item.workstreamName = session.workstreamName;
         }
       }
       allItems.push(...items);
+    }
+
+    // Include history from recently-closed workstreams
+    const closedWorkstreams = listRecentlyClosedWorkstreams(runtime.blackboard, 24);
+    for (const ws of closedWorkstreams) {
+      const piSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
+      if (!piSessionId || processedSessionIds.has(piSessionId)) continue;
+      processedSessionIds.add(piSessionId);
+
+      const row = runtime.blackboard
+        .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
+        .get(piSessionId) as { session_file: string | null } | undefined;
+      if (!row?.session_file) continue;
+
+      const body = await readPiHistory(piSessionId, row.session_file, historyMode);
+      for (const item of body.items) {
+        item.id = `${piSessionId}:${item.id}`;
+        if (item.kind === "message") {
+          item.workstreamName = ws.name;
+        }
+      }
+      allItems.push(...body.items);
     }
 
     allItems.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
