@@ -27,7 +27,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
 
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
-  const { history } = Route.useLoaderData();
+  const history = Route.useLoaderData()?.history ?? [];
   const snapshot = usePiSessionStore();
   const accum = piSessionStore.getSessionAccum(sessionId);
   const sendMessage = piSessionStore.getSendMessage();
