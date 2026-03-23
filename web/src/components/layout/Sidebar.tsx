@@ -156,13 +156,11 @@ export function Sidebar({
                 Active workstreams
               </p>
               <div className="space-y-1">
-                {openWorkstreams.map((ws) => (
+                {openWorkstreams.filter((ws) => ws.piSessionId).map((ws) => (
                   <Link
                     key={ws.id}
-                    to={ws.piSessionId ? "/pi/$sessionId" : "/sessions/workstream/$workstreamId"}
-                    params={
-                      ws.piSessionId ? { sessionId: ws.piSessionId } : { workstreamId: ws.id }
-                    }
+                    to="/pi/$sessionId"
+                    params={{ sessionId: ws.piSessionId! }}
                     className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
                   >
                     <span className="truncate">{ws.name}</span>
@@ -181,13 +179,11 @@ export function Sidebar({
                 Recently closed
               </p>
               <div className="space-y-1">
-                {closedWorkstreams.map((ws) => (
+                {closedWorkstreams.filter((ws) => ws.piSessionId).map((ws) => (
                   <Link
                     key={ws.id}
-                    to={ws.piSessionId ? "/pi/$sessionId" : "/sessions/workstream/$workstreamId"}
-                    params={
-                      ws.piSessionId ? { sessionId: ws.piSessionId } : { workstreamId: ws.id }
-                    }
+                    to="/pi/$sessionId"
+                    params={{ sessionId: ws.piSessionId! }}
                     className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
                   >
                     <span className="truncate">{ws.name}</span>

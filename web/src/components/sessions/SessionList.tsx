@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { SessionSummary } from "~/lib/types";
 import { cn, formatRelativeTime } from "~/lib/utils";
 
+
 function statusDotColor(status: SessionSummary["status"]): string {
   switch (status) {
     case "working":
@@ -27,13 +28,13 @@ export function SessionList({
   description?: string;
 }) {
   // Group by workstream
-  const grouped = new Map<string, { id: string; sessions: SessionSummary[] }>();
+  const grouped = new Map<string, { sessions: SessionSummary[] }>();
   const unlinked: SessionSummary[] = [];
 
   for (const session of items) {
     if (session.workstreamName && session.workstreamId) {
       const key = session.workstreamName;
-      if (!grouped.has(key)) grouped.set(key, { id: session.workstreamId, sessions: [] });
+      if (!grouped.has(key)) grouped.set(key, { sessions: [] });
       grouped.get(key)!.sessions.push(session);
     } else {
       unlinked.push(session);
@@ -54,11 +55,10 @@ export function SessionList({
       )}
 
       {/* Workstream groups */}
-      {[...grouped.entries()].map(([wsName, { id, sessions }]) => (
+      {[...grouped.entries()].map(([wsName, { sessions }]) => (
         <SessionGroup
           key={wsName}
           label={wsName}
-          workstreamId={id}
           sessions={sessions}
           selectedSessionId={selectedSessionId}
         />
@@ -87,31 +87,19 @@ export function SessionList({
 
 function SessionGroup({
   label,
-  workstreamId,
   sessions,
   selectedSessionId,
 }: {
   label: string;
-  workstreamId?: string;
   sessions: SessionSummary[];
   selectedSessionId?: string;
 }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        {workstreamId ? (
-          <Link
-            to="/sessions/workstream/$workstreamId"
-            params={{ workstreamId }}
-            className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium hover:text-foreground transition-colors"
-          >
-            {label}
-          </Link>
-        ) : (
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-            {label}
-          </p>
-        )}
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          {label}
+        </p>
         <span className="text-[10px] text-muted-foreground/60 tabular-nums">{sessions.length}</span>
       </div>
       <div className="space-y-1">
