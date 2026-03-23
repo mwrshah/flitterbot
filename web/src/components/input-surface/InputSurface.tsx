@@ -253,13 +253,25 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 
 /* ── Main Component ── */
 
-export function InputSurface() {
+/* ── Deduplication helper (same logic as pi.route.tsx) ── */
+
+function mergeTimelines(
+  loaderItems: ChatTimelineItem[],
+  appendedItems: ChatTimelineItem[],
+): ChatTimelineItem[] {
+  if (appendedItems.length === 0) return loaderItems;
+  const seen = new Set(loaderItems.map((item) => item.id));
+  const unique = appendedItems.filter((item) => !seen.has(item.id));
+  return [...loaderItems, ...unique];
+}
+
+export function InputSurface({ loaderTimeline }: { loaderTimeline: ChatTimelineItem[] }) {
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const [timeline, setTimeline] = useState<ChatTimelineItem[]>([]);
+  const [appendedItems, setAppendedItems] = useState<ChatTimelineItem[]>([]);
   const connectionState = useSyncExternalStore(
     useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
     useCallback(() => wsClient.connectionState, [wsClient]),
@@ -276,33 +288,13 @@ export function InputSurface() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
 
+  const timeline = useMemo(
+    () => mergeTimelines(loaderTimeline, appendedItems),
+    [loaderTimeline, appendedItems],
+  );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
 
-  // Scroll viewport to bottom (used on mount and after history hydration)
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = viewportRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  }, []);
-
-  // Hydrate from history, then scroll to bottom
-  useEffect(() => {
-    let cancelled = false;
-    void apiClient
-      .getPiHistory("input")
-      .then((history) => {
-        if (cancelled) return;
-        setTimeline((current) => [...history.items, ...current]);
-        scrollToBottom();
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, scrollToBottom]);
-
-  // WebSocket events — same as ChatPanel but we store into timeline
+  // WebSocket events — append to local state; deduped against loader via mergeTimelines
   useEffect(() => {
     const unsubscribe = wsClient.subscribe((message) => {
       if (message.type === "text_delta") {
@@ -318,17 +310,21 @@ export function InputSurface() {
         const content = message.content || "";
         if (message.role === "user") {
           if (content.trim()) {
-            setTimeline((current) => [
-              ...current,
-              {
-                id: createId("user"),
-                kind: "message",
-                role: "user",
-                content,
-                source: (message.source as MessageSource) ?? "web",
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ]);
+            const id = message.messageId ? `${message.messageId}:message` : createId("user");
+            setAppendedItems((current) => {
+              if (current.some((item) => item.id === id)) return current;
+              return [
+                ...current,
+                {
+                  id,
+                  kind: "message",
+                  role: "user",
+                  content,
+                  source: (message.source as MessageSource) ?? "web",
+                  createdAt: message.timestamp ?? new Date().toISOString(),
+                },
+              ];
+            });
           }
           return;
         }
@@ -339,17 +335,21 @@ export function InputSurface() {
 
       if (message.type === "pi_surfaced") {
         if (message.content.trim()) {
-          setTimeline((current) => [
-            ...current,
-            {
-              id: createId("assistant"),
-              kind: "message",
-              role: "assistant",
-              content: message.content,
-              workstreamName: message.workstreamName,
-              createdAt: message.timestamp ?? new Date().toISOString(),
-            },
-          ]);
+          const id = message.messageId ? `${message.messageId}:message` : createId("assistant");
+          setAppendedItems((current) => {
+            if (current.some((item) => item.id === id)) return current;
+            return [
+              ...current,
+              {
+                id,
+                kind: "message",
+                role: "assistant",
+                content: message.content,
+                workstreamName: message.workstreamName,
+                createdAt: message.timestamp ?? new Date().toISOString(),
+              },
+            ];
+          });
         }
         return;
       }
