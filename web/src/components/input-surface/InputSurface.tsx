@@ -112,6 +112,53 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
   return entries;
 }
 
+/* ── Collapsible Content Wrapper ── */
+
+const MAX_LINES = 30;
+
+function CollapsibleContent({
+  children,
+  fadeClassName = "from-card",
+}: {
+  children: React.ReactNode;
+  fadeClassName?: string;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+  });
+
+  return (
+    <div className="relative">
+      <div
+        ref={contentRef}
+        style={!expanded ? { maxHeight: `calc(${MAX_LINES}lh)`, overflow: "hidden" } : undefined}
+      >
+        {children}
+      </div>
+      {isOverflowing && !expanded && (
+        <div
+          className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${fadeClassName} to-transparent pointer-events-none`}
+        />
+      )}
+      {(isOverflowing || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ── Entry Renderers ── */
 
 function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
@@ -136,7 +183,9 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
             {badgeName}
           </span>
         )}
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
+        <CollapsibleContent>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
+        </CollapsibleContent>
       </div>
     </div>
   );
@@ -214,7 +263,9 @@ function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response
             {entry.workstreamName}
           </span>
         )}
-        <LitMarkdownBlock content={entry.content} />
+        <CollapsibleContent fadeClassName="from-muted/30">
+          <LitMarkdownBlock content={entry.content} />
+        </CollapsibleContent>
       </div>
     </div>
   );
