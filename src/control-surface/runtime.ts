@@ -657,8 +657,9 @@ export class ControlSurfaceRuntime {
     this.transitionPiAfterTurn(piSessionId);
 
     // Auto-surface final assistant message
-    const finalText = extractFinalAssistantText(session);
-    if (finalText) {
+    const finalAssistant = extractFinalAssistantMessage(session);
+    if (finalAssistant) {
+      const { text: finalText, messageId: finalMessageId } = finalAssistant;
       // Persist outbound
       try {
         const workstreamId =
@@ -688,6 +689,7 @@ export class ControlSurfaceRuntime {
         });
         this.wsHub.broadcast({
           type: "pi_surfaced",
+          messageId: finalMessageId,
           content: finalText,
           timestamp: new Date().toISOString(),
           sessionId: managed.piSessionId,
@@ -1102,19 +1104,24 @@ export class ControlSurfaceRuntime {
   }
 }
 
-function extractFinalAssistantText(session: any): string | undefined {
+function extractFinalAssistantMessage(
+  session: any,
+): { text: string; messageId?: string } | undefined {
   if (!session?.messages?.length) return undefined;
   for (let i = session.messages.length - 1; i >= 0; i--) {
     const msg = session.messages[i] as Record<string, unknown> | undefined;
     if (!msg || msg.role !== "assistant") continue;
+    const messageId =
+      typeof msg.id === "string" && (msg.id as string).trim() ? (msg.id as string) : undefined;
     const content = msg.content;
-    if (typeof content === "string" && content.trim()) return content.trim();
+    if (typeof content === "string" && content.trim())
+      return { text: content.trim(), messageId };
     if (Array.isArray(content)) {
       const textParts = content
         .filter((block: any) => block?.type === "text" && typeof block.text === "string")
         .map((block: any) => block.text)
         .join("");
-      if (textParts.trim()) return textParts.trim();
+      if (textParts.trim()) return { text: textParts.trim(), messageId };
     }
     return undefined;
   }

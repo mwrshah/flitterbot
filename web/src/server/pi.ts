@@ -37,6 +37,15 @@ export const fetchPiHistory = createServerFn({ method: "GET" })
     return res.items;
   });
 
+export const fetchPiInputHistory = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AnyJson> => {
+    const res = (await piRequest("/api/pi/history?surface=input")) as {
+      items: ChatTimelineItem[];
+    };
+    return res.items;
+  },
+);
+
 export const fetchPiStatus = createServerFn({ method: "GET" }).handler(
   async (): Promise<AnyJson> => {
     return (await piRequest("/status")) as StatusResponse;

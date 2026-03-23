@@ -1,17 +1,22 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Scripts,
+  useRouter,
+} from "@tanstack/react-router";
 import type * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { AppShell } from "~/components/layout/AppShell";
 import { NotFound } from "~/components/NotFound";
 import type { AutonomaApiClient } from "~/lib/api";
-import type { WsMessage } from "~/lib/types";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
+import type { ConnectionState, WsMessage } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
 import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";
@@ -71,6 +76,8 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const { wsClient } = Route.useRouteContext();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const prevConnectionRef = useRef<ConnectionState>(wsClient.connectionState);
 
   // Invalidate status query when workstreams change via WebSocket — single listener for all consumers
   useEffect(() => {
@@ -80,6 +87,17 @@ function RootComponent() {
       }
     });
   }, [wsClient, queryClient]);
+
+  // Re-run all route loaders on WS reconnect so stale data is replaced with fresh server state
+  useEffect(() => {
+    return wsClient.subscribeConnection((state: ConnectionState) => {
+      const prev = prevConnectionRef.current;
+      prevConnectionRef.current = state;
+      if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
+        router.invalidate();
+      }
+    });
+  }, [wsClient, router]);
 
   return (
     <RootDocument>
