@@ -24,12 +24,12 @@ function PiDefaultRoute() {
   const { history } = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
   const snapshot = usePiSessionStore();
-  const accum = piSessionStore.getSessionAccum("default");
   const sendMessage = piSessionStore.getSendMessage();
 
   // Read the default agent's piSessionId from the status query (already loaded by parent route)
   const statusQuery = useQuery(statusQueryOptions(apiClient));
   const defaultSessionId = statusQuery.data?.pi?.default?.sessionId;
+  const accum = piSessionStore.getSessionAccum(defaultSessionId ?? "");
 
   return (
     <ChatPanel

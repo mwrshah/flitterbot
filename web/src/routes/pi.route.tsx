@@ -106,15 +106,21 @@ function PiLayoutRoute() {
     const store = piSessionStore;
 
     const unsubscribe = wsClient.subscribe((message: WsMessage) => {
-      const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : "default";
+      const sessionId =
+        "sessionId" in message && message.sessionId ? message.sessionId : undefined;
 
       if (message.type === "connected") {
-        store.addPill("default", {
-          id: "ws-connected",
-          label: `WS ${message.clientId.slice(0, 8)}`,
-        });
+        // Global pill — attach to default session if known, otherwise skip
+        if (defaultSessionId) {
+          store.addPill(defaultSessionId, {
+            id: "ws-connected",
+            label: `WS ${message.clientId.slice(0, 8)}`,
+          });
+        }
         return;
       }
+
+      if (!sessionId) return;
 
       if (message.type === "queue_item_start") {
         const sourceLabel =
@@ -255,11 +261,13 @@ function PiLayoutRoute() {
       }
 
       if (message.type === "error") {
-        store.addPill("default", {
-          id: createId("error"),
-          label: message.message,
-          variant: "error",
-        });
+        if (defaultSessionId) {
+          store.addPill(defaultSessionId, {
+            id: createId("error"),
+            label: message.message,
+            variant: "error",
+          });
+        }
       }
     });
 
@@ -270,7 +278,7 @@ function PiLayoutRoute() {
       unsubscribe();
       unsubscribeConnection();
     };
-  }, [wsClient]);
+  }, [wsClient, defaultSessionId]);
 
   // Set initial connection state
   useEffect(() => {
