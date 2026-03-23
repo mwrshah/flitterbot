@@ -53,18 +53,40 @@ function PiLayoutRoute() {
     resetPiSessionStore();
   }, []);
 
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   // Status query — seeded by loader, invalidated via WebSocket (listener in root route)
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
   });
 
-  const orchestrators = statusQuery.data?.pi?.orchestrators ?? [];
+  const allOrchestrators = statusQuery.data?.pi?.orchestrators ?? [];
   const defaultPi = statusQuery.data?.pi?.default;
+  const workstreams = statusQuery.data?.workstreams ?? [];
+
+  // Build set of open workstream IDs
+  const openWsIds = new Set(workstreams.filter((w) => w.status === "open").map((w) => w.id));
+
+  // Persistent tabs: only orchestrators with open workstreams
+  const openOrchestrators = allOrchestrators.filter((o) => openWsIds.has(o.workstreamId));
+
+  // Ephemeral tab: if current URL points to a closed workstream's orchestrator, include it
+  const currentSessionId = pathname.startsWith("/pi/") ? pathname.split("/")[2] : null;
+  const ephemeralOrchestrator =
+    currentSessionId && currentSessionId !== "default"
+      ? allOrchestrators.find(
+          (o) => o.sessionId === currentSessionId && !openWsIds.has(o.workstreamId),
+        )
+      : undefined;
+
+  const orchestrators = ephemeralOrchestrator
+    ? [...openOrchestrators, ephemeralOrchestrator]
+    : openOrchestrators;
 
   // Subscribe to all orchestrator sessions
   useEffect(() => {
-    const sessionIds = orchestrators.map((o) => o.sessionId);
+    const sessionIds = allOrchestrators.map((o) => o.sessionId);
     for (const id of sessionIds) {
       wsClient.subscribeSession(id);
     }
@@ -73,7 +95,7 @@ function PiLayoutRoute() {
         wsClient.unsubscribeSession(id);
       }
     };
-  }, [wsClient, orchestrators.map((o) => o.sessionId).join(",")]);
+  }, [wsClient, allOrchestrators.map((o) => o.sessionId).join(",")]);
 
   // WebSocket event subscription — routes events to correct session via store
   useEffect(() => {
@@ -285,8 +307,6 @@ function PiLayoutRoute() {
       };
     });
   }, [wsClient, apiClient]);
-
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
     <div className="flex flex-col h-full">
