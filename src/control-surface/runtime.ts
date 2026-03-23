@@ -85,8 +85,15 @@ export class ControlSurfaceRuntime {
     managedByControlSurface: true,
   };
 
+  get whatsappEnabled(): boolean {
+    return this.config.whatsappEnabled;
+  }
+
   constructor(config: AutonomaConfig = loadConfig()) {
     this.config = config;
+    if (!config.whatsappEnabled) {
+      this.whatsappStatusCache = { status: "disabled", managedByControlSurface: true };
+    }
     this.blackboard = openBlackboard(config.blackboardPath);
     this.wsHub = new WebSocketHub(this.handleWebSocketMessage.bind(this));
     this.sessionManager = new PiSessionManager(
@@ -516,6 +523,9 @@ export class ControlSurfaceRuntime {
   }
 
   async startWhatsAppDaemon(): Promise<RuntimeWhatsAppStartResponse> {
+    if (!this.whatsappEnabled) {
+      return { ok: false, status: "disabled", managedByControlSurface: true };
+    }
     const existing = await getDaemonStatus();
     if (existing) {
       this.whatsappStatusCache = this.mapDaemonStatus(existing);
@@ -529,6 +539,9 @@ export class ControlSurfaceRuntime {
   }
 
   async stopWhatsAppDaemon(): Promise<RuntimeWhatsAppStopResponse> {
+    if (!this.whatsappEnabled) {
+      return { ok: false, status: "disabled", managedByControlSurface: true };
+    }
     const daemon = await stopDaemonProcess();
     this.whatsappStatusCache = this.mapDaemonStatus(daemon);
     this.broadcastStatusChanged("whatsapp");
@@ -955,6 +968,7 @@ export class ControlSurfaceRuntime {
   }
 
   private async sendWhatsAppCommand(command: Record<string, unknown>): Promise<any> {
+    if (!this.whatsappEnabled) return { ok: false, status: "disabled" };
     try {
       const response = await sendDaemonCommand(command as any);
       if (response.daemon) {
@@ -1003,6 +1017,7 @@ export class ControlSurfaceRuntime {
   }
 
   private async refreshWhatsAppStatus(): Promise<void> {
+    if (!this.whatsappEnabled) return;
     const prev = this.whatsappStatusCache.status;
     this.whatsappStatusCache = this.mapDaemonStatus(await getDaemonStatus());
     if (this.whatsappStatusCache.status !== prev) {
@@ -1019,6 +1034,10 @@ export class ControlSurfaceRuntime {
   }
 
   private async ensureWhatsAppDaemon(): Promise<void> {
+    if (!this.whatsappEnabled) {
+      this.log("whatsapp daemon disabled via WHATSAPP_ENABLED");
+      return;
+    }
     await this.refreshWhatsAppStatus();
     if (this.whatsappStatusCache.status !== "stopped") return;
     try {

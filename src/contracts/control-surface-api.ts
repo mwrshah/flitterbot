@@ -11,6 +11,7 @@ export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
   | "unknown"
+  | "disabled"
   | "stopped"
   | "starting"
   | "auth_required"

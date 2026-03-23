@@ -29,6 +29,7 @@ export type AutonomaConfig = {
   controlSurfacePromptPath: string;
   projectsDir: string;
   wipeWorkstreamsOnStart: boolean;
+  whatsappEnabled: boolean;
 };
 
 const HOME = os.homedir();
@@ -80,6 +81,12 @@ export function loadConfig(): AutonomaConfig {
   const wipeWorkstreamsOnStart = Boolean(
     raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1",
   );
+  const whatsappEnabled =
+    process.env.WHATSAPP_ENABLED !== undefined
+      ? process.env.WHATSAPP_ENABLED !== "0" && process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
+      : raw.whatsappEnabled !== undefined
+        ? Boolean(raw.whatsappEnabled)
+        : true;
   const configuredPiModel = String(raw.piModel ?? "");
   const configuredClaudeCliCommand = String(raw.claudeCliCommand ?? "");
   const config: AutonomaConfig = {
@@ -105,6 +112,7 @@ export function loadConfig(): AutonomaConfig {
         : "claude --dangerously-skip-permissions",
     projectsDir,
     wipeWorkstreamsOnStart,
+    whatsappEnabled,
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,

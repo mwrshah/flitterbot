@@ -129,7 +129,7 @@ export function Sidebar({
           color={
             waStatus === "connected"
               ? "bg-emerald-500"
-              : waStatus === "stopped"
+              : waStatus === "stopped" || waStatus === "disabled"
                 ? "bg-zinc-500"
                 : "bg-amber-500"
           }

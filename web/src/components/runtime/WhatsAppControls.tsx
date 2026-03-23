@@ -33,6 +33,7 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
   });
 
   const waStatus = status?.whatsapp.status ?? "unknown";
+  const isDisabled = waStatus === "disabled";
 
   return (
     <Card>
@@ -43,53 +44,59 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
-                Daemon PID
-              </p>
-              <p className="text-sm font-mono">{status?.whatsapp.pid ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
-                Managed by
-              </p>
-              <p className="text-sm">
-                {status?.whatsapp.managedByControlSurface ? "control surface" : "unknown"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              disabled={
-                startMutation.isPending || waStatus === "connected" || waStatus === "starting"
-              }
-              onClick={() => startMutation.mutate()}
-            >
-              {startMutation.isPending ? "Starting..." : "Start"}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={stopMutation.isPending || waStatus === "stopped"}
-              onClick={() => stopMutation.mutate()}
-            >
-              {stopMutation.isPending ? "Stopping..." : "Stop"}
-            </Button>
-          </div>
-
-          {startMutation.error && (
-            <p className="text-xs text-destructive">Failed to start daemon.</p>
-          )}
-          {stopMutation.error && <p className="text-xs text-destructive">Failed to stop daemon.</p>}
-
-          <p className="text-[10px] text-muted-foreground/50">
-            Auth stays terminal-driven in v1. Browser only controls start/stop.
+        {isDisabled ? (
+          <p className="text-xs text-muted-foreground">
+            WhatsApp daemon is disabled. Set <code className="text-[11px]">WHATSAPP_ENABLED=true</code> and restart the control surface to enable it.
           </p>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                  Daemon PID
+                </p>
+                <p className="text-sm font-mono">{status?.whatsapp.pid ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                  Managed by
+                </p>
+                <p className="text-sm">
+                  {status?.whatsapp.managedByControlSurface ? "control surface" : "unknown"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={
+                  startMutation.isPending || waStatus === "connected" || waStatus === "starting"
+                }
+                onClick={() => startMutation.mutate()}
+              >
+                {startMutation.isPending ? "Starting..." : "Start"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={stopMutation.isPending || waStatus === "stopped"}
+                onClick={() => stopMutation.mutate()}
+              >
+                {stopMutation.isPending ? "Stopping..." : "Stop"}
+              </Button>
+            </div>
+
+            {startMutation.error && (
+              <p className="text-xs text-destructive">Failed to start daemon.</p>
+            )}
+            {stopMutation.error && <p className="text-xs text-destructive">Failed to stop daemon.</p>}
+
+            <p className="text-[10px] text-muted-foreground/50">
+              Auth stays terminal-driven in v1. Browser only controls start/stop.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
