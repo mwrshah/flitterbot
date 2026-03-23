@@ -12,6 +12,8 @@ async function readSessionHistory(
   const snapshot = managed.state.getSnapshot();
   if (!snapshot.sessionId) return [];
 
+  let items: PiHistoryItem[];
+
   if (
     managed.session?.sessionId === snapshot.sessionId &&
     Array.isArray(managed.session.messages)
@@ -23,14 +25,30 @@ async function readSessionHistory(
       historyMode,
     );
     if (body.items.length > 0 || !snapshot.sessionFile) {
-      return body.items;
+      items = body.items;
+    } else if (snapshot.sessionFile) {
+      const fileBody = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
+      items = fileBody.items;
+    } else {
+      return [];
+    }
+  } else if (snapshot.sessionFile) {
+    const body = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
+    items = body.items;
+  } else {
+    return [];
+  }
+
+  // When a turn is in progress, suppress the trailing assistant message —
+  // it's an intermediate response that will change once tool calls finish.
+  if (historyMode === "input" && snapshot.busy && items.length > 0) {
+    const last = items[items.length - 1]!;
+    if (last.kind === "message" && last.role === "assistant") {
+      items = items.slice(0, -1);
     }
   }
 
-  if (!snapshot.sessionFile) return [];
-
-  const body = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
-  return body.items;
+  return items;
 }
 
 export async function handleBrowserPiHistoryRoute(
