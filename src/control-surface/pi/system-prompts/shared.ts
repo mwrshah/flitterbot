@@ -25,7 +25,8 @@ export const SESSION_PROCEDURES = `When a Claude Code session stops or ends:
 1. Query the blackboard for session details
 2. Read the recent transcript if needed
 3. Decide: re-prompt the session, notify the user, or do nothing
-4. Compose a concise response with actionable options`;
+4. Compose a concise response with actionable options
+5. When re-prompting, use the tmux2 \`message\` command (not \`send\`) — it verifies inference started and retries if needed; reserve \`send\` for raw keystrokes like bare Enter to accept permission prompts`;
 
 export const INVESTIGATION_PROCEDURE = `When the user requests investigation or research:
 1. Read the relevant FEATURE.md and spec files to understand scope
