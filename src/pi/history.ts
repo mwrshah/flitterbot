@@ -43,6 +43,24 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
+/** Extract a non-empty string field from a record. */
+function extractStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+/**
+ * Extract a stable identifier from a message record.
+ * For assistant messages, prefer `responseId` (Anthropic API identifier, e.g. `msg_01VM...`).
+ * Returns undefined for non-assistant roles or when no responseId is present.
+ */
+function extractStableId(record: Record<string, unknown>): string | undefined {
+  if (record.role === "assistant") {
+    return extractStringField(record, "responseId");
+  }
+  return undefined;
+}
+
 /** Resolve an agent ID to a server UUID via the resolver, falling back to the agent ID. */
 function resolveId(agentId: string, resolver?: IdResolver): string {
   if (!resolver) return agentId;
@@ -274,8 +292,9 @@ function parseHistoryLine(
 
   const messageRecord = asRecord(parsed.message);
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
-  const rawId =
-    typeof parsed.id === "string" && parsed.id.trim() ? parsed.id : `line-${lineNumber}`;
+  // For assistant messages, prefer responseId (Anthropic API identifier) as the stable ID.
+  // Falls back to the JSONL entry wrapper id, then positional.
+  const rawId = extractStableId(messageRecord) ?? extractStringField(parsed, "id") ?? `line-${lineNumber}`;
   const resolvedId = resolveId(rawId, resolver);
   parseMessageRecord(messageRecord, createdAt, resolvedId, items);
 }
@@ -292,8 +311,7 @@ export function readPiHistoryFromMessages(
   messages.forEach((message, index) => {
     const record = asRecord(message);
     const createdAt = isoTimestamp(record.timestamp);
-    const rawId =
-      typeof record.id === "string" && record.id.trim() ? record.id : `memory-${index}`;
+    const rawId = extractStableId(record) ?? extractStringField(record, "id") ?? `memory-${index}`;
     const resolvedId = resolveId(rawId, resolver);
     parseMessageRecord(record, createdAt, resolvedId, items);
   });

@@ -98,8 +98,13 @@ function extractMessageText(message: unknown): string | undefined {
 
 function extractMessageId(message: unknown): string | undefined {
   if (!message || typeof message !== "object") return undefined;
-  const id = (message as Record<string, unknown>).id;
-  return typeof id === "string" && id.trim() ? id : undefined;
+  const record = message as Record<string, unknown>;
+  // Prefer responseId (Anthropic API response identifier, available on AssistantMessage since SDK 0.60)
+  for (const key of ["responseId", "id"] as const) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
 }
 
 function extractTimestamp(message: unknown, fallback: string): string {

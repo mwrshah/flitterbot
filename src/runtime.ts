@@ -1362,8 +1362,10 @@ function extractFinalAssistantMessage(
   for (let i = session.messages.length - 1; i >= 0; i--) {
     const msg = session.messages[i] as Record<string, unknown> | undefined;
     if (!msg || msg.role !== "assistant") continue;
+    // Prefer responseId (Anthropic API identifier, available since SDK 0.60) over generic id
     const messageId =
-      typeof msg.id === "string" && (msg.id as string).trim() ? (msg.id as string) : undefined;
+      (typeof msg.responseId === "string" && (msg.responseId as string).trim() ? (msg.responseId as string) : undefined)
+      ?? (typeof msg.id === "string" && (msg.id as string).trim() ? (msg.id as string) : undefined);
     const content = msg.content;
     if (typeof content === "string" && content.trim()) return { text: content.trim(), messageId };
     if (Array.isArray(content)) {
