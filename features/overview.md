@@ -1,140 +1,222 @@
 # Autonoma — Features Overview
 
-Orchestration layer above Claude Code. A long-running control surface hosts a single embedded Pi agent behind a stateless message router, manages workstreams and their Claude Code sessions in SQLite, and communicates with the user over WhatsApp and a web client — both primary surfaces with bidirectional sync.
+Orchestration layer above Claude Code. A long-running control surface hosts concurrent Pi agent sessions — one default for triage, one orchestrator per active workstream — behind a Groq classifier. State in SQLite; user interaction via WhatsApp and web client (bidirectionally synced); Claude Code sessions report back via hooks; OS-level cron injects periodic health checks.
 
-## What it does
+## How It Works
 
-Every inbound message (WhatsApp or web client) passes through a stateless router (Gemini Flash Lite) that classifies it against open workstreams stored in SQLite, plus a directory listing of known projects. The router assigns the message to an existing workstream, creates a new workstream row (with a name it derives from the message), or passes null for non-work messages. It then forwards the message with workstream context to the single embedded Pi agent running inside the control surface.
+### Message Flow
 
-Pi receives messages tagged with workstream context and acts accordingly: creating git worktrees for workstreams that involve code changes, launching Claude Code sessions in tmux (tagged to the workstream), and managing wave execution through prompt-based coordination. When Pi enriches a workstream (choosing the repo, creating the worktree), it writes the repo path and worktree path back to the workstream row.
+All inbound messages hit the control surface. Web and WhatsApp messages pass through a Groq classifier (`openai/gpt-oss-120b`) that matches against open workstreams in SQLite plus known project directories. Hook events and cron prompts bypass classification.
 
-Claude Code sessions report lifecycle events via hooks that POST to the control surface. When a session completes, Pi is notified and decides whether to launch follow-up work, wait for other sessions in the wave, or notify the user. Pi's final text response each turn is automatically extracted by the runtime and pushed to both WhatsApp and the web client simultaneously — no explicit tool call needed.
+Routing after classification:
+- **Matched workstream** → that workstream's orchestrator
+- **New workstream needed** → default agent (can call `create_workstream` to spawn orchestrator)
+- **Non-work / no match** → default agent
+- **Hook events** → Pi session owning the Claude Code session (by `pi_session_id`, `workstream_id`, worktree path, or default fallback)
+- **Cron** → default agent
 
-Pi is reactive in v1 — triggered by human messages and Claude Code hook events. There is no cron-driven proactive behavior yet. Pi can read Todoist when asked and annotate tasks, but never autonomously completes them. Workstream rows are ephemeral — created by the router, enriched by Pi, and deleted by Pi when the workstream is done (along with git worktree cleanup).
+Each Pi session has its own FIFO turn queue; all agents process concurrently.
+
+### Workstream Lifecycle
+
+Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, removes the worktree, closes the row, and self-destructs the orchestrator.
+
+Soft-deleted: `status` flips to `closed` with `closed_at`. Classifier sees recently closed workstreams (24h) to prevent duplicates and allow reopening.
+
+### Claude Code Feedback Loop
+
+Hook scripts POST lifecycle events (`session-start`, `stop`, `session-end`) to the control surface. `session-start` registers the session in SQLite with Pi/workstream linkage. `stop` extracts the last assistant message from the transcript and enqueues it back to the owning Pi — closing the Pi → CC → Pi loop. `session-end` marks the session ended.
+
+### Output Surfacing
+
+Pi's final text each turn auto-surfaces to WhatsApp and web — no tool call needed. Web messages mirror to WhatsApp (`*User (web):*` prefix); Pi responses appear as `*B-bot:*`. Replies from either surface reach both.
+
+### Proactive Behavior (Cron)
+
+OS-level timer (systemd on Linux, launchd on macOS, 10-min interval) POSTs to `/cron/tick`. The endpoint runs a 6-gate sequence:
+
+1. Pi not busy — no duplicate prompts
+2. Pi session exists — not ended/crashed
+3. WhatsApp connected — Pi can reach user
+4. No active circuit breakers (`health_flags`)
+5. Stale sessions exist → stale-check prompt
+6. No working sessions → idle-check prompt
+
+Separate 60s maintenance loop: pings blackboard, refreshes WhatsApp, marks stale sessions, kills 24h-old idle tmux sessions, detects stuck turns (sets `stuck_turn` health flag, 30-min TTL, WhatsApp alert).
 
 ## Architecture
 
 ```
-┌──────────────┐                         ┌──────────────┐
-│   Web App    │                         │  Hook Scripts │
-│  (browser)   │                         │  (cc events)  │
-└──────┬───────┘                         └──────┬────────┘
-       │ WS / HTTP                              │ HTTP POST
-       ▼                                        │
-┌──────────────────────────────────────────────────────────┐
-│               Control Surface (:18820)                  │
-│                                                          │
-│  ┌─────────────────────┐   Hook events bypass router,    │
-│  │ Router              │   feed directly to Pi ─────┐    │
-│  │ (Gemini Flash Lite) │                            │    │
-│  │ Classifies inbound  │                            │    │
-│  │ messages against    │                            │    │
-│  │ open workstreams    │                            │    │
-│  └─────────┬───────────┘                            │    │
-│            │ msg + workstream ctx                   │    │
-│            ▼                                        ▼    │
-│  ┌──────────────────────────────────────────────┐        │
-│  │           Embedded Pi Agent (SDK)            │        │
-│  │  Persistent session · auto-compacting        │        │
-│  │  Serialized turn queue                       │        │
-│  │  Tools: query_blackboard, close_workstream,  │        │
-│  │         reload_resources, read, bash, grep   │        │
-│  │  Skills: Todoist, tmux-2, Autonoma workflows │        │
-│  └──────────────────────────────────────────────┘        │
-│                         │                                │
-└─────────────────────────┼────────────────────────────────┘
-             ┌────────────┼────────────┐
-             ▼            ▼            ▼
-    ┌────────────┐ ┌──────────────┐ ┌──────────────────────┐
-    │  WhatsApp  │ │  Blackboard  │ │ Claude Code (tmux)   │
-    │  Daemon    │ │   SQLite     │ │  Git Worktrees       │
-    │ (Baileys)  │ │              │ │  Hook → POST         │
-    └────────────┘ └──────────────┘ └──────────────────────┘
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│   Web App    │  │  WhatsApp    │  │  Cron Timer  │
+│  (browser)   │  │  Daemon      │  │  (OS-level)  │
+└──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+       │ WS / HTTP        │ HTTP POST       │ HTTP POST
+       ▼                  ▼                 ▼
+┌───────────────────────────────────────────────────────────┐
+│                Control Surface (:18820)                    │
+│                                                           │
+│  ┌───────────────────┐  Hook events ─────┐               │
+│  │ Classifier (Groq) │  Cron prompts ────┤               │
+│  │ Routes web/WA to  │                   │               │
+│  │ workstream or     │                   │               │
+│  │ default           │                   │               │
+│  └────────┬──────────┘                   │               │
+│           ▼                              ▼               │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │              PiSessionManager                      │  │
+│  │  Default agent (always-on singleton)               │  │
+│  │  Orchestrators (per-workstream, ephemeral)         │  │
+│  │  Each: TurnQueue · PiSessionState · Pi SDK session │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                           │
+│  Blackboard (SQLite, WAL)  ·  WebSocketHub (RFC 6455)    │
+│  Maintenance loop (60s)    ·  Bearer-token auth           │
+└────────────────────┬──────────────────────────────────────┘
+                     │
+    ┌────────────────┼────────────────┐
+    ▼                ▼                ▼
+┌──────────┐  ┌──────────────┐  ┌─────────────────────┐
+│ WhatsApp │  │  Blackboard  │  │ Claude Code (tmux)  │
+│ Daemon   │  │  SQLite DB   │  │ Git Worktrees       │
+│(Baileys) │  │  (v11)       │  │ Hook → POST         │
+└──────────┘  └──────────────┘  └─────────────────────┘
+```
+
+## Components
+
+### Control Surface
+
+Node.js/TypeScript server on `127.0.0.1:18820`. Hosts `PiSessionManager`, Groq classifier, HTTP/WS API, maintenance loop. Single user, localhost only. Read-only `/api/*` unauthenticated; mutating endpoints require bearer token (auto-generated UUID).
+
+Endpoints: `POST /message`, `/hook/:event`, `/cron/tick`, `/stop`, `/sessions/:id/message` (tmux inject), `/runtime/whatsapp/start|stop`; `GET /status`, `/api/sessions[/:id[/transcript]]`, `/api/pi/history`, `/api/skills`; `WS /ws`.
+
+### Pi Agents
+
+Two roles with tailored system prompts and role-gated tools:
+
+**Default** — always-on triage. Delegates engineering work via `create_workstream` (spawns orchestrator); sends messages to orchestrators via `enqueue_message`. Cannot write code.
+
+**Orchestrators** — ephemeral, one per workstream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_workstream` (merge, push, cleanup, self-destruct). Cannot write code directly.
+
+Shared: `query_blackboard` (read-only SQL), `reload_resources` (hot-reload). SDK-provided: `read`, `bash`, `grep`.
+
+Delivery: `followUp` (queue append) or `steer` (bypass queue, interrupt via `streamingBehavior: "steer"`; two-layer bypass at runtime and TurnQueue level).
+
+On startup: creates default agent, rehydrates orchestrators for open workstreams. Crashed orchestrators auto-destroyed.
+
+### Blackboard (SQLite)
+
+`~/.autonoma/blackboard.db` — WAL, 5s busy timeout, foreign keys. Schema v11 (migrations v0→v11). Schema + row types + enums in `src/contracts/blackboard.ts`.
+
+| Table | Purpose |
+|-------|---------|
+| `workstreams` | Units of work (open/closed), repo/worktree paths |
+| `sessions` | Claude Code sessions: working → idle → stale → ended; linked to workstream + pi_session |
+| `pi_sessions` | Pi runtime sessions: active / waiting_for_user / waiting_for_sessions / ended / crashed |
+| `messages` | Unified log; sources: whatsapp, web, hook, cron, init, agent, pi_outbound |
+| `whatsapp_messages` | Delivery tracking (pending → sent → delivered \| failed), reply matching |
+| `pending_actions` | Persistent user decisions: whatsapp_auth_expired, restart_session, approve_change, clarify |
+| `health_flags` | Circuit-breaker flags with optional TTL |
+
+Code: `query-*.ts` (reads), `write-*.ts` (mutations), `pi-sessions.ts` (adapter). No barrel file.
+
+### WhatsApp Channel
+
+Standalone Baileys daemon, detached process, Unix domain socket IPC (newline-delimited JSON). Control surface auto-starts on first command.
+
+Outbound: DB record → typing indicator → send → mark sent/failed; delivery receipts → `delivered`. Inbound: unwrap wrappers → extract text/caption → echo filter (5s) → dedup (`wa_message_id`) → forward HTTP → persist. Reply matching: quoted message → latest pending action → latest outbound with context_ref.
+
+Auth: QR or pairing code; credentials backed up on every update; expiry creates `whatsapp_auth_expired` pending action. Single recipient, text-only.
+
+### Web App
+
+Thin browser client. TanStack Start (SSR + file-based routing), Tailwind v4 (oklch), Lit components for chat (`@mariozechner/pi-agent-core`), `marked` + `highlight.js`.
+
+Routes: `/` (Input Surface), `/pi` (agent tabs: default + orchestrators), `/sessions` (list, 10s poll), `/sessions/$id` (detail + paginated transcript), `/runtime` (status, 5s poll).
+
+Three `useSyncExternalStore` stores: `PiSessionStore` (per-session accumulators), `SettingsStore` (localStorage), WebSocket client (auto-reconnect, exponential backoff 3s → 30s).
+
+Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), followUp/steer modes, origin badges, light/dark/system theme, WhatsApp controls. WS subscription filtering: clients subscribe to session IDs; server filters `broadcast()` per-subscription.
+
+### Installer
+
+Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (`node:*` only). Deploys `~/.autonoma/`, bootstraps config, installs Claude Code hooks in `~/.claude/settings.json`, optionally installs OS scheduler. Every change manifest-tracked (SHA-256 checksums, drift detection). Each step shows diff, requires confirmation.
+
+Runtime tree: hook dispatcher (`hook-post.mjs`), process manager (`autonoma-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`autonoma-wa`), cron script, shared shell utilities.
+
+## Source Organization
+
+Domain-organized, max 2-level nesting (`src/domain/file.ts`):
+
+```
+src/
+├── blackboard/      # SQLite wrapper, migrations, query-*/write-*
+├── classifier/      # Groq LLM routing
+├── claude-sessions/ # Tmux inspection + injection
+├── config/          # AutonomaConfig loader
+├── contracts/       # Shared types, schema DDL, enums (SSOT)
+├── custom-tools/    # close-workstream, create-worktree
+├── pi/              # Session manager, turn queue, state, agent creation
+├── prompts/         # System prompts (default, orchestrator, classifier)
+├── routes/          # One file per endpoint
+├── transcript/      # Paginated reader
+├── whatsapp/        # Daemon, IPC, auth, send, receive, CLI
+├── ws/              # WebSocketHub (raw RFC 6455)
+├── runtime.ts       # ControlSurfaceRuntime
+└── server.ts        # HTTP server, route dispatch, WS upgrade
 ```
 
 ## Features
 
 | # | Feature | Purpose |
 |---|---------|---------|
-| 1 | [Installer / Uninstaller](installer/FEATURE.md) | Permission-gated, manifest-tracked modification of external configs. Uninstaller-first. |
-| 2 | [Blackboard](blackboard/FEATURE.md) | SQLite state layer. Tracks workstreams, Claude Code sessions (linked to workstreams), Pi runtime sessions, events, messages, and pending actions. |
-| 3 | [Control Surface](control-surface/FEATURE.md) | HTTP server hosting the embedded Pi agent and stateless message router. Central hub: all channels push events in, router classifies, Pi acts through tools and skills. |
-| 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys messaging. Daemon maintains connection; forwards inbound to control surface and stores history in the blackboard. |
-| 5 | [Web App](web-app/FEATURE.md) | Browser client: chat with Pi, Pi session drill-down, Claude Code session drill-down with transcripts, direct session messaging, WhatsApp health indicator. |
-| 6 | [Cron Scheduler](cron-scheduler/FEATURE.md) | *Deferred to post-v1.* Periodic state check and recovery loop. Will wake Pi for idle/stale classification and Todoist-driven work discovery once Pi has orchestration logic. |
-| 7 | [Pi Agent Tools](pi-agent/FEATURE.md) | Custom tools given to Pi agents, role-gated by type (default vs orchestrator). Covers query_blackboard, reload_resources, create_workstream, create_worktree, close_workstream, and new tool specs. |
+| 1 | [Installer / Uninstaller](installer/FEATURE.md) | Permission-gated, manifest-tracked deployment of runtime tree and external config modifications |
+| 2 | [Blackboard](blackboard/FEATURE.md) | SQLite state layer (v11). Workstreams, Claude Code sessions, Pi sessions, unified messages, WhatsApp tracking, pending actions, health flags |
+| 3 | [Control Surface](control-surface/FEATURE.md) | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
+| 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
+| 5 | [Web App](web-app/FEATURE.md) | Browser client: Pi chat (two surfaces), session dashboard, paginated transcripts, direct messaging, runtime controls |
+| 6 | [Cron Scheduler](cron-scheduler/FEATURE.md) | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
+| 7 | [Pi Agent](pi-agent/FEATURE.md) | Multi-agent Pi layer: default triage + per-workstream orchestrators with role-gated custom tools |
+| 8 | [WebSocket Filtering](ws-subscription-filtering/FEATURE.md) | Per-client session subscriptions with server-side broadcast filtering |
+| 9 | [Restructure src/](restructure-src/FEATURE.md) | Domain-organized codebase with max 2-level nesting, prefix conventions, barrel exports |
 
 ## Dependency Order
 
 ```
 Installer → Blackboard → WhatsApp Channel ──┐
-                                             ├─→ Control Surface (+ Router)
+                                             ├─→ Control Surface (+ Classifier)
                                    (none) ──┘            → Web App
+                                                         → Cron Scheduler
 ```
-
-Installer configures hooks. Blackboard needs installed hooks. WhatsApp daemon is a standalone transport that the control surface connects to. The control surface depends on the blackboard and WhatsApp daemon being available. The web app talks to the control surface.
 
 ## State Glossary
 
-Canonical runtime terms used across the specs:
+### Claude Code sessions
 
-### Claude Code session states
+`working` → `idle` → `stale` → `ended`. No persisted `crashed`; unlaunched sessions have no row. Staleness: `last_event_at` > `stallMinutes` (15) AND no tool activity past `toolTimeoutMinutes` (60); marked by maintenance loop.
 
-- **`working`** — the session appears active and is still inferencing or otherwise advancing work
-- **`idle`** — the session exists but is not currently doing work; this also covers "waiting for input"
-- **`stale`** — the session stopped advancing long enough that SQLite now marks it suspect and Pi should verify real tmux state
-- **`ended`** — the session is finished or has been intentionally reconciled closed
+### Pi sessions
 
-Notes:
-- Claude does **not** use a separate persisted `crashed` state in v1
-- a session that has never been launched usually has **no row yet** rather than a special `not_started` status
+`active` (processing turn) · `waiting_for_user` (universal idle) · `waiting_for_sessions` (CC sessions running) · `ended` · `crashed`. All transitions runtime-managed.
 
-### Pi runtime states
+### Workstreams
 
-- **inactive** — no active Pi runtime row currently exists
-- **`active`** — Pi runtime exists and is processing a turn
-- **`waiting_for_user`** — universal idle state. Covers: startup, between tasks, after finishing work, ball in user's court. Any time Pi isn't active and isn't waiting for sessions, it's waiting for the user.
-- **`waiting_for_sessions`** — Pi is waiting for one or more managed Claude Code sessions to complete. When the last managed session stops, Pi transitions to `active` (processes the hook), then to `waiting_for_user`.
-- **`ended`** — Pi runtime was intentionally closed
-- **`crashed`** — Pi runtime was reconciled as abnormally terminated
-
-Notes:
-- All state transitions are runtime-managed — Pi never sets its own state
-- `waiting_for_user` and `waiting_for_sessions` are tracked for observability in v1; cron will act on them post-v1
-- Pi `crashed` is worth persisting because repeated abnormal exits are operationally useful to debug
-
-### Workstream states
-
-Workstreams are soft-deleted, not hard-deleted. Each workstream has a `status` field (`open` or `closed`) and a `closed_at` timestamp. When Pi completes a workstream (via the orchestrator's `close_workstream` tool), the row is set to `closed` and the git worktree is removed. The router sees recently closed workstreams (last 6 hours) to prevent duplicate creation and allow reopening.
+`open` (active, optional repo/worktree) · `closed` (soft-deleted with `closed_at`; visible to classifier for 24h).
 
 ## Design Principles
 
-- **Single embedded Pi (v1)**: only the control surface hosts Pi. Future versions will support multiple orchestrator Pi agents per workstream.
-- **Router classifies all inbound**: every human message passes through the stateless router before reaching Pi. Hook events bypass the router.
-- **Workstreams are the unit of work**: Pi manages work through workstreams, each with its own git worktree and associated Claude Code sessions.
-- **Unified comms**: Pi's final text response is automatically surfaced to WhatsApp and the web client by the runtime. Bidirectional sync — replies from either surface appear on both.
-- **Wave execution is prompt-driven**: Pi coordinates Claude Code session waves through its instructions, not infrastructure. No wave table or completion counting in code.
-- **Channels are transports**: WhatsApp, web app, and hooks all push events into the control surface. Context lives in Pi and the blackboard, never in the surface.
-- **Pi is the brain**: orchestration intelligence lives in the embedded Pi session, not in disconnected wrappers.
-- **Todoist is human-owned**: Pi reads Todoist when asked, can annotate tasks, but never autonomously completes them.
-- **Permission-gated**: Pi suggests actions, doesn't execute significant changes without user approval.
-- **Push-based, never poll**: all message delivery is event-driven. WhatsApp inbound pushes to the control surface via HTTP; Claude Code hooks push via HTTP; the web client pushes via WebSocket. No component polls a database or queue to discover new messages. Polling introduces unnecessary latency, coupling, and failure modes.
-- **Delivery before bookkeeping**: the primary action (forwarding a message to its destination) must never be gated on secondary concerns (database writes, context enrichment, deduplication). Persist and enrich after delivery succeeds, inside a try/catch so failures are logged but never drop the message.
-- **Minimal footprint**: only `~/.claude/settings.json` and systemd/launchd entries touched outside Autonoma's directory.
-- **Uninstaller-first**: removal scripts before installation scripts.
-- **Namespaced**: all Autonoma artifacts are identifiable for clean removal.
-
-## Future Direction
-
-The v1 single-Pi architecture is designed to evolve toward the full vision. The Pi lifecycle spec is now written and being implemented — the foundations for multi-Pi are actively being built:
-
-- **Pi lifecycle (in progress)**: Pi→session linkage (`pi_session_id` FK on sessions), runtime-managed state machine (active/waiting_for_sessions/waiting_for_user/ended/crashed), orchestrator self-close via human-gated `close_workstream` tool.
-- **Multi-Pi orchestration**: each workstream gets its own Pi agent (orchestrator), with a default agent handling non-workstream requests and Todoist-driven work discovery.
-- **Router spawns orchestrators**: instead of just classifying, the router creates new orchestrator Pi instances with one-time context transfer.
-- **Cron-driven proactivity**: Pi agents wake on cron to check Todoist, monitor sessions, and surface options to the user.
-- **Skill Recursion Engine**: automated audit of Claude Code sessions for skill improvement proposals.
-
-The v1 workstreams table, session-to-workstream binding, router classification, and Pi lifecycle machinery lay the schema and behavioral foundation for this evolution.
+- **Multi-agent, single runtime** — one process, concurrent Pi sessions with independent turn queues
+- **Classifier routes, Pi acts** — Groq matches to workstreams; hooks and cron bypass classification
+- **Workstreams are the unit of work** — each gets a worktree, CC sessions, dedicated orchestrator that self-destructs on completion
+- **Unified comms** — Pi responses auto-surface to WhatsApp + web; messages from either surface mirror to both
+- **Push-based** — all delivery event-driven; no polling for message discovery
+- **Delivery before bookkeeping** — forward first, persist in try/catch after
+- **Prompt-driven waves** — Pi coordinates CC session waves through instructions, not infrastructure
+- **Todoist is human-owned** — Pi reads/annotates, never autonomously completes
+- **Permission-gated** — Pi suggests, doesn't execute without approval
+- **Minimal footprint** — only `~/.claude/settings.json` and scheduler entries touched outside `~/.autonoma/`
+- **Uninstaller-first** — manifest-tracked, drift-detected removal before installation
 
 ## Quick Start
 
