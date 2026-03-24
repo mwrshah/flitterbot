@@ -806,7 +806,7 @@ export class ControlSurfaceRuntime {
         name: "create_workstream",
         label: "Create Workstream",
         description:
-          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. Optionally enqueue an initial message onto the new workstream.",
+          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. The user's original message is automatically passed through to the new workstream.",
         parameters: {
           type: "object",
           properties: {
@@ -814,11 +814,6 @@ export class ControlSurfaceRuntime {
               type: "string",
               description:
                 "Short descriptive name, 2-5 words, lowercase, dash-separated (e.g. 'fix-auth-token-refresh')",
-            },
-            message: {
-              type: "string",
-              description:
-                "Initial message to enqueue onto the new workstream. Should describe what the orchestrator needs to do — include context, spec paths, constraints.",
             },
           },
           required: ["name"],
@@ -844,30 +839,35 @@ export class ControlSurfaceRuntime {
               workstreamName: ws.name,
             });
 
-            if (params.message) {
+            // Pass through the original user message to the new workstream
+            const defaultSession = this.sessionManager.getDefault();
+            const originalText = defaultSession?.queue.getCurrentItem()?.text;
+
+            if (originalText) {
+              const messageText = originalText + '\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.';
               const prompt = this.sessionManager.buildWorkstreamPrompt(
-                params.message,
+                messageText,
                 ws.name,
                 ws.id,
               );
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,
-                source: "agent",
+                source: "user",
                 metadata: {
                   workstream_id: ws.id,
                   workstream_name: ws.name,
                 },
                 receivedAt: new Date().toISOString(),
               });
-              this.log(`enqueued initial message onto workstream "${ws.name}" (${ws.id})`);
+              this.log(`enqueued original user message onto workstream "${ws.name}" (${ws.id})`);
             }
 
             return {
               content: [
                 {
                   type: "text",
-                  text: `Workstream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${params.message ? " and initial message enqueued" : ""}.`,
+                  text: `Workstream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${originalText ? " and user message passed through" : ""}.`,
                 },
               ],
               details: { workstreamId: ws.id, workstreamName: ws.name },
