@@ -53,7 +53,7 @@ export async function sendMessageToClaudeSession(
   }
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, settleMs));
+    await new Promise<void>((resolve) => setTimeout(resolve, settleMs));
 
     const after = await inspectTmuxSession(sessionName);
     const uiState = after.pane?.uiState ?? (after.exists ? "NO_CLAUDE" : "MISSING");

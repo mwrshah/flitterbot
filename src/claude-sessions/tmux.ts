@@ -180,7 +180,7 @@ export async function sendEnterToTmuxSession(sessionName: string): Promise<void>
 async function gracefulInterruptTmuxSession(sessionName: string): Promise<void> {
   const target = getPrimaryTarget(sessionName);
   await runTmux(["send-keys", "-t", target, "C-c"]);
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await new Promise<void>((resolve) => setTimeout(resolve, 500));
   await runTmux(["send-keys", "-t", target, "C-c"]);
 }
 
@@ -197,7 +197,7 @@ export async function killTmuxSession(sessionName: string): Promise<void> {
   const inspection = await inspectTmuxSession(sessionName);
   if (inspection.pane?.currentCommand === "claude") {
     await gracefulInterruptTmuxSession(sessionName);
-    await new Promise((resolve) => setTimeout(resolve, 750));
+    await new Promise<void>((resolve) => setTimeout(resolve, 750));
   }
 }
 
