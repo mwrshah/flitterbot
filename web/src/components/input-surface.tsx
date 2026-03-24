@@ -80,18 +80,27 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
   const entries: SurfaceEntry[] = [];
 
   for (const item of timeline) {
-    if (item.kind === "divider") continue;
+    const msg = item.kind === "message" ? (item as ChatTimelineMessage) : undefined;
+    const base = { id: item.id, type: item.kind, role: msg?.role, source: msg?.source, sessionId: (item as any).sessionId };
+
+    if (item.kind === "divider") {
+      console.log('[InputSurface] EXCLUDED:', { ...base, reason: 'divider' });
+      continue;
+    }
 
     if (item.kind === "message" && item.role === "user") {
-      const msg = item as ChatTimelineMessage;
-      const source = msg.source ?? "web";
-      if (source !== "web" && source !== "whatsapp") continue;
+      const source = msg!.source ?? "web";
+      if (source !== "web" && source !== "whatsapp") {
+        console.log('[InputSurface] EXCLUDED:', { ...base, reason: `user message with source '${source}' (not web/whatsapp)` });
+        continue;
+      }
+      console.log('[InputSurface] INCLUDED:', { ...base, reason: `user message with source '${source}'` });
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
-        source: msg.source ?? "web",
-        content: msg.content,
+        source: msg!.source ?? "web",
+        content: msg!.content,
         workstreamName: item.workstreamName,
       });
       continue;
@@ -100,7 +109,11 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
     if (item.kind === "message" && item.role === "assistant") {
       // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
       // Intermediate pre-tool-call fragments have a different source or no source.
-      if ((item as ChatTimelineMessage).source !== "pi_outbound") continue;
+      if (msg!.source !== "pi_outbound") {
+        console.log('[InputSurface] EXCLUDED:', { ...base, reason: `assistant message with source '${msg!.source ?? 'undefined'}' (not pi_outbound)` });
+        continue;
+      }
+      console.log('[InputSurface] INCLUDED:', { ...base, reason: 'assistant message with source pi_outbound' });
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
@@ -112,6 +125,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
     }
 
     if (item.kind === "tool") {
+      console.log('[InputSurface] EXCLUDED:', { ...base, reason: 'tool call' });
       // Skip all tool calls — only user messages and pi responses shown
       // (mirrors WhatsApp: user message in, pi final text response out)
     }
