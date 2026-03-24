@@ -20,7 +20,7 @@ export function AppShell() {
   const connectionState = useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 
   return (
-    <div className="grid grid-cols-[240px_1fr] h-screen overflow-hidden">
+    <div className="grid grid-cols-[240px_1fr] h-dvh overflow-hidden">
       <Sidebar connectionState={connectionState} onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="flex flex-col min-h-0 overflow-hidden">
