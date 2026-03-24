@@ -1,135 +1,111 @@
 # Feature: Installer / Uninstaller
 
-Permission-gated, manifest-tracked modification of external configs and deployment of the `~/.autonoma/` runtime tree. Every change reversible in one command. Uninstaller written and tested before installer.
+Permission-gated, manifest-tracked deployment of `~/.autonoma/` and modification of external configs. Every change reversible in one command.
 
 ## Problem
 
-Autonoma modifies files it doesn't own: `~/.claude/settings.json` (hooks) and scheduler integration files (`launchd` on macOS, `systemd --user` on Linux). It also deploys a runtime tree to `~/.autonoma/` containing hooks, scripts, config, and WhatsApp integration files. Changes must coexist with existing config and be removable without artifacts.
+Autonoma modifies files it doesn't own (`~/.claude/settings.json`, scheduler units) and deploys a runtime tree to `~/.autonoma/`. Changes must coexist with existing config and be removable without artifacts.
 
-## Goals
+## Architecture
 
-1. Deploy runtime files to `~/.autonoma/` (hooks, scripts, bin, cron, WhatsApp, source files)
-2. Bootstrap `~/.autonoma/config.json` and `~/.autonoma/whatsapp/config.json`
-3. Initialize the blackboard database
-4. Install Claude Code hook entries in `~/.claude/settings.json` pointing to `~/.autonoma/hooks/`
-5. Install scheduler entries (launchd plist on macOS, `systemd --user` timer on Linux) — opt-in via `--with-scheduler`
-6. Show exact proposed changes; proceed only on explicit confirmation
-7. Record all external modifications in `~/.autonoma/manifest.json`
-8. Surgical uninstaller: removes only Autonoma's entries
-9. Meta uninstall: one-command complete removal
+Two standalone ESM scripts — `install.mjs` and `uninstall.mjs` — using only `node:*` built-ins (no dependencies). Both log to `~/.autonoma/logs/install.log` with 10 MB rotation.
 
-## CLI
+### Installer flow (`node .autonoma/install.mjs`)
 
-**Installer** (`node .autonoma/install.mjs`):
-- `--dry-run` — show what would change without writing
-- `--yes` — skip confirmation prompts
-- `--with-scheduler` / `--enable-scheduler` — install scheduler entries (off by default)
-- `--without-scheduler` / `--skip-scheduler` — explicitly skip scheduler (default)
+1. **Preflight** — detect OS, locate project root (via sibling `features/`+`src/` dirs or `~/.autonoma/source-root`), create directory skeleton, write VERSION
+2. **Deploy runtime files** — copy from repo `.autonoma/` into `~/.autonoma/`, removing obsolete legacy files (shell hooks, Python dispatch scripts). Tracks create/update/remove changes, shows diff, requires confirmation
+3. **Bootstrap config** — merge defaults into `~/.autonoma/config.json` (control surface, pi model, blackboard path, WhatsApp paths, `claudeCliCommand`, `projectsDir`). Prompts interactively for `projectsDir` if missing. Syncs `VITE_AUTONOMA_BASE_URL` and `VITE_AUTONOMA_TOKEN` to `web/.env`
+4. **Bootstrap WhatsApp config** — if `~/.autonoma/whatsapp/config.json` absent, prompts for pairing phone number, writes `recipientJid`, `pairingPhoneNumber`, `typingDelayMs`
+5. **Init blackboard** — runs `scripts/init-db.sh` to create/migrate SQLite DB at configured `blackboardPath`
+6. **Install hooks** — registers hook groups in `~/.claude/settings.json` for `SessionStart`, `Stop`, `SessionEnd` pointing to `node ~/.autonoma/hooks/hook-post.mjs <event-slug>`. Cleans deprecated events (`PreToolUse`, `PostToolUse`, etc.) from previous installs
+7. **Install scheduler** (opt-in `--with-scheduler`) — macOS: launchd plist; Linux: systemd user service+timer. Cleans legacy crontab entries during Linux install
 
-**Uninstaller** (`node ~/.autonoma/uninstall.mjs`):
-- `--dry-run` — show what would change without writing
-- `--yes` — skip confirmation prompts
-- `--meta` — full removal including `~/.autonoma/` runtime tree (default)
-- `--external-only` — remove hooks and scheduler but preserve `~/.autonoma/`
+Each step shows a diff and requires explicit confirmation before writing.
 
-## Design
+### Uninstaller flow (`node ~/.autonoma/uninstall.mjs`)
 
-### Identification
+1. **Remove hooks** — surgical removal of entries matching `~/.autonoma/hooks/` prefix from `settings.json`. Drift detection via manifest checksum comparison
+2. **Remove scheduler** — macOS: bootout + delete plist; Linux: disable/stop systemd units + remove files; legacy crontab cleanup
+3. **Cleanup manifest** — delete if no external targets remain
+4. **Remove runtime tree** — graceful stop via `autonoma-up stop`, then `rm -rf ~/.autonoma/`
 
-Hook commands point to `~/.autonoma/hooks/*` (path-based). Manifest records exact inserted objects — uninstaller matches on path prefix and manifest content.
-
-### Runtime Deployment
-
-The installer syncs the full runtime tree into `~/.autonoma/`:
-- **Top-level**: `install.mjs`, `uninstall.mjs`, `VERSION`
-- **Hooks**: `hooks/hook-post.mjs`
-- **Scripts**: `scripts/init-db.sh`, `scripts/runtime-common.sh`
-- **Bin**: `bin/autonoma-up`, `bin/autonoma-wa`
-- **Cron** (when `--with-scheduler`): `cron/autonoma-checkin.sh`, `cron/scheduler.sh`, `cron/com.autonoma.scheduler.plist`
-- **WhatsApp**: `whatsapp/cli.js`, `whatsapp/daemon.js`, `whatsapp/run-entry.js`, `whatsapp/README.md`, `whatsapp/config.json.example`
-- **Source**: `src/blackboard/schema.sql`
-
-Obsolete files from previous installer versions (legacy shell scripts, Python dispatch scripts) are removed automatically. The project root is recorded at `~/.autonoma/source-root` so future installs can locate the repo.
-
-### Config Bootstrap
-
-Creates or updates `~/.autonoma/config.json` with defaults for:
-- Control surface: `controlSurfaceHost`, `controlSurfacePort`, `controlSurfaceToken`
-- Pi: `piModel`, `piThinkingLevel`
-- Runtime: `stallMinutes`, `toolTimeoutMinutes`, `claudeCliCommand`
-- Blackboard: `blackboardPath`
-- WhatsApp: `whatsappAuthDir`, `whatsappSocketPath`, `whatsappPidPath`, `whatsappCliPath`, `whatsappDaemonPath`
-- Paths: `projectRoot`, `sourceRoot`, `controlSurfaceCommand`
-
-Also syncs `VITE_AUTONOMA_BASE_URL` and `VITE_AUTONOMA_TOKEN` to `web/.env` so the frontend can authenticate with the control surface.
-
-### WhatsApp Config Bootstrap
-
-If `~/.autonoma/whatsapp/config.json` does not exist, interactively prompts for a pairing phone number and creates the config with `recipientJid`, `pairingPhoneNumber`, and `typingDelayMs`.
-
-### Blackboard Initialization
-
-Runs `scripts/init-db.sh` to create the SQLite blackboard database at the configured `blackboardPath`.
+`--external-only` skips step 4 (preserves `~/.autonoma/`).
 
 ### Manifest (`~/.autonoma/manifest.json`)
 
 Target-keyed structure tracking all external modifications:
 
-```
+```json
 {
-  version: "1",
-  autonoma_version: "<from VERSION>",
-  installed_at: "<ISO timestamp>",
-  targets: {
-    "<file-path>": {
-      type: "<external-config | owned-tree>",
-      modifications: [{ id, action, content, content_sha256 }],
-      checksums: {
-        algorithm: "sha256",
-        file_before_install: "<hash>",
-        file_after_install: "<hash>"
-      }
+  "version": "1",
+  "autonoma_version": "<VERSION>",
+  "installed_at": "<ISO>",
+  "targets": {
+    "<path>": {
+      "type": "<json-merge | file-create | owned-tree>",
+      "modifications": [{ "id": "...", "action": "...", "content_sha256": "..." }],
+      "checksums": { "algorithm": "sha256", "file_before_install": "...", "file_after_install": "..." }
     }
   }
 }
 ```
 
-Targets include `~/.claude/settings.json` (hooks), scheduler unit paths, and `~/.autonoma` (owned-tree snapshot of the entire runtime directory). Checksums enable drift detection during uninstall — the uninstaller warns if `settings.json` was modified externally since installation.
+Checksums enable drift detection — uninstaller warns if `settings.json` changed externally since install.
 
-### Claude Code Hooks
+### Hook dispatcher (`hooks/hook-post.mjs`)
 
-**Install:** Read `~/.claude/settings.json` → for each event (SessionStart, Stop, SessionEnd) register a hook group (`{ matcher: "", hooks: [{ type: "command", command: "node ~/.autonoma/hooks/hook-post.mjs <event-slug>", async: true, timeout: 15 }] }`) → show diff → confirm → write + update manifest. Deprecated hook events (PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop) from previous installs are cleaned up automatically.
+Reads Claude Code hook payload from stdin, enriches with `AUTONOMA_*` env vars (agent-managed metadata, tmux session, workstream ID), POSTs to control surface at `http://{host}:{port}/hook/{event-slug}`. 2-second timeout; silently skips if control surface is down (`ECONNREFUSED`).
 
-**Uninstall:** Read manifest → detect drift via checksum comparison → remove entries matching `~/.autonoma/hooks/` prefix (both direct path and `node <path>` forms) → show changes → confirm → write + clear manifest.
+## CLI
 
-### Scheduler
+**Installer** (`node .autonoma/install.mjs`):
+- `--dry-run` — show changes without writing
+- `--yes` — skip confirmation prompts
+- `--with-scheduler` — install scheduler entries (off by default)
 
-Opt-in via `--with-scheduler` (skipped by default).
+**Uninstaller** (`node ~/.autonoma/uninstall.mjs`):
+- `--dry-run` — show changes without writing
+- `--yes` — skip confirmation prompts
+- `--external-only` — remove hooks/scheduler but preserve `~/.autonoma/`
 
-- **macOS**: `~/Library/LaunchAgents/com.autonoma.scheduler.plist`
-- **Linux**: `~/.config/systemd/user/autonoma-scheduler.service` + `autonoma-scheduler.timer`
+## Runtime tree (`~/.autonoma/`)
 
-### Meta Uninstall (`node ~/.autonoma/uninstall.mjs`)
+| Directory | Contents |
+|-----------|----------|
+| (root) | `install.mjs`, `uninstall.mjs`, `VERSION`, `config.json`, `manifest.json`, `source-root` |
+| `hooks/` | `hook-post.mjs` |
+| `scripts/` | `init-db.sh`, `runtime-common.sh` |
+| `bin/` | `autonoma-up`, `autonoma-wa` |
+| `cron/` | `autonoma-checkin.sh`, `scheduler.sh`, `com.autonoma.scheduler.plist` |
+| `whatsapp/` | `cli.js`, `daemon.js`, `run-entry.js`, `config.json`, `config.json.example`, `README.md` |
+| `src/blackboard/` | `schema.sql` |
+| `logs/` | `install.log`, `hooks-errors.log` |
 
-Runs hooks uninstaller → scheduler uninstaller → legacy crontab cleanup (removes `# autonoma-scheduler` entries from user crontab) → cleanup empty manifest → graceful stop (`autonoma-up stop`) → removes `~/.autonoma/` (with confirmation). Use `--external-only` to remove hooks and scheduler but preserve the runtime tree.
+## External files touched
 
-### Logging
-
-Both scripts log to `~/.autonoma/logs/install.log` with automatic rotation at 10 MB.
-
-## External Files Touched
-
-- `~/.claude/settings.json`
+- `~/.claude/settings.json` — hook entries
 - `~/Library/LaunchAgents/com.autonoma.scheduler.plist` (macOS) or `~/.config/systemd/user/autonoma-scheduler.{service,timer}` (Linux)
-- `~/.autonoma/manifest.json`
-- `~/.autonoma/config.json`
-- `~/.autonoma/whatsapp/config.json`
-- `~/.autonoma/blackboard.db`
-- `web/.env` (when project root is available)
+- `web/.env` — frontend auth tokens
 
-## Constraints
+## Key files
 
-- Uninstaller-first: removal code before installation code
-- Idempotent: double-install doesn't duplicate; double-uninstall doesn't error
-- Permission-gated: every modification requires confirmation
-- macOS first, Linux follows
+| File | Role |
+|------|------|
+| `.autonoma/install.mjs` | Installer — runtime deployment, config bootstrap, hooks, scheduler |
+| `.autonoma/uninstall.mjs` | Uninstaller — surgical removal via manifest |
+| `.autonoma/hooks/hook-post.mjs` | Hook dispatcher — enriches + POSTs events to control surface |
+| `.autonoma/scripts/init-db.sh` | Blackboard DB creation + migration (versioned schema, legacy upgrade path) |
+
+## Principles
+
+- **Uninstaller-first**: removal code before installation code
+- **Idempotent**: double-install doesn't duplicate; double-uninstall doesn't error
+- **Permission-gated**: every modification requires explicit confirmation
+- **Manifest-tracked**: all external changes recorded with checksums for drift detection
+- **Zero dependencies**: both scripts use only `node:*` built-ins
+
+## Observations
+
+- **attention!** `syncWebEnv()` (`install.mjs:572-591`) writes `web/.env` without calling `confirm()` — shows the diff but skips the confirmation prompt. Every other external write is permission-gated; this one isn't.
+- **attention!** The uninstaller has no awareness of `web/.env`. The installer writes it (`VITE_AUTONOMA_BASE_URL`, `VITE_AUTONOMA_TOKEN`), but `uninstall.mjs` never cleans it up — not even with `--meta`. It's also absent from the manifest, so drift detection doesn't cover it.
+- **TBD!** `install.mjs:527` silently upgrades `piModel` from `claude-sonnet-4-6` to `claude-opus-4-6` on every install. This is a one-time migration baked into the installer as a permanent conditional — should be removed once all installs have rotated past it, or guarded by a version check.

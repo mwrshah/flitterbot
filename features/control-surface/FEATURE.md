@@ -1,173 +1,213 @@
 # Feature: Control Surface
 
-Long-running server hosting the only embedded Pi agent. Central nervous system of Autonoma: receives events from all channels, routes them through a serialized turn queue into one persistent Pi session, and Pi acts on the world through custom tools plus existing skills.
+Long-running Node.js/TypeScript server — Autonoma's central nervous system. Hosts multiple concurrent Pi agent sessions (one default + per-workstream orchestrators), routes inbound events through a Groq-based classifier, and lets Pi act on the world through custom tools, skills, and auto-surfaced replies.
 
 ## Problem
 
-Without a control surface, the architecture fragments: a WhatsApp daemon writes to SQLite, hook scripts write to SQLite, a cron scheduler wakes up independently, and a web UI would need its own agent session. Pi would constantly cold-start, rebuild context, and lose continuity.
-
-Autonoma needs one always-on process where Pi lives, where channels push messages, and where deterministic runtime behavior handles queueing, state reconciliation, and process integration.
-
-## Goals
-
-1. A long-running Node.js/TypeScript server hosting Pi via `createAgentSession()` from the Pi SDK
-2. Pi maintains one persistent session with auto-compaction
-3. The active Pi runtime session is mirrored into the blackboard in a dedicated `pi_sessions` table
-4. All inbound sources route into a single queued prompt stream: WhatsApp replies, Claude Code hook events, cron ticks, web app messages
-5. Pi acts through custom tools (query blackboard, reload resources) and on-demand skills (tmux-2 for session management, Todoist for task context); Pi's final text response each turn is auto-surfaced to WhatsApp and the web client by the runtime
-6. Todoist integration comes from existing Pi skills, not bespoke infrastructure code
-7. HTTP + WebSocket API for external processes and the thin web client
-8. The control surface acts as the app runtime owner: on startup it also brings up dependent processes such as the WhatsApp daemon
-9. Deterministic runtime behavior for queueing, maintenance sweeps, routing, and dependent-process supervision; Pi decides actions and messaging
+Without a control surface, every channel (WhatsApp, hooks, cron, web) needs its own agent session. Pi cold-starts constantly, loses continuity, and can't work across workstreams concurrently.
 
 ## Architecture
 
 ```
-               ┌──────────────────────────────────────────────────┐
-               │                 Control Surface                  │
-               │                                                  │
-               │   HTTP / WS API (:18820)                         │
-               │   ├─ POST /message        ← Web, cron, daemon    │
-               │   ├─ POST /hook/:event    ← Claude Code hooks    │
-               │   ├─ POST /stop           ← Graceful shutdown    │
-               │   ├─ GET  /status         ← Health/status (open) │
-               │   ├─ GET  /api/sessions   ← Session browser (open)│
-               │   ├─ GET  /api/pi/history ← Pi history (open)    │
-               │   ├─ POST /runtime/whatsapp/start|stop ← Daemon  │
-               │   ├─ POST /sessions/:id/message ← Direct inject  │
-               │   └─ WS   /ws            ← Web client            │
-               │                                                  │
-               │   ┌──────────────────────────────────────────┐   │
-               │   │ Inbound queue + single active Pi turn    │   │
-               │   └──────────────────────┬───────────────────┘   │
-               │                          │                       │
-               │   ┌──────────────────────▼───────────────────┐   │
-               │   │          Embedded Pi Agent               │   │
-               │   │  Persistent, auto-compacting session     │   │
-               │   │  Tools:                                   │   │
-               │   │   - query_blackboard                      │   │
-               │   │   - reload_resources                      │   │
-               │   │   - read, bash, grep                      │   │
-               │   │  Auto-surface: final text → WA + web      │   │
-               │   │  Skills: Todoist, tmux-2, Autonoma wkflws │   │
-               │   └──────────────────────┬───────────────────┘   │
-               │                          │                       │
-               │   ┌──────────────────────▼───────────────────┐   │
-               │   │ Deterministic runtime helpers            │   │
-               │   │ queueing · sweeps · health checks        │   │
-               │   └──────────────────────────────────────────┘   │
-               └──────────────────┬───────────────────────────────┘
-                                  │
-            ┌─────────────────────┼─────────────────────┐
-            ▼                     ▼                     ▼
-   ┌────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-   │ WhatsApp Daemon│  │ Blackboard (SQL) │  │ Claude Code tmux │
-   │ (Baileys)      │  │                  │  │ sessions         │
-   └────────────────┘  └──────────────────┘  └──────────────────┘
+              ┌──────────────────────────────────────────────────────┐
+              │                  Control Surface                     │
+              │                                                      │
+              │  HTTP / WS API (:18820, localhost only)              │
+              │  ├─ POST /message         ← Web, cron, daemon       │
+              │  ├─ POST /hook/:event     ← Claude Code hooks       │
+              │  ├─ POST /cron/tick       ← Scheduled maintenance   │
+              │  ├─ POST /stop            ← Graceful shutdown       │
+              │  ├─ GET  /status          ← Health (open)           │
+              │  ├─ GET  /api/sessions    ← Session browser (open)  │
+              │  ├─ GET  /api/pi/history  ← Pi history (open)       │
+              │  ├─ GET  /api/skills      ← Loaded skills (open)    │
+              │  ├─ POST /runtime/whatsapp/start|stop               │
+              │  ├─ POST /sessions/:id/message  ← Direct inject     │
+              │  └─ WS   /ws             ← Real-time events         │
+              │                                                      │
+              │  ┌────────────────────────────────────────────────┐  │
+              │  │ PiSessionManager                              │  │
+              │  │  ├─ Default agent (always-on, one instance)   │  │
+              │  │  └─ Orchestrators (per-workstream, ephemeral) │  │
+              │  │     Each has: TurnQueue · PiSessionState ·    │  │
+              │  │     Pi agent session · WebSocket subscription  │  │
+              │  └────────────────────────────────────────────────┘  │
+              │                                                      │
+              │  Classifier (Groq) → route message to workstream    │
+              │  Blackboard (SQLite) → persistent state             │
+              │  WebSocketHub → broadcast events to web clients     │
+              └──────────────┬───────────────────────────────────────┘
+                             │
+           ┌─────────────────┼─────────────────────┐
+           ▼                 ▼                      ▼
+  ┌─────────────────┐ ┌──────────────┐  ┌───────────────────┐
+  │ WhatsApp Daemon │ │ Blackboard   │  │ Claude Code tmux  │
+  │ (Baileys)       │ │ (SQLite)     │  │ sessions          │
+  └─────────────────┘ └──────────────┘  └───────────────────┘
 ```
 
-## How Events Reach Pi
+## Multi-Agent Model
 
-| Source | Transport | What Pi Receives |
-|--------|-----------|-----------------|
-| WhatsApp reply | Daemon forwards via HTTP POST `/message` | `[WhatsApp] User replied: {body}` + context metadata |
-| Claude hook: SessionStart | Hook script POSTs to `/hook/session-start` | Notification that a session started, with transcript/cwd/session metadata |
-| Claude hook: Stop | Hook script POSTs to `/hook/stop` | Notification that a session paused/stopped |
-| Claude hook: SessionEnd | Hook script POSTs to `/hook/session-end` | Notification that a session ended |
-| Cron tick | launchd/systemd timer POSTs to `/message` | Scheduled check-in request |
-| Web app message | WebSocket or HTTP POST `/message` | User's typed message |
+`PiSessionManager` manages two roles:
 
-## How Pi Acts on the World
+**Default agent** — always-on singleton. Handles non-work messages and meta-operations. Has `create_workstream` tool. Receives raw user text (context header injection is stubbed but not yet implemented — see Observations).
 
-Pi uses custom tools for machine actions, skills for workflow logic, and auto-surface for user-facing replies.
+**Orchestrators** — ephemeral, one per active workstream. Spawned on classifier match. Has `create_worktree`, `close_workstream`, `enqueue_message` tools. Receives raw user text. Self-destructs on workstream close: kill CC sessions, merge branch, push, clean up.
 
-| Mechanism | What It Does |
-|-----------|---------------|
-| Auto-surface | After each Pi turn, the runtime extracts Pi's final assistant text and automatically sends it to both WhatsApp (via daemon IPC) and all connected web clients (via `pi_surfaced` WebSocket event). Pi does not need a tool to reach the user. |
-| `query_blackboard` | Runs read-only SQL (SELECT/PRAGMA only) against `blackboard.db` |
-| `reload_resources` | Hot-reload skills, extensions, prompts, context files, and system prompt |
-| Skills (tmux-2) | Manage Claude Code sessions across tmux — launch, inspect, inject, kill |
-| Skills (Todoist) | Todoist and workflow-specific behavior loaded into Pi |
-| Standard tools | `read`, `bash`, `grep` |
+Shared tools: `query_blackboard`, `reload_resources`, `read`, `bash`, `grep`, plus skills (Todoist, tmux-2).
 
-## Session Lifecycle
+Each `ManagedPiSession` bundles: agent session, `TurnQueue` (FIFO + steer-interrupt), `PiSessionState`, role, workstream binding, WebSocket subscription.
 
-Pi's session persists across server restarts via `SessionManager.create()` (JSONL on disk). Auto-compaction summarizes older messages when approaching context limits. The session is a continuous thread across WhatsApp, hooks, cron, and the web app.
+## Message Flow
 
-The control surface also mirrors the active embedded Pi runtime into the blackboard's `pi_sessions` table. The JSONL file remains Pi's native session history; SQLite stores the runtime lookup row needed to answer “which Pi session is active right now?”
+1. **Inbound**: WhatsApp/web/hook/cron → HTTP endpoint → `runtime.enqueue()`
+2. **Classify**: Groq classifier matches web/WhatsApp messages to open workstreams (or "none")
+3. **Route**: matched → orchestrator queue; new workstream → spawn orchestrator; non-work → default agent
+4. **Process**: `TurnQueue.pump()` → `processQueueItem()` → `session.prompt()` — per-session queues, so all agents run concurrently
+5. **Output**: Pi's final text auto-surfaces to WhatsApp (IPC) + web clients (`pi_surfaced` WS event)
 
-The control surface serializes all inbound prompts. Only one Pi turn runs at a time. Additional inbound events wait in a queue and are processed in order.
+### Delivery Modes
 
-## Web Client
+`followUp` appends to queue normally. `steer` bypasses queue and interrupts the current turn — for urgent redirects.
 
-The web app is more than a chat window — it provides operational visibility into the running system.
+### Event Sources
 
-| Feature | Description |
-|---------|-------------|
-| Pi chat | Real-time streaming of Pi responses via WebSocket (text deltas, tool execution, turn events). Supports image attachments. |
-| Session browser | Browse all Claude Code sessions tracked in the blackboard. View status, cwd, model, permissions, tmux state. |
-| Transcript viewer | Paginated reading of Claude Code session transcript files (cursor-based pagination). |
-| Direct message injection | Send a message directly into a Claude Code session's tmux pane (POST `/sessions/:id/message`). Includes inference verification and retry logic. |
-| WhatsApp controls | Start/stop the WhatsApp daemon from the web UI (POST `/runtime/whatsapp/start|stop`). Shows daemon PID, status, auth state. |
-| Settings | Theme (light/dark/system), base URL, bearer token config. Persisted to localStorage. |
+| Source | Transport | Endpoint |
+|--------|-----------|----------|
+| WhatsApp | Daemon HTTP forward | POST /message |
+| Web app | WebSocket or HTTP | POST /message |
+| Claude Code hooks | Hook script POST | POST /hook/:event |
+| Cron | systemd/launchd timer | POST /cron/tick |
 
-Web-originated user messages are automatically mirrored to WhatsApp with a `[Web] User` prefix so the conversation stays in sync across channels.
+## Blackboard (SQLite)
 
-## Maintenance Loop
+`~/.autonoma/blackboard.db` — persistent state. Tables:
 
-A background loop runs every 60 seconds and performs deterministic housekeeping:
+- **workstreams** — id, name, status, repo, worktree path, closed_at (soft-delete with 6h visibility window)
+- **sessions** — Claude Code sessions with pi_session_id linkage, status, tmux/cwd/model metadata
+- **pi_sessions** — Pi runtime state mirror (status, model, session file path, prompt/event timestamps)
+- **messages** — inbound/outbound message log with source, workstream binding
+- **whatsapp_messages** — WhatsApp-specific message tracking (wa_message_id, direction, status)
+- **health_flags** — circuit breakers for maintenance gating
+- **pending_actions** — queued actions
 
-- Blackboard health check
-- WhatsApp daemon status refresh
-- Mark stale Claude Code sessions (exceeding `stallMinutes` threshold)
-- Clean up idle sessions (24h+ since last activity) and kill their tmux sessions
-- Detect stuck queue turns (exceeding `toolTimeoutMinutes` threshold)
+Key enums: `ClaudeSessionStatus` (working/idle/stale/ended), `PiSessionStatus` (active/waiting_for_user/waiting_for_sessions/ended/crashed), `WorkstreamStatus`.
 
-## Hook Event Filtering
+## Hook Event Handling
 
-Not all hook events are forwarded to Pi. The runtime filters:
+POST `/hook/:event` — runtime filters before forwarding to Pi:
 
-- **SessionStart**: only processes sessions with `agent_managed=true` or sessions matching Pi's own session ID. Other sessions are ignored.
-- **Stop / SessionEnd**: only processes sessions already known to the blackboard. Unknown sessions return `filtered=true`.
+- **SessionStart**: only `agent_managed=true` or Pi's own session; others filtered
+- **Stop/SessionEnd**: only sessions already in blackboard; unknown filtered
+
+Accepted hooks update blackboard and enqueue to the relevant Pi session (via `pi_session_id`).
+
+## Cron Tick
+
+POST `/cron/tick` — gated on: Pi not busy, session exists, WhatsApp connected, no circuit breakers. Marks stale CC sessions; enqueues stale-check or idle-check prompt.
+
+## Custom Tools
+
+| Tool | Role | What It Does |
+|------|------|-------------|
+| `query_blackboard` | both | Read-only SQL against blackboard.db (SELECT/PRAGMA only) |
+| `reload_resources` | both | Hot-reload skills, extensions, prompts, system prompt |
+| `create_workstream` | default | Register new workstream; triggers orchestrator spawn |
+| `create_worktree` | orchestrator | Git worktree creation (NNN-slug branch naming, git-town integration) |
+| `close_workstream` | orchestrator | Kill CC sessions, merge branch to main, push, close workstream, end Pi session |
+| `enqueue_message` | orchestrator | Send message to another Pi session (cross-session communication) |
+
+## WebSocket
+
+`WebSocketHub` — raw RFC 6455 (no library). Clients subscribe to session IDs or `*` (wildcard). Events: `text_delta`, `message_end`, `tool_execution_start/end`, `turn_end`, `pi_surfaced`, `workstreams_changed`, `status_changed`, `queue_item_start/end`.
+
+## HTTP API
+
+**Read-only (unauthenticated, localhost):** GET /api/sessions, /api/sessions/:id, /api/sessions/:id/transcript, /api/pi/history (`?surface=input|agent`, `?piSessionId=`), /api/skills
+
+**Mutating (bearer auth):** POST /message, /hook/:event, /stop, /cron/tick, /sessions/:id/message (tmux inject), /runtime/whatsapp/start|stop
+
+## WhatsApp Integration
+
+Baileys daemon — separate process, control-surface-owned. Inbound: filtered (5s echo window, dedup), forwarded to /message. Supports conversation, extended text, image, video, document types. Outbound: auto-surfaced replies via daemon IPC.
+
+## Session Persistence
+
+JSONL on disk with auto-compaction. `pi_sessions` SQLite table mirrors runtime state. On startup, `PiSessionManager` reconciles previous sessions and creates the default agent.
+
+## Key Source Files
+
+```
+src/control-surface/
+├── server.ts              # HTTP server, route dispatch, WebSocket upgrade
+├── runtime.ts             # ControlSurfaceRuntime — main orchestrator class
+├── config/
+│   └── load-config.ts     # AutonomaConfig (23 props from ~/.autonoma/config.json + env)
+├── contracts/
+│   ├── control-surface-api.ts  # All request/response types, endpoint definitions
+│   ├── blackboard.ts           # Schema DDL, row types, status enums
+│   ├── websocket.ts            # Client/server WebSocket event types
+│   └── tmux-bridge.ts          # Tmux inspection + session launch types
+├── pi/
+│   ├── session-manager.ts      # PiSessionManager — default + orchestrator lifecycle
+│   ├── turn-queue.ts           # TurnQueue — FIFO with steer-interrupt
+│   ├── session-state.ts        # PiSessionState — mutable runtime snapshot
+│   ├── create-agent.ts         # createAutonomaAgent() — spawn Pi with tools/skills
+│   ├── format-prompt.ts        # formatPromptWithContext() — stub, currently pass-through
+│   ├── subscribe.ts            # subscribeToPiSession() — event → WebSocket bridge
+│   └── history.ts              # readPiHistory() — parse JSONL session files
+├── routes/                     # One file per endpoint (message, hooks, cron-tick, etc.)
+├── ws/
+│   └── hub.ts                  # WebSocketHub — raw RFC 6455, subscriptions, broadcast
+├── blackboard/
+│   ├── db.ts                   # SQLite wrapper (WAL mode)
+│   ├── query-*.ts / write-*.ts # Per-table query/write functions
+│   └── migrate.ts              # Schema versioning
+├── custom-tools/
+│   ├── create-worktree.ts      # Git worktree creation
+│   ├── close-workstream.ts     # Workstream finalization (merge, push, cleanup)
+│   └── manage-session.ts       # Direct CC session messaging via tmux
+├── classifier/
+│   ├── classify.ts             # classifyMessage() — Groq LLM routing
+│   └── groq-client.ts          # Groq API client
+├── prompts/
+│   ├── default-agent.ts        # Default agent system prompt
+│   ├── orchestrator.ts         # Orchestrator system prompt
+│   └── classifier.ts           # Classifier prompt
+├── whatsapp/                   # Daemon lifecycle, send/receive, auth, IPC, config
+├── claude-sessions/            # Tmux inspection + message injection
+└── transcript/                 # Paginated transcript reading
+```
+
+## Runtime Files
+
+| Path | Purpose |
+|------|---------|
+| `~/.autonoma/config.json` | Port, tokens, thresholds, model, WhatsApp config |
+| `~/.autonoma/blackboard.db` | SQLite (WAL mode) |
+| `~/.autonoma/control-surface/sessions/` | Pi session JSONL files |
+| `~/.autonoma/control-surface/agent/` | Pi prompt, skills, extensions, auth/models |
+| `~/.autonoma/logs/control-surface.log` | Server log |
+| `~/.autonoma/whatsapp/` | Auth data, daemon PID, IPC socket |
+| `~/.autonoma/hooks/hook-post.mjs` | Claude Code hook script |
 
 ## Design Decisions
 
-**Single embedded Pi.** The control surface is the only place where Pi is embedded. The web app is a thin client, cron is a trigger, and hooks are event forwarders.
-
-**HTTP on loopback.** Hooks, cron, the web app, and the WhatsApp daemon can all speak to the control surface over localhost HTTP/WS.
-
-**WhatsApp daemon stays separate, but is app-owned.** Baileys needs its own persistent socket to WhatsApp servers. The daemon remains a transport process, not a second orchestrator, and the control surface is responsible for bringing it up as part of app startup.
-
-**Claude Code launches use the CLI in tmux.** Managed sessions are interactive Claude Code sessions started inside tmux with Autonoma metadata passed via environment variables. The first `SessionStart` hook records that metadata in the blackboard.
-
-**Todoist is a skill concern.** The control surface does not add custom Todoist infrastructure. Pi uses the existing Todoist skill when workflow logic needs it.
-
-## Dependencies
-
-- Pi SDK (`@mariozechner/pi-coding-agent`)
-- Blackboard (Feature #2)
-- WhatsApp Channel (Feature #4)
-- Installer (Feature #1)
+- **Multi-agent, single runtime.** One process, multiple concurrent Pi sessions — default for meta-ops, orchestrators for workstreams.
+- **Groq classifier as router.** Cheap/fast LLM classifies messages to workstreams before reaching Pi — deterministic routing, clean context.
+- **Per-session turn queues.** Each session's own queue; orchestrators run concurrently with each other and the default agent.
+- **HTTP on loopback.** Bearer token for mutations; read-only unauthenticated.
+- **WhatsApp daemon separate, app-owned.** Transport process only; control surface owns lifecycle.
+- **Orchestrator self-close.** `close_workstream` finalizes the workstream (merge, push, cleanup) and self-destructs.
+- **Workstream soft-delete.** 6h visibility window after close — router and Pi retain recent context.
+- **Raw WebSocket.** `WebSocketHub` implements RFC 6455 directly — no library.
 
 ## Constraints
 
-- Single user, single Pi instance for v1
-- Server binds to localhost only
-- Bearer-token auth for mutating endpoints (`/message`, `/hook/:event`, `/stop`, `/sessions/:id/message`, `/runtime/whatsapp/*`) and WebSocket (via header or `token` query param). Token is auto-generated UUID on first run, stored in `config.json`.
-- Read-only `/api/*` endpoints (`/api/sessions`, `/api/pi/history`, `/api/sessions/:id/transcript`) are unauthenticated — acceptable because the server binds to localhost only
-- Pi uses Anthropic API by default, configurable
+- Single user, single server, localhost only
+- Bearer-token auth (auto-generated UUID) for mutations; read-only /api/* unauthenticated
+- Pi defaults to claude-opus-4-6 via Anthropic API; configurable
 
-## Files Touched
+## Observations
 
-| File/Dir | Purpose |
-|----------|---------|
-| `~/.autonoma/control-surface/` | Server runtime: PID, logs, state |
-| `~/.autonoma/control-surface/sessions/` | Pi session JSONL |
-| `~/.autonoma/control-surface/agent/` | Pi prompt, skills, extensions, auth/models |
-| `~/.autonoma/config.json` | Port, tokens, thresholds, model config |
-| `~/.autonoma/logs/` | `control-surface.log` |
-| `~/.autonoma/blackboard.db` | SQLite database |
-| `~/.autonoma/whatsapp/auth/` | Baileys auth data |
-| `~/.autonoma/whatsapp/daemon.sock` | Unix socket for daemon IPC |
-| `~/.autonoma/whatsapp/daemon.pid` | Daemon PID file |
-| `~/.autonoma/hooks/` | Hook script (`hook-post.mjs`) that POSTs to the control surface; control surface owns blackboard writes |
+- **TBD!** `formatPromptWithContext()` in `src/pi/format-prompt.ts` is a no-op — returns `item.text` unchanged, ignores the `_role` parameter. The `<context source="..." workstream="..." />` XML header injection (spec-03-clean-pi-messages) was never implemented. Default agent receives raw text identical to orchestrators; no structured metadata distinguishes message source or workstream context at the prompt level.

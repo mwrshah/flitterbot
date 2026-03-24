@@ -1,149 +1,105 @@
 # Feature: Blackboard (SQLite State Layer)
 
-Real-time, queryable view of Autonoma state on the machine. Fed by Claude Code hooks, the WhatsApp daemon, and the control surface.
+Shared SQLite database (`~/.autonoma/blackboard.db`) providing a real-time, queryable view of all Autonoma state. Consumers: orchestrator (Pi), cron, WhatsApp daemon, web app, hooks.
 
 ## Problem
 
-Multiple sessions run concurrently across tmux and worktrees. The orchestrator, cron, WhatsApp channel, and web app all need answers: which sessions are working, idle, stale, or ended? What task is each on? Which did Autonoma start? What messages are pending? Without shared state, each consumer would need to independently query tmux, parse transcripts, and reconcile — duplicating logic across every consumer.
+Multiple Claude Code sessions run concurrently across tmux and worktrees. The orchestrator, cron, WhatsApp, and web app all need session status, task assignments, pending messages, and pending user decisions. Without shared state each consumer would independently query tmux, parse transcripts, and reconcile — duplicating logic everywhere.
 
-## Goals
+## Architecture
 
-1. SQLite at `~/.autonoma/blackboard.db`
-2. Three Claude Code hooks (SessionStart, Stop, SessionEnd) POST to the control surface, which writes to SQLite for managed sessions only
-3. Session metadata is captured from the hook payload and `AUTONOMA_*` environment variables enriched by the hook script
-4. Autonoma-managed launches are tagged deterministically via launch metadata passed through environment variables and recorded at SessionStart
-5. WhatsApp history and reply matching live in the same database
-6. Pending user decisions are persisted so reply handling survives process restarts and Pi session compaction
-7. Active Pi runtime sessions are tracked separately from Claude Code sessions
-8. Fast queries: working, idle, stale, by project, pending messages, pending actions, active Pi sessions
+**Database wrapper** (`db.ts`): `BlackboardDatabase` class wraps Node's `DatabaseSync`. Constructor creates the directory, opens the file, sets WAL mode + busy timeout + foreign keys, and runs migrations. Exposes `exec`, `prepare`, `run`, `get`, `all`, `ping`, `close`.
 
-## Schema Ownership
+**Schema** is defined as a SQL string in `src/contracts/blackboard.ts` (`BLACKBOARD_SCHEMA_SQL`) — the contracts package is the single source of truth for the schema and all row types. The local `schema.sql` is a reference copy.
 
-The blackboard owns the shared SQLite schema for Autonoma. Other features may write specific tables, but the schema contract is defined here.
+**Migrations** (`migrate.ts`): versioned (currently v9), tracked in `schema_migrations`. Fresh databases get the full schema in one shot. Existing databases step through incremental migrations. Legacy upgrade handles the v1–v3 transition (drops `events`/`agents` tables, remaps `running` → `working` status). Migrations v4–v9 add workstreams, refine pi_session statuses, add the unified `messages` table, add `health_flags`, and add `pi_sessions.workstream_id`.
 
-## Core Tables
+**Code organization**: query modules (read) and write modules (write) are split by domain:
 
-### `sessions`
+| Domain | Query | Write |
+|--------|-------|-------|
+| Claude sessions | `query-sessions.ts` | (inserts/updates in same file) |
+| Pi sessions | `query-pi-sessions.ts` | `write-pi-sessions.ts` |
+| WhatsApp messages | `query-whatsapp.ts` | `write-whatsapp.ts` |
+| Unified messages | `query-messages.ts` | `write-messages.ts` |
+| Pending actions | (queries in `query-whatsapp.ts`) | `write-pending-actions.ts` |
+| Workstreams | `query-workstreams.ts` | (inserts/updates in same file) |
+| Health flags | `query-health-flags.ts` | (in same file) |
 
-| Column | Type | Description |
-|--------|------|-------------|
-| session_id | TEXT PK | Claude Code session ID |
-| launch_id | TEXT | Autonoma launch correlation ID, if agent-managed |
-| tmux_session | TEXT | Tmux session name, if managed |
-| cwd | TEXT | Working directory (= worktree path when in a worktree) |
-| project | TEXT | Git remote origin normalized to `host/owner/repo`; folder basename if no git remote |
-| project_label | TEXT | Human-friendly fallback label, usually `basename(cwd)` |
-| model | TEXT | Model in use |
-| permission_mode | TEXT | Claude Code permission mode |
-| source | TEXT | SessionStart source: startup / resume / clear / compact |
-| status | TEXT | working / idle / stale / ended |
-| transcript_path | TEXT | JSONL transcript path |
-| task_description | TEXT | Managed task description |
-| todoist_task_id | TEXT | Todoist task reference, if relevant |
-| agent_managed | BOOLEAN | Autonoma-started? |
-| session_end_reason | TEXT | SessionEnd reason |
-| started_at | DATETIME | First SessionStart |
-| ended_at | DATETIME | SessionEnd time |
-| last_event_at | DATETIME | Latest event |
-| last_tool_started_at | DATETIME | For in-flight tool detection |
+`index.ts` re-exports everything as the public API.
 
-### `pi_sessions`
+## Tables
 
-Tracks embedded Pi runtime sessions separately from Claude Code sessions. `sessions` is for Claude Code; `pi_sessions` is for the orchestrator runtime itself.
+**`workstreams`** — Named units of work (open/closed). Link sessions, pi_sessions, and messages to a logical task context. Fields: id, name, repo_path, worktree_path, status, created_at, closed_at.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| pi_session_id | TEXT PK | Pi SDK session ID |
-| role | TEXT | orchestrator / cron / user / test |
-| status | TEXT | active / idle / ended / crashed |
-| runtime_instance_id | TEXT | Control-surface process instance UUID |
-| pid | INTEGER | Owning process PID, if known |
-| session_file | TEXT | Pi JSONL session file path |
-| cwd | TEXT | Pi session working directory |
-| agent_dir | TEXT | Pi agent/config directory |
-| model_provider | TEXT | Active provider |
-| model_id | TEXT | Active model |
-| thinking_level | TEXT | Current thinking level |
-| started_at | DATETIME | Pi session start time |
-| last_prompt_at | DATETIME | Most recent prompt sent to Pi |
-| last_event_at | DATETIME | Latest observed Pi activity |
-| ended_at | DATETIME | End/crash time |
-| end_reason | TEXT | shutdown / restart / crash_detected / replaced / other |
+**`sessions`** — Claude Code sessions. Status: working → idle → stale → ended. Linked to a workstream and pi_session. Key fields: session_id, tmux_session, cwd, project, model, agent_managed, task_description, todoist_task_id, transcript_path. Timestamps: started_at, ended_at, last_event_at, last_tool_started_at.
 
-### `whatsapp_messages`
+**`pi_sessions`** — Pi orchestrator runtime sessions (separate from Claude Code sessions). Status: active | waiting_for_user | waiting_for_sessions | ended | crashed. Tracks role, runtime_instance_id, pid, model config, and links to a workstream.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | INTEGER PK | Auto-increment |
-| direction | TEXT | inbound / outbound |
-| wa_message_id | TEXT | WhatsApp message ID |
-| remote_jid | TEXT | Remote JID |
-| body | TEXT | Message body |
-| context_ref | TEXT | Reply-matching context |
-| status | TEXT | sent / delivered / failed (outbound); received (inbound) |
-| error_message | TEXT | Failure info |
-| created_at | DATETIME | Creation time |
-| processed_at | DATETIME | Inbound processing time |
+**`messages`** — Unified message log across all channels. Source: whatsapp | web | hook | cron | init | pi_outbound. Direction: inbound | outbound. Links to workstream. Supports conversation history queries per-workstream with time windowing.
 
-### `pending_actions`
+**`whatsapp_messages`** — WhatsApp-specific message tracking with delivery status lifecycle (pending → sent → delivered | failed). Supports reply matching via `context_ref` and `wa_message_id`.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| action_id | TEXT PK | Stable action/question ID |
-| channel | TEXT | whatsapp / web / internal |
-| context_ref | TEXT | External correlation tag |
-| kind | TEXT | restart_session / approve_change / clarify / other |
-| prompt_text | TEXT | What the user was asked |
-| related_session_id | TEXT | Optional session link |
-| related_todoist_task_id | TEXT | Optional task link |
-| status | TEXT | pending / resolved / expired / canceled |
-| created_at | DATETIME | When action was created |
-| resolved_at | DATETIME | When action was resolved |
-| resolution_payload | TEXT | JSON with reply or chosen action |
+**`pending_actions`** — User decisions that survive process restarts. Kind: restart_session, approve_change, clarify, etc. Status: pending → resolved | expired | canceled. Linked to sessions and Todoist tasks via optional FKs.
 
-## Hook Flow
+**`health_flags`** — Circuit-breaker flags with optional TTL. Set/cleared by the control surface to signal degraded subsystems.
 
-Three hooks are installed: SessionStart, Stop, SessionEnd. Each invokes a single Node.js dispatcher (`~/.autonoma/hooks/hook-post.mjs`) that reads the Claude Code JSON payload from stdin, enriches it with `AUTONOMA_*` environment variables from the process environment, and POSTs to the control surface.
+## Key Behaviors
 
-The control surface gates on `AUTONOMA_AGENT_MANAGED=1` in the payload. Only managed sessions are written to SQLite. The control surface owns all blackboard writes — hooks never touch the database directly.
+**Session lifecycle**: `insertSession` upserts on session_id — a resume/compact re-registers the same session. `updateSessionStop` transitions working → idle. `markSessionEnded` sets ended status + reason + clears tool timestamp.
 
-Environment variables enriched by the hook script:
+**Staleness detection**: `markStaleSessions` finds working sessions whose `last_event_at` exceeds the stall threshold AND whose `last_tool_started_at` (if set) exceeds the tool timeout. Both thresholds come from `AutonomaConfig` (stallMinutes, toolTimeoutMinutes).
 
-- `AUTONOMA_AGENT_MANAGED=1`
-- `AUTONOMA_LAUNCH_ID`
-- `AUTONOMA_TMUX_SESSION`
-- `AUTONOMA_TASK_DESCRIPTION`
-- `AUTONOMA_TODOIST_TASK_ID`
+**Injection eligibility**: `getInjectionEligibility` evaluates whether a session can receive injected prompts — returns ok:true only for idle sessions with a tmux_session. Ended, stale, and actively-working sessions are rejected.
 
-This gives the blackboard a deterministic handshake between the tmux-based session launch and the first hook event. Users can also opt manual sessions into tracking by launching with `AUTONOMA_AGENT_MANAGED=1 claude`.
+**Pi session reconciliation**: On startup, `reconcilePreviousPiSessions` ends all active pi_sessions for a given role except the current runtime instance — prevents ghost sessions from prior crashes.
 
-## Staleness
+**WhatsApp reply matching**: `resolveInboundContextRef` chains three fallbacks: (1) look up the quoted message's context_ref, (2) find the latest pending action's context_ref, (3) fall back to the latest outbound message with a context_ref.
 
-Defaults:
-- stale after **15 minutes** with no events while the session still appears active
-- except when a tool is in flight
-- long-running tool considered suspicious after **60 minutes**
+**Workstream lifecycle**: Create → enrich with repo/worktree paths → close/reopen. Pi sessions and messages link to workstreams for scoped queries.
 
-Thresholds live in `~/.autonoma/config.json` so behavior is configurable without schema changes.
+## Contracts
 
-## Crash Recovery
+All row types and status enums live in `src/contracts/blackboard.ts`:
+- `ClaudeSessionStatus`, `PiSessionStatus`, `WorkstreamStatus`
+- `WhatsAppMessageDirection`, `WhatsAppMessageStatus`, `PendingActionStatus`
+- `UnifiedMessageSource`, `UnifiedMessageDirection`
+- `HookEventName`, `HookRouteEventName`
+- Schema version: `BLACKBOARD_SCHEMA_VERSION` (currently 9)
 
-Crash recovery is deterministic runtime behavior, not model judgment:
+## Key Files
 
-1. On control-surface startup, sweep any `working` sessions with stale timestamps and dead tmux sessions
-2. On periodic maintenance, re-check stale sessions and mark them `stale` in SQLite when the timestamp rule is met
-3. Pi or deterministic runtime reconciliation may later move a stale Claude session back to `working` or to `ended`
-4. Never require reboot detection; sweeps are idempotent and safe on every run
+```
+src/blackboard/
+  db.ts                    — BlackboardDatabase class, open/ping helpers
+  migrate.ts               — Versioned migration logic (v1→v9)
+  index.ts                 — Public API re-exports
+  schema.sql               — Reference copy of full schema
+  query-sessions.ts        — Session CRUD, staleness, injection eligibility
+  query-pi-sessions.ts     — Pi session reads + delegates to write module
+  query-whatsapp.ts        — WhatsApp + pending action reads
+  query-messages.ts        — Unified message reads, conversation history
+  query-workstreams.ts     — Workstream CRUD + pi session lookups
+  query-health-flags.ts    — Health flag set/get/clear
+  write-messages.ts        — Unified message inserts
+  write-pending-actions.ts — Pending action create/resolve
+  write-pi-sessions.ts     — Pi session upsert/touch/close
+  write-whatsapp.ts        — WhatsApp message inserts + status transitions
+src/contracts/blackboard.ts — Schema SQL, row types, status enums, version
+```
 
-## Migration
+## Observations
 
-Blackboard schema is versioned and migration-owned here. It is the shared contract between hooks, the control surface, WhatsApp, cron, and the web app.
+**attention!** `schema.sql` and `contracts/blackboard-schema.sql` are stale — both are identical to each other but behind `BLACKBOARD_SCHEMA_SQL` in `contracts/blackboard.ts`. They're missing `pi_sessions.workstream_id` (v9), the `health_flags` table (v7), and the `idx_pi_sessions_workstream` index. The contracts SQL is the one `migrate.ts` actually uses for fresh databases; these files are dead reference copies that will mislead anyone reading them.
 
-Adding `pi_sessions` is a schema migration owned here. Existing generic `agents` ideas should be treated as superseded by the more explicit Pi-runtime table.
+**attention!** The barrel export (`index.ts`) is never imported. Every external consumer (`runtime.ts`, `whatsapp/daemon.ts`, `pi/session-manager.ts`, `routes/`, `custom-tools/`, etc.) imports directly from individual modules (`blackboard/query-sessions.ts`, `blackboard/write-whatsapp.ts`, etc.). The barrel re-exports 66 symbols; roughly 25 of those have zero external callers. The file exists but serves no purpose.
 
-## Dependencies
+**attention!** `sessions.launch_id` is always written as `null`. `insertSession` (`query-sessions.ts:281`) hardcodes `null` for the launch_id parameter. No other code path writes a non-null value. The column exists in the schema and survives through legacy migration but is dead.
 
-- Installer (hooks in `~/.claude/settings.json`)
-- Node.js (hook dispatcher)
-- Control Surface (owns all blackboard writes from hooks)
-- sqlite3 (init and ad-hoc queries)
+**attention!** `WhatsAppMessageStatus` includes `'processed'` in both the type and the schema CHECK constraint, but no code path ever writes this status. The actual lifecycle is pending → sent → delivered | failed. `'processed'` is a phantom status.
+
+**TBD!** `setHealthFlag` and `clearHealthFlag` have zero callers outside the blackboard module. The only health_flags usage is `clearAllHealthFlags` called once at runtime startup (blanket reset) and `getActiveHealthFlags` read by the cron-tick route. The circuit-breaker infrastructure exists but no subsystem sets flags — it's plumbing with no consumers.
+
+**TBD!** `query-pi-sessions.ts` is misnamed — it imports from `write-pi-sessions.ts` and re-exports write operations (`upsertPiSession`, `touchPiPrompt`, `touchPiEvent`, `endPiSession`, `reconcilePreviousPiSessions`). All external callers use it for writes. The query/write split documented in the Architecture table is not accurate for this domain; `query-pi-sessions.ts` is effectively the combined facade.
+
+**TBD!** Pending action `kind` has no schema constraint or type enum — it's a freeform string. The FEATURE.md lists "restart_session, approve_change, clarify" but the only kind actually written in the codebase is `"whatsapp_auth_expired"` (in `whatsapp/daemon.ts`). The other kinds may be passed through from external callers via `PendingActionRequest`, but no enum enforces the contract.

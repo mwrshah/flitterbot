@@ -1,158 +1,108 @@
 # Feature: Cron Scheduler
 
-Periodic health-gated prompt injection for the Autonoma control surface. Cron is a dumb external timer that pings a running control surface. The control surface decides whether to act based on its own health state, circuit breakers, and session classification. If the surface is down, nothing happens — cron never starts processes.
+External health-gated periodic prompt injection. An OS-level timer pings the running control surface; the surface decides whether to act based on health state, circuit breakers, and session classification. If the surface is down, nothing happens — cron never starts processes.
 
 ## Problem
 
-Autonoma benefits from periodic proactive behavior: checking for stale Claude Code sessions, reviewing Todoist for next steps, surfacing idle-window suggestions. But this proactive loop must be safe:
+Autonoma needs periodic proactive behavior: checking stale Claude Code sessions, reviewing Todoist, surfacing idle-window suggestions. This loop must be safe — it must not restart a stopped surface, enqueue prompts when unhealthy, duplicate prompts when Pi is active, or hide scheduling state inside invisible in-process timers.
 
-- It must not restart a stopped control surface (user stopping the surface is an intentional kill switch)
-- It must not enqueue prompts when the system is unhealthy (rate limits, LLM errors, WhatsApp disconnected)
-- It must not duplicate prompts when Pi is already active
-- It must not hide scheduling state inside in-process timers that are invisible from the outside
-- It must be observable and controllable through standard OS tools
+## Architecture
 
-## Goals
+Three-tier: OS timer → bash script → control surface endpoint.
 
-1. **External timer only.** A systemd user timer (Linux) or launchd agent (macOS) fires a single HTTP request to the control surface. No in-process `setInterval` loops.
-2. **No cold-start.** If the control surface is not running, the HTTP call fails and cron exits silently. Cron never spawns processes.
-3. **Health-gated.** The control surface checks internal health gates before enqueuing any prompt. If any gate fails, the tick is skipped with a logged reason.
-4. **Circuit breakers in SQLite.** Persistent error flags (rate limits, repeated LLM failures) prevent cron from burning tokens into known failures. Flags are set by the control surface when errors occur and cleared by expiry or manual reset.
-5. **Observable.** The cron endpoint returns a structured response indicating what it did and why. systemd journal / launchd logs capture every tick.
-6. **Single cron implementation.** One bash script, one endpoint, one decision path. No duplicate TypeScript cron loop.
+**OS timer** — systemd user timer (Linux, `OnUnitActiveSec=10m`) or launchd agent (macOS, 600s interval). Fires the bash script on schedule; does nothing else. Timer enable/disable is the feature flag — no app-level config key.
 
-## Design
+**Bash script** (`~/.autonoma/cron/autonoma-checkin.sh`) — reads token and port from `~/.autonoma/config.json`, POSTs to `/cron/tick` with bearer auth. Fails silently if surface is down (`curl -sf ... || true`). No logic, no SQLite, no process management.
 
-### External Timer
+**Control surface endpoint** (`POST /cron/tick`) — runs a gate sequence; first failure skips the tick with a logged reason.
 
-The systemd timer (or launchd agent) runs every N minutes (default 5) and executes a minimal bash script:
+### Gate Sequence
 
-```bash
-#!/usr/bin/env bash
-curl -sf -X POST \
-  -H "Authorization: Bearer ${AUTONOMA_TOKEN}" \
-  "http://127.0.0.1:18820/cron/tick" \
-  || true
-```
+1. **Pi not busy** — if Pi is processing a turn, skip (no duplicate prompt)
+2. **Pi session exists** — if session ended/crashed, skip
+3. **WhatsApp connected** — if disconnected, skip (Pi can't reach user for confirmation)
+4. **No active circuit breakers** — query `health_flags` for unexpired flags; any active flag → skip
+5. **Classify sessions** — call `markStaleSessions()`; if stale found, enqueue stale-check prompt
+6. **No active working sessions** — if non-stale `working` sessions remain, skip with `no_actionable_state` (active work shouldn't be interrupted). Otherwise enqueue idle-check prompt
 
-That's it. If the surface is down, `curl` fails, the script exits 0. No retries, no process spawning, no SQLite access from bash.
+### Response
 
-### Control Surface Endpoint
+Always 200 (tick succeeded; decision was skip or enqueue). Non-200 only for auth failures or server errors.
 
-`POST /cron/tick` (bearer auth) is a new endpoint on the control surface. When it receives a tick, it runs through a gate check sequence. The first failing gate stops the sequence and returns a skip response.
-
-#### Gate Sequence
-
-1. **Pi not active.** If Pi is currently processing a turn (`active` status), skip — no duplicate prompt.
-2. **Pi not ended/crashed.** If the Pi session has terminated, skip — nothing to enqueue to.
-3. **WhatsApp connected.** If WhatsApp is disconnected or in an error state, skip — Pi can't reach the user for confirmation, so proactive work is pointless.
-4. **No active circuit breakers.** Check `health_flags` for unexpired error flags. If any blocking flag is set, skip.
-5. **Classify sessions.** Query the blackboard for stale and idle sessions, then enqueue the appropriate prompt.
-
-#### Response Shape
-
-```
-POST /cron/tick → 200
+```json
 {
   "ok": true,
-  "action": "enqueued" | "skipped",
-  "reason": "idle_check" | "stale_check" | "pi_active" | "pi_ended" | "whatsapp_disconnected" | "circuit_breaker" | "no_actionable_state",
-  "flags": ["rate_limit", ...]    // only present when action=skipped due to circuit_breaker
+  "action": "enqueued | skipped",
+  "reason": "idle_check | stale_check | pi_active | pi_ended | whatsapp_disconnected | circuit_breaker | no_actionable_state",
+  "flags": ["rate_limit"]  // only when reason=circuit_breaker
 }
 ```
 
-Always returns 200 (the tick itself succeeded; the decision was to skip or enqueue). Non-200 only for auth failures or server errors.
+### Circuit Breakers: `health_flags` Table
 
-### Circuit Breaker: `health_flags` Table
-
-A new SQLite table tracks error conditions that should suppress cron activity:
+SQLite table suppressing cron activity during known-bad states. Schema:
 
 | Column | Type | Purpose |
 |--------|------|---------|
-| `flag` | TEXT PK | Identifier: `rate_limit`, `llm_error`, `pi_crash_loop`, etc. |
-| `reason` | TEXT | Human-readable description of what triggered the flag |
-| `set_at` | TEXT | ISO timestamp when the flag was set |
-| `expires_at` | TEXT NULL | ISO timestamp for auto-expiry. NULL = manual clear only |
-| `cleared_at` | TEXT NULL | Set when manually cleared. Non-null = inactive |
+| `flag` | TEXT PK | `rate_limit`, `llm_error`, `pi_crash_loop`, etc. |
+| `reason` | TEXT | Human-readable trigger description |
+| `set_at` | TEXT | ISO timestamp |
+| `expires_at` | TEXT NULL | Auto-expiry; NULL = manual clear only |
+| `cleared_at` | TEXT NULL | Non-null = inactive |
 
-**Setting flags:** Any part of the control surface that detects a blocking error condition calls a shared `setHealthFlag(flag, reason, ttlMinutes?)` function. Examples:
-- LLM provider returns 429 → set `rate_limit` with 15-minute TTL
-- Pi crashes 3+ times in an hour → set `pi_crash_loop` with 60-minute TTL
-- Repeated LLM inference errors → set `llm_error` with 30-minute TTL
-
-**Checking flags:** The cron endpoint queries for active flags: `WHERE cleared_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now'))`. Any result = circuit open = skip.
-
-**Clearing flags:** Flags clear in three ways:
-1. TTL expiry (checked at query time, no background job)
-2. Manual clear via a future admin endpoint or Pi tool
-3. Control surface restart clears all flags (fresh start = clean slate)
+**Set** by any component detecting a blocking error via `setHealthFlag(db, flag, reason, ttlMinutes?)`. **Checked** at query time — no background cleanup job. **Cleared** three ways: TTL expiry, manual clear, or control surface restart (clears all).
 
 ### Stale Detection
 
-Stale detection moves fully into the control surface endpoint. A `working` session is classified as stale when both conditions are met:
+A `working` session is stale when both: `last_event_at` > `stallMinutes` (default 15) AND `last_tool_started_at` is NULL or > `toolTimeoutMinutes` (default 60). The endpoint calls `markStaleSessions()` before selecting a prompt.
 
-1. `last_event_at` is older than `stallMinutes` (default 15 min)
-2. `last_tool_started_at` is either NULL or older than `toolTimeoutMinutes` (default 60 min)
+### Prompt Selection
 
-The endpoint marks matching sessions as `stale` in the blackboard before deciding which prompt to enqueue.
+Two deterministic prompts based on session classification:
 
-### Standard Prompts
+- **Stale check** — when stale sessions exist: lists session IDs and last activity, asks Pi to verify tmux state and reconcile
+- **Idle check** — when all sessions stopped/idle: asks Pi to review state, transcripts, Obsidian/Todoist context, and suggest next work
 
-Two deterministic prompts, same as before. The control surface selects which one based on session classification.
+Cron messages enter the default Pi session's `TurnQueue` with `source: "cron"` and skip router classification (unlike web/WhatsApp messages).
 
-**Stale-session prompt** — when one or more sessions are classified stale:
+### Maintenance Loop (Separate)
 
-```text
-[Cron stale session check] N session(s) appear stale:
-  - <session_id> (<tmux_name>) last activity: <timestamp>
-Verify real tmux state, reconcile SQLite state if needed, and decide whether each session should return to working, stay idle, be ended, or be re-prompted.
-```
+`runtime.ts` runs a 60-second `setInterval` maintenance loop independent of cron. It pings the blackboard, refreshes WhatsApp status, marks stale sessions, cleans up 24h-old idle sessions (kills tmux), and checks for stuck turns. This is housekeeping — not prompt injection.
 
-**Idle-work prompt** — when all sessions are stopped/idle and no stale sessions exist:
+## Key Files
 
-```text
-[Cron idle check] All tracked Claude Code sessions appear stopped or idle. Review the latest session state, recent transcripts, Obsidian context, and Todoist context. Figure out what the user most likely wants to tackle next. If an obvious next prompt exists for an idle Claude session, consider continuing it. If parallel Claude Code work would help, prepare a concrete suggestion and ask the user for confirmation before launching anything significant.
-```
+| File | Role |
+|------|------|
+| `src/routes/cron-tick.ts` | `/cron/tick` endpoint — gate sequence, classification, enqueue |
+| `src/blackboard/query-health-flags.ts` | `setHealthFlag`, `getActiveHealthFlags`, `clearHealthFlag`, `clearAllHealthFlags` |
+| `src/blackboard/migrate.ts` | Creates `health_flags` table (migration v7) |
+| `src/contracts/blackboard.ts` | `HealthFlagRow` schema |
+| `src/contracts/control-surface-api.ts` | `CronTickAction`, `CronTickReason`, `MessageSource` types |
+| `src/pi/turn-queue.ts` | `TurnQueue` — FIFO sequential processing of enqueued items |
+| `src/pi/session-manager.ts` | Routes cron messages to default Pi session queue |
+| `src/routes/message.ts` | Normalizes "cron" as valid source, skips router for cron |
+| `src/runtime.ts` | `startMaintenanceLoop()` — 60s housekeeping (separate from cron) |
+| `src/server.ts` | Registers `/cron/tick` route |
+| `.autonoma/cron/autonoma-checkin.sh` | Bash script — authenticated curl to `/cron/tick` |
+| `.autonoma/cron/com.autonoma.scheduler.plist` | macOS launchd config (600s interval) |
+| `.autonoma/install.mjs` | Installs systemd timer/launchd agent, writes bash script |
 
-### Ownership Boundary
+## Design Principles
 
-| Owner | Responsibility |
-|-------|---------------|
-| **systemd/launchd timer** | Fire HTTP request on schedule. Nothing else. |
-| **Bash script** | Single authenticated `curl` call. No logic, no SQLite, no process management. |
-| **Control surface `/cron/tick`** | Gate checks, session classification, stale marking, prompt selection, enqueue decision. |
-| **`health_flags` table** | Persistent circuit breaker state. Set by any component, checked by cron endpoint. |
-| **Pi** | All orchestration reasoning: tmux verification, transcript reading, next-step decisions, user-facing suggestions. |
+- **External timer only** — scheduling owned by OS, not in-process `setInterval`
+- **No cold-start** — cron never spawns processes; surface down = silent no-op
+- **Health-gated** — circuit breakers prevent burning tokens into known failures
+- **Observable** — structured JSON responses captured in systemd journal / launchd logs
+- **Single path** — one script, one endpoint, one decision sequence
 
-### What Gets Removed
+## Observations
 
-- **`src/control-surface/cron.ts`** — the in-process `setInterval` loop. Replaced by the endpoint.
-- **`cronTimer` in `runtime.ts`** — no more in-process timer management.
-- **`cronEnabled` config key** — not needed. The systemd timer being enabled/disabled is the feature flag.
-- **`cronIntervalMinutes` config key** — the interval is owned by the systemd timer unit, not the app config.
-- **`.autonoma/cron/autonoma-checkin.sh` complexity** — rewritten to a 3-line curl script. No blackboard access, no `autonoma-up`, no `jq`, no retry logic.
+- **attention!** `setHealthFlag` is never called. It's defined in `query-health-flags.ts` and exported from the barrel, but no code in `src/` invokes it. The circuit breaker gate in `cron-tick.ts:54-62` queries `health_flags` and the table exists, but nothing ever writes rows. The entire circuit breaker gate is effectively dead — it will never trigger. Either callers need to be added (rate limit handlers, LLM error paths, Pi crash detection) or the gate should be removed.
 
-### Platform Support
+- **attention!** Bash script depends on `jq`. `autonoma-checkin.sh` uses `jq` to parse `config.json` and silently exits if `jq` is missing (`command -v jq` check on line 11). This is a silent failure mode — if jq isn't installed, cron stops working with no error logged anywhere.
 
-- **Linux:** `systemd --user` timer + service. Installed/uninstalled by the Autonoma installer.
-- **macOS:** launchd user agent plist. Same curl script, same endpoint.
+- **attention!** Gate sequence in FEATURE.md was missing a step. After stale marking, `cron-tick.ts:87-93` checks whether any non-stale `working` sessions remain — if so, it skips with `no_actionable_state`. This is a 6th gate between "classify sessions" and "enqueue idle prompt" that prevents cron from interrupting active work. (Now documented in Gate Sequence above.)
 
-Both are registered by the installer and controllable via standard OS commands (`systemctl --user enable/disable`, `launchctl load/unload`).
+- **TBD!** Duplicate stale marking. Both the 60s maintenance loop (`runtime.ts:1199`) and the 10-minute cron tick (`cron-tick.ts:65`) call `markStaleSessions()`. Idempotent so not harmful, but the maintenance loop already marks sessions stale continuously — by the time cron fires, the work is done. Cron's call is technically redundant.
 
-### Configuration
-
-Cron-relevant config in `~/.autonoma/config.json` is reduced to:
-
-| Key | Type | Default | Purpose |
-|-----|------|---------|---------|
-| `stallMinutes` | int | `15` | Minutes before a silent `working` session is marked `stale` |
-| `toolTimeoutMinutes` | int | `60` | Grace period for long-running tools before stale marking applies |
-| `controlSurfaceToken` | string | — | Bearer token for the `/cron/tick` endpoint |
-
-Timer interval is configured in the systemd unit / launchd plist, not in app config.
-
-## Dependencies
-
-- Installer (systemd/launchd timer registration)
-- Control Surface (hosts the `/cron/tick` endpoint)
-- Blackboard (`health_flags` table, session state queries)
+- **TBD!** Stuck-turn detection has no escalation. The maintenance loop (`runtime.ts:1216-1231`) detects turns stuck longer than `toolTimeoutMinutes` but only logs a warning. No health flag is set, no alert is sent, no recovery action is taken. This is a monitoring gap — a permanently stuck turn will generate a log line every 60 seconds indefinitely.
