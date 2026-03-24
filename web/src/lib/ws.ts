@@ -4,6 +4,28 @@ import type { ConnectionState, WsMessage } from "./types";
 type WsSubscriber = (message: WsMessage) => void;
 type ConnectionSubscriber = (state: ConnectionState) => void;
 
+// ── Heartbeat config ──
+const HEARTBEAT_INTERVAL = 30_000;
+const HEARTBEAT_TIMEOUT = 10_000;
+
+// ── Reconnect config ──
+const BACKOFF_BASE = 1_000;
+const BACKOFF_MAX = 30_000;
+const BACKOFF_JITTER = 500;
+const MAX_RECONNECT_ATTEMPTS = 10;
+
+/**
+ * Valid state transitions:
+ *   DISCONNECTED  → CONNECTING    (connect)
+ *   CONNECTING    → CONNECTED     (socket open)
+ *   CONNECTING    → DISCONNECTED  (socket error/close, or construction failure)
+ *   CONNECTING    → STUB          (construction failure with stub fallback)
+ *   CONNECTED     → RECONNECTING  (socket close, heartbeat timeout)
+ *   RECONNECTING  → CONNECTING    (backoff timer fires)
+ *   RECONNECTING  → DISCONNECTED  (circuit breaker, or manual disconnect)
+ *   CONNECTED     → DISCONNECTED  (manual disconnect)
+ *   *             → DISCONNECTED  (manual disconnect always allowed)
+ */
 export class AutonomaWsClient {
   private getSettings: () => ControlSurfaceSettings;
   private socket: WebSocket | null = null;
@@ -11,9 +33,12 @@ export class AutonomaWsClient {
   private connectionSubscribers = new Set<ConnectionSubscriber>();
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnectDelay = 3000;
-  private static readonly MAX_RECONNECT_DELAY = 30000;
+  private reconnectAttempt = 0;
   private activeSubscriptions = new Set<string>();
+
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private boundVisibilityHandler: (() => void) | null = null;
 
   constructor(getSettings: () => ControlSurfaceSettings) {
     this.getSettings = getSettings;
@@ -23,48 +48,55 @@ export class AutonomaWsClient {
     return this._connectionState;
   }
 
-  private setConnectionState(state: ConnectionState) {
-    this._connectionState = state;
-    for (const fn of this.connectionSubscribers) fn(state);
+  // ── State machine ──
+
+  private transition(to: ConnectionState) {
+    const from = this._connectionState;
+    if (from === to) return;
+    console.debug(`[ws] ${from} → ${to}`);
+    this._connectionState = to;
+    for (const fn of this.connectionSubscribers) fn(to);
   }
 
+  // ── Public API: connect / disconnect / reconnect ──
+
   connect() {
-    // Close any existing socket to prevent orphans
-    if (this.socket) {
-      this.socket.onclose = null; // prevent triggering scheduleReconnect
-      this.socket.close();
-      this.socket = null;
+    // Guard: no-op if already connecting or connected
+    if (this._connectionState === "connecting" || this._connectionState === "connected") {
+      return;
     }
+
+    this.clearReconnectTimer();
+    this.closeSocket();
 
     const { baseUrl, token, useStubFallback } = this.getSettings();
     const wsUrl = baseUrl.replace(/^http/, "ws").replace(/\/$/, "");
     const params = token ? `?token=${encodeURIComponent(token)}` : "";
 
-    this.setConnectionState("connecting");
+    this.transition("connecting");
 
     try {
       this.socket = new WebSocket(`${wsUrl}/ws${params}`);
     } catch {
-      if (useStubFallback) {
-        this.setConnectionState("stub");
-      } else {
-        this.setConnectionState("disconnected");
-      }
+      this.transition(useStubFallback ? "stub" : "disconnected");
       return;
     }
 
     this.socket.onopen = () => {
-      this.reconnectDelay = 3000;
-      this.setConnectionState("connected");
-      // Re-subscribe to all active sessions after reconnect
+      this.reconnectAttempt = 0;
+      this.transition("connected");
+      this.startHeartbeat();
+      this.listenVisibility();
       for (const sessionId of this.activeSubscriptions) {
         this.socket?.send(JSON.stringify({ type: "subscribe", sessionId }));
       }
     };
 
     this.socket.onmessage = (event) => {
+      this.resetHeartbeatTimeout();
       try {
         const message = JSON.parse(event.data as string) as WsMessage;
+        if ((message as { type: string }).type === "pong") return;
         for (const fn of this.subscribers) fn(message);
       } catch {
         // Ignore malformed messages
@@ -72,44 +104,159 @@ export class AutonomaWsClient {
     };
 
     this.socket.onclose = () => {
-      this.setConnectionState("disconnected");
-      this.scheduleReconnect();
+      this.stopHeartbeat();
+      // If we were CONNECTED, transition to RECONNECTING (not DISCONNECTED)
+      // If we were CONNECTING (never made it to open), go to DISCONNECTED and schedule
+      if (this._connectionState === "connected") {
+        this.scheduleReconnect();
+      } else {
+        this.transition("disconnected");
+        this.scheduleReconnect();
+      }
     };
 
     this.socket.onerror = () => {
-      // onclose will fire after onerror
+      // onclose fires after onerror — let onclose handle the transition
     };
   }
 
+  /** Manual disconnect — goes to DISCONNECTED, no auto-reconnect. */
   disconnect() {
+    this.clearReconnectTimer();
+    this.stopHeartbeat();
+    this.unlistenVisibility();
+    this.closeSocket();
+    this.reconnectAttempt = 0;
+    this.transition("disconnected");
+  }
+
+  /** Manual reconnect — resets backoff and immediately connects. */
+  reconnect() {
+    this.clearReconnectTimer();
+    this.stopHeartbeat();
+    this.unlistenVisibility();
+    this.closeSocket();
+    this.reconnectAttempt = 0;
+    // Force state to disconnected so connect() guard passes
+    this._connectionState = "disconnected";
+    this.connect();
+  }
+
+  // ── Socket cleanup ──
+
+  private closeSocket() {
+    if (this.socket) {
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.onmessage = null;
+      this.socket.onopen = null;
+      this.socket.close();
+      this.socket = null;
+    }
+  }
+
+  // ── Reconnect with exponential backoff + jitter ──
+
+  private clearReconnectTimer() {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    if (this.socket) {
-      this.socket.onclose = null;
-      this.socket.close();
-      this.socket = null;
-    }
-    this.setConnectionState("disconnected");
-  }
-
-  reconnect() {
-    this.disconnect();
-    this.reconnectDelay = 3000;
-    this.connect();
   }
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
-    this.setConnectionState("reconnecting");
-    const delay = this.reconnectDelay;
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, AutonomaWsClient.MAX_RECONNECT_DELAY);
+
+    // Circuit breaker: stop trying after maxAttempts
+    if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      console.warn(`[ws] circuit breaker: ${MAX_RECONNECT_ATTEMPTS} attempts exhausted, staying disconnected`);
+      this.transition("disconnected");
+      return;
+    }
+
+    this.transition("reconnecting");
+
+    const jitter = Math.random() * BACKOFF_JITTER;
+    const delay = Math.min(BACKOFF_BASE * 2 ** this.reconnectAttempt + jitter, BACKOFF_MAX);
+    this.reconnectAttempt++;
+
+    console.debug(`[ws] reconnect attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay)}ms`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
+      // Force state so connect() guard passes
+      this._connectionState = "disconnected";
       this.connect();
     }, delay);
   }
+
+  // ── Heartbeat ──
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify({ type: "ping" }));
+        if (!this.heartbeatTimeout) {
+          this.heartbeatTimeout = setTimeout(() => {
+            this.heartbeatTimeout = null;
+            this.closeSocket();
+            this.scheduleReconnect();
+          }, HEARTBEAT_TIMEOUT);
+        }
+      }
+    }, HEARTBEAT_INTERVAL);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+
+  private resetHeartbeatTimeout() {
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+
+  // ── Visibility ──
+
+  private listenVisibility() {
+    if (typeof document === "undefined") return;
+    this.unlistenVisibility();
+    this.boundVisibilityHandler = () => {
+      if (document.visibilityState === "visible") {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          this.reconnect();
+        } else {
+          this.socket.send(JSON.stringify({ type: "ping" }));
+          if (!this.heartbeatTimeout) {
+            this.heartbeatTimeout = setTimeout(() => {
+              this.heartbeatTimeout = null;
+              this.closeSocket();
+              this.scheduleReconnect();
+            }, HEARTBEAT_TIMEOUT);
+          }
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", this.boundVisibilityHandler);
+  }
+
+  private unlistenVisibility() {
+    if (this.boundVisibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.boundVisibilityHandler);
+      this.boundVisibilityHandler = null;
+    }
+  }
+
+  // ── Messaging ──
 
   async sendMessage(
     text: string,

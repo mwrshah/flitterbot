@@ -21,6 +21,11 @@ export function getRouter() {
 
   // Connect WS eagerly — ready before any component renders
   if (typeof window !== "undefined") {
+    // Disconnect any previous wsClient orphaned by HMR
+    const prev = (window as any).__autonoma_wsClient as AutonomaWsClient | undefined;
+    if (prev) prev.disconnect();
+    (window as any).__autonoma_wsClient = wsClient;
+
     wsClient.connect();
     window.addEventListener("beforeunload", () => {
       wsClient.disconnect();

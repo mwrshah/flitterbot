@@ -1283,6 +1283,10 @@ export class ControlSurfaceRuntime {
   ): Promise<void> {
     if (!data || typeof data !== "object") return;
     const payload = data as ControlSurfaceWebSocketClientEvent;
+    if (payload.type === "ping") {
+      this.wsHub.send(client.id, { type: "pong" });
+      return;
+    }
     if (payload.type === "subscribe" && typeof payload.sessionId === "string") {
       this.wsHub.subscribeClient(client.id, payload.sessionId);
       return;
