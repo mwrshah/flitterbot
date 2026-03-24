@@ -18,7 +18,7 @@ inbound message → runtime.enqueue()
 
 **Session manager** (`PiSessionManager`) owns all `ManagedPiSession` instances — one default, zero-or-more orchestrators keyed by workstream ID. On startup the runtime creates the default session and rehydrates orchestrators for any open workstreams persisted in SQLite.
 
-**Message routing** (`resolveTargetSession`): direct-targeted session ID takes priority; cron always goes to default; router-matched workstream routes to its orchestrator; everything else falls to default.
+**Message routing** (`resolveTargetSession`): returns `ManagedPiSession | undefined`. Direct-targeted session ID takes priority; cron always goes to default; router-matched workstream routes to its orchestrator; everything else falls to default.
 
 **Steer delivery**: messages with `deliveryMode: "steer"` bypass the queue when the session is actively streaming — delivered directly via `session.prompt()` with `streamingBehavior: "steer"`.
 
@@ -45,7 +45,7 @@ Registered by `runtime.createCustomTools(role, workstreamId?)` and passed throug
 
 | Tool | What it does |
 |------|-------------|
-| `create_workstream` | Insert workstream row, spawn orchestrator session, optionally enqueue initial message with workstream-prefixed context |
+| `create_workstream` | Insert workstream row, spawn orchestrator session; automatically passes the original user message through to the new orchestrator (no explicit `message` parameter) |
 | `enqueue_message` | Send a message to an existing orchestrator — validates workstream is open and orchestrator is running, enqueues with `[Workstream: "name" (id)]` prefix, persists to blackboard |
 
 ### Orchestrator only
@@ -61,8 +61,8 @@ Registered by `runtime.createCustomTools(role, workstreamId?)` and passed throug
 
 ## Session Lifecycle
 
-1. **Creation**: `createDefault()` / `createOrchestrator()` calls `createAutonomaAgent()`, which wires up Pi SDK auth (`~/.pi/agent/`), model config, resource loader, and standard + custom tools. Session is persisted to `pi_sessions` table.
-2. **Event subscription**: `subscribeToPiSession()` bridges Pi SDK events (`message_update`, `message_end`, `tool_execution_start/end`, `turn_end`) to WebSocket broadcasts. Assistant messages are deferred until `turn_end` (intermediate vs. final).
+1. **Creation**: `createDefault()` / `createOrchestrator()` calls `createAutonomaAgent()`, which wires up Pi SDK auth (`~/.pi/agent/`), model config, resource loader, and standard + custom tools. Returns `modelInfo` (`{ provider: string; id: string }`) and `resourceInfo` (`{ skillNames, agentsFilePaths }`) for startup logging. Session is persisted to `pi_sessions` table.
+2. **Event subscription**: `subscribeToPiSession()` bridges Pi SDK `AgentSessionEvent`s (`message_update`, `message_end`, `tool_execution_start/end`, `turn_end`) to WebSocket broadcasts. Assistant messages are deferred until `turn_end` (intermediate vs. final). `turn_end` events with `stopReason === "toolUse"` are treated as mid-turn tool calls and do not flush pending messages. Server UUIDs are pre-allocated for streaming assistant messages and inserted into `message_id_map` at `message_end`. Final assistant messages at `turn_end` are tagged with `source: "pi_outbound"`.
 3. **State tracking**: `PiSessionState` tracks message count, last prompt/event timestamps, busy flag, current queue item.
 4. **Orchestrator teardown**: `destroyOrchestrator()` stops the queue, unsubscribes events, disposes the Pi session, marks it ended/crashed in SQLite.
 5. **Rehydration**: on startup, open workstreams from SQLite trigger `createOrchestrator()` for each, restoring the multi-session topology.
@@ -94,7 +94,7 @@ Per-turn prompt: `formatPromptWithContext(item, role)` — currently returns `it
 | `src/pi/turn-queue.ts` | `TurnQueue` — FIFO with steer bypass |
 | `src/pi/session-state.ts` | `PiSessionState` — per-session runtime metadata |
 | `src/pi/subscribe.ts` | `subscribeToPiSession()` — Pi SDK events → WebSocket broadcast |
-| `src/pi/history.ts` | `readPiHistory()` — parse session files for history API |
+| `src/pi/history.ts` | `readPiHistory()` — parse session files for history API; accepts optional `IdResolver` to map agent IDs to server UUIDs |
 | `src/pi/format-prompt.ts` | `formatPromptWithContext()` — per-turn prompt formatting |
 | `src/prompts/default-agent.ts` | Default agent system prompt |
 | `src/prompts/orchestrator.ts` | Orchestrator system prompt |
@@ -119,6 +119,10 @@ Per-turn prompt: `formatPromptWithContext(item, role)` — currently returns `it
 
 *Resolved:* `formatPromptWithContext()` — removed unused `_role` parameter, updated all call sites.
 
-*Resolved:* `ManagedPiSession.session` typed as `AgentSession` (from `@mariozechner/pi-coding-agent`). `customTools` typed as `unknown[]` through the chain, with an explicit cast to `ToolDefinition[]` at the SDK boundary in `createAutonomaAgent()`. A local `CustomToolDefinition` type in `runtime.ts` captures the plain-JSON-Schema tool shape.
+*Resolved:* `ManagedPiSession.session` typed as `AgentSession` (from `@mariozechner/pi-coding-agent`). `customTools` typed as `unknown[]` through the chain, with an explicit cast to `ToolDefinition[]` at the SDK boundary in `createAutonomaAgent()`. A local `CustomToolDefinition` type in `runtime.ts` captures the plain-JSON-Schema tool shape. Custom tool `execute` methods are now typed with `Record<string, unknown>` params instead of `any`.
 
 *Resolved:* `enqueue_message` tool wraps `orchestrator.queue.enqueue()` in try/catch, returning a clean error message if the queue is stopped.
+
+*Resolved:* `subscribeToPiSession()` now uses the Pi SDK's `AgentSessionEvent` type directly instead of a custom `PiSessionSubscriptionEvent` union type. Message extraction functions (`extractMessageRole`, `extractMessageText`, `extractMessageId`, `extractTimestamp`) are typed against the SDK's `AgentMessage` type.
+
+*Resolved:* `ManagedPiSession` deferred initialization fields (`queue`, `unsubscribe`) use `null!` instead of `undefined as any`.

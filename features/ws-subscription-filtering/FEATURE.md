@@ -12,7 +12,10 @@ Clients send `subscribe`/`unsubscribe` messages to declare which sessions they c
 ```
 { type: "subscribe", sessionId: string }
 { type: "unsubscribe", sessionId: string }
+{ type: "ping" }
 ```
+
+Server responds to `ping` with `{ type: "pong" }` (unicast to sender).
 
 `sessionId: "*"` subscribes to all sessions (broadcast mode).
 
@@ -26,7 +29,7 @@ Clients send `subscribe`/`unsubscribe` messages to declare which sessions they c
 | File | Role |
 |------|------|
 | `src/ws/hub.ts` | `WebSocketHub` — per-client `subscriptions: Set<string>`, filtered `broadcast()`, `subscribeClient()`/`unsubscribeClient()` methods, RFC 6455 frame encode/decode |
-| `src/contracts/websocket.ts` | Event type definitions; session-scoped events carry optional `sessionId` |
+| `src/contracts/websocket.ts` | Event type definitions; session-scoped events carry optional `sessionId`; includes `WebSocketClientPingEvent` and `PongWebSocketEvent` |
 | `src/runtime.ts` | Handles incoming `subscribe`/`unsubscribe` messages from clients, routes to hub |
 | `src/pi/session-manager.ts` | Broadcasts `queue_item_start`/`queue_item_end` with `sessionId` |
 | `src/pi/subscribe.ts` | Subscribes to Pi session stream events (`text_delta`, `message_end`, `tool_execution_start/end`, `turn_end`) — all tagged with `sessionId` |
@@ -35,7 +38,7 @@ Clients send `subscribe`/`unsubscribe` messages to declare which sessions they c
 
 **Session-scoped** (filtered by subscription): `queue_item_start`, `queue_item_end`, `text_delta`, `message_end`, `tool_execution_start`, `tool_execution_end`, `turn_end`, `pi_surfaced`
 
-**Unicast** (sent directly to one client, not broadcast): `connected`
+**Unicast** (sent directly to one client, not broadcast): `connected`, `pong`
 
 **Global** (delivered to all via broadcast): `workstreams_changed`, `status_changed`
 
