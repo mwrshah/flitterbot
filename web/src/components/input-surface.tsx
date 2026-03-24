@@ -325,7 +325,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     refetchOnWindowFocus: false,
   });
 
-  // Read appended items from the shared store (populated by pi.route.tsx WS handler)
+  // Read appended items from the shared store (populated by usePiWsHandler in root)
   const storeSnapshot = usePiSessionStore();
   const appendedItems = useMemo(
     () => piSessionStore.getAllAppendedItems(),
@@ -340,14 +340,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     [loaderTimeline, appendedItems],
   );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
-
-  // Subscribe to wildcard session so the server delivers all session-scoped events
-  useEffect(() => {
-    wsClient.subscribeSession("*");
-    return () => {
-      wsClient.unsubscribeSession("*");
-    };
-  }, [wsClient]);
 
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));

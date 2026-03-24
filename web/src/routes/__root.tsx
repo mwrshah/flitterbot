@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -18,6 +18,7 @@ import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { ConnectionState, WsMessage } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
+import { usePiWsHandler } from "~/hooks/use-pi-ws-handler";
 import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";
 import { seo } from "~/utils/seo";
@@ -74,10 +75,20 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
-  const { wsClient } = Route.useRouteContext();
+  const { apiClient, wsClient } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const router = useRouter();
   const prevConnectionRef = useRef<ConnectionState>(wsClient.connectionState);
+
+  // Status query — needed to resolve defaultSessionId for the WS handler
+  const statusQuery = useQuery({
+    ...statusQueryOptions(apiClient),
+    retry: 1,
+  });
+  const defaultSessionId = statusQuery.data?.pi?.default?.sessionId;
+
+  // Route all WS events into piSessionStore — always active regardless of current route
+  usePiWsHandler(wsClient, apiClient, defaultSessionId);
 
   // Invalidate status query when workstreams change via WebSocket — single listener for all consumers
   useEffect(() => {
