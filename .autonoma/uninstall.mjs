@@ -441,6 +441,88 @@ async function uninstallLinuxLegacyCrontab() {
 }
 
 // ---------------------------------------------------------------------------
+// Uninstall web/.env
+// ---------------------------------------------------------------------------
+const AUTONOMA_ENV_KEYS = ["VITE_AUTONOMA_BASE_URL", "VITE_AUTONOMA_TOKEN"];
+const WEB_ENV_MANIFEST_KEY = "web/.env";
+
+function resolveProjectRoot() {
+  const configPath = join(AUTONOMA_DIR, "config.json");
+  if (existsSync(configPath)) {
+    try {
+      const config = readJsonFile(configPath);
+      if (config.projectRoot) return config.projectRoot;
+    } catch {}
+  }
+  const sourceRootPath = join(AUTONOMA_DIR, "source-root");
+  if (existsSync(sourceRootPath)) {
+    const root = readFileSync(sourceRootPath, "utf8").trim();
+    if (root) return root;
+  }
+  return "";
+}
+
+async function uninstallWebEnv() {
+  const projectRoot = resolveProjectRoot();
+  if (!projectRoot) {
+    if (manifestTargetExists(WEB_ENV_MANIFEST_KEY)) {
+      warn("Cannot resolve project root to clean up web/.env. Clearing manifest entry.");
+      if (!DRY_RUN) manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
+    }
+    return;
+  }
+
+  const webEnvPath = join(projectRoot, "web", ".env");
+  if (!existsSync(webEnvPath) && !manifestTargetExists(WEB_ENV_MANIFEST_KEY)) return;
+
+  if (!existsSync(webEnvPath)) {
+    info("web/.env already absent.");
+    if (!DRY_RUN) manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
+    return;
+  }
+
+  const before = readFileSync(webEnvPath, "utf8");
+  const afterLines = before.split("\n").filter((line) => {
+    const key = line.split("=")[0].trim();
+    return !AUTONOMA_ENV_KEYS.includes(key);
+  });
+  const after = afterLines.join("\n").replace(/^\n+/, "").replace(/\n{3,}/g, "\n\n");
+
+  if (!after.trim()) {
+    info("=== web/.env cleanup ===");
+    info(`Will remove ${webEnvPath} (only contained Autonoma vars)`);
+    info("");
+
+    if (await confirm()) {
+      if (!DRY_RUN) {
+        rmSync(webEnvPath, { force: true });
+        manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
+        info("Removed web/.env.");
+      }
+    } else {
+      info("Skipped web/.env cleanup.");
+    }
+  } else if (before !== after) {
+    info("=== web/.env cleanup ===");
+    console.log(diffText(before, after));
+    info("");
+
+    if (await confirm()) {
+      if (!DRY_RUN) {
+        atomicWrite(webEnvPath, after);
+        manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
+        info("Cleaned Autonoma vars from web/.env.");
+      }
+    } else {
+      info("Skipped web/.env cleanup.");
+    }
+  } else {
+    info("web/.env has no Autonoma vars to clean.");
+    if (!DRY_RUN) manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Uninstall scheduler (combined)
 // ---------------------------------------------------------------------------
 async function uninstallScheduler() {
@@ -525,6 +607,7 @@ async function main() {
   info("");
 
   await uninstallHooks();
+  await uninstallWebEnv();
   await uninstallScheduler();
   cleanupManifestIfEmpty();
   await uninstallRuntimeTree();

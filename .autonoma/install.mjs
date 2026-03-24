@@ -524,7 +524,7 @@ async function bootstrapConfig() {
   configAfter.controlSurfaceHost = configAfter.controlSurfaceHost || "127.0.0.1";
   configAfter.controlSurfacePort = configAfter.controlSurfacePort || 18820;
   if (!configAfter.controlSurfaceToken) configAfter.controlSurfaceToken = token;
-  if (!configAfter.piModel || configAfter.piModel === "claude-sonnet-4-6") configAfter.piModel = "claude-opus-4-6";
+  configAfter.piModel = configAfter.piModel || "claude-opus-4-6";
   configAfter.piThinkingLevel = configAfter.piThinkingLevel || "low";
   configAfter.stallMinutes = configAfter.stallMinutes || 15;
   configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 60;
@@ -566,15 +566,17 @@ async function bootstrapConfig() {
   }
 
   // Always sync token to web/.env so the frontend can authenticate
-  syncWebEnv(configAfter);
+  await syncWebEnv(configAfter);
 }
 
-function syncWebEnv(config) {
+async function syncWebEnv(config) {
   if (!PROJECT_ROOT) return;
   const webEnvPath = join(PROJECT_ROOT, "web", ".env");
   const baseUrl = `http://${config.controlSurfaceHost || "127.0.0.1"}:${config.controlSurfacePort || 18820}`;
   const token = config.controlSurfaceToken || "";
   const desired = `VITE_AUTONOMA_BASE_URL=${baseUrl}\nVITE_AUTONOMA_TOKEN=${token}\n`;
+
+  const beforeHash = existsSync(webEnvPath) ? sha256File(webEnvPath) : "";
 
   if (existsSync(webEnvPath)) {
     const existing = readFileSync(webEnvPath, "utf8");
@@ -583,10 +585,25 @@ function syncWebEnv(config) {
 
   info("=== Web app .env sync ===");
   console.log(showTextDiff(webEnvPath, desired));
+  info("");
 
-  if (!DRY_RUN) {
-    writeRuntimeFile(webEnvPath, desired, 0o600);
-    info(`Wrote ${webEnvPath}`);
+  if (await confirm()) {
+    if (!DRY_RUN) {
+      writeRuntimeFile(webEnvPath, desired, 0o600);
+      const afterHash = sha256File(webEnvPath);
+      manifestWriteTarget("web/.env", {
+        type: "file-create",
+        modifications: [{ id: "web-env:sync", action: "upsert", content_sha256: afterHash }],
+        checksums: {
+          algorithm: "sha256",
+          file_before_install: beforeHash || null,
+          file_after_install: afterHash,
+        },
+      });
+      info(`Wrote ${webEnvPath}`);
+    }
+  } else {
+    info("Skipped web .env sync.");
   }
 }
 

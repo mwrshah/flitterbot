@@ -106,6 +106,4 @@ Reads Claude Code hook payload from stdin, enriches with `AUTONOMA_*` env vars (
 
 ## Observations
 
-- **attention!** `syncWebEnv()` (`install.mjs:572-591`) writes `web/.env` without calling `confirm()` — shows the diff but skips the confirmation prompt. Every other external write is permission-gated; this one isn't.
-- **attention!** The uninstaller has no awareness of `web/.env`. The installer writes it (`VITE_AUTONOMA_BASE_URL`, `VITE_AUTONOMA_TOKEN`), but `uninstall.mjs` never cleans it up — not even with `--meta`. It's also absent from the manifest, so drift detection doesn't cover it.
-- **TBD!** `install.mjs:527` silently upgrades `piModel` from `claude-sonnet-4-6` to `claude-opus-4-6` on every install. This is a one-time migration baked into the installer as a permanent conditional — should be removed once all installs have rotated past it, or guarded by a version check.
+(No outstanding items — all prior findings resolved.)
