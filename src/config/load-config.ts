@@ -6,6 +6,26 @@ import path from "node:path";
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
+type RawConfigJson = {
+  controlSurfaceHost?: string;
+  controlSurfacePort?: number;
+  controlSurfaceToken?: string;
+  piModel?: string;
+  piThinkingLevel?: ThinkingLevel;
+  stallMinutes?: number;
+  toolTimeoutMinutes?: number;
+  blackboardPath?: string;
+  whatsappAuthDir?: string;
+  whatsappSocketPath?: string;
+  whatsappPidPath?: string;
+  whatsappCliPath?: string;
+  whatsappDaemonPath?: string;
+  claudeCliCommand?: string;
+  projectsDir?: string;
+  wipeWorkstreamsOnStart?: boolean;
+  whatsappEnabled?: boolean;
+};
+
 export type AutonomaConfig = {
   controlSurfaceHost: string;
   controlSurfacePort: number;
@@ -58,48 +78,45 @@ export function loadConfig(): AutonomaConfig {
   ensureDir(AUTONOMA_DIR);
   ensureDir(path.join(AUTONOMA_DIR, "logs"));
 
-  const raw = readJsonFile<Record<string, unknown>>(CONFIG_PATH) ?? {};
+  const raw = readJsonFile<RawConfigJson>(CONFIG_PATH) ?? {};
   const controlSurfaceDir = path.join(AUTONOMA_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
   const agentDir = path.join(controlSurfaceDir, "agent");
   const promptPath = path.join(agentDir, "system-prompt.md");
   const pidPath = path.join(controlSurfaceDir, "server.pid");
   const logPath = path.join(AUTONOMA_DIR, "logs", "control-surface.log");
-  const blackboardPath = expandHome(String(raw.blackboardPath ?? "~/.autonoma/blackboard.db"));
-  const whatsappAuthDir = expandHome(String(raw.whatsappAuthDir ?? "~/.autonoma/whatsapp/auth"));
+  const blackboardPath = expandHome(raw.blackboardPath ?? "~/.autonoma/blackboard.db");
+  const whatsappAuthDir = expandHome(raw.whatsappAuthDir ?? "~/.autonoma/whatsapp/auth");
   const whatsappSocketPath = expandHome(
-    String(raw.whatsappSocketPath ?? "~/.autonoma/whatsapp/daemon.sock"),
+    raw.whatsappSocketPath ?? "~/.autonoma/whatsapp/daemon.sock",
   );
   const whatsappPidPath = expandHome(
-    String(raw.whatsappPidPath ?? "~/.autonoma/whatsapp/daemon.pid"),
+    raw.whatsappPidPath ?? "~/.autonoma/whatsapp/daemon.pid",
   );
-  const whatsappCliPath = expandHome(String(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js"));
+  const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js");
   const whatsappDaemonPath = expandHome(
-    String(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js"),
+    raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js",
   );
-  const projectsDir = expandHome(String(raw.projectsDir ?? "~/development"));
-  const wipeWorkstreamsOnStart = Boolean(
-    raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1",
-  );
+  const projectsDir = expandHome(raw.projectsDir ?? "~/development");
+  const wipeWorkstreamsOnStart =
+    raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1";
   const whatsappEnabled =
     process.env.WHATSAPP_ENABLED !== undefined
       ? process.env.WHATSAPP_ENABLED !== "0" && process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
-      : raw.whatsappEnabled !== undefined
-        ? Boolean(raw.whatsappEnabled)
-        : true;
-  const configuredPiModel = String(raw.piModel ?? "");
-  const configuredClaudeCliCommand = String(raw.claudeCliCommand ?? "");
+      : raw.whatsappEnabled ?? true;
+  const configuredPiModel = raw.piModel ?? "";
+  const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: AutonomaConfig = {
-    controlSurfaceHost: String(raw.controlSurfaceHost ?? "127.0.0.1"),
-    controlSurfacePort: Number(raw.controlSurfacePort ?? 18820),
-    controlSurfaceToken: String(raw.controlSurfaceToken ?? crypto.randomUUID()),
+    controlSurfaceHost: raw.controlSurfaceHost ?? "127.0.0.1",
+    controlSurfacePort: raw.controlSurfacePort ?? 18820,
+    controlSurfaceToken: raw.controlSurfaceToken ?? crypto.randomUUID(),
     piModel:
       configuredPiModel && configuredPiModel !== "claude-sonnet-4-6"
         ? configuredPiModel
         : "claude-opus-4-6",
-    piThinkingLevel: (raw.piThinkingLevel as ThinkingLevel | undefined) ?? "low",
-    stallMinutes: Number(raw.stallMinutes ?? 15),
-    toolTimeoutMinutes: Number(raw.toolTimeoutMinutes ?? 60),
+    piThinkingLevel: raw.piThinkingLevel ?? "low",
+    stallMinutes: raw.stallMinutes ?? 15,
+    toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 60,
     blackboardPath,
     whatsappAuthDir,
     whatsappSocketPath,
