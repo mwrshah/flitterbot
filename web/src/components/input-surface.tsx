@@ -10,8 +10,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { Badge } from "~/components/ui/Badge";
-import { MessageInput } from "~/components/ui/MessageInput";
+import { Badge } from "~/components/ui/badge";
+import { MessageInput } from "~/components/ui/message-input";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import type {
   ChatTimelineItem,

@@ -1,8 +1,8 @@
 import { getRouteApi, Outlet } from "@tanstack/react-router";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import type { ConnectionState } from "~/lib/types";
-import { SettingsDrawer } from "./SettingsDrawer";
-import { Sidebar } from "./Sidebar";
+import { SettingsDrawer } from "./settings-drawer";
+import { Sidebar } from "./sidebar";
 
 const SERVER_SNAPSHOT: ConnectionState = "disconnected";
 

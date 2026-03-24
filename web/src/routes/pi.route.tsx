@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Badge } from "~/components/ui/Badge";
+import { Badge } from "~/components/ui/badge";
 import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
 import { statusQueryOptions } from "~/lib/queries";
 import type {

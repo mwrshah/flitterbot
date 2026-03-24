@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { InputSurface } from "~/components/input-surface/InputSurface";
+import { InputSurface } from "~/components/input-surface";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiInputHistory } from "~/server/pi";
 
