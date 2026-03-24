@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
+import type { ApiError } from "../contracts/blackboard.ts";
 import {
   endPiSession,
   reconcilePreviousPiSessions,
@@ -22,7 +23,7 @@ export interface ManagedPiSession {
   workstreamName: string | null;
   piSessionId: string;
   createdAt: string;
-  modelInfo: { provider?: string; id?: string };
+  modelInfo: { provider: string; id: string };
   unsubscribe: () => void;
 }
 
@@ -268,15 +269,17 @@ export class PiSessionManager {
   }
 
   private buildManagedSession(
-    created: { session: AgentSession; modelInfo: { provider?: string; id?: string } },
+    created: { session: AgentSession; modelInfo: { provider: string; id: string } },
     state: PiSessionState,
     role: "default" | "orchestrator",
     workstreamId: string | null,
     workstreamName: string | null,
   ): ManagedPiSession {
+    // Circular init: queue callback closes over `managed`, so the object must exist first.
+    // null! signals deferred initialization — both fields are set immediately below.
     const managed: ManagedPiSession = {
       session: created.session,
-      queue: undefined as any, // set below
+      queue: null!,
       state,
       role,
       workstreamId,
@@ -284,7 +287,7 @@ export class PiSessionManager {
       piSessionId: created.session.sessionId,
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
-      unsubscribe: undefined as any, // set below
+      unsubscribe: null!,
     };
 
     const processCallback = this.processCallback;
@@ -302,10 +305,10 @@ export class PiSessionManager {
       onItemEnd: (item, error) => {
         state.setBusy(false);
         if (error) {
-          const detail =
-            error instanceof Error
-              ? `${error.message}${(error as any).status ? ` [status=${(error as any).status}]` : ""}${(error as any).body ? ` body=${JSON.stringify((error as any).body).slice(0, 200)}` : ""}`
-              : String(error);
+          const apiErr = error instanceof Error ? (error as ApiError) : undefined;
+          const detail = apiErr
+            ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
+            : String(error);
           this.log(
             `queue item ${item.id} failed (${role}${workstreamId ? ` ws=${workstreamId}` : ""}): ${detail}`,
           );

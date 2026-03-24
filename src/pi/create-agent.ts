@@ -100,8 +100,8 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   return {
     ...created,
     modelInfo: {
-      provider: (model as any).providerId ?? (model as any).provider ?? "anthropic",
-      id: (model as any).modelId ?? (model as any).id ?? config.piModel,
+      provider: model.provider,
+      id: model.id,
     },
     resourceInfo: {
       skillNames,
