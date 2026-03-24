@@ -13,8 +13,8 @@ export async function handleHookRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
   const payload = await readJsonBody<ClaudeHookPayload>(req);
-  const sessionId = (payload as Record<string, unknown>).session_id ?? (payload as Record<string, unknown>).sessionId;
-  const result: HookResponse = runtime.handleHook(eventName, payload);
+  const sessionId = payload.session_id ?? payload.sessionId;
+  const result: HookResponse = runtime.handleHook(eventName, payload as Record<string, unknown>);
   // Single summary log — only include response detail for non-ok results
   const parts = [`hook ${eventName}: session_id=${sessionId ?? "none"}`];
   if (result.bookkeeping) parts.push("bookkeeping=true");

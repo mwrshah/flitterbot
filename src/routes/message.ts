@@ -1,9 +1,11 @@
 import type http from "node:http";
 import type {
   DeliveryMode,
+  MessageMetadata,
   MessageRequest,
   MessageResponse,
   MessageSource,
+  WorkstreamRoutingMeta,
 } from "../contracts/index.ts";
 import { classifyMessage } from "../classifier/classify.ts";
 import { resolveGroqApiKey } from "../classifier/groq-client.ts";
@@ -29,7 +31,7 @@ export async function handleMessageRoute(
   const formatted = formatInboundMessage(body.text, source, body.metadata);
 
   // Direct-targeted session (web UI tab input) — skip router
-  let workstreamMeta: Record<string, unknown> = {};
+  let workstreamMeta: WorkstreamRoutingMeta = {};
   if (body.targetSessionId) {
     workstreamMeta._targetSessionId = body.targetSessionId;
   } else if (source === "web" || source === "whatsapp") {
@@ -55,12 +57,12 @@ export async function handleMessageRoute(
 async function routeMessage(
   runtime: ControlSurfaceRuntime,
   rawText: string,
-): Promise<{ metadata: Record<string, unknown> } | null> {
+): Promise<{ metadata: WorkstreamRoutingMeta } | null> {
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
     const result = await classifyMessage(rawText, runtime.blackboard, apiKey);
-    const meta: Record<string, unknown> = {
+    const meta: WorkstreamRoutingMeta = {
       router_action: result.action,
     };
     if (result.workstream) {
@@ -91,7 +93,7 @@ function normalizeSource(source?: string): MessageSource {
 function formatInboundMessage(
   text: string,
   source: MessageSource,
-  _metadata?: Record<string, unknown>,
+  _metadata?: MessageMetadata,
 ): string {
   // Hook and cron messages are structured content — pass through unchanged
   if (source === "cron" || source === "hook") {

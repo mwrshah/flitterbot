@@ -2,6 +2,23 @@ import fs from "node:fs";
 
 const DEFAULT_TAIL_BYTES = 50_000;
 
+type RawTranscriptEntry = {
+  type?: string;
+  role?: string;
+  message?: RawTranscriptMessage;
+  content?: unknown;
+};
+
+type RawTranscriptMessage = {
+  role?: string;
+  content?: unknown;
+};
+
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; name: string; id: string; input: unknown }
+  | { type: "tool_result"; tool_use_id: string; content: string };
+
 /**
  * Extract the last assistant text from a CC transcript JSONL file.
  * Reads only the tail of the file (last `maxBytes`) to avoid loading multi-MB transcripts.
@@ -29,15 +46,15 @@ export function extractLastAssistantText(
       const line = lines[i]!.trim();
       if (!line) continue;
 
-      let obj: Record<string, unknown>;
+      let obj: RawTranscriptEntry;
       try {
-        obj = JSON.parse(line);
+        obj = JSON.parse(line) as RawTranscriptEntry;
       } catch {
         continue;
       }
 
       if (obj.type !== "assistant") continue;
-      const message = obj.message as Record<string, unknown> | undefined;
+      const message = obj.message;
       if (!message || message.role !== "assistant") continue;
 
       const text = extractTextFromContent(message.content);
@@ -72,10 +89,10 @@ function extractTextFromContent(content: unknown): string | undefined {
     if (
       typeof block === "object" &&
       block !== null &&
-      (block as Record<string, unknown>).type === "text" &&
-      typeof (block as Record<string, unknown>).text === "string"
+      (block as ContentBlock).type === "text" &&
+      typeof (block as ContentBlock & { type: "text" }).text === "string"
     ) {
-      parts.push((block as Record<string, unknown>).text as string);
+      parts.push((block as ContentBlock & { type: "text" }).text);
     }
   }
   const joined = parts.join("").trim();

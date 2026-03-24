@@ -7,9 +7,39 @@ import type {
   TranscriptToolStatus,
 } from "../contracts/index.ts";
 
-function asRecord(value: unknown): Record<string, unknown> {
+type RawTranscriptEntry = {
+  role?: string;
+  sender?: string;
+  author?: string;
+  type?: string;
+  kind?: string;
+  event_name?: string;
+  event?: string;
+  text?: string;
+  content?: unknown;
+  message?: unknown;
+  summary?: string;
+  error?: string;
+  status?: string;
+  tool_status?: string;
+  toolStatus?: string;
+  timestamp?: string | number;
+  ts?: string;
+  time?: string;
+  created_at?: string | number;
+  createdAt?: string;
+  tool_name?: string;
+  toolName?: string;
+  name?: string;
+  tool_use_id?: string;
+  toolUseId?: string;
+  id?: string;
+  parts?: unknown[];
+};
+
+function asRecord(value: unknown): RawTranscriptEntry {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
+    ? (value as RawTranscriptEntry)
     : {};
 }
 
@@ -48,7 +78,7 @@ function firstString(value: unknown): string | null {
   return null;
 }
 
-function detectToolStatus(record: Record<string, unknown>): TranscriptToolStatus | null {
+function detectToolStatus(record: RawTranscriptEntry): TranscriptToolStatus | null {
   const candidate = [record.status, record.tool_status, record.toolStatus].find(
     (value) => typeof value === "string" && value.trim(),
   ) as string | undefined;

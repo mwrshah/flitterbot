@@ -1,6 +1,6 @@
 import type http from "node:http";
 
-export async function readJsonBody<T = any>(req: http.IncomingMessage): Promise<T> {
+export async function readJsonBody<T = unknown>(req: http.IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
