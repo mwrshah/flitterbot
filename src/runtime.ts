@@ -245,6 +245,9 @@ export class ControlSurfaceRuntime {
 
     // Route to the correct session's queue
     const target = this.resolveTargetSession(input, item);
+    if (!target) {
+      throw new Error("No target session available");
+    }
 
     // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
     // streamingBehavior: "steer". The Pi SDK handles both streaming and non-streaming states.
@@ -400,6 +403,10 @@ export class ControlSurfaceRuntime {
     }
     if (!targetQueue) {
       targetQueue = this.sessionManager.getDefault();
+    }
+    if (!targetQueue) {
+      this.log(`hook: no target session found for session_id=${sessionId}`);
+      return { ok: false };
     }
 
     const text = formatHookMessage(normalized, payload);
@@ -573,7 +580,7 @@ export class ControlSurfaceRuntime {
    * Resolve which ManagedPiSession should handle this message.
    * May lazily create an orchestrator if needed.
    */
-  private resolveTargetSession(input: EnqueueInput, _item: QueueItem): ManagedPiSession {
+  private resolveTargetSession(input: EnqueueInput, _item: QueueItem): ManagedPiSession | undefined {
     const meta = input.metadata;
 
     // Direct-targeted session (web UI tab input) — bypass all routing
@@ -878,7 +885,7 @@ export class ControlSurfaceRuntime {
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,
-                source: "user",
+                source: "web",
                 metadata: {
                   workstream_id: ws.id,
                   workstream_name: ws.name,
@@ -1248,8 +1255,9 @@ export class ControlSurfaceRuntime {
           markSessionEnded(this.blackboard, session.sessionId, "idle_timeout");
         }
         // Check all active sessions for stuck turns
+        const defaultManaged = this.sessionManager.getDefault();
         const allManaged = [
-          this.sessionManager.getDefault(),
+          ...(defaultManaged ? [defaultManaged] : []),
           ...this.sessionManager.listOrchestrators(),
         ];
         for (const managed of allManaged) {

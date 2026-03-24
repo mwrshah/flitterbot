@@ -73,10 +73,9 @@ export async function handleBrowserPiHistoryRoute(
   // When input surface requests history with no specific session, aggregate all
   if (historyMode === "input" && !piSessionId) {
     const allSessions: ManagedPiSession[] = [];
-    try {
-      allSessions.push(runtime.sessionManager.getDefault());
-    } catch {
-      /* no default yet */
+    const defaultSession = runtime.sessionManager.getDefault();
+    if (defaultSession) {
+      allSessions.push(defaultSession);
     }
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
