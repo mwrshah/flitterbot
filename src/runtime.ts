@@ -40,6 +40,7 @@ import type {
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
   StatusResponse,
+  WorkstreamRoutingMeta,
 } from "./contracts/index.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -53,7 +54,7 @@ import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
-import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
@@ -842,10 +843,11 @@ export class ControlSurfaceRuntime {
           required: ["name"],
           additionalProperties: false,
         },
-        execute: async (_toolCallId: string, params: any) => {
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const { name } = params as { name: string };
           const { insertWorkstream } = await import("./blackboard/query-workstreams.ts");
-          const ws = insertWorkstream(this.blackboard, params.name);
-          this.log(`default agent created workstream "${params.name}" (${ws.id})`);
+          const ws = insertWorkstream(this.blackboard, name);
+          this.log(`default agent created workstream "${name}" (${ws.id})`);
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
@@ -930,15 +932,16 @@ export class ControlSurfaceRuntime {
           required: ["workstream_id", "message"],
           additionalProperties: false,
         },
-        execute: async (_toolCallId: string, params: any) => {
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const { workstream_id, message } = params as { workstream_id: string; message: string };
           const { getWorkstreamById } = await import(
             "./blackboard/query-workstreams.ts"
           );
-          const ws = getWorkstreamById(this.blackboard, params.workstream_id);
+          const ws = getWorkstreamById(this.blackboard, workstream_id);
           if (!ws) {
             return {
               content: [
-                { type: "text", text: `Workstream not found: ${params.workstream_id}` },
+                { type: "text", text: `Workstream not found: ${workstream_id}` },
               ],
               details: { error: true },
             };
@@ -963,7 +966,7 @@ export class ControlSurfaceRuntime {
             };
           }
 
-          const formattedText = `[Workstream: "${ws.name}" (${ws.id})]\n${params.message}`;
+          const formattedText = `[Workstream: "${ws.name}" (${ws.id})]\n${message}`;
 
           try {
             orchestrator.queue.enqueue({
@@ -991,7 +994,7 @@ export class ControlSurfaceRuntime {
           try {
             persistInboundMessage(this.blackboard, {
               source: "agent",
-              content: params.message,
+              content: message,
               sender: "system",
               workstreamId: ws.id,
               metadata: {
@@ -1046,12 +1049,13 @@ export class ControlSurfaceRuntime {
           required: ["workstream_id", "repo_path"],
           additionalProperties: false,
         },
-        execute: async (_toolCallId: string, params: any) => {
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const { workstream_id, repo_path, branch_name } = params as { workstream_id: string; repo_path: string; branch_name?: string };
           const result = executeCreateWorktree(
             this.blackboard,
-            params.workstream_id,
-            params.repo_path,
-            params.branch_name,
+            workstream_id,
+            repo_path,
+            branch_name,
           );
           return { content: [{ type: "text", text: result.message }], details: result };
         },
@@ -1071,7 +1075,8 @@ export class ControlSurfaceRuntime {
           required: ["workstream_id"],
           additionalProperties: false,
         },
-        execute: async (_toolCallId: string, params: any) => {
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const { workstream_id } = params as { workstream_id: string };
           const managed = closeWsId ? this.sessionManager.getByWorkstream(closeWsId) : undefined;
           const piSessId = managed?.piSessionId;
           if (!piSessId) {
@@ -1083,13 +1088,13 @@ export class ControlSurfaceRuntime {
           const result = await executeCloseWorkstream(
             this.blackboard,
             piSessId,
-            params.workstream_id,
+            workstream_id,
           );
           if (result.ok) {
             this.wsHub.broadcast({
               type: "workstreams_changed",
               reason: "closed",
-              workstreamId: params.workstream_id,
+              workstreamId: workstream_id,
             });
           }
           return { content: [{ type: "text", text: result.message }], details: result };
@@ -1312,7 +1317,7 @@ export class ControlSurfaceRuntime {
         typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
 
       // Skip router when message targets a specific Pi session (direct tab input)
-      let routerMeta: Record<string, unknown> = {};
+      let routerMeta: WorkstreamRoutingMeta = {};
       if (targetSessionId) {
         routerMeta._targetSessionId = targetSessionId;
       } else {
@@ -1361,25 +1366,19 @@ export class ControlSurfaceRuntime {
 }
 
 function extractFinalAssistantMessage(
-  session: any,
+  session: AgentSession,
 ): { text: string; messageId?: string } | undefined {
-  if (!session?.messages?.length) return undefined;
+  if (!session.messages.length) return undefined;
   for (let i = session.messages.length - 1; i >= 0; i--) {
-    const msg = session.messages[i] as Record<string, unknown> | undefined;
+    const msg = session.messages[i];
     if (!msg || msg.role !== "assistant") continue;
-    // Prefer responseId (Anthropic API identifier, available since SDK 0.60) over generic id
-    const messageId =
-      (typeof msg.responseId === "string" && (msg.responseId as string).trim() ? (msg.responseId as string) : undefined)
-      ?? (typeof msg.id === "string" && (msg.id as string).trim() ? (msg.id as string) : undefined);
-    const content = msg.content;
-    if (typeof content === "string" && content.trim()) return { text: content.trim(), messageId };
-    if (Array.isArray(content)) {
-      const textParts = content
-        .filter((block: any) => block?.type === "text" && typeof block.text === "string")
-        .map((block: any) => block.text)
-        .join("");
-      if (textParts.trim()) return { text: textParts.trim(), messageId };
-    }
+    const assistantMsg = msg as AssistantMessage;
+    const messageId = assistantMsg.responseId?.trim() || undefined;
+    const textParts = assistantMsg.content
+      .filter((block): block is TextContent => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+    if (textParts.trim()) return { text: textParts.trim(), messageId };
     return undefined;
   }
   return undefined;

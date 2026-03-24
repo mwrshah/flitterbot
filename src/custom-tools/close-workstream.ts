@@ -219,7 +219,7 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
       required: ["workstream_id"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId: string, params: any) => {
+    execute: async (_toolCallId: string, params: { workstream_id: string }) => {
       const result = await executeCloseWorkstream(blackboard, piSessionId, params.workstream_id);
       return {
         content: [{ type: "text", text: result.message }],
