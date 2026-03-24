@@ -3,6 +3,8 @@ import path from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { migrateBlackboard } from "./migrate.ts";
 
+export type CountRow = { count: number };
+
 export class BlackboardDatabase {
   readonly path: string;
   readonly sqlite: DatabaseSync;
@@ -29,13 +31,13 @@ export class BlackboardDatabase {
     this.prepare(sql).run(...(params as Array<import("node:sqlite").SQLInputValue>));
   }
 
-  get<T = Record<string, unknown>>(sql: string, ...params: Array<unknown>): T | undefined {
+  get<T>(sql: string, ...params: Array<unknown>): T | undefined {
     return this.prepare(sql).get(...(params as Array<import("node:sqlite").SQLInputValue>)) as
       | T
       | undefined;
   }
 
-  all<T = Record<string, unknown>>(sql: string, ...params: Array<unknown>): T[] {
+  all<T>(sql: string, ...params: Array<unknown>): T[] {
     return this.prepare(sql).all(...(params as Array<import("node:sqlite").SQLInputValue>)) as T[];
   }
 

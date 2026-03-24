@@ -1,12 +1,16 @@
 import type { DatabaseSync } from "node:sqlite";
 import { BLACKBOARD_SCHEMA_SQL, BLACKBOARD_SCHEMA_VERSION } from "../contracts/index.ts";
 
+type MigrationTableRow = { name: string };
+type MigrationVersionRow = { version: number };
+type MigrationCountRow = { count: number };
+
 const LATEST_BLACKBOARD_SCHEMA_VERSION = BLACKBOARD_SCHEMA_VERSION;
 
 function hasTable(db: DatabaseSync, tableName: string): boolean {
   const row = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-    .get(tableName) as { name?: string } | undefined;
+    .get(tableName) as MigrationTableRow | undefined;
   return Boolean(row?.name);
 }
 
@@ -16,9 +20,7 @@ function getSchemaVersion(db: DatabaseSync): number {
   }
   const row = db
     .prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations")
-    .get() as {
-    version: number;
-  };
+    .get() as MigrationVersionRow;
   return Number(row.version ?? 0);
 }
 
@@ -31,9 +33,7 @@ function hasLegacyMarkers(db: DatabaseSync): boolean {
   }
   const row = db
     .prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'running'")
-    .get() as {
-    count: number;
-  };
+    .get() as MigrationCountRow;
   return Number(row.count ?? 0) > 0;
 }
 
