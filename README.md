@@ -18,7 +18,6 @@ Run by **cloning the repo locally** — not yet packaged as a standalone app.
 
 ### Optional
 
-- `uv` for Python lint/audit tooling
 - A modern browser for the web UI
 
 Sanity check:
@@ -39,7 +38,16 @@ pnpm install
 pnpm --dir web install
 ```
 
-### 2) Run the installer
+### 2) Configure environment variables
+
+```bash
+cp .env.example .env
+# Edit .env and add your API keys:
+#   ANTHROPIC_API_KEY  — required for Pi agent inference
+#   GROQ_API_KEY       — required for message classification
+```
+
+### 3) Run the installer
 
 Deploys runtime files into `~/.autonoma/`, bootstraps config, writes `web/.env` with the auth token, optionally prompts for WhatsApp phone number, initializes the blackboard, and installs Claude Code hooks into `~/.claude/settings.json`.
 
@@ -49,7 +57,7 @@ node .autonoma/install.mjs --dry-run    # inspect changes first
 node .autonoma/install.mjs --with-scheduler  # also install launchd/systemd scheduler
 ```
 
-### 3) Review generated config
+### 4) Review generated config
 
 ```bash
 ~/.autonoma/config.json          # controlSurfaceHost/Port/Token, piModel, claudeCliCommand, projectRoot/sourceRoot
@@ -57,7 +65,7 @@ node .autonoma/install.mjs --with-scheduler  # also install launchd/systemd sche
 web/.env                         # VITE_AUTONOMA_BASE_URL, VITE_AUTONOMA_TOKEN (auto-generated, gitignored)
 ```
 
-### 4) Authenticate WhatsApp (optional)
+### 5) Authenticate WhatsApp (optional)
 
 ```bash
 ~/.autonoma/bin/autonoma-wa auth                # QR mode
@@ -166,10 +174,9 @@ pnpm run web:build           # production build
 ## Audit commands
 
 ```bash
-pnpm install && uv sync --dev   # install tooling
+pnpm install                     # install tooling
 pnpm run audit                   # all audits
 pnpm run audit:ts                # TypeScript only
-pnpm run audit:py                # Python only
 pnpm run audit:shell             # Shell only
 ```
 
