@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
   type FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -146,15 +147,21 @@ function CollapsibleContent({
   children: React.ReactNode;
   fadeClassName?: string;
 }) {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const roRef = useRef<ResizeObserver | null>(null);
 
-  useEffect(() => {
-    const el = contentRef.current;
+  const contentRef = useCallback((el: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect();
+      roRef.current = null;
+    }
     if (!el) return;
-    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-  });
+    const check = () => setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+    check();
+    roRef.current = new ResizeObserver(check);
+    roRef.current.observe(el);
+  }, []);
 
   return (
     <div className="relative">
