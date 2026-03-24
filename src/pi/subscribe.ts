@@ -268,7 +268,7 @@ export function subscribeToPiSession(
           broadcast(
             wsHub,
             isLast
-              ? pendingAssistantMessages[i]!
+              ? { ...pendingAssistantMessages[i]!, source: "pi_outbound" }
               : { ...pendingAssistantMessages[i]!, intermediate: true },
           );
         }
