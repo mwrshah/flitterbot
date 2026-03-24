@@ -17,6 +17,7 @@ export function emptyAccum(): SessionAccum {
 export type PiSessionStore = {
   getSessionAccum: (sessionId: string) => SessionAccum;
   updateSession: (sessionId: string, updater: (s: SessionAccum) => SessionAccum) => void;
+  clearSession: (sessionId: string) => void;
   addPill: (sessionId: string, pill: StatusPill) => void;
   removePill: (sessionId: string, id: string) => void;
   /** Returns all appended items from all sessions, sorted by createdAt. */
@@ -84,9 +85,18 @@ export function createPiSessionStore(): PiSessionStore {
     return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
+  function clearSession(sessionId: string) {
+    if (sessions.has(sessionId)) {
+      sessions = new Map(sessions);
+      sessions.delete(sessionId);
+      notify();
+    }
+  }
+
   return {
     getSessionAccum,
     updateSession,
+    clearSession,
     addPill,
     removePill,
     getAllAppendedItems,

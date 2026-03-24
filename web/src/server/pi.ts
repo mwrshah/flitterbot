@@ -26,10 +26,11 @@ async function piRequest(path: string): Promise<unknown> {
 type AnyJson = unknown;
 
 export const fetchPiHistory = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId?: string }) => input)
+  .inputValidator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
   .handler(async ({ data }): Promise<AnyJson> => {
     const params = new URLSearchParams();
     if (data.piSessionId) params.set("piSessionId", data.piSessionId);
+    if (data.surface) params.set("surface", data.surface);
     const qs = params.toString();
     const path = qs ? `/api/pi/history?${qs}` : "/api/pi/history";
     const res = (await piRequest(path)) as { items: ChatTimelineItem[] };
