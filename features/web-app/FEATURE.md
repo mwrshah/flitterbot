@@ -119,6 +119,5 @@ web/src/
 
 ## Observations
 
-- **attention!** Dead code: `fetchPiStatus` in `server/pi.ts` is exported but never imported — all status fetching goes through `statusQueryOptions` in `lib/queries.ts` via the API client. Remove it.
-- **attention!** Duplicate `mergeTimelines`: identical function defined in `routes/pi.route.tsx` (exported, used by child routes) and `components/input-surface/InputSurface.tsx` (local copy). Violates single-source-of-truth — extract to shared utility.
-- **TBD!** Empty `.catch(() => {})` blocks swallow pi-web-ui initialization errors in `InputSurface.tsx:234` and `TranscriptViewer.tsx:22`. Failure is tracked via state flag, but the catch discards the error object — at minimum log it.
+- `mergeTimelines` utility lives in `lib/utils.ts` — deduplicates appended timeline items against loader history by ID.
+- pi-web-ui initialization errors are logged via `console.error` in catch blocks (won't crash the UI).

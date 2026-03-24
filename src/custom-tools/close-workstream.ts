@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { endPiSession } from "../blackboard/query-pi-sessions.ts";
+import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeWorkstream, getWorkstreamById } from "../blackboard/query-workstreams.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";

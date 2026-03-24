@@ -19,7 +19,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
       .then(() => {
         if (!cancelled) setReady(true);
       })
-      .catch(() => {});
+      .catch((err) => console.error("pi-web-ui init failed:", err));
     return () => {
       cancelled = true;
     };

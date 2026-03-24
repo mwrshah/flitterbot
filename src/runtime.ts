@@ -4,9 +4,9 @@ import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
-import { clearAllHealthFlags } from "./blackboard/query-health-flags.ts";
+import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
-import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/query-pi-sessions.ts";
+import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
 import {
   findIdleCleanupCandidates,
   getSessionById,
@@ -28,6 +28,8 @@ import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
 import type {
   ControlSurfaceWebSocketClientEvent,
   WhatsAppDaemonStatus as ControlSurfaceWhatsAppStatus,
+  DaemonCommand,
+  DaemonResponse,
   DeliveryMode,
   DirectSessionMessageResponse,
   HookResponse,
@@ -224,13 +226,13 @@ export class ControlSurfaceRuntime {
     // Route to the correct session's queue
     const target = this.resolveTargetSession(input, item);
 
-    // Steer bypass: if the queue is busy and the session is actively streaming,
-    // deliver the steer directly to the running session instead of waiting in the queue.
-    if (item.deliveryMode === "steer" && target.queue.isBusy() && target.session.isStreaming) {
+    // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
+    // streamingBehavior: "steer". The Pi SDK handles both streaming and non-streaming states.
+    if (item.deliveryMode === "steer" && target.queue.isBusy()) {
       this.log(
-        `steer bypass: delivering ${item.id} directly to ${target.role} (queue busy, session streaming)`,
+        `steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`,
       );
-      void target.session.prompt(formatPromptWithContext(item, target.role), {
+      void target.session.prompt(formatPromptWithContext(item), {
         streamingBehavior: "steer",
         images: item.images,
       });
@@ -673,7 +675,7 @@ export class ControlSurfaceRuntime {
         await this.sendWhatsAppCommand({
           command: "send",
           text: `*B-bot:*\n---\n${surfaceText}`,
-          contextRef: null,
+          contextRef: undefined,
         });
         this.wsHub.broadcast({
           type: "pi_surfaced",
@@ -859,7 +861,7 @@ export class ControlSurfaceRuntime {
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,
-                source: "web",
+                source: "agent",
                 metadata: {
                   workstream_id: ws.id,
                   workstream_name: ws.name,
@@ -1085,17 +1087,17 @@ export class ControlSurfaceRuntime {
     return this.blackboard.prepare(normalized).all() as Array<Record<string, unknown>>;
   }
 
-  private async sendWhatsAppCommand(command: Record<string, unknown>): Promise<any> {
+  private async sendWhatsAppCommand(command: DaemonCommand): Promise<DaemonResponse> {
     if (!this.whatsappEnabled) return { ok: false, status: "disabled" };
     try {
-      const response = await sendDaemonCommand(command as any);
+      const response = await sendDaemonCommand(command);
       if (response.daemon) {
         this.whatsappStatusCache = this.mapDaemonStatus(response.daemon);
       }
       return response;
     } catch {
       await this.startWhatsAppDaemon();
-      const response = await sendDaemonCommand(command as any);
+      const response = await sendDaemonCommand(command);
       if (response.daemon) {
         this.whatsappStatusCache = this.mapDaemonStatus(response.daemon);
       }
@@ -1223,9 +1225,20 @@ export class ControlSurfaceRuntime {
           if (snapshot.busy && snapshot.currentTurnStartedAt) {
             const age = Date.now() - Date.parse(snapshot.currentTurnStartedAt);
             if (age > this.config.toolTimeoutMinutes * 60_000) {
-              this.log(
-                `queue turn appears stuck for ${Math.round(age / 1000)}s (${managed.role}${managed.workstreamId ? ` ws=${managed.workstreamId}` : ""})`,
+              const label = `${managed.role}${managed.workstreamId ? ` ws=${managed.workstreamId}` : ""}`;
+              const ageSeconds = Math.round(age / 1000);
+              this.log(`queue turn appears stuck for ${ageSeconds}s (${label})`);
+              setHealthFlag(
+                this.blackboard,
+                "stuck_turn",
+                `Turn stuck for ${ageSeconds}s (${label})`,
+                30,
               );
+              this.sendWhatsAppCommand({
+                command: "send",
+                text: `⚠️ Stuck turn detected: ${label} — stuck for ${Math.round(age / 60_000)}min. Cron paused via circuit breaker (30min TTL).`,
+                contextRef: undefined,
+              }).catch(() => {});
             }
           }
         }
@@ -1305,7 +1318,7 @@ export class ControlSurfaceRuntime {
         await this.sendWhatsAppCommand({
           command: "send",
           text: `${wsLabel}*User (web):*\n---\n${payload.text}`,
-          contextRef: null,
+          contextRef: undefined,
         });
       } catch (error) {
         this.log(

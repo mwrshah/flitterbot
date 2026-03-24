@@ -85,7 +85,6 @@ function applyLegacyUpgrade(db: DatabaseSync): void {
       db.exec(`
         INSERT INTO sessions (
           session_id,
-          launch_id,
           tmux_session,
           cwd,
           project,
@@ -106,7 +105,6 @@ function applyLegacyUpgrade(db: DatabaseSync): void {
         )
         SELECT
           session_id,
-          launch_id,
           tmux_session,
           COALESCE(NULLIF(cwd, ''), '.') AS cwd,
           COALESCE(NULLIF(project, ''), NULLIF(project_label, ''), COALESCE(NULLIF(cwd, ''), 'unknown')) AS project,
@@ -385,6 +383,135 @@ function applyV9Migration(db: DatabaseSync): void {
   }
 }
 
+function applyV10Migration(db: DatabaseSync): void {
+  // Drop launch_id from sessions; remove 'processed' from whatsapp_messages status CHECK.
+  // SQLite doesn't support DROP COLUMN (pre-3.35) or ALTER CHECK — recreate both tables.
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    // 1. Recreate sessions without launch_id
+    db.exec(`
+      CREATE TABLE sessions_v10 (
+          session_id TEXT PRIMARY KEY,
+          tmux_session TEXT,
+          cwd TEXT NOT NULL,
+          project TEXT NOT NULL,
+          project_label TEXT,
+          model TEXT,
+          permission_mode TEXT,
+          source TEXT,
+          status TEXT NOT NULL DEFAULT 'working'
+            CHECK (status IN ('working', 'idle', 'stale', 'ended')),
+          transcript_path TEXT,
+          task_description TEXT,
+          todoist_task_id TEXT,
+          agent_managed BOOLEAN DEFAULT 0,
+          session_end_reason TEXT,
+          workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+          pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
+          started_at DATETIME NOT NULL,
+          ended_at DATETIME,
+          last_event_at DATETIME NOT NULL,
+          last_tool_started_at DATETIME
+      );
+
+      INSERT INTO sessions_v10
+        SELECT session_id, tmux_session, cwd, project, project_label,
+               model, permission_mode, source, status, transcript_path,
+               task_description, todoist_task_id, agent_managed, session_end_reason,
+               workstream_id, pi_session_id, started_at, ended_at,
+               last_event_at, last_tool_started_at
+        FROM sessions;
+
+      DROP TABLE sessions;
+      ALTER TABLE sessions_v10 RENAME TO sessions;
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
+      CREATE INDEX IF NOT EXISTS idx_sessions_last_event_at ON sessions(last_event_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_workstream ON sessions(workstream_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
+    `);
+
+    // 2. Recreate whatsapp_messages without 'processed' in CHECK
+    db.exec(`
+      CREATE TABLE whatsapp_messages_v10 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          wa_message_id TEXT,
+          remote_jid TEXT NOT NULL,
+          body TEXT NOT NULL,
+          context_ref TEXT,
+          status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'sent', 'delivered', 'failed')),
+          error_message TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+          processed_at DATETIME
+      );
+
+      INSERT INTO whatsapp_messages_v10
+        SELECT * FROM whatsapp_messages WHERE status != 'processed';
+
+      DROP TABLE whatsapp_messages;
+      ALTER TABLE whatsapp_messages_v10 RENAME TO whatsapp_messages;
+
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_status_created ON whatsapp_messages(status, created_at);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (10);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys=ON;");
+  }
+}
+
+/**
+ * V11: Add 'agent' to messages source CHECK constraint.
+ * SQLite CHECK constraints are part of the table definition, so we recreate the table.
+ */
+function applyV11Migration(db: DatabaseSync): void {
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      CREATE TABLE messages_v11 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          content TEXT NOT NULL,
+          sender TEXT,
+          workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO messages_v11 SELECT * FROM messages;
+
+      DROP TABLE messages;
+      ALTER TABLE messages_v11 RENAME TO messages;
+
+      CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_workstream ON messages(workstream_id);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (11);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys=ON;");
+  }
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -430,6 +557,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 9) {
     applyV9Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 10) {
+    applyV10Migration(db);
   }
 
   return getSchemaVersion(db);

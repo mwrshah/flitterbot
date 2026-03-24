@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 9;
+export const BLACKBOARD_SCHEMA_VERSION = 11;
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
 export type PiSessionStatus =
@@ -9,7 +9,8 @@ export type PiSessionStatus =
   | "crashed";
 export type WorkstreamStatus = "open" | "closed";
 export type WhatsAppMessageDirection = "inbound" | "outbound";
-export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "processed" | "failed";
+export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "failed";
+export type PendingActionKind = "whatsapp_auth_expired" | "restart_session" | "approve_change" | "clarify";
 export type PendingActionStatus = "pending" | "resolved" | "expired" | "canceled";
 export type HookEventName = "SessionStart" | "Stop" | "SessionEnd";
 
@@ -67,7 +68,7 @@ export interface WhatsAppMessageRow {
   processed_at: string | null;
 }
 
-export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "pi_outbound";
+export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
 export type UnifiedMessageDirection = "inbound" | "outbound";
 
 export interface MessageRow {
@@ -85,7 +86,7 @@ export interface PendingActionRow {
   action_id: string;
   channel: string;
   context_ref: string | null;
-  kind: string;
+  kind: PendingActionKind;
   prompt_text: string;
   related_session_id: string | null;
   related_todoist_task_id: string | null;
@@ -125,7 +126,6 @@ CREATE TABLE IF NOT EXISTS workstreams (
 
 CREATE TABLE IF NOT EXISTS sessions (
     session_id TEXT PRIMARY KEY,
-    launch_id TEXT,
     tmux_session TEXT,
     cwd TEXT NOT NULL,
     project TEXT NOT NULL,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
     body TEXT NOT NULL,
     context_ref TEXT,
     status TEXT NOT NULL DEFAULT 'pending'
-      CHECK (status IN ('pending', 'sent', 'delivered', 'processed', 'failed')),
+      CHECK (status IN ('pending', 'sent', 'delivered', 'failed')),
     error_message TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     processed_at DATETIME
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'pi_outbound')),
+    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,

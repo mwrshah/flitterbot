@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { ChatTimelineItem, StatusResponse } from "~/lib/types";
+import type { ChatTimelineItem } from "~/lib/types";
 
 const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
@@ -45,8 +45,3 @@ export const fetchPiInputHistory = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const fetchPiStatus = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AnyJson> => {
-    return (await piRequest("/status")) as StatusResponse;
-  },
-);

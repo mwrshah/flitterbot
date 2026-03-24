@@ -5,7 +5,6 @@ import { Badge } from "~/components/ui/Badge";
 import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
 import { statusQueryOptions } from "~/lib/queries";
 import type {
-  ChatTimelineItem,
   ChatTimelineTool,
   ConnectionState,
   DeliveryMode,
@@ -30,18 +29,6 @@ export const Route = createFileRoute("/pi")({
   ),
   component: PiLayoutRoute,
 });
-
-/* ── Deduplication helper ── */
-
-export function mergeTimelines(
-  loaderItems: ChatTimelineItem[],
-  appendedItems: ChatTimelineItem[],
-): ChatTimelineItem[] {
-  if (appendedItems.length === 0) return loaderItems;
-  const seen = new Set(loaderItems.map((item) => item.id));
-  const unique = appendedItems.filter((item) => !seen.has(item.id));
-  return [...loaderItems, ...unique];
-}
 
 /* ── Layout component ── */
 

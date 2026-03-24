@@ -4,7 +4,7 @@ import {
   endPiSession,
   reconcilePreviousPiSessions,
   upsertPiSession,
-} from "../blackboard/query-pi-sessions.ts";
+} from "../blackboard/pi-sessions.ts";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 import type { WebSocketHub } from "../ws/hub.ts";

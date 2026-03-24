@@ -5,7 +5,7 @@ import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiHistory } from "~/server/pi";
-import { mergeTimelines } from "./pi.route";
+import { mergeTimelines } from "~/lib/utils";
 
 export const Route = createFileRoute("/pi/default")({
   loader: async () => {

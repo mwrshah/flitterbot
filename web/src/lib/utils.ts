@@ -72,6 +72,19 @@ export function safeJsonParse<T>(raw: string | null | undefined): T | null {
   }
 }
 
+import type { ChatTimelineItem } from "~/lib/types";
+
+/** Deduplicate appended timeline items against loader history by ID. */
+export function mergeTimelines(
+  loaderItems: ChatTimelineItem[],
+  appendedItems: ChatTimelineItem[],
+): ChatTimelineItem[] {
+  if (appendedItems.length === 0) return loaderItems;
+  const seen = new Set(loaderItems.map((item) => item.id));
+  const unique = appendedItems.filter((item) => !seen.has(item.id));
+  return [...loaderItems, ...unique];
+}
+
 export function extractToolName(event: unknown): string {
   if (typeof event === "object" && event !== null) {
     const record = event as Record<string, unknown>;

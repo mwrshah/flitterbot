@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { PendingActionRow } from "../contracts/index.ts";
+import type { PendingActionKind, PendingActionRow } from "../contracts/index.ts";
 import { getLatestPendingAction, getPendingActionByContextRef } from "./query-whatsapp.ts";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
@@ -9,7 +9,7 @@ type CreatePendingActionInput = {
   actionId?: string;
   channel: string;
   contextRef?: string;
-  kind: string;
+  kind: PendingActionKind;
   promptText: string;
   relatedSessionId?: string;
   relatedTodoistTaskId?: string;

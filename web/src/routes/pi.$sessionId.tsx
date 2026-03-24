@@ -3,7 +3,7 @@ import { ChatPanel } from "~/components/chat/ChatPanel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiHistory } from "~/server/pi";
-import { mergeTimelines } from "./pi.route";
+import { mergeTimelines } from "~/lib/utils";
 
 export const Route = createFileRoute("/pi/$sessionId")({
   loader: async ({ params }) => {

@@ -1,5 +1,5 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { touchPiEvent } from "../blackboard/query-pi-sessions.ts";
+import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,

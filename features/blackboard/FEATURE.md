@@ -10,23 +10,23 @@ Multiple Claude Code sessions run concurrently across tmux and worktrees. The or
 
 **Database wrapper** (`db.ts`): `BlackboardDatabase` class wraps Node's `DatabaseSync`. Constructor creates the directory, opens the file, sets WAL mode + busy timeout + foreign keys, and runs migrations. Exposes `exec`, `prepare`, `run`, `get`, `all`, `ping`, `close`.
 
-**Schema** is defined as a SQL string in `src/contracts/blackboard.ts` (`BLACKBOARD_SCHEMA_SQL`) — the contracts package is the single source of truth for the schema and all row types. The local `schema.sql` is a reference copy.
+**Schema** is defined as a SQL string in `src/contracts/blackboard.ts` (`BLACKBOARD_SCHEMA_SQL`) — the contracts package is the single source of truth for the schema and all row types.
 
-**Migrations** (`migrate.ts`): versioned (currently v9), tracked in `schema_migrations`. Fresh databases get the full schema in one shot. Existing databases step through incremental migrations. Legacy upgrade handles the v1–v3 transition (drops `events`/`agents` tables, remaps `running` → `working` status). Migrations v4–v9 add workstreams, refine pi_session statuses, add the unified `messages` table, add `health_flags`, and add `pi_sessions.workstream_id`.
+**Migrations** (`migrate.ts`): versioned (currently v10), tracked in `schema_migrations`. Fresh databases get the full schema in one shot. Existing databases step through incremental migrations. Legacy upgrade handles the v1–v3 transition (drops `events`/`agents` tables, remaps `running` → `working` status). Migrations v4–v9 add workstreams, refine pi_session statuses, add the unified `messages` table, add `health_flags`, and add `pi_sessions.workstream_id`. Migration v10 drops `sessions.launch_id` and removes the phantom `'processed'` status from `whatsapp_messages`.
 
 **Code organization**: query modules (read) and write modules (write) are split by domain:
 
 | Domain | Query | Write |
 |--------|-------|-------|
 | Claude sessions | `query-sessions.ts` | (inserts/updates in same file) |
-| Pi sessions | `query-pi-sessions.ts` | `write-pi-sessions.ts` |
+| Pi sessions | `pi-sessions.ts` | `write-pi-sessions.ts` |
 | WhatsApp messages | `query-whatsapp.ts` | `write-whatsapp.ts` |
 | Unified messages | `query-messages.ts` | `write-messages.ts` |
 | Pending actions | (queries in `query-whatsapp.ts`) | `write-pending-actions.ts` |
 | Workstreams | `query-workstreams.ts` | (inserts/updates in same file) |
 | Health flags | `query-health-flags.ts` | (in same file) |
 
-`index.ts` re-exports everything as the public API.
+Consumers import directly from individual modules (no barrel file).
 
 ## Tables
 
@@ -38,9 +38,9 @@ Multiple Claude Code sessions run concurrently across tmux and worktrees. The or
 
 **`messages`** — Unified message log across all channels. Source: whatsapp | web | hook | cron | init | pi_outbound. Direction: inbound | outbound. Links to workstream. Supports conversation history queries per-workstream with time windowing.
 
-**`whatsapp_messages`** — WhatsApp-specific message tracking with delivery status lifecycle (pending → sent → delivered | failed). Supports reply matching via `context_ref` and `wa_message_id`.
+**`whatsapp_messages`** — WhatsApp-specific message tracking with delivery status lifecycle (pending → sent → delivered | failed). Supports reply matching via `context_ref` and `wa_message_id`. The `processed_at` column records when the message was handled by the control surface.
 
-**`pending_actions`** — User decisions that survive process restarts. Kind: restart_session, approve_change, clarify, etc. Status: pending → resolved | expired | canceled. Linked to sessions and Todoist tasks via optional FKs.
+**`pending_actions`** — User decisions that survive process restarts. Kind is typed via `PendingActionKind` (whatsapp_auth_expired, restart_session, approve_change, clarify). Status: pending → resolved | expired | canceled. Linked to sessions and Todoist tasks via optional FKs.
 
 **`health_flags`** — Circuit-breaker flags with optional TTL. Set/cleared by the control surface to signal degraded subsystems.
 
@@ -62,10 +62,10 @@ Multiple Claude Code sessions run concurrently across tmux and worktrees. The or
 
 All row types and status enums live in `src/contracts/blackboard.ts`:
 - `ClaudeSessionStatus`, `PiSessionStatus`, `WorkstreamStatus`
-- `WhatsAppMessageDirection`, `WhatsAppMessageStatus`, `PendingActionStatus`
+- `WhatsAppMessageDirection`, `WhatsAppMessageStatus`, `PendingActionKind`, `PendingActionStatus`
 - `UnifiedMessageSource`, `UnifiedMessageDirection`
 - `HookEventName`, `HookRouteEventName`
-- Schema version: `BLACKBOARD_SCHEMA_VERSION` (currently 9)
+- Schema version: `BLACKBOARD_SCHEMA_VERSION` (currently 10)
 
 ## Key Files
 
@@ -73,10 +73,8 @@ All row types and status enums live in `src/contracts/blackboard.ts`:
 src/blackboard/
   db.ts                    — BlackboardDatabase class, open/ping helpers
   migrate.ts               — Versioned migration logic (v1→v9)
-  index.ts                 — Public API re-exports
-  schema.sql               — Reference copy of full schema
   query-sessions.ts        — Session CRUD, staleness, injection eligibility
-  query-pi-sessions.ts     — Pi session reads + delegates to write module
+  pi-sessions.ts           — Pi session facade (reads + delegates to write module)
   query-whatsapp.ts        — WhatsApp + pending action reads
   query-messages.ts        — Unified message reads, conversation history
   query-workstreams.ts     — Workstream CRUD + pi session lookups
@@ -88,18 +86,6 @@ src/blackboard/
 src/contracts/blackboard.ts — Schema SQL, row types, status enums, version
 ```
 
-## Observations
+## Open Questions
 
-**attention!** `schema.sql` and `contracts/blackboard-schema.sql` are stale — both are identical to each other but behind `BLACKBOARD_SCHEMA_SQL` in `contracts/blackboard.ts`. They're missing `pi_sessions.workstream_id` (v9), the `health_flags` table (v7), and the `idx_pi_sessions_workstream` index. The contracts SQL is the one `migrate.ts` actually uses for fresh databases; these files are dead reference copies that will mislead anyone reading them.
-
-**attention!** The barrel export (`index.ts`) is never imported. Every external consumer (`runtime.ts`, `whatsapp/daemon.ts`, `pi/session-manager.ts`, `routes/`, `custom-tools/`, etc.) imports directly from individual modules (`blackboard/query-sessions.ts`, `blackboard/write-whatsapp.ts`, etc.). The barrel re-exports 66 symbols; roughly 25 of those have zero external callers. The file exists but serves no purpose.
-
-**attention!** `sessions.launch_id` is always written as `null`. `insertSession` (`query-sessions.ts:281`) hardcodes `null` for the launch_id parameter. No other code path writes a non-null value. The column exists in the schema and survives through legacy migration but is dead.
-
-**attention!** `WhatsAppMessageStatus` includes `'processed'` in both the type and the schema CHECK constraint, but no code path ever writes this status. The actual lifecycle is pending → sent → delivered | failed. `'processed'` is a phantom status.
-
-**TBD!** `setHealthFlag` and `clearHealthFlag` have zero callers outside the blackboard module. The only health_flags usage is `clearAllHealthFlags` called once at runtime startup (blanket reset) and `getActiveHealthFlags` read by the cron-tick route. The circuit-breaker infrastructure exists but no subsystem sets flags — it's plumbing with no consumers.
-
-**TBD!** `query-pi-sessions.ts` is misnamed — it imports from `write-pi-sessions.ts` and re-exports write operations (`upsertPiSession`, `touchPiPrompt`, `touchPiEvent`, `endPiSession`, `reconcilePreviousPiSessions`). All external callers use it for writes. The query/write split documented in the Architecture table is not accurate for this domain; `query-pi-sessions.ts` is effectively the combined facade.
-
-**TBD!** Pending action `kind` has no schema constraint or type enum — it's a freeform string. The FEATURE.md lists "restart_session, approve_change, clarify" but the only kind actually written in the codebase is `"whatsapp_auth_expired"` (in `whatsapp/daemon.ts`). The other kinds may be passed through from external callers via `PendingActionRequest`, but no enum enforces the contract.
+- **Health flag setters have zero callers.** `setHealthFlag`/`clearHealthFlag` are exported infrastructure for the circuit-breaker system, but no subsystem calls them yet. Callers are needed for `rate_limit`, `llm_error`, and `pi_crash_loop` scenarios. The only current usage is `clearAllHealthFlags` (blanket reset at startup) and `getActiveHealthFlags` (read by cron-tick route).

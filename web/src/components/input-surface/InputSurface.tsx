@@ -21,7 +21,7 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { createId } from "~/lib/utils";
+import { createId, mergeTimelines } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -231,7 +231,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
       .then(() => {
         if (!cancelled) setReady(true);
       })
-      .catch(() => {});
+      .catch((err) => console.error("pi-web-ui init failed:", err));
     return () => {
       cancelled = true;
     };
@@ -308,18 +308,6 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 }
 
 /* ── Main Component ── */
-
-/* ── Deduplication helper (same logic as pi.route.tsx) ── */
-
-function mergeTimelines(
-  loaderItems: ChatTimelineItem[],
-  appendedItems: ChatTimelineItem[],
-): ChatTimelineItem[] {
-  if (appendedItems.length === 0) return loaderItems;
-  const seen = new Set(loaderItems.map((item) => item.id));
-  const unique = appendedItems.filter((item) => !seen.has(item.id));
-  return [...loaderItems, ...unique];
-}
 
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
   const rootApi = getRouteApi("__root__");

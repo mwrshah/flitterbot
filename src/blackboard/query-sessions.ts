@@ -251,11 +251,11 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
 
   db.prepare(
     `INSERT INTO sessions (
-       session_id, launch_id, tmux_session, cwd, project, project_label,
+       session_id, tmux_session, cwd, project, project_label,
        model, permission_mode, source, status, transcript_path,
        task_description, todoist_task_id, agent_managed,
        pi_session_id, workstream_id, started_at, last_event_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?, ?, ?, ?, ?, ?)
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(session_id) DO UPDATE SET
        tmux_session = COALESCE(excluded.tmux_session, sessions.tmux_session),
        cwd = excluded.cwd,
@@ -278,7 +278,6 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
        last_event_at = MAX(sessions.last_event_at, excluded.last_event_at)`,
   ).run(
     payload.session_id,
-    null,
     textOrNull(payload.tmux_session),
     cwd,
     project,

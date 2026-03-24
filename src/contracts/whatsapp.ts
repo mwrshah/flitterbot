@@ -1,3 +1,4 @@
+import type { PendingActionKind } from "./blackboard.ts";
 import type { WhatsAppDaemonStatus as ControlSurfaceWhatsAppStatus } from "./control-surface-api.ts";
 
 export type WhatsAppConnectionStatus = Exclude<ControlSurfaceWhatsAppStatus, "unknown">;
@@ -33,7 +34,7 @@ export interface SendWhatsAppResult {
 }
 
 export interface PendingActionRequest {
-  kind: string;
+  kind: PendingActionKind;
   promptText: string;
   relatedSessionId?: string;
   relatedTodoistTaskId?: string;
