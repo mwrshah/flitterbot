@@ -29,6 +29,13 @@ export class AutonomaWsClient {
   }
 
   connect() {
+    // Close any existing socket to prevent orphans
+    if (this.socket) {
+      this.socket.onclose = null; // prevent triggering scheduleReconnect
+      this.socket.close();
+      this.socket = null;
+    }
+
     const { baseUrl, token, useStubFallback } = this.getSettings();
     const wsUrl = baseUrl.replace(/^http/, "ws").replace(/\/$/, "");
     const params = token ? `?token=${encodeURIComponent(token)}` : "";
