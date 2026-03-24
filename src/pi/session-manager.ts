@@ -78,7 +78,7 @@ export class PiSessionManager {
     return Array.from(this.orchestrators.values());
   }
 
-  async createDefault(customTools: Array<any>): Promise<ManagedPiSession> {
+  async createDefault(customTools: unknown[]): Promise<ManagedPiSession> {
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
     reconcilePreviousPiSessions(this.blackboard, "orchestrator", this.runtimeInstanceId, "restart");
 
@@ -122,7 +122,7 @@ export class PiSessionManager {
     workstreamId: string,
     workstreamName: string,
     repoPath?: string,
-    customTools?: Array<any>,
+    customTools?: unknown[],
   ): Promise<ManagedPiSession> {
     // If one already exists for this workstream, return it
     const existing = this.orchestrators.get(workstreamId);
@@ -252,7 +252,7 @@ export class PiSessionManager {
   }
 
   private buildManagedSession(
-    created: { session: any; modelInfo: { provider?: string; id?: string } },
+    created: { session: AgentSession; modelInfo: { provider?: string; id?: string } },
     state: PiSessionState,
     role: "default" | "orchestrator",
     workstreamId: string | null,

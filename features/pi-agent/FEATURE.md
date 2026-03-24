@@ -111,14 +111,14 @@ Per-turn prompt: `formatPromptWithContext(item, role)` — currently returns `it
 
 ## Observations
 
-**attention!** Dual steer delivery paths diverge in behavior. `runtime.enqueue()` (line ~229) catches steer when `queue.isBusy() && session.isStreaming` and calls `session.prompt()` directly with `streamingBehavior: "steer"`. If the queue is busy but the session is *not* streaming, the steer falls through to `TurnQueue.enqueue()` (line ~45), which fire-and-forgets through the full `processQueueItem` callback — that callback only sets `streamingBehavior` when `session.isStreaming`, so this second path delivers the steer as a normal follow-up prompt. The two paths produce different behavior for the same delivery mode.
+*Resolved:* Steer bypass in `runtime.enqueue()` now delivers directly via `session.prompt()` with `streamingBehavior: "steer"` whenever the queue is busy, regardless of streaming state. The `isStreaming` guard was removed.
 
-**attention!** `enqueue_message` tool tags agent-to-agent messages as `source: "web"` (both the queue item and the persisted blackboard row). Human web messages use the same source value — making agent-forwarded messages indistinguishable from human input in queries and logs. Consider a dedicated source like `"agent"` or `"internal"`.
+*Resolved:* `enqueue_message` and `create_workstream` initial messages now use `source: "agent"` instead of `"web"`. Added `"agent"` to `MessageSource`, `UnifiedMessageSource`, and the `messages` table CHECK constraint (migration v11).
 
-**attention!** `persistOutboundMessage` is called with `source: "pi_outbound" as any` (runtime.ts ~656). The `as any` cast indicates the `MessageSource` union doesn't include this value — the type and the runtime disagree.
+*Resolved:* `"pi_outbound"` added to `MessageSource` union; `as any` cast removed from `persistOutboundMessage` call.
 
-**TBD!** `formatPromptWithContext()` is a pass-through that returns `item.text` unchanged. The `_role` parameter is accepted but unused. Either this is a planned extension point or dead complexity that could be inlined.
+*Resolved:* `formatPromptWithContext()` — removed unused `_role` parameter, updated all call sites.
 
-**TBD!** `ManagedPiSession.session` is typed `any` and `customTools` is `Array<any>` throughout the chain (`runtime.createCustomTools` → `createAutonomaAgent` → `PiSessionManager`). The Pi SDK likely exports session and tool types that could replace these.
+*Resolved:* `ManagedPiSession.session` typed as `AgentSession` (from `@mariozechner/pi-coding-agent`). `customTools` typed as `unknown[]` through the chain, with an explicit cast to `ToolDefinition[]` at the SDK boundary in `createAutonomaAgent()`. A local `CustomToolDefinition` type in `runtime.ts` captures the plain-JSON-Schema tool shape.
 
-**TBD!** `enqueue_message` doesn't wrap `orchestrator.queue.enqueue()` in try/catch. If the orchestrator crashed and its queue is stopped, the throw propagates as an unhandled tool execution error rather than a clean error message to the default agent.
+*Resolved:* `enqueue_message` tool wraps `orchestrator.queue.enqueue()` in try/catch, returning a clean error message if the queue is stopped.

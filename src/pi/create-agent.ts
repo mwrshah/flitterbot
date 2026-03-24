@@ -25,9 +25,13 @@ const HOME = os.homedir();
 
 type PiRole = "default" | "orchestrator";
 
+/**
+ * Custom tools use plain JSON Schema objects for `parameters` (not TypeBox TSchema),
+ * so we accept a loose array and cast to ToolDefinition[] at the SDK boundary.
+ */
 type CreateAutonomaAgentOptions = {
   config: AutonomaConfig;
-  customTools: ToolDefinition[];
+  customTools: unknown[];
   role?: PiRole;
   orchestratorContext?: OrchestratorInput;
 };
@@ -82,7 +86,7 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
     model,
     thinkingLevel: config.piThinkingLevel,
     tools: [createReadTool(workingDir), createBashTool(workingDir), createGrepTool(workingDir)],
-    customTools,
+    customTools: customTools as ToolDefinition[],
     resourceLoader,
     sessionManager,
     settingsManager,

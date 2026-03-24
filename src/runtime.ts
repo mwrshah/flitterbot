@@ -50,13 +50,24 @@ import {
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { extractLastAssistantText } from "./transcript/reader.ts";
 import { type WebSocketClient, WebSocketHub } from "./ws/hub.ts";
+
+/** Custom tool shape using plain JSON Schema (not TypeBox). Cast to ToolDefinition[] at the SDK boundary. */
+type CustomToolDefinition = {
+  name: string;
+  label: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  execute: (toolCallId: string, params: any, ...rest: unknown[]) => Promise<{
+    content: Array<{ type: string; text: string }>;
+    details?: unknown;
+  }>;
+};
 
 type EnqueueInput = {
   text: string;
@@ -753,8 +764,8 @@ export class ControlSurfaceRuntime {
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     workstreamId?: string,
-  ): ToolDefinition[] {
-    const tools: ToolDefinition[] = [
+  ): CustomToolDefinition[] {
+    const tools: CustomToolDefinition[] = [
       {
         name: "query_blackboard",
         label: "Query Blackboard",
@@ -951,16 +962,28 @@ export class ControlSurfaceRuntime {
 
           const formattedText = `[Workstream: "${ws.name}" (${ws.id})]\n${params.message}`;
 
-          orchestrator.queue.enqueue({
-            id: `enq-msg-${crypto.randomUUID()}`,
-            text: formattedText,
-            source: "agent",
-            metadata: {
-              workstream_id: ws.id,
-              workstream_name: ws.name,
-            },
-            receivedAt: new Date().toISOString(),
-          });
+          try {
+            orchestrator.queue.enqueue({
+              id: `enq-msg-${crypto.randomUUID()}`,
+              text: formattedText,
+              source: "agent",
+              metadata: {
+                workstream_id: ws.id,
+                workstream_name: ws.name,
+              },
+              receivedAt: new Date().toISOString(),
+            });
+          } catch (enqueueError) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Failed to enqueue message to workstream "${ws.name}": ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+                },
+              ],
+              details: { error: true },
+            };
+          }
 
           try {
             persistInboundMessage(this.blackboard, {
