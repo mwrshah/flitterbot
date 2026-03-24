@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
@@ -20,6 +21,14 @@ import type {
   MessageSource,
 } from "~/lib/types";
 import { mergeTimelines } from "~/lib/utils";
+
+const emptySubscribe = () => () => {};
+const useIsClient = () =>
+  useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
 /* ── Types ── */
 
@@ -315,6 +324,7 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 /* ── Main Component ── */
 
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
+  const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");
@@ -410,7 +420,9 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
-        <Badge variant={connectionVariant}>{connectionLabel}</Badge>
+        {isClient && (
+          <Badge variant={connectionVariant}>{connectionLabel}</Badge>
+        )}
       </div>
 
       {/* Activity feed */}
