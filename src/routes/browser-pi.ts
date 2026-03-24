@@ -88,6 +88,12 @@ export async function handleBrowserPiHistoryRoute(
       if (snapshot.sessionId) processedSessionIds.add(snapshot.sessionId);
 
       const items = await readSessionHistory(session, historyMode, resolver);
+      // Prefix IDs to avoid collisions across sessions in the aggregate response.
+      // NOTE: WS events use bare UUIDs (no prefix). This is safe because the
+      // /pi/default route refetches with a specific piSessionId once known,
+      // switching to the single-session path which also returns bare IDs.
+      // The prefixed aggregate response is only used as initialData before
+      // defaultSessionId resolves — during which no WS events are being merged.
       const sessionPrefix = snapshot.sessionId ?? "default";
       for (const item of items) {
         item.id = `${sessionPrefix}:${item.id}`;

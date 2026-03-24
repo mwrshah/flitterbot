@@ -211,7 +211,7 @@ export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
-  | { type: "text_delta"; delta: string; messageId?: string; sessionId?: string }
+  | { type: "text_delta"; delta: string; messageId: string; sessionId?: string }
   | {
       type: "message_end";
       messageId: string;
@@ -226,7 +226,7 @@ export type WsMessage =
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
-      id?: string;
+      id: string;
       tool?: string;
       toolUseId?: string;
       args?: unknown;

@@ -69,7 +69,7 @@ export interface TextDeltaWebSocketEvent {
   type: "text_delta";
   sessionId?: string;
   /** Server UUID of the message being streamed. */
-  messageId?: string;
+  messageId: string;
   delta: string;
 }
 
@@ -92,7 +92,7 @@ export interface MessageEndWebSocketEvent {
 export interface ToolExecutionStartWebSocketEvent {
   type: "tool_execution_start";
   /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:start" */
-  id?: string;
+  id: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;
@@ -104,7 +104,7 @@ export interface ToolExecutionStartWebSocketEvent {
 export interface ToolExecutionEndWebSocketEvent {
   type: "tool_execution_end";
   /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:end" */
-  id?: string;
+  id: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;

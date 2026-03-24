@@ -221,7 +221,7 @@ export function subscribeToPiSession(
         const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
         const deterministicId = toolCallId
           ? `${anchorId}:tool:${toolCallId}:start`
-          : undefined;
+          : `${anchorId}:tool:pos-${toolIndex}:start`;
 
         const payload: ToolExecutionStartWebSocketEvent = {
           type: "tool_execution_start",
@@ -245,7 +245,7 @@ export function subscribeToPiSession(
         const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
         const deterministicId = toolCallId
           ? `${anchorId}:tool:${toolCallId}:end`
-          : undefined;
+          : `${anchorId}:tool:pos-${toolIndex}:end`;
 
         const payload: ToolExecutionEndWebSocketEvent = {
           type: "tool_execution_end",

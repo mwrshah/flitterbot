@@ -88,7 +88,7 @@ export function usePiWsHandler(
       if (message.type === "text_delta") {
         store.updateSession(sessionId, (s) => ({
           ...s,
-          streamingMessageId: message.messageId ?? s.streamingMessageId,
+          streamingMessageId: message.messageId,
           streamingText: (s.streamingText ?? "") + message.delta,
         }));
         return;
@@ -178,7 +178,7 @@ export function usePiWsHandler(
             : undefined;
 
         const toolEvent: ChatTimelineTool = {
-          id: message.id ?? createId("tool"),
+          id: message.id,
           kind: "tool",
           tool: message.tool || extractToolName(message.event),
           phase: message.type === "tool_execution_start" ? "start" : "end",
