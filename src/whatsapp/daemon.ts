@@ -7,7 +7,6 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
-  type WAMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
@@ -61,11 +60,9 @@ function delay(ms: number): Promise<void> {
 }
 
 function getDisconnectCode(update: Partial<ConnectionState>): number | undefined {
-  const error = update.lastDisconnect?.error as
-    | { output?: { statusCode?: number }; statusCode?: number; data?: { statusCode?: number } }
-    | undefined;
-
-  return error?.output?.statusCode ?? error?.statusCode ?? error?.data?.statusCode;
+  const error = update.lastDisconnect?.error;
+  if (!error || !("output" in error)) return undefined;
+  return error.output.statusCode;
 }
 
 function formatError(error: unknown): string {
@@ -238,7 +235,7 @@ class WhatsAppDaemon {
         return;
       }
 
-      for (const message of upsert.messages as WAMessage[]) {
+      for (const message of upsert.messages) {
         const rejectionReason = getInboundMessageRejectionReason(message, allowedJids);
         if (rejectionReason) {
           logger.info(
@@ -264,8 +261,8 @@ class WhatsAppDaemon {
     });
 
     this.socket.ev.on("message-receipt.update", (updates) => {
-      for (const update of updates as Array<{ key?: { id?: string } }>) {
-        const id = update.key?.id;
+      for (const update of updates) {
+        const id = update.key.id;
         if (id) {
           markWhatsAppMessageDelivered(this.db, id);
         }
@@ -477,9 +474,11 @@ class WhatsAppDaemon {
     this.status = "stopping";
 
     try {
-      (this.socket?.ev as any)?.removeAllListeners?.();
-      const transport = this.socket as unknown as { ws?: { close: () => void } } | undefined;
-      transport?.ws?.close?.();
+      this.socket?.ev.removeAllListeners("creds.update");
+      this.socket?.ev.removeAllListeners("connection.update");
+      this.socket?.ev.removeAllListeners("messages.upsert");
+      this.socket?.ev.removeAllListeners("message-receipt.update");
+      this.socket?.ws.close();
     } catch (error) {
       logger.warn({ err: error }, "failed to close WhatsApp socket cleanly");
     }
