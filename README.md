@@ -43,7 +43,7 @@ pnpm --dir web install
 ```bash
 cp .env.example .env
 # Edit .env and add your API keys:
-#   ANTHROPIC_API_KEY  — required for Pi agent inference
+#   ANTHROPIC_API_KEY  — optional if you have Pi OAuth tokens (`pi auth login`)
 #   GROQ_API_KEY       — required for message classification
 ```
 
