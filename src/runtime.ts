@@ -844,7 +844,7 @@ export class ControlSurfaceRuntime {
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
 
             if (originalText) {
-              const messageText = originalText + '\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.';
+              const messageText = originalText;
               const prompt = this.sessionManager.buildWorkstreamPrompt(
                 messageText,
                 ws.name,
