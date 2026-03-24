@@ -44,19 +44,29 @@ append_log() {
   printf '[%s] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$level" "$message" >> "$path"
 }
 
+# Read a value from config.json using Node.js.
+# Usage: config_value '.controlSurfaceHost' '127.0.0.1'
+# The leading dot is optional and stripped automatically.
 config_value() {
-  local jq_expr="$1"
+  local key="${1#.}"
   local fallback="$2"
-  if command -v jq >/dev/null 2>&1 && [[ -f "$AUTONOMA_CONFIG" ]]; then
-    local value
-    value=$(jq -r --arg fallback "$fallback" "$jq_expr // \$fallback" "$AUTONOMA_CONFIG" 2>/dev/null || true)
-    if [[ -n "$value" && "$value" != "null" ]]; then
-      printf '%s\n' "$value"
-      return 0
-    fi
+  if [[ ! -f "$AUTONOMA_CONFIG" ]]; then
+    printf '%s\n' "$fallback"
+    return 0
   fi
 
-  printf '%s\n' "$fallback"
+  local value
+  value=$(node -e "
+    const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
+    const v = c[process.argv[2]];
+    process.stdout.write(v != null ? String(v) : '');
+  " "$AUTONOMA_CONFIG" "$key" 2>/dev/null || true)
+
+  if [[ -n "$value" && "$value" != "null" ]]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
 }
 
 config_int() {
@@ -107,25 +117,33 @@ curl_status_json() {
   curl --silent --show-error --max-time 2 --connect-timeout 1 "http://${host}:${port}/status"
 }
 
+# Check if JSON body has .ok == true using Node.js
 status_is_ok() {
   local body="$1"
-  if [[ -z "$body" ]] || ! command -v jq >/dev/null 2>&1; then
+  if [[ -z "$body" ]]; then
     return 1
   fi
 
-  printf '%s' "$body" | jq -e '.ok == true' >/dev/null 2>&1
+  node -e "
+    try { process.exit(JSON.parse(process.argv[1]).ok === true ? 0 : 1); }
+    catch { process.exit(1); }
+  " "$body" 2>/dev/null
 }
 
+# Check if JSON body indicates an active Pi session
 status_has_active_pi() {
   local body="$1"
   if ! status_is_ok "$body"; then
     return 1
   fi
 
-  printf '%s' "$body" | jq -e '
-    .pi.default != null and
-    (.pi.default.sessionId? != null and .pi.default.sessionId != "")
-  ' >/dev/null 2>&1
+  node -e "
+    try {
+      const s = JSON.parse(process.argv[1]);
+      const d = s.pi && s.pi.default;
+      process.exit(d && d.sessionId ? 0 : 1);
+    } catch { process.exit(1); }
+  " "$body" 2>/dev/null
 }
 
 wait_for_active_pi() {

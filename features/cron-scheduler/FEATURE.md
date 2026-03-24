@@ -99,7 +99,7 @@ Cron messages enter the default Pi session's `TurnQueue` with `source: "cron"` a
 
 - **resolved** `setHealthFlag` now called from stuck-turn detection. The maintenance loop in `runtime.ts` calls `setHealthFlag(db, "stuck_turn", reason, 30)` when a turn exceeds `toolTimeoutMinutes`, activating the circuit breaker gate in `cron-tick.ts`. A WhatsApp alert is also sent.
 
-- **resolved** Bash script now errors on missing `jq`. `autonoma-checkin.sh` prints an error to stderr and exits 1 if `jq` is not installed, instead of silently exiting 0.
+- **resolved** `jq` dependency removed from all shell scripts. Config parsing now uses Node.js (already a required dependency).
 
 - **resolved** Gate sequence documented correctly. The 6-step gate sequence in this doc matches the implementation in `cron-tick.ts`.
 

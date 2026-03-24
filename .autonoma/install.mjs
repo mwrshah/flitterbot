@@ -690,7 +690,7 @@ function initBlackboard() {
     return;
   }
 
-  // Read blackboardPath from config to pass as env so init-db.sh skips jq
+  // Read blackboardPath from config to pass as env to init-db.sh
   let dbPath = "";
   const configPath = join(AUTONOMA_DIR, "config.json");
   if (existsSync(configPath)) {

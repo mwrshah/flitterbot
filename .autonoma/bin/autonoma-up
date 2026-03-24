@@ -82,8 +82,11 @@ pid_from_file() {
 }
 
 pid_from_state_file() {
-  if [[ -f "$STATE_FILE" ]] && command -v jq >/dev/null 2>&1; then
-    jq -r '.pid // empty' "$STATE_FILE" 2>/dev/null || true
+  if [[ -f "$STATE_FILE" ]]; then
+    node -e "
+      const s = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
+      if (s.pid) process.stdout.write(String(s.pid));
+    " "$STATE_FILE" 2>/dev/null || true
   fi
 }
 
@@ -150,15 +153,16 @@ write_state_file() {
   local attempt="$1"
   local pid="$2"
   local command="$3"
-  if command -v jq >/dev/null 2>&1; then
-    jq -n \
-      --arg started_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      --arg command "$command" \
-      --arg pid "$pid" \
-      --arg attempt "$attempt" \
-      '{startedAt:$started_at,command:$command,pid:($pid|tonumber),attempt:($attempt|tonumber)}' > "$STATE_FILE"
-    chmod 600 "$STATE_FILE"
-  fi
+  node -e "
+    const fs = require('fs');
+    fs.writeFileSync(process.argv[1], JSON.stringify({
+      startedAt: process.argv[2],
+      command: process.argv[3],
+      pid: Number(process.argv[4]),
+      attempt: Number(process.argv[5]),
+    }));
+    fs.chmodSync(process.argv[1], 0o600);
+  " "$STATE_FILE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$command" "$pid" "$attempt"
 }
 
 start_once() {

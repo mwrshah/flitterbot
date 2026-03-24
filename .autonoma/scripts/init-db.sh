@@ -23,8 +23,11 @@ expand_home() {
   fi
 }
 
-if [[ -z "$DB_PATH" && -f "$AUTONOMA_CONFIG" ]] && command -v jq >/dev/null 2>&1; then
-  config_db_path="$(jq -r '.blackboardPath // empty' "$AUTONOMA_CONFIG" 2>/dev/null || true)"
+if [[ -z "$DB_PATH" && -f "$AUTONOMA_CONFIG" ]]; then
+  config_db_path="$(node -e "
+    const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
+    if (c.blackboardPath) process.stdout.write(c.blackboardPath);
+  " "$AUTONOMA_CONFIG" 2>/dev/null || true)"
   if [[ -n "$config_db_path" && "$config_db_path" != "null" ]]; then
     DB_PATH="$(expand_home "$config_db_path")"
   fi
