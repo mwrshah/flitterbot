@@ -148,26 +148,9 @@ export function usePiWsHandler(
       }
 
       if (message.type === "pi_surfaced") {
-        if (message.content.trim()) {
-          store.updateSession(sessionId, (s) => {
-            if (s.appendedItems.some((item) => item.id === message.messageId)) return s;
-            return {
-              ...s,
-              appendedItems: [
-                ...s.appendedItems,
-                {
-                  id: message.messageId,
-                  kind: "message",
-                  role: "assistant",
-                  content: message.content,
-                  source: "pi_outbound" as MessageSource,
-                  workstreamName: message.workstreamName,
-                  createdAt: message.timestamp ?? new Date().toISOString(),
-                },
-              ],
-            };
-          });
-        }
+        // pi_surfaced confirms WhatsApp delivery — not used for timeline rendering.
+        // The final assistant message is already in the timeline via message_end
+        // with source: "pi_outbound" (set by subscribe.ts at turn_end).
         return;
       }
 
