@@ -240,7 +240,8 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
     }
 
     if (isUserMsg && lastAssistantIdx >= 0) {
-      result.push(items[lastAssistantIdx]!);
+      const kept = { ...items[lastAssistantIdx]!, source: "pi_outbound" } as PiHistoryItem;
+      result.push(kept);
       lastAssistantIdx = -1;
     }
 
@@ -249,7 +250,8 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
 
   // Flush trailing assistant message (last turn with no following user message)
   if (lastAssistantIdx >= 0) {
-    result.push(items[lastAssistantIdx]!);
+    const kept = { ...items[lastAssistantIdx]!, source: "pi_outbound" } as PiHistoryItem;
+    result.push(kept);
   }
 
   return result;

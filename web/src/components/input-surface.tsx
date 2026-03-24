@@ -90,25 +90,20 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 
   for (const item of timeline) {
     const msg = item.kind === "message" ? (item as ChatTimelineMessage) : undefined;
-    const base = { id: item.id, type: item.kind, role: msg?.role, source: msg?.source, sessionId: (item as any).sessionId };
-
     if (item.kind === "divider") {
-      console.log('[InputSurface] EXCLUDED:', { ...base, reason: 'divider' });
       continue;
     }
 
     if (item.kind === "message" && item.role === "user") {
-      const source = msg!.source ?? "web";
+      const source = msg!.source;
       if (source !== "web" && source !== "whatsapp") {
-        console.log('[InputSurface] EXCLUDED:', { ...base, reason: `user message with source '${source}' (not web/whatsapp)` });
         continue;
       }
-      console.log('[InputSurface] INCLUDED:', { ...base, reason: `user message with source '${source}'` });
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
-        source: msg!.source ?? "web",
+        source,
         content: msg!.content,
         workstreamName: item.workstreamName,
       });
@@ -119,10 +114,8 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
       // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
       // Intermediate pre-tool-call fragments have a different source or no source.
       if (msg!.source !== "pi_outbound") {
-        console.log('[InputSurface] EXCLUDED:', { ...base, reason: `assistant message with source '${msg!.source ?? 'undefined'}' (not pi_outbound)` });
         continue;
       }
-      console.log('[InputSurface] INCLUDED:', { ...base, reason: 'assistant message with source pi_outbound' });
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
@@ -134,7 +127,6 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
     }
 
     if (item.kind === "tool") {
-      console.log('[InputSurface] EXCLUDED:', { ...base, reason: 'tool call' });
       // Skip all tool calls — only user messages and pi responses shown
       // (mirrors WhatsApp: user message in, pi final text response out)
     }
