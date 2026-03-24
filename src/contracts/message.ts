@@ -1,3 +1,5 @@
+import type { MessageMetadata } from "./blackboard.ts";
+
 export type MessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
 
 export type MessageBlock =
@@ -16,5 +18,5 @@ export interface UnifiedMessage {
   createdAt: string;
   intermediate?: boolean;
   textDelta?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
 }

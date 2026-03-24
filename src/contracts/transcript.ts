@@ -1,3 +1,5 @@
+import type { MessageMetadata } from "./blackboard.ts";
+
 export type TranscriptActor = "user" | "assistant" | "system" | "tool" | "runtime" | "unknown";
 export type TranscriptItemKind =
   | "message"
@@ -25,7 +27,7 @@ export interface TranscriptNormalizedItem {
   toolUseId: string | null;
   toolStatus: TranscriptToolStatus | null;
   isError: boolean;
-  metadata: Record<string, unknown>;
+  metadata: MessageMetadata;
   rawType: string | null;
 }
 

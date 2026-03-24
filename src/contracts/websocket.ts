@@ -1,4 +1,5 @@
 import type { DeliveryMode, MessageSource } from "./control-surface-api.ts";
+import type { MessageMetadata } from "./blackboard.ts";
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 
@@ -44,7 +45,7 @@ type QueuedTurnSummary = {
   id: string;
   source: MessageSource;
   text: string;
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
   receivedAt: string;
   webClientId?: string;
   deliveryMode?: DeliveryMode;

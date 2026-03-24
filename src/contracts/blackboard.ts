@@ -1,5 +1,61 @@
 export const BLACKBOARD_SCHEMA_VERSION = 12;
 
+// --- Shared types used across multiple files ---
+
+export type MessageMetadata = {
+  router_action?: string;
+  workstream_id?: string;
+  workstream_name?: string;
+  _targetSessionId?: string;
+  serverMessageId?: string;
+  [key: string]: unknown;
+};
+
+export type WorkstreamRoutingMeta = {
+  router_action?: string;
+  workstream_id?: string;
+  workstream_name?: string;
+  _targetSessionId?: string;
+};
+
+export type CountRow = { count: number };
+
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; name: string; id: string; input: unknown }
+  | { type: "tool_result"; tool_use_id: string; content: string };
+
+export interface ApiError extends Error {
+  status?: number;
+  body?: unknown;
+}
+
+export type RawTranscriptEntry = {
+  role?: string;
+  sender?: string;
+  author?: string;
+  type?: string;
+  kind?: string;
+  event_name?: string;
+  event?: string;
+  text?: string;
+  content?: unknown;
+  message?: RawTranscriptEntry;
+  summary?: string;
+  error?: string;
+  status?: string;
+  tool_status?: string;
+  toolStatus?: string;
+  timestamp?: string | number;
+  created_at?: string | number;
+};
+
+export type ActionResolutionPayload = {
+  resolvedBy: string;
+  deliveryResult?: Record<string, unknown>;
+  error?: string;
+};
+
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
 export type PiSessionStatus =
   | "active"

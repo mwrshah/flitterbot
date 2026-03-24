@@ -1,4 +1,4 @@
-import type { ClaudeSessionStatus } from "./blackboard.ts";
+import type { ClaudeSessionStatus, MessageMetadata } from "./blackboard.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
@@ -102,7 +102,7 @@ export interface StatusResponse {
 export interface MessageRequest {
   text: string;
   source?: MessageSource;
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
   targetSessionId?: string;
@@ -116,6 +116,7 @@ export interface ClaudeHookPayload {
   hook_event_name?: string;
   event_name?: string;
   session_id?: string;
+  sessionId?: string;
   tool_name?: string;
   tool_use_id?: string;
   cwd?: string;
@@ -125,7 +126,7 @@ export interface ClaudeHookPayload {
   transcript_path?: string;
   reason?: string;
   timestamp?: string;
-  [key: string]: unknown;
+  lastAssistantText?: string;
 }
 
 export interface HookResponse {
