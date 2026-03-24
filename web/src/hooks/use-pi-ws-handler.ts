@@ -99,21 +99,24 @@ export function usePiWsHandler(
 
         if (message.role === "user") {
           if (content.trim()) {
-            store.updateSession(sessionId, (s) => ({
-              ...s,
-              appendedItems: [
-                ...s.appendedItems,
-                {
-                  id: message.messageId,
-                  kind: "message",
-                  role: "user",
-                  content,
-                  source: (message.source as MessageSource) ?? "web",
-                  workstreamName: message.workstreamName,
-                  createdAt: message.timestamp ?? new Date().toISOString(),
-                },
-              ],
-            }));
+            store.updateSession(sessionId, (s) => {
+              if (s.appendedItems.some((item) => item.id === message.messageId)) return s;
+              return {
+                ...s,
+                appendedItems: [
+                  ...s.appendedItems,
+                  {
+                    id: message.messageId,
+                    kind: "message",
+                    role: "user",
+                    content,
+                    source: (message.source as MessageSource) ?? "web",
+                    workstreamName: message.workstreamName,
+                    createdAt: message.timestamp ?? new Date().toISOString(),
+                  },
+                ],
+              };
+            });
           }
           return;
         }
@@ -125,6 +128,7 @@ export function usePiWsHandler(
             streamingMessageId: null,
           };
           if (content.trim()) {
+            if (s.appendedItems.some((item) => item.id === message.messageId)) return next;
             next.appendedItems = [
               ...s.appendedItems,
               {
@@ -195,10 +199,10 @@ export function usePiWsHandler(
           isError: message.type === "tool_execution_end" ? message.isError : undefined,
           createdAt: message.timestamp ?? new Date().toISOString(),
         };
-        store.updateSession(sessionId, (s) => ({
-          ...s,
-          appendedItems: [...s.appendedItems, toolEvent],
-        }));
+        store.updateSession(sessionId, (s) => {
+          if (s.appendedItems.some((item) => item.id === toolEvent.id)) return s;
+          return { ...s, appendedItems: [...s.appendedItems, toolEvent] };
+        });
         return;
       }
 

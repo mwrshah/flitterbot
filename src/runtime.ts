@@ -646,18 +646,20 @@ export class ControlSurfaceRuntime {
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
 
-      // Resolve agent message ID → server UUID via mapping table
+      // Resolve agent message ID → server UUID via mapping table.
+      // When the agent message has no ID, we can't reliably match this pi_surfaced
+      // event to the message_end already broadcast by subscribe.ts, so we skip the
+      // WS broadcast (the content was already delivered via message_end).
       const resolvedMessageId = finalMessageId
         ? (resolveServerId(this.blackboard, finalMessageId) ?? finalMessageId)
-        : crypto.randomUUID();
+        : undefined;
 
-      // Persist outbound with resolved server UUID
-      const outboundId = resolvedMessageId;
+      // Persist outbound with resolved server UUID (when available)
       try {
         const workstreamId =
           managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
-          id: outboundId,
+          id: resolvedMessageId,
           source: "pi_outbound",
           content: finalText,
           workstreamId,
@@ -680,15 +682,20 @@ export class ControlSurfaceRuntime {
           text: `*B-bot:*\n---\n${surfaceText}`,
           contextRef: undefined,
         });
-        this.wsHub.broadcast({
-          type: "pi_surfaced",
-          messageId: resolvedMessageId,
-          content: finalText,
-          timestamp: new Date().toISOString(),
-          sessionId: managed.piSessionId,
-          workstreamId: managed.workstreamId ?? undefined,
-          workstreamName: managed.workstreamName ?? undefined,
-        });
+        // Only broadcast pi_surfaced when we have a resolved ID that matches the
+        // message_end already sent by subscribe.ts. Without a resolved ID, the
+        // broadcast would create a duplicate with a mismatched UUID.
+        if (resolvedMessageId) {
+          this.wsHub.broadcast({
+            type: "pi_surfaced",
+            messageId: resolvedMessageId,
+            content: finalText,
+            timestamp: new Date().toISOString(),
+            sessionId: managed.piSessionId,
+            workstreamId: managed.workstreamId ?? undefined,
+            workstreamName: managed.workstreamName ?? undefined,
+          });
+        }
       } catch (error) {
         this.log(
           `auto-surface to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,

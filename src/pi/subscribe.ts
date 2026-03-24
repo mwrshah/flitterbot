@@ -208,13 +208,14 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_start": {
-        // Deterministic tool ID for deduplication
+        // Deterministic tool ID for deduplication — must match history.ts format
         const toolCallId = event.toolCallId as string | undefined;
         const lastAssistantId = pendingAssistantMessages.length > 0
           ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
           : undefined;
-        const deterministicId = toolCallId && lastAssistantId
-          ? `${lastAssistantId}:tool:${toolCallId}:start`
+        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
+        const deterministicId = toolCallId
+          ? `${anchorId}:tool:${toolCallId}:start`
           : undefined;
 
         const payload: ToolExecutionStartWebSocketEvent = {
@@ -236,8 +237,9 @@ export function subscribeToPiSession(
         const lastAssistantId = pendingAssistantMessages.length > 0
           ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
           : undefined;
-        const deterministicId = toolCallId && lastAssistantId
-          ? `${lastAssistantId}:tool:${toolCallId}:end`
+        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
+        const deterministicId = toolCallId
+          ? `${anchorId}:tool:${toolCallId}:end`
           : undefined;
 
         const payload: ToolExecutionEndWebSocketEvent = {
