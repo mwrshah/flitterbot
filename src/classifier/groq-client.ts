@@ -30,7 +30,7 @@ const MAX_RETRIES = 3;
 export async function callGroqClassify(apiKey: string, prompt: string): Promise<ClassifyResult> {
   const client = getClient(apiKey);
 
-  let lastError: unknown;
+  let lastError: Error | undefined;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const response = await client.chat.completions.create({
@@ -67,7 +67,7 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
           MAX_RETRIES,
           parseError instanceof Error ? parseError.message : String(parseError),
         );
-        lastError = parseError;
+        lastError = parseError instanceof Error ? parseError : new Error(String(parseError));
         continue;
       }
 
@@ -87,7 +87,7 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
         MAX_RETRIES,
         apiError instanceof Error ? apiError.message : String(apiError),
       );
-      lastError = apiError;
+      lastError = apiError instanceof Error ? apiError : new Error(String(apiError));
     }
   }
 
