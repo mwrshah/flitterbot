@@ -10,9 +10,9 @@ import {
 } from "@tanstack/react-router";
 import type * as React from "react";
 import { useEffect, useRef } from "react";
-import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
-import { AppShell } from "~/components/layout/AppShell";
-import { NotFound } from "~/components/NotFound";
+import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
+import { AppShell } from "~/components/app-shell";
+import { NotFound } from "~/components/not-found";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";

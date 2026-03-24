@@ -6,8 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { SkillPicker } from "~/components/input-surface/SkillPicker";
-import { Button } from "~/components/ui/Button";
+import { SkillPicker } from "~/components/skill-picker";
+import { Button } from "~/components/ui/button";
 import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {

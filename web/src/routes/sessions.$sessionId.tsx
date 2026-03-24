@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { SessionDetail } from "~/components/sessions/SessionDetail";
-import { SessionList } from "~/components/sessions/SessionList";
-import { TranscriptViewer } from "~/components/sessions/TranscriptViewer";
+import { SessionDetail } from "~/components/session-detail";
+import { SessionList } from "~/components/session-list";
+import { TranscriptViewer } from "~/components/transcript-viewer";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
   component: SessionDetailPage,

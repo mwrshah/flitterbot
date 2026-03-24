@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
-import { Badge } from "~/components/ui/Badge";
-import { MessageInput } from "~/components/ui/MessageInput";
+import { Badge } from "~/components/ui/badge";
+import { MessageInput } from "~/components/ui/message-input";
 import {
   buildStreamingAssistantMessage,
   pendingToolCallsFromTimeline,
@@ -10,8 +10,8 @@ import {
 } from "~/lib/pi-web-ui-bridge";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
-import { PiMessageList } from "./PiMessageList";
-import { PiStreamingMessage } from "./PiStreamingMessage";
+import { PiMessageList } from "./pi-message-list";
+import { PiStreamingMessage } from "./pi-streaming-message";
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 

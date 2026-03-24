@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { SessionList } from "~/components/sessions/SessionList";
+import { SessionList } from "~/components/session-list";
 
 export const Route = createFileRoute("/sessions/")({
   component: SessionsIndexPage,
