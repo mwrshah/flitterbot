@@ -98,6 +98,9 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
     }
 
     if (item.kind === "message" && item.role === "assistant") {
+      // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
+      // Intermediate pre-tool-call fragments have a different source or no source.
+      if ((item as ChatTimelineMessage).source !== "pi_outbound") continue;
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
