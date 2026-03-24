@@ -512,11 +512,14 @@ async function bootstrapConfig() {
   if (!projectRoot && PROJECT_ROOT) projectRoot = PROJECT_ROOT;
 
   let commandHint = configBefore.controlSurfaceCommand || "";
+  if (commandHint) {
+    // Validate existing command — re-detect if the entry point file no longer exists
+    const match = commandHint.match(/(?:node\S*\s+(?:--\S+\s+)*)(\S+\.(?:ts|js))$/);
+    if (match && !existsSync(match[1])) commandHint = "";
+  }
   if (!commandHint && projectRoot) {
-    if (existsSync(join(projectRoot, "dist", "control-surface", "server.js"))) {
-      commandHint = `cd ${projectRoot} && exec node ${join(projectRoot, "dist", "control-surface", "server.js")}`;
-    } else if (existsSync(join(projectRoot, "src", "control-surface", "server.ts"))) {
-      commandHint = `cd ${projectRoot} && exec node --experimental-strip-types ${join(projectRoot, "src", "control-surface", "server.ts")}`;
+    if (existsSync(join(projectRoot, "src", "server.ts"))) {
+      commandHint = `cd ${projectRoot} && exec node --experimental-strip-types ${join(projectRoot, "src", "server.ts")}`;
     }
   }
 

@@ -3,7 +3,7 @@
   "entry": [
     "src/whatsapp/cli.ts",
     "src/whatsapp/daemon.ts",
-    "src/control-surface/server.ts"
+    "src/server.ts"
   ],
   "project": [
     "src/**/*.ts"

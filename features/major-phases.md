@@ -114,13 +114,13 @@ Blackboard + runtime config (with workstreams)
 - Runtime lifecycle handling
 - Basic custom-tool registration shells
 
-**Suggested modules:**
-- `src/control-surface/server.ts`, `runtime.ts`
-- `src/control-surface/router/classify.ts` (Gemini Flash Lite call)
-- `src/control-surface/pi/create-agent.ts`, `session-state.ts`, `subscribe.ts`
-- `src/control-surface/queue/turn-queue.ts`
-- `src/control-surface/routes/message.ts`, `hooks.ts`, `status.ts`, `stop.ts`
-- `src/control-surface/tools/send-to-user.ts`
+**Modules:**
+- `src/server.ts`, `runtime.ts`
+- `src/classifier/classify.ts` (Gemini Flash Lite call)
+- `src/pi/create-agent.ts`, `session-state.ts`, `subscribe.ts`
+- `src/pi/turn-queue.ts`
+- `src/routes/message.ts`, `hooks.ts`, `status.ts`, `stop.ts`
+- `src/custom-tools/` (send-to-user, etc.)
 
 **Exit criteria:** Control surface starts cleanly; router classifies inbound messages and manages workstream rows; embedded Pi persists across restarts; queue serializes turns; Pi state tracked; `/status` reports live Pi and open workstreams; hook and message ingress work; `send_to_user` pushes to both surfaces.
 
@@ -143,7 +143,7 @@ Blackboard + runtime config (with workstreams)
 **Suggested modules:**
 - `src/claude-sessions/tmux.ts`, `send-message.ts`, `launch-session.ts`
 - `src/claude-sessions/worktree.ts` (create/cleanup git worktrees)
-- `src/control-surface/routes/direct-session-message.ts`, `browser-sessions.ts`, `browser-transcript.ts`
+- `src/routes/direct-session-message.ts`, `browser-sessions.ts`, `browser-transcript.ts`
 
 **Key v1 decision:** Direct Claude session messaging uses **tmux send-keys**, but only after an inject-safe state check; busy or ambiguous sessions fail closed.
 
@@ -167,7 +167,7 @@ Blackboard + runtime config (with workstreams)
 
 **Suggested modules:**
 - `src/whatsapp/daemon.ts`, `ipc.ts`, `auth.ts`, `send.ts`, `receive.ts`
-- `src/control-surface/routes/runtime-whatsapp.ts`
+- `src/routes/runtime-whatsapp.ts`
 
 **V1 UX decision:** WhatsApp auth stays **manual and terminal-driven**.
 
@@ -336,9 +336,9 @@ Safe in parallel: frontend builds against stable APIs while hardening improves b
 | Team | Primary ownership |
 |------|------------------|
 | Data / blackboard | `src/blackboard/**`, `src/config/load-config.ts` |
-| Control surface + router | `src/control-surface/**` (except routes owned elsewhere) |
-| Claude/tmux bridge + worktrees | `src/claude-sessions/**`, `src/control-surface/routes/direct-session-message.ts` |
-| WhatsApp integration | `src/whatsapp/**`, `src/control-surface/routes/runtime-whatsapp.ts` |
+| Runtime + router | `src/server.ts`, `src/runtime.ts`, `src/pi/**`, `src/classifier/**`, `src/routes/**` |
+| Claude/tmux bridge + worktrees | `src/claude-sessions/**`, `src/routes/direct-session-message.ts` |
+| WhatsApp integration | `src/whatsapp/**`, `src/routes/runtime-whatsapp.ts` |
 | Web app | `web/src/**` |
 | Runtime packaging / installer | `scripts/**`, installer/uninstaller files |
 

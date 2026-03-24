@@ -49,16 +49,13 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
   ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
   // Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
-  // ~/.autonoma/control-surface/agent/auth.json is symlinked here, but if someone
-  // breaks the symlink we still resolve to the right place.
   const piAuthPath = path.join(HOME, ".pi", "agent", "auth.json");
   const authPath = fs.existsSync(piAuthPath)
     ? piAuthPath
     : path.join(config.controlSurfaceAgentDir, "auth.json");
   const authStorage = AuthStorage.create(authPath);
   // Use ~/.pi/agent as the agent dir — same as the Pi CLI. This picks up
-  // AGENTS.md, models.json, and any agent-level config from the canonical location
-  // instead of a separate ~/.autonoma/control-surface/agent/ silo.
+  // AGENTS.md, models.json, and any agent-level config from the canonical location.
   const piAgentDir = path.join(HOME, ".pi", "agent");
   const agentDir = fs.existsSync(piAgentDir) ? piAgentDir : config.controlSurfaceAgentDir;
 

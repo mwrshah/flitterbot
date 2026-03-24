@@ -138,7 +138,7 @@ JSONL on disk with auto-compaction. `pi_sessions` SQLite table mirrors runtime s
 ## Key Source Files
 
 ```
-src/control-surface/
+src/
 ├── server.ts              # HTTP server, route dispatch, WebSocket upgrade
 ├── runtime.ts             # ControlSurfaceRuntime — main orchestrator class
 ├── config/

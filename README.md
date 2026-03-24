@@ -116,11 +116,15 @@ No dedicated "pause but keep installed" command yet. Use `stop` for temporary, `
 
 ### Runtime source
 
-- `src/control-surface/**` — backend runtime and Pi host
+- `src/server.ts`, `src/runtime.ts` — HTTP server and runtime orchestrator
+- `src/pi/**` — Pi agent lifecycle, turn queue, session state
+- `src/routes/**` — one file per HTTP endpoint
+- `src/classifier/**` — Groq-based message routing
 - `src/blackboard/**` — SQLite layer
 - `src/claude-sessions/**` — tmux / Claude integration
 - `src/whatsapp/**` — WhatsApp daemon / CLI / IPC
 - `src/contracts/**` — shared API and runtime contracts
+- `src/custom-tools/**` — worktree, session, workstream tools
 - `web/**` — browser client
 - `features/**` — architecture and spec docs
 

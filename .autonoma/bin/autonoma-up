@@ -63,33 +63,11 @@ resolve_control_surface_command() {
     return 0
   fi
 
-  if [[ -x "$AUTONOMA_HOME/control-surface/start.sh" ]]; then
-    printf 'cd %q && exec %q\n' "$AUTONOMA_HOME/control-surface" "$AUTONOMA_HOME/control-surface/start.sh"
-    return 0
-  fi
-
-  if [[ -f "$AUTONOMA_HOME/control-surface/server.js" ]]; then
-    printf 'cd %q && exec node %q\n' "$AUTONOMA_HOME/control-surface" "$AUTONOMA_HOME/control-surface/server.js"
-    return 0
-  fi
-
   local root=""
   root=$(project_root)
   if [[ -n "$root" ]]; then
-    if [[ -f "$root/package.json" ]] && command -v jq >/dev/null 2>&1; then
-      if jq -e '.scripts["control-surface"]? != null' "$root/package.json" >/dev/null 2>&1; then
-        printf 'cd %q && exec npm run control-surface\n' "$root"
-        return 0
-      fi
-    fi
-
-    if [[ -f "$root/dist/control-surface/server.js" ]]; then
-      printf 'cd %q && exec node %q\n' "$root" "$root/dist/control-surface/server.js"
-      return 0
-    fi
-
-    if [[ -f "$root/src/control-surface/server.ts" ]]; then
-      printf 'cd %q && exec node --experimental-strip-types %q\n' "$root" "$root/src/control-surface/server.ts"
+    if [[ -f "$root/src/server.ts" ]]; then
+      printf 'cd %q && exec node --experimental-strip-types %q\n' "$root" "$root/src/server.ts"
       return 0
     fi
   fi
@@ -241,9 +219,9 @@ list_control_surface_pids() {
   root=$(project_root)
 
   # Build candidate patterns that identify a control-surface process
-  local -a patterns=("control-surface/server.ts" "control-surface/server.js")
+  local -a patterns=("src/server.ts")
   if [[ -n "$root" ]]; then
-    patterns+=("$root/src/control-surface/server.ts" "$root/dist/control-surface/server.js")
+    patterns+=("$root/src/server.ts")
   fi
 
   ps -axo pid=,command= 2>/dev/null | while IFS= read -r line; do

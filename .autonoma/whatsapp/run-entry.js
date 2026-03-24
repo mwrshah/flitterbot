@@ -30,10 +30,6 @@ function resolveEntry(entryName) {
     if (existsSync(src)) {
       return ['--experimental-strip-types', src];
     }
-    const dist = path.join(configuredRoot, 'dist', 'whatsapp', `${entryName}.js`);
-    if (existsSync(dist)) {
-      return [dist];
-    }
   }
 
   const repoRelativeSrc = path.resolve(runtimeDir, '..', '..', 'src', 'whatsapp', `${entryName}.ts`);
