@@ -1,6 +1,6 @@
 import type http from "node:http";
 import { getActiveHealthFlags } from "../blackboard/query-health-flags.ts";
-import { markStaleSessions } from "../blackboard/query-sessions.ts";
+import { getStaleSessions } from "../blackboard/query-sessions.ts";
 import type { CronTickResponse } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
@@ -61,12 +61,8 @@ export function handleCronTickRoute(
     );
   }
 
-  // Gate 5: Classify sessions and enqueue appropriate prompt
-  const staleSessions = markStaleSessions(
-    runtime.blackboard,
-    runtime.config.stallMinutes,
-    runtime.config.toolTimeoutMinutes,
-  );
+  // Gate 5: Check for stale sessions (already marked by maintenance loop) and enqueue appropriate prompt
+  const staleSessions = getStaleSessions(runtime.blackboard);
 
   if (staleSessions.length > 0) {
     const sessionList = staleSessions

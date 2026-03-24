@@ -8,13 +8,18 @@ AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
 CONFIG_FILE="$AUTONOMA_HOME/config.json"
 
 # Read token and connection details from config
-if [[ -f "$CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
-  TOKEN=$(jq -r '.controlSurfaceToken // empty' "$CONFIG_FILE")
-  HOST=$(jq -r '.controlSurfaceHost // "127.0.0.1"' "$CONFIG_FILE")
-  PORT=$(jq -r '.controlSurfacePort // 18820' "$CONFIG_FILE")
-else
+if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 0
 fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required but not installed" >&2
+  exit 1
+fi
+
+TOKEN=$(jq -r '.controlSurfaceToken // empty' "$CONFIG_FILE")
+HOST=$(jq -r '.controlSurfaceHost // "127.0.0.1"' "$CONFIG_FILE")
+PORT=$(jq -r '.controlSurfacePort // 18820' "$CONFIG_FILE")
 
 if [[ -z "${TOKEN:-}" ]]; then
   exit 0

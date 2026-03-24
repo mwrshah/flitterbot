@@ -22,7 +22,7 @@ Three-tier: OS timer → bash script → control surface endpoint.
 2. **Pi session exists** — if session ended/crashed, skip
 3. **WhatsApp connected** — if disconnected, skip (Pi can't reach user for confirmation)
 4. **No active circuit breakers** — query `health_flags` for unexpired flags; any active flag → skip
-5. **Classify sessions** — call `markStaleSessions()`; if stale found, enqueue stale-check prompt
+5. **Check stale sessions** — query sessions already marked stale by maintenance loop; if stale found, enqueue stale-check prompt
 6. **No active working sessions** — if non-stale `working` sessions remain, skip with `no_actionable_state` (active work shouldn't be interrupted). Otherwise enqueue idle-check prompt
 
 ### Response
@@ -97,12 +97,12 @@ Cron messages enter the default Pi session's `TurnQueue` with `source: "cron"` a
 
 ## Observations
 
-- **attention!** `setHealthFlag` is never called. It's defined in `query-health-flags.ts` and exported from the barrel, but no code in `src/` invokes it. The circuit breaker gate in `cron-tick.ts:54-62` queries `health_flags` and the table exists, but nothing ever writes rows. The entire circuit breaker gate is effectively dead — it will never trigger. Either callers need to be added (rate limit handlers, LLM error paths, Pi crash detection) or the gate should be removed.
+- **resolved** `setHealthFlag` now called from stuck-turn detection. The maintenance loop in `runtime.ts` calls `setHealthFlag(db, "stuck_turn", reason, 30)` when a turn exceeds `toolTimeoutMinutes`, activating the circuit breaker gate in `cron-tick.ts`. A WhatsApp alert is also sent.
 
-- **attention!** Bash script depends on `jq`. `autonoma-checkin.sh` uses `jq` to parse `config.json` and silently exits if `jq` is missing (`command -v jq` check on line 11). This is a silent failure mode — if jq isn't installed, cron stops working with no error logged anywhere.
+- **resolved** Bash script now errors on missing `jq`. `autonoma-checkin.sh` prints an error to stderr and exits 1 if `jq` is not installed, instead of silently exiting 0.
 
-- **attention!** Gate sequence in FEATURE.md was missing a step. After stale marking, `cron-tick.ts:87-93` checks whether any non-stale `working` sessions remain — if so, it skips with `no_actionable_state`. This is a 6th gate between "classify sessions" and "enqueue idle prompt" that prevents cron from interrupting active work. (Now documented in Gate Sequence above.)
+- **resolved** Gate sequence documented correctly. The 6-step gate sequence in this doc matches the implementation in `cron-tick.ts`.
 
-- **TBD!** Duplicate stale marking. Both the 60s maintenance loop (`runtime.ts:1199`) and the 10-minute cron tick (`cron-tick.ts:65`) call `markStaleSessions()`. Idempotent so not harmful, but the maintenance loop already marks sessions stale continuously — by the time cron fires, the work is done. Cron's call is technically redundant.
+- **resolved** Duplicate stale marking removed. Cron tick now reads already-marked stale sessions via `getStaleSessions()` instead of calling `markStaleSessions()`. The maintenance loop (60s) is the sole writer of stale status.
 
-- **TBD!** Stuck-turn detection has no escalation. The maintenance loop (`runtime.ts:1216-1231`) detects turns stuck longer than `toolTimeoutMinutes` but only logs a warning. No health flag is set, no alert is sent, no recovery action is taken. This is a monitoring gap — a permanently stuck turn will generate a log line every 60 seconds indefinitely.
+- **resolved** Stuck-turn detection now escalates. The maintenance loop sets a `stuck_turn` health flag (30-min TTL) and sends a WhatsApp notification when a turn exceeds `toolTimeoutMinutes`. The health flag triggers the circuit breaker gate in cron, preventing prompt injection into stuck sessions.

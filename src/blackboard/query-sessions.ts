@@ -99,6 +99,13 @@ export function listSessions(db: BlackboardDatabase): SessionListItem[] {
   return rows.map(mapSessionRow);
 }
 
+export function getStaleSessions(db: BlackboardDatabase): SessionListItem[] {
+  const rows = db
+    .prepare(`SELECT * FROM sessions WHERE status = 'stale' ORDER BY last_event_at ASC`)
+    .all() as unknown as ClaudeSessionRow[];
+  return rows.map(mapSessionRow);
+}
+
 export function getSessionById(db: BlackboardDatabase, sessionId: string): SessionListItem | null {
   const row = db.prepare("SELECT * FROM sessions WHERE session_id = ?").get(sessionId) as unknown as
     | ClaudeSessionRow

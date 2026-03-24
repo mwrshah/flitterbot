@@ -11,9 +11,10 @@ import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
 
 export interface ManagedPiSession {
-  session: any;
+  session: AgentSession;
   queue: TurnQueue;
   state: PiSessionState;
   role: "default" | "orchestrator";

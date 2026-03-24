@@ -6,7 +6,7 @@ import type {
 } from "./tmux-bridge.ts";
 import type { TranscriptPageResponse } from "./transcript.ts";
 
-export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init";
+export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init" | "agent" | "pi_outbound";
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =

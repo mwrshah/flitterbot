@@ -50,6 +50,7 @@ import {
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
@@ -616,7 +617,7 @@ export class ControlSurfaceRuntime {
     const promptAt = managed.state.notePrompt(session.messages.length);
     touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
 
-    const promptText = formatPromptWithContext(item, managed.role);
+    const promptText = formatPromptWithContext(item);
 
     if (session.isStreaming) {
       await session.prompt(promptText, {
@@ -655,7 +656,7 @@ export class ControlSurfaceRuntime {
         const workstreamId =
           managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
-          source: "pi_outbound" as any,
+          source: "pi_outbound",
           content: finalText,
           workstreamId,
         });
@@ -752,8 +753,8 @@ export class ControlSurfaceRuntime {
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     workstreamId?: string,
-  ): Array<any> {
-    const tools: Array<any> = [
+  ): ToolDefinition[] {
+    const tools: ToolDefinition[] = [
       {
         name: "query_blackboard",
         label: "Query Blackboard",
@@ -953,7 +954,7 @@ export class ControlSurfaceRuntime {
           orchestrator.queue.enqueue({
             id: `enq-msg-${crypto.randomUUID()}`,
             text: formattedText,
-            source: "web",
+            source: "agent",
             metadata: {
               workstream_id: ws.id,
               workstream_name: ws.name,
@@ -963,7 +964,7 @@ export class ControlSurfaceRuntime {
 
           try {
             persistInboundMessage(this.blackboard, {
-              source: "web",
+              source: "agent",
               content: params.message,
               sender: "system",
               workstreamId: ws.id,

@@ -13,6 +13,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
@@ -26,7 +27,7 @@ type PiRole = "default" | "orchestrator";
 
 type CreateAutonomaAgentOptions = {
   config: AutonomaConfig;
-  customTools: Array<any>;
+  customTools: ToolDefinition[];
   role?: PiRole;
   orchestratorContext?: OrchestratorInput;
 };
