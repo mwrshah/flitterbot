@@ -18,19 +18,7 @@ dist/
 build/
 out/
 *.tsbuildinfo
-.next/
-.nuxt/
-.output/
-.vinxi/
-.turbo/
-.cache/
 .vite/
-
-# Python (for any helper scripts)
-__pycache__/
-*.py[codz]
-.venv
-venv/
 
 # Logs
 *.log

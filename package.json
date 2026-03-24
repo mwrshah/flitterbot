@@ -7,10 +7,9 @@
     "control-surface": "node --experimental-strip-types src/server.ts",
     "web:dev": "pnpm --dir web run dev",
     "web:build": "pnpm --dir web run build",
-    "audit": "npm run audit:ts && npm run audit:py && npm run audit:shell",
+    "audit": "npm run audit:ts && npm run audit:shell",
     "audit:ts": "biome check src/ web/src/ && tsc --noEmit && tsc --noEmit -p web/tsconfig.json && knip --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints && knip --directory web --config knip.json --include files,dependencies,unlisted --exclude binaries --no-config-hints",
     "audit:ts:fix": "biome check --fix src/ web/src/ && pnpm run audit:ts",
-    "audit:py": "uv run ruff check .autonoma/scripts && uv run vulture .autonoma/scripts --min-confidence 100",
     "audit:shell": "find .autonoma -type f \\( -name '*.sh' -o -path '.autonoma/bin/autonoma-up' -o -path '.autonoma/bin/autonoma-wa' \\) -print0 | xargs -0 -n1 bash -n && node --check .autonoma/install.mjs && node --check .autonoma/uninstall.mjs"
   },
   "devDependencies": {
