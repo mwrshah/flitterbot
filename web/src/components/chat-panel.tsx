@@ -53,6 +53,7 @@ function connectionVariant(state: ConnectionState): "success" | "warning" | "mut
 type ChatPanelProps = {
   timeline: ChatTimelineItem[];
   streamingText: string | null;
+  streamingMessageId?: string | null;
   statusPills: StatusPill[];
   connectionState: ConnectionState;
   onSendMessage: (
@@ -65,6 +66,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   timeline,
   streamingText,
+  streamingMessageId,
   statusPills,
   connectionState,
   onSendMessage,

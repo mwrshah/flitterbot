@@ -8,6 +8,9 @@ import type {
 
 type PiHistoryMode = "agent" | "input";
 
+/** Resolves an agent-generated message ID to a server UUID. Returns null if unmapped. */
+export type IdResolver = (agentId: string) => string | null;
+
 type PiHistoryMessageBlock = NonNullable<PiHistoryMessageItem["blocks"]>[number];
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -40,13 +43,19 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
+/** Resolve an agent ID to a server UUID via the resolver, falling back to the agent ID. */
+function resolveId(agentId: string, resolver?: IdResolver): string {
+  if (!resolver) return agentId;
+  return resolver(agentId) ?? agentId;
+}
+
 function pushMessage(
   items: PiHistoryItem[],
-  id: string,
+  resolvedId: string,
   role: "user" | "assistant" | "system",
   content: string,
   createdAt: string,
-  suffix = "message",
+  subIndex?: number,
   blocks?: PiHistoryMessageBlock[],
 ): void {
   let normalized = content.trim();
@@ -55,8 +64,11 @@ function pushMessage(
   );
   if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
 
+  // For multi-message splits, append sub-index. Single messages use bare ID.
+  const itemId = subIndex !== undefined ? `${resolvedId}:${subIndex}` : resolvedId;
+
   const item: PiHistoryMessageItem = {
-    id: `${id}:${suffix}`,
+    id: itemId,
     kind: "message",
     role,
     content: normalized,
@@ -70,14 +82,14 @@ function pushMessage(
 
 function parseMessageContent(
   items: PiHistoryItem[],
-  messageId: string,
+  resolvedId: string,
   role: "user" | "assistant" | "system",
   createdAt: string,
   content: unknown,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, messageId, role, text, createdAt);
+    if (text) pushMessage(items, resolvedId, role, text, createdAt);
     return;
   }
 
@@ -85,6 +97,7 @@ function parseMessageContent(
   let textBuffer = "";
   let toolIndex = 0;
   let messageIndex = 0;
+  let needsSubIndex = false;
 
   const flushTextBlock = () => {
     if (!textBuffer.trim()) return;
@@ -98,9 +111,16 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, `message-${messageIndex}`, [
-      ...messageBlocks,
-    ]);
+    // Use sub-index only when splitting a single agent message into multiple display items
+    pushMessage(
+      items,
+      resolvedId,
+      role,
+      contentText,
+      createdAt,
+      needsSubIndex ? messageIndex : undefined,
+      [...messageBlocks],
+    );
     messageBlocks.length = 0;
     messageIndex += 1;
   };
@@ -123,13 +143,21 @@ function parseMessageContent(
     }
 
     if (type === "toolCall") {
+      needsSubIndex = true; // Multiple display items from one agent message
       flushMessage();
+
+      // Deterministic tool ID: ${resolvedId}:tool:${toolCallId}:start
+      const toolCallId = typeof record.id === "string" ? record.id : undefined;
+      const toolItemId = toolCallId
+        ? `${resolvedId}:tool:${toolCallId}:start`
+        : `${resolvedId}:tool:${toolIndex}:start`;
+
       items.push({
-        id: `${messageId}:tool-start-${toolIndex}`,
+        id: toolItemId,
         kind: "tool",
         tool: typeof record.name === "string" && record.name.trim() ? record.name : "unknown_tool",
         phase: "start",
-        toolUseId: typeof record.id === "string" ? record.id : undefined,
+        toolUseId: toolCallId,
         args: record.arguments,
         createdAt,
       });
@@ -143,28 +171,35 @@ function parseMessageContent(
 function parseMessageRecord(
   messageRecord: Record<string, unknown>,
   createdAt: string,
-  messageId: string,
+  resolvedId: string,
   items: PiHistoryItem[],
 ): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content);
+    parseMessageContent(items, resolvedId, role, createdAt, messageRecord.content);
     return;
   }
 
   if (role === "toolResult") {
     const resultText = firstText(messageRecord.content);
+
+    // Deterministic tool end ID: ${resolvedId}:tool:${toolCallId}:end
+    const toolCallId =
+      typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : undefined;
+    const toolItemId = toolCallId
+      ? `${resolvedId}:tool:${toolCallId}:end`
+      : `${resolvedId}:tool-end`;
+
     items.push({
-      id: `${messageId}:tool-end`,
+      id: toolItemId,
       kind: "tool",
       tool:
         typeof messageRecord.toolName === "string" && messageRecord.toolName.trim()
           ? messageRecord.toolName
           : "unknown_tool",
       phase: "end",
-      toolUseId:
-        typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : undefined,
+      toolUseId: toolCallId,
       result: messageRecord.details ?? resultText,
       isError: Boolean(messageRecord.isError),
       createdAt,
@@ -228,15 +263,21 @@ function shapeHistoryItems(items: PiHistoryItem[], mode: PiHistoryMode): PiHisto
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
-function parseHistoryLine(line: string, lineNumber: number, items: PiHistoryItem[]): void {
+function parseHistoryLine(
+  line: string,
+  lineNumber: number,
+  items: PiHistoryItem[],
+  resolver?: IdResolver,
+): void {
   const parsed = JSON.parse(line) as Record<string, unknown>;
   if (parsed.type !== "message") return;
 
   const messageRecord = asRecord(parsed.message);
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
-  const messageId =
+  const rawId =
     typeof parsed.id === "string" && parsed.id.trim() ? parsed.id : `line-${lineNumber}`;
-  parseMessageRecord(messageRecord, createdAt, messageId, items);
+  const resolvedId = resolveId(rawId, resolver);
+  parseMessageRecord(messageRecord, createdAt, resolvedId, items);
 }
 
 export function readPiHistoryFromMessages(
@@ -244,15 +285,17 @@ export function readPiHistoryFromMessages(
   sessionFile: string | null,
   messages: Array<unknown>,
   mode: PiHistoryMode = "agent",
+  resolver?: IdResolver,
 ): PiHistoryResponse {
   const items: PiHistoryItem[] = [];
 
   messages.forEach((message, index) => {
     const record = asRecord(message);
     const createdAt = isoTimestamp(record.timestamp);
-    const messageId =
+    const rawId =
       typeof record.id === "string" && record.id.trim() ? record.id : `memory-${index}`;
-    parseMessageRecord(record, createdAt, messageId, items);
+    const resolvedId = resolveId(rawId, resolver);
+    parseMessageRecord(record, createdAt, resolvedId, items);
   });
 
   return {
@@ -266,6 +309,7 @@ export async function readPiHistory(
   sessionId: string,
   sessionFile: string,
   mode: PiHistoryMode = "agent",
+  resolver?: IdResolver,
 ): Promise<PiHistoryResponse> {
   if (!fs.existsSync(sessionFile)) {
     return {
@@ -286,7 +330,7 @@ export async function readPiHistory(
       const line = rawLine.trim();
       if (!line) continue;
       try {
-        parseHistoryLine(line, lineNumber, items);
+        parseHistoryLine(line, lineNumber, items, resolver);
       } catch {
         // Ignore malformed lines and continue reading the session.
       }

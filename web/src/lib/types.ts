@@ -10,7 +10,7 @@ export type JsonValue =
 
 /* ── Chat timeline ── */
 
-export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init";
+export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
 
 export type ImageAttachment = {
   data: string;
@@ -211,10 +211,10 @@ export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
-  | { type: "text_delta"; delta: string; sessionId?: string }
+  | { type: "text_delta"; delta: string; messageId?: string; sessionId?: string }
   | {
       type: "message_end";
-      messageId?: string;
+      messageId: string;
       role: string;
       content?: string;
       source?: string;
@@ -226,6 +226,7 @@ export type WsMessage =
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
+      id?: string;
       tool?: string;
       toolUseId?: string;
       args?: unknown;
@@ -238,7 +239,7 @@ export type WsMessage =
   | { type: "turn_end"; sessionId?: string }
   | {
       type: "pi_surfaced";
-      messageId?: string;
+      messageId: string;
       content: string;
       timestamp?: string;
       sessionId?: string;

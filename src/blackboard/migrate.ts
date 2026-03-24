@@ -512,6 +512,60 @@ function applyV11Migration(db: DatabaseSync): void {
   }
 }
 
+/**
+ * V12: Change messages.id from INTEGER AUTOINCREMENT to TEXT (UUID PK).
+ * Add message_id_map table for agent UUID → server UUID bridging.
+ */
+function applyV12Migration(db: DatabaseSync): void {
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    // Recreate messages table with TEXT PK
+    db.exec(`
+      CREATE TABLE messages_v12 (
+          id TEXT PRIMARY KEY,
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          content TEXT NOT NULL,
+          sender TEXT,
+          workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO messages_v12 (id, source, direction, content, sender, workstream_id, metadata, created_at)
+        SELECT CAST(id AS TEXT), source, direction, content, sender, workstream_id, metadata, created_at
+        FROM messages;
+
+      DROP TABLE messages;
+      ALTER TABLE messages_v12 RENAME TO messages;
+
+      CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_workstream ON messages(workstream_id);
+
+      -- Message ID mapping table
+      CREATE TABLE IF NOT EXISTS message_id_map (
+          server_id TEXT PRIMARY KEY,
+          agent_id TEXT,
+          pi_session_id TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_message_id_map_agent ON message_id_map(agent_id);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (12);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys=ON;");
+  }
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -567,6 +621,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 11) {
     applyV11Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 12) {
+    applyV12Migration(db);
   }
 
   return getSchemaVersion(db);

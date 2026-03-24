@@ -36,6 +36,7 @@ function PiSessionRoute() {
     <ChatPanel
       timeline={mergeTimelines(history, accum.appendedItems)}
       streamingText={accum.streamingText}
+      streamingMessageId={accum.streamingMessageId}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}
       onSendMessage={(text, deliveryMode, images) =>

@@ -63,14 +63,16 @@ export interface QueueItemEndWebSocketEvent {
 export interface TextDeltaWebSocketEvent {
   type: "text_delta";
   sessionId?: string;
+  /** Server UUID of the message being streamed. */
+  messageId?: string;
   delta: string;
 }
 
 export interface MessageEndWebSocketEvent {
   type: "message_end";
   sessionId?: string;
-  /** Persistent message ID from the session — matches history item IDs for deduplication. */
-  messageId?: string;
+  /** Server-assigned UUID — required, used for deduplication against history. */
+  messageId: string;
   role: "user" | "assistant";
   content: string;
   source?: string;
@@ -84,6 +86,8 @@ export interface MessageEndWebSocketEvent {
 
 export interface ToolExecutionStartWebSocketEvent {
   type: "tool_execution_start";
+  /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:start" */
+  id?: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;
@@ -94,6 +98,8 @@ export interface ToolExecutionStartWebSocketEvent {
 
 export interface ToolExecutionEndWebSocketEvent {
   type: "tool_execution_end";
+  /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:end" */
+  id?: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;
@@ -112,8 +118,8 @@ export interface TurnEndWebSocketEvent {
 
 export interface PiSurfacedWebSocketEvent {
   type: "pi_surfaced";
-  /** Persistent message ID from the session — matches history item IDs for deduplication. */
-  messageId?: string;
+  /** Server-assigned UUID — required, used for deduplication against history. */
+  messageId: string;
   content: string;
   timestamp?: string;
   sessionId?: string;

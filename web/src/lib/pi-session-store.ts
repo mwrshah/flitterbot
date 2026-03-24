@@ -5,12 +5,13 @@ type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 export type SessionAccum = {
   appendedItems: import("./types").ChatTimelineItem[];
+  streamingMessageId: string | null;
   streamingText: string | null;
   statusPills: StatusPill[];
 };
 
 export function emptyAccum(): SessionAccum {
-  return { appendedItems: [], streamingText: null, statusPills: [] };
+  return { appendedItems: [], streamingMessageId: null, streamingText: null, statusPills: [] };
 }
 
 export type PiSessionStore = {
@@ -18,6 +19,8 @@ export type PiSessionStore = {
   updateSession: (sessionId: string, updater: (s: SessionAccum) => SessionAccum) => void;
   addPill: (sessionId: string, pill: StatusPill) => void;
   removePill: (sessionId: string, id: string) => void;
+  /** Returns all appended items from all sessions, sorted by createdAt. */
+  getAllAppendedItems: () => import("./types").ChatTimelineItem[];
   getSendMessage: () => (
     text: string,
     deliveryMode: DeliveryMode,
@@ -73,11 +76,20 @@ export function createPiSessionStore(): PiSessionStore {
     }));
   }
 
+  function getAllAppendedItems(): import("./types").ChatTimelineItem[] {
+    const all: import("./types").ChatTimelineItem[] = [];
+    for (const accum of sessions.values()) {
+      all.push(...accum.appendedItems);
+    }
+    return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   return {
     getSessionAccum,
     updateSession,
     addPill,
     removePill,
+    getAllAppendedItems,
     getSendMessage: () => sendMessageFn(),
     setSendMessage: (fn) => {
       sendMessageFn = fn;

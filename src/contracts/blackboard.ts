@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 11;
+export const BLACKBOARD_SCHEMA_VERSION = 12;
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
 export type PiSessionStatus =
@@ -72,13 +72,20 @@ export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "init"
 export type UnifiedMessageDirection = "inbound" | "outbound";
 
 export interface MessageRow {
-  id: number;
+  id: string;
   source: UnifiedMessageSource;
   direction: UnifiedMessageDirection;
   content: string;
   sender: string | null;
   workstream_id: string | null;
   metadata: string | null;
+  created_at: string;
+}
+
+export interface MessageIdMapRow {
+  server_id: string;
+  agent_id: string | null;
+  pi_session_id: string | null;
   created_at: string;
 }
 
@@ -186,7 +193,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 );
 
 CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
@@ -195,6 +202,14 @@ CREATE TABLE IF NOT EXISTS messages (
     metadata TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS message_id_map (
+    server_id TEXT PRIMARY KEY,
+    agent_id TEXT,
+    pi_session_id TEXT,
+    created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_message_id_map_agent ON message_id_map(agent_id);
 
 CREATE TABLE IF NOT EXISTS health_flags (
     flag TEXT PRIMARY KEY,

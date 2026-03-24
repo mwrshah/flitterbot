@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
-import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
+import { type BlackboardDatabase, openBlackboard, pingBlackboard, resolveServerId } from "./blackboard/db.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
 import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
@@ -220,11 +220,14 @@ export class ControlSurfaceRuntime {
       images: images?.length ? images : undefined,
     };
 
-    // Persist to unified messages table
+    // Generate server UUID for this message and persist
+    const messageUuid = crypto.randomUUID();
+    item.metadata = { ...item.metadata, serverMessageId: messageUuid };
     try {
       const source = item.source as "whatsapp" | "web" | "hook" | "cron";
       const workstreamId = (input.metadata?.workstream_id as string) ?? undefined;
       persistInboundMessage(this.blackboard, {
+        id: messageUuid,
         source,
         content: input.text,
         sender: source === "hook" ? "system" : "user",
@@ -642,11 +645,19 @@ export class ControlSurfaceRuntime {
     const finalAssistant = extractFinalAssistantMessage(session);
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
-      // Persist outbound
+
+      // Resolve agent message ID → server UUID via mapping table
+      const resolvedMessageId = finalMessageId
+        ? (resolveServerId(this.blackboard, finalMessageId) ?? finalMessageId)
+        : crypto.randomUUID();
+
+      // Persist outbound with resolved server UUID
+      const outboundId = resolvedMessageId;
       try {
         const workstreamId =
           managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
+          id: outboundId,
           source: "pi_outbound",
           content: finalText,
           workstreamId,
@@ -671,7 +682,7 @@ export class ControlSurfaceRuntime {
         });
         this.wsHub.broadcast({
           type: "pi_surfaced",
-          messageId: finalMessageId,
+          messageId: resolvedMessageId,
           content: finalText,
           timestamp: new Date().toISOString(),
           sessionId: managed.piSessionId,

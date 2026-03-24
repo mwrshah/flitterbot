@@ -2,26 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
   type FormEvent,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
-  ConnectionState,
   DeliveryMode,
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { createId, mergeTimelines } from "~/lib/utils";
+import { mergeTimelines } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -43,6 +41,8 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   hook: "bg-violet-500",
   cron: "bg-cyan-500",
   init: "bg-gray-400",
+  agent: "bg-indigo-500",
+  pi_outbound: "bg-blue-500",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -51,6 +51,8 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   hook: "Hook",
   cron: "Cron",
   init: "Init",
+  agent: "Agent",
+  pi_outbound: "Pi Out",
 };
 
 const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
@@ -315,12 +317,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const [appendedItems, setAppendedItems] = useState<ChatTimelineItem[]>([]);
-  const connectionState = useSyncExternalStore(
-    useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
-    useCallback(() => wsClient.connectionState, [wsClient]),
-    () => "disconnected" as ConnectionState,
-  );
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
@@ -328,6 +324,14 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  // Read appended items from the shared store (populated by pi.route.tsx WS handler)
+  const storeSnapshot = usePiSessionStore();
+  const appendedItems = useMemo(
+    () => piSessionStore.getAllAppendedItems(),
+    [storeSnapshot],
+  );
+  const connectionState = storeSnapshot.connectionState;
 
   const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
 
@@ -337,77 +341,10 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
 
-  // WebSocket events — append to local state; deduped against loader via mergeTimelines
+  // Subscribe to wildcard session so the server delivers all session-scoped events
   useEffect(() => {
-    const unsubscribe = wsClient.subscribe((message) => {
-      if (message.type === "text_delta") {
-        // Intentionally ignored — Input Surface only shows final pi_surfaced messages,
-        // not intermediate streaming text (which may include reasoning, tool calls, etc.)
-        return;
-      }
-
-      if (message.type === "message_end") {
-        // Skip intermediate assistant messages (pre-tool-call fragments within a turn)
-        if (message.intermediate) return;
-
-        const content = message.content || "";
-        if (message.role === "user") {
-          const source = (message.source as MessageSource) ?? "web";
-          if (source !== "web" && source !== "whatsapp") return;
-          if (content.trim()) {
-            const id = message.messageId ? `${message.messageId}:message` : createId("user");
-            setAppendedItems((current) => {
-              if (current.some((item) => item.id === id)) return current;
-              return [
-                ...current,
-                {
-                  id,
-                  kind: "message",
-                  role: "user",
-                  content,
-                  source,
-                  workstreamName: message.workstreamName,
-                  createdAt: message.timestamp ?? new Date().toISOString(),
-                },
-              ];
-            });
-          }
-          return;
-        }
-
-        // Don't add assistant message_end to timeline — only pi_surfaced events appear
-        return;
-      }
-
-      if (message.type === "pi_surfaced") {
-        if (message.content.trim()) {
-          const id = message.messageId ? `${message.messageId}:message` : createId("assistant");
-          setAppendedItems((current) => {
-            if (current.some((item) => item.id === id)) return current;
-            return [
-              ...current,
-              {
-                id,
-                kind: "message",
-                role: "assistant",
-                content: message.content,
-                workstreamName: message.workstreamName,
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ];
-          });
-        }
-        return;
-      }
-    });
-
-    // Subscribe to ALL sessions so the server delivers session-scoped events
-    // (message_end, pi_surfaced) to this client. Without this, hub.ts skips
-    // clients with zero subscriptions.
     wsClient.subscribeSession("*");
-
     return () => {
-      unsubscribe();
       wsClient.unsubscribeSession("*");
     };
   }, [wsClient]);

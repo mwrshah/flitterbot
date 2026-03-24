@@ -1,4 +1,5 @@
-import type { BlackboardDatabase } from "../blackboard/db.ts";
+import crypto from "node:crypto";
+import { type BlackboardDatabase, insertIdMapping } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
   ControlSurfaceWebSocketServerEvent,
@@ -125,6 +126,11 @@ export function subscribeToPiSession(
   // Earlier ones get broadcast with intermediate: true; only the last one is final.
   const pendingAssistantMessages: MessageEndWebSocketEvent[] = [];
 
+  // Pre-allocated server UUID for the current streaming assistant message.
+  // Set when the first text_delta arrives for a new assistant message, used at message_end.
+  let streamingServerUuid: string | null = null;
+  let toolIndex = 0;
+
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
     // FR-3: Only set 'active' during turns. Post-turn transitions (waiting_for_user/waiting_for_sessions)
@@ -137,9 +143,14 @@ export function subscribeToPiSession(
       case "message_update": {
         const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
         if (ame?.type === "text_delta" && typeof ame.delta === "string") {
+          // Pre-allocate server UUID for this streaming message if not already set
+          if (!streamingServerUuid) {
+            streamingServerUuid = crypto.randomUUID();
+          }
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
+            messageId: streamingServerUuid,
             delta: ame.delta,
           });
         }
@@ -153,10 +164,33 @@ export function subscribeToPiSession(
         }
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
+        const agentMessageId = extractMessageId(event.message);
+
+        // Resolve or create server UUID for this message
+        let serverMessageId: string;
+        if (role === "user") {
+          // User messages: server UUID was assigned at ingestion, available in queue item metadata
+          const snapshot = state.getSnapshot();
+          serverMessageId = (snapshot.currentItem?.metadata?.serverMessageId as string) ?? crypto.randomUUID();
+        } else {
+          // Assistant messages: use pre-allocated streaming UUID if available, otherwise generate
+          serverMessageId = streamingServerUuid ?? crypto.randomUUID();
+          streamingServerUuid = null; // Reset for next message
+        }
+
+        // Insert agent→server UUID mapping when we have both IDs
+        if (agentMessageId) {
+          try {
+            insertIdMapping(blackboard, serverMessageId, agentMessageId, session.sessionId);
+          } catch {
+            // Ignore duplicate insert errors
+          }
+        }
+
         const payload: MessageEndWebSocketEvent = {
           type: "message_end",
           sessionId: session.sessionId,
-          messageId: extractMessageId(event.message),
+          messageId: serverMessageId,
           role,
           content,
           source: currentItem?.source,
@@ -174,24 +208,44 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_start": {
+        // Deterministic tool ID for deduplication
+        const toolCallId = event.toolCallId as string | undefined;
+        const lastAssistantId = pendingAssistantMessages.length > 0
+          ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
+          : undefined;
+        const deterministicId = toolCallId && lastAssistantId
+          ? `${lastAssistantId}:tool:${toolCallId}:start`
+          : undefined;
+
         const payload: ToolExecutionStartWebSocketEvent = {
           type: "tool_execution_start",
+          id: deterministicId,
           sessionId: session.sessionId,
           tool: event.toolName as string | undefined,
-          toolUseId: event.toolCallId as string | undefined,
+          toolUseId: toolCallId,
           args: event.args ?? event.parameters,
           timestamp: now,
           event,
         };
         broadcast(wsHub, payload);
+        toolIndex += 1;
         break;
       }
       case "tool_execution_end": {
+        const toolCallId = event.toolCallId as string | undefined;
+        const lastAssistantId = pendingAssistantMessages.length > 0
+          ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
+          : undefined;
+        const deterministicId = toolCallId && lastAssistantId
+          ? `${lastAssistantId}:tool:${toolCallId}:end`
+          : undefined;
+
         const payload: ToolExecutionEndWebSocketEvent = {
           type: "tool_execution_end",
+          id: deterministicId,
           sessionId: session.sessionId,
           tool: event.toolName as string | undefined,
-          toolUseId: event.toolCallId as string | undefined,
+          toolUseId: toolCallId,
           result: event.result,
           isError: event.isError as boolean | undefined,
           timestamp: now,
@@ -212,6 +266,8 @@ export function subscribeToPiSession(
           );
         }
         pendingAssistantMessages.length = 0;
+        toolIndex = 0;
+        streamingServerUuid = null;
 
         const payload: TurnEndWebSocketEvent = {
           type: "turn_end",

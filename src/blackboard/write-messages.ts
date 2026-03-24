@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type {
   MessageRow,
@@ -8,6 +9,7 @@ import type {
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
 
 export type InsertMessageInput = {
+  id?: string;
   source: UnifiedMessageSource;
   direction: UnifiedMessageDirection;
   content: string;
@@ -22,25 +24,25 @@ function timestamp(value?: string): string {
 }
 
 export function insertMessage(db: SqlDatabase, input: InsertMessageInput): MessageRow {
+  const id = input.id ?? crypto.randomUUID();
   const createdAt = timestamp(input.createdAt);
   const metadataJson = input.metadata ? JSON.stringify(input.metadata) : null;
 
-  const result = db
-    .prepare(
-      `INSERT INTO messages (source, direction, content, sender, workstream_id, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      input.source,
-      input.direction,
-      input.content,
-      input.sender ?? null,
-      input.workstreamId ?? null,
-      metadataJson,
-      createdAt,
-    );
+  db.prepare(
+    `INSERT INTO messages (id, source, direction, content, sender, workstream_id, metadata, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.source,
+    input.direction,
+    input.content,
+    input.sender ?? null,
+    input.workstreamId ?? null,
+    metadataJson,
+    createdAt,
+  );
 
   return db
     .prepare("SELECT * FROM messages WHERE id = ?")
-    .get(Number(result.lastInsertRowid)) as unknown as MessageRow;
+    .get(id) as unknown as MessageRow;
 }
