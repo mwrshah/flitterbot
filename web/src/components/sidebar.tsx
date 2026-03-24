@@ -109,7 +109,7 @@ export function Sidebar({
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Brand */}
-      <div className="px-4 py-4 border-b border-sidebar-border">
+      <div className="shrink-0 px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-sidebar-primary flex items-center justify-center">
             <span className="text-xs font-bold text-sidebar-primary-foreground">A</span>
@@ -119,7 +119,7 @@ export function Sidebar({
       </div>
 
       {/* Status cluster */}
-      <div className="px-4 py-3 space-y-1.5 border-b border-sidebar-border">
+      <div className="shrink-0 px-4 py-3 space-y-1.5 border-b border-sidebar-border">
         <StatusDot
           color={piState === "active" ? "bg-emerald-500" : "bg-blue-400"}
           label="Pi"
@@ -140,7 +140,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="px-3 py-3 space-y-0.5">
+      <nav className="shrink-0 px-3 py-3 space-y-0.5">
         <NavItem to="/" label="Input Surface" icon={icons.inputSurface} />
         <NavItem to="/pi" label="Pi Agent" icon={icons.piAgent} />
         <NavItem to="/sessions" label="Claude Code" icon={icons.sessions} />
@@ -149,7 +149,7 @@ export function Sidebar({
 
       {/* Workstreams */}
       {allWorkstreams.length > 0 && (
-        <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-auto">
+        <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
           {openWorkstreams.length > 0 && (
             <>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
@@ -202,7 +202,7 @@ export function Sidebar({
       {allWorkstreams.length === 0 && <div className="flex-1" />}
 
       {/* Settings trigger */}
-      <div className="px-3 py-3 border-t border-sidebar-border">
+      <div className="shrink-0 px-3 py-3 border-t border-sidebar-border">
         <button
           onClick={onOpenSettings}
           className={cn(
