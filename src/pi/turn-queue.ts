@@ -1,4 +1,4 @@
-import type { DeliveryMode, MessageSource } from "../contracts/index.ts";
+import type { DeliveryMode, MessageMetadata, MessageSource } from "../contracts/index.ts";
 
 export type QueueSource = MessageSource;
 
@@ -6,7 +6,7 @@ export type QueueItem = {
   id: string;
   source: QueueSource;
   text: string;
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
   receivedAt: string;
   webClientId?: string;
   deliveryMode?: DeliveryMode;

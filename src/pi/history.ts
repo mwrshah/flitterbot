@@ -8,6 +8,32 @@ import type {
 
 type PiHistoryMode = "agent" | "input";
 
+/**
+ * Shape of a raw JSONL session entry before validation.
+ * Mirrors pi-coding-agent's SessionEntryBase + SessionMessageEntry
+ * but kept local because we parse across SDK versions.
+ */
+type RawSessionEntry = {
+  type?: string;
+  id?: string;
+  parentId?: string | null;
+  timestamp?: string | number;
+  message?: RawMessageRecord;
+};
+
+/** Shape of the `message` field inside a raw session entry. */
+type RawMessageRecord = {
+  id?: string;
+  role?: string;
+  content?: unknown;
+  timestamp?: string | number;
+  responseId?: string;
+  toolCallId?: string;
+  toolName?: string;
+  details?: unknown;
+  isError?: boolean;
+};
+
 /** Resolves an agent-generated message ID to a server UUID. Returns null if unmapped. */
 export type IdResolver = (agentId: string) => string | null;
 
@@ -43,20 +69,14 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
-/** Extract a non-empty string field from a record. */
-function extractStringField(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
-
 /**
  * Extract a stable identifier from a message record.
  * For assistant messages, prefer `responseId` (Anthropic API identifier, e.g. `msg_01VM...`).
  * Returns undefined for non-assistant roles or when no responseId is present.
  */
-function extractStableId(record: Record<string, unknown>): string | undefined {
+function extractStableId(record: RawMessageRecord): string | undefined {
   if (record.role === "assistant") {
-    return extractStringField(record, "responseId");
+    return record.responseId?.trim() ? record.responseId : undefined;
   }
   return undefined;
 }
@@ -187,7 +207,7 @@ function parseMessageContent(
 }
 
 function parseMessageRecord(
-  messageRecord: Record<string, unknown>,
+  messageRecord: RawMessageRecord,
   createdAt: string,
   resolvedId: string,
   items: PiHistoryItem[],
@@ -203,8 +223,7 @@ function parseMessageRecord(
     const resultText = firstText(messageRecord.content);
 
     // Deterministic tool end ID: ${resolvedId}:tool:${toolCallId}:end
-    const toolCallId =
-      typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : undefined;
+    const toolCallId = messageRecord.toolCallId;
     const toolItemId = toolCallId
       ? `${resolvedId}:tool:${toolCallId}:end`
       : `${resolvedId}:tool-end`;
@@ -289,14 +308,14 @@ function parseHistoryLine(
   items: PiHistoryItem[],
   resolver?: IdResolver,
 ): void {
-  const parsed = JSON.parse(line) as Record<string, unknown>;
+  const parsed = JSON.parse(line) as RawSessionEntry;
   if (parsed.type !== "message") return;
 
-  const messageRecord = asRecord(parsed.message);
+  const messageRecord: RawMessageRecord = parsed.message ?? {};
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
   // For assistant messages, prefer responseId (Anthropic API identifier) as the stable ID.
   // Falls back to the JSONL entry wrapper id, then positional.
-  const rawId = extractStableId(messageRecord) ?? extractStringField(parsed, "id") ?? `line-${lineNumber}`;
+  const rawId = extractStableId(messageRecord) ?? (parsed.id?.trim() ? parsed.id : undefined) ?? `line-${lineNumber}`;
   const resolvedId = resolveId(rawId, resolver);
   parseMessageRecord(messageRecord, createdAt, resolvedId, items);
 }
@@ -311,9 +330,9 @@ export function readPiHistoryFromMessages(
   const items: PiHistoryItem[] = [];
 
   messages.forEach((message, index) => {
-    const record = asRecord(message);
+    const record = asRecord(message) as RawMessageRecord;
     const createdAt = isoTimestamp(record.timestamp);
-    const rawId = extractStableId(record) ?? extractStringField(record, "id") ?? `memory-${index}`;
+    const rawId = extractStableId(record) ?? (record.id?.trim() ? record.id : undefined) ?? `memory-${index}`;
     const resolvedId = resolveId(rawId, resolver);
     parseMessageRecord(record, createdAt, resolvedId, items);
   });
