@@ -114,6 +114,7 @@ export class PiSessionManager {
 
     this.defaultSession = managed;
     this.byPiSessionId.set(managed.piSessionId, managed);
+    this.logResourceInfo("default", created.resourceInfo);
     return managed;
   }
 
@@ -175,6 +176,7 @@ export class PiSessionManager {
     this.orchestrators.set(workstreamId, managed);
     this.byPiSessionId.set(managed.piSessionId, managed);
     this.log(`orchestrator created for workstream "${workstreamName}" (${workstreamId})`);
+    this.logResourceInfo("orchestrator", created.resourceInfo);
     return managed;
   }
 
@@ -248,6 +250,21 @@ export class PiSessionManager {
 
   private formatWorkstreamMessage(message: string, name: string, id: string): string {
     return `[Workstream: "${name}" (${id})] [NEW]\n${message}\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
+  }
+
+  private logResourceInfo(
+    role: string,
+    info: { skillNames: string[]; agentsFilePaths: string[] },
+  ): void {
+    const { skillNames, agentsFilePaths } = info;
+    if (skillNames.length > 0) {
+      this.log(`pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`);
+    } else {
+      this.log(`pi-agent (${role}): no skills loaded`);
+    }
+    for (const filePath of agentsFilePaths) {
+      this.log(`pi-agent (${role}): loaded ${path.basename(filePath)} from ${filePath}`);
+    }
   }
 
   private buildManagedSession(

@@ -22,11 +22,7 @@ export async function classifyMessage(
     workstreams,
     recentConversation,
   );
-  console.log(
-    "── [router] classifying ──\nworkstreams: %d open | message: %s\n── [/router] ──",
-    workstreams.length,
-    message,
-  );
+  console.log("[router] classifying: %d open workstreams | message: %s", workstreams.length, message.slice(0, 120));
 
   let result: ClassifyResult;
   try {

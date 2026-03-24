@@ -280,9 +280,6 @@ export class ControlSurfaceRuntime {
     if (normalized === "session-start") {
       const agentManaged = payload.agent_managed === true || payload.agent_managed === 1;
       if (!agentManaged && !isOwnPiSession) {
-        this.log(
-          `hook session-start: filtered session_id=${sessionId}, not agent_managed and not own pi session`,
-        );
         return { ok: true, filtered: true };
       }
       const cwd = pickString(payload, ["cwd"]);
@@ -335,9 +332,6 @@ export class ControlSurfaceRuntime {
       if (!isOwnPiSession) {
         const known = getSessionById(this.blackboard, sessionId);
         if (!known) {
-          this.log(
-            `hook ${normalized}: filtered session_id=${sessionId}, not own pi session and not known session`,
-          );
           return { ok: true, filtered: true };
         }
       }
@@ -352,7 +346,6 @@ export class ControlSurfaceRuntime {
     }
 
     if (normalized !== "stop") {
-      this.log(`hook ${normalized}: bookkeeping only for session_id=${sessionId}`);
       return { ok: true, bookkeeping: true };
     }
 
@@ -372,24 +365,16 @@ export class ControlSurfaceRuntime {
       "AUTONOMA_PI_SESSION_ID",
     ]);
     let targetQueue: ManagedPiSession | undefined;
+    let resolvedVia = "default";
     if (piSessionIdFromPayload) {
       targetQueue = this.sessionManager.getByPiSessionId(piSessionIdFromPayload);
-      if (targetQueue) {
-        this.log(
-          `hook stop: session_id=${sessionId} resolved queue via payload pi_session_id=${piSessionIdFromPayload}`,
-        );
-      }
+      if (targetQueue) resolvedVia = "payload";
     }
     const ccSession = !targetQueue ? getSessionById(this.blackboard, sessionId) : undefined;
     if (!targetQueue) {
-      // Fall back: look up pi_session_id from the sessions table
       if (ccSession?.piSessionId) {
         targetQueue = this.sessionManager.getByPiSessionId(ccSession.piSessionId);
-        if (targetQueue) {
-          this.log(
-            `hook stop: session_id=${sessionId} resolved queue via sessions table pi_session_id=${ccSession.piSessionId}`,
-          );
-        }
+        if (targetQueue) resolvedVia = "sessions-table";
       }
     }
     if (!targetQueue) {
@@ -401,17 +386,12 @@ export class ControlSurfaceRuntime {
         );
         if (matchingWs) {
           targetQueue = this.sessionManager.getByWorkstream(matchingWs.id);
-          if (targetQueue) {
-            this.log(
-              `hook stop: session_id=${sessionId} resolved queue via cwd match workstream_id=${matchingWs.id}`,
-            );
-          }
+          if (targetQueue) resolvedVia = `cwd-match:${matchingWs.id}`;
         }
       }
     }
     if (!targetQueue) {
       targetQueue = this.sessionManager.getDefault();
-      this.log(`hook stop: session_id=${sessionId} resolved queue via default fallback`);
     }
 
     const text = formatHookMessage(normalized, payload);
@@ -441,7 +421,7 @@ export class ControlSurfaceRuntime {
 
     targetQueue.queue.enqueue(hookItem);
     this.log(
-      `enqueued hook stop item ${hookItem.id} → ${targetQueue.role}${targetQueue.workstreamId ? ` ws=${targetQueue.workstreamId}` : ""}`,
+      `hook stop: session_id=${sessionId} → ${targetQueue.role}${targetQueue.workstreamId ? ` ws=${targetQueue.workstreamId}` : ""} (via ${resolvedVia})`,
     );
     return { ok: true };
   }

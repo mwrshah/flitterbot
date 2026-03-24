@@ -14,8 +14,12 @@ export async function handleHookRoute(
   }
   const payload = await readJsonBody<ClaudeHookPayload>(req);
   const sessionId = (payload as Record<string, unknown>).session_id ?? (payload as Record<string, unknown>).sessionId;
-  runtime.log(`hook ${eventName}: received session_id=${sessionId ?? "none"}`);
   const result: HookResponse = runtime.handleHook(eventName, payload);
-  runtime.log(`hook ${eventName}: response ${JSON.stringify(result)}`);
+  // Single summary log — only include response detail for non-ok results
+  const parts = [`hook ${eventName}: session_id=${sessionId ?? "none"}`];
+  if (result.bookkeeping) parts.push("bookkeeping=true");
+  if (result.filtered) parts.push("filtered=true");
+  if (!result.ok) parts.push(`response=${JSON.stringify(result)}`);
+  runtime.log(parts.join(" "));
   return sendJson(res, 200, result);
 }

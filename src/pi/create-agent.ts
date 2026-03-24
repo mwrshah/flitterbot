@@ -72,6 +72,12 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   });
   await resourceLoader.reload();
 
+  // Collect resource info for startup logging
+  const { skills } = resourceLoader.getSkills();
+  const { agentsFiles } = resourceLoader.getAgentsFiles();
+  const skillNames = skills.map((s) => s.name);
+  const agentsFilePaths = agentsFiles.map((f) => f.path);
+
   const model = getModel("anthropic", config.piModel as Parameters<typeof getModel>[1]);
   if (!model) {
     throw new Error(`Unable to resolve Pi model: ${config.piModel}`);
@@ -96,6 +102,10 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
     modelInfo: {
       provider: (model as any).providerId ?? (model as any).provider ?? "anthropic",
       id: (model as any).modelId ?? (model as any).id ?? config.piModel,
+    },
+    resourceInfo: {
+      skillNames,
+      agentsFilePaths,
     },
   };
 }

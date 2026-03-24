@@ -1,3 +1,11 @@
+// Suppress the node:sqlite ExperimentalWarning before any imports that use it.
+const _origWarningListeners = process.listeners("warning");
+process.removeAllListeners("warning");
+process.on("warning", (warning) => {
+  if (warning.name === "ExperimentalWarning" && warning.message.includes("SQLite")) return;
+  for (const listener of _origWarningListeners) (listener as (w: Error) => void)(warning);
+});
+
 import http from "node:http";
 import {
   CONTROL_SURFACE_ENDPOINTS,
@@ -99,7 +107,6 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (method === "POST" && segments[0] === "hook" && segments[1]) {
     const eventName = segments[1] as HookRouteEventName;
     if (eventName in ROUTE_EVENT_TO_HOOK_EVENT) {
-      runtime.log(`hook ${eventName}: route matched`);
       return handleHookRoute(runtime, req, res, eventName);
     }
     runtime.log(`hook ${segments[1]}: unknown event, rejecting`);
