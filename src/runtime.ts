@@ -26,6 +26,7 @@ import {
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
 import type {
+  ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
   WhatsAppDaemonStatus as ControlSurfaceWhatsAppStatus,
   DaemonCommand,
@@ -33,6 +34,7 @@ import type {
   DeliveryMode,
   DirectSessionMessageResponse,
   HookResponse,
+  MessageMetadata,
   RuntimeWhatsAppStartResponse,
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
@@ -50,6 +52,8 @@ import {
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
@@ -63,7 +67,7 @@ type CustomToolDefinition = {
   label: string;
   description: string;
   parameters: Record<string, unknown>;
-  execute: (toolCallId: string, params: any, ...rest: unknown[]) => Promise<{
+  execute: (toolCallId: string, params: Record<string, unknown>, ...rest: unknown[]) => Promise<{
     content: Array<{ type: string; text: string }>;
     details?: unknown;
   }>;
@@ -72,7 +76,7 @@ type CustomToolDefinition = {
 type EnqueueInput = {
   text: string;
   source: QueueSource;
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
   deliveryMode?: DeliveryMode;
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
@@ -264,7 +268,7 @@ export class ControlSurfaceRuntime {
     return { ok: true, item };
   }
 
-  handleHook(eventName: string, payload: Record<string, unknown>): HookResponse {
+  handleHook(eventName: string, payload: ClaudeHookPayload): HookResponse {
     const normalized = eventName.toLowerCase();
     if (!ACCEPTED_HOOK_EVENTS.has(normalized)) {
       this.log(`hook ${eventName}: filtered, unknown event`);
@@ -357,7 +361,7 @@ export class ControlSurfaceRuntime {
     if (transcriptPath) {
       const lastOutput = extractLastAssistantText(transcriptPath);
       if (lastOutput) {
-        (payload as Record<string, unknown>).lastAssistantText = lastOutput;
+        payload.lastAssistantText = lastOutput;
       }
     }
 
@@ -624,15 +628,12 @@ export class ControlSurfaceRuntime {
     this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
 
     // Check for API errors
-    const lastMsg = session.messages[session.messages.length - 1] as
-      | Record<string, unknown>
-      | undefined;
+    const lastMsg = session.messages[session.messages.length - 1];
     if (lastMsg?.role === "assistant") {
-      const stopReason = (lastMsg as any).stopReason ?? (lastMsg as any).stop_reason;
-      const errorMessage = (lastMsg as any).errorMessage ?? (lastMsg as any).error_message;
-      if (stopReason === "error" || errorMessage) {
-        this.log(`queue item ${item.id} API error: ${errorMessage ?? "unknown"}`);
-        throw new Error(`Pi API error: ${errorMessage ?? stopReason}`);
+      const assistantMsg = lastMsg as AssistantMessage;
+      if (assistantMsg.stopReason === "error" || assistantMsg.errorMessage) {
+        this.log(`queue item ${item.id} API error: ${assistantMsg.errorMessage ?? "unknown"}`);
+        throw new Error(`Pi API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`);
       }
     }
 
@@ -737,20 +738,24 @@ export class ControlSurfaceRuntime {
   /**
    * Detect if the last tool call was close_workstream (orchestrator self-destruct).
    */
-  private detectCloseWorkstream(session: any): boolean {
+  private detectCloseWorkstream(session: AgentSession): boolean {
     const messages = session.messages;
-    if (!messages?.length) return false;
+    if (!messages.length) return false;
     // Look at recent messages for a close_workstream tool result
     for (let i = messages.length - 1; i >= Math.max(0, messages.length - 5); i--) {
-      const msg = messages[i] as Record<string, unknown> | undefined;
+      const msg = messages[i];
       if (!msg) continue;
-      if (msg.role === "toolResult" && (msg as any).toolName === "close_workstream") {
-        return true;
+      if (msg.role === "toolResult") {
+        const toolResult = msg as ToolResultMessage;
+        if (toolResult.toolName === "close_workstream") {
+          return true;
+        }
       }
       // Also check content array for tool_use blocks
-      if (msg.role === "assistant" && Array.isArray(msg.content)) {
-        for (const block of msg.content as any[]) {
-          if (block?.type === "toolCall" && block?.name === "close_workstream") {
+      if (msg.role === "assistant") {
+        const assistantMsg = msg as AssistantMessage;
+        for (const block of assistantMsg.content) {
+          if (block.type === "toolCall" && block.name === "close_workstream") {
             return true;
           }
         }
@@ -776,8 +781,8 @@ export class ControlSurfaceRuntime {
           required: ["sql"],
           additionalProperties: false,
         },
-        execute: async (_toolCallId: string, params: any) => {
-          const rows = this.queryBlackboard(params.sql);
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const rows = this.queryBlackboard(String(params.sql));
           return {
             content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
             details: rows,

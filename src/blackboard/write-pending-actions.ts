@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
-import type { PendingActionKind, PendingActionRow } from "../contracts/index.ts";
+import type { ActionResolutionPayload, PendingActionKind, PendingActionRow } from "../contracts/index.ts";
+import type { BlackboardDatabase } from "./db.ts";
 import { getLatestPendingAction, getPendingActionByContextRef } from "./query-whatsapp.ts";
-
-type SqlDatabase = Pick<DatabaseSync, "prepare">;
 
 type CreatePendingActionInput = {
   actionId?: string;
@@ -21,7 +19,7 @@ function timestamp(value?: string): string {
 }
 
 export function createPendingAction(
-  db: SqlDatabase,
+  db: BlackboardDatabase,
   input: CreatePendingActionInput,
 ): PendingActionRow {
   const actionId = input.actionId ?? randomUUID();
@@ -51,15 +49,13 @@ export function createPendingAction(
     createdAt,
   );
 
-  return db
-    .prepare("SELECT * FROM pending_actions WHERE action_id = ?")
-    .get(actionId) as unknown as PendingActionRow;
+  return db.get<PendingActionRow>("SELECT * FROM pending_actions WHERE action_id = ?", actionId)!;
 }
 
 export function resolvePendingActionByContextRef(
-  db: SqlDatabase,
+  db: BlackboardDatabase,
   contextRef: string,
-  resolutionPayload: Record<string, unknown>,
+  resolutionPayload: ActionResolutionPayload,
   resolvedAt?: string,
 ): PendingActionRow | undefined {
   const action = getPendingActionByContextRef(db, contextRef);
@@ -76,14 +72,12 @@ export function resolvePendingActionByContextRef(
      WHERE action_id = ?`,
   ).run(effectiveResolvedAt, JSON.stringify(resolutionPayload), action.action_id);
 
-  return db
-    .prepare("SELECT * FROM pending_actions WHERE action_id = ?")
-    .get(action.action_id) as unknown as PendingActionRow;
+  return db.get<PendingActionRow>("SELECT * FROM pending_actions WHERE action_id = ?", action.action_id)!;
 }
 
 export function resolveLatestPendingAction(
-  db: SqlDatabase,
-  resolutionPayload: Record<string, unknown>,
+  db: BlackboardDatabase,
+  resolutionPayload: ActionResolutionPayload,
   resolvedAt?: string,
 ): PendingActionRow | undefined {
   const action = getLatestPendingAction(db, "whatsapp");

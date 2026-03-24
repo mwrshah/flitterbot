@@ -29,9 +29,8 @@ function timestamp(value?: string): string {
 }
 
 function getMessageById(db: SqlDatabase, id: number): WhatsAppMessageRow {
-  return db
-    .prepare("SELECT * FROM whatsapp_messages WHERE id = ?")
-    .get(id) as unknown as WhatsAppMessageRow;
+  const row: unknown = db.prepare("SELECT * FROM whatsapp_messages WHERE id = ?").get(id);
+  return row as WhatsAppMessageRow;
 }
 
 function insertWhatsAppMessage(

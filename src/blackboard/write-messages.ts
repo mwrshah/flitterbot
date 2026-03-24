@@ -1,12 +1,11 @@
 import crypto from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
 import type {
+  MessageMetadata,
   MessageRow,
   UnifiedMessageDirection,
   UnifiedMessageSource,
 } from "../contracts/index.ts";
-
-type SqlDatabase = Pick<DatabaseSync, "prepare">;
+import type { BlackboardDatabase } from "./db.ts";
 
 export type InsertMessageInput = {
   id?: string;
@@ -15,7 +14,7 @@ export type InsertMessageInput = {
   content: string;
   sender?: string | null;
   workstreamId?: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: MessageMetadata | null;
   createdAt?: string;
 };
 
@@ -23,7 +22,7 @@ function timestamp(value?: string): string {
   return value ?? new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-export function insertMessage(db: SqlDatabase, input: InsertMessageInput): MessageRow {
+export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput): MessageRow {
   const id = input.id ?? crypto.randomUUID();
   const createdAt = timestamp(input.createdAt);
   const metadataJson = input.metadata ? JSON.stringify(input.metadata) : null;
@@ -42,7 +41,5 @@ export function insertMessage(db: SqlDatabase, input: InsertMessageInput): Messa
     createdAt,
   );
 
-  return db
-    .prepare("SELECT * FROM messages WHERE id = ?")
-    .get(id) as unknown as MessageRow;
+  return db.get<MessageRow>("SELECT * FROM messages WHERE id = ?", id)!;
 }

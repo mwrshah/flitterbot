@@ -122,11 +122,35 @@ export interface ClaudeHookPayload {
   cwd?: string;
   model?: string;
   permission_mode?: string;
+  permissionMode?: string;
   source?: string;
   transcript_path?: string;
+  transcriptPath?: string;
   reason?: string;
+  stop_reason?: string;
+  session_end_reason?: string;
   timestamp?: string;
   lastAssistantText?: string;
+  agent_managed?: boolean | number;
+  pi_session_id?: string;
+  piSessionId?: string;
+  AUTONOMA_PI_SESSION_ID?: string;
+  workstream_id?: string;
+  workstreamId?: string;
+  AUTONOMA_WORKSTREAM_ID?: string;
+  tmux_session?: string;
+  tmuxSession?: string;
+  AUTONOMA_TMUX_SESSION?: string;
+  task_description?: string;
+  taskDescription?: string;
+  AUTONOMA_TASK_DESCRIPTION?: string;
+  todoist_task_id?: string;
+  todoistTaskId?: string;
+  AUTONOMA_TODOIST_TASK_ID?: string;
+  project?: string;
+  project_label?: string;
+  projectLabel?: string;
+  [key: string]: unknown;
 }
 
 export interface HookResponse {
