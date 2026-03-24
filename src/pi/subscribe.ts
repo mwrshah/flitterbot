@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { TurnEndEvent } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, insertIdMapping } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
@@ -12,114 +12,60 @@ import type {
 import type { WebSocketHub } from "../ws/hub.ts";
 import type { PiSessionState } from "./session-state.ts";
 
-type PiSessionSubscriptionEvent =
-  | {
-      type: "message_update";
-      message?: unknown;
-      assistantMessageEvent?: {
-        type?: string;
-        delta?: string;
-      };
-    }
-  | {
-      type: "message_end";
-      message?: unknown;
-    }
-  | {
-      type: "tool_execution_start";
-      toolName?: string;
-      toolCallId?: string;
-      parameters?: unknown;
-      args?: unknown;
-      [key: string]: unknown;
-    }
-  | {
-      type: "tool_execution_end";
-      toolName?: string;
-      toolCallId?: string;
-      result?: unknown;
-      isError?: boolean;
-      [key: string]: unknown;
-    }
-  | (TurnEndEvent & { type: "turn_end" })
-  | {
-      type: "agent_end";
-      [key: string]: unknown;
-    }
-  | {
-      type: string;
-      [key: string]: unknown;
-    };
+/** Derived from AgentSessionEvent since pi-agent-core is not a direct dependency */
+type AgentMessage = Extract<AgentSessionEvent, { type: "message_end" }>["message"];
 
 type SubscribablePiSession = {
   sessionId: string;
-  messages: Array<unknown>;
-  subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
+  messages: AgentMessage[];
+  subscribe: (listener: (event: AgentSessionEvent) => void) => () => void;
 };
 
 function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEvent): void {
   wsHub.broadcast(payload);
 }
 
-function extractMessageRole(message: unknown): "user" | "assistant" | undefined {
-  if (!message || typeof message !== "object") return undefined;
+function extractMessageRole(message: AgentMessage): "user" | "assistant" | undefined {
+  if (message.role === "user" || message.role === "assistant") {
+    return message.role;
+  }
+  return undefined;
+}
 
-  const role = (message as Record<string, unknown>).role;
-  if (role === "user" || role === "assistant") {
-    return role;
+function extractMessageText(message: AgentMessage): string | undefined {
+  if (message.role === "assistant") {
+    if (message.errorMessage?.trim()) return message.errorMessage;
+    const parts = message.content
+      .flatMap((block) => (block.type === "text" ? [block.text] : []))
+      .join("");
+    return parts.trim().length > 0 ? parts : undefined;
+  }
+
+  if (message.role === "user") {
+    if (typeof message.content === "string") {
+      return message.content.trim().length > 0 ? message.content : undefined;
+    }
+    const parts = message.content
+      .flatMap((block) => (block.type === "text" ? [block.text] : []))
+      .join("");
+    return parts.trim().length > 0 ? parts : undefined;
   }
 
   return undefined;
 }
 
-function extractMessageText(message: unknown): string | undefined {
-  if (!message || typeof message !== "object") return undefined;
-
-  const record = message as Record<string, unknown>;
-  const directText = [record.text, record.message, record.errorMessage].find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  );
-  if (directText) return directText;
-
-  const content = record.content;
-  if (!Array.isArray(content)) return undefined;
-
-  const parts = content
-    .flatMap((block) => {
-      if (!block || typeof block !== "object") return [];
-      const item = block as Record<string, unknown>;
-      if (item.type === "text" && typeof item.text === "string") {
-        return [item.text];
-      }
-      return [];
-    })
-    .join("");
-
-  return parts.trim().length > 0 ? parts : undefined;
-}
-
-function extractMessageId(message: unknown): string | undefined {
-  if (!message || typeof message !== "object") return undefined;
-  const record = message as Record<string, unknown>;
-  // Prefer responseId (Anthropic API response identifier, available on AssistantMessage since SDK 0.60)
-  for (const key of ["responseId", "id"] as const) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value;
+function extractMessageId(message: AgentMessage): string | undefined {
+  // responseId is the Anthropic API response identifier, available on AssistantMessage since SDK 0.60
+  if (message.role === "assistant" && message.responseId?.trim()) {
+    return message.responseId;
   }
   return undefined;
 }
 
-function extractTimestamp(message: unknown, fallback: string): string {
-  if (!message || typeof message !== "object") return fallback;
-
-  const timestamp = (message as Record<string, unknown>).timestamp;
-  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
-    return new Date(timestamp).toISOString();
+function extractTimestamp(message: AgentMessage, fallback: string): string {
+  if (Number.isFinite(message.timestamp)) {
+    return new Date(message.timestamp).toISOString();
   }
-  if (typeof timestamp === "string" && timestamp.trim()) {
-    return timestamp;
-  }
-
   return fallback;
 }
 
@@ -148,8 +94,7 @@ export function subscribeToPiSession(
 
     switch (event.type) {
       case "message_update": {
-        const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
-        if (ame?.type === "text_delta" && typeof ame.delta === "string") {
+        if (event.assistantMessageEvent.type === "text_delta") {
           // Pre-allocate server UUID for this streaming message if not already set
           if (!streamingServerUuid) {
             streamingServerUuid = crypto.randomUUID();
@@ -158,7 +103,7 @@ export function subscribeToPiSession(
             type: "text_delta",
             sessionId: session.sessionId,
             messageId: streamingServerUuid,
-            delta: ame.delta,
+            delta: event.assistantMessageEvent.delta,
           });
         }
         break;
@@ -216,7 +161,7 @@ export function subscribeToPiSession(
       }
       case "tool_execution_start": {
         // Deterministic tool ID for deduplication — must match history.ts format
-        const toolCallId = event.toolCallId as string | undefined;
+        const toolCallId = event.toolCallId;
         const lastAssistantId = pendingAssistantMessages.length > 0
           ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
           : undefined;
@@ -229,9 +174,9 @@ export function subscribeToPiSession(
           type: "tool_execution_start",
           id: deterministicId,
           sessionId: session.sessionId,
-          tool: event.toolName as string | undefined,
+          tool: event.toolName,
           toolUseId: toolCallId,
-          args: event.args ?? event.parameters,
+          args: event.args,
           timestamp: now,
           event,
         };
@@ -240,7 +185,7 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_end": {
-        const toolCallId = event.toolCallId as string | undefined;
+        const toolCallId = event.toolCallId;
         const lastAssistantId = pendingAssistantMessages.length > 0
           ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
           : undefined;
@@ -253,10 +198,10 @@ export function subscribeToPiSession(
           type: "tool_execution_end",
           id: deterministicId,
           sessionId: session.sessionId,
-          tool: event.toolName as string | undefined,
+          tool: event.toolName,
           toolUseId: toolCallId,
           result: event.result,
-          isError: event.isError as boolean | undefined,
+          isError: event.isError,
           timestamp: now,
           event,
         };
@@ -268,7 +213,7 @@ export function subscribeToPiSession(
         // tool-use stops. Only treat it as a real end-of-turn when the assistant's
         // stopReason is NOT "toolUse" (i.e. the model finished with text, not a
         // tool call that will be followed by tool execution and another turn).
-        const { message: turnMessage } = event as TurnEndEvent;
+        const turnMessage = event.message;
         const stopReason = turnMessage.role === "assistant" ? turnMessage.stopReason : undefined;
 
         if (stopReason === "toolUse") {
