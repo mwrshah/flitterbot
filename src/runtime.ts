@@ -633,6 +633,22 @@ export class ControlSurfaceRuntime {
     } else {
       await session.prompt(promptText, { images: item.images });
     }
+
+    // Stamp the user message in the SDK's messages array with the server UUID
+    // so the history API returns IDs matching WS events (prevents duplicate rendering).
+    // The SDK user message has no `id` field, so history.ts falls back to `memory-N` —
+    // a positional ID that differs from the server UUID used in WS message_end events.
+    const serverMsgId = item.metadata?.serverMessageId as string | undefined;
+    if (serverMsgId) {
+      for (let i = session.messages.length - 1; i >= 0; i--) {
+        const msg = session.messages[i] as Record<string, unknown> | undefined;
+        if (msg?.role === "user") {
+          msg.id = serverMsgId;
+          break;
+        }
+      }
+    }
+
     this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
 
     // Check for API errors

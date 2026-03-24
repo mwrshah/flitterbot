@@ -156,7 +156,7 @@ export async function handleBrowserPiHistoryRoute(
     return sendJson(response, 200, body);
   }
 
-  const items = await readSessionHistory(targetSession, historyMode);
+  const items = await readSessionHistory(targetSession, historyMode, resolver);
   if (targetSession.workstreamName) {
     for (const item of items) {
       if (item.kind === "message") {
