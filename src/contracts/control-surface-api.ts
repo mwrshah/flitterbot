@@ -72,7 +72,7 @@ export interface PiOrchestratorStatus {
 }
 
 export interface PiMultiSessionStatus {
-  default: PiRuntimeStatus;
+  default: PiRuntimeStatus | null;
   orchestrators: PiOrchestratorStatus[];
 }
 

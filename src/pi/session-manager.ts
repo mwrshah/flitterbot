@@ -61,8 +61,7 @@ export class PiSessionManager {
     this.log = log;
   }
 
-  getDefault(): ManagedPiSession {
-    if (!this.defaultSession) throw new Error("Default Pi session not initialized");
+  getDefault(): ManagedPiSession | undefined {
     return this.defaultSession;
   }
 

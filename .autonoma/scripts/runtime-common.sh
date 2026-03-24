@@ -123,9 +123,8 @@ status_has_active_pi() {
   fi
 
   printf '%s' "$body" | jq -e '
-    (.pi.sessionId? != null and .pi.sessionId != "") or
-    (.pi.status? == "active") or
-    (.pi.status? == "idle")
+    .pi.default != null and
+    (.pi.default.sessionId? != null and .pi.default.sessionId != "")
   ' >/dev/null 2>&1
 }
 

@@ -448,7 +448,7 @@ export class ControlSurfaceRuntime {
 
   getStatus(): StatusResponse {
     const def = this.sessionManager.getDefault();
-    const defSnapshot = def.state.getSnapshot();
+    const defSnapshot = def?.state.getSnapshot();
     const whatsapp = this.getWhatsAppStatusSnapshot();
     const blackboardStatus = pingBlackboard(this.blackboard) ? "ok" : "error";
 
@@ -480,13 +480,13 @@ export class ControlSurfaceRuntime {
       pid: process.pid,
       uptime: Math.floor((Date.now() - this.startedAt) / 1000),
       pi: {
-        default: {
+        default: defSnapshot ? {
           sessionId: defSnapshot.sessionId!,
           sessionFile: defSnapshot.sessionFile ?? null,
-          messageCount: def.session?.messages?.length ?? defSnapshot.messageCount,
+          messageCount: def!.session?.messages?.length ?? defSnapshot.messageCount,
           lastPromptAt: defSnapshot.lastPromptAt ?? null,
           busy: defSnapshot.busy,
-        },
+        } : null,
         orchestrators: orchestratorStatuses,
       },
       whatsapp: {
