@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { TurnEndEvent } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, insertIdMapping } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
@@ -40,8 +41,9 @@ type PiSessionSubscriptionEvent =
       isError?: boolean;
       [key: string]: unknown;
     }
+  | (TurnEndEvent & { type: "turn_end" })
   | {
-      type: "turn_end" | "agent_end";
+      type: "agent_end";
       [key: string]: unknown;
     }
   | {
@@ -262,6 +264,19 @@ export function subscribeToPiSession(
         break;
       }
       case "turn_end": {
+        // The SDK fires turn_end after every API response — including mid-turn
+        // tool-use stops. Only treat it as a real end-of-turn when the assistant's
+        // stopReason is NOT "toolUse" (i.e. the model finished with text, not a
+        // tool call that will be followed by tool execution and another turn).
+        const { message: turnMessage } = event as TurnEndEvent;
+        const stopReason = turnMessage.role === "assistant" ? turnMessage.stopReason : undefined;
+
+        if (stopReason === "toolUse") {
+          // Mid-turn tool call — do NOT flush pending messages or broadcast
+          // turn_end. The turn is still in progress.
+          break;
+        }
+
         // Flush deferred assistant messages: all but last are intermediate
         for (let i = 0; i < pendingAssistantMessages.length; i++) {
           const isLast = i === pendingAssistantMessages.length - 1;
