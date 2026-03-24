@@ -1,1 +1,1 @@
-.pi/AGENTS.md
+/home/mas/development/dotfiles/CLAUDE.arch.md
