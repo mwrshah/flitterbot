@@ -562,6 +562,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 10) {
     applyV10Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 11) {
+    applyV11Migration(db);
   }
 
   return getSchemaVersion(db);

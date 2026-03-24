@@ -12,7 +12,7 @@ Multiple Claude Code sessions run concurrently across tmux and worktrees. The or
 
 **Schema** is defined as a SQL string in `src/contracts/blackboard.ts` (`BLACKBOARD_SCHEMA_SQL`) — the contracts package is the single source of truth for the schema and all row types.
 
-**Migrations** (`migrate.ts`): versioned (currently v10), tracked in `schema_migrations`. Fresh databases get the full schema in one shot. Existing databases step through incremental migrations. Legacy upgrade handles the v1–v3 transition (drops `events`/`agents` tables, remaps `running` → `working` status). Migrations v4–v9 add workstreams, refine pi_session statuses, add the unified `messages` table, add `health_flags`, and add `pi_sessions.workstream_id`. Migration v10 drops `sessions.launch_id` and removes the phantom `'processed'` status from `whatsapp_messages`.
+**Migrations** (`migrate.ts`): versioned (currently v11), tracked in `schema_migrations`. Fresh databases get the full schema in one shot. Existing databases step through incremental migrations. Legacy upgrade handles the v1–v3 transition (drops `events`/`agents` tables, remaps `running` → `working` status). Migrations v4–v9 add workstreams, refine pi_session statuses, add the unified `messages` table, add `health_flags`, and add `pi_sessions.workstream_id`. Migration v10 drops `sessions.launch_id` and removes the phantom `'processed'` status from `whatsapp_messages`. Migration v11 adds `'agent'` to the messages source CHECK constraint.
 
 **Code organization**: query modules (read) and write modules (write) are split by domain:
 
