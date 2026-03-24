@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { WhatsAppControls } from "~/components/whatsapp-controls";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { WhatsAppControls } from "~/components/whatsapp-controls";
 import { statusQueryOptions } from "~/lib/queries";
 import { formatDuration } from "~/lib/utils";
 

@@ -1,12 +1,12 @@
-import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import { piHistoryQueryOptions, statusQueryOptions } from "~/lib/queries";
-import { fetchPiHistory } from "~/server/pi";
-import { mergeTimelines } from "~/lib/utils";
 import type { ChatTimelineItem } from "~/lib/types";
+import { mergeTimelines } from "~/lib/utils";
+import { fetchPiHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/default")({
   loader: async () => {

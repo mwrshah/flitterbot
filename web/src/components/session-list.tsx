@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import type { SessionSummary } from "~/lib/types";
 import { cn, formatRelativeTime } from "~/lib/utils";
 
-
 function statusDotColor(status: SessionSummary["status"]): string {
   switch (status) {
     case "working":

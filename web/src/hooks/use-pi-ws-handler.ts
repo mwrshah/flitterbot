@@ -1,16 +1,17 @@
 import { useEffect } from "react";
+import type { AutonomaApiClient } from "~/lib/api";
 import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
 import type {
   ChatTimelineTool,
   ConnectionState,
+  DeliveryMode,
+  ImageAttachment,
   JsonValue,
   MessageSource,
   WsMessage,
 } from "~/lib/types";
-import type { AutonomaWsClient } from "~/lib/ws";
 import { createId, extractToolName } from "~/lib/utils";
-import type { AutonomaApiClient } from "~/lib/api";
-import type { DeliveryMode, ImageAttachment } from "~/lib/types";
+import type { AutonomaWsClient } from "~/lib/ws";
 
 /**
  * Routes WebSocket events into `piSessionStore` so any route (/, /pi, /pi/:id)
@@ -40,8 +41,7 @@ export function usePiWsHandler(
     const store = piSessionStore;
 
     const unsubscribe = wsClient.subscribe((message: WsMessage) => {
-      const sessionId =
-        "sessionId" in message && message.sessionId ? message.sessionId : undefined;
+      const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : undefined;
 
       if (message.type === "connected") {
         // Global pill — attach to default session if known, otherwise skip

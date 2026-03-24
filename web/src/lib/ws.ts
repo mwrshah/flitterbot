@@ -169,7 +169,9 @@ export class AutonomaWsClient {
 
     // Circuit breaker: stop trying after maxAttempts
     if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
-      console.warn(`[ws] circuit breaker: ${MAX_RECONNECT_ATTEMPTS} attempts exhausted, staying disconnected`);
+      console.warn(
+        `[ws] circuit breaker: ${MAX_RECONNECT_ATTEMPTS} attempts exhausted, staying disconnected`,
+      );
       this.transition("disconnected");
       return;
     }
@@ -180,7 +182,9 @@ export class AutonomaWsClient {
     const delay = Math.min(BACKOFF_BASE * 2 ** this.reconnectAttempt + jitter, BACKOFF_MAX);
     this.reconnectAttempt++;
 
-    console.debug(`[ws] reconnect attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay)}ms`);
+    console.debug(
+      `[ws] reconnect attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay)}ms`,
+    );
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       // Force state so connect() guard passes

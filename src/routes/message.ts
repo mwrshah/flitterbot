@@ -1,4 +1,6 @@
 import type http from "node:http";
+import { classifyMessage } from "../classifier/classify.ts";
+import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type {
   DeliveryMode,
   MessageMetadata,
@@ -7,8 +9,6 @@ import type {
   MessageSource,
   WorkstreamRoutingMeta,
 } from "../contracts/index.ts";
-import { classifyMessage } from "../classifier/classify.ts";
-import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 

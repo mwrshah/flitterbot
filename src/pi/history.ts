@@ -1,10 +1,6 @@
 import fs, { createReadStream } from "node:fs";
 import readline from "node:readline";
-import type {
-  PiHistoryItem,
-  PiHistoryMessageItem,
-  PiHistoryResponse,
-} from "../contracts/index.ts";
+import type { PiHistoryItem, PiHistoryMessageItem, PiHistoryResponse } from "../contracts/index.ts";
 
 type PiHistoryMode = "agent" | "input";
 
@@ -96,7 +92,7 @@ function pushMessage(
   subIndex?: number,
   blocks?: PiHistoryMessageBlock[],
 ): void {
-  let normalized = content.trim();
+  const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );
@@ -315,7 +311,10 @@ function parseHistoryLine(
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
   // For assistant messages, prefer responseId (Anthropic API identifier) as the stable ID.
   // Falls back to the JSONL entry wrapper id, then positional.
-  const rawId = extractStableId(messageRecord) ?? (parsed.id?.trim() ? parsed.id : undefined) ?? `line-${lineNumber}`;
+  const rawId =
+    extractStableId(messageRecord) ??
+    (parsed.id?.trim() ? parsed.id : undefined) ??
+    `line-${lineNumber}`;
   const resolvedId = resolveId(rawId, resolver);
   parseMessageRecord(messageRecord, createdAt, resolvedId, items);
 }
@@ -332,7 +331,8 @@ export function readPiHistoryFromMessages(
   messages.forEach((message, index) => {
     const record = asRecord(message) as RawMessageRecord;
     const createdAt = isoTimestamp(record.timestamp);
-    const rawId = extractStableId(record) ?? (record.id?.trim() ? record.id : undefined) ?? `memory-${index}`;
+    const rawId =
+      extractStableId(record) ?? (record.id?.trim() ? record.id : undefined) ?? `memory-${index}`;
     const resolvedId = resolveId(rawId, resolver);
     parseMessageRecord(record, createdAt, resolvedId, items);
   });

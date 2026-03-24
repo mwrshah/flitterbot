@@ -1,2 +1,2 @@
-export { readTranscriptPage } from "./transcript.ts";
 export { extractLastAssistantText } from "./reader.ts";
+export { readTranscriptPage } from "./transcript.ts";

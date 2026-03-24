@@ -75,10 +75,7 @@ export function insertIdMapping(
   );
 }
 
-export function resolveServerId(
-  db: BlackboardDatabase,
-  agentId: string,
-): string | null {
+export function resolveServerId(db: BlackboardDatabase, agentId: string): string | null {
   const row = db.get<{ server_id: string }>(
     "SELECT server_id FROM message_id_map WHERE agent_id = ?",
     agentId,
@@ -87,8 +84,6 @@ export function resolveServerId(
 }
 
 /** Returns a resolver function suitable for passing to the history parser. */
-export function createIdResolver(
-  db: BlackboardDatabase,
-): (agentId: string) => string | null {
+export function createIdResolver(db: BlackboardDatabase): (agentId: string) => string | null {
   return (agentId: string) => resolveServerId(db, agentId);
 }

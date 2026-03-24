@@ -56,7 +56,7 @@ export function PiMessageList({
       console.log("[PiMessageList] created <message-list>");
     }
 
-    const el = elementRef.current as any;
+    const el = elementRef.current as HTMLElement & Record<string, unknown>;
     el.messages = messages;
     el.tools = [];
     el.pendingToolCalls = pendingToolCalls ?? new Set<string>();

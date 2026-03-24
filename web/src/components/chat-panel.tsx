@@ -3,12 +3,12 @@ import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import {
   buildStreamingAssistantMessage,
   pendingToolCallsFromTimeline,
   timelineToAgentMessages,
 } from "~/lib/pi-web-ui-bridge";
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./pi-message-list";
 import { PiStreamingMessage } from "./pi-streaming-message";
@@ -66,7 +66,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   timeline,
   streamingText,
-  streamingMessageId,
+  streamingMessageId: _streamingMessageId,
   statusPills,
   connectionState,
   onSendMessage,
@@ -84,7 +84,7 @@ export function ChatPanel({
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
 
-  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, engageAndScroll } = useStickToBottom();
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 

@@ -1,10 +1,10 @@
 import type http from "node:http";
-import type { PiHistoryItem, PiHistoryResponse } from "../contracts/index.ts";
 import { createIdResolver } from "../blackboard/db.ts";
 import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
 } from "../blackboard/query-workstreams.ts";
+import type { PiHistoryItem, PiHistoryResponse } from "../contracts/index.ts";
 import { type IdResolver, readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -34,13 +34,23 @@ async function readSessionHistory(
     if (body.items.length > 0 || !snapshot.sessionFile) {
       items = body.items;
     } else if (snapshot.sessionFile) {
-      const fileBody = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode, resolver);
+      const fileBody = await readPiHistory(
+        snapshot.sessionId,
+        snapshot.sessionFile,
+        historyMode,
+        resolver,
+      );
       items = fileBody.items;
     } else {
       return [];
     }
   } else if (snapshot.sessionFile) {
-    const body = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode, resolver);
+    const body = await readPiHistory(
+      snapshot.sessionId,
+      snapshot.sessionFile,
+      historyMode,
+      resolver,
+    );
     items = body.items;
   } else {
     return [];

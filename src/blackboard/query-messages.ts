@@ -1,9 +1,6 @@
 import type { MessageMetadata, MessageRow, UnifiedMessageSource } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
-import {
-  type InsertMessageInput,
-  insertMessage as writeMessage,
-} from "./write-messages.ts";
+import { type InsertMessageInput, insertMessage as writeMessage } from "./write-messages.ts";
 
 export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput): MessageRow {
   return writeMessage(db, input);

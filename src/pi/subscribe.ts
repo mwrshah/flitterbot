@@ -123,7 +123,8 @@ export function subscribeToPiSession(
         if (role === "user") {
           // User messages: server UUID was assigned at ingestion, available in queue item metadata
           const snapshot = state.getSnapshot();
-          serverMessageId = (snapshot.currentItem?.metadata?.serverMessageId as string) ?? crypto.randomUUID();
+          serverMessageId =
+            (snapshot.currentItem?.metadata?.serverMessageId as string) ?? crypto.randomUUID();
         } else {
           // Assistant messages: use pre-allocated streaming UUID if available, otherwise generate
           serverMessageId = streamingServerUuid ?? crypto.randomUUID();
@@ -162,9 +163,10 @@ export function subscribeToPiSession(
       case "tool_execution_start": {
         // Deterministic tool ID for deduplication — must match history.ts format
         const toolCallId = event.toolCallId;
-        const lastAssistantId = pendingAssistantMessages.length > 0
-          ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
-          : undefined;
+        const lastAssistantId =
+          pendingAssistantMessages.length > 0
+            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
+            : undefined;
         const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
         const deterministicId = toolCallId
           ? `${anchorId}:tool:${toolCallId}:start`
@@ -186,9 +188,10 @@ export function subscribeToPiSession(
       }
       case "tool_execution_end": {
         const toolCallId = event.toolCallId;
-        const lastAssistantId = pendingAssistantMessages.length > 0
-          ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
-          : undefined;
+        const lastAssistantId =
+          pendingAssistantMessages.length > 0
+            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
+            : undefined;
         const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
         const deterministicId = toolCallId
           ? `${anchorId}:tool:${toolCallId}:end`

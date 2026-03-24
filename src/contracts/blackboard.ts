@@ -66,7 +66,11 @@ export type PiSessionStatus =
 export type WorkstreamStatus = "open" | "closed";
 export type WhatsAppMessageDirection = "inbound" | "outbound";
 export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "failed";
-export type PendingActionKind = "whatsapp_auth_expired" | "restart_session" | "approve_change" | "clarify";
+export type PendingActionKind =
+  | "whatsapp_auth_expired"
+  | "restart_session"
+  | "approve_change"
+  | "clarify";
 export type PendingActionStatus = "pending" | "resolved" | "expired" | "canceled";
 export type HookEventName = "SessionStart" | "Stop" | "SessionEnd";
 
@@ -124,7 +128,14 @@ export interface WhatsAppMessageRow {
   processed_at: string | null;
 }
 
-export type UnifiedMessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
+export type UnifiedMessageSource =
+  | "whatsapp"
+  | "web"
+  | "hook"
+  | "cron"
+  | "init"
+  | "agent"
+  | "pi_outbound";
 export type UnifiedMessageDirection = "inbound" | "outbound";
 
 export interface MessageRow {

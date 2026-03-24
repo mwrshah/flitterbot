@@ -49,7 +49,7 @@ export function PiStreamingMessage({
       console.log("[PiStreamingMessage] created <assistant-message>");
     }
 
-    const el = elementRef.current as any;
+    const el = elementRef.current as HTMLElement & Record<string, unknown>;
     if (message) {
       el.message = message;
       el.isStreaming = true;

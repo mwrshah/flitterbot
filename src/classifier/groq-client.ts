@@ -78,7 +78,11 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
       if (attempt > 1) {
         console.log("[router] Groq classification succeeded on attempt %d", attempt);
       }
-      console.log("[router] classification: workstream_id=%s reasoning=%s", result.workstream_id ?? "none", result.reasoning.slice(0, 120));
+      console.log(
+        "[router] classification: workstream_id=%s reasoning=%s",
+        result.workstream_id ?? "none",
+        result.reasoning.slice(0, 120),
+      );
       return result;
     } catch (apiError) {
       console.warn(

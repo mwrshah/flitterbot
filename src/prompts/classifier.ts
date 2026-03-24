@@ -1,5 +1,5 @@
-import type { WorkstreamRow } from "../contracts/index.ts";
 import type { ConversationSnippet } from "../blackboard/query-messages.ts";
+import type { WorkstreamRow } from "../contracts/index.ts";
 
 function formatWorkstreamLine(ws: WorkstreamRow, label?: string): string {
   const suffix = label ? ` ${label}` : "";

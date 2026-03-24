@@ -1,11 +1,11 @@
 import type { ClaudeSessionStatus, MessageMetadata } from "./blackboard.ts";
+import type { MessageSource } from "./message.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
 import type { TranscriptPageResponse } from "./transcript.ts";
-import type { MessageSource } from "./message.ts";
 
 export type { MessageSource } from "./message.ts";
 export type DeliveryMode = "followUp" | "steer";

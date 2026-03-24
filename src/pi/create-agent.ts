@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getModel } from "@mariozechner/pi-ai";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import {
   AuthStorage,
   createAgentSession,
@@ -13,7 +14,6 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";

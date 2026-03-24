@@ -156,19 +156,21 @@ export function Sidebar({
                 Active workstreams
               </p>
               <div className="space-y-1">
-                {openWorkstreams.filter((ws) => ws.piSessionId).map((ws) => (
-                  <Link
-                    key={ws.id}
-                    to="/pi/$sessionId"
-                    params={{ sessionId: ws.piSessionId! }}
-                    className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
-                  >
-                    <span className="truncate">{ws.name}</span>
-                    <span className="text-sidebar-foreground/40 tabular-nums shrink-0 ml-2">
-                      {ws.sessionCount}
-                    </span>
-                  </Link>
-                ))}
+                {openWorkstreams
+                  .filter((ws) => ws.piSessionId)
+                  .map((ws) => (
+                    <Link
+                      key={ws.id}
+                      to="/pi/$sessionId"
+                      params={{ sessionId: ws.piSessionId! }}
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+                    >
+                      <span className="truncate">{ws.name}</span>
+                      <span className="text-sidebar-foreground/40 tabular-nums shrink-0 ml-2">
+                        {ws.sessionCount}
+                      </span>
+                    </Link>
+                  ))}
               </div>
             </>
           )}
@@ -179,19 +181,21 @@ export function Sidebar({
                 Recently closed
               </p>
               <div className="space-y-1">
-                {closedWorkstreams.filter((ws) => ws.piSessionId).map((ws) => (
-                  <Link
-                    key={ws.id}
-                    to="/pi/$sessionId"
-                    params={{ sessionId: ws.piSessionId! }}
-                    className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
-                  >
-                    <span className="truncate">{ws.name}</span>
-                    <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
-                      {ws.sessionCount}
-                    </span>
-                  </Link>
-                ))}
+                {closedWorkstreams
+                  .filter((ws) => ws.piSessionId)
+                  .map((ws) => (
+                    <Link
+                      key={ws.id}
+                      to="/pi/$sessionId"
+                      params={{ sessionId: ws.piSessionId! }}
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
+                    >
+                      <span className="truncate">{ws.name}</span>
+                      <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
+                        {ws.sessionCount}
+                      </span>
+                    </Link>
+                  ))}
               </div>
             </div>
           )}

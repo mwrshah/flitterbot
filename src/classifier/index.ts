@@ -1,7 +1,7 @@
 export { type ClassificationResult, classifyMessage } from "./classify.ts";
 export {
-  resolveGroqApiKey,
   type ClassifyResult,
   callGroqClassify,
   resetGroqClient,
+  resolveGroqApiKey,
 } from "./groq-client.ts";

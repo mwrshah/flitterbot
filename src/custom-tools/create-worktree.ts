@@ -180,10 +180,7 @@ export function executeCreateWorktree(
       usedGtr: useGtr,
     };
   } catch (error: unknown) {
-    const msg =
-      error instanceof Error
-        ? error.message
-        : String(error);
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       workstreamId,

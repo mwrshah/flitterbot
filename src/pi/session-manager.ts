@@ -1,18 +1,18 @@
 import path from "node:path";
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import type { ApiError } from "../contracts/blackboard.ts";
 import {
   endPiSession,
   reconcilePreviousPiSessions,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import type { AutonomaConfig } from "../config/load-config.ts";
-import { type QueueItem, TurnQueue } from "./turn-queue.ts";
+import type { ApiError } from "../contracts/blackboard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 
 export interface ManagedPiSession {
   session: AgentSession;
@@ -333,4 +333,3 @@ export class PiSessionManager {
     return managed;
   }
 }
-

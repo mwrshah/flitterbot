@@ -9,11 +9,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -214,7 +214,9 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
           </span>
         )}
         <CollapsibleContent>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+            {displayContent}
+          </p>
         </CollapsibleContent>
       </div>
     </div>
@@ -353,13 +355,10 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
 
   // Read appended items from the shared store (populated by usePiWsHandler in root)
   const storeSnapshot = usePiSessionStore();
-  const appendedItems = useMemo(
-    () => piSessionStore.getAllAppendedItems(),
-    [storeSnapshot],
-  );
+  const appendedItems = useMemo(() => piSessionStore.getAllAppendedItems(), [storeSnapshot]);
   const connectionState = storeSnapshot.connectionState;
 
-  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, engageAndScroll } = useStickToBottom();
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, appendedItems),
@@ -433,9 +432,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
-        {isClient && (
-          <Badge variant={connectionVariant}>{connectionLabel}</Badge>
-        )}
+        {isClient && <Badge variant={connectionVariant}>{connectionLabel}</Badge>}
       </div>
 
       {/* Activity feed */}

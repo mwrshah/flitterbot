@@ -1,5 +1,5 @@
-import type { DeliveryMode, MessageSource } from "./control-surface-api.ts";
 import type { MessageMetadata } from "./blackboard.ts";
+import type { DeliveryMode, MessageSource } from "./control-surface-api.ts";
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 

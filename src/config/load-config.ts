@@ -90,20 +90,17 @@ export function loadConfig(): AutonomaConfig {
   const whatsappSocketPath = expandHome(
     raw.whatsappSocketPath ?? "~/.autonoma/whatsapp/daemon.sock",
   );
-  const whatsappPidPath = expandHome(
-    raw.whatsappPidPath ?? "~/.autonoma/whatsapp/daemon.pid",
-  );
+  const whatsappPidPath = expandHome(raw.whatsappPidPath ?? "~/.autonoma/whatsapp/daemon.pid");
   const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js");
-  const whatsappDaemonPath = expandHome(
-    raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js",
-  );
+  const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js");
   const projectsDir = expandHome(raw.projectsDir ?? "~/development");
   const wipeWorkstreamsOnStart =
     raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1";
   const whatsappEnabled =
     process.env.WHATSAPP_ENABLED !== undefined
-      ? process.env.WHATSAPP_ENABLED !== "0" && process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
-      : raw.whatsappEnabled ?? true;
+      ? process.env.WHATSAPP_ENABLED !== "0" &&
+        process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
+      : (raw.whatsappEnabled ?? true);
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: AutonomaConfig = {

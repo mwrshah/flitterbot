@@ -46,7 +46,9 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
       <CardContent>
         {isDisabled ? (
           <p className="text-xs text-muted-foreground">
-            WhatsApp daemon is disabled. Set <code className="text-[11px]">WHATSAPP_ENABLED=true</code> and restart the control surface to enable it.
+            WhatsApp daemon is disabled. Set{" "}
+            <code className="text-[11px]">WHATSAPP_ENABLED=true</code> and restart the control
+            surface to enable it.
           </p>
         ) : (
           <div className="space-y-3">
@@ -90,7 +92,9 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
             {startMutation.error && (
               <p className="text-xs text-destructive">Failed to start daemon.</p>
             )}
-            {stopMutation.error && <p className="text-xs text-destructive">Failed to stop daemon.</p>}
+            {stopMutation.error && (
+              <p className="text-xs text-destructive">Failed to stop daemon.</p>
+            )}
 
             <p className="text-[10px] text-muted-foreground/50">
               Auth stays terminal-driven in v1. Browser only controls start/stop.

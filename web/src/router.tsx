@@ -8,6 +8,12 @@ import { createSettingsStore } from "./lib/settings-store";
 import { AutonomaWsClient } from "./lib/ws";
 import { routeTree } from "./routeTree.gen";
 
+declare global {
+  interface Window {
+    __autonoma_wsClient?: AutonomaWsClient;
+  }
+}
+
 export function getRouter() {
   const queryClient = new QueryClient();
 
@@ -22,9 +28,9 @@ export function getRouter() {
   // Connect WS eagerly — ready before any component renders
   if (typeof window !== "undefined") {
     // Disconnect any previous wsClient orphaned by HMR
-    const prev = (window as any).__autonoma_wsClient as AutonomaWsClient | undefined;
+    const prev = window.__autonoma_wsClient;
     if (prev) prev.disconnect();
-    (window as any).__autonoma_wsClient = wsClient;
+    window.__autonoma_wsClient = wsClient;
 
     wsClient.connect();
     window.addEventListener("beforeunload", () => {

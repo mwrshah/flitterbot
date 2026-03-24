@@ -3,10 +3,17 @@ import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
-import { type BlackboardDatabase, openBlackboard, pingBlackboard, resolveServerId } from "./blackboard/db.ts";
+import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import {
+  type BlackboardDatabase,
+  openBlackboard,
+  pingBlackboard,
+  resolveServerId,
+} from "./blackboard/db.ts";
+import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
-import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
 import {
   findIdleCleanupCandidates,
   getSessionById,
@@ -42,6 +49,14 @@ import type {
   StatusResponse,
   WorkstreamRoutingMeta,
 } from "./contracts/index.ts";
+import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
+import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
+import { directSessionMessage } from "./custom-tools/manage-session.ts";
+import { formatPromptWithContext } from "./pi/format-prompt.ts";
+import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
+import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
+import { extractLastAssistantText } from "./transcript/reader.ts";
+import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
 import {
@@ -50,16 +65,6 @@ import {
   stopDaemonProcess,
   waitForDaemonReady,
 } from "./whatsapp/process.ts";
-import { formatPromptWithContext } from "./pi/format-prompt.ts";
-import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
-import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
-import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
-import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
-import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
-import { directSessionMessage } from "./custom-tools/manage-session.ts";
-import { readTranscriptPage } from "./transcript/transcript.ts";
-import { extractLastAssistantText } from "./transcript/reader.ts";
 import { type WebSocketClient, WebSocketHub } from "./ws/hub.ts";
 
 /** Custom tool shape using plain JSON Schema (not TypeBox). Cast to ToolDefinition[] at the SDK boundary. */
@@ -68,7 +73,11 @@ type CustomToolDefinition = {
   label: string;
   description: string;
   parameters: Record<string, unknown>;
-  execute: (toolCallId: string, params: Record<string, unknown>, ...rest: unknown[]) => Promise<{
+  execute: (
+    toolCallId: string,
+    params: Record<string, unknown>,
+    ...rest: unknown[]
+  ) => Promise<{
     content: Array<{ type: string; text: string }>;
     details?: unknown;
   }>;
@@ -252,9 +261,7 @@ export class ControlSurfaceRuntime {
     // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
     // streamingBehavior: "steer". The Pi SDK handles both streaming and non-streaming states.
     if (item.deliveryMode === "steer" && target.queue.isBusy()) {
-      this.log(
-        `steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`,
-      );
+      this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`);
       void target.session.prompt(formatPromptWithContext(item), {
         streamingBehavior: "steer",
         images: item.images,
@@ -475,13 +482,15 @@ export class ControlSurfaceRuntime {
       pid: process.pid,
       uptime: Math.floor((Date.now() - this.startedAt) / 1000),
       pi: {
-        default: defSnapshot ? {
-          sessionId: defSnapshot.sessionId!,
-          sessionFile: defSnapshot.sessionFile ?? null,
-          messageCount: def!.session?.messages?.length ?? defSnapshot.messageCount,
-          lastPromptAt: defSnapshot.lastPromptAt ?? null,
-          busy: defSnapshot.busy,
-        } : null,
+        default: defSnapshot
+          ? {
+              sessionId: defSnapshot.sessionId!,
+              sessionFile: defSnapshot.sessionFile ?? null,
+              messageCount: def!.session?.messages?.length ?? defSnapshot.messageCount,
+              lastPromptAt: defSnapshot.lastPromptAt ?? null,
+              busy: defSnapshot.busy,
+            }
+          : null,
         orchestrators: orchestratorStatuses,
       },
       whatsapp: {
@@ -580,7 +589,10 @@ export class ControlSurfaceRuntime {
    * Resolve which ManagedPiSession should handle this message.
    * May lazily create an orchestrator if needed.
    */
-  private resolveTargetSession(input: EnqueueInput, _item: QueueItem): ManagedPiSession | undefined {
+  private resolveTargetSession(
+    input: EnqueueInput,
+    _item: QueueItem,
+  ): ManagedPiSession | undefined {
     const meta = input.metadata;
 
     // Direct-targeted session (web UI tab input) — bypass all routing
@@ -893,11 +905,7 @@ export class ControlSurfaceRuntime {
 
             if (originalText) {
               const messageText = originalText;
-              const prompt = this.sessionManager.buildWorkstreamPrompt(
-                messageText,
-                ws.name,
-                ws.id,
-              );
+              const prompt = this.sessionManager.buildWorkstreamPrompt(messageText, ws.name, ws.id);
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,
@@ -957,15 +965,11 @@ export class ControlSurfaceRuntime {
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
           const { workstream_id, message } = params as { workstream_id: string; message: string };
-          const { getWorkstreamById } = await import(
-            "./blackboard/query-workstreams.ts"
-          );
+          const { getWorkstreamById } = await import("./blackboard/query-workstreams.ts");
           const ws = getWorkstreamById(this.blackboard, workstream_id);
           if (!ws) {
             return {
-              content: [
-                { type: "text", text: `Workstream not found: ${workstream_id}` },
-              ],
+              content: [{ type: "text", text: `Workstream not found: ${workstream_id}` }],
               details: { error: true },
             };
           }
@@ -1073,7 +1077,11 @@ export class ControlSurfaceRuntime {
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { workstream_id, repo_path, branch_name } = params as { workstream_id: string; repo_path: string; branch_name?: string };
+          const { workstream_id, repo_path, branch_name } = params as {
+            workstream_id: string;
+            repo_path: string;
+            branch_name?: string;
+          };
           const result = executeCreateWorktree(
             this.blackboard,
             workstream_id,
@@ -1108,11 +1116,7 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseWorkstream(
-            this.blackboard,
-            piSessId,
-            workstream_id,
-          );
+          const result = await executeCloseWorkstream(this.blackboard, piSessId, workstream_id);
           if (result.ok) {
             this.wsHub.broadcast({
               type: "workstreams_changed",

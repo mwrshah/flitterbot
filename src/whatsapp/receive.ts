@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { WAMessage, proto } from "@whiskeysockets/baileys";
+import type { proto, WAMessage } from "@whiskeysockets/baileys";
 import pino from "pino";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;

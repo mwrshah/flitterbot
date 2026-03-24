@@ -17,12 +17,12 @@ export async function classifyMessage(
 ): Promise<ClassificationResult> {
   const workstreams = listOpenWorkstreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
-  const prompt = buildClassificationPrompt(
-    message,
-    workstreams,
-    recentConversation,
+  const prompt = buildClassificationPrompt(message, workstreams, recentConversation);
+  console.log(
+    "[router] classifying: %d open workstreams | message: %s",
+    workstreams.length,
+    message.slice(0, 120),
   );
-  console.log("[router] classifying: %d open workstreams | message: %s", workstreams.length, message.slice(0, 120));
 
   let result: ClassifyResult;
   try {

@@ -2,9 +2,7 @@ import type { MessageMetadata } from "./blackboard.ts";
 
 export type MessageSource = "whatsapp" | "web" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
 
-export type MessageBlock =
-  | { type: "text"; text: string }
-  | { type: "thinking"; thinking: string };
+export type MessageBlock = { type: "text"; text: string } | { type: "thinking"; thinking: string };
 
 export interface UnifiedMessage {
   id: string;

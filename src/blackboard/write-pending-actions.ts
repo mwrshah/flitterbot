@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { ActionResolutionPayload, PendingActionKind, PendingActionRow } from "../contracts/index.ts";
+import type {
+  ActionResolutionPayload,
+  PendingActionKind,
+  PendingActionRow,
+} from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 import { getLatestPendingAction, getPendingActionByContextRef } from "./query-whatsapp.ts";
 
@@ -72,7 +76,10 @@ export function resolvePendingActionByContextRef(
      WHERE action_id = ?`,
   ).run(effectiveResolvedAt, JSON.stringify(resolutionPayload), action.action_id);
 
-  return db.get<PendingActionRow>("SELECT * FROM pending_actions WHERE action_id = ?", action.action_id)!;
+  return db.get<PendingActionRow>(
+    "SELECT * FROM pending_actions WHERE action_id = ?",
+    action.action_id,
+  )!;
 }
 
 export function resolveLatestPendingAction(

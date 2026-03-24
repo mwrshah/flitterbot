@@ -10,10 +10,7 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
   };
 }
 
-export function piHistoryQueryOptions(
-  sessionId: string | undefined,
-  surface?: "input" | "agent",
-) {
+export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
   return {
     queryKey: ["pi-history", sessionId ?? "default", surface ?? "agent"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> => {

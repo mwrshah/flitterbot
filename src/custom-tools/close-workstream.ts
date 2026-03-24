@@ -68,10 +68,7 @@ function mergeToMain(repoPath: string, branch: string): MergeResult {
   try {
     exec("git checkout main", repoPath);
   } catch (error: unknown) {
-    const msg =
-      error instanceof Error
-        ? error.message
-        : String(error);
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       conflicts: [],
