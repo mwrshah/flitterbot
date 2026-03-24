@@ -649,10 +649,10 @@ export class ControlSurfaceRuntime {
       // Resolve agent message ID → server UUID via mapping table
       const resolvedMessageId = finalMessageId
         ? (resolveServerId(this.blackboard, finalMessageId) ?? finalMessageId)
-        : undefined;
+        : crypto.randomUUID();
 
       // Persist outbound with resolved server UUID
-      const outboundId = resolvedMessageId ?? crypto.randomUUID();
+      const outboundId = resolvedMessageId;
       try {
         const workstreamId =
           managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
