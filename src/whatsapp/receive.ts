@@ -122,13 +122,6 @@ export function getInboundMessageRejectionReason(
   return undefined;
 }
 
-export function shouldAcceptInboundMessage(
-  message: WAMessage,
-  allowedJids?: Set<string>,
-): boolean {
-  return getInboundMessageRejectionReason(message, allowedJids) === undefined;
-}
-
 async function forwardInboundToControlSurface(input: {
   body: string;
   waMessageId?: string;
@@ -246,17 +239,21 @@ export async function persistInboundMessage(
       }
     }
   } catch (error) {
+    // DB failure during echo/dedup must not drop the message — this is a command channel.
+    // Continue to forward; at worst a duplicate reaches the control surface.
     logger.error(
       { err: error, waMessageId, remoteJid, bodyPreview: previewBody(body) },
-      "failed echo/duplicate check — skipping message to be safe",
+      "failed echo/duplicate check — forwarding anyway (DB unavailable)",
     );
-    return { body };
   }
 
   // Forward to control surface only after echo/duplicate filtering
   await forwardInboundToControlSurface({ body, waMessageId, remoteJid });
 
-  // Persist to blackboard as a secondary concern
+  // Persist to blackboard as a secondary concern.
+  // Known eventual-consistency gap: if forwarding succeeds but persist fails,
+  // the message reaches the orchestrator but has no DB record. Future dedup
+  // checks won't find it and context_ref resolution will have a hole.
   try {
     const quotedWaMessageId = extractQuotedWaMessageId(message);
     const contextRef = resolveInboundContextRef(db, {

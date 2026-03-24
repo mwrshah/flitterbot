@@ -1255,12 +1255,12 @@ export class ControlSurfaceRuntime {
   ): Promise<void> {
     if (!data || typeof data !== "object") return;
     const payload = data as ControlSurfaceWebSocketClientEvent;
-    if (payload.type === "subscribe" && typeof (payload as any).sessionId === "string") {
-      this.wsHub.subscribeClient(client.id, (payload as any).sessionId);
+    if (payload.type === "subscribe" && typeof payload.sessionId === "string") {
+      this.wsHub.subscribeClient(client.id, payload.sessionId);
       return;
     }
-    if (payload.type === "unsubscribe" && typeof (payload as any).sessionId === "string") {
-      this.wsHub.unsubscribeClient(client.id, (payload as any).sessionId);
+    if (payload.type === "unsubscribe" && typeof payload.sessionId === "string") {
+      this.wsHub.unsubscribeClient(client.id, payload.sessionId);
       return;
     }
     if (payload.type === "message" && typeof payload.text === "string") {

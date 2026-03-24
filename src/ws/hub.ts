@@ -84,20 +84,28 @@ export class WebSocketHub {
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
     const sessionId =
-      "sessionId" in payload ? ((payload as any).sessionId as string | undefined) : undefined;
+      "sessionId" in payload ? (payload.sessionId as string | undefined) : undefined;
     const frame = encodeFrame(JSON.stringify(payload));
     for (const client of this.clients.values()) {
       // No sessionId on event → global event, deliver to all
       if (!sessionId) {
-        client.socket.write(frame);
+        this.safeWrite(client, frame);
         continue;
       }
       // Client has no subscriptions → skip (they haven't subscribed to anything)
       if (client.subscriptions.size === 0) continue;
       // Wildcard or matching subscription
       if (client.subscriptions.has("*") || client.subscriptions.has(sessionId)) {
-        client.socket.write(frame);
+        this.safeWrite(client, frame);
       }
+    }
+  }
+
+  private safeWrite(client: WebSocketClient, frame: Buffer): void {
+    try {
+      client.socket.write(frame);
+    } catch {
+      this.clients.delete(client.id);
     }
   }
 

@@ -35,7 +35,9 @@ Clients send `subscribe`/`unsubscribe` messages to declare which sessions they c
 
 **Session-scoped** (filtered by subscription): `queue_item_start`, `queue_item_end`, `text_delta`, `message_end`, `tool_execution_start`, `tool_execution_end`, `turn_end`, `pi_surfaced`
 
-**Global** (delivered to all): `connected`, `workstreams_changed`, `status_changed`
+**Unicast** (sent directly to one client, not broadcast): `connected`
+
+**Global** (delivered to all via broadcast): `workstreams_changed`, `status_changed`
 
 ## Principles
 
@@ -45,7 +47,5 @@ Clients send `subscribe`/`unsubscribe` messages to declare which sessions they c
 
 ## Observations
 
-- **attention!** `connected` is listed as a global event, but it's actually unicast — sent via `send(clientId)`, not `broadcast()`. It never passes through subscription filtering. Harmless, but the mental model "global = broadcast to all" doesn't apply here.
-- **attention!** `as any` casts throughout the WS broadcasting path: `hub.ts:87` casts the payload to extract `sessionId`, `session-manager.ts:283,307` cast `queue_item_start`/`queue_item_end` payloads, `runtime.ts:1258-1263` casts subscribe/unsubscribe payloads to access `sessionId`. All are unnecessary — TypeScript narrowing and the existing interface definitions cover these cases. The casts suppress type errors that would catch contract drift.
-- **attention!** `broadcast()` in `hub.ts:89-101` calls `client.socket.write(frame)` with no error handling. If a client socket is broken but the `close`/`error` event hasn't fired yet, `write()` throws and crashes the broadcast loop — remaining clients don't receive the event.
-- **TBD!** `WorkstreamsChangedWebSocketEvent.reason` includes `"reopened"` in its union (`contracts/websocket.ts:126`), but no code path ever emits this reason. Dead variant — either implement workstream reopening or remove it from the type.
+- `connected` is unicast — sent via `send(clientId)`, not `broadcast()`. It never passes through subscription filtering.
+- `broadcast()` wraps each `client.socket.write()` in try/catch. On write error, the dead client is removed and the loop continues for remaining clients.

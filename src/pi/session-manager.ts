@@ -280,7 +280,7 @@ export class PiSessionManager {
           item,
           sessionId: managed.piSessionId,
           ...(workstreamId ? { workstreamId } : {}),
-        } as any);
+        });
       },
       onItemEnd: (item, error) => {
         state.setBusy(false);
@@ -304,7 +304,7 @@ export class PiSessionManager {
           error: error instanceof Error ? error.message : error ? String(error) : undefined,
           sessionId: managed.piSessionId,
           ...(workstreamId ? { workstreamId } : {}),
-        } as any);
+        });
       },
     });
 

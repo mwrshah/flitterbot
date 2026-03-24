@@ -246,7 +246,7 @@ export type WsMessage =
     }
   | {
       type: "workstreams_changed";
-      reason: "created" | "reopened" | "closed";
+      reason: "created" | "closed";
       workstreamId: string;
       workstreamName?: string;
     }
