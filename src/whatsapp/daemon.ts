@@ -13,13 +13,13 @@ import makeWASocket, {
 import pino from "pino";
 import qrcode from "qrcode-terminal";
 import { type BlackboardDatabase, openBlackboard } from "../blackboard/db.ts";
-import { createPendingAction } from "../blackboard/writers/pending-actions.ts";
+import { createPendingAction } from "../blackboard/write-pending-actions.ts";
 import {
   createOutboundPendingMessage,
   markWhatsAppMessageDelivered,
   markWhatsAppMessageFailed,
   markWhatsAppMessageSent,
-} from "../blackboard/writers/whatsapp-writer.ts";
+} from "../blackboard/write-whatsapp.ts";
 import { loadConfig } from "../config/load-config.ts";
 import type {
   DaemonCommand,

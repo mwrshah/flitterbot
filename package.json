@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "control-surface": "node --experimental-strip-types src/control-surface/server.ts",
+    "control-surface": "node --experimental-strip-types src/server.ts",
     "web:dev": "pnpm --dir web run dev",
     "web:build": "pnpm --dir web run build",
     "audit": "npm run audit:ts && npm run audit:py && npm run audit:shell",

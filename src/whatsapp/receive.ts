@@ -7,11 +7,11 @@ type SqlDatabase = Pick<DatabaseSync, "prepare">;
 import {
   getLatestOutboundMessage,
   getWhatsAppMessageByWaMessageId,
-} from "../blackboard/queries/whatsapp.ts";
+} from "../blackboard/query-whatsapp.ts";
 import {
   insertInboundWhatsAppMessage,
   resolveInboundContextRef,
-} from "../blackboard/writers/whatsapp-writer.ts";
+} from "../blackboard/write-whatsapp.ts";
 import { loadConfig } from "../config/load-config.ts";
 import { resolveRecipientJid } from "./config.ts";
 
