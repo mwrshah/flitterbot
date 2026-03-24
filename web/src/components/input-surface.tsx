@@ -43,6 +43,8 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   hook: "bg-violet-500",
   cron: "bg-cyan-500",
   init: "bg-gray-400",
+  agent: "bg-indigo-500",
+  pi_outbound: "bg-blue-500",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -51,6 +53,8 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   hook: "Hook",
   cron: "Cron",
   init: "Init",
+  agent: "Agent",
+  pi_outbound: "Pi Out",
 };
 
 const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;

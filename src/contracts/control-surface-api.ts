@@ -5,8 +5,9 @@ import type {
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
 import type { TranscriptPageResponse } from "./transcript.ts";
+import type { MessageSource } from "./message.ts";
 
-export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init" | "agent" | "pi_outbound";
+export type { MessageSource } from "./message.ts";
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =

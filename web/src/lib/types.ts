@@ -10,7 +10,7 @@ export type JsonValue =
 
 /* ── Chat timeline ── */
 
-export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init";
+export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
 
 export type ImageAttachment = {
   data: string;
