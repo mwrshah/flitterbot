@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { WAMessage } from "@whiskeysockets/baileys";
+import type { WAMessage, proto } from "@whiskeysockets/baileys";
 import pino from "pino";
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
@@ -42,18 +42,16 @@ function shouldFilterRecentOutboundEcho(db: SqlDatabase, message: WAMessage): bo
   return Date.now() - outboundTimestamp <= OUTBOUND_ECHO_WINDOW_MS;
 }
 
-function unwrapMessageContent(message: WAMessage): Record<string, unknown> | undefined {
-  let content = message.message as Record<string, unknown> | undefined;
+function unwrapMessageContent(message: WAMessage): proto.IMessage | undefined {
+  let content = message.message;
 
   while (content) {
     const nested =
-      (content.ephemeralMessage as { message?: Record<string, unknown> } | undefined)?.message ??
-      (content.viewOnceMessage as { message?: Record<string, unknown> } | undefined)?.message ??
-      (content.viewOnceMessageV2 as { message?: Record<string, unknown> } | undefined)?.message ??
-      (content.viewOnceMessageV2Extension as { message?: Record<string, unknown> } | undefined)
-        ?.message ??
-      (content.documentWithCaptionMessage as { message?: Record<string, unknown> } | undefined)
-        ?.message;
+      content.ephemeralMessage?.message ??
+      content.viewOnceMessage?.message ??
+      content.viewOnceMessageV2?.message ??
+      content.viewOnceMessageV2Extension?.message ??
+      content.documentWithCaptionMessage?.message;
 
     if (!nested) {
       break;
@@ -62,20 +60,11 @@ function unwrapMessageContent(message: WAMessage): Record<string, unknown> | und
     content = nested;
   }
 
-  return content;
+  return content ?? undefined;
 }
 
 function extractConversationBody(message: WAMessage): string | undefined {
-  const content = unwrapMessageContent(message) as
-    | {
-        conversation?: string;
-        extendedTextMessage?: { text?: string };
-        imageMessage?: { caption?: string };
-        videoMessage?: { caption?: string };
-        documentMessage?: { caption?: string };
-      }
-    | undefined;
-
+  const content = unwrapMessageContent(message);
   if (!content) {
     return undefined;
   }
@@ -91,13 +80,7 @@ function extractConversationBody(message: WAMessage): string | undefined {
 }
 
 function extractQuotedWaMessageId(message: WAMessage): string | undefined {
-  const content = unwrapMessageContent(message) as
-    | {
-        extendedTextMessage?: { contextInfo?: { stanzaId?: string } };
-        imageMessage?: { contextInfo?: { stanzaId?: string } };
-        videoMessage?: { contextInfo?: { stanzaId?: string } };
-      }
-    | undefined;
+  const content = unwrapMessageContent(message);
 
   return (
     content?.extendedTextMessage?.contextInfo?.stanzaId ??

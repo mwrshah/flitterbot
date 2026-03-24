@@ -9,6 +9,13 @@ type WhatsAppConfig = {
   daemonStartupTimeoutMs: number;
 };
 
+type WhatsAppConfigJson = {
+  recipientJid?: string;
+  pairingPhoneNumber?: string;
+  typingDelayMs?: number;
+  daemonStartupTimeoutMs?: number;
+};
+
 const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   recipientJid: undefined,
   pairingPhoneNumber: undefined,
@@ -20,7 +27,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readJsonObject(filePath: string): Record<string, unknown> {
+function readJsonObject(filePath: string): WhatsAppConfigJson {
   if (!existsSync(filePath)) {
     return {};
   }
@@ -35,7 +42,7 @@ function readJsonObject(filePath: string): Record<string, unknown> {
     throw new Error(`WhatsApp config must be a JSON object: ${filePath}`);
   }
 
-  return parsed;
+  return parsed as WhatsAppConfigJson;
 }
 
 function readString(value: unknown): string | undefined {
