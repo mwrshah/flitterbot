@@ -28,13 +28,11 @@ export function setHealthFlag(
  * Get all active (unexpired, uncleared) health flags.
  */
 export function getActiveHealthFlags(db: BlackboardDatabase): HealthFlagRow[] {
-  return db
-    .prepare(
-      `SELECT * FROM health_flags
+  return db.all<HealthFlagRow>(
+    `SELECT * FROM health_flags
      WHERE cleared_at IS NULL
        AND (expires_at IS NULL OR expires_at > datetime('now'))`,
-    )
-    .all() as unknown as HealthFlagRow[];
+  );
 }
 
 /**

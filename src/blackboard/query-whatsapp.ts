@@ -3,10 +3,6 @@ import type { PendingActionRow, WhatsAppMessageRow } from "../contracts/index.ts
 
 type SqlDatabase = Pick<DatabaseSync, "prepare">;
 
-function _rows<T>(result: unknown): T[] {
-  return result as T[];
-}
-
 function maybeRow<T>(result: unknown): T | undefined {
   return result as T | undefined;
 }

@@ -3,7 +3,7 @@ import type {
   ClaudeSessionRow,
   ClaudeSessionListItem as SessionListItem,
 } from "../contracts/index.ts";
-import type { BlackboardDatabase } from "./db.ts";
+import type { BlackboardDatabase, CountRow } from "./db.ts";
 
 export interface SessionStartPayload {
   session_id: string;
@@ -81,9 +81,8 @@ function mapSessionRow(row: ClaudeSessionRow): SessionListItem {
 }
 
 export function listSessions(db: BlackboardDatabase): SessionListItem[] {
-  const rows = db
-    .prepare(
-      `SELECT *
+  const rows = db.all<ClaudeSessionRow>(
+    `SELECT *
        FROM sessions
        ORDER BY
          CASE status
@@ -93,23 +92,20 @@ export function listSessions(db: BlackboardDatabase): SessionListItem[] {
            ELSE 3
          END,
          last_event_at DESC`,
-    )
-    .all() as unknown as ClaudeSessionRow[];
+  );
 
   return rows.map(mapSessionRow);
 }
 
 export function getStaleSessions(db: BlackboardDatabase): SessionListItem[] {
-  const rows = db
-    .prepare(`SELECT * FROM sessions WHERE status = 'stale' ORDER BY last_event_at ASC`)
-    .all() as unknown as ClaudeSessionRow[];
+  const rows = db.all<ClaudeSessionRow>(
+    `SELECT * FROM sessions WHERE status = 'stale' ORDER BY last_event_at ASC`,
+  );
   return rows.map(mapSessionRow);
 }
 
 export function getSessionById(db: BlackboardDatabase, sessionId: string): SessionListItem | null {
-  const row = db.prepare("SELECT * FROM sessions WHERE session_id = ?").get(sessionId) as unknown as
-    | ClaudeSessionRow
-    | undefined;
+  const row = db.get<ClaudeSessionRow>("SELECT * FROM sessions WHERE session_id = ?", sessionId);
   return row ? mapSessionRow(row) : null;
 }
 
@@ -117,15 +113,14 @@ export function getSessionByTmuxSession(
   db: BlackboardDatabase,
   tmuxSession: string,
 ): SessionListItem | null {
-  const row = db
-    .prepare(
-      `SELECT *
+  const row = db.get<ClaudeSessionRow>(
+    `SELECT *
        FROM sessions
        WHERE tmux_session = ?
        ORDER BY last_event_at DESC
        LIMIT 1`,
-    )
-    .get(tmuxSession) as unknown as ClaudeSessionRow | undefined;
+    tmuxSession,
+  );
 
   return row ? mapSessionRow(row) : null;
 }
@@ -175,9 +170,8 @@ function findStaleCandidates(
   stallMinutes: number,
   toolTimeoutMinutes: number,
 ): SessionListItem[] {
-  const rows = db
-    .prepare(
-      `SELECT *
+  const rows = db.all<ClaudeSessionRow>(
+    `SELECT *
        FROM sessions
        WHERE status = 'working'
          AND datetime(last_event_at) <= datetime('now', '-' || ? || ' minutes')
@@ -186,8 +180,9 @@ function findStaleCandidates(
            OR datetime(last_tool_started_at) <= datetime('now', '-' || ? || ' minutes')
          )
        ORDER BY last_event_at ASC`,
-    )
-    .all(stallMinutes, toolTimeoutMinutes) as unknown as ClaudeSessionRow[];
+    stallMinutes,
+    toolTimeoutMinutes,
+  );
   return rows.map(mapSessionRow);
 }
 
@@ -211,25 +206,23 @@ export function findIdleCleanupCandidates(
 ): SessionListItem[] {
   let rows: ClaudeSessionRow[];
   if (typeof idleBeforeIsoOrHours === "string") {
-    rows = db
-      .prepare(
-        `SELECT *
+    rows = db.all<ClaudeSessionRow>(
+      `SELECT *
          FROM sessions
          WHERE status IN ('working', 'stale')
            AND last_event_at < ?
          ORDER BY last_event_at ASC`,
-      )
-      .all(idleBeforeIsoOrHours) as unknown as ClaudeSessionRow[];
+      idleBeforeIsoOrHours,
+    );
   } else {
-    rows = db
-      .prepare(
-        `SELECT *
+    rows = db.all<ClaudeSessionRow>(
+      `SELECT *
          FROM sessions
          WHERE status IN ('working', 'stale')
            AND datetime(last_event_at) <= datetime('now', '-' || ? || ' hours')
          ORDER BY last_event_at ASC`,
-      )
-      .all(idleBeforeIsoOrHours) as unknown as ClaudeSessionRow[];
+      idleBeforeIsoOrHours,
+    );
   }
   return rows.map(mapSessionRow);
 }
@@ -321,16 +314,15 @@ export function getActiveManagedSessionsByPi(
   db: BlackboardDatabase,
   piSessionId: string,
 ): SessionListItem[] {
-  const rows = db
-    .prepare(
-      `SELECT *
+  const rows = db.all<ClaudeSessionRow>(
+    `SELECT *
        FROM sessions
        WHERE pi_session_id = ?
          AND status IN ('working', 'idle')
          AND agent_managed = 1
        ORDER BY last_event_at DESC`,
-    )
-    .all(piSessionId) as unknown as ClaudeSessionRow[];
+    piSessionId,
+  );
   return rows.map(mapSessionRow);
 }
 
@@ -338,14 +330,13 @@ export function countActiveManagedSessionsByPi(
   db: BlackboardDatabase,
   piSessionId: string,
 ): number {
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS count
+  const row = db.get<CountRow>(
+    `SELECT COUNT(*) AS count
        FROM sessions
        WHERE pi_session_id = ?
          AND status IN ('working', 'idle')
          AND agent_managed = 1`,
-    )
-    .get(piSessionId) as { count: number };
-  return Number(row.count);
+    piSessionId,
+  );
+  return Number(row?.count ?? 0);
 }

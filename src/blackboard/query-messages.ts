@@ -1,4 +1,4 @@
-import type { MessageRow, UnifiedMessageSource } from "../contracts/index.ts";
+import type { MessageMetadata, MessageRow, UnifiedMessageSource } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 import {
   type InsertMessageInput,
@@ -17,7 +17,7 @@ export function persistInboundMessage(
     content: string;
     sender?: string;
     workstreamId?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: MessageMetadata;
   },
 ): MessageRow {
   return writeMessage(db, {
@@ -38,7 +38,7 @@ export function persistOutboundMessage(
     source: UnifiedMessageSource;
     content: string;
     workstreamId?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: MessageMetadata;
   },
 ): MessageRow {
   return writeMessage(db, {
@@ -53,9 +53,7 @@ export function persistOutboundMessage(
 }
 
 export function getRecentMessages(db: BlackboardDatabase, limit: number = 50): MessageRow[] {
-  return db
-    .prepare("SELECT * FROM messages ORDER BY created_at DESC LIMIT ?")
-    .all(limit) as unknown as MessageRow[];
+  return db.all<MessageRow>("SELECT * FROM messages ORDER BY created_at DESC LIMIT ?", limit);
 }
 
 export function getMessagesBySource(
@@ -63,9 +61,11 @@ export function getMessagesBySource(
   source: UnifiedMessageSource,
   limit: number = 50,
 ): MessageRow[] {
-  return db
-    .prepare("SELECT * FROM messages WHERE source = ? ORDER BY created_at DESC LIMIT ?")
-    .all(source, limit) as unknown as MessageRow[];
+  return db.all<MessageRow>(
+    "SELECT * FROM messages WHERE source = ? ORDER BY created_at DESC LIMIT ?",
+    source,
+    limit,
+  );
 }
 
 export function getMessagesByWorkstream(
@@ -73,9 +73,11 @@ export function getMessagesByWorkstream(
   workstreamId: string,
   limit: number = 100,
 ): MessageRow[] {
-  return db
-    .prepare("SELECT * FROM messages WHERE workstream_id = ? ORDER BY created_at ASC LIMIT ?")
-    .all(workstreamId, limit) as unknown as MessageRow[];
+  return db.all<MessageRow>(
+    "SELECT * FROM messages WHERE workstream_id = ? ORDER BY created_at ASC LIMIT ?",
+    workstreamId,
+    limit,
+  );
 }
 
 export type ConversationSnippet = {
@@ -93,16 +95,15 @@ export function getRecentConversationByWorkstream(
   withinHours: number,
   maxPerWorkstream: number,
 ): Map<string, ConversationSnippet[]> {
-  const rows = db
-    .prepare(
-      `SELECT m.workstream_id, w.name AS workstream_name,
+  const rows = db.all<ConversationSnippet>(
+    `SELECT m.workstream_id, w.name AS workstream_name,
             m.content, m.source, m.created_at, m.direction, m.sender
      FROM messages m
      JOIN workstreams w ON w.id = m.workstream_id AND w.status = 'open'
      WHERE m.created_at >= datetime('now', '-' || ? || ' hours')
      ORDER BY m.workstream_id, m.created_at DESC`,
-    )
-    .all(withinHours) as unknown as ConversationSnippet[];
+    withinHours,
+  );
 
   const grouped = new Map<string, ConversationSnippet[]>();
   for (const row of rows) {
