@@ -12,6 +12,7 @@ export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput)
 export function persistInboundMessage(
   db: BlackboardDatabase,
   opts: {
+    id?: string;
     source: UnifiedMessageSource;
     content: string;
     sender?: string;
@@ -20,6 +21,7 @@ export function persistInboundMessage(
   },
 ): MessageRow {
   return writeMessage(db, {
+    id: opts.id,
     source: opts.source,
     direction: "inbound",
     content: opts.content,
@@ -32,6 +34,7 @@ export function persistInboundMessage(
 export function persistOutboundMessage(
   db: BlackboardDatabase,
   opts: {
+    id?: string;
     source: UnifiedMessageSource;
     content: string;
     workstreamId?: string;
@@ -39,6 +42,7 @@ export function persistOutboundMessage(
   },
 ): MessageRow {
   return writeMessage(db, {
+    id: opts.id,
     source: opts.source,
     direction: "outbound",
     content: opts.content,

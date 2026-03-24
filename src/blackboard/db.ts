@@ -56,3 +56,37 @@ export function openBlackboard(dbPath: string): BlackboardDatabase {
 export function pingBlackboard(db: BlackboardDatabase): boolean {
   return db.ping();
 }
+
+/* ── Message ID mapping helpers ── */
+
+export function insertIdMapping(
+  db: BlackboardDatabase,
+  serverId: string,
+  agentId: string,
+  piSessionId?: string,
+): void {
+  db.run(
+    `INSERT OR IGNORE INTO message_id_map (server_id, agent_id, pi_session_id) VALUES (?, ?, ?)`,
+    serverId,
+    agentId,
+    piSessionId ?? null,
+  );
+}
+
+export function resolveServerId(
+  db: BlackboardDatabase,
+  agentId: string,
+): string | null {
+  const row = db.get<{ server_id: string }>(
+    "SELECT server_id FROM message_id_map WHERE agent_id = ?",
+    agentId,
+  );
+  return row?.server_id ?? null;
+}
+
+/** Returns a resolver function suitable for passing to the history parser. */
+export function createIdResolver(
+  db: BlackboardDatabase,
+): (agentId: string) => string | null {
+  return (agentId: string) => resolveServerId(db, agentId);
+}

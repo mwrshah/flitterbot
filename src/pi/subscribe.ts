@@ -1,4 +1,5 @@
-import type { BlackboardDatabase } from "../blackboard/db.ts";
+import crypto from "node:crypto";
+import { type BlackboardDatabase, insertIdMapping } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
   ControlSurfaceWebSocketServerEvent,
@@ -153,10 +154,32 @@ export function subscribeToPiSession(
         }
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
+        const agentMessageId = extractMessageId(event.message);
+
+        // Resolve or create server UUID for this message
+        let serverMessageId: string | undefined;
+        if (role === "user") {
+          // User messages: server UUID was assigned at ingestion, available in queue item metadata
+          const snapshot = state.getSnapshot();
+          serverMessageId = snapshot.currentItem?.metadata?.serverMessageId as string | undefined;
+        } else {
+          // Assistant messages: generate server UUID and map to agent ID
+          serverMessageId = crypto.randomUUID();
+        }
+
+        // Insert agent→server UUID mapping when we have both IDs
+        if (agentMessageId && serverMessageId) {
+          try {
+            insertIdMapping(blackboard, serverMessageId, agentMessageId, session.sessionId);
+          } catch {
+            // Ignore duplicate insert errors
+          }
+        }
+
         const payload: MessageEndWebSocketEvent = {
           type: "message_end",
           sessionId: session.sessionId,
-          messageId: extractMessageId(event.message),
+          messageId: serverMessageId ?? agentMessageId,
           role,
           content,
           source: currentItem?.source,
