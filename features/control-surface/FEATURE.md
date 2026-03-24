@@ -210,4 +210,4 @@ src/control-surface/
 
 ## Observations
 
-- **TBD!** `formatPromptWithContext()` in `src/pi/format-prompt.ts` is a no-op — returns `item.text` unchanged, ignores the `_role` parameter. The `<context source="..." workstream="..." />` XML header injection (spec-03-clean-pi-messages) was never implemented. Default agent receives raw text identical to orchestrators; no structured metadata distinguishes message source or workstream context at the prompt level.
+- `formatPromptWithContext()` is a pass-through extension point — currently returns `item.text` unchanged. No XML context injection implemented yet.
