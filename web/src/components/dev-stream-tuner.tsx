@@ -3,6 +3,7 @@
  * Reads the chunker instance from window.__streamChunker (set by chat-panel).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StreamChunker, StreamChunkerStats } from "~/lib/stream-chunker";
 
 function getChunker(): StreamChunker | null {
@@ -10,6 +11,7 @@ function getChunker(): StreamChunker | null {
 }
 
 export function DevStreamTuner() {
+  useWhyDidYouRender("DevStreamTuner", {});
   const [visible, setVisible] = useState(false);
   const [chunkSize, setChunkSize] = useState(4);
   const [intervalMs, setIntervalMs] = useState(32);

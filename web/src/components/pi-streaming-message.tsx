@@ -8,6 +8,7 @@
 
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 
 export type PiStreamingMessageHandle = {
@@ -17,6 +18,7 @@ export type PiStreamingMessageHandle = {
 
 export const PiStreamingMessage = forwardRef<PiStreamingMessageHandle>(
   function PiStreamingMessage(_props, ref) {
+    useWhyDidYouRender("PiStreamingMessage", {});
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<HTMLElement | null>(null);
     const [ready, setReady] = useState(false);

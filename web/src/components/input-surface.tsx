@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -139,6 +140,7 @@ function CollapsibleContent({
   children: React.ReactNode;
   fadeClassName?: string;
 }) {
+  useWhyDidYouRender("CollapsibleContent", { children, fadeClassName });
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const roRef = useRef<ResizeObserver | null>(null);
@@ -184,6 +186,7 @@ function CollapsibleContent({
 /* ── Entry Renderers ── */
 
 function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
+  useWhyDidYouRender("InboundEntry", { entry });
   const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
   const displayContent = parsed ? parsed.cleanContent : entry.content;
   const badgeName = parsed?.workstreamName ?? entry.workstreamName;
@@ -216,6 +219,7 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
 }
 
 function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }) {
+  useWhyDidYouRender("OutboundEntry", { entry });
   const isWhatsApp = entry.channel === "whatsapp";
   return (
     <div className="flex gap-3 items-start">
@@ -242,6 +246,7 @@ function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }
 }
 
 function LitMarkdownBlock({ content }: { content: string }) {
+  useWhyDidYouRender("LitMarkdownBlock", { content });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -272,6 +277,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
 }
 
 function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
+  useWhyDidYouRender("PiResponseEntry", { entry });
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -296,6 +302,7 @@ function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response
 }
 
 function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
+  useWhyDidYouRender("HookEntry", { entry });
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -316,6 +323,7 @@ function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
 }
 
 function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
+  useWhyDidYouRender("SurfaceEntryRenderer", { entry });
   switch (entry.kind) {
     case "inbound":
       return <InboundEntry entry={entry} />;
@@ -331,6 +339,7 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 /* ── Main Component ── */
 
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
+  useWhyDidYouRender("InputSurface", { loaderTimeline });
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();

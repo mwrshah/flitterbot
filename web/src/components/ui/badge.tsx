@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
 type BadgeVariant = "default" | "muted" | "error" | "success" | "warning";
@@ -16,6 +17,7 @@ type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 export function Badge({ className, variant = "default", ...props }: BadgeProps) {
+  useWhyDidYouRender("Badge", { className, variant });
   return (
     <span
       className={cn(

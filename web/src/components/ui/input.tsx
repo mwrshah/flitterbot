@@ -1,10 +1,12 @@
 import * as React from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
 export const Input = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
 >(function Input({ className, ...props }, ref) {
+  useWhyDidYouRender("Input", { className });
   return (
     <input
       ref={ref}

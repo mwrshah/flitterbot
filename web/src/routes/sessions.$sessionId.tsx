@@ -3,12 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SessionDetail } from "~/components/session-detail";
 import { SessionList } from "~/components/session-list";
 import { TranscriptViewer } from "~/components/transcript-viewer";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
   component: SessionDetailPage,
 });
 
 function SessionDetailPage() {
+  useWhyDidYouRender("SessionDetailPage", {});
   const { sessionId } = Route.useParams();
   const { apiClient } = Route.useRouteContext();
 
@@ -23,6 +25,8 @@ function SessionDetailPage() {
     queryFn: () => apiClient.getSessionDetail(sessionId),
     refetchInterval: 10_000,
   });
+
+  useWhyDidYouRender("SessionDetailPage", { sessionId, apiClient, sessionsQuery, detailQuery });
 
   return (
     <div className="flex-1 overflow-auto p-6">

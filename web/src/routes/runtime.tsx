@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Badge } from "~/components/ui/badge";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { WhatsAppControls } from "~/components/whatsapp-controls";
@@ -15,6 +16,8 @@ export const Route = createFileRoute("/runtime")({
 });
 
 function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  useWhyDidYouRender("MetaItem", { label, value, mono });
+
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
@@ -26,6 +29,7 @@ function MetaItem({ label, value, mono }: { label: string; value: string; mono?:
 }
 
 function RuntimePage() {
+  useWhyDidYouRender("RuntimePage", {});
   const { apiClient } = Route.useRouteContext();
 
   const statusQuery = useQuery({
@@ -35,6 +39,8 @@ function RuntimePage() {
   });
 
   const status = statusQuery.data;
+
+  useWhyDidYouRender("RuntimePage", { apiClient, statusQuery, status });
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-4">

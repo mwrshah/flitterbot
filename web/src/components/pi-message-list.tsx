@@ -7,6 +7,7 @@
 
 import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import { memo, useEffect, useRef, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 
 const EMPTY_TOOLS: AgentTool[] = [];
@@ -21,6 +22,7 @@ export const PiMessageList = memo(function PiMessageList({
   isStreaming?: boolean;
   pendingToolCalls?: Set<string>;
 }) {
+  useWhyDidYouRender("PiMessageList", { messages, isStreaming, pendingToolCalls });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);

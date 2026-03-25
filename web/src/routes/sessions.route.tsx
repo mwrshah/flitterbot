@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/sessions")({
   head: () => ({
@@ -8,5 +9,7 @@ export const Route = createFileRoute("/sessions")({
 });
 
 function SessionsLayout() {
+  useWhyDidYouRender("SessionsLayout", {});
+
   return <Outlet />;
 }

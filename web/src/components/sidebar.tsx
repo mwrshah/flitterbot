@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
+  useWhyDidYouRender("NavItem", { to, label, icon });
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -27,6 +29,7 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: React.R
 }
 
 function StatusDot({ color, label, value }: { color: string; label: string; value: string }) {
+  useWhyDidYouRender("StatusDot", { color, label, value });
   return (
     <div className="flex items-center gap-2 min-w-0">
       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", color)} />
@@ -89,6 +92,7 @@ export function Sidebar({
   connectionState: ConnectionState;
   onOpenSettings: () => void;
 }) {
+  useWhyDidYouRender("Sidebar", { connectionState, onOpenSettings });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
 

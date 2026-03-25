@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -21,6 +22,7 @@ function statusVariant(status: string): "success" | "default" | "warning" | "mut
 }
 
 function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  useWhyDidYouRender("SessionDetail.MetaItem", { label, value, mono });
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
@@ -40,6 +42,7 @@ export function SessionDetail({
   session: SessionDetailType;
   tmux?: TmuxSessionInspection | null;
 }) {
+  useWhyDidYouRender("SessionDetail", { session, tmux });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InputSurface } from "~/components/input-surface";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiInputHistory } from "~/server/pi";
 
@@ -20,5 +21,6 @@ export const Route = createFileRoute("/")({
 
 function InputSurfacePage() {
   const { history } = Route.useLoaderData();
+  useWhyDidYouRender("InputSurfacePage", { history });
   return <InputSurface loaderTimeline={history} />;
 }
