@@ -21,15 +21,18 @@ export function AppShell() {
   const getSnapshot = useCallback(() => wsClient.connectionState, [wsClient]);
   const connectionState = useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 
+  const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+  const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
+
   return (
     <div className="grid grid-cols-[240px_1fr] h-screen overflow-hidden">
-      <Sidebar connectionState={connectionState} onOpenSettings={() => setSettingsOpen(true)} />
+      <Sidebar connectionState={connectionState} onOpenSettings={handleOpenSettings} />
 
       <main className="flex flex-col min-h-0 overflow-hidden">
         <Outlet />
       </main>
 
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={handleCloseSettings} />
     </div>
   );
 }

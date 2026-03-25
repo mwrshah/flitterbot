@@ -1,4 +1,5 @@
 import { getRouteApi } from "@tanstack/react-router";
+import { memo } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useTheme } from "~/hooks/use-theme";
@@ -13,7 +14,7 @@ const themeOptions = [
   { value: "system" as const, label: "System", icon: "💻" },
 ];
 
-export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export const SettingsDrawer = memo(function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   useWhyDidYouRender("SettingsDrawer", { open, onClose });
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);
@@ -109,4 +110,4 @@ export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () =
       </div>
     </>
   );
-}
+});

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import { lazy, memo, Suspense } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
@@ -90,7 +90,7 @@ function connectionColor(state: ConnectionState): string {
   }
 }
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   connectionState,
   onOpenSettings,
 }: {
@@ -236,4 +236,4 @@ export function Sidebar({
       </div>
     </aside>
   );
-}
+});
