@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -10,9 +10,14 @@ import {
   pendingToolCallsFromTimeline,
   timelineToAgentMessages,
 } from "~/lib/pi-web-ui-bridge";
+import { StreamChunker } from "~/lib/stream-chunker";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./pi-message-list";
 import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
+
+const DevStreamTuner = import.meta.env.DEV
+  ? lazy(() => import("./dev-stream-tuner").then((m) => ({ default: m.DevStreamTuner })))
+  : null;
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
@@ -90,22 +95,51 @@ export function ChatPanel({
 
   const streamingRef = useRef<PiStreamingMessageHandle>(null);
 
-  // Register streaming callback — fires synchronously from WS handler, no React in the loop
+  // Register streaming callback — fires synchronously from WS handler, no React in the loop.
+  // StreamChunker buffers deltas and drains them on a smooth interval to avoid jittery rendering.
   useEffect(() => {
     if (!sessionId) return;
 
+    const chunker = new StreamChunker({
+      onChunk: (fullText) => {
+        streamingRef.current?.update(buildStreamingAssistantMessage(fullText));
+      },
+    });
+
+    let streaming = false;
+    let seenLen = 0;
+
     piSessionStore.onStreamingDelta(sessionId, (text, _messageId) => {
       if (text === null) {
+        chunker.flush();
         streamingRef.current?.clear();
+        streaming = false;
+        seenLen = 0;
         setIsStreaming(false);
         return;
       }
-      streamingRef.current?.update(buildStreamingAssistantMessage(text));
-      if (!isStreaming) setIsStreaming(true);
+      // Store callback sends full accumulated text — push only the new portion
+      if (text.length > seenLen) {
+        chunker.push(text.slice(seenLen));
+        seenLen = text.length;
+      }
+      if (!streaming) {
+        streaming = true;
+        setIsStreaming(true);
+      }
     });
+
+    // Expose chunker for dev tuning overlay
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__streamChunker = chunker;
+    }
 
     return () => {
       piSessionStore.offStreamingDelta(sessionId);
+      chunker.destroy();
+      if (import.meta.env.DEV) {
+        delete (window as unknown as Record<string, unknown>).__streamChunker;
+      }
     };
   }, [sessionId]);
 
@@ -163,6 +197,11 @@ export function ChatPanel({
         skills={skillsData?.items}
         rows={2}
       />
+      {DevStreamTuner && (
+        <Suspense fallback={null}>
+          <DevStreamTuner />
+        </Suspense>
+      )}
     </div>
   );
 }
