@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
+
+const DevStreamTuner = import.meta.env.DEV
+  ? lazy(() => import("./dev-stream-tuner").then((m) => ({ default: m.DevStreamTuner })))
+  : null;
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   const pathname = useRouterState({
@@ -204,6 +209,13 @@ export function Sidebar({
 
       {/* Spacer */}
       {allWorkstreams.length === 0 && <div className="flex-1" />}
+
+      {/* Dev stream tuner */}
+      {DevStreamTuner && (
+        <Suspense fallback={null}>
+          <DevStreamTuner />
+        </Suspense>
+      )}
 
       {/* Settings trigger */}
       <div className="shrink-0 px-3 py-3 border-t border-sidebar-border">

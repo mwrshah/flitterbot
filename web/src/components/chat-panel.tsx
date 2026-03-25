@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -14,10 +14,6 @@ import { StreamChunker } from "~/lib/stream-chunker";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./pi-message-list";
 import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
-
-const DevStreamTuner = import.meta.env.DEV
-  ? lazy(() => import("./dev-stream-tuner").then((m) => ({ default: m.DevStreamTuner })))
-  : null;
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
@@ -242,11 +238,6 @@ export function ChatPanel({
         skills={skillsData?.items}
         rows={2}
       />
-      {DevStreamTuner && (
-        <Suspense fallback={null}>
-          <DevStreamTuner />
-        </Suspense>
-      )}
     </div>
   );
 }
