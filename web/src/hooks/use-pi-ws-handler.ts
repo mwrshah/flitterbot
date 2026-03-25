@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { AutonomaApiClient } from "~/lib/api";
-import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
+import { piSessionStore, resetPiSessionStore } from "~/lib/pi-session-store";
 import type {
   ChatTimelineTool,
   ConnectionState,
@@ -86,11 +86,7 @@ export function usePiWsHandler(
       }
 
       if (message.type === "text_delta") {
-        store.updateSession(sessionId, (s) => ({
-          ...s,
-          streamingMessageId: message.messageId,
-          streamingText: (s.streamingText ?? "") + message.delta,
-        }));
+        store.appendStreamingDelta(sessionId, message.messageId, message.delta);
         return;
       }
 
@@ -121,28 +117,27 @@ export function usePiWsHandler(
           return;
         }
 
+        store.clearStreamingState(sessionId);
         store.updateSession(sessionId, (s) => {
-          const next: SessionAccum = {
-            ...s,
-            streamingText: null,
-            streamingMessageId: null,
-          };
           if (content.trim()) {
-            if (s.appendedItems.some((item) => item.id === message.messageId)) return next;
-            next.appendedItems = [
-              ...s.appendedItems,
-              {
-                id: message.messageId,
-                kind: "message",
-                role: "assistant",
-                content,
-                source: (message.source as MessageSource) ?? undefined,
-                workstreamName: message.workstreamName,
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ];
+            if (s.appendedItems.some((item) => item.id === message.messageId)) return s;
+            return {
+              ...s,
+              appendedItems: [
+                ...s.appendedItems,
+                {
+                  id: message.messageId,
+                  kind: "message",
+                  role: "assistant",
+                  content,
+                  source: (message.source as MessageSource) ?? undefined,
+                  workstreamName: message.workstreamName,
+                  createdAt: message.timestamp ?? new Date().toISOString(),
+                },
+              ],
+            };
           }
-          return next;
+          return s;
         });
         return;
       }
@@ -191,10 +186,9 @@ export function usePiWsHandler(
       }
 
       if (message.type === "turn_end") {
+        store.clearStreamingState(sessionId);
         store.updateSession(sessionId, (s) => ({
           ...s,
-          streamingText: null,
-          streamingMessageId: null,
           appendedItems: [
             ...s.appendedItems,
             {

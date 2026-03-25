@@ -5,14 +5,18 @@ type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 export type SessionAccum = {
   appendedItems: import("./types").ChatTimelineItem[];
-  streamingMessageId: string | null;
-  streamingText: string | null;
   statusPills: StatusPill[];
 };
 
 export function emptyAccum(): SessionAccum {
-  return { appendedItems: [], streamingMessageId: null, streamingText: null, statusPills: [] };
+  return { appendedItems: [], statusPills: [] };
 }
+
+type StreamingState = { text: string; messageId: string };
+type StreamingCallback = (text: string | null, messageId: string | null) => void;
+
+const activeStreams = new Map<string, StreamingState>();
+const streamingCallbacks = new Map<string, StreamingCallback>();
 
 export type PiSessionStore = {
   getSessionAccum: (sessionId: string) => SessionAccum;
@@ -33,6 +37,11 @@ export type PiSessionStore = {
   setConnectionState: (state: ConnectionState) => void;
   subscribe: (fn: () => void) => () => void;
   getSnapshot: () => PiSessionSnapshot;
+  appendStreamingDelta: (sessionId: string, messageId: string, delta: string) => void;
+  getStreamingState: (sessionId: string) => StreamingState | null;
+  clearStreamingState: (sessionId: string) => void;
+  onStreamingDelta: (sessionId: string, callback: StreamingCallback) => void;
+  offStreamingDelta: (sessionId: string) => void;
 };
 
 export type PiSessionSnapshot = {
@@ -116,6 +125,32 @@ export function createPiSessionStore(): PiSessionStore {
       };
     },
     getSnapshot: () => snapshot,
+    appendStreamingDelta: (sessionId, messageId, delta) => {
+      const existing = activeStreams.get(sessionId);
+      if (existing) {
+        existing.text += delta;
+        existing.messageId = messageId;
+      } else {
+        activeStreams.set(sessionId, { text: delta, messageId });
+      }
+      const cb = streamingCallbacks.get(sessionId);
+      if (cb) {
+        const state = activeStreams.get(sessionId)!;
+        cb(state.text, state.messageId);
+      }
+    },
+    getStreamingState: (sessionId) => activeStreams.get(sessionId) ?? null,
+    clearStreamingState: (sessionId) => {
+      activeStreams.delete(sessionId);
+      const cb = streamingCallbacks.get(sessionId);
+      if (cb) cb(null, null);
+    },
+    onStreamingDelta: (sessionId, callback) => {
+      streamingCallbacks.set(sessionId, callback);
+    },
+    offStreamingDelta: (sessionId) => {
+      streamingCallbacks.delete(sessionId);
+    },
   };
 }
 

@@ -1,74 +1,81 @@
 /**
  * React wrapper for pi-web-ui's <assistant-message> to show the
  * currently streaming assistant response.
+ *
+ * Exposes an imperative API via forwardRef so ChatPanel can push
+ * updates directly without triggering React renders.
  */
 
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { memo, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 
-export const PiStreamingMessage = memo(function PiStreamingMessage({
-  message,
-  visible,
-}: {
-  message: AssistantMessage | null;
-  visible: boolean;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const elementRef = useRef<HTMLElement | null>(null);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+export type PiStreamingMessageHandle = {
+  update(message: AssistantMessage): void;
+  clear(): void;
+};
 
-  useEffect(() => {
-    let cancelled = false;
+export const PiStreamingMessage = forwardRef<PiStreamingMessageHandle>(
+  function PiStreamingMessage(_props, ref) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const elementRef = useRef<HTMLElement | null>(null);
+    const [ready, setReady] = useState(false);
+    const [error, setError] = useState<unknown>(null);
 
-    ensurePiWebUiReady()
-      .then(() => {
-        if (cancelled) return;
-        console.log("[PiStreamingMessage] pi-web-ui ready");
-        setReady(true);
-      })
-      .catch((initError) => {
-        if (cancelled) return;
-        console.log("[PiStreamingMessage] pi-web-ui initialization failed", initError);
-        setError(initError);
-      });
+    useEffect(() => {
+      let cancelled = false;
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      ensurePiWebUiReady()
+        .then(() => {
+          if (cancelled) return;
+          console.log("[PiStreamingMessage] pi-web-ui ready");
+          setReady(true);
+        })
+        .catch((initError) => {
+          if (cancelled) return;
+          console.log("[PiStreamingMessage] pi-web-ui initialization failed", initError);
+          setError(initError);
+        });
 
-  useEffect(() => {
-    if (!ready || !containerRef.current) return;
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
-    if (!elementRef.current) {
+    // Create the web component element once ready
+    useEffect(() => {
+      if (!ready || !containerRef.current || elementRef.current) return;
       const el = document.createElement("assistant-message");
+      el.style.display = "none";
       containerRef.current.appendChild(el);
       elementRef.current = el;
       console.log("[PiStreamingMessage] created <assistant-message>");
+    }, [ready]);
+
+    useImperativeHandle(ref, () => ({
+      update(message: AssistantMessage) {
+        const el = elementRef.current as (HTMLElement & Record<string, unknown>) | null;
+        if (!el) return;
+        el.message = message;
+        el.isStreaming = true;
+        el.hideToolCalls = false;
+        el.style.display = "block";
+      },
+      clear() {
+        const el = elementRef.current as (HTMLElement & Record<string, unknown>) | null;
+        if (!el) return;
+        el.style.display = "none";
+      },
+    }));
+
+    if (error) {
+      return (
+        <div className="error-text tiny" style={{ padding: "0.75rem 1rem" }}>
+          Pi Web UI streaming renderer failed. Check the browser console.
+        </div>
+      );
     }
 
-    const el = elementRef.current as HTMLElement & Record<string, unknown>;
-    if (message) {
-      el.message = message;
-      el.isStreaming = true;
-      el.hideToolCalls = false;
-      el.style.display = "block";
-    } else {
-      el.style.display = "none";
-    }
-  }, [ready, message]);
-
-  if (error) {
-    return (
-      <div className="error-text tiny" style={{ padding: "0.75rem 1rem" }}>
-        Pi Web UI streaming renderer failed. Check the browser console.
-      </div>
-    );
-  }
-
-  if (!visible || !ready) return null;
-
-  return <div ref={containerRef} />;
-});
+    return <div ref={containerRef} />;
+  },
+);

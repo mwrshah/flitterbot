@@ -89,7 +89,11 @@ export function subscribeToPiSession(
     // FR-3: Only set 'active' during turns. Post-turn transitions (waiting_for_user/waiting_for_sessions)
     // are handled by runtime.transitionPiAfterTurn(), not the event subscriber.
     if (event.type !== "turn_end" && event.type !== "agent_end") {
-      touchPiEvent(blackboard, session.sessionId, now, "active");
+      const isTextDelta =
+        event.type === "message_update" && event.assistantMessageEvent.type === "text_delta";
+      if (!isTextDelta) {
+        touchPiEvent(blackboard, session.sessionId, now, "active");
+      }
     }
 
     switch (event.type) {
