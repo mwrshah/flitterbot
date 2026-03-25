@@ -224,8 +224,11 @@ export function subscribeToPiSession(
         const stopReason = turnMessage.role === "assistant" ? turnMessage.stopReason : undefined;
 
         if (stopReason === "toolUse") {
-          // Mid-turn tool call — do NOT flush pending messages or broadcast
-          // turn_end. The turn is still in progress.
+          // Flush intermediate assistant messages so text-before-tool-calls is visible
+          for (const msg of pendingAssistantMessages) {
+            broadcast(wsHub, { ...msg, intermediate: true });
+          }
+          pendingAssistantMessages.length = 0;
           break;
         }
 
