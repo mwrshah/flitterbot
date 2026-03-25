@@ -76,7 +76,7 @@ export function DevStreamTuner() {
     setIntervalMs(v);
     const c = getChunker();
     if (c) {
-      c.setInterval(v);
+      c.setIntervalMs(v);
       console.log("[StreamTuner] interval changed:", v, "ms");
     }
   }, []);
