@@ -95,6 +95,16 @@ export function usePiWsHandler(
         return;
       }
 
+      if (message.type === "toolcall_start") {
+        store.startStreamingToolCall(sessionId, message.contentIndex, message.toolName ?? "tool");
+        return;
+      }
+
+      if (message.type === "toolcall_delta") {
+        store.appendStreamingToolCallDelta(sessionId, message.contentIndex, message.delta);
+        return;
+      }
+
       if (message.type === "message_end") {
         const content = message.content || "";
 
@@ -148,6 +158,7 @@ export function usePiWsHandler(
         });
         store.clearStreamingState(sessionId);
         store.clearStreamingThinkingState(sessionId);
+        store.clearStreamingToolCalls(sessionId);
         return;
       }
 
@@ -220,6 +231,7 @@ export function usePiWsHandler(
       if (message.type === "turn_end") {
         store.clearStreamingState(sessionId);
         store.clearStreamingThinkingState(sessionId);
+        store.clearStreamingToolCalls(sessionId);
         store.updateSession(sessionId, (s) => ({
           ...s,
           appendedItems: [

@@ -24,6 +24,13 @@ type ThinkingStreamingCallback = (thinking: string | null, messageId: string | n
 const activeThinkingStreams = new Map<string, ThinkingStreamingState>();
 const thinkingStreamingCallbacks = new Map<string, ThinkingStreamingCallback>();
 
+export type StreamingToolCall = { contentIndex: number; toolName: string; partialJson: string };
+type ToolcallStreamingState = Map<number, StreamingToolCall>;
+type ToolcallStreamingCallback = (toolCalls: StreamingToolCall[] | null) => void;
+
+const activeToolcallStreams = new Map<string, ToolcallStreamingState>();
+const toolcallStreamingCallbacks = new Map<string, ToolcallStreamingCallback>();
+
 export type PiSessionStore = {
   getSessionAccum: (sessionId: string) => SessionAccum;
   updateSession: (sessionId: string, updater: (s: SessionAccum) => SessionAccum) => void;
@@ -53,6 +60,12 @@ export type PiSessionStore = {
   clearStreamingThinkingState: (sessionId: string) => void;
   onStreamingThinkingDelta: (sessionId: string, callback: ThinkingStreamingCallback) => void;
   offStreamingThinkingDelta: (sessionId: string) => void;
+  startStreamingToolCall: (sessionId: string, contentIndex: number, toolName: string) => void;
+  appendStreamingToolCallDelta: (sessionId: string, contentIndex: number, delta: string) => void;
+  getStreamingToolCalls: (sessionId: string) => StreamingToolCall[];
+  clearStreamingToolCalls: (sessionId: string) => void;
+  onStreamingToolCall: (sessionId: string, callback: ToolcallStreamingCallback) => void;
+  offStreamingToolCall: (sessionId: string) => void;
 };
 
 export type PiSessionSnapshot = {
@@ -187,6 +200,41 @@ export function createPiSessionStore(): PiSessionStore {
     },
     offStreamingThinkingDelta: (sessionId) => {
       thinkingStreamingCallbacks.delete(sessionId);
+    },
+    startStreamingToolCall: (sessionId, contentIndex, toolName) => {
+      let state = activeToolcallStreams.get(sessionId);
+      if (!state) {
+        state = new Map();
+        activeToolcallStreams.set(sessionId, state);
+      }
+      state.set(contentIndex, { contentIndex, toolName, partialJson: "" });
+      const cb = toolcallStreamingCallbacks.get(sessionId);
+      if (cb) cb([...state.values()]);
+    },
+    appendStreamingToolCallDelta: (sessionId, contentIndex, delta) => {
+      const state = activeToolcallStreams.get(sessionId);
+      if (!state) return;
+      const tc = state.get(contentIndex);
+      if (tc) {
+        tc.partialJson += delta;
+        const cb = toolcallStreamingCallbacks.get(sessionId);
+        if (cb) cb([...state.values()]);
+      }
+    },
+    getStreamingToolCalls: (sessionId) => {
+      const state = activeToolcallStreams.get(sessionId);
+      return state ? [...state.values()] : [];
+    },
+    clearStreamingToolCalls: (sessionId) => {
+      activeToolcallStreams.delete(sessionId);
+      const cb = toolcallStreamingCallbacks.get(sessionId);
+      if (cb) cb(null);
+    },
+    onStreamingToolCall: (sessionId, callback) => {
+      toolcallStreamingCallbacks.set(sessionId, callback);
+    },
+    offStreamingToolCall: (sessionId) => {
+      toolcallStreamingCallbacks.delete(sessionId);
     },
   };
 }

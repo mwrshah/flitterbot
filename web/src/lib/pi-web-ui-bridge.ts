@@ -10,6 +10,7 @@ import type {
   ThinkingContent,
   ToolCall,
 } from "@mariozechner/pi-ai";
+import type { StreamingToolCall } from "./pi-session-store";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -169,10 +170,27 @@ export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<
 export function buildStreamingAssistantMessage(
   text: string,
   thinking?: string,
+  toolCalls?: StreamingToolCall[],
 ): AssistantMessage {
   const content: AssistantMessage["content"] = [];
   if (thinking) content.push({ type: "thinking", thinking } as ThinkingContent);
   if (text) content.push({ type: "text", text });
+  if (toolCalls?.length) {
+    for (const tc of toolCalls) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.partialJson);
+      } catch {
+        // Partial JSON — pass empty args, the component handles it
+      }
+      content.push({
+        type: "toolCall",
+        id: `streaming-tc-${tc.contentIndex}`,
+        name: tc.toolName,
+        arguments: args,
+      } as ToolCall);
+    }
+  }
   return {
     role: "assistant",
     content,

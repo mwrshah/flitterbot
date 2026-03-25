@@ -214,6 +214,20 @@ export type WsMessage =
   | { type: "text_delta"; delta: string; messageId: string; sessionId?: string }
   | { type: "thinking_delta"; delta: string; messageId: string; sessionId?: string }
   | {
+      type: "toolcall_start";
+      messageId: string;
+      contentIndex: number;
+      toolName?: string;
+      sessionId?: string;
+    }
+  | {
+      type: "toolcall_delta";
+      messageId: string;
+      contentIndex: number;
+      delta: string;
+      sessionId?: string;
+    }
+  | {
       type: "message_end";
       messageId: string;
       role: string;

@@ -100,16 +100,25 @@ export function ChatPanel({
   useEffect(() => {
     if (!sessionId) return;
 
-    // Shared mutable state across text + thinking callbacks
+    // Shared mutable state across text + thinking + toolcall callbacks
     let currentThinking: string | null = null;
     let currentChunkedText: string = "";
+    let currentToolCalls: import("~/lib/pi-session-store").StreamingToolCall[] | null = null;
+
+    function pushUpdate() {
+      streamingRef.current?.update(
+        buildStreamingAssistantMessage(
+          currentChunkedText,
+          currentThinking ?? undefined,
+          currentToolCalls ?? undefined,
+        ),
+      );
+    }
 
     const chunker = new StreamChunker({
       onChunk: (fullText) => {
         currentChunkedText = fullText;
-        streamingRef.current?.update(
-          buildStreamingAssistantMessage(fullText, currentThinking ?? undefined),
-        );
+        pushUpdate();
       },
     });
 
@@ -143,14 +152,24 @@ export function ChatPanel({
         return;
       }
       currentThinking = thinking;
-      // Update streaming message immediately so thinking renders even before text starts
       if (!streaming) {
         streaming = true;
         setIsStreaming(true);
       }
-      streamingRef.current?.update(
-        buildStreamingAssistantMessage(currentChunkedText, currentThinking),
-      );
+      pushUpdate();
+    });
+
+    piSessionStore.onStreamingToolCall(sessionId, (toolCalls) => {
+      if (toolCalls === null) {
+        currentToolCalls = null;
+        return;
+      }
+      currentToolCalls = toolCalls;
+      if (!streaming) {
+        streaming = true;
+        setIsStreaming(true);
+      }
+      pushUpdate();
     });
 
     // Expose chunker for dev tuning overlay
@@ -161,6 +180,7 @@ export function ChatPanel({
     return () => {
       piSessionStore.offStreamingDelta(sessionId);
       piSessionStore.offStreamingThinkingDelta(sessionId);
+      piSessionStore.offStreamingToolCall(sessionId);
       chunker.destroy();
       if (import.meta.env.DEV) {
         delete (window as unknown as Record<string, unknown>).__streamChunker;
