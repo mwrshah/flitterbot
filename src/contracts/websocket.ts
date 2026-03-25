@@ -116,6 +116,16 @@ export interface ToolExecutionEndWebSocketEvent {
   event?: unknown;
 }
 
+export interface ToolExecutionUpdateWebSocketEvent {
+  type: "tool_execution_update";
+  id: string;
+  sessionId?: string;
+  tool?: string;
+  toolUseId?: string;
+  partialResult?: unknown;
+  timestamp?: string;
+}
+
 export interface TurnEndWebSocketEvent {
   type: "turn_end";
   sessionId?: string;
@@ -160,6 +170,7 @@ export type ControlSurfaceWebSocketServerEvent =
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionEndWebSocketEvent
+  | ToolExecutionUpdateWebSocketEvent
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent

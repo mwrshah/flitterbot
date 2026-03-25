@@ -152,6 +152,29 @@ export function usePiWsHandler(
         return;
       }
 
+      if (message.type === "tool_execution_update") {
+        store.updateSession(sessionId, (s) => {
+          // Find matching tool_execution_start by toolUseId and update its result
+          const idx = s.appendedItems.findIndex(
+            (item) =>
+              item.kind === "tool" &&
+              item.toolUseId === message.toolUseId &&
+              item.phase === "start",
+          );
+          if (idx >= 0) {
+            const items = [...s.appendedItems];
+            items[idx] = {
+              ...(items[idx] as ChatTimelineTool),
+              phase: "update",
+              result: message.partialResult as JsonValue | undefined,
+            };
+            return { ...s, appendedItems: items };
+          }
+          return s;
+        });
+        return;
+      }
+
       if (message.type === "tool_execution_start" || message.type === "tool_execution_end") {
         const eventRecord =
           message.event && typeof message.event === "object"

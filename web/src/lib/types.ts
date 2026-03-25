@@ -33,7 +33,7 @@ export type ChatTimelineTool = {
   id: string;
   kind: "tool";
   tool: string;
-  phase: "start" | "end";
+  phase: "start" | "update" | "end";
   toolUseId?: string;
   args?: JsonValue;
   result?: JsonValue;
@@ -234,6 +234,15 @@ export type WsMessage =
       result?: unknown;
       isError?: boolean;
       event?: unknown;
+      timestamp?: string;
+      sessionId?: string;
+    }
+  | {
+      type: "tool_execution_update";
+      id: string;
+      tool?: string;
+      toolUseId?: string;
+      partialResult?: unknown;
       timestamp?: string;
       sessionId?: string;
     }

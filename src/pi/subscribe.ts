@@ -7,6 +7,7 @@ import type {
   MessageEndWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
+  ToolExecutionUpdateWebSocketEvent,
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -230,6 +231,28 @@ export function subscribeToPiSession(
           event,
         };
         broadcast(wsHub, payload);
+        break;
+      }
+      case "tool_execution_update": {
+        const toolCallId = event.toolCallId;
+        const lastAssistantId =
+          pendingAssistantMessages.length > 0
+            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
+            : undefined;
+        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
+        const deterministicId = toolCallId
+          ? `${anchorId}:tool:${toolCallId}:update`
+          : `${anchorId}:tool:pos-${toolIndex}:update`;
+
+        broadcast(wsHub, {
+          type: "tool_execution_update",
+          id: deterministicId,
+          sessionId: session.sessionId,
+          tool: event.toolName,
+          toolUseId: toolCallId,
+          partialResult: event.partialResult,
+          timestamp: now,
+        });
         break;
       }
       case "turn_end": {
