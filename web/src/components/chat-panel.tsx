@@ -123,7 +123,6 @@ export function ChatPanel({
 
     piSessionStore.onStreamingDelta(sessionId, (text, _messageId) => {
       if (text === null) {
-        chunker.flush();
         streamingRef.current?.clear();
         streaming = false;
         seenLen = 0;
