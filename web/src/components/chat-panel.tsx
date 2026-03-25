@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
@@ -65,7 +65,7 @@ type ChatPanelProps = {
   ) => Promise<void>;
 };
 
-export function ChatPanel({
+export const ChatPanel = memo(function ChatPanel({
   timeline,
   sessionId,
   statusPills,
@@ -242,4 +242,4 @@ export function ChatPanel({
       />
     </div>
   );
-}
+});

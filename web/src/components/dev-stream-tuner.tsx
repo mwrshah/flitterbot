@@ -12,7 +12,6 @@ function getChunker(): StreamChunker | null {
 }
 
 export function DevStreamTuner() {
-  useWhyDidYouRender("DevStreamTuner", {});
   const [visible, setVisible] = useState(false);
   const [chunkSize, setChunkSize] = useState(4);
   const [intervalMs, setIntervalMs] = useState(32);
@@ -24,6 +23,7 @@ export function DevStreamTuner() {
   });
   const rafRef = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  useWhyDidYouRender("DevStreamTuner", { visible, chunkSize, intervalMs, stats });
 
   // Poll stats via rAF when visible, log summary every ~1s
   useEffect(() => {

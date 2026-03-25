@@ -8,7 +8,6 @@ export const Route = createFileRoute("/sessions/")({
 });
 
 function SessionsIndexPage() {
-  useWhyDidYouRender("SessionsIndexPage", {});
   const { apiClient } = Route.useRouteContext();
 
   const sessionsQuery = useQuery({

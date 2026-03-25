@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ChatPanel } from "~/components/chat-panel";
-import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import { piSessionStore, useSessionAccum, useConnectionState } from "~/lib/pi-session-store";
 import { piHistoryQueryOptions, statusQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem } from "~/lib/types";
+import type { ChatTimelineItem, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { mergeTimelines } from "~/lib/utils";
 import { fetchPiHistory } from "~/server/pi";
+
+const EMPTY_HISTORY: ChatTimelineItem[] = [];
 
 export const Route = createFileRoute("/pi/default")({
   loader: async () => {
@@ -38,11 +40,10 @@ function filterSurfacedItems(items: ChatTimelineItem[]): ChatTimelineItem[] {
 }
 
 function PiDefaultRoute() {
-  useWhyDidYouRender("PiDefaultRoute", {});
   const loaderData = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
-  const snapshot = usePiSessionStore();
   const sendMessage = piSessionStore.getSendMessage();
+  const connectionState = useConnectionState();
 
   // Read the default agent's piSessionId from the status query (already loaded by parent route)
   const statusQuery = useQuery(statusQueryOptions(apiClient));
@@ -55,10 +56,10 @@ function PiDefaultRoute() {
     initialData: defaultSessionId ? undefined : loaderData.history,
   });
 
-  const history = historyQuery.data ?? [];
-  const accum = piSessionStore.getSessionAccum(defaultSessionId ?? "");
+  const history = historyQuery.data ?? EMPTY_HISTORY;
+  const accum = useSessionAccum(defaultSessionId ?? "");
 
-  useWhyDidYouRender("PiDefaultRoute", { loaderData, apiClient, snapshot, sendMessage, defaultSessionId, history, accum });
+  useWhyDidYouRender("PiDefaultRoute", { loaderData, apiClient, connectionState, sendMessage, defaultSessionId, history, accum });
 
   // When defaultSessionId changes, clear the old session's accum
   const prevSessionIdRef = useRef(defaultSessionId);
@@ -80,15 +81,19 @@ function PiDefaultRoute() {
     [history, surfacedAccumItems],
   );
 
+  const handleSendMessage = useCallback(
+    (text: string, deliveryMode: DeliveryMode, images?: ImageAttachment[]) =>
+      sendMessage(text, deliveryMode, images, defaultSessionId),
+    [sendMessage, defaultSessionId],
+  );
+
   return (
     <ChatPanel
       timeline={timeline}
       sessionId={defaultSessionId}
       statusPills={accum.statusPills}
-      connectionState={snapshot.connectionState}
-      onSendMessage={(text, deliveryMode, images) =>
-        sendMessage(text, deliveryMode, images, defaultSessionId)
-      }
+      connectionState={connectionState}
+      onSendMessage={handleSendMessage}
     />
   );
 }

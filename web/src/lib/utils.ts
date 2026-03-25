@@ -82,6 +82,7 @@ export function mergeTimelines(
   if (appendedItems.length === 0) return loaderItems;
   const seen = new Set(loaderItems.map((item) => item.id));
   const unique = appendedItems.filter((item) => !seen.has(item.id));
+  if (unique.length === 0) return loaderItems;
   return [...loaderItems, ...unique];
 }
 
