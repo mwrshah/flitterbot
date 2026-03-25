@@ -30,17 +30,17 @@ TanStack Router with dependency-injected context — `QueryClient`, `AutonomaApi
   - `/sessions/$sessionId` — session detail + paginated transcript
 - `/runtime` — system status dashboard (5s polling)
 
-Root layout (`__root.tsx`) subscribes to WS `workstreams_changed` and `status_changed` events, invalidating React Query caches on change and on WS reconnect.
+Root layout (`__root.tsx`) subscribes to WS `workstreams_changed` and `status_changed` events, invalidating React Query caches on change and on WS reconnect. Also mounts `usePiWsHandler` to route all WS events into `piSessionStore` — always active regardless of current route.
 
 ### State Management
 
 Three stores, all using `useSyncExternalStore` — no Zustand, no React Context providers:
 
-1. **PiSessionStore** (`lib/pi-session-store.ts`) — module-level singleton. Per-session accumulators: `appendedItems` (timeline items since loader), `streamingText` (partial deltas), `statusPills` (transient feedback, max 6). Reset on Pi layout mount. Initialized by `pi.route.tsx`, consumed by child routes.
+1. **PiSessionStore** (`lib/pi-session-store.ts`) — module-level singleton. Per-session accumulators: `appendedItems` (timeline items since loader), `streamingText` (partial deltas), `streamingMessageId` (server UUID of current streaming message), `statusPills` (transient feedback, max 6). Also provides `clearSession()` and `getAllAppendedItems()` (cross-session aggregation). Initialized by `usePiWsHandler` hook in root layout; consumed by all routes.
 
 2. **SettingsStore** (`lib/settings-store.ts`) — localStorage-backed. Controls base URL, bearer token, stub fallback. `set()` persists and triggers WS reconnect.
 
-3. **WebSocket client** (`lib/ws.ts`) — auto-reconnect with exponential backoff (3s → 30s). Per-session subscriptions; re-subscribes on reconnect. Pub/sub for message and connection state. Primary transport; HTTP is fallback.
+3. **WebSocket client** (`lib/ws.ts`) — auto-reconnect with exponential backoff (1s base → 30s cap, jitter). Circuit breaker: stops after 10 failed attempts. Heartbeat: sends `ping` every 30s, expects `pong` within 10s or triggers reconnect. Visibility-aware: reconnects on tab focus if socket is dead. Per-session subscriptions; re-subscribes on reconnect. Explicit state machine: `disconnected → connecting → connected → reconnecting`. Primary transport; HTTP is fallback.
 
 ### Pi-Web-UI Bridge
 
@@ -48,9 +48,9 @@ Lit web components from `@mariozechner/pi-agent-core` render chat. Bridge (`lib/
 
 ### Timeline Merging
 
-Each Pi session merges loader history with live appended items (`displayed = loaderHistory ++ appendedItems`), deduplicated by ID. WS events flow through `pi.route.tsx` → `piSessionStore` by session ID; child routes subscribe and re-render.
+Each Pi session merges loader history with live appended items (`displayed = loaderHistory ++ appendedItems`), deduplicated by ID. WS events flow through `usePiWsHandler` (root layout) → `piSessionStore` by session ID; child routes subscribe and re-render. The `/pi/default` route filters accumulated items to surfaced content only (user messages + `source: "pi_outbound"` assistant messages).
 
-WS message types: `text_delta`, `message_end`, `tool_execution_start/end`, `queue_item_start/end` (status pills), `turn_end` (divider), `error`, `connected`.
+WS message types: `text_delta` (with `messageId`), `message_end` (required `messageId`), `tool_execution_start/end` (with deterministic `id`), `queue_item_start/end` (status pills), `turn_end` (divider), `pi_surfaced` (ignored for timeline — only confirms WhatsApp delivery), `pong`, `error`, `connected`. `MessageSource` includes `agent` and `pi_outbound`.
 
 ## Key Files
 
@@ -68,14 +68,23 @@ web/src/
 │   ├── sessions.index.tsx        # session list
 │   ├── sessions.$sessionId.tsx   # session detail + transcript
 │   └── runtime.tsx               # runtime dashboard
-├── components/
-│   ├── layout/                   # AppShell, Sidebar, SettingsDrawer
-│   ├── chat/                     # ChatPanel, PiMessageList, PiStreamingMessage
-│   ├── input-surface/            # InputSurface, SkillPicker
-│   ├── sessions/                 # SessionList, SessionDetail, TranscriptViewer
-│   ├── runtime/                  # WhatsAppControls
-│   └── ui/                       # MessageInput, Badge, Button, Card, etc.
-├── hooks/                        # use-stick-to-bottom, use-theme
+├── components/                   # flat, kebab-case naming
+│   ├── app-shell.tsx             # AppShell layout
+│   ├── sidebar.tsx               # Navigation sidebar
+│   ├── settings-drawer.tsx       # Settings panel
+│   ├── chat-panel.tsx            # Pi chat panel
+│   ├── pi-message-list.tsx       # Lit-rendered message list
+│   ├── pi-streaming-message.tsx  # Streaming text display
+│   ├── input-surface.tsx         # Input Surface (filters to pi_outbound)
+│   ├── skill-picker.tsx          # Slash-command dropdown
+│   ├── session-list.tsx          # Session browser
+│   ├── session-detail.tsx        # Session detail view
+│   ├── transcript-viewer.tsx     # Paginated transcript
+│   ├── whatsapp-controls.tsx     # WhatsApp daemon controls
+│   ├── default-catch-boundary.tsx
+│   ├── not-found.tsx
+│   └── ui/                       # message-input, badge, button, card, input
+├── hooks/                        # use-stick-to-bottom, use-theme, use-pi-ws-handler
 ├── lib/
 │   ├── api.ts                    # HTTP client factory
 │   ├── ws.ts                     # WebSocket client with reconnect
@@ -100,7 +109,7 @@ web/src/
 - **Skill picker:** slash-command dropdown (`/` trigger) with `cmdk`, fetches available skills from `GET /api/skills`
 - **Image attachments:** clipboard paste, drag-drop, file picker (base64-encoded)
 - **Delivery modes:** followUp (queue) vs steer (interrupt)
-- **Origin badges:** web, whatsapp, hook, cron
+- **Origin badges:** web, whatsapp, hook, cron, agent, pi_outbound
 - **Theme:** light/dark/system, localStorage-persisted, flash-prevented via inline script
 - **Runtime controls:** WhatsApp daemon start/stop, orchestrator status
 
@@ -121,3 +130,5 @@ web/src/
 
 - `mergeTimelines` utility lives in `lib/utils.ts` — deduplicates appended timeline items against loader history by ID.
 - pi-web-ui initialization errors are logged via `console.error` in catch blocks (won't crash the UI).
+- Router cleans up orphaned `wsClient` on HMR by storing it on `window.__autonoma_wsClient`.
+- InputSurface uses `ResizeObserver` (via callback ref) for overflow detection instead of `useEffect`, and `useIsClient()` for hydration-safe connection badge rendering.

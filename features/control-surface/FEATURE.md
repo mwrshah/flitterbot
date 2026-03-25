@@ -50,7 +50,7 @@ Without a control surface, every channel (WhatsApp, hooks, cron, web) needs its 
 
 `PiSessionManager` manages two roles:
 
-**Default agent** — always-on singleton. Handles non-work messages and meta-operations. Has `create_workstream` tool. Receives raw user text (context header injection is stubbed but not yet implemented — see Observations).
+**Default agent** — always-on singleton. Handles non-work messages and meta-operations. Has `create_workstream` tool. Receives raw user text (context header injection is stubbed but not yet implemented — see Observations). `getDefault()` returns `ManagedPiSession | undefined` — callers check for null rather than catching exceptions.
 
 **Orchestrators** — ephemeral, one per active workstream. Spawned on classifier match. Has `create_worktree`, `close_workstream`, `enqueue_message` tools. Receives raw user text. Self-destructs on workstream close: kill CC sessions, merge branch, push, clean up.
 
@@ -104,7 +104,7 @@ Accepted hooks update blackboard and enqueue to the relevant Pi session (via `pi
 
 ## Cron Tick
 
-POST `/cron/tick` — gated on: Pi not busy, session exists, WhatsApp connected, no circuit breakers. Marks stale CC sessions; enqueues stale-check or idle-check prompt.
+POST `/cron/tick` — gated on: Pi session ready, Pi not busy, session object exists, WhatsApp connected, no circuit breakers. Enqueues stale-check or idle-check prompt.
 
 ## Custom Tools
 
@@ -112,14 +112,14 @@ POST `/cron/tick` — gated on: Pi not busy, session exists, WhatsApp connected,
 |------|------|-------------|
 | `query_blackboard` | both | Read-only SQL against blackboard.db (SELECT/PRAGMA only) |
 | `reload_resources` | both | Hot-reload skills, extensions, prompts, system prompt |
-| `create_workstream` | default | Register new workstream; triggers orchestrator spawn |
+| `create_workstream` | default | Register new workstream; triggers orchestrator spawn; auto-passes original user message to orchestrator (no explicit `message` parameter) |
 | `create_worktree` | orchestrator | Git worktree creation (NNN-slug branch naming, git-town integration) |
 | `close_workstream` | orchestrator | Kill CC sessions, merge branch to main, push, close workstream, end Pi session |
 | `enqueue_message` | orchestrator | Send message to another Pi session (cross-session communication) |
 
 ## WebSocket
 
-`WebSocketHub` — raw RFC 6455 (no library). Clients subscribe to session IDs or `*` (wildcard). Events: `text_delta`, `message_end`, `tool_execution_start/end`, `turn_end`, `pi_surfaced`, `workstreams_changed`, `status_changed`, `queue_item_start/end`.
+`WebSocketHub` — raw RFC 6455 (no library). Clients subscribe to session IDs or `*` (wildcard). Events: `text_delta`, `message_end`, `tool_execution_start/end`, `turn_end`, `pi_surfaced`, `workstreams_changed`, `status_changed`, `queue_item_start/end`, `pong`. Clients can send `ping` messages; server responds with `pong`. `text_delta` and `message_end` now carry required `messageId` (server UUID). Tool events carry a deterministic `id` for deduplication.
 
 ## HTTP API
 
@@ -145,8 +145,9 @@ src/
 │   └── load-config.ts     # AutonomaConfig (23 props from ~/.autonoma/config.json + env)
 ├── contracts/
 │   ├── control-surface-api.ts  # All request/response types, endpoint definitions
-│   ├── blackboard.ts           # Schema DDL, row types, status enums
-│   ├── websocket.ts            # Client/server WebSocket event types
+│   ├── blackboard.ts           # Schema DDL, row types, status enums, shared types (MessageMetadata, etc.)
+│   ├── message.ts              # MessageSource, MessageBlock, UnifiedMessage
+│   ├── websocket.ts            # Client/server WebSocket event types (incl. ping/pong)
 │   └── tmux-bridge.ts          # Tmux inspection + session launch types
 ├── pi/
 │   ├── session-manager.ts      # PiSessionManager — default + orchestrator lifecycle
@@ -211,3 +212,5 @@ src/
 ## Observations
 
 - `formatPromptWithContext()` is a pass-through extension point — currently returns `item.text` unchanged. No XML context injection implemented yet.
+- `server.ts` suppresses the `node:sqlite` ExperimentalWarning at startup before any imports.
+- `handleHook()` accepts typed `ClaudeHookPayload` (not `Record<string, unknown>`). Hook logging is consolidated to a single summary line per event (bookkeeping/filtered status).

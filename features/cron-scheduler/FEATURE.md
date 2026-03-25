@@ -18,12 +18,12 @@ Three-tier: OS timer → bash script → control surface endpoint.
 
 ### Gate Sequence
 
-1. **Pi not busy** — if Pi is processing a turn, skip (no duplicate prompt)
-2. **Pi session exists** — if session ended/crashed, skip
-3. **WhatsApp connected** — if disconnected, skip (Pi can't reach user for confirmation)
-4. **No active circuit breakers** — query `health_flags` for unexpired flags; any active flag → skip
-5. **Check stale sessions** — query sessions already marked stale by maintenance loop; if stale found, enqueue stale-check prompt
-6. **No active working sessions** — if non-stale `working` sessions remain, skip with `no_actionable_state` (active work shouldn't be interrupted). Otherwise enqueue idle-check prompt
+1. **Pi not ready** — if `getDefault()` returns undefined (no default session), skip (`pi_ended`)
+2. **Pi not busy** — if Pi is processing a turn, skip (`pi_active`)
+3. **Pi session exists** — if session object is missing (ended/crashed), skip (`pi_ended`)
+4. **WhatsApp connected** — if disconnected, skip (`whatsapp_disconnected`)
+5. **No active circuit breakers** — query `health_flags` for unexpired flags; any active flag → skip (`circuit_breaker`)
+6. **Check stale sessions / idle state** — query sessions already marked stale by maintenance loop; if stale found, enqueue stale-check prompt; if no working sessions remain, enqueue idle-check prompt; otherwise skip (`no_actionable_state`)
 
 ### Response
 

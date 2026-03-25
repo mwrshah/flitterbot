@@ -19,7 +19,7 @@ Each Pi session has its own FIFO turn queue; all agents process concurrently.
 
 ### Workstream Lifecycle
 
-Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, removes the worktree, closes the row, and self-destructs the orchestrator.
+Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator, and automatically passes through the original user message. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, removes the worktree, closes the row, and self-destructs the orchestrator.
 
 Soft-deleted: `status` flips to `closed` with `closed_at`. Classifier sees recently closed workstreams (24h) to prevent duplicates and allow reopening.
 
@@ -35,12 +35,12 @@ Pi's final text each turn auto-surfaces to WhatsApp and web — no tool call nee
 
 OS-level timer (systemd on Linux, launchd on macOS, 10-min interval) POSTs to `/cron/tick`. The endpoint runs a 6-gate sequence:
 
-1. Pi not busy — no duplicate prompts
-2. Pi session exists — not ended/crashed
-3. WhatsApp connected — Pi can reach user
-4. No active circuit breakers (`health_flags`)
-5. Stale sessions exist → stale-check prompt
-6. No working sessions → idle-check prompt
+1. Pi session ready — default session exists
+2. Pi not busy — no duplicate prompts
+3. Pi session object exists — not ended/crashed
+4. WhatsApp connected — Pi can reach user
+5. No active circuit breakers (`health_flags`)
+6. Stale sessions → stale-check prompt; no working sessions → idle-check prompt
 
 Separate 60s maintenance loop: pings blackboard, refreshes WhatsApp, marks stale sessions, kills 24h-old idle tmux sessions, detects stuck turns (sets `stuck_turn` health flag, 30-min TTL, WhatsApp alert).
 
@@ -79,7 +79,7 @@ Separate 60s maintenance loop: pings blackboard, refreshes WhatsApp, marks stale
 ┌──────────┐  ┌──────────────┐  ┌─────────────────────┐
 │ WhatsApp │  │  Blackboard  │  │ Claude Code (tmux)  │
 │ Daemon   │  │  SQLite DB   │  │ Git Worktrees       │
-│(Baileys) │  │  (v11)       │  │ Hook → POST         │
+│(Baileys) │  │  (v12)       │  │ Hook → POST         │
 └──────────┘  └──────────────┘  └─────────────────────┘
 ```
 
@@ -95,7 +95,7 @@ Endpoints: `POST /message`, `/hook/:event`, `/cron/tick`, `/stop`, `/sessions/:i
 
 Two roles with tailored system prompts and role-gated tools:
 
-**Default** — always-on triage. Delegates engineering work via `create_workstream` (spawns orchestrator); sends messages to orchestrators via `enqueue_message`. Cannot write code.
+**Default** — always-on triage. Delegates engineering work via `create_workstream` (spawns orchestrator, auto-passes original user message); sends messages to orchestrators via `enqueue_message`. Cannot write code.
 
 **Orchestrators** — ephemeral, one per workstream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_workstream` (merge, push, cleanup, self-destruct). Cannot write code directly.
 
@@ -107,14 +107,15 @@ On startup: creates default agent, rehydrates orchestrators for open workstreams
 
 ### Blackboard (SQLite)
 
-`~/.autonoma/blackboard.db` — WAL, 5s busy timeout, foreign keys. Schema v11 (migrations v0→v11). Schema + row types + enums in `src/contracts/blackboard.ts`.
+`~/.autonoma/blackboard.db` — WAL, 5s busy timeout, foreign keys. Schema v12 (migrations v0→v12). Schema + row types + enums in `src/contracts/blackboard.ts`.
 
 | Table | Purpose |
 |-------|---------|
 | `workstreams` | Units of work (open/closed), repo/worktree paths |
 | `sessions` | Claude Code sessions: working → idle → stale → ended; linked to workstream + pi_session |
 | `pi_sessions` | Pi runtime sessions: active / waiting_for_user / waiting_for_sessions / ended / crashed |
-| `messages` | Unified log; sources: whatsapp, web, hook, cron, init, agent, pi_outbound |
+| `messages` | Unified log (TEXT UUID PK); sources: whatsapp, web, hook, cron, init, agent, pi_outbound |
+| `message_id_map` | Agent message ID → server UUID bridging for deduplication |
 | `whatsapp_messages` | Delivery tracking (pending → sent → delivered \| failed), reply matching |
 | `pending_actions` | Persistent user decisions: whatsapp_auth_expired, restart_session, approve_change, clarify |
 | `health_flags` | Circuit-breaker flags with optional TTL |
@@ -135,9 +136,9 @@ Thin browser client. TanStack Start (SSR + file-based routing), Tailwind v4 (okl
 
 Routes: `/` (Input Surface), `/pi` (agent tabs: default + orchestrators), `/sessions` (list, 10s poll), `/sessions/$id` (detail + paginated transcript), `/runtime` (status, 5s poll).
 
-Three `useSyncExternalStore` stores: `PiSessionStore` (per-session accumulators), `SettingsStore` (localStorage), WebSocket client (auto-reconnect, exponential backoff 3s → 30s).
+Three `useSyncExternalStore` stores: `PiSessionStore` (per-session accumulators), `SettingsStore` (localStorage), WebSocket client (auto-reconnect with exponential backoff, heartbeat ping/pong, visibility-aware reconnect, circuit breaker).
 
-Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), followUp/steer modes, origin badges, light/dark/system theme, WhatsApp controls. WS subscription filtering: clients subscribe to session IDs; server filters `broadcast()` per-subscription.
+Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), followUp/steer modes, origin badges, light/dark/system theme, WhatsApp controls. WS subscription filtering: clients subscribe to session IDs; server filters `broadcast()` per-subscription. WS events use server-assigned UUIDs for message deduplication; ping/pong heartbeat for connection health.
 
 ### Installer
 
@@ -155,7 +156,7 @@ src/
 ├── classifier/      # Groq LLM routing
 ├── claude-sessions/ # Tmux inspection + injection
 ├── config/          # AutonomaConfig loader
-├── contracts/       # Shared types, schema DDL, enums (SSOT)
+├── contracts/       # Shared types, schema DDL, enums (SSOT), message.ts
 ├── custom-tools/    # close-workstream, create-worktree
 ├── pi/              # Session manager, turn queue, state, agent creation
 ├── prompts/         # System prompts (default, orchestrator, classifier)
@@ -172,7 +173,7 @@ src/
 | # | Feature | Purpose |
 |---|---------|---------|
 | 1 | [Installer / Uninstaller](installer/FEATURE.md) | Permission-gated, manifest-tracked deployment of runtime tree and external config modifications |
-| 2 | [Blackboard](blackboard/FEATURE.md) | SQLite state layer (v11). Workstreams, Claude Code sessions, Pi sessions, unified messages, WhatsApp tracking, pending actions, health flags |
+| 2 | [Blackboard](blackboard/FEATURE.md) | SQLite state layer (v12). Workstreams, Claude Code sessions, Pi sessions, unified messages, message ID mapping, WhatsApp tracking, pending actions, health flags |
 | 3 | [Control Surface](control-surface/FEATURE.md) | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
 | 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
 | 5 | [Web App](web-app/FEATURE.md) | Browser client: Pi chat (two surfaces), session dashboard, paginated transcripts, direct messaging, runtime controls |
