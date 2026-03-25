@@ -17,7 +17,7 @@ import python from "highlight.js/lib/languages/python";
 import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import htmlLanguage from "highlight.js/lib/languages/xml";
-import { html, LitElement, type TemplateResult } from "lit";
+import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -673,6 +673,8 @@ export class UserMessage extends LitElement {
   }
 
   override render() {
+    if (!this.message?.content) return nothing;
+
     const contentArr =
       typeof this.message.content === "string"
         ? [{ type: "text" as const, text: this.message.content }]
@@ -842,6 +844,8 @@ export class AssistantMessage extends LitElement {
   }
 
   override render() {
+    if (!this.message?.content) return nothing;
+
     const orderedParts: TemplateResult[] = [];
 
     for (const chunk of this.message.content) {
