@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Badge } from "~/components/ui/badge";
 import { statusQueryOptions } from "~/lib/queries";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
 export const Route = createFileRoute("/pi")({
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/pi")({
 /* ── Layout component ── */
 
 function PiLayoutRoute() {
+  useWhyDidYouRender("PiLayoutRoute", {});
   const { apiClient } = Route.useRouteContext();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -35,6 +37,8 @@ function PiLayoutRoute() {
   const allOrchestrators = statusQuery.data?.pi?.orchestrators ?? [];
   const defaultPi = statusQuery.data?.pi?.default;
   const workstreams = statusQuery.data?.workstreams ?? [];
+
+  useWhyDidYouRender("PiLayoutRoute", { apiClient, pathname, allOrchestrators, defaultPi, workstreams });
 
   // Build set of open workstream IDs
   const openWsIds = new Set(workstreams.filter((w) => w.status === "open").map((w) => w.id));
@@ -94,6 +98,7 @@ function TabLink({
   active: boolean;
   children: React.ReactNode;
 }) {
+  useWhyDidYouRender("TabLink", { to, active, children });
   return (
     <Link
       to={to}

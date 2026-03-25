@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -71,6 +72,7 @@ export function ChatPanel({
   connectionState,
   onSendMessage,
 }: ChatPanelProps) {
+  useWhyDidYouRender("ChatPanel", { timeline, sessionId, statusPills, connectionState, onSendMessage });
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();

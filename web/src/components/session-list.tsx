@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SessionSummary } from "~/lib/types";
 import { cn, formatRelativeTime } from "~/lib/utils";
 
@@ -26,6 +27,7 @@ export function SessionList({
   title?: string;
   description?: string;
 }) {
+  useWhyDidYouRender("SessionList", { items, selectedSessionId, title, description });
   // Group by workstream
   const grouped = new Map<string, { sessions: SessionSummary[] }>();
   const unlinked: SessionSummary[] = [];
@@ -93,6 +95,7 @@ function SessionGroup({
   sessions: SessionSummary[];
   selectedSessionId?: string;
 }) {
+  useWhyDidYouRender("SessionGroup", { label, sessions, selectedSessionId });
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -115,6 +118,7 @@ function SessionGroup({
 }
 
 function SessionRow({ session, selected }: { session: SessionSummary; selected: boolean }) {
+  useWhyDidYouRender("SessionRow", { session, selected });
   return (
     <Link
       to="/sessions/$sessionId"

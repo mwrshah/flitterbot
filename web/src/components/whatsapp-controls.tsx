@@ -3,6 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusResponse } from "~/lib/types";
 
 function statusVariant(status: string): "success" | "warning" | "muted" {
@@ -18,6 +19,7 @@ function statusVariant(status: string): "success" | "warning" | "muted" {
 }
 
 export function WhatsAppControls({ status }: { status?: StatusResponse }) {
+  useWhyDidYouRender("WhatsAppControls", { status });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();

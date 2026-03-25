@@ -5,6 +5,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import { piHistoryQueryOptions, statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { mergeTimelines } from "~/lib/utils";
 import { fetchPiHistory } from "~/server/pi";
 
@@ -37,6 +38,7 @@ function filterSurfacedItems(items: ChatTimelineItem[]): ChatTimelineItem[] {
 }
 
 function PiDefaultRoute() {
+  useWhyDidYouRender("PiDefaultRoute", {});
   const loaderData = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
   const snapshot = usePiSessionStore();
@@ -55,6 +57,8 @@ function PiDefaultRoute() {
 
   const history = historyQuery.data ?? [];
   const accum = piSessionStore.getSessionAccum(defaultSessionId ?? "");
+
+  useWhyDidYouRender("PiDefaultRoute", { loaderData, apiClient, snapshot, sendMessage, defaultSessionId, history, accum });
 
   // When defaultSessionId changes, clear the old session's accum
   const prevSessionIdRef = useRef(defaultSessionId);

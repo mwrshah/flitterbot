@@ -1,5 +1,6 @@
 import { Command } from "cmdk";
 import { useMemo } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
 
 type SkillPickerProps = {
@@ -21,6 +22,7 @@ export function SkillPicker({
   onSelect,
   onClose: _onClose,
 }: SkillPickerProps) {
+  useWhyDidYouRender("SkillPicker", { open, filter, skills, selectedValue, onSelectedValueChange, onSelect });
   const filtered = useMemo(() => {
     if (!filter) return skills;
     const lower = filter.toLowerCase();

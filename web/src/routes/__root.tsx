@@ -11,6 +11,7 @@ import {
 import type * as React from "react";
 import { useEffect, useRef } from "react";
 import { AppShell } from "~/components/app-shell";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
 import { NotFound } from "~/components/not-found";
 import { usePiWsHandler } from "~/hooks/use-pi-ws-handler";
@@ -87,6 +88,8 @@ function RootComponent() {
   });
   const defaultSessionId = statusQuery.data?.pi?.default?.sessionId;
 
+  useWhyDidYouRender("RootComponent", { apiClient, wsClient, queryClient, router, defaultSessionId });
+
   // Route all WS events into piSessionStore — always active regardless of current route
   usePiWsHandler(wsClient, apiClient, defaultSessionId);
 
@@ -119,6 +122,7 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  useWhyDidYouRender("RootDocument", { children });
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

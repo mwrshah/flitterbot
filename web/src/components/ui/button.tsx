@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
 type ButtonVariant = "default" | "secondary" | "ghost" | "destructive";
@@ -27,6 +28,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   { className, variant = "default", size = "default", ...props },
   ref,
 ) {
+  useWhyDidYouRender("Button", { className, variant, size });
   return (
     <button
       ref={ref}

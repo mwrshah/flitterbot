@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -9,6 +10,7 @@ import type { TranscriptItem } from "~/lib/types";
 import { cn, formatDateTime, prettifyJson } from "~/lib/utils";
 
 function LitMarkdownBlock({ content }: { content: string }) {
+  useWhyDidYouRender("TranscriptViewer.LitMarkdownBlock", { content });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -39,6 +41,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
 }
 
 function TranscriptRow({ item }: { item: TranscriptItem }) {
+  useWhyDidYouRender("TranscriptRow", { item });
   if (item.kind === "message" && item.role) {
     return (
       <div
@@ -105,6 +108,7 @@ function TranscriptRow({ item }: { item: TranscriptItem }) {
 }
 
 export function TranscriptViewer({ sessionId }: { sessionId: string }) {
+  useWhyDidYouRender("TranscriptViewer", { sessionId });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
 

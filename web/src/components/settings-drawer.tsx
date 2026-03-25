@@ -2,6 +2,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useTheme } from "~/hooks/use-theme";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useSettings } from "~/lib/settings-store";
 
 const rootApi = getRouteApi("__root__");
@@ -13,6 +14,7 @@ const themeOptions = [
 ];
 
 export function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useWhyDidYouRender("SettingsDrawer", { open, onClose });
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);
   const updateSettings = settingsStore.set;

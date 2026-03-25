@@ -1,6 +1,7 @@
 import { type ClipboardEvent, type DragEvent, memo, useCallback, useRef, useState } from "react";
 import { SkillPicker } from "~/components/skill-picker";
 import { Button } from "~/components/ui/button";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
@@ -24,6 +25,7 @@ export const MessageInput = memo(function MessageInput({
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills",
 }: MessageInputProps) {
+  useWhyDidYouRender("MessageInput", { deliveryMode, onDeliveryModeChange, isSending, onSubmit, skills, placeholder, rows, helpText });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);

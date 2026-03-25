@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { SessionList } from "~/components/session-list";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/sessions/")({
   component: SessionsIndexPage,
 });
 
 function SessionsIndexPage() {
+  useWhyDidYouRender("SessionsIndexPage", {});
   const { apiClient } = Route.useRouteContext();
 
   const sessionsQuery = useQuery({
@@ -14,6 +16,8 @@ function SessionsIndexPage() {
     queryFn: () => apiClient.listSessions(),
     refetchInterval: 10_000,
   });
+
+  useWhyDidYouRender("SessionsIndexPage", { apiClient, sessionsQuery });
 
   return (
     <div className="flex-1 overflow-auto p-6">

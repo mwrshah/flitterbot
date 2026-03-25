@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ChatPanel } from "~/components/chat-panel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type { ChatTimelineItem } from "~/lib/types";
@@ -37,6 +38,8 @@ function PiSessionRoute() {
     () => mergeTimelines(history, accum.appendedItems),
     [history, accum.appendedItems],
   );
+
+  useWhyDidYouRender("PiSessionRoute", { sessionId, history, snapshot, accum, sendMessage, timeline });
 
   return (
     <ChatPanel
