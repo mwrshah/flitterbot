@@ -1,47 +1,32 @@
-import {
-  type ClipboardEvent,
-  type DragEvent,
-  type FormEvent,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { type ClipboardEvent, type DragEvent, memo, useCallback, useRef, useState } from "react";
 import { SkillPicker } from "~/components/skill-picker";
 import { Button } from "~/components/ui/button";
 import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
-  draft: string;
-  onDraftChange: (value: string) => void;
   deliveryMode: DeliveryMode;
   onDeliveryModeChange: (mode: DeliveryMode) => void;
   isSending: boolean;
-  onSubmit: (event: FormEvent) => void;
-  pendingImages: ImageAttachment[];
-  onAddImages: (files: FileList | File[]) => void;
-  onRemoveImage: (index: number) => void;
+  onSubmit: (text: string, images?: ImageAttachment[]) => void;
   skills?: SkillListItem[];
   placeholder?: string;
   rows?: number;
   helpText?: string;
 };
 
-export function MessageInput({
-  draft,
-  onDraftChange,
+export const MessageInput = memo(function MessageInput({
   deliveryMode,
   onDeliveryModeChange,
   isSending,
   onSubmit,
-  pendingImages,
-  onAddImages,
-  onRemoveImage,
   skills,
   placeholder = "Message Pi…",
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills",
 }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [draft, setDraft] = useState("");
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
@@ -54,7 +39,7 @@ export function MessageInput({
 
   const handleDraftChange = useCallback(
     (value: string) => {
-      onDraftChange(value);
+      setDraft(value);
       const match = value.match(/^\/(\S*)$/);
       if (match && skills?.length) {
         setPickerOpen(true);
@@ -64,12 +49,21 @@ export function MessageInput({
         setPickerOpen(false);
       }
     },
-    [onDraftChange, skills],
+    [skills],
   );
 
   function handleSkillSelect(name: string) {
-    onDraftChange(`/${name} `);
+    setDraft(`/${name} `);
     setPickerOpen(false);
+  }
+
+  function submit() {
+    const text = draft.trim();
+    const images = pendingImages.length ? [...pendingImages] : undefined;
+    if (!text && !images?.length) return;
+    setDraft("");
+    setPendingImages([]);
+    onSubmit(text || "(image)", images);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -106,7 +100,7 @@ export function MessageInput({
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      onSubmit(event as unknown as FormEvent);
+      submit();
     }
   }
 
@@ -122,19 +116,44 @@ export function MessageInput({
     }
     if (imageFiles.length) {
       event.preventDefault();
-      onAddImages(imageFiles);
+      addImageFiles(imageFiles);
     }
+  }
+
+  function addImageFiles(files: File[] | FileList) {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    for (const file of imageFiles) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1];
+        if (base64) {
+          setPendingImages((prev) => [...prev, { data: base64, mimeType: file.type }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function removeImage(index: number) {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     if (event.dataTransfer?.files?.length) {
-      onAddImages(Array.from(event.dataTransfer.files));
+      addImageFiles(Array.from(event.dataTransfer.files));
     }
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+  }
+
+  function handleFormSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    submit();
   }
 
   const canSend = draft.trim() || pendingImages.length > 0;
@@ -145,7 +164,7 @@ export function MessageInput({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <form onSubmit={onSubmit} className="space-y-2">
+      <form onSubmit={handleFormSubmit} className="space-y-2">
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {pendingImages.map((img, i) => (
@@ -157,7 +176,7 @@ export function MessageInput({
                 />
                 <button
                   type="button"
-                  onClick={() => onRemoveImage(i)}
+                  onClick={() => removeImage(i)}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   &times;
@@ -173,7 +192,7 @@ export function MessageInput({
           multiple
           className="hidden"
           onChange={(e) => {
-            if (e.target.files?.length) onAddImages(Array.from(e.target.files));
+            if (e.target.files?.length) addImageFiles(Array.from(e.target.files));
             e.target.value = "";
           }}
         />
@@ -254,4 +273,4 @@ export function MessageInput({
       </form>
     </div>
   );
-}
+});

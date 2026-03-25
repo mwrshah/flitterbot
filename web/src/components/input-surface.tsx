@@ -1,14 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -342,8 +334,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
-  const [draft, setDraft] = useState("");
-  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
@@ -366,50 +356,25 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
 
-  function addImageFiles(files: FileList | File[]) {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (!imageFiles.length) return;
-    for (const file of imageFiles) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(",")[1];
-        if (base64) {
-          setPendingImages((prev) => [...prev, { data: base64, mimeType: file.type }]);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  function removeImage(index: number) {
-    setPendingImages((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const text = draft.trim();
-    const images = pendingImages.length ? [...pendingImages] : undefined;
-    if (!text && !images?.length) return;
-
-    setIsSending(true);
-    setDraft("");
-    setPendingImages([]);
-    engageAndScroll();
-
-    try {
-      await wsClient.sendMessage(text || "(image)", deliveryMode, images);
-    } catch {
-      await apiClient.sendMessage({
-        text: text || "(image)",
-        source: "web",
-        deliveryMode,
-        images,
-      });
-    } finally {
-      setIsSending(false);
-    }
-  }
+  const handleSubmit = useCallback(
+    async (text: string, images?: ImageAttachment[]) => {
+      setIsSending(true);
+      engageAndScroll();
+      try {
+        await wsClient.sendMessage(text, deliveryMode, images);
+      } catch {
+        await apiClient.sendMessage({
+          text,
+          source: "web",
+          deliveryMode,
+          images,
+        });
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [wsClient, apiClient, deliveryMode, engageAndScroll],
+  );
 
   const connectionLabel =
     connectionState === "connected"
@@ -448,15 +413,10 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
       </div>
 
       <MessageInput
-        draft={draft}
-        onDraftChange={setDraft}
         deliveryMode={deliveryMode}
         onDeliveryModeChange={setDeliveryMode}
         isSending={isSending}
         onSubmit={handleSubmit}
-        pendingImages={pendingImages}
-        onAddImages={addImageFiles}
-        onRemoveImage={removeImage}
         skills={skillsData?.items}
         placeholder="Message Pi via Web…"
       />

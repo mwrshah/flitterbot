@@ -6,10 +6,10 @@
  */
 
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 
-export function PiMessageList({
+export const PiMessageList = memo(function PiMessageList({
   messages,
   isStreaming = false,
   pendingToolCalls,
@@ -88,4 +88,4 @@ export function PiMessageList({
   }
 
   return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
-}
+});

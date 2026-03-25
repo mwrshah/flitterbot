@@ -4,10 +4,10 @@
  */
 
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 
-export function PiStreamingMessage({
+export const PiStreamingMessage = memo(function PiStreamingMessage({
   message,
   visible,
 }: {
@@ -71,4 +71,4 @@ export function PiStreamingMessage({
   if (!visible || !ready) return null;
 
   return <div ref={containerRef} />;
-}
+});
