@@ -2,10 +2,13 @@
  * Dev-only sidebar widget for tuning StreamChunker parameters in real time.
  * Renders an inline icon button; when toggled, shows a popover panel anchored
  * to the button. Keyboard shortcut: Ctrl+Shift+S.
+ *
+ * Includes a manual profiler toggle that measures total lag across an entire
+ * streaming turn (WS arrival span vs render span).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { StreamChunker, StreamChunkerStats } from "~/lib/stream-chunker";
+import type { ProfileResult, StreamChunker, StreamChunkerStats } from "~/lib/stream-chunker";
 
 function getChunker(): StreamChunker | null {
   return (window as unknown as Record<string, unknown>).__streamChunker as StreamChunker | null;
@@ -17,15 +20,18 @@ export function DevStreamTuner() {
   const [intervalMs, setIntervalMs] = useState(32);
   const [stats, setStats] = useState<StreamChunkerStats>({
     bufferDepth: 0,
-    lastDeltaTime: 0,
+    profiling: false,
+    profileStartTime: 0,
+    lastPushTime: 0,
     lastRenderTime: 0,
-    lagMs: 0,
   });
+  const [profiling, setProfiling] = useState(false);
+  const [profileResult, setProfileResult] = useState<ProfileResult | null>(null);
   const rafRef = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   useWhyDidYouRender("DevStreamTuner", { visible, chunkSize, intervalMs, stats });
 
-  // Poll stats via rAF when visible, log summary every ~1s
+  // Poll stats via rAF when visible, log summary every ~1s during profiling
   useEffect(() => {
     if (!visible) return;
     let lastLogTime = 0;
@@ -34,15 +40,15 @@ export function DevStreamTuner() {
       if (c) {
         const s = c.getStats();
         setStats(s);
-        const now = performance.now();
-        if (now - lastLogTime >= 1000 && (s.bufferDepth > 0 || s.lagMs > 0)) {
-          console.log("[StreamTuner] stats:", {
-            bufferDepth: s.bufferDepth,
-            lagMs: s.lagMs,
-            lastDeltaTime: s.lastDeltaTime,
-            lastRenderTime: s.lastRenderTime,
-          });
-          lastLogTime = now;
+        if (s.profiling && s.profileStartTime > 0) {
+          const now = performance.now();
+          if (now - lastLogTime >= 1000) {
+            console.log("[StreamTuner] profiling:", {
+              bufferDepth: s.bufferDepth,
+              elapsed: (now - s.profileStartTime).toFixed(1) + "ms",
+            });
+            lastLogTime = now;
+          }
         }
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -83,8 +89,22 @@ export function DevStreamTuner() {
     }
   }, []);
 
+  const handleProfileToggle = useCallback(() => {
+    const c = getChunker();
+    if (!c) return;
+    if (profiling) {
+      const result = c.stopProfiling();
+      setProfileResult(result);
+      setProfiling(false);
+    } else {
+      c.startProfiling();
+      setProfileResult(null);
+      setProfiling(true);
+    }
+  }, [profiling]);
+
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
@@ -129,9 +149,37 @@ export function DevStreamTuner() {
             />
           </label>
 
-          <div className="space-y-0.5 text-zinc-400 font-mono">
+          <div className="space-y-0.5 text-zinc-400 font-mono mb-2">
             <div>Buffer: {stats.bufferDepth} chars</div>
-            <div>Lag: {stats.lagMs.toFixed(1)}ms</div>
+          </div>
+
+          {/* Profiler */}
+          <div className="border-t border-zinc-700 pt-2 mt-2">
+            <button
+              type="button"
+              onClick={handleProfileToggle}
+              className={`px-2 py-1 rounded text-xs font-medium w-full ${
+                profiling
+                  ? "bg-red-600/80 text-white hover:bg-red-600"
+                  : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+              }`}
+            >
+              {profiling ? "Stop Profile" : "Start Profile"}
+            </button>
+
+            {profiling && stats.profileStartTime > 0 && (
+              <div className="mt-1.5 text-zinc-500 font-mono">
+                Recording...
+              </div>
+            )}
+
+            {!profiling && profileResult && (
+              <div className="mt-1.5 space-y-0.5 text-zinc-400 font-mono">
+                <div>WS span: {profileResult.wsSpan.toFixed(1)}ms</div>
+                <div>Render span: {profileResult.renderSpan.toFixed(1)}ms</div>
+                <div>Total lag: {profileResult.totalLag.toFixed(1)}ms</div>
+              </div>
+            )}
           </div>
         </div>
       )}
