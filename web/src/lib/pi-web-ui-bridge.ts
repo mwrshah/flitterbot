@@ -148,24 +148,6 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 }
 
 /**
- * Derive the set of toolUseIds that have started but not yet ended.
- */
-const EMPTY_PENDING_SET = new Set<string>();
-
-export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<string> {
-  const started = new Set<string>();
-  const ended = new Set<string>();
-  for (const item of timeline) {
-    if (item.kind === "tool" && item.toolUseId) {
-      if (item.phase === "start") started.add(item.toolUseId);
-      else ended.add(item.toolUseId);
-    }
-  }
-  for (const id of ended) started.delete(id);
-  return started.size === 0 ? EMPTY_PENDING_SET : started;
-}
-
-/**
  * Build a streaming AssistantMessage from partial text for the
  * <assistant-message> web component.
  */

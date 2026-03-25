@@ -831,7 +831,6 @@ export class AssistantMessage extends LitElement {
   @property({ type: Boolean }) hideToolCalls = false;
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
-  @property({ type: Boolean }) hidePendingToolCalls = false;
   @property({ attribute: false }) onCostClick?: () => void;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -859,9 +858,6 @@ export class AssistantMessage extends LitElement {
         const tool = this.tools?.find((candidate) => candidate.name === chunk.name);
         const pending = this.pendingToolCalls?.has(chunk.id) ?? false;
         const result = this.toolResultsById?.get(chunk.id);
-        if (this.hidePendingToolCalls && pending && !result) {
-          continue;
-        }
         const aborted = this.message.stopReason === "aborted" && !result;
         orderedParts.push(html`
           <tool-message
@@ -916,6 +912,8 @@ export class MessageList extends LitElement {
   @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
 
+  private _streamingEl: (HTMLElement & Record<string, unknown>) | null = null;
+
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -923,6 +921,26 @@ export class MessageList extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+  }
+
+  /** Imperatively create/update the streaming assistant-message element. */
+  updateStreaming(message: AssistantMessageType): void {
+    if (!this._streamingEl) {
+      this._streamingEl = document.createElement("assistant-message") as HTMLElement & Record<string, unknown>;
+      this.appendChild(this._streamingEl);
+    }
+    this._streamingEl.message = message;
+    this._streamingEl.isStreaming = true;
+    (this._streamingEl as HTMLElement).style.display = "block";
+  }
+
+  /** Hide the streaming element with a smooth rAF-batched clear. */
+  clearStreaming(): void {
+    const el = this._streamingEl;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      (el as HTMLElement).style.display = "none";
+    });
   }
 
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
@@ -968,7 +986,6 @@ export class MessageList extends LitElement {
               .pendingToolCalls=${this.pendingToolCalls}
               .toolResultsById=${resultByCallId}
               .hideToolCalls=${false}
-              .hidePendingToolCalls=${this.isStreaming}
               .onCostClick=${this.onCostClick}
             ></assistant-message>
           `,
