@@ -23,12 +23,26 @@ export function DevStreamTuner() {
   const rafRef = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Poll stats via rAF when visible
+  // Poll stats via rAF when visible, log summary every ~1s
   useEffect(() => {
     if (!visible) return;
+    let lastLogTime = 0;
     const tick = () => {
       const c = getChunker();
-      if (c) setStats(c.getStats());
+      if (c) {
+        const s = c.getStats();
+        setStats(s);
+        const now = performance.now();
+        if (now - lastLogTime >= 1000 && (s.bufferDepth > 0 || s.lagMs > 0)) {
+          console.log("[StreamTuner] stats:", {
+            bufferDepth: s.bufferDepth,
+            lagMs: s.lagMs,
+            lastDeltaTime: s.lastDeltaTime,
+            lastRenderTime: s.lastRenderTime,
+          });
+          lastLogTime = now;
+        }
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -50,13 +64,21 @@ export function DevStreamTuner() {
   const handleChunkSize = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setChunkSize(v);
-    getChunker()?.setChunkSize(v);
+    const c = getChunker();
+    if (c) {
+      c.setChunkSize(v);
+      console.log("[StreamTuner] chunkSize changed:", v);
+    }
   }, []);
 
   const handleInterval = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setIntervalMs(v);
-    getChunker()?.setInterval(v);
+    const c = getChunker();
+    if (c) {
+      c.setInterval(v);
+      console.log("[StreamTuner] interval changed:", v, "ms");
+    }
   }, []);
 
   return (

@@ -20,6 +20,8 @@ export class StreamChunker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastDeltaTime = 0;
   private lastRenderTime = 0;
+  private oldestBufferedPushTime = 0;
+  private lagMs = 0;
 
   constructor({ onChunk, chunkSize = 4, intervalMs = 32 }: StreamChunkerOptions) {
     this.onChunk = onChunk;
@@ -29,6 +31,9 @@ export class StreamChunker {
   }
 
   push(delta: string): void {
+    if (this.buffer.length === 0) {
+      this.oldestBufferedPushTime = performance.now();
+    }
     this.buffer += delta;
     this.lastDeltaTime = performance.now();
   }
@@ -38,7 +43,12 @@ export class StreamChunker {
       this.fullText += this.buffer;
       this.buffer = "";
       this.onChunk(this.fullText);
-      this.lastRenderTime = performance.now();
+      const now = performance.now();
+      this.lastRenderTime = now;
+      if (this.oldestBufferedPushTime > 0) {
+        this.lagMs = now - this.oldestBufferedPushTime;
+        this.oldestBufferedPushTime = 0;
+      }
     }
   }
 
@@ -58,9 +68,7 @@ export class StreamChunker {
       bufferDepth: this.buffer.length,
       lastDeltaTime: this.lastDeltaTime,
       lastRenderTime: this.lastRenderTime,
-      lagMs: this.lastDeltaTime > 0 && this.lastRenderTime > 0
-        ? Math.max(0, this.lastDeltaTime - this.lastRenderTime)
-        : 0,
+      lagMs: this.lagMs,
     };
   }
 
@@ -82,6 +90,8 @@ export class StreamChunker {
   private drain(): void {
     if (this.buffer.length === 0) return;
 
+    const pushTime = this.oldestBufferedPushTime;
+
     // Adaptive: larger chunks when buffer is deep
     const adaptive = this.buffer.length > this.chunkSize * 3
       ? Math.min(this.buffer.length, this.chunkSize * 2)
@@ -91,6 +101,15 @@ export class StreamChunker {
     this.buffer = this.buffer.slice(adaptive);
     this.fullText += slice;
     this.onChunk(this.fullText);
-    this.lastRenderTime = performance.now();
+
+    const now = performance.now();
+    this.lastRenderTime = now;
+    if (pushTime > 0) {
+      this.lagMs = now - pushTime;
+    }
+    // If buffer is fully drained, reset the push timestamp
+    if (this.buffer.length === 0) {
+      this.oldestBufferedPushTime = 0;
+    }
   }
 }
