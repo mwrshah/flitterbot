@@ -937,7 +937,7 @@ export class MessageList extends LitElement {
     }
 
     const items: Array<{ key: string; template: TemplateResult }> = [];
-    let index = 0;
+    let fallbackIndex = 0;
 
     for (const msg of this.messages) {
       const role = (msg as unknown as { role: string }).role;
@@ -945,18 +945,21 @@ export class MessageList extends LitElement {
         continue;
       }
 
+      const ts = (msg as unknown as { timestamp?: number }).timestamp;
+      const key = ts != null ? `${role}:${ts}` : `msg:${fallbackIndex}`;
+      fallbackIndex++;
+
       if (role === "user" || role === "user-with-attachments") {
         items.push({
-          key: `msg:${index}`,
+          key,
           template: html`<user-message .message=${msg}></user-message>`,
         });
-        index++;
         continue;
       }
 
       if (role === "assistant") {
         items.push({
-          key: `msg:${index}`,
+          key,
           template: html`
             <assistant-message
               .message=${msg as AssistantMessageType}
@@ -970,7 +973,6 @@ export class MessageList extends LitElement {
             ></assistant-message>
           `,
         });
-        index++;
       }
     }
 

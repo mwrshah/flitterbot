@@ -117,7 +117,8 @@ export function usePiWsHandler(
           return;
         }
 
-        store.clearStreamingState(sessionId);
+        // Add completed message to timeline BEFORE clearing streaming state,
+        // so the historical message renders before the streaming element hides.
         store.updateSession(sessionId, (s) => {
           if (content.trim()) {
             if (s.appendedItems.some((item) => item.id === message.messageId)) return s;
@@ -139,6 +140,7 @@ export function usePiWsHandler(
           }
           return s;
         });
+        store.clearStreamingState(sessionId);
         return;
       }
 

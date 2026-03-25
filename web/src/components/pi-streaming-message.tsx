@@ -42,20 +42,15 @@ export const PiStreamingMessage = forwardRef<PiStreamingMessageHandle>(
       };
     }, []);
 
-    // Create the web component element once ready
-    useEffect(() => {
-      if (!ready || !containerRef.current || elementRef.current) return;
-      const el = document.createElement("assistant-message");
-      el.style.display = "none";
-      containerRef.current.appendChild(el);
-      elementRef.current = el;
-      console.log("[PiStreamingMessage] created <assistant-message>");
-    }, [ready]);
-
     useImperativeHandle(ref, () => ({
       update(message: AssistantMessage) {
-        const el = elementRef.current as (HTMLElement & Record<string, unknown>) | null;
-        if (!el) return;
+        if (!ready || !containerRef.current) return;
+        let el = elementRef.current as (HTMLElement & Record<string, unknown>) | null;
+        if (!el) {
+          el = document.createElement("assistant-message") as HTMLElement & Record<string, unknown>;
+          containerRef.current.appendChild(el);
+          elementRef.current = el;
+        }
         el.message = message;
         el.isStreaming = true;
         el.hideToolCalls = false;

@@ -5,9 +5,12 @@
  * need property (not attribute) assignment for complex types like arrays.
  */
 
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import { memo, useEffect, useRef, useState } from "react";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
+
+const EMPTY_TOOLS: AgentTool[] = [];
+const EMPTY_PENDING = new Set<string>();
 
 export const PiMessageList = memo(function PiMessageList({
   messages,
@@ -58,8 +61,8 @@ export const PiMessageList = memo(function PiMessageList({
 
     const el = elementRef.current as HTMLElement & Record<string, unknown>;
     el.messages = messages;
-    el.tools = [];
-    el.pendingToolCalls = pendingToolCalls ?? new Set<string>();
+    el.tools = EMPTY_TOOLS;
+    el.pendingToolCalls = pendingToolCalls ?? EMPTY_PENDING;
     el.isStreaming = isStreaming;
   }, [ready, messages, isStreaming, pendingToolCalls]);
 
