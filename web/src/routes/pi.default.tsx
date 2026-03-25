@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import { piHistoryQueryOptions, statusQueryOptions } from "~/lib/queries";
@@ -67,13 +67,19 @@ function PiDefaultRoute() {
   }, [defaultSessionId]);
 
   // Filter accum to surfaced content only — no tools, no intermediate assistant messages
-  const surfacedAccumItems = filterSurfacedItems(accum.appendedItems);
+  const surfacedAccumItems = useMemo(
+    () => filterSurfacedItems(accum.appendedItems),
+    [accum.appendedItems],
+  );
+  const timeline = useMemo(
+    () => mergeTimelines(history, surfacedAccumItems),
+    [history, surfacedAccumItems],
+  );
 
   return (
     <ChatPanel
-      timeline={mergeTimelines(history, surfacedAccumItems)}
-      streamingText={accum.streamingText}
-      streamingMessageId={accum.streamingMessageId}
+      timeline={timeline}
+      sessionId={defaultSessionId}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}
       onSendMessage={(text, deliveryMode, images) =>

@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
 import type { ChatTimelineItem } from "~/lib/types";
@@ -32,11 +33,15 @@ function PiSessionRoute() {
   const accum = piSessionStore.getSessionAccum(sessionId);
   const sendMessage = piSessionStore.getSendMessage();
 
+  const timeline = useMemo(
+    () => mergeTimelines(history, accum.appendedItems),
+    [history, accum.appendedItems],
+  );
+
   return (
     <ChatPanel
-      timeline={mergeTimelines(history, accum.appendedItems)}
-      streamingText={accum.streamingText}
-      streamingMessageId={accum.streamingMessageId}
+      timeline={timeline}
+      sessionId={sessionId}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}
       onSendMessage={(text, deliveryMode, images) =>
