@@ -1,6 +1,7 @@
 /**
- * Dev-only floating overlay for tuning StreamChunker parameters in real time.
- * Reads the chunker instance from window.__streamChunker (set by chat-panel).
+ * Dev-only sidebar widget for tuning StreamChunker parameters in real time.
+ * Renders an inline icon button; when toggled, shows a popover panel anchored
+ * to the button. Keyboard shortcut: Ctrl+Shift+S.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StreamChunker, StreamChunkerStats } from "~/lib/stream-chunker";
@@ -20,6 +21,7 @@ export function DevStreamTuner() {
     lagMs: 0,
   });
   const rafRef = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Poll stats via rAF when visible
   useEffect(() => {
@@ -57,55 +59,58 @@ export function DevStreamTuner() {
     getChunker()?.setInterval(v);
   }, []);
 
-  if (!visible) {
-    return (
+  return (
+    <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setVisible(true)}
-        className="fixed bottom-3 right-3 z-50 bg-zinc-800 text-zinc-300 text-xs px-2 py-1 rounded opacity-40 hover:opacity-100"
+        onClick={() => setVisible((v) => !v)}
+        title="Stream Tuner (Ctrl+Shift+S)"
+        className="w-6 h-6 rounded-md flex items-center justify-center text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
       >
-        Stream Tuner
+        <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+          <path d="M1 3h4v2H1V3Zm6 0h8v2H7V3ZM1 7h8v2H1V7Zm10 0h4v2h-4V7ZM1 11h3v2H1v-2Zm5 0h9v2H6v-2Z" />
+        </svg>
       </button>
-    );
-  }
 
-  return (
-    <div className="fixed bottom-3 right-3 z-50 bg-zinc-900 border border-zinc-700 text-zinc-200 rounded-lg p-3 text-xs w-64 shadow-xl">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold">Stream Tuner</span>
-        <button type="button" onClick={() => setVisible(false)} className="text-zinc-500 hover:text-zinc-300">
-          x
-        </button>
-      </div>
+      {visible && (
+        <div className="absolute left-full top-0 ml-2 z-50 bg-zinc-900 border border-zinc-700 text-zinc-200 rounded-lg p-3 text-xs w-64 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold">Stream Tuner</span>
+            <button type="button" onClick={() => setVisible(false)} className="text-zinc-500 hover:text-zinc-300">
+              x
+            </button>
+          </div>
 
-      <label className="block mb-1">
-        Chunk size: {chunkSize}
-        <input
-          type="range"
-          min={1}
-          max={20}
-          value={chunkSize}
-          onChange={handleChunkSize}
-          className="w-full"
-        />
-      </label>
+          <label className="block mb-1">
+            Chunk size: {chunkSize}
+            <input
+              type="range"
+              min={1}
+              max={20}
+              value={chunkSize}
+              onChange={handleChunkSize}
+              className="w-full"
+            />
+          </label>
 
-      <label className="block mb-2">
-        Interval: {intervalMs}ms
-        <input
-          type="range"
-          min={10}
-          max={100}
-          value={intervalMs}
-          onChange={handleInterval}
-          className="w-full"
-        />
-      </label>
+          <label className="block mb-2">
+            Interval: {intervalMs}ms
+            <input
+              type="range"
+              min={10}
+              max={100}
+              value={intervalMs}
+              onChange={handleInterval}
+              className="w-full"
+            />
+          </label>
 
-      <div className="space-y-0.5 text-zinc-400 font-mono">
-        <div>Buffer: {stats.bufferDepth} chars</div>
-        <div>Lag: {stats.lagMs.toFixed(1)}ms</div>
-      </div>
+          <div className="space-y-0.5 text-zinc-400 font-mono">
+            <div>Buffer: {stats.bufferDepth} chars</div>
+            <div>Lag: {stats.lagMs.toFixed(1)}ms</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

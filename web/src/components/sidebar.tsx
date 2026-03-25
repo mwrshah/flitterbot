@@ -120,6 +120,11 @@ export function Sidebar({
             <span className="text-xs font-bold text-sidebar-primary-foreground">A</span>
           </div>
           <span className="text-sm font-semibold text-sidebar-foreground">Autonoma</span>
+          {DevStreamTuner && (
+            <Suspense fallback={null}>
+              <DevStreamTuner />
+            </Suspense>
+          )}
         </div>
       </div>
 
@@ -209,13 +214,6 @@ export function Sidebar({
 
       {/* Spacer */}
       {allWorkstreams.length === 0 && <div className="flex-1" />}
-
-      {/* Dev stream tuner */}
-      {DevStreamTuner && (
-        <Suspense fallback={null}>
-          <DevStreamTuner />
-        </Suspense>
-      )}
 
       {/* Settings trigger */}
       <div className="shrink-0 px-3 py-3 border-t border-sidebar-border">
