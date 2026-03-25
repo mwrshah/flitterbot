@@ -45,10 +45,8 @@ export class StreamChunker {
       this.onChunk(this.fullText);
       const now = performance.now();
       this.lastRenderTime = now;
-      if (this.oldestBufferedPushTime > 0) {
-        this.lagMs = now - this.oldestBufferedPushTime;
-        this.oldestBufferedPushTime = 0;
-      }
+      this.oldestBufferedPushTime = 0;
+      this.lagMs = 0;
     }
   }
 
@@ -56,7 +54,7 @@ export class StreamChunker {
     this.chunkSize = n;
   }
 
-  setInterval(ms: number): void {
+  setIntervalMs(ms: number): void {
     this.intervalMs = ms;
     // Restart loop with new interval
     this.stopLoop();
@@ -107,9 +105,10 @@ export class StreamChunker {
     if (pushTime > 0) {
       this.lagMs = now - pushTime;
     }
-    // If buffer is fully drained, reset the push timestamp
+    // If buffer is fully drained, reset tracking state
     if (this.buffer.length === 0) {
       this.oldestBufferedPushTime = 0;
+      this.lagMs = 0;
     }
   }
 }
