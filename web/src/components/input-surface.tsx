@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
@@ -79,8 +79,12 @@ function formatTime(iso: string): string {
   }
 }
 
+/** Cache of previous entries keyed by id, used for structural sharing */
+let prevEntriesById = new Map<string, SurfaceEntry>();
+
 function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] {
   const entries: SurfaceEntry[] = [];
+  const nextCache = new Map<string, SurfaceEntry>();
 
   for (const item of timeline) {
     const msg = item.kind === "message" ? (item as ChatTimelineMessage) : undefined;
@@ -88,44 +92,46 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
       continue;
     }
 
+    let entry: SurfaceEntry | undefined;
+
     if (item.kind === "message" && item.role === "user") {
       const source = msg!.source;
       if (source !== "web" && source !== "whatsapp") {
         continue;
       }
-      entries.push({
+      entry = {
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
         source,
         content: msg!.content,
         workstreamName: item.workstreamName,
-      });
-      continue;
-    }
-
-    if (item.kind === "message" && item.role === "assistant") {
-      // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
-      // Intermediate pre-tool-call fragments have a different source or no source.
+      };
+    } else if (item.kind === "message" && item.role === "assistant") {
       if (msg!.source !== "pi_outbound") {
         continue;
       }
-      entries.push({
+      entry = {
         id: item.id,
         timestamp: item.createdAt,
         kind: "pi-response",
         content: item.content,
         workstreamName: item.workstreamName,
-      });
-      continue;
+      };
     }
 
-    if (item.kind === "tool") {
-      // Skip all tool calls — only user messages and pi responses shown
-      // (mirrors WhatsApp: user message in, pi final text response out)
+    if (entry) {
+      // Structural sharing: reuse previous object if content hasn't changed
+      const prev = prevEntriesById.get(entry.id);
+      if (prev && prev.content === entry.content && prev.timestamp === entry.timestamp) {
+        entry = prev;
+      }
+      nextCache.set(entry.id, entry);
+      entries.push(entry);
     }
   }
 
+  prevEntriesById = nextCache;
   return entries;
 }
 
@@ -133,7 +139,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 
 const MAX_LINES = 30;
 
-function CollapsibleContent({
+const CollapsibleContent = memo(function CollapsibleContent({
   children,
   fadeClassName = "from-card",
 }: {
@@ -181,7 +187,7 @@ function CollapsibleContent({
       )}
     </div>
   );
-}
+});
 
 /* ── Entry Renderers ── */
 
@@ -276,7 +282,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
   return <div ref={containerRef} />;
 }
 
-function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
+const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
   useWhyDidYouRender("PiResponseEntry", { entry });
   return (
     <div className="flex gap-3 items-start">
@@ -299,7 +305,7 @@ function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response
       </div>
     </div>
   );
-}
+});
 
 function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
   useWhyDidYouRender("HookEntry", { entry });
@@ -322,7 +328,7 @@ function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
   );
 }
 
-function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
+const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
   useWhyDidYouRender("SurfaceEntryRenderer", { entry });
   switch (entry.kind) {
     case "inbound":
@@ -334,7 +340,7 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
     case "hook":
       return <HookEntry entry={entry} />;
   }
-}
+});
 
 /* ── Main Component ── */
 
