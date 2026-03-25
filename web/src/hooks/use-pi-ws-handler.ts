@@ -131,6 +131,7 @@ export function usePiWsHandler(
                   kind: "message",
                   role: "assistant",
                   content,
+                  blocks: message.blocks,
                   source: (message.source as MessageSource) ?? undefined,
                   workstreamName: message.workstreamName,
                   createdAt: message.timestamp ?? new Date().toISOString(),

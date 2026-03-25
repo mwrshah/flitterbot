@@ -54,6 +54,22 @@ function extractMessageText(message: AgentMessage): string | undefined {
   return undefined;
 }
 
+function extractMessageBlocks(
+  message: AgentMessage,
+): Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> | undefined {
+  if (message.role !== "assistant") return undefined;
+
+  const blocks: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> = [];
+  for (const block of message.content) {
+    if (block.type === "text" && block.text.trim()) {
+      blocks.push({ type: "text", text: block.text });
+    } else if (block.type === "thinking" && (block as { thinking?: string }).thinking?.trim()) {
+      blocks.push({ type: "thinking", thinking: (block as { thinking: string }).thinking });
+    }
+  }
+  return blocks.length > 0 ? blocks : undefined;
+}
+
 function extractMessageId(message: AgentMessage): string | undefined {
   // responseId is the Anthropic API response identifier, available on AssistantMessage since SDK 0.60
   if (message.role === "assistant" && message.responseId?.trim()) {
@@ -154,6 +170,7 @@ export function subscribeToPiSession(
           timestamp: extractTimestamp(event.message, now),
           workstreamId: currentItem?.workstreamId,
           workstreamName: currentItem?.workstreamName,
+          blocks: extractMessageBlocks(event.message),
         };
 
         if (role === "assistant") {

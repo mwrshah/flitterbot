@@ -223,6 +223,7 @@ export type WsMessage =
       intermediate?: boolean;
       workstreamId?: string;
       workstreamName?: string;
+      blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";

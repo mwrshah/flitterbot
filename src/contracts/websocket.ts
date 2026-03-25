@@ -88,6 +88,7 @@ export interface MessageEndWebSocketEvent {
   intermediate?: boolean;
   workstreamId?: string;
   workstreamName?: string;
+  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
