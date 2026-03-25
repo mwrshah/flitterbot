@@ -18,11 +18,11 @@ export type PiStreamingMessageHandle = {
 
 export const PiStreamingMessage = forwardRef<PiStreamingMessageHandle>(
   function PiStreamingMessage(_props, ref) {
-    useWhyDidYouRender("PiStreamingMessage", {});
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<HTMLElement | null>(null);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
+    useWhyDidYouRender("PiStreamingMessage", { ready, error });
 
     useEffect(() => {
       let cancelled = false;

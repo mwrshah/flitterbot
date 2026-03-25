@@ -1,9 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { memo, useMemo } from "react";
 import { Badge } from "~/components/ui/badge";
 import { statusQueryOptions } from "~/lib/queries";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
+
+type Orchestrator = { sessionId: string; workstreamId: string; workstreamName?: string; busy?: boolean };
+type Workstream = { id: string; status: string };
+
+const EMPTY_ORCHESTRATORS: Orchestrator[] = [];
+const EMPTY_WORKSTREAMS: Workstream[] = [];
 
 export const Route = createFileRoute("/pi")({
   head: () => ({
@@ -23,7 +30,6 @@ export const Route = createFileRoute("/pi")({
 /* ── Layout component ── */
 
 function PiLayoutRoute() {
-  useWhyDidYouRender("PiLayoutRoute", {});
   const { apiClient } = Route.useRouteContext();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -34,48 +40,49 @@ function PiLayoutRoute() {
     retry: 1,
   });
 
-  const allOrchestrators = statusQuery.data?.pi?.orchestrators ?? [];
+  const allOrchestrators = statusQuery.data?.pi?.orchestrators ?? EMPTY_ORCHESTRATORS;
   const defaultPi = statusQuery.data?.pi?.default;
-  const workstreams = statusQuery.data?.workstreams ?? [];
+  const workstreams = statusQuery.data?.workstreams ?? EMPTY_WORKSTREAMS;
 
   useWhyDidYouRender("PiLayoutRoute", { apiClient, pathname, allOrchestrators, defaultPi, workstreams });
 
-  // Build set of open workstream IDs
-  const openWsIds = new Set(workstreams.filter((w) => w.status === "open").map((w) => w.id));
-
-  // Persistent tabs: only orchestrators with open workstreams
-  const openOrchestrators = allOrchestrators.filter((o) => openWsIds.has(o.workstreamId));
-
-  // Ephemeral tab: if current URL points to a closed workstream's orchestrator, include it
+  // Memoize orchestrators filtering — only recompute when inputs change
   const currentSessionId = pathname.startsWith("/pi/") ? pathname.split("/")[2] : null;
-  const ephemeralOrchestrator =
-    currentSessionId && currentSessionId !== "default"
-      ? allOrchestrators.find(
-          (o) => o.sessionId === currentSessionId && !openWsIds.has(o.workstreamId),
-        )
-      : undefined;
 
-  const orchestrators = ephemeralOrchestrator
-    ? [...openOrchestrators, ephemeralOrchestrator]
-    : openOrchestrators;
+  const orchestrators = useMemo(() => {
+    const openWsIds = new Set(workstreams.filter((w) => w.status === "open").map((w) => w.id));
+    const openOrchestrators = allOrchestrators.filter((o) => openWsIds.has(o.workstreamId));
+
+    const ephemeralOrchestrator =
+      currentSessionId && currentSessionId !== "default"
+        ? allOrchestrators.find(
+            (o) => o.sessionId === currentSessionId && !openWsIds.has(o.workstreamId),
+          )
+        : undefined;
+
+    return ephemeralOrchestrator
+      ? [...openOrchestrators, ephemeralOrchestrator]
+      : openOrchestrators;
+  }, [allOrchestrators, workstreams, currentSessionId]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-4 py-2 border-b border-border shrink-0 overflow-x-auto">
-        <TabLink to="/pi/default" active={pathname === "/pi/default" || pathname === "/pi"}>
-          Default
-          {defaultPi?.busy && <Badge variant="success">active</Badge>}
-        </TabLink>
+        <TabLink
+          to="/pi/default"
+          active={pathname === "/pi/default" || pathname === "/pi"}
+          label="Default"
+          busy={defaultPi?.busy}
+        />
         {orchestrators.map((o) => (
           <TabLink
             key={o.sessionId}
             to={`/pi/${o.sessionId}`}
             active={pathname === `/pi/${o.sessionId}`}
-          >
-            {o.workstreamName ?? o.workstreamId}
-            {o.busy && <Badge variant="success">active</Badge>}
-          </TabLink>
+            label={o.workstreamName ?? o.workstreamId}
+            busy={o.busy}
+          />
         ))}
       </div>
 
@@ -89,16 +96,18 @@ function PiLayoutRoute() {
 
 /* ── Tab link component ── */
 
-function TabLink({
+const TabLink = memo(function TabLink({
   to,
   active,
-  children,
+  label,
+  busy,
 }: {
   to: string;
   active: boolean;
-  children: React.ReactNode;
+  label: string;
+  busy?: boolean;
 }) {
-  useWhyDidYouRender("TabLink", { to, active, children });
+  useWhyDidYouRender("TabLink", { to, active, label, busy });
   return (
     <Link
       to={to}
@@ -109,7 +118,8 @@ function TabLink({
           : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
       )}
     >
-      {children}
+      {label}
+      {busy && <Badge variant="success">active</Badge>}
     </Link>
   );
-}
+});

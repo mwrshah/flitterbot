@@ -150,6 +150,8 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 /**
  * Derive the set of toolUseIds that have started but not yet ended.
  */
+const EMPTY_PENDING_SET = new Set<string>();
+
 export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<string> {
   const started = new Set<string>();
   const ended = new Set<string>();
@@ -160,7 +162,7 @@ export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<
     }
   }
   for (const id of ended) started.delete(id);
-  return started;
+  return started.size === 0 ? EMPTY_PENDING_SET : started;
 }
 
 /**

@@ -29,7 +29,6 @@ function MetaItem({ label, value, mono }: { label: string; value: string; mono?:
 }
 
 function RuntimePage() {
-  useWhyDidYouRender("RuntimePage", {});
   const { apiClient } = Route.useRouteContext();
 
   const statusQuery = useQuery({

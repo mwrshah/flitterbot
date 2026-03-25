@@ -1,11 +1,14 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ChatPanel } from "~/components/chat-panel";
-import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
-import type { ChatTimelineItem } from "~/lib/types";
+import { piSessionStore, useSessionAccum, useConnectionState } from "~/lib/pi-session-store";
+import type { ChatTimelineItem, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { mergeTimelines } from "~/lib/utils";
+
 import { fetchPiHistory } from "~/server/pi";
+
+const EMPTY_HISTORY: ChatTimelineItem[] = [];
 
 export const Route = createFileRoute("/pi/$sessionId")({
   loader: async ({ params }) => {
@@ -29,9 +32,9 @@ export const Route = createFileRoute("/pi/$sessionId")({
 
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
-  const history = Route.useLoaderData()?.history ?? [];
-  const snapshot = usePiSessionStore();
-  const accum = piSessionStore.getSessionAccum(sessionId);
+  const history = Route.useLoaderData()?.history ?? EMPTY_HISTORY;
+  const accum = useSessionAccum(sessionId);
+  const connectionState = useConnectionState();
   const sendMessage = piSessionStore.getSendMessage();
 
   const timeline = useMemo(
@@ -39,17 +42,21 @@ function PiSessionRoute() {
     [history, accum.appendedItems],
   );
 
-  useWhyDidYouRender("PiSessionRoute", { sessionId, history, snapshot, accum, sendMessage, timeline });
+  const handleSendMessage = useCallback(
+    (text: string, deliveryMode: DeliveryMode, images?: ImageAttachment[]) =>
+      sendMessage(text, deliveryMode, images, sessionId),
+    [sendMessage, sessionId],
+  );
+
+  useWhyDidYouRender("PiSessionRoute", { sessionId, history, connectionState, accum, sendMessage, timeline });
 
   return (
     <ChatPanel
       timeline={timeline}
       sessionId={sessionId}
       statusPills={accum.statusPills}
-      connectionState={snapshot.connectionState}
-      onSendMessage={(text, deliveryMode, images) =>
-        sendMessage(text, deliveryMode, images, sessionId)
-      }
+      connectionState={connectionState}
+      onSendMessage={handleSendMessage}
     />
   );
 }

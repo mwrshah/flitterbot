@@ -10,7 +10,6 @@ export const Route = createFileRoute("/sessions/$sessionId")({
 });
 
 function SessionDetailPage() {
-  useWhyDidYouRender("SessionDetailPage", {});
   const { sessionId } = Route.useParams();
   const { apiClient } = Route.useRouteContext();
 

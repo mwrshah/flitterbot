@@ -5,7 +5,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import { useAllAppendedItems, useConnectionState } from "~/lib/pi-session-store";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import type {
   ChatTimelineItem,
@@ -359,9 +359,8 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   });
 
   // Read appended items from the shared store (populated by usePiWsHandler in root)
-  const storeSnapshot = usePiSessionStore();
-  const appendedItems = useMemo(() => piSessionStore.getAllAppendedItems(), [storeSnapshot]);
-  const connectionState = storeSnapshot.connectionState;
+  const appendedItems = useAllAppendedItems();
+  const connectionState = useConnectionState();
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 

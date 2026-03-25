@@ -80,12 +80,23 @@ export function createPiSessionStore(): PiSessionStore {
   let sessions = new Map<string, SessionAccum>();
   let connectionState: ConnectionState = "disconnected";
   let sendMessageFn: PiSessionStore["getSendMessage"] = () => async () => {};
-  let cachedSendMessage: ReturnType<PiSessionStore["getSendMessage"]> | null = null;
+  /** Stable wrapper — identity never changes, delegates to current sendMessageFn */
+  const stableSendMessage: ReturnType<PiSessionStore["getSendMessage"]> = (
+    text, deliveryMode, images, targetSessionId,
+  ) => {
+    const fn = sendMessageFn();
+    return fn(text, deliveryMode, images, targetSessionId);
+  };
   const listeners = new Set<() => void>();
-  let snapshot: PiSessionSnapshot = { sessions, connectionState };
+  /** Frozen sessions snapshot — only replaced when sessions actually change */
+  let sessionsSnapshot: Map<string, SessionAccum> = new Map(sessions);
+  let snapshot: PiSessionSnapshot = { sessions: sessionsSnapshot, connectionState };
 
-  function notify() {
-    snapshot = { sessions: new Map(sessions), connectionState };
+  function notify({ sessionsChanged = false } = {}) {
+    if (sessionsChanged) {
+      sessionsSnapshot = new Map(sessions);
+    }
+    snapshot = { sessions: sessionsSnapshot, connectionState };
     for (const fn of listeners) fn();
   }
 
@@ -97,7 +108,7 @@ export function createPiSessionStore(): PiSessionStore {
     const current = sessions.get(sessionId) ?? emptyAccum();
     sessions = new Map(sessions);
     sessions.set(sessionId, updater(current));
-    notify();
+    notify({ sessionsChanged: true });
   }
 
   function addPill(sessionId: string, pill: StatusPill) {
@@ -126,7 +137,7 @@ export function createPiSessionStore(): PiSessionStore {
     if (sessions.has(sessionId)) {
       sessions = new Map(sessions);
       sessions.delete(sessionId);
-      notify();
+      notify({ sessionsChanged: true });
     }
   }
 
@@ -137,13 +148,9 @@ export function createPiSessionStore(): PiSessionStore {
     addPill,
     removePill,
     getAllAppendedItems,
-    getSendMessage: () => {
-      if (!cachedSendMessage) cachedSendMessage = sendMessageFn();
-      return cachedSendMessage;
-    },
+    getSendMessage: () => stableSendMessage,
     setSendMessage: (fn) => {
       sendMessageFn = fn;
-      cachedSendMessage = null;
     },
     getConnectionState: () => connectionState,
     setConnectionState: (state) => {
@@ -254,10 +261,50 @@ export function resetPiSessionStore() {
   piSessionStore = createPiSessionStore();
 }
 
-export function usePiSessionStore(): PiSessionSnapshot {
+/**
+ * Subscribe to a single session's accum. Only re-renders when that session's
+ * accum object identity changes (other sessions' updates are ignored).
+ */
+export function useSessionAccum(sessionId: string): SessionAccum {
   return useSyncExternalStore(
     piSessionStore.subscribe,
-    piSessionStore.getSnapshot,
-    piSessionStore.getSnapshot,
+    () => piSessionStore.getSessionAccum(sessionId),
+    () => piSessionStore.getSessionAccum(sessionId),
   );
+}
+
+/**
+ * Subscribe to connectionState only. String primitive — equality is free.
+ */
+export function useConnectionState(): ConnectionState {
+  return useSyncExternalStore(
+    piSessionStore.subscribe,
+    () => piSessionStore.getConnectionState(),
+    () => piSessionStore.getConnectionState(),
+  );
+}
+
+/**
+ * Subscribe to the full sessions map. Re-renders on ANY session mutation.
+ * Use sparingly — prefer useSessionAccum for single-session consumers.
+ */
+export function usePiSessions(): Map<string, SessionAccum> {
+  return useSyncExternalStore(
+    piSessionStore.subscribe,
+    () => piSessionStore.getSnapshot().sessions,
+    () => piSessionStore.getSnapshot().sessions,
+  );
+}
+
+/**
+ * Returns all appended items across all sessions, sorted by createdAt.
+ * Re-renders on any session mutation (uses full snapshot).
+ */
+export function useAllAppendedItems(): import("./types").ChatTimelineItem[] {
+  const sessions = usePiSessions();
+  const items: import("./types").ChatTimelineItem[] = [];
+  for (const accum of sessions.values()) {
+    items.push(...accum.appendedItems);
+  }
+  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
