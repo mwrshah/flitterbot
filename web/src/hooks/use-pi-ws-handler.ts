@@ -90,6 +90,11 @@ export function usePiWsHandler(
         return;
       }
 
+      if (message.type === "thinking_delta") {
+        store.appendStreamingThinkingDelta(sessionId, message.messageId, message.delta);
+        return;
+      }
+
       if (message.type === "message_end") {
         const content = message.content || "";
 
@@ -142,6 +147,7 @@ export function usePiWsHandler(
           return s;
         });
         store.clearStreamingState(sessionId);
+        store.clearStreamingThinkingState(sessionId);
         return;
       }
 
@@ -213,6 +219,7 @@ export function usePiWsHandler(
 
       if (message.type === "turn_end") {
         store.clearStreamingState(sessionId);
+        store.clearStreamingThinkingState(sessionId);
         store.updateSession(sessionId, (s) => ({
           ...s,
           appendedItems: [

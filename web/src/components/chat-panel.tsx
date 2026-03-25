@@ -100,9 +100,16 @@ export function ChatPanel({
   useEffect(() => {
     if (!sessionId) return;
 
+    // Shared mutable state across text + thinking callbacks
+    let currentThinking: string | null = null;
+    let currentChunkedText: string = "";
+
     const chunker = new StreamChunker({
       onChunk: (fullText) => {
-        streamingRef.current?.update(buildStreamingAssistantMessage(fullText));
+        currentChunkedText = fullText;
+        streamingRef.current?.update(
+          buildStreamingAssistantMessage(fullText, currentThinking ?? undefined),
+        );
       },
     });
 
@@ -115,6 +122,7 @@ export function ChatPanel({
         streamingRef.current?.clear();
         streaming = false;
         seenLen = 0;
+        currentChunkedText = "";
         setIsStreaming(false);
         return;
       }
@@ -129,6 +137,22 @@ export function ChatPanel({
       }
     });
 
+    piSessionStore.onStreamingThinkingDelta(sessionId, (thinking, _messageId) => {
+      if (thinking === null) {
+        currentThinking = null;
+        return;
+      }
+      currentThinking = thinking;
+      // Update streaming message immediately so thinking renders even before text starts
+      if (!streaming) {
+        streaming = true;
+        setIsStreaming(true);
+      }
+      streamingRef.current?.update(
+        buildStreamingAssistantMessage(currentChunkedText, currentThinking),
+      );
+    });
+
     // Expose chunker for dev tuning overlay
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).__streamChunker = chunker;
@@ -136,6 +160,7 @@ export function ChatPanel({
 
     return () => {
       piSessionStore.offStreamingDelta(sessionId);
+      piSessionStore.offStreamingThinkingDelta(sessionId);
       chunker.destroy();
       if (import.meta.env.DEV) {
         delete (window as unknown as Record<string, unknown>).__streamChunker;

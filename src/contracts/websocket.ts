@@ -74,6 +74,29 @@ export interface TextDeltaWebSocketEvent {
   delta: string;
 }
 
+export interface ThinkingDeltaWebSocketEvent {
+  type: "thinking_delta";
+  sessionId?: string;
+  messageId: string;
+  delta: string;
+}
+
+export interface ToolcallStartWebSocketEvent {
+  type: "toolcall_start";
+  sessionId?: string;
+  messageId: string;
+  contentIndex: number;
+  toolName?: string;
+}
+
+export interface ToolcallDeltaWebSocketEvent {
+  type: "toolcall_delta";
+  sessionId?: string;
+  messageId: string;
+  contentIndex: number;
+  delta: string;
+}
+
 export interface MessageEndWebSocketEvent {
   type: "message_end";
   sessionId?: string;
@@ -167,6 +190,9 @@ export type ControlSurfaceWebSocketServerEvent =
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
   | TextDeltaWebSocketEvent
+  | ThinkingDeltaWebSocketEvent
+  | ToolcallStartWebSocketEvent
+  | ToolcallDeltaWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionEndWebSocketEvent

@@ -166,10 +166,16 @@ export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<
  * Build a streaming AssistantMessage from partial text for the
  * <assistant-message> web component.
  */
-export function buildStreamingAssistantMessage(text: string): AssistantMessage {
+export function buildStreamingAssistantMessage(
+  text: string,
+  thinking?: string,
+): AssistantMessage {
+  const content: AssistantMessage["content"] = [];
+  if (thinking) content.push({ type: "thinking", thinking } as ThinkingContent);
+  if (text) content.push({ type: "text", text });
   return {
     role: "assistant",
-    content: [{ type: "text", text }],
+    content,
     stopReason: null,
     timestamp: Date.now(),
   } as unknown as AssistantMessage;

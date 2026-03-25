@@ -18,6 +18,12 @@ type StreamingCallback = (text: string | null, messageId: string | null) => void
 const activeStreams = new Map<string, StreamingState>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 
+type ThinkingStreamingState = { thinking: string; messageId: string };
+type ThinkingStreamingCallback = (thinking: string | null, messageId: string | null) => void;
+
+const activeThinkingStreams = new Map<string, ThinkingStreamingState>();
+const thinkingStreamingCallbacks = new Map<string, ThinkingStreamingCallback>();
+
 export type PiSessionStore = {
   getSessionAccum: (sessionId: string) => SessionAccum;
   updateSession: (sessionId: string, updater: (s: SessionAccum) => SessionAccum) => void;
@@ -42,6 +48,11 @@ export type PiSessionStore = {
   clearStreamingState: (sessionId: string) => void;
   onStreamingDelta: (sessionId: string, callback: StreamingCallback) => void;
   offStreamingDelta: (sessionId: string) => void;
+  appendStreamingThinkingDelta: (sessionId: string, messageId: string, delta: string) => void;
+  getStreamingThinkingState: (sessionId: string) => ThinkingStreamingState | null;
+  clearStreamingThinkingState: (sessionId: string) => void;
+  onStreamingThinkingDelta: (sessionId: string, callback: ThinkingStreamingCallback) => void;
+  offStreamingThinkingDelta: (sessionId: string) => void;
 };
 
 export type PiSessionSnapshot = {
@@ -150,6 +161,32 @@ export function createPiSessionStore(): PiSessionStore {
     },
     offStreamingDelta: (sessionId) => {
       streamingCallbacks.delete(sessionId);
+    },
+    appendStreamingThinkingDelta: (sessionId, messageId, delta) => {
+      const existing = activeThinkingStreams.get(sessionId);
+      if (existing) {
+        existing.thinking += delta;
+        existing.messageId = messageId;
+      } else {
+        activeThinkingStreams.set(sessionId, { thinking: delta, messageId });
+      }
+      const cb = thinkingStreamingCallbacks.get(sessionId);
+      if (cb) {
+        const state = activeThinkingStreams.get(sessionId)!;
+        cb(state.thinking, state.messageId);
+      }
+    },
+    getStreamingThinkingState: (sessionId) => activeThinkingStreams.get(sessionId) ?? null,
+    clearStreamingThinkingState: (sessionId) => {
+      activeThinkingStreams.delete(sessionId);
+      const cb = thinkingStreamingCallbacks.get(sessionId);
+      if (cb) cb(null, null);
+    },
+    onStreamingThinkingDelta: (sessionId, callback) => {
+      thinkingStreamingCallbacks.set(sessionId, callback);
+    },
+    offStreamingThinkingDelta: (sessionId) => {
+      thinkingStreamingCallbacks.delete(sessionId);
     },
   };
 }

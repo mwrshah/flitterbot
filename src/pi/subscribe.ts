@@ -115,16 +115,50 @@ export function subscribeToPiSession(
 
     switch (event.type) {
       case "message_update": {
-        if (event.assistantMessageEvent.type === "text_delta") {
-          // Pre-allocate server UUID for this streaming message if not already set
-          if (!streamingServerUuid) {
-            streamingServerUuid = crypto.randomUUID();
-          }
+        const subType = event.assistantMessageEvent.type;
+
+        // Allocate streaming UUID on first delta of any kind
+        if (
+          (subType === "text_delta" || subType === "thinking_delta" ||
+           subType === "toolcall_start" || subType === "toolcall_delta") &&
+          !streamingServerUuid
+        ) {
+          streamingServerUuid = crypto.randomUUID();
+        }
+
+        if (subType === "text_delta") {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
-            messageId: streamingServerUuid,
+            messageId: streamingServerUuid!,
             delta: event.assistantMessageEvent.delta,
+          });
+        } else if (subType === "thinking_delta") {
+          broadcast(wsHub, {
+            type: "thinking_delta",
+            sessionId: session.sessionId,
+            messageId: streamingServerUuid!,
+            delta: event.assistantMessageEvent.delta,
+          });
+        } else if (subType === "toolcall_start") {
+          const evt = event.assistantMessageEvent;
+          const block = evt.partial?.content?.[evt.contentIndex];
+          const toolName = block && "name" in block ? (block as { name?: string }).name : undefined;
+          broadcast(wsHub, {
+            type: "toolcall_start",
+            sessionId: session.sessionId,
+            messageId: streamingServerUuid!,
+            contentIndex: evt.contentIndex,
+            toolName,
+          });
+        } else if (subType === "toolcall_delta") {
+          const evt = event.assistantMessageEvent;
+          broadcast(wsHub, {
+            type: "toolcall_delta",
+            sessionId: session.sessionId,
+            messageId: streamingServerUuid!,
+            contentIndex: evt.contentIndex,
+            delta: evt.delta,
           });
         }
         break;
