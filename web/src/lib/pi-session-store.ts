@@ -12,6 +12,9 @@ export function emptyAccum(): SessionAccum {
   return { appendedItems: [], statusPills: [] };
 }
 
+/** Shared frozen sentinel so getSessionAccum returns a stable ref for missing sessions */
+const EMPTY_ACCUM: SessionAccum = Object.freeze({ appendedItems: [], statusPills: [] }) as SessionAccum;
+
 type StreamingState = { text: string; messageId: string };
 type StreamingCallback = (text: string | null, messageId: string | null) => void;
 
@@ -77,6 +80,7 @@ export function createPiSessionStore(): PiSessionStore {
   let sessions = new Map<string, SessionAccum>();
   let connectionState: ConnectionState = "disconnected";
   let sendMessageFn: PiSessionStore["getSendMessage"] = () => async () => {};
+  let cachedSendMessage: ReturnType<PiSessionStore["getSendMessage"]> | null = null;
   const listeners = new Set<() => void>();
   let snapshot: PiSessionSnapshot = { sessions, connectionState };
 
@@ -86,7 +90,7 @@ export function createPiSessionStore(): PiSessionStore {
   }
 
   function getSessionAccum(sessionId: string): SessionAccum {
-    return sessions.get(sessionId) ?? emptyAccum();
+    return sessions.get(sessionId) ?? EMPTY_ACCUM;
   }
 
   function updateSession(sessionId: string, updater: (s: SessionAccum) => SessionAccum) {
@@ -133,9 +137,13 @@ export function createPiSessionStore(): PiSessionStore {
     addPill,
     removePill,
     getAllAppendedItems,
-    getSendMessage: () => sendMessageFn(),
+    getSendMessage: () => {
+      if (!cachedSendMessage) cachedSendMessage = sendMessageFn();
+      return cachedSendMessage;
+    },
     setSendMessage: (fn) => {
       sendMessageFn = fn;
+      cachedSendMessage = null;
     },
     getConnectionState: () => connectionState,
     setConnectionState: (state) => {

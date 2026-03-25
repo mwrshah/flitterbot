@@ -54,10 +54,10 @@ export const MessageInput = memo(function MessageInput({
     [skills],
   );
 
-  function handleSkillSelect(name: string) {
+  const handleSkillSelect = useCallback((name: string) => {
     setDraft(`/${name} `);
     setPickerOpen(false);
-  }
+  }, []);
 
   function submit() {
     const text = draft.trim();
