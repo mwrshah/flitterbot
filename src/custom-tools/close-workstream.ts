@@ -49,6 +49,24 @@ function getConflictedFiles(repoPath: string): string[] {
   }
 }
 
+type CommitResult = { hasChanges: false } | { hasChanges: true; ok: true } | { hasChanges: true; ok: false; message: string };
+
+function commitUncommittedChanges(worktreePath: string): CommitResult {
+  const status = exec("git status --porcelain", worktreePath, 5_000);
+  if (!status) return { hasChanges: false };
+  try {
+    exec("git add -A", worktreePath);
+    exec(
+      'git commit -m "chore: auto-commit uncommitted changes before workstream close"',
+      worktreePath,
+    );
+    return { hasChanges: true, ok: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { hasChanges: true, ok: false, message: msg };
+  }
+}
+
 type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
 
 function mergeToMain(repoPath: string, branch: string): MergeResult {
@@ -165,6 +183,14 @@ export async function executeCloseWorkstream(
     branch = inferBranchFromWorktree(worktreePath);
 
     if (branch) {
+      const commitResult = commitUncommittedChanges(worktreePath);
+      if (commitResult.hasChanges && !commitResult.ok) {
+        return {
+          ok: false,
+          workstreamId,
+          message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
+        };
+      }
       const mergeResult = mergeToMain(repoPath, branch);
       if (mergeResult.ok === false) {
         // Return early — Pi resolves conflicts and calls again
