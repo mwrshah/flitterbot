@@ -826,7 +826,7 @@ export class ControlSurfaceRuntime {
         name: "create_workstream",
         label: "Create Workstream",
         description:
-          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. Optionally enqueue an initial message onto the new workstream.",
+          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. The user's original message is automatically captured and passed to the orchestrator verbatim.",
         parameters: {
           type: "object",
           properties: {
@@ -838,7 +838,7 @@ export class ControlSurfaceRuntime {
             message: {
               type: "string",
               description:
-                "Initial message to enqueue onto the new workstream. Should describe what the orchestrator needs to do — include context, spec paths, constraints.",
+                "Optional supplementary context for the orchestrator — spec paths, constraints, background gathered during triage. Do NOT restate the user's request here; it is passed through automatically.",
             },
           },
           required: ["name"],
@@ -848,6 +848,12 @@ export class ControlSurfaceRuntime {
           const { insertWorkstream } = await import("./blackboard/query-workstreams.ts");
           const ws = insertWorkstream(this.blackboard, params.name);
           this.log(`default agent created workstream "${params.name}" (${ws.id})`);
+
+          // Capture the user's original verbatim message from the current queue item
+          const defaultSession = this.sessionManager.getDefault();
+          const currentItem = defaultSession?.queue.getCurrentItem();
+          const originalUserMessage =
+            currentItem?.source === "user" ? currentItem.text : undefined;
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
@@ -864,11 +870,12 @@ export class ControlSurfaceRuntime {
               workstreamName: ws.name,
             });
 
-            if (params.message) {
+            if (originalUserMessage || params.message) {
               const prompt = this.sessionManager.buildWorkstreamPrompt(
-                params.message,
                 ws.name,
                 ws.id,
+                originalUserMessage,
+                params.message,
               );
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
