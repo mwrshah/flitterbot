@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { AutonomaApiClient } from "~/lib/api";
 import { piSessionStore, resetPiSessionStore } from "~/lib/pi-session-store";
+import { StreamChunker } from "~/lib/stream-chunker";
 import type {
   ChatTimelineTool,
   ConnectionState,
@@ -28,9 +29,16 @@ export function usePiWsHandler(
     resetPiSessionStore();
   }, []);
 
+  // StreamChunker instances keyed by messageId — buffers rapid text_delta events
+  // and drains them at a controlled rate to reduce React re-renders.
+  const chunkersRef = useRef<Map<string, { chunker: StreamChunker; flushedLength: number }>>(
+    new Map(),
+  );
+
   // WebSocket event subscription — routes events to correct session via store
   useEffect(() => {
     const store = piSessionStore;
+    const chunkers = chunkersRef.current;
 
     const unsubscribe = wsClient.subscribe((message: WsMessage) => {
       const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : undefined;
@@ -78,7 +86,27 @@ export function usePiWsHandler(
       }
 
       if (message.type === "text_delta") {
-        store.appendStreamingDelta(sessionId, message.messageId, message.delta);
+        const itemId = message.messageId;
+
+        if (!chunkers.has(itemId)) {
+          let flushedLength = 0;
+          const chunker = new StreamChunker({
+            onChunk: (fullText) => {
+              const delta = fullText.slice(flushedLength);
+              flushedLength = fullText.length;
+              if (delta) {
+                store.appendStreamingDelta(sessionId, itemId, delta);
+              }
+            },
+          });
+          chunkers.set(itemId, { chunker, flushedLength: 0 });
+
+          if (import.meta.env.DEV) {
+            (window as any).__streamChunker = chunker;
+          }
+        }
+
+        chunkers.get(itemId)!.chunker.push(message.delta);
         return;
       }
 
@@ -98,6 +126,17 @@ export function usePiWsHandler(
       }
 
       if (message.type === "message_end") {
+        // Destroy chunker for this message
+        const msgId = (message as any).messageId ?? message.message?.id;
+        const entry = msgId ? chunkers.get(msgId) : undefined;
+        if (entry && msgId) {
+          entry.chunker.destroy();
+          chunkers.delete(msgId);
+          if (import.meta.env.DEV && (window as any).__streamChunker === entry.chunker) {
+            (window as any).__streamChunker = null;
+          }
+        }
+
         const content = message.content || "";
 
         if (message.role === "user") {
@@ -221,6 +260,15 @@ export function usePiWsHandler(
       }
 
       if (message.type === "turn_end") {
+        // Destroy all remaining chunkers for this session
+        for (const [id, entry] of chunkers) {
+          entry.chunker.destroy();
+          chunkers.delete(id);
+        }
+        if (import.meta.env.DEV) {
+          (window as any).__streamChunker = null;
+        }
+
         store.clearStreamingState(sessionId);
         store.clearStreamingThinkingState(sessionId);
         store.clearStreamingToolCalls(sessionId);
@@ -255,6 +303,11 @@ export function usePiWsHandler(
     return () => {
       unsubscribe();
       unsubscribeConnection();
+      // Destroy all chunkers on cleanup
+      for (const [, entry] of chunkers) {
+        entry.chunker.destroy();
+      }
+      chunkers.clear();
     };
   }, [wsClient, defaultSessionId]);
 
