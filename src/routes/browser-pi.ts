@@ -64,14 +64,28 @@ export async function handleBrowserPiHistoryRoute(
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
   const piSessionId = url.searchParams.get("piSessionId");
 
+  try {
+    return await handleBrowserPiHistoryRouteInner(runtime, response, historyMode, piSessionId);
+  } catch (err) {
+    const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
+    console.error("pi-history route error (%s, mode=%s): %O", ctx, historyMode, err);
+    const body: PiHistoryResponse = { sessionId: piSessionId, sessionFile: null, items: [] };
+    return sendJson(response, 500, body);
+  }
+}
+
+async function handleBrowserPiHistoryRouteInner(
+  runtime: ControlSurfaceRuntime,
+  response: http.ServerResponse,
+  historyMode: "input" | "agent",
+  piSessionId: string | null,
+) {
+
   // When input surface requests history with no specific session, aggregate all
   if (historyMode === "input" && !piSessionId) {
     const allSessions: ManagedPiSession[] = [];
-    try {
-      allSessions.push(runtime.sessionManager.getDefault());
-    } catch {
-      /* no default yet */
-    }
+    const defaultSession = runtime.sessionManager.getDefault();
+    if (defaultSession) allSessions.push(defaultSession);
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
     const allItems: ChatTimelineItem[] = [];
