@@ -212,6 +212,18 @@ export function subscribeToPiSession(
           // Defer — accumulate until turn_end so we can mark intermediate vs final
           pendingAssistantMessages.push(payload);
         } else {
+          // Stamp the user message in the SDK's messages array immediately so the
+          // history API sees the correct server UUID even during the turn (before
+          // prompt() returns). Without this, readPiHistoryFromMessages falls back
+          // to a positional "memory-N" ID that won't match the WS message_end's
+          // messageId, causing mergeTimelines to fail deduplication.
+          for (let i = session.messages.length - 1; i >= 0; i--) {
+            const msg = session.messages[i] as Record<string, unknown> | undefined;
+            if (msg?.role === "user") {
+              msg.id = serverMessageId;
+              break;
+            }
+          }
           broadcast(wsHub, payload);
         }
         break;
