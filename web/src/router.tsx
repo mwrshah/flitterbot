@@ -7,6 +7,7 @@ import { createAutonomaApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
 import type { StatusResponse } from "./lib/types";
 import { AutonomaWsClient } from "./lib/ws";
+import { setupWsRouteSubscriptions } from "./lib/ws-route-subscriptions";
 import { setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { routeTree } from "./routeTree.gen";
 
@@ -64,6 +65,7 @@ export function getRouter() {
         return status?.pi?.default?.sessionId;
       },
     });
+    setupWsRouteSubscriptions(router, wsClient);
   }
 
   return router;

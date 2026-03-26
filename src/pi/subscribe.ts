@@ -4,6 +4,7 @@ import type {
   ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
+  PiSurfacedWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
   TurnEndWebSocketEvent,
@@ -62,6 +63,21 @@ type SubscribablePiSession = {
 
 function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEvent): void {
   wsHub.broadcast(payload);
+}
+
+function broadcastSurfaced(
+  wsHub: WebSocketHub,
+  sessionId: string,
+  message: ChatTimelineMessage,
+): void {
+  const payload: PiSurfacedWebSocketEvent = {
+    type: "pi_surfaced",
+    sessionId,
+    message,
+    workstreamId: message.workstreamId,
+    workstreamName: message.workstreamName,
+  };
+  broadcast(wsHub, payload);
 }
 
 type BroadcastRole = "user" | "assistant";
@@ -219,6 +235,7 @@ export function subscribeToPiSession(
             message: timelineMessage,
           };
           broadcast(wsHub, payload);
+          broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
         }
         break;
       }
@@ -262,6 +279,9 @@ export function subscribeToPiSession(
             message: msg,
           };
           broadcast(wsHub, payload);
+          if (isLast) {
+            broadcastSurfaced(wsHub, session.sessionId, msg);
+          }
         }
         pendingAssistantMessages.length = 0;
         currentStreamingMessageId = null;

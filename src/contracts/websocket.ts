@@ -106,10 +106,7 @@ export interface TurnEndWebSocketEvent {
 
 export interface PiSurfacedWebSocketEvent {
   type: "pi_surfaced";
-  /** Persistent message ID from the session — matches history item IDs for deduplication. */
-  messageId?: string;
-  content: string;
-  timestamp?: string;
+  message: ChatTimelineMessage;
   sessionId?: string;
   workstreamId?: string;
   workstreamName?: string;

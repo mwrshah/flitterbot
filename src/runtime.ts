@@ -5,12 +5,7 @@ import type net from "node:net";
 import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
-import {
-  type BlackboardDatabase,
-  openBlackboard,
-  pingBlackboard,
-  resolveServerId,
-} from "./blackboard/db.ts";
+import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
@@ -683,20 +678,12 @@ export class ControlSurfaceRuntime {
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
 
-      // Resolve agent message ID → server UUID via mapping table.
-      // When the agent message has no ID, we can't reliably match this pi_surfaced
-      // event to the message_end already broadcast by subscribe.ts, so we skip the
-      // WS broadcast (the content was already delivered via message_end).
-      const resolvedMessageId = finalMessageId
-        ? (resolveServerId(this.blackboard, finalMessageId) ?? finalMessageId)
-        : undefined;
-
       // Persist outbound with resolved server UUID (when available)
       try {
         const workstreamId =
           managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
-          id: resolvedMessageId,
+          id: finalMessageId,
           source: "pi_outbound",
           content: finalText,
           workstreamId,
@@ -719,20 +706,6 @@ export class ControlSurfaceRuntime {
           text: `*B-bot:*\n---\n${surfaceText}`,
           contextRef: undefined,
         });
-        // Only broadcast pi_surfaced when we have a resolved ID that matches the
-        // message_end already sent by subscribe.ts. Without a resolved ID, the
-        // broadcast would create a duplicate with a mismatched UUID.
-        if (resolvedMessageId) {
-          this.wsHub.broadcast({
-            type: "pi_surfaced",
-            messageId: resolvedMessageId,
-            content: finalText,
-            timestamp: new Date().toISOString(),
-            sessionId: managed.piSessionId,
-            workstreamId: managed.workstreamId ?? undefined,
-            workstreamName: managed.workstreamName ?? undefined,
-          });
-        }
       } catch (error) {
         this.log(
           `auto-surface to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,

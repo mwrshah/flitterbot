@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piHistoryQueryOptions, statusPillsQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState } from "~/lib/types";
@@ -8,6 +8,9 @@ import { sendMessage } from "~/lib/ws-query-bridge";
 import { fetchPiHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/$sessionId")({
+  staticData: {
+    wsMode: "pi-session",
+  },
   loader: async ({ params, context }) => {
     try {
       const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } });
@@ -47,8 +50,6 @@ function PiSessionRoute() {
     useCallback(() => wsClient.connectionState, [wsClient]),
     () => "disconnected" as ConnectionState,
   );
-
-  useEffect(() => wsClient.subscribeSession(sessionId), [sessionId, wsClient]);
 
   return (
     <ChatPanel

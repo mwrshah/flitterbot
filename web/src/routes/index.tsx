@@ -5,6 +5,9 @@ import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiInputHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/")({
+  staticData: {
+    wsMode: "input-surface",
+  },
   head: () => ({
     meta: [{ title: "Autonoma — Input Surface" }],
   }),

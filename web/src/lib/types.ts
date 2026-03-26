@@ -204,10 +204,9 @@ export type WsMessage =
   | { type: "turn_end"; sessionId?: string }
   | {
       type: "pi_surfaced";
-      messageId?: string;
-      content: string;
-      timestamp?: string;
+      message: ChatTimelineMessage;
       sessionId?: string;
+      workstreamId?: string;
       workstreamName?: string;
     }
   | {

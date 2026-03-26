@@ -324,17 +324,13 @@ export function setupWsQueryBridge(deps: {
 
     // ── pi_surfaced → input surface Query cache ──
     if (message.type === "pi_surfaced") {
-      if (message.content.trim()) {
-        const id = message.messageId ? `${message.messageId}:message` : createId("assistant");
-        const item: ChatTimelineMessage = {
-          id,
-          kind: "message",
-          role: "assistant",
-          content: message.content,
-          workstreamName: message.workstreamName,
-          createdAt: message.timestamp ?? new Date().toISOString(),
-        };
-        appendTimelineItem(queryClient, sessionId, item, "input");
+      const surfacedMessage: ChatTimelineMessage = {
+        ...message.message,
+        workstreamId: message.message.workstreamId ?? message.workstreamId,
+        workstreamName: message.message.workstreamName ?? message.workstreamName,
+      };
+      if (surfacedMessage.content.trim()) {
+        appendTimelineItem(queryClient, sessionId, surfacedMessage, "input");
       }
       return;
     }
