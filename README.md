@@ -30,7 +30,7 @@ node -v && pnpm -v && tmux -V && claude --version && sqlite3 --version
 
 ## First-time setup
 
-### 1) Clone and install dependencies
+### 1) Clone and install
 
 ```bash
 git clone <repo-url> && cd autonoma
@@ -38,18 +38,18 @@ pnpm install
 pnpm --dir web install
 ```
 
-### 2) Configure environment variables
+### 2) Configure environment
 
 ```bash
 cp .env.example .env
-# Edit .env and add your API keys:
-#   ANTHROPIC_API_KEY  — optional if you have Pi OAuth tokens (`pi auth login`)
+# Edit .env:
+#   ANTHROPIC_API_KEY  — optional with Pi OAuth tokens (`pi auth login`)
 #   GROQ_API_KEY       — required for message classification
 ```
 
 ### 3) Run the installer
 
-Deploys runtime files into `~/.autonoma/`, bootstraps config, writes `web/.env` with the auth token, optionally prompts for WhatsApp phone number, initializes the blackboard, and installs Claude Code hooks into `~/.claude/settings.json`.
+Deploys runtime files to `~/.autonoma/`, bootstraps config, writes `web/.env` with the auth token, optionally prompts for WhatsApp phone number, initializes the blackboard, and installs Claude Code hooks into `~/.claude/settings.json`.
 
 ```bash
 node .autonoma/install.mjs              # full install
@@ -81,7 +81,7 @@ Auth state stored at `~/.autonoma/whatsapp/auth/`.
 ### Control surface
 
 ```bash
-~/.autonoma/bin/autonoma-up start     # start (handles pid cleanup, retries, logging)
+~/.autonoma/bin/autonoma-up start     # handles pid cleanup, retries, logging
 ~/.autonoma/bin/autonoma-up status
 ~/.autonoma/bin/autonoma-up stop      # POST /stop → marks Pi ended, stops WhatsApp, removes pid
 ~/.autonoma/bin/autonoma-up restart
@@ -101,22 +101,22 @@ Not managed by `autonoma-up`.
 ~/.autonoma/bin/autonoma-wa start | status | stop | auth
 ```
 
-### Cron / scheduler (deferred — not installed by default)
+### Scheduler (deferred — not installed by default)
 
 If installed with `--with-scheduler`, periodically runs `~/.autonoma/cron/autonoma-checkin.sh` — may restart the control surface if machine state is actionable and runtime is down. Deferred to post-v1; Pi is reactive (human messages + hook events) until orchestration logic matures.
 
 ### Full shutdown
 
-`autonoma-up stop` is a temporary stop — the scheduler may bring the runtime back.
+`autonoma-up stop` is temporary — the scheduler may bring the runtime back.
 
 To permanently disable (removes hooks + scheduler entries):
 
 ```bash
-node ~/.autonoma/uninstall.mjs          # disable and remove hooks/scheduler
+node ~/.autonoma/uninstall.mjs          # disable, remove hooks/scheduler
 node ~/.autonoma/uninstall.mjs --meta   # also remove ~/.autonoma/ entirely
 ```
 
-No dedicated "pause but keep installed" command yet. Use `stop` for temporary, `uninstall` for permanent.
+No dedicated "pause but keep installed" command yet — use `stop` for temporary, `uninstall` for permanent.
 
 ---
 
@@ -158,7 +158,7 @@ Changes tracked in `~/.autonoma/manifest.json`.
 ### Operational notes
 
 - **`projectRoot` / `sourceRoot`** in config = this Autonoma checkout, **not** the working directory for Claude sessions.
-- **Session tracking gated by `AUTONOMA_AGENT_MANAGED=1`**. Only sessions with this env var are tracked. Set automatically by `launch_claude_code` tool; opt in manually with `AUTONOMA_AGENT_MANAGED=1 claude`.
+- **Session tracking gated by `AUTONOMA_AGENT_MANAGED=1`** — only sessions with this env var are tracked. Set automatically by `launch_claude_code` tool; opt in manually with `AUTONOMA_AGENT_MANAGED=1 claude`.
 - **Hooks are Node.js** (`.mjs`, `node:*` built-ins only). Claude Code invokes `node ~/.autonoma/hooks/hook-post.mjs <event-slug>` → reads JSON from stdin, enriches with `AUTONOMA_*` env vars, POSTs to control surface. Silently skips when control surface is down. Errors in `~/.autonoma/logs/hooks-errors.log`.
 
 ---
@@ -188,7 +188,7 @@ pnpm run audit:shell             # Shell only
 |---|---|
 | `autonoma-up start` fails | `~/.autonoma/config.json`, `~/.autonoma/logs/control-surface.log`, `node`/`claude`/`tmux`/`sqlite3` available, `pnpm install` done |
 | WhatsApp auth errors | Re-run `~/.autonoma/bin/autonoma-wa auth` |
-| Hooks not firing | `~/.claude/settings.json`, `~/.autonoma/hooks/hook-post.mjs`, `~/.autonoma/logs/hooks-errors.log`. Hooks run async with 15s timeout; silently skip when control surface is down. |
+| Hooks not firing | `~/.claude/settings.json`, `~/.autonoma/hooks/hook-post.mjs`, `~/.autonoma/logs/hooks-errors.log` — hooks run async with 15s timeout; silently skip when control surface is down |
 | Runtime keeps restarting after stop | Scheduler still installed — run `node ~/.autonoma/uninstall.mjs` |
 
 ---
