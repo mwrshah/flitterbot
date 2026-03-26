@@ -242,15 +242,29 @@ export class PiSessionManager {
    * Build the initial prompt for a new orchestrator workstream.
    */
   buildWorkstreamPrompt(
-    currentMessage: string,
     workstreamName: string,
     workstreamId: string,
+    originalUserMessage?: string,
+    agentContext?: string,
   ): string {
-    return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
+    return this.formatWorkstreamMessage(workstreamName, workstreamId, originalUserMessage, agentContext);
   }
 
-  private formatWorkstreamMessage(message: string, name: string, id: string): string {
-    return `[Workstream: "${name}" (${id})] [NEW]\n${message}\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
+  private formatWorkstreamMessage(
+    name: string,
+    id: string,
+    originalUserMessage?: string,
+    agentContext?: string,
+  ): string {
+    let prompt = `[Workstream: "${name}" (${id})] [NEW]\n`;
+    if (originalUserMessage) {
+      prompt += `[User request]\n${originalUserMessage}\n\n`;
+    }
+    if (agentContext) {
+      prompt += `[Agent context]\n${agentContext}\n\n`;
+    }
+    prompt += `IMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
+    return prompt;
   }
 
   private logResourceInfo(
