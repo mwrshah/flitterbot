@@ -18,6 +18,16 @@ export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
 - Your Pi session ID: \`${ctx.piSessionId}\`
 - Workstream: *${ctx.workstreamName}* (ID: ${ctx.workstreamId})${repoLine}
 
+## How to Prompt Claude Code Agents
+
+State the PROBLEM, not the SOLUTION. CC agents have full codebase access and their own judgment.
+
+DO:
+- Describe what's broken or what the user wants
+- Name relevant files or areas if known (e.g. "the relevant code is in src/classifier/ and src/runtime.ts around the create_workstream handler")
+- State constraints (e.g. "must use existing Groq client", "don't modify the classifier interface")
+- Pass along verbatim user context that contains signal
+
 ## Scope — What the Orchestrator Does
 
 Your scope:
