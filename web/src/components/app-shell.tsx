@@ -1,25 +1,18 @@
-import { getRouteApi, Outlet } from "@tanstack/react-router";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Outlet } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { connectionStateQueryOptions } from "~/lib/queries";
 import type { ConnectionState } from "~/lib/types";
 import { SettingsDrawer } from "./settings-drawer";
 import { Sidebar } from "./sidebar";
 
-const SERVER_SNAPSHOT: ConnectionState = "disconnected";
-
-const rootApi = getRouteApi("__root__");
-
 export function AppShell() {
-  const { wsClient } = rootApi.useRouteContext();
+  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
+    connectionStateQueryOptions(),
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   useWhyDidYouRender("AppShell", { settingsOpen });
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => wsClient.subscribeConnection(onStoreChange),
-    [wsClient],
-  );
-  const getSnapshot = useCallback(() => wsClient.connectionState, [wsClient]);
-  const connectionState = useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);

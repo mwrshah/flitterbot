@@ -33,7 +33,6 @@ function RuntimePage() {
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
-    refetchInterval: (query) => (query.state.error ? 30_000 : 5_000),
     retry: 1,
   });
 

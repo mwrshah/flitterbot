@@ -6,9 +6,6 @@ import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
 
 export const Route = createFileRoute("/pi")({
-  head: () => ({
-    meta: [{ title: "Autonoma — Pi Agent" }],
-  }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
   },

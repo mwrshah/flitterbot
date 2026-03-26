@@ -11,6 +11,7 @@ import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { AutonomaWsClient } from "~/lib/ws";
+import type { SendMessageFn } from "~/lib/ws-query-bridge";
 import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";
 import { seo } from "~/utils/seo";
@@ -20,6 +21,7 @@ export const Route = createRootRouteWithContext<{
   apiClient: AutonomaApiClient;
   wsClient: AutonomaWsClient;
   settingsStore: SettingsStore;
+  sendMessage: SendMessageFn;
 }>()({
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));

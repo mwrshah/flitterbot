@@ -1,19 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
-import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
+import { connectionStateQueryOptions, inputSurfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -23,7 +15,6 @@ import type {
   MessageSource,
 } from "~/lib/types";
 import { mergeTimelines } from "~/lib/utils";
-import { sendMessage as wsSendMessage } from "~/lib/ws-query-bridge";
 
 /* ── Types ── */
 
@@ -317,16 +308,15 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 
 /* ── Main Component ── */
 
+const rootApi = getRouteApi("__root__");
+
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
-  const rootApi = getRouteApi("__root__");
-  const { apiClient, wsClient } = rootApi.useRouteContext();
+  const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const connectionState = useSyncExternalStore(
-    useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
-    useCallback(() => wsClient.connectionState, [wsClient]),
-    () => "disconnected" as ConnectionState,
+  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
+    connectionStateQueryOptions(),
   );
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
@@ -379,14 +369,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     engageAndScroll();
 
     try {
-      await wsSendMessage(text || "(image)", deliveryMode, images);
-    } catch {
-      await apiClient.sendMessage({
-        text: text || "(image)",
-        source: "web",
-        deliveryMode,
-        images,
-      });
+      await sendMessage(text || "(image)", deliveryMode, images);
     } finally {
       setIsSending(false);
     }

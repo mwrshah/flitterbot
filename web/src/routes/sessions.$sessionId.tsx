@@ -6,6 +6,9 @@ import { TranscriptViewer } from "~/components/transcript-viewer";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
+  head: () => ({
+    meta: [{ title: "Autonoma — Session Detail" }],
+  }),
   component: SessionDetailPage,
 });
 

@@ -46,43 +46,45 @@ function _setDevStreamChunker(v: StreamChunker | null) {
   window.__streamChunker = v;
 }
 
-/* ── Send message (exposed for components) ── */
+/* ── Send message factory (provided via router context) ── */
 
-let _wsClient: AutonomaWsClient | null = null;
-let _apiClient: AutonomaApiClient | null = null;
-let _queryClient: QueryClient | null = null;
-
-export async function sendMessage(
+export type SendMessageFn = (
   text: string,
   deliveryMode: DeliveryMode,
   images?: ImageAttachment[],
   targetSessionId?: string,
-): Promise<void> {
-  if (!_wsClient || !_apiClient) throw new Error("WS bridge not initialized");
-  try {
-    await _wsClient.sendMessage(text, deliveryMode, images, targetSessionId);
-  } catch (wsError) {
-    console.error("WS send failed, trying HTTP fallback:", wsError);
+) => Promise<void>;
+
+export function createSendMessage(deps: {
+  wsClient: AutonomaWsClient;
+  apiClient: AutonomaApiClient;
+  queryClient: QueryClient;
+}): SendMessageFn {
+  const { wsClient, apiClient, queryClient } = deps;
+  return async (text, deliveryMode, images, targetSessionId) => {
     try {
-      await _apiClient.sendMessage({
-        text,
-        source: "web",
-        deliveryMode,
-        images,
-        targetSessionId,
-      });
-    } catch (httpError) {
-      console.error("HTTP fallback also failed:", httpError);
-      if (_queryClient) {
+      await wsClient.sendMessage(text, deliveryMode, images, targetSessionId);
+    } catch (wsError) {
+      console.error("WS send failed, trying HTTP fallback:", wsError);
+      try {
+        await apiClient.sendMessage({
+          text,
+          source: "web",
+          deliveryMode,
+          images,
+          targetSessionId,
+        });
+      } catch (httpError) {
+        console.error("HTTP fallback also failed:", httpError);
         const sid = targetSessionId ?? "default";
-        addPill(_queryClient, sid, {
+        addPill(queryClient, sid, {
           id: createId("send-error"),
           label: "Failed to send message",
           variant: "error",
         });
       }
     }
-  }
+  };
 }
 
 /* ── Pill management helpers ── */
@@ -175,10 +177,6 @@ export function setupWsQueryBridge(deps: {
   getDefaultSessionId: () => string | undefined;
 }): () => void {
   const { queryClient, wsClient, apiClient, router, getDefaultSessionId } = deps;
-
-  _wsClient = wsClient;
-  _apiClient = apiClient;
-  _queryClient = queryClient;
 
   /* ── WS message handler ── */
 
@@ -401,13 +399,20 @@ export function setupWsQueryBridge(deps: {
     }
   });
 
-  /* ── Connection state handler — reconnect invalidation ── */
+  /* ── Connection state handler — query cache + reconnect invalidation ── */
+
+  // Seed initial connection state
+  queryClient.setQueryData<ConnectionState>(["connection-state"], wsClient.connectionState);
 
   let prevConnectionState: ConnectionState = wsClient.connectionState;
 
   const unsubscribeConnection = wsClient.subscribeConnection((state: ConnectionState) => {
     const prev = prevConnectionState;
     prevConnectionState = state;
+
+    // Write every transition to query cache
+    queryClient.setQueryData<ConnectionState>(["connection-state"], state);
+
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
       // Re-fetch stale data after reconnect
       queryClient.invalidateQueries({ queryKey: ["status"] });
@@ -423,8 +428,5 @@ export function setupWsQueryBridge(deps: {
     unsubscribeMessages();
     unsubscribeConnection();
     destroyAllChunkers();
-    _wsClient = null;
-    _apiClient = null;
-    _queryClient = null;
   };
 }

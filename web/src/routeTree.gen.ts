@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RuntimeRouteImport } from './routes/runtime'
-import { Route as SessionsRouteRouteImport } from './routes/sessions.route'
 import { Route as PiRouteRouteImport } from './routes/pi.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
@@ -24,11 +23,6 @@ const RuntimeRoute = RuntimeRouteImport.update({
   path: '/runtime',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SessionsRouteRoute = SessionsRouteRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PiRouteRoute = PiRouteRouteImport.update({
   id: '/pi',
   path: '/pi',
@@ -40,9 +34,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsIndexRoute = SessionsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SessionsRouteRoute,
+  id: '/sessions/',
+  path: '/sessions/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PiIndexRoute = PiIndexRouteImport.update({
   id: '/',
@@ -50,9 +44,9 @@ const PiIndexRoute = PiIndexRouteImport.update({
   getParentRoute: () => PiRouteRoute,
 } as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
-  id: '/$sessionId',
-  path: '/$sessionId',
-  getParentRoute: () => SessionsRouteRoute,
+  id: '/sessions/$sessionId',
+  path: '/sessions/$sessionId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PiDefaultRoute = PiDefaultRouteImport.update({
   id: '/default',
@@ -68,7 +62,6 @@ const PiSessionIdRoute = PiSessionIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/pi': typeof PiRouteRouteWithChildren
-  '/sessions': typeof SessionsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
   '/pi/$sessionId': typeof PiSessionIdRoute
   '/pi/default': typeof PiDefaultRoute
@@ -89,7 +82,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/pi': typeof PiRouteRouteWithChildren
-  '/sessions': typeof SessionsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
   '/pi/$sessionId': typeof PiSessionIdRoute
   '/pi/default': typeof PiDefaultRoute
@@ -102,7 +94,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/pi'
-    | '/sessions'
     | '/runtime'
     | '/pi/$sessionId'
     | '/pi/default'
@@ -122,7 +113,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/pi'
-    | '/sessions'
     | '/runtime'
     | '/pi/$sessionId'
     | '/pi/default'
@@ -134,8 +124,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PiRouteRoute: typeof PiRouteRouteWithChildren
-  SessionsRouteRoute: typeof SessionsRouteRouteWithChildren
   RuntimeRoute: typeof RuntimeRoute
+  SessionsSessionIdRoute: typeof SessionsSessionIdRoute
+  SessionsIndexRoute: typeof SessionsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -145,13 +136,6 @@ declare module '@tanstack/react-router' {
       path: '/runtime'
       fullPath: '/runtime'
       preLoaderRoute: typeof RuntimeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sessions': {
-      id: '/sessions'
-      path: '/sessions'
-      fullPath: '/sessions'
-      preLoaderRoute: typeof SessionsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pi': {
@@ -170,10 +154,10 @@ declare module '@tanstack/react-router' {
     }
     '/sessions/': {
       id: '/sessions/'
-      path: '/'
+      path: '/sessions'
       fullPath: '/sessions/'
       preLoaderRoute: typeof SessionsIndexRouteImport
-      parentRoute: typeof SessionsRouteRoute
+      parentRoute: typeof rootRouteImport
     }
     '/pi/': {
       id: '/pi/'
@@ -184,10 +168,10 @@ declare module '@tanstack/react-router' {
     }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
-      path: '/$sessionId'
+      path: '/sessions/$sessionId'
       fullPath: '/sessions/$sessionId'
       preLoaderRoute: typeof SessionsSessionIdRouteImport
-      parentRoute: typeof SessionsRouteRoute
+      parentRoute: typeof rootRouteImport
     }
     '/pi/default': {
       id: '/pi/default'
@@ -221,25 +205,12 @@ const PiRouteRouteChildren: PiRouteRouteChildren = {
 const PiRouteRouteWithChildren =
   PiRouteRoute._addFileChildren(PiRouteRouteChildren)
 
-interface SessionsRouteRouteChildren {
-  SessionsSessionIdRoute: typeof SessionsSessionIdRoute
-  SessionsIndexRoute: typeof SessionsIndexRoute
-}
-
-const SessionsRouteRouteChildren: SessionsRouteRouteChildren = {
-  SessionsSessionIdRoute: SessionsSessionIdRoute,
-  SessionsIndexRoute: SessionsIndexRoute,
-}
-
-const SessionsRouteRouteWithChildren = SessionsRouteRoute._addFileChildren(
-  SessionsRouteRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PiRouteRoute: PiRouteRouteWithChildren,
-  SessionsRouteRoute: SessionsRouteRouteWithChildren,
   RuntimeRoute: RuntimeRoute,
+  SessionsSessionIdRoute: SessionsSessionIdRoute,
+  SessionsIndexRoute: SessionsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

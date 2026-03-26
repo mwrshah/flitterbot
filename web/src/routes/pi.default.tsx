@@ -1,16 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useSyncExternalStore } from "react";
 import { ChatPanel } from "~/components/chat-panel";
-import { piHistoryQueryOptions, statusPillsQueryOptions, statusQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ConnectionState } from "~/lib/types";
-import { sendMessage } from "~/lib/ws-query-bridge";
+import { usePiChat } from "~/hooks/use-pi-chat";
+import { statusQueryOptions } from "~/lib/queries";
+import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/default")({
   staticData: {
     wsMode: "pi-default",
   },
+  head: () => ({
+    meta: [{ title: "Autonoma — Pi / Default" }],
+  }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(
       statusQueryOptions(context.apiClient),
@@ -36,36 +37,18 @@ export const Route = createFileRoute("/pi/default")({
 
 function PiDefaultRoute() {
   const { history, defaultSessionId } = Route.useLoaderData();
-  const { wsClient } = Route.useRouteContext();
-
-  // Timeline from Query cache — seeded by loader, appended by WS bridge.
-  // Falls back to loader history when defaultSessionId is not yet resolved
-  // (piHistoryQueryOptions has enabled: false when sessionId is undefined).
-  const { data: timeline = history } = useQuery({
-    ...piHistoryQueryOptions(defaultSessionId),
-  });
-
-  // Status pills from Query cache — managed by WS bridge
-  const { data: statusPills = [] } = useQuery(
-    statusPillsQueryOptions(defaultSessionId ?? "default"),
-  );
-
-  // Connection state via useSyncExternalStore on wsClient
-  const connectionState = useSyncExternalStore(
-    useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
-    useCallback(() => wsClient.connectionState, [wsClient]),
-    () => "disconnected" as ConnectionState,
+  const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId } = usePiChat(
+    defaultSessionId,
+    history,
   );
 
   return (
     <ChatPanel
-      sessionId={defaultSessionId ?? "default"}
+      sessionId={effectiveSessionId}
       timeline={timeline}
       statusPills={statusPills}
       connectionState={connectionState}
-      onSendMessage={(text, deliveryMode, images) =>
-        sendMessage(text, deliveryMode, images, defaultSessionId)
-      }
+      onSendMessage={onSendMessage}
     />
   );
 }

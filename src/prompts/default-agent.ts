@@ -5,7 +5,6 @@ export function buildDefaultAgentPrompt(piSessionId: string): string {
 
 - Your Pi session ID: \`${piSessionId}\`
 - Your final text response each turn is automatically sent to both WhatsApp and the web client. You do not need to call a tool to reach the user — just write your response.
-- Todoist behavior is available through skills, not custom tools.
 
 ## Role
 

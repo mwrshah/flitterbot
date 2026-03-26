@@ -1,5 +1,5 @@
 import type { AutonomaApiClient } from "~/lib/api";
-import type { ChatTimelineItem, StatusResponse } from "~/lib/types";
+import type { ChatTimelineItem, ConnectionState, StatusResponse } from "~/lib/types";
 import { fetchPiHistory } from "~/server/pi";
 
 export function statusQueryOptions(apiClient: AutonomaApiClient) {
@@ -36,6 +36,15 @@ export function statusPillsQueryOptions(sessionId: string) {
     queryFn: (): StatusPill[] => [],
     staleTime: Infinity,
     // Initialized as empty; WS bridge uses setQueryData to manage pills
+  };
+}
+
+/** Connection state — managed by WS bridge via setQueryData. */
+export function connectionStateQueryOptions() {
+  return {
+    queryKey: ["connection-state"] as const,
+    queryFn: (): ConnectionState => "disconnected",
+    staleTime: Infinity,
   };
 }
 

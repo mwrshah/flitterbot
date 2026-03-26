@@ -4,6 +4,9 @@ import { SessionList } from "~/components/session-list";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/sessions/")({
+  head: () => ({
+    meta: [{ title: "Autonoma — Claude Code Sessions" }],
+  }),
   component: SessionsIndexPage,
 });
 

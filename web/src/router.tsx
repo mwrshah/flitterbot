@@ -7,15 +7,9 @@ import { createAutonomaApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
 import type { StatusResponse } from "./lib/types";
 import { AutonomaWsClient } from "./lib/ws";
+import { createSendMessage, setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { setupWsRouteSubscriptions } from "./lib/ws-route-subscriptions";
-import { setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { routeTree } from "./routeTree.gen";
-
-declare global {
-  interface Window {
-    __autonoma_wsClient?: AutonomaWsClient;
-  }
-}
 
 export function getRouter() {
   const queryClient = new QueryClient();
@@ -27,10 +21,11 @@ export function getRouter() {
 
   const apiClient = createAutonomaApiClient(() => settingsStore.get());
   const wsClient = new AutonomaWsClient(() => settingsStore.get());
+  const sendMessage = createSendMessage({ wsClient, apiClient, queryClient });
 
   const router = createRouter({
     routeTree,
-    context: { queryClient, apiClient, wsClient, settingsStore },
+    context: { queryClient, apiClient, wsClient, settingsStore, sendMessage },
     defaultPreload: "intent",
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
@@ -42,19 +37,10 @@ export function getRouter() {
     queryClient,
   });
 
-  // Connect WS and wire up the bridge — ready before any component renders
+  // ── Client-side WS bootstrap (runs once at router creation) ──
   if (typeof window !== "undefined") {
-    // Disconnect any previous wsClient orphaned by HMR
-    const prev = window.__autonoma_wsClient;
-    if (prev) prev.disconnect();
-    window.__autonoma_wsClient = wsClient;
-
     wsClient.connect();
-    window.addEventListener("beforeunload", () => {
-      wsClient.disconnect();
-    });
 
-    // Wire WS events → Query cache (replaces usePiWsHandler)
     setupWsQueryBridge({
       queryClient,
       wsClient,
@@ -65,7 +51,8 @@ export function getRouter() {
         return status?.pi?.default?.sessionId;
       },
     });
-    setupWsRouteSubscriptions(router, wsClient);
+
+    setupWsRouteSubscriptions(router, wsClient, queryClient);
   }
 
   return router;

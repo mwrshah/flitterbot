@@ -32,9 +32,7 @@ export class AutonomaWsClient {
   private socket: WebSocket | null = null;
   private subscribers = new Set<WsSubscriber>();
   private connectionSubscribers = new Set<ConnectionSubscriber>();
-  private nextSubscriptionClaimId = 1;
-  private subscriptionClaims = new Map<number, SessionSubscription>();
-  private effectiveSubscriptions = new Map<string, string[] | undefined>();
+  private activeSessionSubscription: SessionSubscription | null = null;
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -89,7 +87,7 @@ export class AutonomaWsClient {
       this.transition("connected");
       this.startHeartbeat();
       this.listenVisibility();
-      this.flushSubscriptions();
+      this.flushSessionSubscription();
     };
 
     this.socket.onmessage = (event) => {
@@ -285,30 +283,34 @@ export class AutonomaWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
-  subscribeSession(sessionId: string, eventTypes?: string[]): () => void {
-    const claimId = this.nextSubscriptionClaimId++;
-    const normalized = normalizeEventTypes(eventTypes);
-    this.subscriptionClaims.set(claimId, { sessionId, eventTypes: normalized });
-    this.recomputeSessionSubscription(sessionId);
-
-    return () => {
-      const claim = this.subscriptionClaims.get(claimId);
-      if (!claim) return;
-      this.subscriptionClaims.delete(claimId);
-      this.recomputeSessionSubscription(claim.sessionId);
+  setSessionSubscription(sessionId: string, eventTypes?: string[]): void {
+    const next: SessionSubscription = {
+      sessionId,
+      eventTypes: normalizeEventTypes(eventTypes),
     };
+    const previous = this.activeSessionSubscription;
+
+    if (
+      previous &&
+      previous.sessionId === next.sessionId &&
+      sameEventTypes(previous.eventTypes, next.eventTypes)
+    ) {
+      return;
+    }
+
+    this.activeSessionSubscription = next;
+
+    if (previous && previous.sessionId !== next.sessionId) {
+      this.sendUnsubscribe(previous.sessionId);
+    }
+    this.sendSubscribe(next.sessionId, next.eventTypes);
   }
 
-  unsubscribeSession(sessionId: string): void {
-    let changed = false;
-    for (const [claimId, claim] of this.subscriptionClaims) {
-      if (claim.sessionId !== sessionId) continue;
-      this.subscriptionClaims.delete(claimId);
-      changed = true;
-    }
-    if (changed) {
-      this.recomputeSessionSubscription(sessionId);
-    }
+  clearSessionSubscription(): void {
+    const previous = this.activeSessionSubscription;
+    if (!previous) return;
+    this.activeSessionSubscription = null;
+    this.sendUnsubscribe(previous.sessionId);
   }
 
   subscribe(fn: WsSubscriber): () => void {
@@ -325,30 +327,12 @@ export class AutonomaWsClient {
     };
   }
 
-  private recomputeSessionSubscription(sessionId: string) {
-    const claims = Array.from(this.subscriptionClaims.values()).filter(
-      (claim) => claim.sessionId === sessionId,
+  private flushSessionSubscription() {
+    if (!this.activeSessionSubscription) return;
+    this.sendSubscribe(
+      this.activeSessionSubscription.sessionId,
+      this.activeSessionSubscription.eventTypes,
     );
-    const previous = this.effectiveSubscriptions.get(sessionId);
-    const next = mergeEventTypes(claims.map((claim) => claim.eventTypes));
-
-    if (next === null) {
-      if (previous !== undefined || this.effectiveSubscriptions.has(sessionId)) {
-        this.effectiveSubscriptions.delete(sessionId);
-        this.sendUnsubscribe(sessionId);
-      }
-      return;
-    }
-
-    if (sameEventTypes(previous, next)) return;
-    this.effectiveSubscriptions.set(sessionId, next);
-    this.sendSubscribe(sessionId, next);
-  }
-
-  private flushSubscriptions() {
-    for (const [sessionId, eventTypes] of this.effectiveSubscriptions) {
-      this.sendSubscribe(sessionId, eventTypes);
-    }
   }
 
   private sendSubscribe(sessionId: string, eventTypes?: string[]) {
@@ -367,18 +351,6 @@ export class AutonomaWsClient {
 function normalizeEventTypes(eventTypes?: string[]): string[] | undefined {
   if (!eventTypes || eventTypes.length === 0) return undefined;
   return Array.from(new Set(eventTypes)).sort();
-}
-
-function mergeEventTypes(eventTypesList: Array<string[] | undefined>): string[] | undefined | null {
-  if (eventTypesList.length === 0) return null;
-  if (eventTypesList.some((eventTypes) => eventTypes === undefined)) return undefined;
-  const merged = new Set<string>();
-  for (const eventTypes of eventTypesList) {
-    for (const eventType of eventTypes ?? []) {
-      merged.add(eventType);
-    }
-  }
-  return Array.from(merged).sort();
 }
 
 function sameEventTypes(a: string[] | undefined, b: string[] | undefined): boolean {
