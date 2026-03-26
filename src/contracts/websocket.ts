@@ -15,6 +15,8 @@ export interface WebSocketClientMessageEvent {
 export interface WebSocketClientSubscribeEvent {
   type: "subscribe";
   sessionId: string;
+  /** If provided, only deliver events of these types for this subscription. Omit for all. */
+  eventTypes?: string[];
 }
 
 export interface WebSocketClientUnsubscribeEvent {
