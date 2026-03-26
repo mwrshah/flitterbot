@@ -1070,23 +1070,38 @@ export class ControlSurfaceRuntime {
             repo_path: { type: "string", description: "Absolute path to the project repository" },
             branch_name: {
               type: "string",
-              description: "Branch name (optional, defaults to ws/<workstream-slug>)",
+              description: "Branch name (optional, defaults to NNN-<slug>)",
+            },
+            update_repo_path: {
+              type: "string",
+              description:
+                "Update only the repo_path field without creating a worktree. Skips all git operations.",
+            },
+            update_worktree_path: {
+              type: "string",
+              description:
+                "Update only the worktree_path field without creating a worktree. Skips all git operations.",
             },
           },
           required: ["workstream_id", "repo_path"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { workstream_id, repo_path, branch_name } = params as {
-            workstream_id: string;
-            repo_path: string;
-            branch_name?: string;
-          };
+          const { workstream_id, repo_path, branch_name, update_repo_path, update_worktree_path } =
+            params as {
+              workstream_id: string;
+              repo_path: string;
+              branch_name?: string;
+              update_repo_path?: string;
+              update_worktree_path?: string;
+            };
           const result = executeCreateWorktree(
             this.blackboard,
             workstream_id,
             repo_path,
             branch_name,
+            update_repo_path,
+            update_worktree_path,
           );
           return { content: [{ type: "text", text: result.message }], details: result };
         },
