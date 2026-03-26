@@ -42,9 +42,12 @@ export function MessageInput({
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills",
 }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
+  // Track the position of the "/" that triggered the picker
+  const slashPositionRef = useRef<number>(-1);
 
   const filteredSkills =
     skills?.filter((s) => {
@@ -52,15 +55,36 @@ export function MessageInput({
       return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
     }) ?? [];
 
+  /**
+   * Detect a slash command token at the cursor position.
+   * A slash trigger is "/" preceded by start-of-string or whitespace,
+   * followed by zero or more non-whitespace chars up to the cursor.
+   */
   const handleDraftChange = useCallback(
     (value: string) => {
       onDraftChange(value);
-      const match = value.match(/^\/(\S*)$/);
-      if (match && skills?.length) {
+      const cursor = textareaRef.current?.selectionStart ?? value.length;
+      // Scan backwards from cursor to find a "/" trigger
+      let slashIdx = -1;
+      for (let i = cursor - 1; i >= 0; i--) {
+        const ch = value[i];
+        if (ch === "/") {
+          // Valid trigger: at start of string or preceded by whitespace
+          if (i === 0 || /\s/.test(value[i - 1]!)) {
+            slashIdx = i;
+          }
+          break;
+        }
+        if (/\s/.test(ch!)) break; // hit whitespace before finding "/" — no trigger
+      }
+      if (slashIdx >= 0 && skills?.length) {
+        const filter = value.slice(slashIdx + 1, cursor);
+        slashPositionRef.current = slashIdx;
         setPickerOpen(true);
-        setPickerFilter(match[1] ?? "");
+        setPickerFilter(filter);
         setSelectedSkill("");
       } else {
+        slashPositionRef.current = -1;
         setPickerOpen(false);
       }
     },
@@ -68,8 +92,23 @@ export function MessageInput({
   );
 
   function handleSkillSelect(name: string) {
-    onDraftChange(`/${name} `);
+    const value = draft;
+    const slashIdx = slashPositionRef.current;
+    const cursor = textareaRef.current?.selectionStart ?? value.length;
+    // Replace from the "/" through the current filter text with "/<name> "
+    const before = value.slice(0, slashIdx);
+    const after = value.slice(cursor);
+    const inserted = `/${name} `;
+    const newValue = before + inserted + after;
+    onDraftChange(newValue);
     setPickerOpen(false);
+    slashPositionRef.current = -1;
+    // Restore cursor position after the inserted command
+    const newCursor = before.length + inserted.length;
+    requestAnimationFrame(() => {
+      textareaRef.current?.setSelectionRange(newCursor, newCursor);
+      textareaRef.current?.focus();
+    });
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -188,6 +227,7 @@ export function MessageInput({
             onClose={() => setPickerOpen(false)}
           />
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
