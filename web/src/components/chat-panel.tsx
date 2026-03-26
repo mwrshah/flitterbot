@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
@@ -63,7 +63,7 @@ type ChatPanelProps = {
   ) => Promise<void>;
 };
 
-export const ChatPanel = memo(function ChatPanel({
+export function ChatPanel({
   timeline,
   sessionId,
   statusPills,
@@ -115,13 +115,12 @@ export const ChatPanel = memo(function ChatPanel({
       },
     });
 
-    let streaming = false;
     let seenLen = 0;
 
     piSessionStore.onStreamingDelta(sessionId, (text, _messageId) => {
       if (text === null) {
+        chunker.flush();
         streamingRef.current?.clearStreaming();
-        streaming = false;
         seenLen = 0;
         currentChunkedText = "";
         return;
@@ -131,9 +130,6 @@ export const ChatPanel = memo(function ChatPanel({
         chunker.push(text.slice(seenLen));
         seenLen = text.length;
       }
-      if (!streaming) {
-        streaming = true;
-      }
     });
 
     piSessionStore.onStreamingThinkingDelta(sessionId, (thinking, _messageId) => {
@@ -142,9 +138,6 @@ export const ChatPanel = memo(function ChatPanel({
         return;
       }
       currentThinking = thinking;
-      if (!streaming) {
-        streaming = true;
-      }
       pushUpdate();
     });
 
@@ -154,9 +147,6 @@ export const ChatPanel = memo(function ChatPanel({
         return;
       }
       currentToolCalls = toolCalls;
-      if (!streaming) {
-        streaming = true;
-      }
       pushUpdate();
     });
 
@@ -230,4 +220,4 @@ export const ChatPanel = memo(function ChatPanel({
       />
     </div>
   );
-});
+}

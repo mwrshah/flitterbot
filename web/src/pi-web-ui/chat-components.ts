@@ -909,10 +909,9 @@ export class MessageList extends LitElement {
   @property({ type: Array }) messages: RenderMessage[] = [];
   @property({ type: Array }) tools: AgentTool[] = [];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
-  @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
 
-  private _streamingEl: (HTMLElement & Record<string, unknown>) | null = null;
+  private _streamingEl: AssistantMessage | null = null;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -923,23 +922,38 @@ export class MessageList extends LitElement {
     this.style.display = "block";
   }
 
-  /** Imperatively create/update the streaming assistant-message element. */
-  updateStreaming(message: AssistantMessageType): void {
+  /**
+   * Imperatively update the streaming assistant-message element.
+   * Creates the element on first call, appends it after the repeat() container.
+   * Does NOT trigger Lit re-render of the repeat() block.
+   */
+  updateStreaming(msg: AssistantMessageType): void {
     if (!this._streamingEl) {
-      this._streamingEl = document.createElement("assistant-message") as HTMLElement & Record<string, unknown>;
-      this.appendChild(this._streamingEl);
+      this._streamingEl = document.createElement("assistant-message") as unknown as AssistantMessage;
+      this._streamingEl.style.display = "block";
+      this._streamingEl.isStreaming = true;
+      this._streamingEl.hideToolCalls = false;
+      // Append to the flex container rendered by this component
+      const container = this.querySelector(":scope > div");
+      if (container) {
+        container.appendChild(this._streamingEl as unknown as Node);
+      }
     }
-    this._streamingEl.message = message;
-    this._streamingEl.isStreaming = true;
-    (this._streamingEl as HTMLElement).style.display = "block";
+    this._streamingEl.message = msg;
+    this._streamingEl.style.display = "block";
   }
 
-  /** Hide the streaming element with a smooth rAF-batched clear. */
+  /**
+   * Hide the streaming element with a brief delay so the completed message
+   * from the next Lit render cycle can take its place without a flash.
+   */
   clearStreaming(): void {
     const el = this._streamingEl;
     if (!el) return;
+    // Delay hiding until after the next frame so React/Lit can commit the
+    // completed message into the repeat() list first.
     requestAnimationFrame(() => {
-      (el as HTMLElement).style.display = "none";
+      el.style.display = "none";
     });
   }
 
