@@ -13,6 +13,9 @@ import { createAutonomaAgent } from "./create-agent.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
+import { formatWorkstreamPrompt } from "./format-workstream-prompt.ts";
+
+export { formatWorkstreamPrompt };
 
 export interface ManagedPiSession {
   session: AgentSession;
@@ -242,29 +245,11 @@ export class PiSessionManager {
    * Build the initial prompt for a new orchestrator workstream.
    */
   buildWorkstreamPrompt(
+    currentMessage: string,
     workstreamName: string,
     workstreamId: string,
-    originalUserMessage?: string,
-    agentContext?: string,
   ): string {
-    return this.formatWorkstreamMessage(workstreamName, workstreamId, originalUserMessage, agentContext);
-  }
-
-  private formatWorkstreamMessage(
-    name: string,
-    id: string,
-    originalUserMessage?: string,
-    agentContext?: string,
-  ): string {
-    let prompt = `[Workstream: "${name}" (${id})] [NEW]\n`;
-    if (originalUserMessage) {
-      prompt += `[User request]\n${originalUserMessage}\n\n`;
-    }
-    if (agentContext) {
-      prompt += `[Agent context]\n${agentContext}\n\n`;
-    }
-    prompt += `IMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
-    return prompt;
+    return formatWorkstreamPrompt([currentMessage], workstreamName, workstreamId);
   }
 
   private logResourceInfo(

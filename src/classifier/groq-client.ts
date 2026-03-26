@@ -99,6 +99,44 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
   throw lastError;
 }
 
+/**
+ * Generic Groq JSON call — sends a prompt and returns the parsed JSON response.
+ * Unlike callGroqClassify, this does not impose a specific return type.
+ */
+export async function callGroqJson<T>(apiKey: string, prompt: string): Promise<T> {
+  const client = getClient(apiKey);
+
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model: MODEL_ID,
+        max_tokens: 1024,
+        response_format: { type: "json_object" },
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const text = response.choices[0]?.message?.content;
+      if (!text) {
+        lastError = new Error("Groq response missing content");
+        continue;
+      }
+
+      return JSON.parse(text) as T;
+    } catch (error) {
+      console.warn(
+        "[groq] JSON call error (attempt %d/%d): %s",
+        attempt,
+        MAX_RETRIES,
+        error instanceof Error ? error.message : String(error),
+      );
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError;
+}
+
 /** Reset cached client (for testing or key rotation). */
 export function resetGroqClient(): void {
   cachedClient = null;
