@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import {
   connectionStateQueryOptions,
   piHistoryQueryOptions,
@@ -10,19 +10,29 @@ import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment }
 
 const rootApi = getRouteApi("__root__");
 
+const emptySubscribe = () => () => {};
+const useIsClient = () =>
+  useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
 /**
  * Shared hook for Pi chat routes (default + per-session).
  * Pulls timeline, status pills, connection state, and sendMessage from
  * TanStack Query cache and router context — no imperative subscriptions.
  */
 export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
+  const isClient = useIsClient();
   const { sendMessage } = rootApi.useRouteContext();
 
   const { data: timeline = loaderHistory } = useQuery(piHistoryQueryOptions(sessionId));
   const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(sessionId ?? "default"));
-  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
+  const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
   );
+  const connectionState = isClient ? rawConnectionState : ("disconnected" as ConnectionState);
 
   const effectiveSessionId = sessionId ?? "default";
 

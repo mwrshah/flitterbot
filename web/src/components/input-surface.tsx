@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -310,14 +310,24 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 
 const rootApi = getRouteApi("__root__");
 
+const emptySubscribe = () => () => {};
+const useIsClient = () =>
+  useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
+  const isClient = useIsClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
+  const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
   );
+  const connectionState = isClient ? rawConnectionState : ("disconnected" as ConnectionState);
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
