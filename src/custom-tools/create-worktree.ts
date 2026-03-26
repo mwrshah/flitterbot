@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { enrichWorkstream, getWorkstreamById } from "../blackboard/query-workstreams.ts";
@@ -23,18 +24,20 @@ function hasGtr(repoPath: string): boolean {
 
 function getHighestBranchNumber(repoPath: string): number {
   try {
-    const output = execSync("git branch --list '[0-9]*'", {
-      cwd: repoPath,
-      timeout: 10_000,
-      stdio: "pipe",
-    })
+    const output = execSync(
+      "git for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/origin/",
+      { cwd: repoPath, timeout: 10_000, stdio: "pipe" },
+    )
       .toString()
       .trim();
     if (!output) return 0;
     const numbers = output
       .split("\n")
-      .map((line) => line.replace(/^[* ]+/, "").trim())
-      .map((name) => parseInt(name, 10))
+      .map((name) => name.replace(/^origin\//, ""))
+      .map((name) => {
+        const match = name.match(/^(\d+)-/);
+        return match ? parseInt(match[1], 10) : Number.NaN;
+      })
       .filter((n) => !Number.isNaN(n));
     return numbers.length > 0 ? Math.max(...numbers) : 0;
   } catch {
@@ -89,6 +92,8 @@ export function executeCreateWorktree(
   workstreamId: string,
   repoPath: string,
   branchName?: string,
+  updateRepoPath?: string,
+  updateWorktreePath?: string,
 ): CreateWorktreeResult {
   const workstream = getWorkstreamById(blackboard, workstreamId);
   if (!workstream) {
@@ -104,6 +109,50 @@ export function executeCreateWorktree(
       ok: false,
       workstreamId,
       message: `Workstream ${workstreamId} is not open`,
+      usedGtr: false,
+    };
+  }
+
+  // Enhancement 2: Field-only updates — skip all git operations
+  if (updateRepoPath !== undefined || updateWorktreePath !== undefined) {
+    const newRepo = updateRepoPath ?? workstream.repo_path ?? repoPath;
+    const newWorktree = updateWorktreePath ?? workstream.worktree_path ?? undefined;
+    enrichWorkstream(blackboard, workstreamId, newRepo, newWorktree);
+    return {
+      ok: true,
+      workstreamId,
+      worktreePath: newWorktree,
+      message: `Updated workstream fields (repo_path=${newRepo}, worktree_path=${newWorktree ?? "null"})`,
+      usedGtr: false,
+    };
+  }
+
+  // Enhancement 1: Clean up orphaned worktree when switching repos
+  let cleanupMessage = "";
+  if (
+    workstream.worktree_path &&
+    workstream.repo_path &&
+    workstream.repo_path !== repoPath
+  ) {
+    try {
+      execSync(
+        `git worktree remove ${JSON.stringify(workstream.worktree_path)} --force`,
+        { cwd: workstream.repo_path, timeout: 15_000, stdio: "pipe" },
+      );
+      cleanupMessage = `Removed orphaned worktree at ${workstream.worktree_path} (old repo: ${workstream.repo_path}). `;
+    } catch {
+      cleanupMessage = `Warning: could not remove old worktree at ${workstream.worktree_path}. `;
+    }
+  }
+
+  // Enhancement 3: Reuse existing worktree if workstream already has one on disk
+  if (workstream.worktree_path && existsSync(workstream.worktree_path)) {
+    enrichWorkstream(blackboard, workstreamId, repoPath, workstream.worktree_path);
+    return {
+      ok: true,
+      workstreamId,
+      worktreePath: workstream.worktree_path,
+      message: `${cleanupMessage}Existing worktree reused at ${workstream.worktree_path}`,
       usedGtr: false,
     };
   }
@@ -140,7 +189,7 @@ export function executeCreateWorktree(
                 workstreamId,
                 worktreePath: existingPath,
                 branchName: resolvedBranch,
-                message: `Worktree already exists at ${existingPath} on branch ${resolvedBranch}`,
+                message: `${cleanupMessage}Worktree already exists at ${existingPath} on branch ${resolvedBranch}`,
                 usedGtr: false,
               };
             }
@@ -176,7 +225,7 @@ export function executeCreateWorktree(
       workstreamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}`,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}`,
       usedGtr: useGtr,
     };
   } catch (error: unknown) {
@@ -184,7 +233,7 @@ export function executeCreateWorktree(
     return {
       ok: false,
       workstreamId,
-      message: `Failed to create worktree: ${msg}`,
+      message: `${cleanupMessage}Failed to create worktree: ${msg}`,
       usedGtr: useGtr,
     };
   }
