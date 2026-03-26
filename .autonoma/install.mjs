@@ -528,7 +528,7 @@ async function bootstrapConfig() {
   configAfter.controlSurfacePort = configAfter.controlSurfacePort || 18820;
   if (!configAfter.controlSurfaceToken) configAfter.controlSurfaceToken = token;
   configAfter.piModel = configAfter.piModel || "claude-opus-4-6";
-  configAfter.piThinkingLevel = configAfter.piThinkingLevel || "low";
+  configAfter.piThinkingLevel = configAfter.piThinkingLevel || "medium";
   configAfter.stallMinutes = configAfter.stallMinutes || 15;
   configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 60;
   configAfter.blackboardPath = configAfter.blackboardPath || "~/.autonoma/blackboard.db";
