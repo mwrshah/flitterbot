@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { useAllAppendedItems, useConnectionState } from "~/lib/pi-session-store";
+import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import { buildStreamingAssistantMessage } from "~/lib/pi-web-ui-bridge";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import { StreamChunker } from "~/lib/stream-chunker";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -15,6 +16,7 @@ import type {
   MessageSource,
 } from "~/lib/types";
 import { mergeTimelines } from "~/lib/utils";
+import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
 
 const emptySubscribe = () => () => {};
 const useIsClient = () =>
@@ -79,12 +81,8 @@ function formatTime(iso: string): string {
   }
 }
 
-/** Cache of previous entries keyed by id, used for structural sharing */
-let prevEntriesById = new Map<string, SurfaceEntry>();
-
 function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] {
   const entries: SurfaceEntry[] = [];
-  const nextCache = new Map<string, SurfaceEntry>();
 
   for (const item of timeline) {
     const msg = item.kind === "message" ? (item as ChatTimelineMessage) : undefined;
@@ -92,46 +90,44 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
       continue;
     }
 
-    let entry: SurfaceEntry | undefined;
-
     if (item.kind === "message" && item.role === "user") {
       const source = msg!.source;
       if (source !== "web" && source !== "whatsapp") {
         continue;
       }
-      entry = {
+      entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
         source,
         content: msg!.content,
         workstreamName: item.workstreamName,
-      };
-    } else if (item.kind === "message" && item.role === "assistant") {
+      });
+      continue;
+    }
+
+    if (item.kind === "message" && item.role === "assistant") {
+      // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
+      // Intermediate pre-tool-call fragments have a different source or no source.
       if (msg!.source !== "pi_outbound") {
         continue;
       }
-      entry = {
+      entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "pi-response",
         content: item.content,
         workstreamName: item.workstreamName,
-      };
+      });
+      continue;
     }
 
-    if (entry) {
-      // Structural sharing: reuse previous object if content hasn't changed
-      const prev = prevEntriesById.get(entry.id);
-      if (prev && prev.content === entry.content && prev.timestamp === entry.timestamp) {
-        entry = prev;
-      }
-      nextCache.set(entry.id, entry);
-      entries.push(entry);
+    if (item.kind === "tool") {
+      // Skip all tool calls — only user messages and pi responses shown
+      // (mirrors WhatsApp: user message in, pi final text response out)
     }
   }
 
-  prevEntriesById = nextCache;
   return entries;
 }
 
@@ -139,14 +135,13 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
 
 const MAX_LINES = 30;
 
-const CollapsibleContent = memo(function CollapsibleContent({
+function CollapsibleContent({
   children,
   fadeClassName = "from-card",
 }: {
   children: React.ReactNode;
   fadeClassName?: string;
 }) {
-  useWhyDidYouRender("CollapsibleContent", { children, fadeClassName });
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const roRef = useRef<ResizeObserver | null>(null);
@@ -187,12 +182,11 @@ const CollapsibleContent = memo(function CollapsibleContent({
       )}
     </div>
   );
-});
+}
 
 /* ── Entry Renderers ── */
 
 function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
-  useWhyDidYouRender("InboundEntry", { entry });
   const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
   const displayContent = parsed ? parsed.cleanContent : entry.content;
   const badgeName = parsed?.workstreamName ?? entry.workstreamName;
@@ -225,7 +219,6 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
 }
 
 function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }) {
-  useWhyDidYouRender("OutboundEntry", { entry });
   const isWhatsApp = entry.channel === "whatsapp";
   return (
     <div className="flex gap-3 items-start">
@@ -252,7 +245,6 @@ function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }
 }
 
 function LitMarkdownBlock({ content }: { content: string }) {
-  useWhyDidYouRender("LitMarkdownBlock", { content });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -282,8 +274,7 @@ function LitMarkdownBlock({ content }: { content: string }) {
   return <div ref={containerRef} />;
 }
 
-const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
-  useWhyDidYouRender("PiResponseEntry", { entry });
+function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -305,10 +296,9 @@ const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: Surfac
       </div>
     </div>
   );
-});
+}
 
 function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
-  useWhyDidYouRender("HookEntry", { entry });
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -328,8 +318,7 @@ function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
   );
 }
 
-const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
-  useWhyDidYouRender("SurfaceEntryRenderer", { entry });
+function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
   switch (entry.kind) {
     case "inbound":
       return <InboundEntry entry={entry} />;
@@ -340,12 +329,11 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { ent
     case "hook":
       return <HookEntry entry={entry} />;
   }
-});
+}
 
 /* ── Main Component ── */
 
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
-  useWhyDidYouRender("InputSurface", { loaderTimeline });
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
@@ -359,10 +347,68 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   });
 
   // Read appended items from the shared store (populated by usePiWsHandler in root)
-  const appendedItems = useAllAppendedItems();
-  const connectionState = useConnectionState();
+  const storeSnapshot = usePiSessionStore();
+  const appendedItems = useMemo(() => piSessionStore.getAllAppendedItems(), [storeSnapshot]);
+  const connectionState = storeSnapshot.connectionState;
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
+
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingRef = useRef<PiStreamingMessageHandle>(null);
+
+  // Subscribe to streaming deltas from ALL sessions (global view).
+  useEffect(() => {
+    const chunker = new StreamChunker({
+      onChunk: (fullText) => {
+        streamingRef.current?.update(buildStreamingAssistantMessage(fullText));
+      },
+    });
+
+    let activeSessionId: string | null = null;
+    let seenLen = 0;
+    let streaming = false;
+
+    const callback = (sessionId: string, text: string | null, _messageId: string | null) => {
+      if (text === null) {
+        // Stream ended for this session
+        if (sessionId === activeSessionId) {
+          chunker.flush();
+          streamingRef.current?.clear();
+          activeSessionId = null;
+          seenLen = 0;
+          streaming = false;
+          setIsStreaming(false);
+        }
+        return;
+      }
+
+      // If a different session starts streaming, reset
+      if (sessionId !== activeSessionId) {
+        if (activeSessionId !== null) {
+          chunker.flush();
+          streamingRef.current?.clear();
+        }
+        activeSessionId = sessionId;
+        seenLen = 0;
+      }
+
+      if (text.length > seenLen) {
+        chunker.push(text.slice(seenLen));
+        seenLen = text.length;
+      }
+      if (!streaming) {
+        streaming = true;
+        setIsStreaming(true);
+      }
+    };
+
+    piSessionStore.onAnyStreamingDelta(callback);
+
+    return () => {
+      piSessionStore.offAnyStreamingDelta(callback);
+      chunker.destroy();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, appendedItems),
@@ -424,6 +470,19 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
         {entries.map((entry) => (
           <SurfaceEntryRenderer key={entry.id} entry={entry} />
         ))}
+        {/* Live streaming entry — styled like a PiResponseEntry */}
+        <div className={`flex gap-3 items-start ${isStreaming ? "" : "hidden"}`}>
+          <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
+            <span className="text-[10px] text-muted-foreground/60">&nbsp;</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <span className="text-[10px] font-medium text-muted-foreground">Pi</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <PiStreamingMessage ref={streamingRef} />
+          </div>
+        </div>
       </div>
 
       <MessageInput
