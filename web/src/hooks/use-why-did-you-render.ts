@@ -25,7 +25,7 @@ declare global {
 // ── Change classification ──
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + "…" : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
 function formatPrimitive(v: unknown): string {
@@ -83,9 +83,10 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
     if (changed.length === 0 && nLen < pLen) {
       return { kind: "VALUE", detail: `Array(${pLen}→${nLen}) -${pLen - nLen} from end` };
     }
-    const idxStr = changed.length > 5
-      ? `[${changed.slice(0, 5).join(",")},...] changed`
-      : `[${changed.join(",")}] changed`;
+    const idxStr =
+      changed.length > 5
+        ? `[${changed.slice(0, 5).join(",")},...] changed`
+        : `[${changed.join(",")}] changed`;
     const lenPart = pLen !== nLen ? `(${pLen}→${nLen})` : `(${pLen})`;
     return { kind: "VALUE", detail: `Array${lenPart} ${idxStr}` };
   }
@@ -111,9 +112,8 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
 
     const parts: string[] = [];
     if (changed.length > 0) {
-      const changedStr = changed.length > 4
-        ? `${changed.slice(0, 4).join(",")},…`
-        : changed.join(",");
+      const changedStr =
+        changed.length > 4 ? `${changed.slice(0, 4).join(",")},…` : changed.join(",");
       parts.push(`{${changedStr}} changed`);
     }
     if (added.length > 0) parts.push(`+{${added.join(",")}}`);
@@ -135,14 +135,17 @@ function getConfig(): WdyrConfig {
 function shouldLog(componentName: string, kind: ChangeKind): boolean {
   const cfg = getConfig();
   if (cfg.include && cfg.include.length > 0 && !cfg.include.includes(componentName)) return false;
-  if (cfg.exclude && cfg.exclude.includes(componentName)) return false;
+  if (cfg.exclude?.includes(componentName)) return false;
   if (cfg.onlyRefChanges && kind !== "REF_ONLY") return false;
   return true;
 }
 
 // ── Hook implementation ──
 
-function useWhyDidYouRenderImpl(componentName: string, trackedValues: Record<string, unknown>): void {
+function useWhyDidYouRenderImpl(
+  componentName: string,
+  trackedValues: Record<string, unknown>,
+): void {
   const prevRef = useRef<Record<string, unknown>>(trackedValues);
 
   useEffect(() => {

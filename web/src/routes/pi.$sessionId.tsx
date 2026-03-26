@@ -4,8 +4,8 @@ import { useCallback, useSyncExternalStore } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piHistoryQueryOptions, statusPillsQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState } from "~/lib/types";
-import { fetchPiHistory } from "~/server/pi";
 import { sendMessage } from "~/lib/ws-query-bridge";
+import { fetchPiHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/$sessionId")({
   loader: async ({ params, context }) => {
@@ -13,10 +13,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
       const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } });
       const history = items as ChatTimelineItem[];
       // Seed the Query cache so useQuery returns instantly
-      context.queryClient.setQueryData(
-        ["pi-history", params.sessionId, "agent"],
-        history,
-      );
+      context.queryClient.setQueryData(["pi-history", params.sessionId, "agent"], history);
       return { history };
     } catch (error) {
       if (error instanceof Error && /404|not found/i.test(error.message)) {

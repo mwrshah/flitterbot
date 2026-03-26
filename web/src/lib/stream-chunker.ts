@@ -82,18 +82,14 @@ export class StreamChunker {
 
   stopProfiling(): ProfileResult {
     this.profiling = false;
-    const wsSpan = this.profileStartTime > 0
-      ? this.lastPushTime - this.profileStartTime
-      : 0;
-    const renderSpan = this.profileStartTime > 0
-      ? this.lastRenderTime - this.profileStartTime
-      : 0;
+    const wsSpan = this.profileStartTime > 0 ? this.lastPushTime - this.profileStartTime : 0;
+    const renderSpan = this.profileStartTime > 0 ? this.lastRenderTime - this.profileStartTime : 0;
     const totalLag = this.lastRenderTime - this.lastPushTime;
     const result = { wsSpan, renderSpan, totalLag };
     console.log("[StreamTuner] Profile result:", {
-      wsSpan: wsSpan.toFixed(1) + "ms",
-      renderSpan: renderSpan.toFixed(1) + "ms",
-      totalLag: totalLag.toFixed(1) + "ms",
+      wsSpan: `${wsSpan.toFixed(1)}ms`,
+      renderSpan: `${renderSpan.toFixed(1)}ms`,
+      totalLag: `${totalLag.toFixed(1)}ms`,
     });
     return result;
   }
@@ -117,9 +113,10 @@ export class StreamChunker {
     if (this.buffer.length === 0) return;
 
     // Adaptive: larger chunks when buffer is deep
-    const adaptive = this.buffer.length > this.chunkSize * 3
-      ? Math.min(this.buffer.length, this.chunkSize * 2)
-      : this.chunkSize;
+    const adaptive =
+      this.buffer.length > this.chunkSize * 3
+        ? Math.min(this.buffer.length, this.chunkSize * 2)
+        : this.chunkSize;
 
     const slice = this.buffer.slice(0, adaptive);
     this.buffer = this.buffer.slice(adaptive);

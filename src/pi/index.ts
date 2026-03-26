@@ -1,6 +1,6 @@
 export { createAutonomaAgent } from "./create-agent.ts";
 export { formatPromptWithContext } from "./format-prompt.ts";
-export { type IdResolver, readPiHistory, readPiHistoryFromMessages } from "./history.ts";
+export { readPiHistory, readPiHistoryFromMessages } from "./history.ts";
 export {
   type ManagedPiSession,
   PiSessionManager,

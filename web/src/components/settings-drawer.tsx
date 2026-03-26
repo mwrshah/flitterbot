@@ -14,7 +14,13 @@ const themeOptions = [
   { value: "system" as const, label: "System", icon: "💻" },
 ];
 
-export const SettingsDrawer = memo(function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export const SettingsDrawer = memo(function SettingsDrawer({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   useWhyDidYouRender("SettingsDrawer", { open, onClose });
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);

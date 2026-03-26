@@ -908,7 +908,9 @@ export class ControlSurfaceRuntime {
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
                 const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
-                const { classifyContextRelevance } = await import("./classifier/context-relevance.ts");
+                const { classifyContextRelevance } = await import(
+                  "./classifier/context-relevance.ts"
+                );
                 const { formatWorkstreamPrompt } = await import("./pi/format-workstream-prompt.ts");
                 const apiKey = resolveGroqApiKey();
 
@@ -930,7 +932,11 @@ export class ControlSurfaceRuntime {
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
                   } else {
-                    prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+                    prompt = this.sessionManager.buildWorkstreamPrompt(
+                      originalText,
+                      ws.name,
+                      ws.id,
+                    );
                   }
                 } else {
                   prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
@@ -1384,7 +1390,11 @@ export class ControlSurfaceRuntime {
       return;
     }
     if (payload.type === "subscribe" && typeof payload.sessionId === "string") {
-      this.wsHub.subscribeClient(client.id, payload.sessionId, Array.isArray(payload.eventTypes) ? payload.eventTypes : undefined);
+      this.wsHub.subscribeClient(
+        client.id,
+        payload.sessionId,
+        Array.isArray(payload.eventTypes) ? payload.eventTypes : undefined,
+      );
       return;
     }
     if (payload.type === "unsubscribe" && typeof payload.sessionId === "string") {

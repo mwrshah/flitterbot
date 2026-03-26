@@ -929,7 +929,9 @@ export class MessageList extends LitElement {
    */
   updateStreaming(msg: AssistantMessageType): void {
     if (!this._streamingEl) {
-      this._streamingEl = document.createElement("assistant-message") as unknown as AssistantMessage;
+      this._streamingEl = document.createElement(
+        "assistant-message",
+      ) as unknown as AssistantMessage;
       this._streamingEl.style.display = "block";
       this._streamingEl.isStreaming = true;
       this._streamingEl.hideToolCalls = false;

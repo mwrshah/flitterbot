@@ -23,11 +23,9 @@ async function piRequest(path: string): Promise<unknown> {
   }
 }
 
-type AnyJson = unknown;
-
 export const fetchPiHistory = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
-  .handler(async ({ data }): Promise<AnyJson> => {
+  .handler(async ({ data }): Promise<ChatTimelineItem[]> => {
     const params = new URLSearchParams();
     if (data.piSessionId) params.set("piSessionId", data.piSessionId);
     if (data.surface) params.set("surface", data.surface);
@@ -37,13 +35,18 @@ export const fetchPiHistory = createServerFn({ method: "GET" })
       const res = (await piRequest(path)) as { items: ChatTimelineItem[] };
       return res.items;
     } catch (err) {
-      console.error("fetchPiHistory failed (piSessionId=%s, surface=%s):", data.piSessionId ?? "none", data.surface ?? "none", err);
+      console.error(
+        "fetchPiHistory failed (piSessionId=%s, surface=%s):",
+        data.piSessionId ?? "none",
+        data.surface ?? "none",
+        err,
+      );
       throw err;
     }
   });
 
 export const fetchPiInputHistory = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AnyJson> => {
+  async (): Promise<ChatTimelineItem[]> => {
     try {
       const res = (await piRequest("/api/pi/history?surface=input")) as {
         items: ChatTimelineItem[];

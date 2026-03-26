@@ -3,12 +3,12 @@ import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
-import { streamingStore } from "~/lib/streaming-store";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
+import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
+import type { StatusPill } from "~/lib/queries";
+import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
-import type { StatusPill } from "~/lib/queries";
 
 const emptySubscribe = () => () => {};
 const useIsClient = () =>
@@ -78,7 +78,7 @@ export function ChatPanel({
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
 
-  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, engageAndScroll } = useStickToBottom();
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
@@ -92,7 +92,14 @@ export function ChatPanel({
           api: "openai-responses",
           provider: "openai",
           model: "",
-          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
           stopReason: "stop",
           timestamp: Date.now(),
         });
@@ -168,10 +175,7 @@ export function ChatPanel({
 
       {/* Message area — fills all available space */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
-        <PiMessageList
-          ref={messageListRef}
-          messages={agentMessages}
-        />
+        <PiMessageList ref={messageListRef} messages={agentMessages} />
       </div>
 
       <MessageInput

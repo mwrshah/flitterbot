@@ -1,10 +1,10 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import type { TranscriptItem } from "~/lib/types";
 import { cn, formatDateTime, prettifyJson } from "~/lib/utils";

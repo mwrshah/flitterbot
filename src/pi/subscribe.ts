@@ -109,7 +109,7 @@ function extractMessageText(message: unknown): string | undefined {
   return parts.trim().length > 0 ? parts : undefined;
 }
 
-function extractMessageId(message: unknown): string | undefined {
+function _extractMessageId(message: unknown): string | undefined {
   if (!message || typeof message !== "object") return undefined;
   const id = (message as Record<string, unknown>).id;
   return typeof id === "string" && id.trim() ? id : undefined;
@@ -168,7 +168,11 @@ export function subscribeToPiSession(
       }
       case "message_update": {
         const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
-        if (ame?.type === "text_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
+        if (
+          ame?.type === "text_delta" &&
+          typeof ame.delta === "string" &&
+          currentStreamingMessageId
+        ) {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,

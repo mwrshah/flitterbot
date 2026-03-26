@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
-import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
 import { formatWorkstreamPrompt } from "../pi/format-workstream-prompt.ts";
+import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
 
 // Mock groq-client before importing context-relevance
 const mockCallGroqJson = mock<(apiKey: string, prompt: string) => Promise<unknown>>();
@@ -77,9 +77,7 @@ const { classifyContextRelevance } = await import("./context-relevance.ts");
 
 describe("classifyContextRelevance", () => {
   test("returns boolean array from Groq response", async () => {
-    mockCallGroqJson.mockImplementation(() =>
-      Promise.resolve({ relevant: [false, true, true] }),
-    );
+    mockCallGroqJson.mockImplementation(() => Promise.resolve({ relevant: [false, true, true] }));
 
     const messages = [
       { content: "Hello", created_at: "2026-03-26T10:00:00Z" },
@@ -93,9 +91,7 @@ describe("classifyContextRelevance", () => {
   });
 
   test("throws on length mismatch", async () => {
-    mockCallGroqJson.mockImplementation(() =>
-      Promise.resolve({ relevant: [true] }),
-    );
+    mockCallGroqJson.mockImplementation(() => Promise.resolve({ relevant: [true] }));
 
     const messages = [
       { content: "Hello", created_at: "2026-03-26T10:00:00Z" },

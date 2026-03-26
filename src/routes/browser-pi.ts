@@ -1,9 +1,9 @@
 import type http from "node:http";
-import type { ChatTimelineItem, PiHistoryResponse } from "../contracts/index.ts";
 import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
 } from "../blackboard/query-workstreams.ts";
+import type { ChatTimelineItem, PiHistoryResponse } from "../contracts/index.ts";
 import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -80,7 +80,6 @@ async function handleBrowserPiHistoryRouteInner(
   historyMode: "input" | "agent",
   piSessionId: string | null,
 ) {
-
   // When input surface requests history with no specific session, aggregate all
   if (historyMode === "input" && !piSessionId) {
     const allSessions: ManagedPiSession[] = [];
@@ -147,16 +146,28 @@ async function handleBrowserPiHistoryRouteInner(
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
         const diskBody = await readPiHistory(piSessionId, row.session_file, historyMode);
-        const body: PiHistoryResponse = {
-          sessionId: piSessionId,
-          sessionFile: row.session_file,
-          items: diskBody.items,
-        };
-        return sendJson(response, 200, body);
+        if (diskBody.items.length > 0) {
+          const body: PiHistoryResponse = {
+            sessionId: piSessionId,
+            sessionFile: row.session_file,
+            items: diskBody.items,
+          };
+          return sendJson(response, 200, body);
+        }
+        // DB row exists but file missing or empty — stale session from a previous runtime
+        console.warn(
+          "pi-history: session in DB but no history on disk (piSessionId=%s, file=%s)",
+          piSessionId,
+          row.session_file,
+        );
       }
     }
-    const body: PiHistoryResponse = { sessionId: piSessionId, sessionFile: null, items: [] };
-    return sendJson(response, 200, body);
+    console.warn(
+      "pi-history: session not found (piSessionId=%s, mode=%s)",
+      piSessionId ?? "none",
+      historyMode,
+    );
+    return sendJson(response, 404, { error: "Session not found" });
   }
 
   const items = await readSessionHistory(targetSession, historyMode);

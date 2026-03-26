@@ -161,4 +161,3 @@ export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<
   for (const id of ended) started.delete(id);
   return started;
 }
-

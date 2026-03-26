@@ -22,7 +22,14 @@ export function SkillPicker({
   onSelect,
   onClose: _onClose,
 }: SkillPickerProps) {
-  useWhyDidYouRender("SkillPicker", { open, filter, skills, selectedValue, onSelectedValueChange, onSelect });
+  useWhyDidYouRender("SkillPicker", {
+    open,
+    filter,
+    skills,
+    selectedValue,
+    onSelectedValueChange,
+    onSelect,
+  });
   const filtered = useMemo(() => {
     if (!filter) return skills;
     const lower = filter.toLowerCase();

@@ -36,7 +36,7 @@ function getHighestBranchNumber(repoPath: string): number {
       .map((name) => name.replace(/^origin\//, ""))
       .map((name) => {
         const match = name.match(/^(\d+)-/);
-        return match ? parseInt(match[1], 10) : Number.NaN;
+        return match ? parseInt(match[1]!, 10) : Number.NaN;
       })
       .filter((n) => !Number.isNaN(n));
     return numbers.length > 0 ? Math.max(...numbers) : 0;
@@ -129,16 +129,13 @@ export function executeCreateWorktree(
 
   // Enhancement 1: Clean up orphaned worktree when switching repos
   let cleanupMessage = "";
-  if (
-    workstream.worktree_path &&
-    workstream.repo_path &&
-    workstream.repo_path !== repoPath
-  ) {
+  if (workstream.worktree_path && workstream.repo_path && workstream.repo_path !== repoPath) {
     try {
-      execSync(
-        `git worktree remove ${JSON.stringify(workstream.worktree_path)} --force`,
-        { cwd: workstream.repo_path, timeout: 15_000, stdio: "pipe" },
-      );
+      execSync(`git worktree remove ${JSON.stringify(workstream.worktree_path)} --force`, {
+        cwd: workstream.repo_path,
+        timeout: 15_000,
+        stdio: "pipe",
+      });
       cleanupMessage = `Removed orphaned worktree at ${workstream.worktree_path} (old repo: ${workstream.repo_path}). `;
     } catch {
       cleanupMessage = `Warning: could not remove old worktree at ${workstream.worktree_path}. `;

@@ -179,7 +179,9 @@ function parseMessageRecord(
   if (role === "toolResult") {
     const resultText = firstText(messageRecord.content);
     const toolCallId =
-      typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : `unknown-${messageId}`;
+      typeof messageRecord.toolCallId === "string"
+        ? messageRecord.toolCallId
+        : `unknown-${messageId}`;
     items.push({
       id: `tool-${toolCallId}-end`,
       kind: "tool",
@@ -254,7 +256,7 @@ function shapeHistoryItems(items: ChatTimelineItem[], mode: PiHistoryMode): Chat
 
 function parseHistoryLine(
   line: string,
-  lineNumber: number,
+  _lineNumber: number,
   items: ChatTimelineItem[],
   ordinal: { value: number },
 ): void {
@@ -298,6 +300,11 @@ export async function readPiHistory(
   mode: PiHistoryMode = "agent",
 ): Promise<PiHistoryResponse> {
   if (!fs.existsSync(sessionFile)) {
+    console.warn(
+      "readPiHistory: session file missing on disk (sessionId=%s, file=%s)",
+      sessionId,
+      sessionFile,
+    );
     return {
       sessionId,
       sessionFile,

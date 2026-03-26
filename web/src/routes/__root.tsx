@@ -1,16 +1,12 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
-import {
-  createRootRouteWithContext,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type * as React from "react";
 import { AppShell } from "~/components/app-shell";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
 import { NotFound } from "~/components/not-found";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";

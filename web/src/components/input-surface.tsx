@@ -9,9 +9,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
@@ -193,7 +193,9 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
           </span>
         )}
         <CollapsibleContent>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+            {displayContent}
+          </p>
         </CollapsibleContent>
       </div>
     </div>
@@ -337,7 +339,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   // WS-appended items from Query cache (written by ws-query-bridge)
   const { data: wsAppendedItems = [] } = useQuery(inputSurfaceTimelineQueryOptions());
 
-  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, engageAndScroll } = useStickToBottom();
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, wsAppendedItems),

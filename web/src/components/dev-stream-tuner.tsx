@@ -28,7 +28,7 @@ export function DevStreamTuner() {
   const [profiling, setProfiling] = useState(false);
   const [profileResult, setProfileResult] = useState<ProfileResult | null>(null);
   const rafRef = useRef<number>(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const _containerRef = useRef<HTMLDivElement>(null);
   useWhyDidYouRender("DevStreamTuner", { visible, chunkSize, intervalMs, stats });
 
   // Poll stats via rAF when visible, log summary every ~1s during profiling
@@ -53,7 +53,7 @@ export function DevStreamTuner() {
           if (now - lastLogTime >= 1000) {
             console.log("[StreamTuner] profiling:", {
               bufferDepth: s.bufferDepth,
-              elapsed: (now - s.profileStartTime).toFixed(1) + "ms",
+              elapsed: `${(now - s.profileStartTime).toFixed(1)}ms`,
             });
             lastLogTime = now;
           }
@@ -128,7 +128,11 @@ export function DevStreamTuner() {
         <div className="absolute left-full top-0 ml-2 z-50 bg-zinc-900 border border-zinc-700 text-zinc-200 rounded-lg p-3 text-xs w-64 shadow-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold">Stream Tuner</span>
-            <button type="button" onClick={() => setVisible(false)} className="text-zinc-500 hover:text-zinc-300">
+            <button
+              type="button"
+              onClick={() => setVisible(false)}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
               x
             </button>
           </div>
@@ -176,9 +180,7 @@ export function DevStreamTuner() {
             </button>
 
             {profiling && stats.profileStartTime > 0 && (
-              <div className="mt-1.5 text-zinc-500 font-mono">
-                Recording...
-              </div>
+              <div className="mt-1.5 text-zinc-500 font-mono">Recording...</div>
             )}
 
             {!profiling && profileResult && (

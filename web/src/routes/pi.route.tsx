@@ -56,7 +56,6 @@ function PiLayoutRoute() {
     ? [...openOrchestrators, ephemeralOrchestrator]
     : openOrchestrators;
 
-
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}

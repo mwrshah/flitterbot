@@ -4,8 +4,8 @@ import { useCallback, useSyncExternalStore } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piHistoryQueryOptions, statusPillsQueryOptions, statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState, StatusResponse } from "~/lib/types";
-import { fetchPiHistory } from "~/server/pi";
 import { sendMessage } from "~/lib/ws-query-bridge";
+import { fetchPiHistory } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/default")({
   loader: async ({ context }) => {
@@ -17,10 +17,7 @@ export const Route = createFileRoute("/pi/default")({
     const status = context.queryClient.getQueryData<StatusResponse>(["status"]);
     const defaultSessionId = status?.pi?.default?.sessionId;
     if (defaultSessionId) {
-      context.queryClient.setQueryData(
-        ["pi-history", defaultSessionId, "agent"],
-        history,
-      );
+      context.queryClient.setQueryData(["pi-history", defaultSessionId, "agent"], history);
     }
 
     return { history };

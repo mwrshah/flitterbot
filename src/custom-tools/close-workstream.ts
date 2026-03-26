@@ -49,7 +49,10 @@ function getConflictedFiles(repoPath: string): string[] {
   }
 }
 
-type CommitResult = { hasChanges: false } | { hasChanges: true; ok: true } | { hasChanges: true; ok: false; message: string };
+type CommitResult =
+  | { hasChanges: false }
+  | { hasChanges: true; ok: true }
+  | { hasChanges: true; ok: false; message: string };
 
 function commitUncommittedChanges(worktreePath: string): CommitResult {
   const status = exec("git status --porcelain", worktreePath, 5_000);

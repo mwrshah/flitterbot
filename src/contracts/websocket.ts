@@ -3,7 +3,6 @@ import type { ChatTimelineMessage, ImageAttachment, MessageSource } from "./time
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 
-
 export interface WebSocketClientMessageEvent {
   type: "message";
   text: string;
@@ -24,10 +23,15 @@ export interface WebSocketClientUnsubscribeEvent {
   sessionId: string;
 }
 
+export interface WebSocketClientPingEvent {
+  type: "ping";
+}
+
 export type ControlSurfaceWebSocketClientEvent =
   | WebSocketClientMessageEvent
   | WebSocketClientSubscribeEvent
-  | WebSocketClientUnsubscribeEvent;
+  | WebSocketClientUnsubscribeEvent
+  | WebSocketClientPingEvent;
 
 export interface ConnectedWebSocketEvent {
   type: "connected";
@@ -125,6 +129,10 @@ export interface StatusChangedWebSocketEvent {
   timestamp: string;
 }
 
+export interface PongWebSocketEvent {
+  type: "pong";
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -136,4 +144,5 @@ export type ControlSurfaceWebSocketServerEvent =
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
-  | StatusChangedWebSocketEvent;
+  | StatusChangedWebSocketEvent
+  | PongWebSocketEvent;

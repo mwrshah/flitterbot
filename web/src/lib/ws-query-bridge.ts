@@ -12,7 +12,7 @@
  */
 
 import type { QueryClient } from "@tanstack/react-query";
-import type { Router } from "@tanstack/react-router";
+import type { AnyRouter } from "@tanstack/react-router";
 import type { AutonomaApiClient } from "~/lib/api";
 import type { StatusPill } from "~/lib/queries";
 import { StreamChunker } from "~/lib/stream-chunker";
@@ -29,6 +29,22 @@ import type {
 } from "~/lib/types";
 import { createId, extractToolName } from "~/lib/utils";
 import type { AutonomaWsClient } from "~/lib/ws";
+
+/* ── Dev-only debug global ── */
+
+declare global {
+  interface Window {
+    __streamChunker?: StreamChunker | null;
+  }
+}
+
+function _devStreamChunker(): StreamChunker | null | undefined {
+  return window.__streamChunker;
+}
+
+function _setDevStreamChunker(v: StreamChunker | null) {
+  window.__streamChunker = v;
+}
 
 /* ── Send message (exposed for components) ── */
 
@@ -72,16 +88,14 @@ export async function sendMessage(
 /* ── Pill management helpers ── */
 
 function addPill(queryClient: QueryClient, sessionId: string, pill: StatusPill) {
-  queryClient.setQueryData<StatusPill[]>(
-    ["pi-status-pills", sessionId],
-    (old) => [...(old ?? []).filter((p) => p.id !== pill.id), pill].slice(-6),
+  queryClient.setQueryData<StatusPill[]>(["pi-status-pills", sessionId], (old) =>
+    [...(old ?? []).filter((p) => p.id !== pill.id), pill].slice(-6),
   );
 }
 
 function removePill(queryClient: QueryClient, sessionId: string, pillId: string) {
-  queryClient.setQueryData<StatusPill[]>(
-    ["pi-status-pills", sessionId],
-    (old) => (old ?? []).filter((p) => p.id !== pillId),
+  queryClient.setQueryData<StatusPill[]>(["pi-status-pills", sessionId], (old) =>
+    (old ?? []).filter((p) => p.id !== pillId),
   );
 }
 
@@ -94,25 +108,19 @@ function appendTimelineItem(
   surface: "agent" | "input" = "agent",
 ) {
   if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(
-      ["pi-input-surface-timeline"],
-      (old) => {
-        const items = old ?? [];
-        if (items.some((existing) => existing.id === item.id)) return items;
-        return [...items, item];
-      },
-    );
-    return;
-  }
-
-  queryClient.setQueryData<ChatTimelineItem[]>(
-    ["pi-history", sessionId, "agent"],
-    (old) => {
+    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) => {
       const items = old ?? [];
       if (items.some((existing) => existing.id === item.id)) return items;
       return [...items, item];
-    },
-  );
+    });
+    return;
+  }
+
+  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+    const items = old ?? [];
+    if (items.some((existing) => existing.id === item.id)) return items;
+    return [...items, item];
+  });
 }
 
 /* ── Update timeline item in-place ── */
@@ -123,17 +131,14 @@ function updateTimelineItem(
   predicate: (item: ChatTimelineItem) => boolean,
   updater: (item: ChatTimelineItem) => ChatTimelineItem,
 ) {
-  queryClient.setQueryData<ChatTimelineItem[]>(
-    ["pi-history", sessionId, "agent"],
-    (old) => {
-      if (!old) return old;
-      const idx = old.findIndex(predicate);
-      if (idx < 0) return old;
-      const items = [...old];
-      items[idx] = updater(items[idx]!);
-      return items;
-    },
-  );
+  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+    if (!old) return old;
+    const idx = old.findIndex(predicate);
+    if (idx < 0) return old;
+    const items = [...old];
+    items[idx] = updater(items[idx]!);
+    return items;
+  });
 }
 
 /* ── StreamChunker management ── */
@@ -145,16 +150,16 @@ function destroyChunker(messageId: string) {
   if (!entry) return;
   entry.chunker.destroy();
   chunkers.delete(messageId);
-  if (import.meta.env.DEV && (window as any).__streamChunker === entry.chunker) {
-    (window as any).__streamChunker = null;
+  if (import.meta.env.DEV && _devStreamChunker() === entry.chunker) {
+    _setDevStreamChunker(null);
   }
 }
 
 function destroyAllChunkers() {
   for (const [, entry] of chunkers) {
     entry.chunker.destroy();
-    if (import.meta.env.DEV && (window as any).__streamChunker === entry.chunker) {
-      (window as any).__streamChunker = null;
+    if (import.meta.env.DEV && _devStreamChunker() === entry.chunker) {
+      _setDevStreamChunker(null);
     }
   }
   chunkers.clear();
@@ -166,7 +171,7 @@ export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: AutonomaWsClient;
   apiClient: AutonomaApiClient;
-  router: Router<any, any, any>;
+  router: AnyRouter;
   getDefaultSessionId: () => string | undefined;
 }): () => void {
   const { queryClient, wsClient, apiClient, router, getDefaultSessionId } = deps;
@@ -178,8 +183,7 @@ export function setupWsQueryBridge(deps: {
   /* ── WS message handler ── */
 
   const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
-    const sessionId =
-      "sessionId" in message && message.sessionId ? message.sessionId : undefined;
+    const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : undefined;
 
     // ── connected ──
     if (message.type === "connected") {
@@ -263,7 +267,7 @@ export function setupWsQueryBridge(deps: {
         chunkers.set(itemId, { chunker, flushedLength: 0 });
 
         if (import.meta.env.DEV) {
-          (window as any).__streamChunker = chunker;
+          _setDevStreamChunker(chunker);
         }
       }
 
