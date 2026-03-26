@@ -111,7 +111,7 @@ export function loadConfig(): AutonomaConfig {
       configuredPiModel && configuredPiModel !== "claude-sonnet-4-6"
         ? configuredPiModel
         : "claude-opus-4-6",
-    piThinkingLevel: raw.piThinkingLevel ?? "low",
+    piThinkingLevel: raw.piThinkingLevel ?? "medium",
     stallMinutes: raw.stallMinutes ?? 15,
     toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 60,
     blackboardPath,
