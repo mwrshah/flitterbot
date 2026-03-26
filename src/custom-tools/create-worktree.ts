@@ -23,18 +23,20 @@ function hasGtr(repoPath: string): boolean {
 
 function getHighestBranchNumber(repoPath: string): number {
   try {
-    const output = execSync("git branch --list '[0-9]*'", {
-      cwd: repoPath,
-      timeout: 10_000,
-      stdio: "pipe",
-    })
+    const output = execSync(
+      "git for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/origin/",
+      { cwd: repoPath, timeout: 10_000, stdio: "pipe" },
+    )
       .toString()
       .trim();
     if (!output) return 0;
     const numbers = output
       .split("\n")
-      .map((line) => line.replace(/^[* ]+/, "").trim())
-      .map((name) => parseInt(name, 10))
+      .map((name) => name.replace(/^origin\//, ""))
+      .map((name) => {
+        const match = name.match(/^(\d+)-/);
+        return match ? parseInt(match[1], 10) : Number.NaN;
+      })
       .filter((n) => !Number.isNaN(n));
     return numbers.length > 0 ? Math.max(...numbers) : 0;
   } catch {
