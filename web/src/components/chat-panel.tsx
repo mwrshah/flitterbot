@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
@@ -8,13 +8,11 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { piSessionStore } from "~/lib/pi-session-store";
 import {
   buildStreamingAssistantMessage,
-  pendingToolCallsFromTimeline,
   timelineToAgentMessages,
 } from "~/lib/pi-web-ui-bridge";
 import { StreamChunker } from "~/lib/stream-chunker";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
-import { PiMessageList } from "./pi-message-list";
-import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
+import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
@@ -83,15 +81,12 @@ export function ChatPanel({
   });
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
-  const pendingToolCalls = useMemo(() => pendingToolCallsFromTimeline(timeline), [timeline]);
-
-  const streamingRef = useRef<PiStreamingMessageHandle>(null);
+  const streamingRef = useRef<PiMessageListHandle>(null);
 
   // Register streaming callback — fires synchronously from WS handler, no React in the loop.
   // StreamChunker buffers deltas and drains them on a smooth interval to avoid jittery rendering.
@@ -104,7 +99,7 @@ export function ChatPanel({
     let currentToolCalls: import("~/lib/pi-session-store").StreamingToolCall[] | null = null;
 
     function pushUpdate() {
-      streamingRef.current?.update(
+      streamingRef.current?.updateStreaming(
         buildStreamingAssistantMessage(
           currentChunkedText,
           currentThinking ?? undefined,
@@ -120,27 +115,20 @@ export function ChatPanel({
       },
     });
 
-    let streaming = false;
     let seenLen = 0;
 
     piSessionStore.onStreamingDelta(sessionId, (text, _messageId) => {
       if (text === null) {
         chunker.flush();
-        streamingRef.current?.clear();
-        streaming = false;
+        streamingRef.current?.clearStreaming();
         seenLen = 0;
         currentChunkedText = "";
-        setIsStreaming(false);
         return;
       }
       // Store callback sends full accumulated text — push only the new portion
       if (text.length > seenLen) {
         chunker.push(text.slice(seenLen));
         seenLen = text.length;
-      }
-      if (!streaming) {
-        streaming = true;
-        setIsStreaming(true);
       }
     });
 
@@ -150,10 +138,6 @@ export function ChatPanel({
         return;
       }
       currentThinking = thinking;
-      if (!streaming) {
-        streaming = true;
-        setIsStreaming(true);
-      }
       pushUpdate();
     });
 
@@ -163,10 +147,6 @@ export function ChatPanel({
         return;
       }
       currentToolCalls = toolCalls;
-      if (!streaming) {
-        streaming = true;
-        setIsStreaming(true);
-      }
       pushUpdate();
     });
 
@@ -225,11 +205,9 @@ export function ChatPanel({
       {/* Message area — fills all available space */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
         <PiMessageList
+          ref={streamingRef}
           messages={agentMessages}
-          isStreaming={isStreaming}
-          pendingToolCalls={pendingToolCalls}
         />
-        <PiStreamingMessage ref={streamingRef} />
       </div>
 
       <MessageInput

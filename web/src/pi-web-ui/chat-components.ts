@@ -831,7 +831,6 @@ export class AssistantMessage extends LitElement {
   @property({ type: Boolean }) hideToolCalls = false;
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
-  @property({ type: Boolean }) hidePendingToolCalls = false;
   @property({ attribute: false }) onCostClick?: () => void;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -859,9 +858,6 @@ export class AssistantMessage extends LitElement {
         const tool = this.tools?.find((candidate) => candidate.name === chunk.name);
         const pending = this.pendingToolCalls?.has(chunk.id) ?? false;
         const result = this.toolResultsById?.get(chunk.id);
-        if (this.hidePendingToolCalls && pending && !result) {
-          continue;
-        }
         const aborted = this.message.stopReason === "aborted" && !result;
         orderedParts.push(html`
           <tool-message
@@ -913,8 +909,9 @@ export class MessageList extends LitElement {
   @property({ type: Array }) messages: RenderMessage[] = [];
   @property({ type: Array }) tools: AgentTool[] = [];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
-  @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
+
+  private _streamingEl: AssistantMessage | null = null;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -923,6 +920,41 @@ export class MessageList extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+  }
+
+  /**
+   * Imperatively update the streaming assistant-message element.
+   * Creates the element on first call, appends it after the repeat() container.
+   * Does NOT trigger Lit re-render of the repeat() block.
+   */
+  updateStreaming(msg: AssistantMessageType): void {
+    if (!this._streamingEl) {
+      this._streamingEl = document.createElement("assistant-message") as unknown as AssistantMessage;
+      this._streamingEl.style.display = "block";
+      this._streamingEl.isStreaming = true;
+      this._streamingEl.hideToolCalls = false;
+      // Append to the flex container rendered by this component
+      const container = this.querySelector(":scope > div");
+      if (container) {
+        container.appendChild(this._streamingEl as unknown as Node);
+      }
+    }
+    this._streamingEl.message = msg;
+    this._streamingEl.style.display = "block";
+  }
+
+  /**
+   * Hide the streaming element with a brief delay so the completed message
+   * from the next Lit render cycle can take its place without a flash.
+   */
+  clearStreaming(): void {
+    const el = this._streamingEl;
+    if (!el) return;
+    // Delay hiding until after the next frame so React/Lit can commit the
+    // completed message into the repeat() list first.
+    requestAnimationFrame(() => {
+      el.style.display = "none";
+    });
   }
 
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
@@ -968,7 +1000,6 @@ export class MessageList extends LitElement {
               .pendingToolCalls=${this.pendingToolCalls}
               .toolResultsById=${resultByCallId}
               .hideToolCalls=${false}
-              .hidePendingToolCalls=${this.isStreaming}
               .onCostClick=${this.onCostClick}
             ></assistant-message>
           `,

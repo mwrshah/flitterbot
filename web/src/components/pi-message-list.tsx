@@ -3,94 +3,108 @@
  *
  * Imperatively manages the Lit element lifecycle since custom elements
  * need property (not attribute) assignment for complex types like arrays.
+ *
+ * Exposes updateStreaming / clearStreaming via forwardRef so ChatPanel can
+ * push streaming deltas directly to the Lit component without React renders.
  */
 
 import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
-import { memo, useEffect, useRef, useState } from "react";
+import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import type { MessageList } from "~/pi-web-ui/chat-components";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 
 const EMPTY_TOOLS: AgentTool[] = [];
 const EMPTY_PENDING = new Set<string>();
 
-export const PiMessageList = memo(function PiMessageList({
-  messages,
-  isStreaming = false,
-  pendingToolCalls,
-}: {
-  messages: AgentMessage[];
-  isStreaming?: boolean;
-  pendingToolCalls?: Set<string>;
-}) {
-  useWhyDidYouRender("PiMessageList", { messages, isStreaming, pendingToolCalls });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const elementRef = useRef<HTMLElement | null>(null);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+export type PiMessageListHandle = {
+  updateStreaming(message: AssistantMessage): void;
+  clearStreaming(): void;
+};
 
-  useEffect(() => {
-    let cancelled = false;
+export const PiMessageList = memo(
+  forwardRef<PiMessageListHandle, { messages: AgentMessage[] }>(
+    function PiMessageList({ messages }, ref) {
+      useWhyDidYouRender("PiMessageList", { messages });
+      const containerRef = useRef<HTMLDivElement>(null);
+      const elementRef = useRef<(HTMLElement & MessageList) | null>(null);
+      const [ready, setReady] = useState(false);
+      const [error, setError] = useState<unknown>(null);
 
-    ensurePiWebUiReady()
-      .then(() => {
-        if (cancelled) return;
-        console.log("[PiMessageList] pi-web-ui ready");
-        setReady(true);
-      })
-      .catch((initError) => {
-        if (cancelled) return;
-        console.log("[PiMessageList] pi-web-ui initialization failed", initError);
-        setError(initError);
-      });
+      useEffect(() => {
+        let cancelled = false;
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+        ensurePiWebUiReady()
+          .then(() => {
+            if (cancelled) return;
+            console.log("[PiMessageList] pi-web-ui ready");
+            setReady(true);
+          })
+          .catch((initError) => {
+            if (cancelled) return;
+            console.log("[PiMessageList] pi-web-ui initialization failed", initError);
+            setError(initError);
+          });
 
-  useEffect(() => {
-    if (!ready) return;
-    const container = containerRef.current;
-    if (!container) return;
+        return () => {
+          cancelled = true;
+        };
+      }, []);
 
-    if (!elementRef.current) {
-      const el = document.createElement("message-list");
-      el.style.display = "block";
-      container.appendChild(el);
-      elementRef.current = el;
-      console.log("[PiMessageList] created <message-list>");
-    }
+      useEffect(() => {
+        if (!ready) return;
+        const container = containerRef.current;
+        if (!container) return;
 
-    const el = elementRef.current as HTMLElement & Record<string, unknown>;
-    el.messages = messages;
-    el.tools = EMPTY_TOOLS;
-    el.pendingToolCalls = pendingToolCalls ?? EMPTY_PENDING;
-    el.isStreaming = isStreaming;
-  }, [ready, messages, isStreaming, pendingToolCalls]);
+        if (!elementRef.current) {
+          const el = document.createElement("message-list") as HTMLElement & MessageList;
+          el.style.display = "block";
+          container.appendChild(el);
+          elementRef.current = el;
+          console.log("[PiMessageList] created <message-list>");
+        }
 
-  useEffect(() => {
-    return () => {
-      elementRef.current = null;
-    };
-  }, []);
+        const el = elementRef.current as HTMLElement & MessageList & Record<string, unknown>;
+        el.messages = messages;
+        el.tools = EMPTY_TOOLS;
+        el.pendingToolCalls = EMPTY_PENDING;
+      }, [ready, messages]);
 
-  if (error) {
-    const initDetails = getPiWebUiInitError();
-    return (
-      <div className="error-text tiny" style={{ padding: "1rem" }}>
-        Pi Web UI failed to initialize. Check the browser console.
-        {initDetails instanceof Error ? <div>{initDetails.message}</div> : null}
-      </div>
-    );
-  }
+      useEffect(() => {
+        return () => {
+          elementRef.current = null;
+        };
+      }, []);
 
-  if (!ready) {
-    return (
-      <div className="muted tiny" style={{ padding: "1rem" }}>
-        Loading chat UI…
-      </div>
-    );
-  }
+      useImperativeHandle(ref, () => ({
+        updateStreaming(message: AssistantMessage) {
+          elementRef.current?.updateStreaming(message);
+        },
+        clearStreaming() {
+          elementRef.current?.clearStreaming();
+        },
+      }));
 
-  return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
-});
+      if (error) {
+        const initDetails = getPiWebUiInitError();
+        return (
+          <div className="error-text tiny" style={{ padding: "1rem" }}>
+            Pi Web UI failed to initialize. Check the browser console.
+            {initDetails instanceof Error ? <div>{initDetails.message}</div> : null}
+          </div>
+        );
+      }
+
+      if (!ready) {
+        return (
+          <div className="muted tiny" style={{ padding: "1rem" }}>
+            Loading chat UI…
+          </div>
+        );
+      }
+
+      return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
+    },
+  ),
+);
