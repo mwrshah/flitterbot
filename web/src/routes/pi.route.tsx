@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Badge } from "~/components/ui/badge";
 import { piSessionStore, resetPiSessionStore } from "~/lib/pi-session-store";
 import { statusQueryOptions } from "~/lib/queries";
+import { StreamChunker } from "~/lib/stream-chunker";
 import type {
   ChatTimelineTool,
   ConnectionState,
@@ -88,8 +89,11 @@ function PiLayoutRoute() {
   }, [wsClient, defaultSessionId, allOrchestrators.map((o) => o.sessionId).join(",")]);
 
   // WebSocket event subscription — routes events to correct session via store
+  const chunkersRef = useRef<Map<string, StreamChunker>>(new Map());
+
   useEffect(() => {
     const store = piSessionStore;
+    const chunkers = chunkersRef.current;
 
     const unsubscribe = wsClient.subscribe((message: WsMessage) => {
       const sessionId =
@@ -139,20 +143,10 @@ function PiLayoutRoute() {
 
       if (message.type === "text_delta") {
         const itemId = message.messageId;
-        store.updateSession(sessionId, (s) => {
-          const existing = s.appendedItems.find((item) => item.id === itemId);
-          if (existing && existing.kind === "message") {
-            return {
-              ...s,
-              appendedItems: s.appendedItems.map((item) =>
-                item.id === itemId && item.kind === "message"
-                  ? { ...item, content: item.content + message.delta }
-                  : item,
-              ),
-            };
-          }
-          // First delta with this messageId — create a streaming timeline item
-          return {
+
+        if (!chunkers.has(itemId)) {
+          // First delta — create the streaming timeline item
+          store.updateSession(sessionId, (s) => ({
             ...s,
             appendedItems: [
               ...s.appendedItems,
@@ -160,17 +154,47 @@ function PiLayoutRoute() {
                 id: itemId,
                 kind: "message" as const,
                 role: "assistant" as const,
-                content: message.delta,
+                content: "",
                 streaming: true,
                 createdAt: new Date().toISOString(),
               },
             ],
-          };
-        });
+          }));
+
+          const chunker = new StreamChunker({
+            onChunk: (fullText) => {
+              store.updateSession(sessionId, (s) => ({
+                ...s,
+                appendedItems: s.appendedItems.map((item) =>
+                  item.id === itemId && item.kind === "message"
+                    ? { ...item, content: fullText }
+                    : item,
+                ),
+              }));
+            },
+          });
+          chunkers.set(itemId, chunker);
+
+          if (import.meta.env.DEV) {
+            (window as any).__streamChunker = chunker;
+          }
+        }
+
+        chunkers.get(itemId)!.push(message.delta);
         return;
       }
 
       if (message.type === "message_end") {
+        // Destroy chunker for this message
+        const msgChunker = chunkers.get(message.message.id);
+        if (msgChunker) {
+          msgChunker.destroy();
+          chunkers.delete(message.message.id);
+          if (import.meta.env.DEV && (window as any).__streamChunker === msgChunker) {
+            (window as any).__streamChunker = null;
+          }
+        }
+
         const msg = message.message;
         if (!msg.content.trim()) return;
 
@@ -231,6 +255,15 @@ function PiLayoutRoute() {
       }
 
       if (message.type === "turn_end") {
+        // Destroy all remaining chunkers for this session
+        for (const [id, c] of chunkers) {
+          c.destroy();
+          chunkers.delete(id);
+        }
+        if (import.meta.env.DEV) {
+          (window as any).__streamChunker = null;
+        }
+
         store.updateSession(sessionId, (s) => ({
           ...s,
           appendedItems: [
@@ -267,6 +300,14 @@ function PiLayoutRoute() {
     return () => {
       unsubscribe();
       unsubscribeConnection();
+      // Destroy all chunkers on teardown
+      for (const c of chunkers.values()) {
+        c.destroy();
+      }
+      chunkers.clear();
+      if (import.meta.env.DEV) {
+        (window as any).__streamChunker = null;
+      }
     };
   }, [wsClient, defaultSessionId]);
 
