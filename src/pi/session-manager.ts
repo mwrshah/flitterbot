@@ -13,6 +13,9 @@ import { createAutonomaAgent } from "./create-agent.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
+import { formatWorkstreamPrompt } from "./format-workstream-prompt.ts";
+
+export { formatWorkstreamPrompt };
 
 export interface ManagedPiSession {
   session: AgentSession;
@@ -246,11 +249,7 @@ export class PiSessionManager {
     workstreamName: string,
     workstreamId: string,
   ): string {
-    return this.formatWorkstreamMessage(currentMessage, workstreamName, workstreamId);
-  }
-
-  private formatWorkstreamMessage(message: string, name: string, id: string): string {
-    return `[Workstream: "${name}" (${id})] [NEW]\n${message}\n\nIMPORTANT: Before doing anything else, run /load2-w to load essential skills.`;
+    return formatWorkstreamPrompt([currentMessage], workstreamName, workstreamId);
   }
 
   private logResourceInfo(

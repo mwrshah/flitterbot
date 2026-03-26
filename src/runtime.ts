@@ -899,13 +899,49 @@ export class ControlSurfaceRuntime {
               workstreamName: ws.name,
             });
 
-            // Pass through the original user message to the new workstream
+            // Pass through relevant context messages to the new workstream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
 
             if (originalText) {
-              const messageText = originalText;
-              const prompt = this.sessionManager.buildWorkstreamPrompt(messageText, ws.name, ws.id);
+              let prompt: string;
+              try {
+                const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
+                const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
+                const { classifyContextRelevance } = await import("./classifier/context-relevance.ts");
+                const { formatWorkstreamPrompt } = await import("./pi/format-workstream-prompt.ts");
+                const apiKey = resolveGroqApiKey();
+
+                const recentMessages = getRecentDefaultMessages(this.blackboard, 10);
+
+                if (apiKey && recentMessages.length > 1) {
+                  const relevance = await classifyContextRelevance(recentMessages, ws.name, apiKey);
+                  const relevantTexts = recentMessages
+                    .filter((_, i) => relevance[i])
+                    .map((m) => m.content);
+
+                  if (relevantTexts.length > 1) {
+                    // Ensure the current message is included (it may not be persisted yet)
+                    if (!relevantTexts.includes(originalText)) {
+                      relevantTexts.push(originalText);
+                    }
+                    prompt = formatWorkstreamPrompt(relevantTexts, ws.name, ws.id);
+                    this.log(
+                      `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
+                    );
+                  } else {
+                    prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+                  }
+                } else {
+                  prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+                }
+              } catch (error) {
+                this.log(
+                  `context classifier failed, falling back to single message: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+              }
+
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,

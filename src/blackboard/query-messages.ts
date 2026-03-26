@@ -87,6 +87,20 @@ export type ConversationSnippet = {
   sender: string | null;
 };
 
+export function getRecentDefaultMessages(
+  db: BlackboardDatabase,
+  limit: number = 10,
+): Pick<MessageRow, "content" | "created_at">[] {
+  const rows = db.all<Pick<MessageRow, "content" | "created_at">>(
+    `SELECT content, created_at FROM messages
+     WHERE direction = 'inbound' AND workstream_id IS NULL
+     ORDER BY created_at DESC LIMIT ?`,
+    limit,
+  );
+  // Return in chronological order
+  return rows.reverse();
+}
+
 export function getRecentConversationByWorkstream(
   db: BlackboardDatabase,
   withinHours: number,
