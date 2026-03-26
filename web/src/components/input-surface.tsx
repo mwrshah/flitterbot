@@ -5,7 +5,9 @@ import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
+import { buildStreamingAssistantMessage } from "~/lib/pi-web-ui-bridge";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import { StreamChunker } from "~/lib/stream-chunker";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -14,6 +16,7 @@ import type {
   MessageSource,
 } from "~/lib/types";
 import { mergeTimelines } from "~/lib/utils";
+import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
 
 const emptySubscribe = () => () => {};
 const useIsClient = () =>
@@ -350,6 +353,63 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingRef = useRef<PiStreamingMessageHandle>(null);
+
+  // Subscribe to streaming deltas from ALL sessions (global view).
+  useEffect(() => {
+    const chunker = new StreamChunker({
+      onChunk: (fullText) => {
+        streamingRef.current?.update(buildStreamingAssistantMessage(fullText));
+      },
+    });
+
+    let activeSessionId: string | null = null;
+    let seenLen = 0;
+    let streaming = false;
+
+    const callback = (sessionId: string, text: string | null, _messageId: string | null) => {
+      if (text === null) {
+        // Stream ended for this session
+        if (sessionId === activeSessionId) {
+          chunker.flush();
+          streamingRef.current?.clear();
+          activeSessionId = null;
+          seenLen = 0;
+          streaming = false;
+          setIsStreaming(false);
+        }
+        return;
+      }
+
+      // If a different session starts streaming, reset
+      if (sessionId !== activeSessionId) {
+        if (activeSessionId !== null) {
+          chunker.flush();
+          streamingRef.current?.clear();
+        }
+        activeSessionId = sessionId;
+        seenLen = 0;
+      }
+
+      if (text.length > seenLen) {
+        chunker.push(text.slice(seenLen));
+        seenLen = text.length;
+      }
+      if (!streaming) {
+        streaming = true;
+        setIsStreaming(true);
+      }
+    };
+
+    piSessionStore.onAnyStreamingDelta(callback);
+
+    return () => {
+      piSessionStore.offAnyStreamingDelta(callback);
+      chunker.destroy();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, appendedItems),
     [loaderTimeline, appendedItems],
@@ -410,6 +470,19 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
         {entries.map((entry) => (
           <SurfaceEntryRenderer key={entry.id} entry={entry} />
         ))}
+        {/* Live streaming entry — styled like a PiResponseEntry */}
+        <div className={`flex gap-3 items-start ${isStreaming ? "" : "hidden"}`}>
+          <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
+            <span className="text-[10px] text-muted-foreground/60">&nbsp;</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <span className="text-[10px] font-medium text-muted-foreground">Pi</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <PiStreamingMessage ref={streamingRef} />
+          </div>
+        </div>
       </div>
 
       <MessageInput

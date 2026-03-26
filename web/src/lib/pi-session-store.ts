@@ -14,9 +14,11 @@ export function emptyAccum(): SessionAccum {
 
 type StreamingState = { text: string; messageId: string };
 type StreamingCallback = (text: string | null, messageId: string | null) => void;
+type GlobalStreamingCallback = (sessionId: string, text: string | null, messageId: string | null) => void;
 
 const activeStreams = new Map<string, StreamingState>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
+const globalStreamingCallbacks = new Set<GlobalStreamingCallback>();
 
 export type PiSessionStore = {
   getSessionAccum: (sessionId: string) => SessionAccum;
@@ -42,6 +44,9 @@ export type PiSessionStore = {
   clearStreamingState: (sessionId: string) => void;
   onStreamingDelta: (sessionId: string, callback: StreamingCallback) => void;
   offStreamingDelta: (sessionId: string) => void;
+  /** Subscribe to streaming deltas from ANY session (for global views like Input Surface). */
+  onAnyStreamingDelta: (callback: GlobalStreamingCallback) => void;
+  offAnyStreamingDelta: (callback: GlobalStreamingCallback) => void;
 };
 
 export type PiSessionSnapshot = {
@@ -133,23 +138,29 @@ export function createPiSessionStore(): PiSessionStore {
       } else {
         activeStreams.set(sessionId, { text: delta, messageId });
       }
+      const state = activeStreams.get(sessionId)!;
       const cb = streamingCallbacks.get(sessionId);
-      if (cb) {
-        const state = activeStreams.get(sessionId)!;
-        cb(state.text, state.messageId);
-      }
+      if (cb) cb(state.text, state.messageId);
+      for (const gcb of globalStreamingCallbacks) gcb(sessionId, state.text, state.messageId);
     },
     getStreamingState: (sessionId) => activeStreams.get(sessionId) ?? null,
     clearStreamingState: (sessionId) => {
       activeStreams.delete(sessionId);
       const cb = streamingCallbacks.get(sessionId);
       if (cb) cb(null, null);
+      for (const gcb of globalStreamingCallbacks) gcb(sessionId, null, null);
     },
     onStreamingDelta: (sessionId, callback) => {
       streamingCallbacks.set(sessionId, callback);
     },
     offStreamingDelta: (sessionId) => {
       streamingCallbacks.delete(sessionId);
+    },
+    onAnyStreamingDelta: (callback) => {
+      globalStreamingCallbacks.add(callback);
+    },
+    offAnyStreamingDelta: (callback) => {
+      globalStreamingCallbacks.delete(callback);
     },
   };
 }
