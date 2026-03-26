@@ -104,6 +104,8 @@ export class AutonomaWsClient {
     };
 
     this.socket.onclose = () => {
+      // Clear stale reference — this socket is now CLOSED
+      this.socket = null;
       this.stopHeartbeat();
       // If we were CONNECTED, transition to RECONNECTING (not DISCONNECTED)
       // If we were CONNECTING (never made it to open), go to DISCONNECTED and schedule
@@ -145,13 +147,19 @@ export class AutonomaWsClient {
   // ── Socket cleanup ──
 
   private closeSocket() {
-    if (this.socket) {
-      this.socket.onclose = null;
-      this.socket.onerror = null;
-      this.socket.onmessage = null;
-      this.socket.onopen = null;
-      this.socket.close();
-      this.socket = null;
+    const s = this.socket;
+    if (!s) return;
+    // Dereference immediately so nothing else uses the stale socket
+    this.socket = null;
+    // Use no-op handlers (not null) so the browser can still dispatch
+    // close/error events and complete the WebSocket close handshake.
+    // Nulling handlers prevents event dispatch, leaving sockets "Pending".
+    s.onclose = () => {};
+    s.onerror = () => {};
+    s.onmessage = null;
+    s.onopen = null;
+    if (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING) {
+      s.close();
     }
   }
 
