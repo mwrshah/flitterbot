@@ -12,7 +12,8 @@ export type WebSocketClient = {
   id: string;
   socket: net.Socket;
   buffer: Buffer;
-  subscriptions: Set<string>;
+  /** sessionId → event type filter (null = all event types) */
+  subscriptions: Map<string, Set<string> | null>;
 };
 
 type WebSocketMessageHandler = (
@@ -65,7 +66,7 @@ export class WebSocketHub {
       id: crypto.randomUUID(),
       socket,
       buffer: head && head.length > 0 ? Buffer.from(head) : Buffer.alloc(0),
-      subscriptions: new Set(),
+      subscriptions: new Map(),
     };
     this.clients.set(client.id, client);
     socket.on("data", (chunk) => {
@@ -85,6 +86,7 @@ export class WebSocketHub {
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
     const sessionId =
       "sessionId" in payload ? (payload.sessionId as string | undefined) : undefined;
+    const eventType = payload.type;
     const frame = encodeFrame(JSON.stringify(payload));
     for (const client of this.clients.values()) {
       // No sessionId on event → global event, deliver to all
@@ -94,8 +96,11 @@ export class WebSocketHub {
       }
       // Client has no subscriptions → skip (they haven't subscribed to anything)
       if (client.subscriptions.size === 0) continue;
-      // Wildcard or matching subscription
-      if (client.subscriptions.has("*") || client.subscriptions.has(sessionId)) {
+      // Check wildcard subscription first, then exact session match
+      const filter = client.subscriptions.get("*") ?? client.subscriptions.get(sessionId);
+      if (filter === undefined) continue;
+      // null filter = all event types; Set filter = only matching types
+      if (filter === null || filter.has(eventType)) {
         this.safeWrite(client, frame);
       }
     }
@@ -109,9 +114,11 @@ export class WebSocketHub {
     }
   }
 
-  subscribeClient(clientId: string, sessionId: string): void {
+  subscribeClient(clientId: string, sessionId: string, eventTypes?: string[]): void {
     const client = this.clients.get(clientId);
-    if (client) client.subscriptions.add(sessionId);
+    if (client) {
+      client.subscriptions.set(sessionId, eventTypes ? new Set(eventTypes) : null);
+    }
   }
 
   unsubscribeClient(clientId: string, sessionId: string): void {

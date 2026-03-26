@@ -1384,7 +1384,7 @@ export class ControlSurfaceRuntime {
       return;
     }
     if (payload.type === "subscribe" && typeof payload.sessionId === "string") {
-      this.wsHub.subscribeClient(client.id, payload.sessionId);
+      this.wsHub.subscribeClient(client.id, payload.sessionId, Array.isArray(payload.eventTypes) ? payload.eventTypes : undefined);
       return;
     }
     if (payload.type === "unsubscribe" && typeof payload.sessionId === "string") {

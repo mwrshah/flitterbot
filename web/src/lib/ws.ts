@@ -34,7 +34,8 @@ export class AutonomaWsClient {
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
-  private activeSubscriptions = new Set<string>();
+  /** sessionId → event type filter (undefined = all event types) */
+  private activeSubscriptions = new Map<string, string[] | undefined>();
 
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -87,8 +88,10 @@ export class AutonomaWsClient {
       this.transition("connected");
       this.startHeartbeat();
       this.listenVisibility();
-      for (const sessionId of this.activeSubscriptions) {
-        this.socket?.send(JSON.stringify({ type: "subscribe", sessionId }));
+      for (const [sessionId, eventTypes] of this.activeSubscriptions) {
+        const msg: Record<string, unknown> = { type: "subscribe", sessionId };
+        if (eventTypes) msg.eventTypes = eventTypes;
+        this.socket?.send(JSON.stringify(msg));
       }
     };
 
@@ -285,10 +288,12 @@ export class AutonomaWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
-  subscribeSession(sessionId: string): void {
-    this.activeSubscriptions.add(sessionId);
+  subscribeSession(sessionId: string, eventTypes?: string[]): void {
+    this.activeSubscriptions.set(sessionId, eventTypes);
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: "subscribe", sessionId }));
+      const msg: Record<string, unknown> = { type: "subscribe", sessionId };
+      if (eventTypes) msg.eventTypes = eventTypes;
+      this.socket.send(JSON.stringify(msg));
     }
   }
 

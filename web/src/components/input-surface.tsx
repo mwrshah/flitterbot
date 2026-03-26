@@ -393,10 +393,8 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
       }
     });
 
-    // Subscribe to ALL sessions so the server delivers session-scoped events
-    // (message_end, pi_surfaced) to this client. Without this, hub.ts skips
-    // clients with zero subscriptions.
-    wsClient.subscribeSession("*");
+    // Subscribe to ALL sessions but only the event types this surface needs.
+    wsClient.subscribeSession("*", ["message_end", "pi_surfaced"]);
 
     return () => {
       unsubscribe();

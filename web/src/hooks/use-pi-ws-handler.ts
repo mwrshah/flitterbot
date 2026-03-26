@@ -28,14 +28,6 @@ export function usePiWsHandler(
     resetPiSessionStore();
   }, []);
 
-  // Subscribe to wildcard so we receive all session-scoped events
-  useEffect(() => {
-    wsClient.subscribeSession("*");
-    return () => {
-      wsClient.unsubscribeSession("*");
-    };
-  }, [wsClient]);
-
   // WebSocket event subscription — routes events to correct session via store
   useEffect(() => {
     const store = piSessionStore;
