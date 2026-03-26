@@ -12,7 +12,7 @@ async function piRequest(path: string): Promise<unknown> {
   };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3_000);
+  const timeout = setTimeout(() => controller.abort(), 8_000);
 
   try {
     const res = await fetch(url, { headers, signal: controller.signal });
@@ -33,15 +33,25 @@ export const fetchPiHistory = createServerFn({ method: "GET" })
     if (data.surface) params.set("surface", data.surface);
     const qs = params.toString();
     const path = qs ? `/api/pi/history?${qs}` : "/api/pi/history";
-    const res = (await piRequest(path)) as { items: ChatTimelineItem[] };
-    return res.items;
+    try {
+      const res = (await piRequest(path)) as { items: ChatTimelineItem[] };
+      return res.items;
+    } catch (err) {
+      console.error("fetchPiHistory failed (piSessionId=%s, surface=%s):", data.piSessionId ?? "none", data.surface ?? "none", err);
+      throw err;
+    }
   });
 
 export const fetchPiInputHistory = createServerFn({ method: "GET" }).handler(
   async (): Promise<AnyJson> => {
-    const res = (await piRequest("/api/pi/history?surface=input")) as {
-      items: ChatTimelineItem[];
-    };
-    return res.items;
+    try {
+      const res = (await piRequest("/api/pi/history?surface=input")) as {
+        items: ChatTimelineItem[];
+      };
+      return res.items;
+    } catch (err) {
+      console.error("fetchPiInputHistory failed:", err);
+      throw err;
+    }
   },
 );
