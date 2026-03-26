@@ -42,7 +42,7 @@ export type ChatTimelineTool = {
   id: string;
   kind: "tool";
   tool: string;
-  phase: "start" | "end";
+  phase: "start" | "update" | "end";
   toolUseId?: string;
   args?: JsonValue;
   result?: JsonValue;

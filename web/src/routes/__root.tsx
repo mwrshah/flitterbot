@@ -1,24 +1,19 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
   Scripts,
-  useRouter,
 } from "@tanstack/react-router";
 import type * as React from "react";
-import { useEffect, useRef } from "react";
 import { AppShell } from "~/components/app-shell";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
 import { NotFound } from "~/components/not-found";
-import { usePiWsHandler } from "~/hooks/use-pi-ws-handler";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
-import type { ConnectionState, WsMessage } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
 import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";
@@ -76,43 +71,7 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
-  const { apiClient, wsClient } = Route.useRouteContext();
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const prevConnectionRef = useRef<ConnectionState>(wsClient.connectionState);
-
-  // Status query — needed to resolve defaultSessionId for the WS handler
-  const statusQuery = useQuery({
-    ...statusQueryOptions(apiClient),
-    retry: 1,
-  });
-  const defaultSessionId = statusQuery.data?.pi?.default?.sessionId;
-
-  useWhyDidYouRender("RootComponent", { apiClient, wsClient, queryClient, router, defaultSessionId });
-
-  // Route all WS events into piSessionStore — always active regardless of current route
-  usePiWsHandler(wsClient, apiClient, defaultSessionId);
-
-  // Invalidate status query when workstreams change via WebSocket — single listener for all consumers
-  useEffect(() => {
-    return wsClient.subscribe((message: WsMessage) => {
-      if (message.type === "workstreams_changed" || message.type === "status_changed") {
-        queryClient.invalidateQueries({ queryKey: ["status"] });
-      }
-    });
-  }, [wsClient, queryClient]);
-
-  // Re-run all route loaders on WS reconnect so stale data is replaced with fresh server state
-  useEffect(() => {
-    return wsClient.subscribeConnection((state: ConnectionState) => {
-      const prev = prevConnectionRef.current;
-      prevConnectionRef.current = state;
-      if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
-        queryClient.invalidateQueries();
-        router.invalidate();
-      }
-    });
-  }, [wsClient, router, queryClient]);
+  useWhyDidYouRender("RootComponent", {});
 
   return (
     <RootDocument>

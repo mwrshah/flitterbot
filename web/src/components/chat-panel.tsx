@@ -4,12 +4,11 @@ import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalSt
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
-import { piSessionStore } from "~/lib/pi-session-store";
+import { streamingStore } from "~/lib/streaming-store";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
-
-type StatusPill = { id: string; label: string; variant?: "info" | "error" };
+import type { StatusPill } from "~/lib/queries";
 
 const emptySubscribe = () => () => {};
 const useIsClient = () =>
@@ -83,10 +82,9 @@ export function ChatPanel({
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
-  // Wire streaming deltas from the session store to the Lit web component
+  // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
-    const store = piSessionStore;
-    store.onStreamingDelta(sessionId, (text, messageId) => {
+    streamingStore.onStreamingDelta(sessionId, (text, messageId) => {
       if (text != null && messageId != null) {
         messageListRef.current?.updateStreaming({
           role: "assistant",
@@ -103,7 +101,7 @@ export function ChatPanel({
       }
     });
     return () => {
-      store.offStreamingDelta(sessionId);
+      streamingStore.offStreamingDelta(sessionId);
     };
   }, [sessionId]);
 

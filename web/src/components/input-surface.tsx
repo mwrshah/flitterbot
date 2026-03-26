@@ -13,6 +13,7 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
+import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -21,7 +22,8 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { createId, mergeTimelines } from "~/lib/utils";
+import { mergeTimelines } from "~/lib/utils";
+import { sendMessage as wsSendMessage } from "~/lib/ws-query-bridge";
 
 /* ── Types ── */
 
@@ -319,7 +321,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
-  const [appendedItems, setAppendedItems] = useState<ChatTimelineItem[]>([]);
   const connectionState = useSyncExternalStore(
     useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
     useCallback(() => wsClient.connectionState, [wsClient]),
@@ -333,70 +334,16 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     refetchOnWindowFocus: false,
   });
 
+  // WS-appended items from Query cache (written by ws-query-bridge)
+  const { data: wsAppendedItems = [] } = useQuery(inputSurfaceTimelineQueryOptions());
+
   const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
 
   const timeline = useMemo(
-    () => mergeTimelines(loaderTimeline, appendedItems),
-    [loaderTimeline, appendedItems],
+    () => mergeTimelines(loaderTimeline, wsAppendedItems),
+    [loaderTimeline, wsAppendedItems],
   );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
-
-  // WebSocket events — append to local state; deduped against loader via mergeTimelines
-  useEffect(() => {
-    const unsubscribe = wsClient.subscribe((message) => {
-      if (message.type === "text_delta") {
-        // Intentionally ignored — Input Surface only shows final pi_surfaced messages,
-        // not intermediate streaming text (which may include reasoning, tool calls, etc.)
-        return;
-      }
-
-      if (message.type === "message_end") {
-        const msg = message.message;
-        // Skip intermediate assistant messages (pre-tool-call fragments within a turn)
-        if (msg.intermediate) return;
-
-        if (msg.role === "user") {
-          const source = msg.source ?? "web";
-          if (source !== "web" && source !== "whatsapp") return;
-          if (msg.content.trim()) {
-            setAppendedItems((current) => {
-              if (current.some((item) => item.id === msg.id)) return current;
-              return [...current, msg];
-            });
-          }
-          return;
-        }
-
-        // Don't add assistant message_end to timeline — only pi_surfaced events appear
-        return;
-      }
-
-      if (message.type === "pi_surfaced") {
-        if (message.content.trim()) {
-          const id = message.messageId ? `${message.messageId}:message` : createId("assistant");
-          setAppendedItems((current) => {
-            if (current.some((item) => item.id === id)) return current;
-            return [
-              ...current,
-              {
-                id,
-                kind: "message",
-                role: "assistant",
-                content: message.content,
-                workstreamName: message.workstreamName,
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ];
-          });
-        }
-        return;
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [wsClient]);
 
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -430,7 +377,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     engageAndScroll();
 
     try {
-      await wsClient.sendMessage(text || "(image)", deliveryMode, images);
+      await wsSendMessage(text || "(image)", deliveryMode, images);
     } catch {
       await apiClient.sendMessage({
         text: text || "(image)",

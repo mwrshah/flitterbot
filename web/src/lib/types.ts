@@ -182,6 +182,7 @@ export type WsMessage =
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
+      id?: string;
       tool?: string;
       toolUseId?: string;
       args?: unknown;
@@ -189,6 +190,15 @@ export type WsMessage =
       isError?: boolean;
       event?: unknown;
       timestamp?: string;
+      sessionId?: string;
+    }
+  | { type: "thinking_delta"; delta: string; sessionId?: string; messageId: string }
+  | { type: "toolcall_start"; contentIndex: number; toolName?: string; sessionId?: string }
+  | { type: "toolcall_delta"; contentIndex: number; delta: string; sessionId?: string }
+  | {
+      type: "tool_execution_update";
+      toolUseId?: string;
+      partialResult?: unknown;
       sessionId?: string;
     }
   | { type: "turn_end"; sessionId?: string }
