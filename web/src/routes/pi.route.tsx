@@ -56,9 +56,14 @@ function PiLayoutRoute() {
     ? [...openOrchestrators, ephemeralOrchestrator]
     : openOrchestrators;
 
-  // Subscribe to default agent + all orchestrator sessions
+  // Subscribe to default agent + all orchestrator sessions.
+  // Guard: skip until status data has loaded so deps are stable on first fire
+  // (avoids subscribe→unsubscribe→subscribe flutter during query hydration).
   const defaultSessionId = defaultPi?.sessionId;
+  const orchestratorSessionIds = allOrchestrators.map((o) => o.sessionId).join(",");
   useEffect(() => {
+    if (!defaultSessionId && allOrchestrators.length === 0) return;
+
     const sessionIds = allOrchestrators.map((o) => o.sessionId);
     if (defaultSessionId) {
       sessionIds.push(defaultSessionId);
@@ -71,7 +76,7 @@ function PiLayoutRoute() {
         wsClient.unsubscribeSession(id);
       }
     };
-  }, [wsClient, defaultSessionId, allOrchestrators.map((o) => o.sessionId).join(",")]);
+  }, [wsClient, defaultSessionId, orchestratorSessionIds]);
 
   return (
     <div className="flex flex-col h-full">
