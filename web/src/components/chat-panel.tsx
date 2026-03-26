@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import { pendingToolCallsFromTimeline, timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
+import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
+import { piSessionStore } from "~/lib/pi-session-store";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
-import { PiMessageList } from "./pi-message-list";
+import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
@@ -46,6 +47,7 @@ function connectionVariant(state: ConnectionState): "success" | "warning" | "mut
 }
 
 type ChatPanelProps = {
+  sessionId: string;
   timeline: ChatTimelineItem[];
   statusPills: StatusPill[];
   connectionState: ConnectionState;
@@ -57,6 +59,7 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({
+  sessionId,
   timeline,
   statusPills,
   connectionState,
@@ -65,6 +68,7 @@ export function ChatPanel({
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
+  const messageListRef = useRef<PiMessageListHandle>(null);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
     queryFn: () => apiClient.listSkills(),
@@ -79,11 +83,29 @@ export function ChatPanel({
 
   const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
 
-  const pendingToolCalls = useMemo(() => pendingToolCallsFromTimeline(timeline), [timeline]);
-
-  const isStreaming = timeline.some(
-    (item) => item.kind === "message" && item.streaming,
-  );
+  // Wire streaming deltas from the session store to the Lit web component
+  useEffect(() => {
+    const store = piSessionStore;
+    store.onStreamingDelta(sessionId, (text, messageId) => {
+      if (text != null && messageId != null) {
+        messageListRef.current?.updateStreaming({
+          role: "assistant",
+          content: [{ type: "text", text }],
+          api: "openai-responses",
+          provider: "openai",
+          model: "",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          stopReason: "stop",
+          timestamp: Date.now(),
+        });
+      } else {
+        messageListRef.current?.clearStreaming();
+      }
+    });
+    return () => {
+      store.offStreamingDelta(sessionId);
+    };
+  }, [sessionId]);
 
   function addImageFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -149,9 +171,8 @@ export function ChatPanel({
       {/* Message area — fills all available space */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
         <PiMessageList
+          ref={messageListRef}
           messages={agentMessages}
-          isStreaming={isStreaming}
-          pendingToolCalls={pendingToolCalls}
         />
       </div>
 

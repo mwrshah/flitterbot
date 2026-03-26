@@ -13,10 +13,14 @@ export function emptyAccum(): SessionAccum {
 }
 
 type StreamingState = { text: string; messageId: string };
+type StreamingThinkingState = { text: string; messageId: string };
+type StreamingToolCall = { contentIndex: number; toolName: string; argsJson: string };
 type StreamingCallback = (text: string | null, messageId: string | null) => void;
 type GlobalStreamingCallback = (sessionId: string, text: string | null, messageId: string | null) => void;
 
 const activeStreams = new Map<string, StreamingState>();
+const activeThinkingStreams = new Map<string, StreamingThinkingState>();
+const activeToolCalls = new Map<string, StreamingToolCall[]>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 const globalStreamingCallbacks = new Set<GlobalStreamingCallback>();
 
@@ -47,6 +51,11 @@ export type PiSessionStore = {
   /** Subscribe to streaming deltas from ANY session (for global views like Input Surface). */
   onAnyStreamingDelta: (callback: GlobalStreamingCallback) => void;
   offAnyStreamingDelta: (callback: GlobalStreamingCallback) => void;
+  appendStreamingThinkingDelta: (sessionId: string, messageId: string, delta: string) => void;
+  clearStreamingThinkingState: (sessionId: string) => void;
+  startStreamingToolCall: (sessionId: string, contentIndex: number, toolName: string) => void;
+  appendStreamingToolCallDelta: (sessionId: string, contentIndex: number, delta: string) => void;
+  clearStreamingToolCalls: (sessionId: string) => void;
 };
 
 export type PiSessionSnapshot = {
@@ -161,6 +170,36 @@ export function createPiSessionStore(): PiSessionStore {
     },
     offAnyStreamingDelta: (callback) => {
       globalStreamingCallbacks.delete(callback);
+    },
+    appendStreamingThinkingDelta: (sessionId, messageId, delta) => {
+      const existing = activeThinkingStreams.get(sessionId);
+      if (existing) {
+        existing.text += delta;
+        existing.messageId = messageId;
+      } else {
+        activeThinkingStreams.set(sessionId, { text: delta, messageId });
+      }
+      // Trigger streaming callbacks so the UI can re-render with thinking content
+      const streamState = activeStreams.get(sessionId);
+      const cb = streamingCallbacks.get(sessionId);
+      if (cb && streamState) cb(streamState.text, streamState.messageId);
+    },
+    clearStreamingThinkingState: (sessionId) => {
+      activeThinkingStreams.delete(sessionId);
+    },
+    startStreamingToolCall: (sessionId, contentIndex, toolName) => {
+      const calls = activeToolCalls.get(sessionId) ?? [];
+      calls.push({ contentIndex, toolName, argsJson: "" });
+      activeToolCalls.set(sessionId, calls);
+    },
+    appendStreamingToolCallDelta: (sessionId, contentIndex, delta) => {
+      const calls = activeToolCalls.get(sessionId);
+      if (!calls) return;
+      const call = calls.find((c) => c.contentIndex === contentIndex);
+      if (call) call.argsJson += delta;
+    },
+    clearStreamingToolCalls: (sessionId) => {
+      activeToolCalls.delete(sessionId);
     },
   };
 }

@@ -34,6 +34,7 @@ function PiSessionRoute() {
 
   return (
     <ChatPanel
+      sessionId={sessionId}
       timeline={mergeTimelines(history, accum.appendedItems)}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Badge } from "~/components/ui/badge";
 import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
@@ -58,11 +58,16 @@ function PiLayoutRoute() {
 
   // Subscribe to default agent + all orchestrator sessions
   const defaultSessionId = defaultPi?.sessionId;
+  const orchestratorSessionIds = useMemo(
+    () => allOrchestrators.map((o) => o.sessionId).join(","),
+    [allOrchestrators],
+  );
   useEffect(() => {
-    const sessionIds = allOrchestrators.map((o) => o.sessionId);
+    const sessionIds = orchestratorSessionIds ? orchestratorSessionIds.split(",") : [];
     if (defaultSessionId) {
       sessionIds.push(defaultSessionId);
     }
+    if (sessionIds.length === 0) return;
     for (const id of sessionIds) {
       wsClient.subscribeSession(id);
     }
@@ -71,7 +76,7 @@ function PiLayoutRoute() {
         wsClient.unsubscribeSession(id);
       }
     };
-  }, [wsClient, defaultSessionId, allOrchestrators.map((o) => o.sessionId).join(",")]);
+  }, [wsClient, defaultSessionId, orchestratorSessionIds]);
 
   return (
     <div className="flex flex-col h-full">

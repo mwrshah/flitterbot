@@ -33,6 +33,7 @@ function PiDefaultRoute() {
 
   return (
     <ChatPanel
+      sessionId={defaultSessionId ?? ""}
       timeline={mergeTimelines(history, accum.appendedItems)}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}
