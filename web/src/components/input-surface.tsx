@@ -393,12 +393,8 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
       }
     });
 
-    // Subscribe to ALL sessions but only the event types this surface needs.
-    wsClient.subscribeSession("*", ["message_end", "pi_surfaced"]);
-
     return () => {
       unsubscribe();
-      wsClient.unsubscribeSession("*");
     };
   }, [wsClient]);
 

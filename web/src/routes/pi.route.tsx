@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+
 import { Badge } from "~/components/ui/badge";
 import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/pi")({
 /* ── Layout component ── */
 
 function PiLayoutRoute() {
-  const { apiClient, wsClient } = Route.useRouteContext();
+  const { apiClient } = Route.useRouteContext();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -56,27 +56,6 @@ function PiLayoutRoute() {
     ? [...openOrchestrators, ephemeralOrchestrator]
     : openOrchestrators;
 
-  // Subscribe to default agent + all orchestrator sessions
-  const defaultSessionId = defaultPi?.sessionId;
-  const orchestratorSessionIds = useMemo(
-    () => allOrchestrators.map((o) => o.sessionId).join(","),
-    [allOrchestrators],
-  );
-  useEffect(() => {
-    const sessionIds = orchestratorSessionIds ? orchestratorSessionIds.split(",") : [];
-    if (defaultSessionId) {
-      sessionIds.push(defaultSessionId);
-    }
-    if (sessionIds.length === 0) return;
-    for (const id of sessionIds) {
-      wsClient.subscribeSession(id);
-    }
-    return () => {
-      for (const id of sessionIds) {
-        wsClient.unsubscribeSession(id);
-      }
-    };
-  }, [wsClient, defaultSessionId, orchestratorSessionIds]);
 
   return (
     <div className="flex flex-col h-full">

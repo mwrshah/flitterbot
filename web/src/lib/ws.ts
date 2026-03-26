@@ -34,9 +34,6 @@ export class AutonomaWsClient {
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
-  /** sessionId → event type filter (undefined = all event types) */
-  private activeSubscriptions = new Map<string, string[] | undefined>();
-
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private boundVisibilityHandler: (() => void) | null = null;
@@ -88,11 +85,8 @@ export class AutonomaWsClient {
       this.transition("connected");
       this.startHeartbeat();
       this.listenVisibility();
-      for (const [sessionId, eventTypes] of this.activeSubscriptions) {
-        const msg: Record<string, unknown> = { type: "subscribe", sessionId };
-        if (eventTypes) msg.eventTypes = eventTypes;
-        this.socket?.send(JSON.stringify(msg));
-      }
+      // Subscribe to all sessions on connect — no per-component subscription management
+      this.socket?.send(JSON.stringify({ type: "subscribe", sessionId: "*" }));
     };
 
     this.socket.onmessage = (event) => {
@@ -288,21 +282,11 @@ export class AutonomaWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
-  subscribeSession(sessionId: string, eventTypes?: string[]): void {
-    this.activeSubscriptions.set(sessionId, eventTypes);
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      const msg: Record<string, unknown> = { type: "subscribe", sessionId };
-      if (eventTypes) msg.eventTypes = eventTypes;
-      this.socket.send(JSON.stringify(msg));
-    }
-  }
+  /** @deprecated No-op — subscriptions are managed globally on connect. */
+  subscribeSession(_sessionId: string, _eventTypes?: string[]): void {}
 
-  unsubscribeSession(sessionId: string): void {
-    this.activeSubscriptions.delete(sessionId);
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: "unsubscribe", sessionId }));
-    }
-  }
+  /** @deprecated No-op — subscriptions are managed globally on connect. */
+  unsubscribeSession(_sessionId: string): void {}
 
   subscribe(fn: WsSubscriber): () => void {
     this.subscribers.add(fn);
