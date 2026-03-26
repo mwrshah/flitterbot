@@ -3,6 +3,7 @@ import type { ConnectionState, WsMessage } from "./types";
 
 type WsSubscriber = (message: WsMessage) => void;
 type ConnectionSubscriber = (state: ConnectionState) => void;
+type SessionSubscription = { sessionId: string; eventTypes?: string[] };
 
 // ── Heartbeat config ──
 const HEARTBEAT_INTERVAL = 30_000;
@@ -31,6 +32,9 @@ export class AutonomaWsClient {
   private socket: WebSocket | null = null;
   private subscribers = new Set<WsSubscriber>();
   private connectionSubscribers = new Set<ConnectionSubscriber>();
+  private nextSubscriptionClaimId = 1;
+  private subscriptionClaims = new Map<number, SessionSubscription>();
+  private effectiveSubscriptions = new Map<string, string[] | undefined>();
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -85,8 +89,7 @@ export class AutonomaWsClient {
       this.transition("connected");
       this.startHeartbeat();
       this.listenVisibility();
-      // Subscribe to all sessions on connect — no per-component subscription management
-      this.socket?.send(JSON.stringify({ type: "subscribe", sessionId: "*" }));
+      this.flushSubscriptions();
     };
 
     this.socket.onmessage = (event) => {
@@ -282,11 +285,31 @@ export class AutonomaWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
-  /** @deprecated No-op — subscriptions are managed globally on connect. */
-  subscribeSession(_sessionId: string, _eventTypes?: string[]): void {}
+  subscribeSession(sessionId: string, eventTypes?: string[]): () => void {
+    const claimId = this.nextSubscriptionClaimId++;
+    const normalized = normalizeEventTypes(eventTypes);
+    this.subscriptionClaims.set(claimId, { sessionId, eventTypes: normalized });
+    this.recomputeSessionSubscription(sessionId);
 
-  /** @deprecated No-op — subscriptions are managed globally on connect. */
-  unsubscribeSession(_sessionId: string): void {}
+    return () => {
+      const claim = this.subscriptionClaims.get(claimId);
+      if (!claim) return;
+      this.subscriptionClaims.delete(claimId);
+      this.recomputeSessionSubscription(claim.sessionId);
+    };
+  }
+
+  unsubscribeSession(sessionId: string): void {
+    let changed = false;
+    for (const [claimId, claim] of this.subscriptionClaims) {
+      if (claim.sessionId !== sessionId) continue;
+      this.subscriptionClaims.delete(claimId);
+      changed = true;
+    }
+    if (changed) {
+      this.recomputeSessionSubscription(sessionId);
+    }
+  }
 
   subscribe(fn: WsSubscriber): () => void {
     this.subscribers.add(fn);
@@ -301,4 +324,66 @@ export class AutonomaWsClient {
       this.connectionSubscribers.delete(fn);
     };
   }
+
+  private recomputeSessionSubscription(sessionId: string) {
+    const claims = Array.from(this.subscriptionClaims.values()).filter(
+      (claim) => claim.sessionId === sessionId,
+    );
+    const previous = this.effectiveSubscriptions.get(sessionId);
+    const next = mergeEventTypes(claims.map((claim) => claim.eventTypes));
+
+    if (next === null) {
+      if (previous !== undefined || this.effectiveSubscriptions.has(sessionId)) {
+        this.effectiveSubscriptions.delete(sessionId);
+        this.sendUnsubscribe(sessionId);
+      }
+      return;
+    }
+
+    if (sameEventTypes(previous, next)) return;
+    this.effectiveSubscriptions.set(sessionId, next);
+    this.sendSubscribe(sessionId, next);
+  }
+
+  private flushSubscriptions() {
+    for (const [sessionId, eventTypes] of this.effectiveSubscriptions) {
+      this.sendSubscribe(sessionId, eventTypes);
+    }
+  }
+
+  private sendSubscribe(sessionId: string, eventTypes?: string[]) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const payload: Record<string, unknown> = { type: "subscribe", sessionId };
+    if (eventTypes && eventTypes.length > 0) payload.eventTypes = eventTypes;
+    this.socket.send(JSON.stringify(payload));
+  }
+
+  private sendUnsubscribe(sessionId: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ type: "unsubscribe", sessionId }));
+  }
+}
+
+function normalizeEventTypes(eventTypes?: string[]): string[] | undefined {
+  if (!eventTypes || eventTypes.length === 0) return undefined;
+  return Array.from(new Set(eventTypes)).sort();
+}
+
+function mergeEventTypes(eventTypesList: Array<string[] | undefined>): string[] | undefined | null {
+  if (eventTypesList.length === 0) return null;
+  if (eventTypesList.some((eventTypes) => eventTypes === undefined)) return undefined;
+  const merged = new Set<string>();
+  for (const eventTypes of eventTypesList) {
+    for (const eventType of eventTypes ?? []) {
+      merged.add(eventType);
+    }
+  }
+  return Array.from(merged).sort();
+}
+
+function sameEventTypes(a: string[] | undefined, b: string[] | undefined): boolean {
+  if (a === undefined && b === undefined) return true;
+  if (a === undefined || b === undefined) return false;
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
 }

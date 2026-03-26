@@ -25,6 +25,8 @@ import type {
 import { mergeTimelines } from "~/lib/utils";
 import { sendMessage as wsSendMessage } from "~/lib/ws-query-bridge";
 
+const INPUT_SURFACE_EVENT_TYPES = ["message_end", "pi_surfaced"];
+
 /* ── Types ── */
 
 type SurfaceEntry = {
@@ -340,6 +342,8 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   const { data: wsAppendedItems = [] } = useQuery(inputSurfaceTimelineQueryOptions());
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
+
+  useEffect(() => wsClient.subscribeSession("*", INPUT_SURFACE_EVENT_TYPES), [wsClient]);
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, wsAppendedItems),

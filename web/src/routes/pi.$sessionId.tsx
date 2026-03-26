@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { piHistoryQueryOptions, statusPillsQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState } from "~/lib/types";
@@ -47,6 +47,8 @@ function PiSessionRoute() {
     useCallback(() => wsClient.connectionState, [wsClient]),
     () => "disconnected" as ConnectionState,
   );
+
+  useEffect(() => wsClient.subscribeSession(sessionId), [sessionId, wsClient]);
 
   return (
     <ChatPanel
