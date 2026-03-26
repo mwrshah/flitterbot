@@ -1,88 +1,131 @@
-import crypto from "node:crypto";
-import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
-import { type BlackboardDatabase, insertIdMapping } from "../blackboard/db.ts";
+import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
+  ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
-  ToolExecutionUpdateWebSocketEvent,
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import type { PiSessionState } from "./session-state.ts";
 
-/** Derived from AgentSessionEvent since pi-agent-core is not a direct dependency */
-type AgentMessage = Extract<AgentSessionEvent, { type: "message_end" }>["message"];
+type PiSessionSubscriptionEvent =
+  | {
+      type: "message_start";
+      message?: unknown;
+      [key: string]: unknown;
+    }
+  | {
+      type: "message_update";
+      message?: unknown;
+      assistantMessageEvent?: {
+        type?: string;
+        delta?: string;
+      };
+    }
+  | {
+      type: "message_end";
+      message?: unknown;
+    }
+  | {
+      type: "tool_execution_start";
+      toolName?: string;
+      toolCallId?: string;
+      parameters?: unknown;
+      args?: unknown;
+      [key: string]: unknown;
+    }
+  | {
+      type: "tool_execution_end";
+      toolName?: string;
+      toolCallId?: string;
+      result?: unknown;
+      isError?: boolean;
+      [key: string]: unknown;
+    }
+  | {
+      type: "turn_end" | "agent_end";
+      [key: string]: unknown;
+    }
+  | {
+      type: string;
+      [key: string]: unknown;
+    };
 
 type SubscribablePiSession = {
   sessionId: string;
-  messages: AgentMessage[];
-  subscribe: (listener: (event: AgentSessionEvent) => void) => () => void;
+  messages: Array<unknown>;
+  subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
 };
 
 function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEvent): void {
   wsHub.broadcast(payload);
 }
 
-function extractMessageRole(message: AgentMessage): "user" | "assistant" | undefined {
-  if (message.role === "user" || message.role === "assistant") {
-    return message.role;
-  }
-  return undefined;
+type BroadcastRole = "user" | "assistant";
+type AnyMessageRole = BroadcastRole | "toolResult";
+
+function extractMessageRole(message: unknown): BroadcastRole | undefined {
+  const role = extractAnyMessageRole(message);
+  return role === "user" || role === "assistant" ? role : undefined;
 }
 
-function extractMessageText(message: AgentMessage): string | undefined {
-  if (message.role === "assistant") {
-    if (message.errorMessage?.trim()) return message.errorMessage;
-    const parts = message.content
-      .flatMap((block) => (block.type === "text" ? [block.text] : []))
-      .join("");
-    return parts.trim().length > 0 ? parts : undefined;
-  }
+function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
+  if (!message || typeof message !== "object") return undefined;
 
-  if (message.role === "user") {
-    if (typeof message.content === "string") {
-      return message.content.trim().length > 0 ? message.content : undefined;
-    }
-    const parts = message.content
-      .flatMap((block) => (block.type === "text" ? [block.text] : []))
-      .join("");
-    return parts.trim().length > 0 ? parts : undefined;
+  const role = (message as Record<string, unknown>).role;
+  if (role === "user" || role === "assistant" || role === "toolResult") {
+    return role;
   }
 
   return undefined;
 }
 
-function extractMessageBlocks(
-  message: AgentMessage,
-): Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> | undefined {
-  if (message.role !== "assistant") return undefined;
+function extractMessageText(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") return undefined;
 
-  const blocks: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> = [];
-  for (const block of message.content) {
-    if (block.type === "text" && block.text.trim()) {
-      blocks.push({ type: "text", text: block.text });
-    } else if (block.type === "thinking" && (block as { thinking?: string }).thinking?.trim()) {
-      blocks.push({ type: "thinking", thinking: (block as { thinking: string }).thinking });
-    }
-  }
-  return blocks.length > 0 ? blocks : undefined;
+  const record = message as Record<string, unknown>;
+  const directText = [record.text, record.message, record.errorMessage].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  if (directText) return directText;
+
+  const content = record.content;
+  if (!Array.isArray(content)) return undefined;
+
+  const parts = content
+    .flatMap((block) => {
+      if (!block || typeof block !== "object") return [];
+      const item = block as Record<string, unknown>;
+      if (item.type === "text" && typeof item.text === "string") {
+        return [item.text];
+      }
+      return [];
+    })
+    .join("");
+
+  return parts.trim().length > 0 ? parts : undefined;
 }
 
-function extractMessageId(message: AgentMessage): string | undefined {
-  // responseId is the Anthropic API response identifier, available on AssistantMessage since SDK 0.60
-  if (message.role === "assistant" && message.responseId?.trim()) {
-    return message.responseId;
-  }
-  return undefined;
+function extractMessageId(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  const id = (message as Record<string, unknown>).id;
+  return typeof id === "string" && id.trim() ? id : undefined;
 }
 
-function extractTimestamp(message: AgentMessage, fallback: string): string {
-  if (Number.isFinite(message.timestamp)) {
-    return new Date(message.timestamp).toISOString();
+function extractTimestamp(message: unknown, fallback: string): string {
+  if (!message || typeof message !== "object") return fallback;
+
+  const timestamp = (message as Record<string, unknown>).timestamp;
+  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+    return new Date(timestamp).toISOString();
   }
+  if (typeof timestamp === "string" && timestamp.trim()) {
+    return timestamp;
+  }
+
   return fallback;
 }
 
@@ -94,243 +137,130 @@ export function subscribeToPiSession(
 ): () => void {
   // Deferred assistant messages: accumulate during a turn, flush on turn_end.
   // Earlier ones get broadcast with intermediate: true; only the last one is final.
-  const pendingAssistantMessages: MessageEndWebSocketEvent[] = [];
+  const pendingAssistantMessages: ChatTimelineMessage[] = [];
 
-  // Pre-allocated server UUID for the current streaming assistant message.
-  // Set when the first text_delta arrives for a new assistant message, used at message_end.
-  let streamingServerUuid: string | null = null;
-  let toolIndex = 0;
+  // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
+  // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
+  // msg-N IDs that match the history path in history.ts.
+  let messageOrdinal = session.messages.length;
+
+  // Tracks the ordinal ID for the currently-streaming assistant message.
+  // Set on message_start (assistant only), cleared on message_end / turn_end.
+  let currentStreamingMessageId: string | null = null;
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
     // FR-3: Only set 'active' during turns. Post-turn transitions (waiting_for_user/waiting_for_sessions)
     // are handled by runtime.transitionPiAfterTurn(), not the event subscriber.
     if (event.type !== "turn_end" && event.type !== "agent_end") {
-      const isTextDelta =
-        event.type === "message_update" && event.assistantMessageEvent.type === "text_delta";
-      if (!isTextDelta) {
-        touchPiEvent(blackboard, session.sessionId, now, "active");
-      }
+      touchPiEvent(blackboard, session.sessionId, now, "active");
     }
 
     switch (event.type) {
-      case "message_update": {
-        const subType = event.assistantMessageEvent.type;
-
-        // Allocate streaming UUID on first delta of any kind
-        if (
-          (subType === "text_delta" || subType === "thinking_delta" ||
-           subType === "toolcall_start" || subType === "toolcall_delta") &&
-          !streamingServerUuid
-        ) {
-          streamingServerUuid = crypto.randomUUID();
+      case "message_start": {
+        const role = extractMessageRole(event.message);
+        if (role === "assistant") {
+          // Pre-assign the ordinal ID for this message so text_delta events can carry it.
+          // The counter is incremented now; message_end will use this same ID.
+          currentStreamingMessageId = `msg-${messageOrdinal}`;
         }
-
-        if (subType === "text_delta") {
+        break;
+      }
+      case "message_update": {
+        const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
+        if (ame?.type === "text_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
-            messageId: streamingServerUuid!,
-            delta: event.assistantMessageEvent.delta,
-          });
-        } else if (subType === "thinking_delta") {
-          broadcast(wsHub, {
-            type: "thinking_delta",
-            sessionId: session.sessionId,
-            messageId: streamingServerUuid!,
-            delta: event.assistantMessageEvent.delta,
-          });
-        } else if (subType === "toolcall_start") {
-          const evt = event.assistantMessageEvent;
-          const block = evt.partial?.content?.[evt.contentIndex];
-          const toolName = block && "name" in block ? (block as { name?: string }).name : undefined;
-          broadcast(wsHub, {
-            type: "toolcall_start",
-            sessionId: session.sessionId,
-            messageId: streamingServerUuid!,
-            contentIndex: evt.contentIndex,
-            toolName,
-          });
-        } else if (subType === "toolcall_delta") {
-          const evt = event.assistantMessageEvent;
-          broadcast(wsHub, {
-            type: "toolcall_delta",
-            sessionId: session.sessionId,
-            messageId: streamingServerUuid!,
-            contentIndex: evt.contentIndex,
-            delta: evt.delta,
+            messageId: currentStreamingMessageId,
+            delta: ame.delta,
           });
         }
         break;
       }
       case "message_end": {
-        const role = extractMessageRole(event.message);
+        const anyRole = extractAnyMessageRole(event.message);
+        if (!anyRole) break;
+
+        // Always increment ordinal for every message role (user, assistant, toolResult)
+        // to stay in sync with history.ts which counts all type: "message" entries.
+        const messageId = currentStreamingMessageId ?? `msg-${messageOrdinal}`;
+        messageOrdinal += 1;
+        currentStreamingMessageId = null;
+
+        // Only broadcast user/assistant messages — toolResult is not surfaced via WS.
+        const role = anyRole === "user" || anyRole === "assistant" ? anyRole : undefined;
         const content = extractMessageText(event.message);
-        if (!role || !content) {
-          break;
-        }
+        if (!role || !content) break;
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
-        const agentMessageId = extractMessageId(event.message);
-
-        // Resolve or create server UUID for this message
-        let serverMessageId: string;
-        if (role === "user") {
-          // User messages: server UUID was assigned at ingestion, available in queue item metadata
-          const snapshot = state.getSnapshot();
-          serverMessageId =
-            (snapshot.currentItem?.metadata?.serverMessageId as string) ?? crypto.randomUUID();
-        } else {
-          // Assistant messages: use pre-allocated streaming UUID if available, otherwise generate
-          serverMessageId = streamingServerUuid ?? crypto.randomUUID();
-          streamingServerUuid = null; // Reset for next message
-        }
-
-        // Insert agent→server UUID mapping when we have both IDs
-        if (agentMessageId) {
-          try {
-            insertIdMapping(blackboard, serverMessageId, agentMessageId, session.sessionId);
-          } catch {
-            // Ignore duplicate insert errors
-          }
-        }
-
-        const payload: MessageEndWebSocketEvent = {
-          type: "message_end",
-          sessionId: session.sessionId,
-          messageId: serverMessageId,
+        const timelineMessage: ChatTimelineMessage = {
+          id: messageId,
+          kind: "message",
           role,
           content,
           source: currentItem?.source,
-          timestamp: extractTimestamp(event.message, now),
           workstreamId: currentItem?.workstreamId,
           workstreamName: currentItem?.workstreamName,
-          blocks: extractMessageBlocks(event.message),
+          createdAt: extractTimestamp(event.message, now),
         };
 
         if (role === "assistant") {
           // Defer — accumulate until turn_end so we can mark intermediate vs final
-          pendingAssistantMessages.push(payload);
+          pendingAssistantMessages.push(timelineMessage);
         } else {
-          // Stamp the user message in the SDK's messages array immediately so the
-          // history API sees the correct server UUID even during the turn (before
-          // prompt() returns). Without this, readPiHistoryFromMessages falls back
-          // to a positional "memory-N" ID that won't match the WS message_end's
-          // messageId, causing mergeTimelines to fail deduplication.
-          for (let i = session.messages.length - 1; i >= 0; i--) {
-            const msg = session.messages[i] as Record<string, unknown> | undefined;
-            if (msg?.role === "user") {
-              msg.id = serverMessageId;
-              break;
-            }
-          }
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: timelineMessage,
+          };
           broadcast(wsHub, payload);
         }
         break;
       }
       case "tool_execution_start": {
-        // Deterministic tool ID for deduplication — must match history.ts format
-        const toolCallId = event.toolCallId;
-        const lastAssistantId =
-          pendingAssistantMessages.length > 0
-            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
-            : undefined;
-        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
-        const deterministicId = toolCallId
-          ? `${anchorId}:tool:${toolCallId}:start`
-          : `${anchorId}:tool:pos-${toolIndex}:start`;
-
         const payload: ToolExecutionStartWebSocketEvent = {
           type: "tool_execution_start",
-          id: deterministicId,
           sessionId: session.sessionId,
-          tool: event.toolName,
-          toolUseId: toolCallId,
-          args: event.args,
+          tool: event.toolName as string | undefined,
+          toolUseId: event.toolCallId as string | undefined,
+          args: event.args ?? event.parameters,
           timestamp: now,
           event,
         };
         broadcast(wsHub, payload);
-        toolIndex += 1;
         break;
       }
       case "tool_execution_end": {
-        const toolCallId = event.toolCallId;
-        const lastAssistantId =
-          pendingAssistantMessages.length > 0
-            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
-            : undefined;
-        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
-        const deterministicId = toolCallId
-          ? `${anchorId}:tool:${toolCallId}:end`
-          : `${anchorId}:tool:pos-${toolIndex}:end`;
-
         const payload: ToolExecutionEndWebSocketEvent = {
           type: "tool_execution_end",
-          id: deterministicId,
           sessionId: session.sessionId,
-          tool: event.toolName,
-          toolUseId: toolCallId,
+          tool: event.toolName as string | undefined,
+          toolUseId: event.toolCallId as string | undefined,
           result: event.result,
-          isError: event.isError,
+          isError: event.isError as boolean | undefined,
           timestamp: now,
           event,
         };
         broadcast(wsHub, payload);
         break;
       }
-      case "tool_execution_update": {
-        const toolCallId = event.toolCallId;
-        const lastAssistantId =
-          pendingAssistantMessages.length > 0
-            ? pendingAssistantMessages[pendingAssistantMessages.length - 1]!.messageId
-            : undefined;
-        const anchorId = lastAssistantId ?? streamingServerUuid ?? session.sessionId;
-        const deterministicId = toolCallId
-          ? `${anchorId}:tool:${toolCallId}:update`
-          : `${anchorId}:tool:pos-${toolIndex}:update`;
-
-        broadcast(wsHub, {
-          type: "tool_execution_update",
-          id: deterministicId,
-          sessionId: session.sessionId,
-          tool: event.toolName,
-          toolUseId: toolCallId,
-          partialResult: event.partialResult,
-          timestamp: now,
-        });
-        break;
-      }
       case "turn_end": {
-        // The SDK fires turn_end after every API response — including mid-turn
-        // tool-use stops. Only treat it as a real end-of-turn when the assistant's
-        // stopReason is NOT "toolUse" (i.e. the model finished with text, not a
-        // tool call that will be followed by tool execution and another turn).
-        const turnMessage = event.message;
-        const stopReason = turnMessage.role === "assistant" ? turnMessage.stopReason : undefined;
-
-        if (stopReason === "toolUse") {
-          // Flush intermediate assistant messages so text-before-tool-calls is visible
-          for (const msg of pendingAssistantMessages) {
-            broadcast(wsHub, { ...msg, intermediate: true });
-          }
-          pendingAssistantMessages.length = 0;
-          break;
-        }
-
         // Flush deferred assistant messages: all but last are intermediate
         for (let i = 0; i < pendingAssistantMessages.length; i++) {
           const isLast = i === pendingAssistantMessages.length - 1;
-          broadcast(
-            wsHub,
-            isLast
-              ? { ...pendingAssistantMessages[i]!, source: "pi_outbound" }
-              : { ...pendingAssistantMessages[i]!, intermediate: true },
-          );
+          const msg = isLast
+            ? pendingAssistantMessages[i]!
+            : { ...pendingAssistantMessages[i]!, intermediate: true };
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: msg,
+          };
+          broadcast(wsHub, payload);
         }
         pendingAssistantMessages.length = 0;
-        toolIndex = 0;
-        streamingServerUuid = null;
+        currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
           type: "turn_end",

@@ -1,39 +1,32 @@
 import fs, { createReadStream } from "node:fs";
 import readline from "node:readline";
-import type { PiHistoryItem, PiHistoryMessageItem, PiHistoryResponse } from "../contracts/index.ts";
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  JsonValue,
+  MessageSource,
+  PiHistoryResponse,
+} from "../contracts/index.ts";
 
 type PiHistoryMode = "agent" | "input";
 
+type PiHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[number];
+
 /**
- * Shape of a raw JSONL session entry before validation.
- * Mirrors pi-coding-agent's SessionEntryBase + SessionMessageEntry
- * but kept local because we parse across SDK versions.
+ * Known bracket prefixes that map to MessageSource values.
+ * Hook and cron embed their own prefixes; web/whatsapp/agent/init/pi_outbound
+ * are added by formatPromptWithContext.
  */
-type RawSessionEntry = {
-  type?: string;
-  id?: string;
-  parentId?: string | null;
-  timestamp?: string | number;
-  message?: RawMessageRecord;
-};
+const SOURCE_PREFIX_RE = /^\[(web|whatsapp|hook|cron|init|agent|pi_outbound)\]\s*/i;
 
-/** Shape of the `message` field inside a raw session entry. */
-type RawMessageRecord = {
-  id?: string;
-  role?: string;
-  content?: unknown;
-  timestamp?: string | number;
-  responseId?: string;
-  toolCallId?: string;
-  toolName?: string;
-  details?: unknown;
-  isError?: boolean;
-};
-
-/** Resolves an agent-generated message ID to a server UUID. Returns null if unmapped. */
-export type IdResolver = (agentId: string) => string | null;
-
-type PiHistoryMessageBlock = NonNullable<PiHistoryMessageItem["blocks"]>[number];
+function extractSource(text: string): { source: MessageSource | undefined; content: string } {
+  const match = SOURCE_PREFIX_RE.exec(text);
+  if (!match) return { source: undefined, content: text };
+  return {
+    source: match[1]!.toLowerCase() as MessageSource,
+    content: text.slice(match[0].length),
+  };
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -65,49 +58,38 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
-/**
- * Extract a stable identifier from a message record.
- * For assistant messages, prefer `responseId` (Anthropic API identifier, e.g. `msg_01VM...`).
- * Returns undefined for non-assistant roles or when no responseId is present.
- */
-function extractStableId(record: RawMessageRecord): string | undefined {
-  if (record.role === "assistant") {
-    return record.responseId?.trim() ? record.responseId : undefined;
-  }
-  return undefined;
-}
-
-/** Resolve an agent ID to a server UUID via the resolver, falling back to the agent ID. */
-function resolveId(agentId: string, resolver?: IdResolver): string {
-  if (!resolver) return agentId;
-  return resolver(agentId) ?? agentId;
-}
-
 function pushMessage(
-  items: PiHistoryItem[],
-  resolvedId: string,
+  items: ChatTimelineItem[],
+  id: string,
   role: "user" | "assistant" | "system",
   content: string,
   createdAt: string,
-  subIndex?: number,
   blocks?: PiHistoryMessageBlock[],
 ): void {
-  const normalized = content.trim();
+  let normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );
   if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
 
-  // For multi-message splits, append sub-index. Single messages use bare ID.
-  const itemId = subIndex !== undefined ? `${resolvedId}:${subIndex}` : resolvedId;
+  // Extract source prefix from user messages (e.g. "[web] Hello" → source: "web", content: "Hello")
+  let source: MessageSource | undefined;
+  if (role === "user") {
+    const extracted = extractSource(normalized);
+    source = extracted.source;
+    normalized = extracted.content;
+  }
 
-  const item: PiHistoryMessageItem = {
-    id: itemId,
+  const item: ChatTimelineMessage = {
+    id,
     kind: "message",
     role,
     content: normalized,
     createdAt,
   };
+  if (source) {
+    item.source = source;
+  }
   if (normalizedBlocks && normalizedBlocks.length > 0) {
     item.blocks = normalizedBlocks;
   }
@@ -115,23 +97,20 @@ function pushMessage(
 }
 
 function parseMessageContent(
-  items: PiHistoryItem[],
-  resolvedId: string,
+  items: ChatTimelineItem[],
+  messageId: string,
   role: "user" | "assistant" | "system",
   createdAt: string,
   content: unknown,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, resolvedId, role, text, createdAt);
+    if (text) pushMessage(items, messageId, role, text, createdAt);
     return;
   }
 
   const messageBlocks: PiHistoryMessageBlock[] = [];
   let textBuffer = "";
-  let toolIndex = 0;
-  let messageIndex = 0;
-  let needsSubIndex = false;
 
   const flushTextBlock = () => {
     if (!textBuffer.trim()) return;
@@ -145,18 +124,8 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    // Use sub-index only when splitting a single agent message into multiple display items
-    pushMessage(
-      items,
-      resolvedId,
-      role,
-      contentText,
-      createdAt,
-      needsSubIndex ? messageIndex : undefined,
-      [...messageBlocks],
-    );
+    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks]);
     messageBlocks.length = 0;
-    messageIndex += 1;
   };
 
   for (const block of content) {
@@ -177,25 +146,17 @@ function parseMessageContent(
     }
 
     if (type === "toolCall") {
-      needsSubIndex = true; // Multiple display items from one agent message
       flushMessage();
-
-      // Deterministic tool ID: ${resolvedId}:tool:${toolCallId}:start
-      const toolCallId = typeof record.id === "string" ? record.id : undefined;
-      const toolItemId = toolCallId
-        ? `${resolvedId}:tool:${toolCallId}:start`
-        : `${resolvedId}:tool:${toolIndex}:start`;
-
+      const toolUseId = typeof record.id === "string" ? record.id : `unknown-${messageId}`;
       items.push({
-        id: toolItemId,
+        id: `tool-${toolUseId}-start`,
         kind: "tool",
         tool: typeof record.name === "string" && record.name.trim() ? record.name : "unknown_tool",
         phase: "start",
-        toolUseId: toolCallId,
-        args: record.arguments,
+        toolUseId,
+        args: record.arguments as JsonValue | undefined,
         createdAt,
       });
-      toolIndex += 1;
     }
   }
 
@@ -203,29 +164,24 @@ function parseMessageContent(
 }
 
 function parseMessageRecord(
-  messageRecord: RawMessageRecord,
+  messageRecord: Record<string, unknown>,
   createdAt: string,
-  resolvedId: string,
-  items: PiHistoryItem[],
+  messageId: string,
+  items: ChatTimelineItem[],
 ): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
-    parseMessageContent(items, resolvedId, role, createdAt, messageRecord.content);
+    parseMessageContent(items, messageId, role, createdAt, messageRecord.content);
     return;
   }
 
   if (role === "toolResult") {
     const resultText = firstText(messageRecord.content);
-
-    // Deterministic tool end ID: ${resolvedId}:tool:${toolCallId}:end
-    const toolCallId = messageRecord.toolCallId;
-    const toolItemId = toolCallId
-      ? `${resolvedId}:tool:${toolCallId}:end`
-      : `${resolvedId}:tool-end`;
-
+    const toolCallId =
+      typeof messageRecord.toolCallId === "string" ? messageRecord.toolCallId : `unknown-${messageId}`;
     items.push({
-      id: toolItemId,
+      id: `tool-${toolCallId}-end`,
       kind: "tool",
       tool:
         typeof messageRecord.toolName === "string" && messageRecord.toolName.trim()
@@ -233,15 +189,15 @@ function parseMessageRecord(
           : "unknown_tool",
       phase: "end",
       toolUseId: toolCallId,
-      result: messageRecord.details ?? resultText,
+      result: (messageRecord.details ?? resultText) as JsonValue | undefined,
       isError: Boolean(messageRecord.isError),
       createdAt,
     });
   }
 }
 
-function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
-  const result: PiHistoryItem[] = [];
+function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[] {
+  const result: ChatTimelineItem[] = [];
   let lastAssistantIdx = -1;
 
   for (let i = 0; i < items.length; i++) {
@@ -255,8 +211,7 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
     }
 
     if (isUserMsg && lastAssistantIdx >= 0) {
-      const kept = { ...items[lastAssistantIdx]!, source: "pi_outbound" } as PiHistoryItem;
-      result.push(kept);
+      result.push(items[lastAssistantIdx]!);
       lastAssistantIdx = -1;
     }
 
@@ -265,8 +220,7 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
 
   // Flush trailing assistant message (last turn with no following user message)
   if (lastAssistantIdx >= 0) {
-    const kept = { ...items[lastAssistantIdx]!, source: "pi_outbound" } as PiHistoryItem;
-    result.push(kept);
+    result.push(items[lastAssistantIdx]!);
   }
 
   return result;
@@ -276,9 +230,9 @@ function keepOnlySurfacedAssistant(items: PiHistoryItem[]): PiHistoryItem[] {
  * Strip everything except user messages and the final surfaced assistant message per turn.
  * This mirrors the WhatsApp / InputSurface live path: no tools, no system messages.
  */
-function stripThinkingFromMessage(item: PiHistoryItem): PiHistoryItem {
+function stripThinkingFromMessage(item: ChatTimelineItem): ChatTimelineItem {
   if (item.kind !== "message" || item.role !== "assistant") return item;
-  const msg = item as PiHistoryMessageItem;
+  const msg = item as ChatTimelineMessage;
   if (!msg.blocks?.length) return item;
   const textBlocks = msg.blocks.filter((b) => b.type === "text");
   if (textBlocks.length === 0) return item;
@@ -286,7 +240,7 @@ function stripThinkingFromMessage(item: PiHistoryItem): PiHistoryItem {
   return { ...msg, content: textOnly, blocks: textBlocks };
 }
 
-function keepOnlySurfaced(items: PiHistoryItem[]): PiHistoryItem[] {
+function keepOnlySurfaced(items: ChatTimelineItem[]): ChatTimelineItem[] {
   return keepOnlySurfacedAssistant(items)
     .filter(
       (item) => item.kind === "message" && (item.role === "user" || item.role === "assistant"),
@@ -294,29 +248,24 @@ function keepOnlySurfaced(items: PiHistoryItem[]): PiHistoryItem[] {
     .map(stripThinkingFromMessage);
 }
 
-function shapeHistoryItems(items: PiHistoryItem[], mode: PiHistoryMode): PiHistoryItem[] {
+function shapeHistoryItems(items: ChatTimelineItem[], mode: PiHistoryMode): ChatTimelineItem[] {
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
 function parseHistoryLine(
   line: string,
   lineNumber: number,
-  items: PiHistoryItem[],
-  resolver?: IdResolver,
+  items: ChatTimelineItem[],
+  ordinal: { value: number },
 ): void {
-  const parsed = JSON.parse(line) as RawSessionEntry;
+  const parsed = JSON.parse(line) as Record<string, unknown>;
   if (parsed.type !== "message") return;
 
-  const messageRecord: RawMessageRecord = parsed.message ?? {};
+  const messageRecord = asRecord(parsed.message);
   const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
-  // For assistant messages, prefer responseId (Anthropic API identifier) as the stable ID.
-  // Falls back to the JSONL entry wrapper id, then positional.
-  const rawId =
-    extractStableId(messageRecord) ??
-    (parsed.id?.trim() ? parsed.id : undefined) ??
-    `line-${lineNumber}`;
-  const resolvedId = resolveId(rawId, resolver);
-  parseMessageRecord(messageRecord, createdAt, resolvedId, items);
+  const messageId = `msg-${ordinal.value}`;
+  ordinal.value += 1;
+  parseMessageRecord(messageRecord, createdAt, messageId, items);
 }
 
 export function readPiHistoryFromMessages(
@@ -324,18 +273,17 @@ export function readPiHistoryFromMessages(
   sessionFile: string | null,
   messages: Array<unknown>,
   mode: PiHistoryMode = "agent",
-  resolver?: IdResolver,
 ): PiHistoryResponse {
-  const items: PiHistoryItem[] = [];
+  const items: ChatTimelineItem[] = [];
+  let ordinal = 0;
 
-  messages.forEach((message, index) => {
-    const record = asRecord(message) as RawMessageRecord;
+  for (const message of messages) {
+    const record = asRecord(message);
     const createdAt = isoTimestamp(record.timestamp);
-    const rawId =
-      extractStableId(record) ?? (record.id?.trim() ? record.id : undefined) ?? `memory-${index}`;
-    const resolvedId = resolveId(rawId, resolver);
-    parseMessageRecord(record, createdAt, resolvedId, items);
-  });
+    const messageId = `msg-${ordinal}`;
+    ordinal += 1;
+    parseMessageRecord(record, createdAt, messageId, items);
+  }
 
   return {
     sessionId,
@@ -348,7 +296,6 @@ export async function readPiHistory(
   sessionId: string,
   sessionFile: string,
   mode: PiHistoryMode = "agent",
-  resolver?: IdResolver,
 ): Promise<PiHistoryResponse> {
   if (!fs.existsSync(sessionFile)) {
     return {
@@ -360,8 +307,9 @@ export async function readPiHistory(
 
   const stream = createReadStream(sessionFile, { encoding: "utf8" });
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
-  const items: PiHistoryItem[] = [];
+  const items: ChatTimelineItem[] = [];
   let lineNumber = 0;
+  const ordinal = { value: 0 };
 
   try {
     for await (const rawLine of lines) {
@@ -369,7 +317,7 @@ export async function readPiHistory(
       const line = rawLine.trim();
       if (!line) continue;
       try {
-        parseHistoryLine(line, lineNumber, items, resolver);
+        parseHistoryLine(line, lineNumber, items, ordinal);
       } catch {
         // Ignore malformed lines and continue reading the session.
       }

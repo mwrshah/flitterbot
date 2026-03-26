@@ -1,30 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { piSessionStore, usePiSessionStore } from "~/lib/pi-session-store";
-import { buildStreamingAssistantMessage } from "~/lib/pi-web-ui-bridge";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
-import { StreamChunker } from "~/lib/stream-chunker";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  ConnectionState,
   DeliveryMode,
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { mergeTimelines } from "~/lib/utils";
-import { PiStreamingMessage, type PiStreamingMessageHandle } from "./pi-streaming-message";
-
-const emptySubscribe = () => () => {};
-const useIsClient = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
+import { createId, mergeTimelines } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -46,8 +43,8 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   hook: "bg-violet-500",
   cron: "bg-cyan-500",
   init: "bg-gray-400",
-  agent: "bg-indigo-500",
-  pi_outbound: "bg-blue-500",
+  agent: "bg-blue-500",
+  pi_outbound: "bg-amber-500",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -57,7 +54,7 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   cron: "Cron",
   init: "Init",
   agent: "Agent",
-  pi_outbound: "Pi Out",
+  pi_outbound: "Pi",
 };
 
 const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
@@ -85,33 +82,24 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
   const entries: SurfaceEntry[] = [];
 
   for (const item of timeline) {
-    const msg = item.kind === "message" ? (item as ChatTimelineMessage) : undefined;
-    if (item.kind === "divider") {
-      continue;
-    }
+    if (item.kind === "divider") continue;
 
     if (item.kind === "message" && item.role === "user") {
-      const source = msg!.source;
-      if (source !== "web" && source !== "whatsapp") {
-        continue;
-      }
+      const msg = item as ChatTimelineMessage;
+      const source = msg.source ?? "web";
+      if (source !== "web" && source !== "whatsapp") continue;
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
         kind: "inbound",
-        source,
-        content: msg!.content,
+        source: msg.source ?? "web",
+        content: msg.content,
         workstreamName: item.workstreamName,
       });
       continue;
     }
 
     if (item.kind === "message" && item.role === "assistant") {
-      // Only show surfaced (final) assistant messages — same content sent to WhatsApp.
-      // Intermediate pre-tool-call fragments have a different source or no source.
-      if (msg!.source !== "pi_outbound") {
-        continue;
-      }
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
@@ -142,21 +130,15 @@ function CollapsibleContent({
   children: React.ReactNode;
   fadeClassName?: string;
 }) {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const roRef = useRef<ResizeObserver | null>(null);
 
-  const contentRef = useCallback((el: HTMLDivElement | null) => {
-    if (roRef.current) {
-      roRef.current.disconnect();
-      roRef.current = null;
-    }
+  useEffect(() => {
+    const el = contentRef.current;
     if (!el) return;
-    const check = () => setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-    check();
-    roRef.current = new ResizeObserver(check);
-    roRef.current.observe(el);
-  }, []);
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+  });
 
   return (
     <div className="relative">
@@ -209,9 +191,7 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
           </span>
         )}
         <CollapsibleContent>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {displayContent}
-          </p>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{displayContent}</p>
         </CollapsibleContent>
       </div>
     </div>
@@ -334,10 +314,17 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
 /* ── Main Component ── */
 
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
-  const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient, wsClient } = rootApi.useRouteContext();
+  const [draft, setDraft] = useState("");
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
+  const [appendedItems, setAppendedItems] = useState<ChatTimelineItem[]>([]);
+  const connectionState = useSyncExternalStore(
+    useCallback((cb: () => void) => wsClient.subscribeConnection(cb), [wsClient]),
+    useCallback(() => wsClient.connectionState, [wsClient]),
+    () => "disconnected" as ConnectionState,
+  );
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
@@ -346,69 +333,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     refetchOnWindowFocus: false,
   });
 
-  // Read appended items from the shared store (populated by usePiWsHandler in root)
-  const storeSnapshot = usePiSessionStore();
-  const appendedItems = useMemo(() => piSessionStore.getAllAppendedItems(), [storeSnapshot]);
-  const connectionState = storeSnapshot.connectionState;
-
-  const { viewportRef, engageAndScroll } = useStickToBottom();
-
-  const [isStreaming, setIsStreaming] = useState(false);
-  const streamingRef = useRef<PiStreamingMessageHandle>(null);
-
-  // Subscribe to streaming deltas from ALL sessions (global view).
-  useEffect(() => {
-    const chunker = new StreamChunker({
-      onChunk: (fullText) => {
-        streamingRef.current?.update(buildStreamingAssistantMessage(fullText));
-      },
-    });
-
-    let activeSessionId: string | null = null;
-    let seenLen = 0;
-    let streaming = false;
-
-    const callback = (sessionId: string, text: string | null, _messageId: string | null) => {
-      if (text === null) {
-        // Stream ended for this session
-        if (sessionId === activeSessionId) {
-          chunker.flush();
-          streamingRef.current?.clear();
-          activeSessionId = null;
-          seenLen = 0;
-          streaming = false;
-          setIsStreaming(false);
-        }
-        return;
-      }
-
-      // If a different session starts streaming, reset
-      if (sessionId !== activeSessionId) {
-        if (activeSessionId !== null) {
-          chunker.flush();
-          streamingRef.current?.clear();
-        }
-        activeSessionId = sessionId;
-        seenLen = 0;
-      }
-
-      if (text.length > seenLen) {
-        chunker.push(text.slice(seenLen));
-        seenLen = text.length;
-      }
-      if (!streaming) {
-        streaming = true;
-        setIsStreaming(true);
-      }
-    };
-
-    piSessionStore.onAnyStreamingDelta(callback);
-
-    return () => {
-      piSessionStore.offAnyStreamingDelta(callback);
-      chunker.destroy();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
 
   const timeline = useMemo(
     () => mergeTimelines(loaderTimeline, appendedItems),
@@ -416,25 +341,113 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   );
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
 
-  const handleSubmit = useCallback(
-    async (text: string, images?: ImageAttachment[]) => {
-      setIsSending(true);
-      engageAndScroll();
-      try {
-        await wsClient.sendMessage(text, deliveryMode, images);
-      } catch {
-        await apiClient.sendMessage({
-          text,
-          source: "web",
-          deliveryMode,
-          images,
-        });
-      } finally {
-        setIsSending(false);
+  // WebSocket events — append to local state; deduped against loader via mergeTimelines
+  useEffect(() => {
+    const unsubscribe = wsClient.subscribe((message) => {
+      if (message.type === "text_delta") {
+        // Intentionally ignored — Input Surface only shows final pi_surfaced messages,
+        // not intermediate streaming text (which may include reasoning, tool calls, etc.)
+        return;
       }
-    },
-    [wsClient, apiClient, deliveryMode, engageAndScroll],
-  );
+
+      if (message.type === "message_end") {
+        const msg = message.message;
+        // Skip intermediate assistant messages (pre-tool-call fragments within a turn)
+        if (msg.intermediate) return;
+
+        if (msg.role === "user") {
+          const source = msg.source ?? "web";
+          if (source !== "web" && source !== "whatsapp") return;
+          if (msg.content.trim()) {
+            setAppendedItems((current) => {
+              if (current.some((item) => item.id === msg.id)) return current;
+              return [...current, msg];
+            });
+          }
+          return;
+        }
+
+        // Don't add assistant message_end to timeline — only pi_surfaced events appear
+        return;
+      }
+
+      if (message.type === "pi_surfaced") {
+        if (message.content.trim()) {
+          const id = message.messageId ? `${message.messageId}:message` : createId("assistant");
+          setAppendedItems((current) => {
+            if (current.some((item) => item.id === id)) return current;
+            return [
+              ...current,
+              {
+                id,
+                kind: "message",
+                role: "assistant",
+                content: message.content,
+                workstreamName: message.workstreamName,
+                createdAt: message.timestamp ?? new Date().toISOString(),
+              },
+            ];
+          });
+        }
+        return;
+      }
+    });
+
+    // Subscribe to ALL sessions so the server delivers session-scoped events
+    // (message_end, pi_surfaced) to this client. Without this, hub.ts skips
+    // clients with zero subscriptions.
+    wsClient.subscribeSession("*");
+
+    return () => {
+      unsubscribe();
+      wsClient.unsubscribeSession("*");
+    };
+  }, [wsClient]);
+
+  function addImageFiles(files: FileList | File[]) {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    for (const file of imageFiles) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1];
+        if (base64) {
+          setPendingImages((prev) => [...prev, { data: base64, mimeType: file.type }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function removeImage(index: number) {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const text = draft.trim();
+    const images = pendingImages.length ? [...pendingImages] : undefined;
+    if (!text && !images?.length) return;
+
+    setIsSending(true);
+    setDraft("");
+    setPendingImages([]);
+    engageAndScroll();
+
+    try {
+      await wsClient.sendMessage(text || "(image)", deliveryMode, images);
+    } catch {
+      await apiClient.sendMessage({
+        text: text || "(image)",
+        source: "web",
+        deliveryMode,
+        images,
+      });
+    } finally {
+      setIsSending(false);
+    }
+  }
 
   const connectionLabel =
     connectionState === "connected"
@@ -457,7 +470,7 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
-        {isClient && <Badge variant={connectionVariant}>{connectionLabel}</Badge>}
+        <Badge variant={connectionVariant}>{connectionLabel}</Badge>
       </div>
 
       {/* Activity feed */}
@@ -470,26 +483,18 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
         {entries.map((entry) => (
           <SurfaceEntryRenderer key={entry.id} entry={entry} />
         ))}
-        {/* Live streaming entry — styled like a PiResponseEntry */}
-        <div className={`flex gap-3 items-start ${isStreaming ? "" : "hidden"}`}>
-          <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
-            <span className="text-[10px] text-muted-foreground/60">&nbsp;</span>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              <span className="text-[10px] font-medium text-muted-foreground">Pi</span>
-            </div>
-          </div>
-          <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
-            <PiStreamingMessage ref={streamingRef} />
-          </div>
-        </div>
       </div>
 
       <MessageInput
+        draft={draft}
+        onDraftChange={setDraft}
         deliveryMode={deliveryMode}
         onDeliveryModeChange={setDeliveryMode}
         isSending={isSending}
         onSubmit={handleSubmit}
+        pendingImages={pendingImages}
+        onAddImages={addImageFiles}
+        onRemoveImage={removeImage}
         skills={skillsData?.items}
         placeholder="Message Pi via Web…"
       />

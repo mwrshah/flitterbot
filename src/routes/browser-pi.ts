@@ -1,11 +1,10 @@
 import type http from "node:http";
-import { createIdResolver } from "../blackboard/db.ts";
+import type { ChatTimelineItem, PiHistoryResponse } from "../contracts/index.ts";
 import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
 } from "../blackboard/query-workstreams.ts";
-import type { PiHistoryItem, PiHistoryResponse } from "../contracts/index.ts";
-import { type IdResolver, readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
+import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
@@ -13,12 +12,11 @@ import { sendJson } from "./_shared.ts";
 async function readSessionHistory(
   managed: ManagedPiSession,
   historyMode: "input" | "agent",
-  resolver?: IdResolver,
-): Promise<PiHistoryItem[]> {
+): Promise<ChatTimelineItem[]> {
   const snapshot = managed.state.getSnapshot();
   if (!snapshot.sessionId) return [];
 
-  let items: PiHistoryItem[];
+  let items: ChatTimelineItem[];
 
   if (
     managed.session?.sessionId === snapshot.sessionId &&
@@ -29,28 +27,17 @@ async function readSessionHistory(
       snapshot.sessionFile ?? null,
       managed.session.messages,
       historyMode,
-      resolver,
     );
     if (body.items.length > 0 || !snapshot.sessionFile) {
       items = body.items;
     } else if (snapshot.sessionFile) {
-      const fileBody = await readPiHistory(
-        snapshot.sessionId,
-        snapshot.sessionFile,
-        historyMode,
-        resolver,
-      );
+      const fileBody = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
       items = fileBody.items;
     } else {
       return [];
     }
   } else if (snapshot.sessionFile) {
-    const body = await readPiHistory(
-      snapshot.sessionId,
-      snapshot.sessionFile,
-      historyMode,
-      resolver,
-    );
+    const body = await readPiHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
     items = body.items;
   } else {
     return [];
@@ -77,32 +64,24 @@ export async function handleBrowserPiHistoryRoute(
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
   const piSessionId = url.searchParams.get("piSessionId");
 
-  // Create a resolver backed by the message_id_map table for dedup-safe IDs
-  const resolver = createIdResolver(runtime.blackboard);
-
   // When input surface requests history with no specific session, aggregate all
   if (historyMode === "input" && !piSessionId) {
     const allSessions: ManagedPiSession[] = [];
-    const defaultSession = runtime.sessionManager.getDefault();
-    if (defaultSession) {
-      allSessions.push(defaultSession);
+    try {
+      allSessions.push(runtime.sessionManager.getDefault());
+    } catch {
+      /* no default yet */
     }
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
-    const allItems: PiHistoryItem[] = [];
+    const allItems: ChatTimelineItem[] = [];
     const processedSessionIds = new Set<string>();
 
     for (const session of allSessions) {
       const snapshot = session.state.getSnapshot();
       if (snapshot.sessionId) processedSessionIds.add(snapshot.sessionId);
 
-      const items = await readSessionHistory(session, historyMode, resolver);
-      // Prefix IDs to avoid collisions across sessions in the aggregate response.
-      // NOTE: WS events use bare UUIDs (no prefix). This is safe because the
-      // /pi/default route refetches with a specific piSessionId once known,
-      // switching to the single-session path which also returns bare IDs.
-      // The prefixed aggregate response is only used as initialData before
-      // defaultSessionId resolves — during which no WS events are being merged.
+      const items = await readSessionHistory(session, historyMode);
       const sessionPrefix = snapshot.sessionId ?? "default";
       for (const item of items) {
         item.id = `${sessionPrefix}:${item.id}`;
@@ -125,7 +104,7 @@ export async function handleBrowserPiHistoryRoute(
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (!row?.session_file) continue;
 
-      const body = await readPiHistory(piSessionId, row.session_file, historyMode, resolver);
+      const body = await readPiHistory(piSessionId, row.session_file, historyMode);
       for (const item of body.items) {
         item.id = `${piSessionId}:${item.id}`;
         if (item.kind === "message") {
@@ -153,7 +132,7 @@ export async function handleBrowserPiHistoryRoute(
         .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
-        const diskBody = await readPiHistory(piSessionId, row.session_file, historyMode, resolver);
+        const diskBody = await readPiHistory(piSessionId, row.session_file, historyMode);
         const body: PiHistoryResponse = {
           sessionId: piSessionId,
           sessionFile: row.session_file,
@@ -166,7 +145,7 @@ export async function handleBrowserPiHistoryRoute(
     return sendJson(response, 200, body);
   }
 
-  const items = await readSessionHistory(targetSession, historyMode, resolver);
+  const items = await readSessionHistory(targetSession, historyMode);
   if (targetSession.workstreamName) {
     for (const item of items) {
       if (item.kind === "message") {

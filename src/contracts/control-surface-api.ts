@@ -1,5 +1,10 @@
-import type { ClaudeSessionStatus, MessageMetadata } from "./blackboard.ts";
-import type { MessageSource } from "./message.ts";
+import type { ClaudeSessionStatus } from "./blackboard.ts";
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  MessageSource,
+} from "./timeline.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
@@ -7,7 +12,6 @@ import type {
 } from "./tmux-bridge.ts";
 import type { TranscriptPageResponse } from "./transcript.ts";
 
-export type { MessageSource } from "./message.ts";
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
@@ -102,7 +106,7 @@ export interface StatusResponse {
 export interface MessageRequest {
   text: string;
   source?: MessageSource;
-  metadata?: MessageMetadata;
+  metadata?: Record<string, unknown>;
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
   targetSessionId?: string;
@@ -116,40 +120,15 @@ export interface ClaudeHookPayload {
   hook_event_name?: string;
   event_name?: string;
   session_id?: string;
-  sessionId?: string;
   tool_name?: string;
   tool_use_id?: string;
   cwd?: string;
   model?: string;
   permission_mode?: string;
-  permissionMode?: string;
   source?: string;
   transcript_path?: string;
-  transcriptPath?: string;
   reason?: string;
-  stop_reason?: string;
-  session_end_reason?: string;
   timestamp?: string;
-  lastAssistantText?: string;
-  agent_managed?: boolean | number;
-  pi_session_id?: string;
-  piSessionId?: string;
-  AUTONOMA_PI_SESSION_ID?: string;
-  workstream_id?: string;
-  workstreamId?: string;
-  AUTONOMA_WORKSTREAM_ID?: string;
-  tmux_session?: string;
-  tmuxSession?: string;
-  AUTONOMA_TMUX_SESSION?: string;
-  task_description?: string;
-  taskDescription?: string;
-  AUTONOMA_TASK_DESCRIPTION?: string;
-  todoist_task_id?: string;
-  todoistTaskId?: string;
-  AUTONOMA_TODOIST_TASK_ID?: string;
-  project?: string;
-  project_label?: string;
-  projectLabel?: string;
   [key: string]: unknown;
 }
 
@@ -168,35 +147,17 @@ export interface SessionDetailResponse {
   tmux?: TmuxSessionInspection | null;
 }
 
-export interface PiHistoryMessageItem {
-  id: string;
-  kind: "message";
-  role: "user" | "assistant" | "system";
-  content: string;
-  source?: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
-  workstreamName?: string;
-  createdAt: string;
-}
-
-export interface PiHistoryToolItem {
-  id: string;
-  kind: "tool";
-  tool: string;
-  phase: "start" | "end";
-  toolUseId?: string;
-  args?: unknown;
-  result?: unknown;
-  isError?: boolean;
-  createdAt: string;
-}
-
-export type PiHistoryItem = PiHistoryMessageItem | PiHistoryToolItem;
+/** @deprecated Use ChatTimelineMessage from timeline.ts */
+export type PiHistoryMessageItem = ChatTimelineMessage;
+/** @deprecated Use ChatTimelineTool from timeline.ts */
+export type PiHistoryToolItem = ChatTimelineTool;
+/** @deprecated Use ChatTimelineItem from timeline.ts */
+export type PiHistoryItem = ChatTimelineItem;
 
 export interface PiHistoryResponse {
   sessionId: string | null;
   sessionFile: string | null;
-  items: PiHistoryItem[];
+  items: ChatTimelineItem[];
 }
 
 export type SessionTranscriptResponse = TranscriptPageResponse;

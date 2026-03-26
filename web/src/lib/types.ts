@@ -1,53 +1,16 @@
-/* ── JSON-safe value (no `unknown`) ── */
+/* ── Chat timeline (shared with backend) ── */
 
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+import type { ChatTimelineItem, ChatTimelineMessage } from "../../../src/contracts/timeline.ts";
 
-/* ── Chat timeline ── */
-
-export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init" | "agent" | "pi_outbound";
-
-export type ImageAttachment = {
-  data: string;
-  mimeType: string;
-};
-
-export type ChatTimelineMessage = {
-  id: string;
-  kind: "message";
-  role: "user" | "assistant" | "system";
-  content: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
-  images?: ImageAttachment[];
-  source?: MessageSource;
-  workstreamName?: string;
-  createdAt: string;
-};
-
-export type ChatTimelineTool = {
-  id: string;
-  kind: "tool";
-  tool: string;
-  phase: "start" | "update" | "end";
-  toolUseId?: string;
-  args?: JsonValue;
-  result?: JsonValue;
-  isError?: boolean;
-  createdAt: string;
-};
-
-export type ChatTimelineDivider = {
-  id: string;
-  kind: "divider";
-  createdAt: string;
-};
-
-export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool | ChatTimelineDivider;
+export type {
+  ChatTimelineDivider,
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  ImageAttachment,
+  JsonValue,
+  MessageSource,
+} from "../../../src/contracts/timeline.ts";
 
 /* ── Connection ── */
 
@@ -211,38 +174,14 @@ export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
-  | { type: "text_delta"; delta: string; messageId: string; sessionId?: string }
-  | { type: "thinking_delta"; delta: string; messageId: string; sessionId?: string }
-  | {
-      type: "toolcall_start";
-      messageId: string;
-      contentIndex: number;
-      toolName?: string;
-      sessionId?: string;
-    }
-  | {
-      type: "toolcall_delta";
-      messageId: string;
-      contentIndex: number;
-      delta: string;
-      sessionId?: string;
-    }
+  | { type: "text_delta"; delta: string; sessionId?: string; messageId: string }
   | {
       type: "message_end";
-      messageId: string;
-      role: string;
-      content?: string;
-      source?: string;
-      timestamp?: string;
       sessionId?: string;
-      intermediate?: boolean;
-      workstreamId?: string;
-      workstreamName?: string;
-      blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
+      message: ChatTimelineMessage;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
-      id: string;
       tool?: string;
       toolUseId?: string;
       args?: unknown;
@@ -252,19 +191,10 @@ export type WsMessage =
       timestamp?: string;
       sessionId?: string;
     }
-  | {
-      type: "tool_execution_update";
-      id: string;
-      tool?: string;
-      toolUseId?: string;
-      partialResult?: unknown;
-      timestamp?: string;
-      sessionId?: string;
-    }
   | { type: "turn_end"; sessionId?: string }
   | {
       type: "pi_surfaced";
-      messageId: string;
+      messageId?: string;
       content: string;
       timestamp?: string;
       sessionId?: string;

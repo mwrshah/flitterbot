@@ -1,12 +1,8 @@
-import type { MessageMetadata } from "./blackboard.ts";
-import type { DeliveryMode, MessageSource } from "./control-surface-api.ts";
+import type { DeliveryMode } from "./control-surface-api.ts";
+import type { ChatTimelineMessage, ImageAttachment, MessageSource } from "./timeline.ts";
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 
-export interface ImageAttachment {
-  data: string;
-  mimeType: string;
-}
 
 export interface WebSocketClientMessageEvent {
   type: "message";
@@ -26,15 +22,10 @@ export interface WebSocketClientUnsubscribeEvent {
   sessionId: string;
 }
 
-export interface WebSocketClientPingEvent {
-  type: "ping";
-}
-
 export type ControlSurfaceWebSocketClientEvent =
   | WebSocketClientMessageEvent
   | WebSocketClientSubscribeEvent
-  | WebSocketClientUnsubscribeEvent
-  | WebSocketClientPingEvent;
+  | WebSocketClientUnsubscribeEvent;
 
 export interface ConnectedWebSocketEvent {
   type: "connected";
@@ -45,7 +36,7 @@ type QueuedTurnSummary = {
   id: string;
   source: MessageSource;
   text: string;
-  metadata?: MessageMetadata;
+  metadata?: Record<string, unknown>;
   receivedAt: string;
   webClientId?: string;
   deliveryMode?: DeliveryMode;
@@ -69,55 +60,18 @@ export interface QueueItemEndWebSocketEvent {
 export interface TextDeltaWebSocketEvent {
   type: "text_delta";
   sessionId?: string;
-  /** Server UUID of the message being streamed. */
   messageId: string;
-  delta: string;
-}
-
-export interface ThinkingDeltaWebSocketEvent {
-  type: "thinking_delta";
-  sessionId?: string;
-  messageId: string;
-  delta: string;
-}
-
-export interface ToolcallStartWebSocketEvent {
-  type: "toolcall_start";
-  sessionId?: string;
-  messageId: string;
-  contentIndex: number;
-  toolName?: string;
-}
-
-export interface ToolcallDeltaWebSocketEvent {
-  type: "toolcall_delta";
-  sessionId?: string;
-  messageId: string;
-  contentIndex: number;
   delta: string;
 }
 
 export interface MessageEndWebSocketEvent {
   type: "message_end";
   sessionId?: string;
-  /** Server-assigned UUID — required, used for deduplication against history. */
-  messageId: string;
-  role: "user" | "assistant";
-  content: string;
-  source?: string;
-  timestamp?: string;
-  /** True for assistant messages that precede tool calls within a turn.
-   *  Only the final assistant message in a turn is broadcast without this flag. */
-  intermediate?: boolean;
-  workstreamId?: string;
-  workstreamName?: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
+  message: ChatTimelineMessage;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
   type: "tool_execution_start";
-  /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:start" */
-  id: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;
@@ -128,8 +82,6 @@ export interface ToolExecutionStartWebSocketEvent {
 
 export interface ToolExecutionEndWebSocketEvent {
   type: "tool_execution_end";
-  /** Deterministic ID for deduplication: "${serverUuid}:tool:${toolCallId}:end" */
-  id: string;
   sessionId?: string;
   tool?: string;
   toolUseId?: string;
@@ -137,16 +89,6 @@ export interface ToolExecutionEndWebSocketEvent {
   isError?: boolean;
   timestamp?: string;
   event?: unknown;
-}
-
-export interface ToolExecutionUpdateWebSocketEvent {
-  type: "tool_execution_update";
-  id: string;
-  sessionId?: string;
-  tool?: string;
-  toolUseId?: string;
-  partialResult?: unknown;
-  timestamp?: string;
 }
 
 export interface TurnEndWebSocketEvent {
@@ -158,8 +100,8 @@ export interface TurnEndWebSocketEvent {
 
 export interface PiSurfacedWebSocketEvent {
   type: "pi_surfaced";
-  /** Server-assigned UUID — required, used for deduplication against history. */
-  messageId: string;
+  /** Persistent message ID from the session — matches history item IDs for deduplication. */
+  messageId?: string;
   content: string;
   timestamp?: string;
   sessionId?: string;
@@ -181,24 +123,15 @@ export interface StatusChangedWebSocketEvent {
   timestamp: string;
 }
 
-export interface PongWebSocketEvent {
-  type: "pong";
-}
-
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
   | TextDeltaWebSocketEvent
-  | ThinkingDeltaWebSocketEvent
-  | ToolcallStartWebSocketEvent
-  | ToolcallDeltaWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionEndWebSocketEvent
-  | ToolExecutionUpdateWebSocketEvent
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
-  | StatusChangedWebSocketEvent
-  | PongWebSocketEvent;
+  | StatusChangedWebSocketEvent;
