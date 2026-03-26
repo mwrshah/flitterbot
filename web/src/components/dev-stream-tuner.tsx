@@ -39,7 +39,15 @@ export function DevStreamTuner() {
       const c = getChunker();
       if (c) {
         const s = c.getStats();
-        setStats(s);
+        setStats((prev) =>
+          prev.bufferDepth === s.bufferDepth &&
+          prev.profiling === s.profiling &&
+          prev.profileStartTime === s.profileStartTime &&
+          prev.lastPushTime === s.lastPushTime &&
+          prev.lastRenderTime === s.lastRenderTime
+            ? prev
+            : s,
+        );
         if (s.profiling && s.profileStartTime > 0) {
           const now = performance.now();
           if (now - lastLogTime >= 1000) {
