@@ -1,5 +1,5 @@
 import type http from "node:http";
-import type { PiHistoryItem, PiHistoryResponse } from "../contracts/index.ts";
+import type { ChatTimelineItem, PiHistoryResponse } from "../contracts/index.ts";
 import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
@@ -12,11 +12,11 @@ import { sendJson } from "./_shared.ts";
 async function readSessionHistory(
   managed: ManagedPiSession,
   historyMode: "input" | "agent",
-): Promise<PiHistoryItem[]> {
+): Promise<ChatTimelineItem[]> {
   const snapshot = managed.state.getSnapshot();
   if (!snapshot.sessionId) return [];
 
-  let items: PiHistoryItem[];
+  let items: ChatTimelineItem[];
 
   if (
     managed.session?.sessionId === snapshot.sessionId &&
@@ -74,7 +74,7 @@ export async function handleBrowserPiHistoryRoute(
     }
     allSessions.push(...runtime.sessionManager.listOrchestrators());
 
-    const allItems: PiHistoryItem[] = [];
+    const allItems: ChatTimelineItem[] = [];
     const processedSessionIds = new Set<string>();
 
     for (const session of allSessions) {

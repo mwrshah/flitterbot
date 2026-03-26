@@ -1,11 +1,8 @@
-import type { DeliveryMode, MessageSource } from "./control-surface-api.ts";
+import type { DeliveryMode } from "./control-surface-api.ts";
+import type { ChatTimelineMessage, ImageAttachment, MessageSource } from "./timeline.ts";
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 
-export interface ImageAttachment {
-  data: string;
-  mimeType: string;
-}
 
 export interface WebSocketClientMessageEvent {
   type: "message";
@@ -63,23 +60,14 @@ export interface QueueItemEndWebSocketEvent {
 export interface TextDeltaWebSocketEvent {
   type: "text_delta";
   sessionId?: string;
+  messageId: string;
   delta: string;
 }
 
 export interface MessageEndWebSocketEvent {
   type: "message_end";
   sessionId?: string;
-  /** Persistent message ID from the session — matches history item IDs for deduplication. */
-  messageId?: string;
-  role: "user" | "assistant";
-  content: string;
-  source?: string;
-  timestamp?: string;
-  /** True for assistant messages that precede tool calls within a turn.
-   *  Only the final assistant message in a turn is broadcast without this flag. */
-  intermediate?: boolean;
-  workstreamId?: string;
-  workstreamName?: string;
+  message: ChatTimelineMessage;
 }
 
 export interface ToolExecutionStartWebSocketEvent {

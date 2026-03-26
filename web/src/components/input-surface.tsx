@@ -43,6 +43,8 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   hook: "bg-violet-500",
   cron: "bg-cyan-500",
   init: "bg-gray-400",
+  agent: "bg-blue-500",
+  pi_outbound: "bg-amber-500",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -51,6 +53,8 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   hook: "Hook",
   cron: "Cron",
   init: "Init",
+  agent: "Agent",
+  pi_outbound: "Pi",
 };
 
 const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
@@ -347,29 +351,17 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
       }
 
       if (message.type === "message_end") {
+        const msg = message.message;
         // Skip intermediate assistant messages (pre-tool-call fragments within a turn)
-        if (message.intermediate) return;
+        if (msg.intermediate) return;
 
-        const content = message.content || "";
-        if (message.role === "user") {
-          const source = (message.source as MessageSource) ?? "web";
+        if (msg.role === "user") {
+          const source = msg.source ?? "web";
           if (source !== "web" && source !== "whatsapp") return;
-          if (content.trim()) {
-            const id = message.messageId ? `${message.messageId}:message` : createId("user");
+          if (msg.content.trim()) {
             setAppendedItems((current) => {
-              if (current.some((item) => item.id === id)) return current;
-              return [
-                ...current,
-                {
-                  id,
-                  kind: "message",
-                  role: "user",
-                  content,
-                  source,
-                  workstreamName: message.workstreamName,
-                  createdAt: message.timestamp ?? new Date().toISOString(),
-                },
-              ];
+              if (current.some((item) => item.id === msg.id)) return current;
+              return [...current, msg];
             });
           }
           return;

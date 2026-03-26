@@ -34,7 +34,6 @@ function PiDefaultRoute() {
   return (
     <ChatPanel
       timeline={mergeTimelines(history, accum.appendedItems)}
-      streamingText={accum.streamingText}
       statusPills={accum.statusPills}
       connectionState={snapshot.connectionState}
       onSendMessage={(text, deliveryMode, images) =>

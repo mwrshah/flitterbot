@@ -1,53 +1,16 @@
-/* ── JSON-safe value (no `unknown`) ── */
+/* ── Chat timeline (shared with backend) ── */
 
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+import type { ChatTimelineItem, ChatTimelineMessage } from "../../../src/contracts/timeline.ts";
 
-/* ── Chat timeline ── */
-
-export type MessageSource = "web" | "whatsapp" | "hook" | "cron" | "init";
-
-export type ImageAttachment = {
-  data: string;
-  mimeType: string;
-};
-
-export type ChatTimelineMessage = {
-  id: string;
-  kind: "message";
-  role: "user" | "assistant" | "system";
-  content: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
-  images?: ImageAttachment[];
-  source?: MessageSource;
-  workstreamName?: string;
-  createdAt: string;
-};
-
-export type ChatTimelineTool = {
-  id: string;
-  kind: "tool";
-  tool: string;
-  phase: "start" | "end";
-  toolUseId?: string;
-  args?: JsonValue;
-  result?: JsonValue;
-  isError?: boolean;
-  createdAt: string;
-};
-
-export type ChatTimelineDivider = {
-  id: string;
-  kind: "divider";
-  createdAt: string;
-};
-
-export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool | ChatTimelineDivider;
+export type {
+  ChatTimelineDivider,
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  ImageAttachment,
+  JsonValue,
+  MessageSource,
+} from "../../../src/contracts/timeline.ts";
 
 /* ── Connection ── */
 
@@ -211,18 +174,11 @@ export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
-  | { type: "text_delta"; delta: string; sessionId?: string }
+  | { type: "text_delta"; delta: string; sessionId?: string; messageId: string }
   | {
       type: "message_end";
-      messageId?: string;
-      role: string;
-      content?: string;
-      source?: string;
-      timestamp?: string;
       sessionId?: string;
-      intermediate?: boolean;
-      workstreamId?: string;
-      workstreamName?: string;
+      message: ChatTimelineMessage;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";

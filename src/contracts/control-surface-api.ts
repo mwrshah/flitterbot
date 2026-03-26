@@ -1,12 +1,17 @@
 import type { ClaudeSessionStatus } from "./blackboard.ts";
 import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  MessageSource,
+} from "./timeline.ts";
+import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
 import type { TranscriptPageResponse } from "./transcript.ts";
 
-export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init" | "agent" | "pi_outbound";
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
@@ -142,35 +147,17 @@ export interface SessionDetailResponse {
   tmux?: TmuxSessionInspection | null;
 }
 
-export interface PiHistoryMessageItem {
-  id: string;
-  kind: "message";
-  role: "user" | "assistant" | "system";
-  content: string;
-  source?: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
-  workstreamName?: string;
-  createdAt: string;
-}
-
-export interface PiHistoryToolItem {
-  id: string;
-  kind: "tool";
-  tool: string;
-  phase: "start" | "end";
-  toolUseId?: string;
-  args?: unknown;
-  result?: unknown;
-  isError?: boolean;
-  createdAt: string;
-}
-
-export type PiHistoryItem = PiHistoryMessageItem | PiHistoryToolItem;
+/** @deprecated Use ChatTimelineMessage from timeline.ts */
+export type PiHistoryMessageItem = ChatTimelineMessage;
+/** @deprecated Use ChatTimelineTool from timeline.ts */
+export type PiHistoryToolItem = ChatTimelineTool;
+/** @deprecated Use ChatTimelineItem from timeline.ts */
+export type PiHistoryItem = ChatTimelineItem;
 
 export interface PiHistoryResponse {
   sessionId: string | null;
   sessionFile: string | null;
-  items: PiHistoryItem[];
+  items: ChatTimelineItem[];
 }
 
 export type SessionTranscriptResponse = TranscriptPageResponse;

@@ -5,12 +5,11 @@ type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 export type SessionAccum = {
   appendedItems: import("./types").ChatTimelineItem[];
-  streamingText: string | null;
   statusPills: StatusPill[];
 };
 
 export function emptyAccum(): SessionAccum {
-  return { appendedItems: [], streamingText: null, statusPills: [] };
+  return { appendedItems: [], statusPills: [] };
 }
 
 export type PiSessionStore = {

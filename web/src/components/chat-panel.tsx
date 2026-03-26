@@ -3,15 +3,10 @@ import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import {
-  buildStreamingAssistantMessage,
-  pendingToolCallsFromTimeline,
-  timelineToAgentMessages,
-} from "~/lib/pi-web-ui-bridge";
+import { pendingToolCallsFromTimeline, timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
 import { PiMessageList } from "./pi-message-list";
-import { PiStreamingMessage } from "./pi-streaming-message";
 
 type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
@@ -52,7 +47,6 @@ function connectionVariant(state: ConnectionState): "success" | "warning" | "mut
 
 type ChatPanelProps = {
   timeline: ChatTimelineItem[];
-  streamingText: string | null;
   statusPills: StatusPill[];
   connectionState: ConnectionState;
   onSendMessage: (
@@ -64,7 +58,6 @@ type ChatPanelProps = {
 
 export function ChatPanel({
   timeline,
-  streamingText,
   statusPills,
   connectionState,
   onSendMessage,
@@ -88,9 +81,8 @@ export function ChatPanel({
 
   const pendingToolCalls = useMemo(() => pendingToolCallsFromTimeline(timeline), [timeline]);
 
-  const streamingMessage = useMemo(
-    () => (streamingText ? buildStreamingAssistantMessage(streamingText) : null),
-    [streamingText],
+  const isStreaming = timeline.some(
+    (item) => item.kind === "message" && item.streaming,
   );
 
   function addImageFiles(files: FileList | File[]) {
@@ -158,10 +150,9 @@ export function ChatPanel({
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
         <PiMessageList
           messages={agentMessages}
-          isStreaming={streamingText !== null}
+          isStreaming={isStreaming}
           pendingToolCalls={pendingToolCalls}
         />
-        <PiStreamingMessage message={streamingMessage} visible={streamingText !== null} />
       </div>
 
       <MessageInput

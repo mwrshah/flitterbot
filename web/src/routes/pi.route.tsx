@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
-import { piSessionStore, resetPiSessionStore, type SessionAccum } from "~/lib/pi-session-store";
+import { piSessionStore, resetPiSessionStore } from "~/lib/pi-session-store";
 import { statusQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineTool,
@@ -10,7 +10,6 @@ import type {
   DeliveryMode,
   ImageAttachment,
   JsonValue,
-  MessageSource,
   WsMessage,
 } from "~/lib/types";
 import { cn, createId, extractToolName } from "~/lib/utils";
@@ -139,58 +138,58 @@ function PiLayoutRoute() {
       }
 
       if (message.type === "text_delta") {
-        store.updateSession(sessionId, (s) => ({
-          ...s,
-          streamingText: (s.streamingText ?? "") + message.delta,
-        }));
+        const itemId = message.messageId;
+        store.updateSession(sessionId, (s) => {
+          const existing = s.appendedItems.find((item) => item.id === itemId);
+          if (existing && existing.kind === "message") {
+            return {
+              ...s,
+              appendedItems: s.appendedItems.map((item) =>
+                item.id === itemId && item.kind === "message"
+                  ? { ...item, content: item.content + message.delta }
+                  : item,
+              ),
+            };
+          }
+          // First delta with this messageId — create a streaming timeline item
+          return {
+            ...s,
+            appendedItems: [
+              ...s.appendedItems,
+              {
+                id: itemId,
+                kind: "message" as const,
+                role: "assistant" as const,
+                content: message.delta,
+                streaming: true,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          };
+        });
         return;
       }
 
       if (message.type === "message_end") {
-        const content = message.content || "";
+        const msg = message.message;
+        if (!msg.content.trim()) return;
 
-        if (message.role === "user") {
-          if (content.trim()) {
-            const id = message.messageId ? `${message.messageId}:message` : createId("user");
-            store.updateSession(sessionId, (s) => ({
-              ...s,
-              appendedItems: [
-                ...s.appendedItems,
-                {
-                  id,
-                  kind: "message",
-                  role: "user",
-                  content,
-                  source: (message.source as MessageSource) ?? "web",
-                  createdAt: message.timestamp ?? new Date().toISOString(),
-                },
-              ],
-            }));
-          }
-          return;
-        }
-
-        const assistantId = message.messageId
-          ? `${message.messageId}:message`
-          : createId("assistant");
         store.updateSession(sessionId, (s) => {
-          const next: SessionAccum = {
-            ...s,
-            streamingText: null,
-          };
-          if (content.trim()) {
-            next.appendedItems = [
-              ...s.appendedItems,
-              {
-                id: assistantId,
-                kind: "message",
-                role: "assistant",
-                content,
-                createdAt: message.timestamp ?? new Date().toISOString(),
-              },
-            ];
+          const existingIdx = s.appendedItems.findIndex((item) => item.id === msg.id);
+          if (existingIdx >= 0) {
+            // Finalize: the streaming text_delta already created this item — replace with full message
+            return {
+              ...s,
+              appendedItems: s.appendedItems.map((item, idx) =>
+                idx === existingIdx ? msg : item,
+              ),
+            };
           }
-          return next;
+          // New message (user or non-streamed assistant) — push directly
+          return {
+            ...s,
+            appendedItems: [...s.appendedItems, msg],
+          };
         });
         return;
       }
@@ -234,9 +233,13 @@ function PiLayoutRoute() {
       if (message.type === "turn_end") {
         store.updateSession(sessionId, (s) => ({
           ...s,
-          streamingText: null,
           appendedItems: [
-            ...s.appendedItems,
+            // Safety: clear any lingering streaming flags
+            ...s.appendedItems.map((item) =>
+              item.kind === "message" && item.streaming
+                ? { ...item, streaming: undefined }
+                : item,
+            ),
             {
               id: createId("divider-turn-end"),
               kind: "divider",

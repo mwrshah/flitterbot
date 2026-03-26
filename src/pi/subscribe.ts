@@ -1,6 +1,7 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
+  ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
@@ -11,6 +12,11 @@ import type { WebSocketHub } from "../ws/hub.ts";
 import type { PiSessionState } from "./session-state.ts";
 
 type PiSessionSubscriptionEvent =
+  | {
+      type: "message_start";
+      message?: unknown;
+      [key: string]: unknown;
+    }
   | {
       type: "message_update";
       message?: unknown;
@@ -58,11 +64,19 @@ function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEv
   wsHub.broadcast(payload);
 }
 
-function extractMessageRole(message: unknown): "user" | "assistant" | undefined {
+type BroadcastRole = "user" | "assistant";
+type AnyMessageRole = BroadcastRole | "toolResult";
+
+function extractMessageRole(message: unknown): BroadcastRole | undefined {
+  const role = extractAnyMessageRole(message);
+  return role === "user" || role === "assistant" ? role : undefined;
+}
+
+function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
   if (!message || typeof message !== "object") return undefined;
 
   const role = (message as Record<string, unknown>).role;
-  if (role === "user" || role === "assistant") {
+  if (role === "user" || role === "assistant" || role === "toolResult") {
     return role;
   }
 
@@ -123,7 +137,16 @@ export function subscribeToPiSession(
 ): () => void {
   // Deferred assistant messages: accumulate during a turn, flush on turn_end.
   // Earlier ones get broadcast with intermediate: true; only the last one is final.
-  const pendingAssistantMessages: MessageEndWebSocketEvent[] = [];
+  const pendingAssistantMessages: ChatTimelineMessage[] = [];
+
+  // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
+  // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
+  // msg-N IDs that match the history path in history.ts.
+  let messageOrdinal = session.messages.length;
+
+  // Tracks the ordinal ID for the currently-streaming assistant message.
+  // Set on message_start (assistant only), cleared on message_end / turn_end.
+  let currentStreamingMessageId: string | null = null;
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
@@ -134,41 +157,63 @@ export function subscribeToPiSession(
     }
 
     switch (event.type) {
+      case "message_start": {
+        const role = extractMessageRole(event.message);
+        if (role === "assistant") {
+          // Pre-assign the ordinal ID for this message so text_delta events can carry it.
+          // The counter is incremented now; message_end will use this same ID.
+          currentStreamingMessageId = `msg-${messageOrdinal}`;
+        }
+        break;
+      }
       case "message_update": {
         const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
-        if (ame?.type === "text_delta" && typeof ame.delta === "string") {
+        if (ame?.type === "text_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
+            messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
         }
         break;
       }
       case "message_end": {
-        const role = extractMessageRole(event.message);
+        const anyRole = extractAnyMessageRole(event.message);
+        if (!anyRole) break;
+
+        // Always increment ordinal for every message role (user, assistant, toolResult)
+        // to stay in sync with history.ts which counts all type: "message" entries.
+        const messageId = currentStreamingMessageId ?? `msg-${messageOrdinal}`;
+        messageOrdinal += 1;
+        currentStreamingMessageId = null;
+
+        // Only broadcast user/assistant messages — toolResult is not surfaced via WS.
+        const role = anyRole === "user" || anyRole === "assistant" ? anyRole : undefined;
         const content = extractMessageText(event.message);
-        if (!role || !content) {
-          break;
-        }
+        if (!role || !content) break;
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
-        const payload: MessageEndWebSocketEvent = {
-          type: "message_end",
-          sessionId: session.sessionId,
-          messageId: extractMessageId(event.message),
+        const timelineMessage: ChatTimelineMessage = {
+          id: messageId,
+          kind: "message",
           role,
           content,
           source: currentItem?.source,
-          timestamp: extractTimestamp(event.message, now),
           workstreamId: currentItem?.workstreamId,
           workstreamName: currentItem?.workstreamName,
+          createdAt: extractTimestamp(event.message, now),
         };
 
         if (role === "assistant") {
           // Defer — accumulate until turn_end so we can mark intermediate vs final
-          pendingAssistantMessages.push(payload);
+          pendingAssistantMessages.push(timelineMessage);
         } else {
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: timelineMessage,
+          };
           broadcast(wsHub, payload);
         }
         break;
@@ -204,14 +249,18 @@ export function subscribeToPiSession(
         // Flush deferred assistant messages: all but last are intermediate
         for (let i = 0; i < pendingAssistantMessages.length; i++) {
           const isLast = i === pendingAssistantMessages.length - 1;
-          broadcast(
-            wsHub,
-            isLast
-              ? pendingAssistantMessages[i]!
-              : { ...pendingAssistantMessages[i]!, intermediate: true },
-          );
+          const msg = isLast
+            ? pendingAssistantMessages[i]!
+            : { ...pendingAssistantMessages[i]!, intermediate: true };
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: msg,
+          };
+          broadcast(wsHub, payload);
         }
         pendingAssistantMessages.length = 0;
+        currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
           type: "turn_end",
