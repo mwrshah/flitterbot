@@ -50,7 +50,6 @@ import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
-import { extractLastAssistantText } from "./transcript/reader.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -362,13 +361,10 @@ export class ControlSurfaceRuntime {
       return { ok: true, bookkeeping: true };
     }
 
-    // Extract last assistant message from the CC session transcript for Pi context
-    const transcriptPath = pickString(payload, ["transcript_path", "transcriptPath"]);
-    if (transcriptPath) {
-      const lastOutput = extractLastAssistantText(transcriptPath);
-      if (lastOutput) {
-        payload.lastAssistantText = lastOutput;
-      }
+    // Use Claude Code's native last_assistant_message from the stop hook payload
+    const lastAssistantText = pickString(payload, ["last_assistant_message", "lastAssistantMessage"]);
+    if (lastAssistantText) {
+      payload.lastAssistantText = lastAssistantText;
     }
 
     // Route stop event to the Pi session that owns this CC session
@@ -1458,7 +1454,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     payload.agentManaged === true ||
     payload.agent_managed === 1 ||
     payload.agentManaged === 1;
-  const lastAssistantText = pickString(payload, ["lastAssistantText"]);
+  const lastAssistantText = pickString(payload, ["lastAssistantText", "last_assistant_message", "lastAssistantMessage"]);
   const lines = [
     `[hook] ${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
