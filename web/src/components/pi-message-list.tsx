@@ -108,4 +108,7 @@ export const PiMessageList = memo(
 
     return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
   }),
+  // Custom equality: skip re-render if messages array is the same reference
+  // (useAgentMessages returns a stable reference via fingerprinting)
+  (prev, next) => prev.messages === next.messages,
 );

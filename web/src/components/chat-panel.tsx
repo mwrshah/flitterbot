@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
+import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
@@ -79,7 +79,7 @@ export function ChatPanel({
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
-  const agentMessages = useMemo(() => timelineToAgentMessages(timeline), [timeline]);
+  const agentMessages = useAgentMessages(timeline);
 
   // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
