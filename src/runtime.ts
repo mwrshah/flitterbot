@@ -370,6 +370,13 @@ export class ControlSurfaceRuntime {
         payload.lastAssistantText = lastOutput;
       }
     }
+    // Fall back to Claude Code's own last_assistant_message if transcript extraction failed
+    if (!payload.lastAssistantText) {
+      const fromPayload = pickString(payload, ["last_assistant_message", "lastAssistantMessage"]);
+      if (fromPayload) {
+        payload.lastAssistantText = fromPayload;
+      }
+    }
 
     // Route stop event to the Pi session that owns this CC session
     const piSessionIdFromPayload = pickString(payload, [
@@ -1458,7 +1465,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     payload.agentManaged === true ||
     payload.agent_managed === 1 ||
     payload.agentManaged === 1;
-  const lastAssistantText = pickString(payload, ["lastAssistantText"]);
+  const lastAssistantText = pickString(payload, ["lastAssistantText", "last_assistant_message", "lastAssistantMessage"]);
   const lines = [
     `[hook] ${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
