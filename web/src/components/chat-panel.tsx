@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -73,7 +73,6 @@ export function ChatPanel({
     queryFn: () => apiClient.listSkills(),
     staleTime: 5 * 60 * 1000,
   });
-  const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
@@ -133,24 +132,19 @@ export function ChatPanel({
   }, []);
 
   // Refs for stable handleSubmit closure
-  const draftRef = useRef(draft);
   const pendingImagesRef = useRef(pendingImages);
   const deliveryModeRef = useRef(deliveryMode);
   useEffect(() => {
-    draftRef.current = draft;
     pendingImagesRef.current = pendingImages;
     deliveryModeRef.current = deliveryMode;
   });
 
   const handleSubmit = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      const text = draftRef.current.trim();
+    async (text: string) => {
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      setDraft("");
       setPendingImages([]);
       engageAndScroll();
 
@@ -192,8 +186,6 @@ export function ChatPanel({
       </div>
 
       <MessageInput
-        draft={draft}
-        onDraftChange={setDraft}
         deliveryMode={deliveryMode}
         onDeliveryModeChange={setDeliveryMode}
         isSending={isSending}

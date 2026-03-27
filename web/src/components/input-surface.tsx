@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -130,8 +130,12 @@ function CollapsibleContent({
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-  });
+    const check = () => setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <div className="relative">
@@ -161,7 +165,7 @@ function CollapsibleContent({
 
 /* ── Entry Renderers ── */
 
-function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
+const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
   const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
   const displayContent = parsed ? parsed.cleanContent : entry.content;
   const badgeName = parsed?.workstreamName ?? entry.workstreamName;
@@ -191,9 +195,9 @@ function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) 
       </div>
     </div>
   );
-}
+});
 
-function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }) {
+const OutboundEntry = memo(function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }) {
   const isWhatsApp = entry.channel === "whatsapp";
   return (
     <div className="flex gap-3 items-start">
@@ -217,9 +221,9 @@ function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }
       </div>
     </div>
   );
-}
+});
 
-function LitMarkdownBlock({ content }: { content: string }) {
+const LitMarkdownBlock = memo(function LitMarkdownBlock({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -247,9 +251,9 @@ function LitMarkdownBlock({ content }: { content: string }) {
   }, [ready, content]);
 
   return <div ref={containerRef} />;
-}
+});
 
-function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
+const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -271,9 +275,9 @@ function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response
       </div>
     </div>
   );
-}
+});
 
-function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
+const HookEntry = memo(function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -291,9 +295,9 @@ function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
       </div>
     </div>
   );
-}
+});
 
-function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
+const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
   switch (entry.kind) {
     case "inbound":
       return <InboundEntry entry={entry} />;
@@ -304,7 +308,7 @@ function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
     case "hook":
       return <HookEntry entry={entry} />;
   }
-}
+});
 
 /* ── Main Component ── */
 
@@ -321,7 +325,6 @@ const useIsClient = () =>
 export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
   const isClient = useIsClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
-  const [draft, setDraft] = useState("");
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
@@ -368,24 +371,19 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
   }, []);
 
   // Refs for stable handleSubmit closure
-  const draftRef = useRef(draft);
   const pendingImagesRef = useRef(pendingImages);
   const deliveryModeRef = useRef(deliveryMode);
   useEffect(() => {
-    draftRef.current = draft;
     pendingImagesRef.current = pendingImages;
     deliveryModeRef.current = deliveryMode;
   });
 
   const handleSubmit = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      const text = draftRef.current.trim();
+    async (text: string) => {
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      setDraft("");
       setPendingImages([]);
       engageAndScroll();
 
@@ -435,8 +433,6 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
       </div>
 
       <MessageInput
-        draft={draft}
-        onDraftChange={setDraft}
         deliveryMode={deliveryMode}
         onDeliveryModeChange={setDeliveryMode}
         isSending={isSending}

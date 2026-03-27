@@ -2,6 +2,7 @@ import {
   type ClipboardEvent,
   type DragEvent,
   type FormEvent,
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -12,12 +13,10 @@ import { Button } from "~/components/ui/button";
 import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
-  draft: string;
-  onDraftChange: (value: string) => void;
   deliveryMode: DeliveryMode;
   onDeliveryModeChange: (mode: DeliveryMode) => void;
   isSending: boolean;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (text: string) => void;
   pendingImages: ImageAttachment[];
   onAddImages: (files: FileList | File[]) => void;
   onRemoveImage: (index: number) => void;
@@ -27,9 +26,7 @@ type MessageInputProps = {
   helpText?: string;
 };
 
-export function MessageInput({
-  draft,
-  onDraftChange,
+export const MessageInput = memo(function MessageInput({
   deliveryMode,
   onDeliveryModeChange,
   isSending,
@@ -44,6 +41,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
@@ -54,14 +52,12 @@ export function MessageInput({
   const draftRef = useRef(draft);
   const pickerOpenRef = useRef(pickerOpen);
   const selectedSkillRef = useRef(selectedSkill);
-  const onDraftChangeRef = useRef(onDraftChange);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
   useEffect(() => {
     draftRef.current = draft;
     pickerOpenRef.current = pickerOpen;
     selectedSkillRef.current = selectedSkill;
-    onDraftChangeRef.current = onDraftChange;
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
   });
@@ -84,7 +80,7 @@ export function MessageInput({
    */
   const handleDraftChange = useCallback(
     (value: string) => {
-      onDraftChange(value);
+      setDraft(value);
       const cursor = textareaRef.current?.selectionStart ?? value.length;
       // Scan backwards from cursor to find a "/" trigger
       let slashIdx = -1;
@@ -110,7 +106,7 @@ export function MessageInput({
         setPickerOpen(false);
       }
     },
-    [onDraftChange, skills],
+    [skills],
   );
 
   const handleSkillSelect = useCallback((name: string) => {
@@ -122,7 +118,7 @@ export function MessageInput({
     const after = value.slice(cursor);
     const inserted = `/${name} `;
     const newValue = before + inserted + after;
-    onDraftChangeRef.current(newValue);
+    setDraft(newValue);
     setPickerOpen(false);
     slashPositionRef.current = -1;
     // Restore cursor position after the inserted command
@@ -172,7 +168,9 @@ export function MessageInput({
 
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        onSubmitRef.current(event as unknown as FormEvent);
+        const text = draftRef.current.trim();
+        onSubmitRef.current(text);
+        setDraft("");
       }
     },
     [handleSkillSelect],
@@ -213,7 +211,7 @@ export function MessageInput({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <form onSubmit={onSubmit} className="space-y-2">
+      <form onSubmit={(e) => { e.preventDefault(); onSubmit(draftRef.current.trim()); setDraft(""); }} className="space-y-2">
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {pendingImages.map((img, i) => (
@@ -323,4 +321,4 @@ export function MessageInput({
       </form>
     </div>
   );
-}
+});
