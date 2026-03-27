@@ -101,6 +101,28 @@ export function getRecentDefaultMessages(
   return rows.reverse();
 }
 
+export type DefaultConversationSnippet = {
+  content: string;
+  source: string;
+  created_at: string;
+  direction: "inbound" | "outbound";
+  sender: string | null;
+};
+
+export function getRecentDefaultConversation(
+  db: BlackboardDatabase,
+  limit: number = 10,
+): DefaultConversationSnippet[] {
+  const rows = db.all<DefaultConversationSnippet>(
+    `SELECT content, source, created_at, direction, sender
+     FROM messages
+     WHERE workstream_id IS NULL
+     ORDER BY created_at DESC LIMIT ?`,
+    limit,
+  );
+  return rows.reverse();
+}
+
 export function getRecentConversationByWorkstream(
   db: BlackboardDatabase,
   withinHours: number,
