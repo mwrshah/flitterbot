@@ -1,9 +1,10 @@
 import type http from "node:http";
+import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
 import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
 } from "../blackboard/query-workstreams.ts";
-import type { ChatTimelineItem, PiHistoryResponse } from "../contracts/index.ts";
+import type { ChatTimelineItem, ChatTimelineMessage, PiHistoryResponse } from "../contracts/index.ts";
 import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -80,56 +81,34 @@ async function handleBrowserPiHistoryRouteInner(
   historyMode: "input" | "agent",
   piSessionId: string | null,
 ) {
-  // When input surface requests history with no specific session, aggregate all
+  // Input surface with no specific session — read from the messages table
   if (historyMode === "input" && !piSessionId) {
-    const allSessions: ManagedPiSession[] = [];
-    const defaultSession = runtime.sessionManager.getDefault();
-    if (defaultSession) allSessions.push(defaultSession);
-    allSessions.push(...runtime.sessionManager.listOrchestrators());
-
-    const allItems: ChatTimelineItem[] = [];
-    const processedSessionIds = new Set<string>();
-
-    for (const session of allSessions) {
-      const snapshot = session.state.getSnapshot();
-      if (snapshot.sessionId) processedSessionIds.add(snapshot.sessionId);
-
-      const items = await readSessionHistory(session, historyMode);
-      const sessionPrefix = snapshot.sessionId ?? "default";
-      for (const item of items) {
-        item.id = `${sessionPrefix}:${item.id}`;
-        if (session.workstreamName && item.kind === "message") {
-          item.workstreamName = session.workstreamName;
-        }
-      }
-      allItems.push(...items);
+    // Collect all relevant pi_session_ids: default + active orchestrators + recently-closed workstreams
+    const piSessionIds: string[] = [];
+    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
+    if (defaultPiSessionId) piSessionIds.push(defaultPiSessionId);
+    for (const orch of runtime.sessionManager.listOrchestrators()) {
+      if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
-
-    // Include history from recently-closed workstreams
+    // Include closed workstreams (24h) — look up their pi_session_ids
     const closedWorkstreams = listRecentlyClosedWorkstreams(runtime.blackboard, 24);
     for (const ws of closedWorkstreams) {
-      const piSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
-      if (!piSessionId || processedSessionIds.has(piSessionId)) continue;
-      processedSessionIds.add(piSessionId);
-
-      const row = runtime.blackboard
-        .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
-        .get(piSessionId) as { session_file: string | null } | undefined;
-      if (!row?.session_file) continue;
-
-      const body = await readPiHistory(piSessionId, row.session_file, historyMode);
-      for (const item of body.items) {
-        item.id = `${piSessionId}:${item.id}`;
-        if (item.kind === "message") {
-          item.workstreamName = ws.name;
-        }
-      }
-      allItems.push(...body.items);
+      const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
+      if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
     }
+    const rows = getInputSurfaceHistory(runtime.blackboard, piSessionIds);
+    const items: ChatTimelineItem[] = rows.map((row): ChatTimelineMessage => ({
+      id: row.id,
+      kind: "message",
+      role: row.direction === "inbound" ? "user" : "assistant",
+      content: row.content,
+      source: row.source,
+      workstreamId: row.workstream_id ?? undefined,
+      workstreamName: row.workstream_name ?? undefined,
+      createdAt: row.created_at,
+    }));
 
-    allItems.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-    const body: PiHistoryResponse = { sessionId: null, sessionFile: null, items: allItems };
+    const body: PiHistoryResponse = { sessionId: null, sessionFile: null, items };
     return sendJson(response, 200, body);
   }
 
