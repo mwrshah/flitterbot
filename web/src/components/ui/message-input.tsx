@@ -3,6 +3,7 @@ import {
   type DragEvent,
   type FormEvent,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -49,11 +50,32 @@ export function MessageInput({
   // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
 
+  // Refs for stable useCallback closures
+  const draftRef = useRef(draft);
+  const pickerOpenRef = useRef(pickerOpen);
+  const selectedSkillRef = useRef(selectedSkill);
+  const onDraftChangeRef = useRef(onDraftChange);
+  const onSubmitRef = useRef(onSubmit);
+  const onAddImagesRef = useRef(onAddImages);
+  useEffect(() => {
+    draftRef.current = draft;
+    pickerOpenRef.current = pickerOpen;
+    selectedSkillRef.current = selectedSkill;
+    onDraftChangeRef.current = onDraftChange;
+    onSubmitRef.current = onSubmit;
+    onAddImagesRef.current = onAddImages;
+  });
+
   const filteredSkills =
     skills?.filter((s) => {
       if (!pickerFilter) return true;
       return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
     }) ?? [];
+
+  const filteredSkillsRef = useRef(filteredSkills);
+  useEffect(() => {
+    filteredSkillsRef.current = filteredSkills;
+  });
 
   /**
    * Detect a slash command token at the cursor position.
@@ -91,8 +113,8 @@ export function MessageInput({
     [onDraftChange, skills],
   );
 
-  function handleSkillSelect(name: string) {
-    const value = draft;
+  const handleSkillSelect = useCallback((name: string) => {
+    const value = draftRef.current;
     const slashIdx = slashPositionRef.current;
     const cursor = textareaRef.current?.selectionStart ?? value.length;
     // Replace from the "/" through the current filter text with "/<name> "
@@ -100,7 +122,7 @@ export function MessageInput({
     const after = value.slice(cursor);
     const inserted = `/${name} `;
     const newValue = before + inserted + after;
-    onDraftChange(newValue);
+    onDraftChangeRef.current(newValue);
     setPickerOpen(false);
     slashPositionRef.current = -1;
     // Restore cursor position after the inserted command
@@ -109,47 +131,54 @@ export function MessageInput({
       textareaRef.current?.setSelectionRange(newCursor, newCursor);
       textareaRef.current?.focus();
     });
-  }
+  }, []);
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (pickerOpen) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setPickerOpen(false);
-        return;
-      }
-      if (event.key === "Enter") {
-        event.preventDefault();
-        if (selectedSkill) {
-          handleSkillSelect(selectedSkill);
-        } else if (filteredSkills.length > 0) {
-          handleSkillSelect(filteredSkills[0]!.name);
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (pickerOpenRef.current) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setPickerOpen(false);
+          return;
         }
-        return;
-      }
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        const currentIndex = filteredSkills.findIndex((s) => s.name === selectedSkill);
-        let nextIndex: number;
-        if (event.key === "ArrowDown") {
-          nextIndex = currentIndex < filteredSkills.length - 1 ? currentIndex + 1 : 0;
-        } else {
-          nextIndex = currentIndex > 0 ? currentIndex - 1 : filteredSkills.length - 1;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const selected = selectedSkillRef.current;
+          const filtered = filteredSkillsRef.current;
+          if (selected) {
+            handleSkillSelect(selected);
+          } else if (filtered.length > 0) {
+            handleSkillSelect(filtered[0]!.name);
+          }
+          return;
         }
-        if (filteredSkills[nextIndex]) {
-          setSelectedSkill(filteredSkills[nextIndex]!.name);
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const filtered = filteredSkillsRef.current;
+          const selected = selectedSkillRef.current;
+          const currentIndex = filtered.findIndex((s) => s.name === selected);
+          let nextIndex: number;
+          if (event.key === "ArrowDown") {
+            nextIndex = currentIndex < filtered.length - 1 ? currentIndex + 1 : 0;
+          } else {
+            nextIndex = currentIndex > 0 ? currentIndex - 1 : filtered.length - 1;
+          }
+          if (filtered[nextIndex]) {
+            setSelectedSkill(filtered[nextIndex]!.name);
+          }
+          return;
         }
-        return;
       }
-    }
 
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      onSubmit(event as unknown as FormEvent);
-    }
-  }
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        onSubmitRef.current(event as unknown as FormEvent);
+      }
+    },
+    [handleSkillSelect],
+  );
 
-  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+  const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items;
     if (!items) return;
     const imageFiles: File[] = [];
@@ -161,20 +190,20 @@ export function MessageInput({
     }
     if (imageFiles.length) {
       event.preventDefault();
-      onAddImages(imageFiles);
+      onAddImagesRef.current(imageFiles);
     }
-  }
+  }, []);
 
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
+  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (event.dataTransfer?.files?.length) {
-      onAddImages(Array.from(event.dataTransfer.files));
+      onAddImagesRef.current(Array.from(event.dataTransfer.files));
     }
-  }
+  }, []);
 
-  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-  }
+  }, []);
 
   const canSend = draft.trim() || pendingImages.length > 0;
 

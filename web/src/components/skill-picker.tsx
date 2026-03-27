@@ -1,5 +1,5 @@
 import { Command } from "cmdk";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
 
@@ -13,7 +13,7 @@ type SkillPickerProps = {
   onClose: () => void;
 };
 
-export function SkillPicker({
+export const SkillPicker = memo(function SkillPicker({
   open,
   filter,
   skills,
@@ -67,4 +67,4 @@ export function SkillPicker({
       </Command>
     </div>
   );
-}
+});

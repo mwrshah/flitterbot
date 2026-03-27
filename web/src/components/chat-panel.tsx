@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -112,7 +112,7 @@ export function ChatPanel({
     };
   }, [sessionId]);
 
-  function addImageFiles(files: FileList | File[]) {
+  const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
     for (const file of imageFiles) {
@@ -126,29 +126,42 @@ export function ChatPanel({
       };
       reader.readAsDataURL(file);
     }
-  }
+  }, []);
 
-  function removeImage(index: number) {
+  const removeImage = useCallback((index: number) => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
-  }
+  }, []);
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const text = draft.trim();
-    const images = pendingImages.length ? [...pendingImages] : undefined;
-    if (!text && !images?.length) return;
+  // Refs for stable handleSubmit closure
+  const draftRef = useRef(draft);
+  const pendingImagesRef = useRef(pendingImages);
+  const deliveryModeRef = useRef(deliveryMode);
+  useEffect(() => {
+    draftRef.current = draft;
+    pendingImagesRef.current = pendingImages;
+    deliveryModeRef.current = deliveryMode;
+  });
 
-    setIsSending(true);
-    setDraft("");
-    setPendingImages([]);
-    engageAndScroll();
+  const handleSubmit = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      const text = draftRef.current.trim();
+      const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
+      if (!text && !images?.length) return;
 
-    try {
-      await onSendMessage(text || "(image)", deliveryMode, images);
-    } finally {
-      setIsSending(false);
-    }
-  }
+      setIsSending(true);
+      setDraft("");
+      setPendingImages([]);
+      engageAndScroll();
+
+      try {
+        await onSendMessage(text || "(image)", deliveryModeRef.current, images);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [engageAndScroll, onSendMessage],
+  );
 
   return (
     <div className="flex flex-col h-full">
