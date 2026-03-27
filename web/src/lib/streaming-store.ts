@@ -73,7 +73,10 @@ export const streamingStore = {
     thinking.delete(sessionId);
   },
 
-  /* ── Tool call streaming ── */
+  /* ── Tool call streaming ──
+   * These methods receive real data from toolcall_start/toolcall_delta WS events.
+   * No UI component reads tool call state yet — ready for future UI consumption
+   * (e.g. showing in-progress tool call arguments in the chat panel). */
 
   startToolCall(sessionId: string, contentIndex: number, toolName: string) {
     const calls = toolCalls.get(sessionId) ?? [];
