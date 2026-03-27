@@ -35,6 +35,7 @@ import type { AutonomaWsClient } from "~/lib/ws";
 declare global {
   interface Window {
     __streamChunker?: StreamChunker | null;
+    __streamProfilingArmed?: boolean;
   }
 }
 
@@ -266,6 +267,10 @@ export function setupWsQueryBridge(deps: {
 
         if (import.meta.env.DEV) {
           _setDevStreamChunker(chunker);
+          if (window.__streamProfilingArmed) {
+            chunker.startProfiling();
+            window.__streamProfilingArmed = false;
+          }
         }
       }
 

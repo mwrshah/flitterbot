@@ -97,6 +97,36 @@ export interface ToolExecutionEndWebSocketEvent {
   event?: unknown;
 }
 
+export interface ThinkingDeltaWebSocketEvent {
+  type: "thinking_delta";
+  sessionId?: string;
+  messageId: string;
+  delta: string;
+}
+
+export interface ToolCallStartWebSocketEvent {
+  type: "toolcall_start";
+  sessionId?: string;
+  contentIndex: number;
+  toolName?: string;
+}
+
+export interface ToolCallDeltaWebSocketEvent {
+  type: "toolcall_delta";
+  sessionId?: string;
+  contentIndex: number;
+  delta: string;
+}
+
+export interface ToolExecutionUpdateWebSocketEvent {
+  type: "tool_execution_update";
+  sessionId?: string;
+  toolUseId?: string;
+  partialResult?: unknown;
+  timestamp?: string;
+  event?: unknown;
+}
+
 export interface TurnEndWebSocketEvent {
   type: "turn_end";
   sessionId?: string;
@@ -135,8 +165,12 @@ export type ControlSurfaceWebSocketServerEvent =
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
   | TextDeltaWebSocketEvent
+  | ThinkingDeltaWebSocketEvent
+  | ToolCallStartWebSocketEvent
+  | ToolCallDeltaWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
+  | ToolExecutionUpdateWebSocketEvent
   | ToolExecutionEndWebSocketEvent
   | TurnEndWebSocketEvent
   | PiSurfacedWebSocketEvent

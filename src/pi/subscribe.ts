@@ -5,8 +5,12 @@ import type {
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
   PiSurfacedWebSocketEvent,
+  ThinkingDeltaWebSocketEvent,
+  ToolCallDeltaWebSocketEvent,
+  ToolCallStartWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
+  ToolExecutionUpdateWebSocketEvent,
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -24,6 +28,7 @@ type PiSessionSubscriptionEvent =
       assistantMessageEvent?: {
         type?: string;
         delta?: string;
+        contentIndex?: number;
       };
     }
   | {
@@ -44,6 +49,13 @@ type PiSessionSubscriptionEvent =
       toolCallId?: string;
       result?: unknown;
       isError?: boolean;
+      [key: string]: unknown;
+    }
+  | {
+      type: "tool_execution_update";
+      toolName?: string;
+      toolCallId?: string;
+      partialResult?: unknown;
       [key: string]: unknown;
     }
   | {
@@ -183,18 +195,56 @@ export function subscribeToPiSession(
         break;
       }
       case "message_update": {
-        const ame = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
-        if (
-          ame?.type === "text_delta" &&
-          typeof ame.delta === "string" &&
-          currentStreamingMessageId
-        ) {
+        const ame = event.assistantMessageEvent as
+          | { type?: string; delta?: string; contentIndex?: number }
+          | undefined;
+        if (!ame?.type) break;
+
+        if (ame.type === "text_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
+        } else if (
+          ame.type === "thinking_delta" &&
+          typeof ame.delta === "string" &&
+          currentStreamingMessageId
+        ) {
+          const payload: ThinkingDeltaWebSocketEvent = {
+            type: "thinking_delta",
+            sessionId: session.sessionId,
+            messageId: currentStreamingMessageId,
+            delta: ame.delta,
+          };
+          broadcast(wsHub, payload);
+        } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
+          // Extract toolName from the partial message's content at contentIndex
+          let toolName: string | undefined;
+          const msg = event.message as { content?: Array<{ name?: string }> } | undefined;
+          if (msg?.content && msg.content[ame.contentIndex]) {
+            toolName = msg.content[ame.contentIndex].name;
+          }
+          const payload: ToolCallStartWebSocketEvent = {
+            type: "toolcall_start",
+            sessionId: session.sessionId,
+            contentIndex: ame.contentIndex,
+            toolName,
+          };
+          broadcast(wsHub, payload);
+        } else if (
+          ame.type === "toolcall_delta" &&
+          typeof ame.contentIndex === "number" &&
+          typeof ame.delta === "string"
+        ) {
+          const payload: ToolCallDeltaWebSocketEvent = {
+            type: "toolcall_delta",
+            sessionId: session.sessionId,
+            contentIndex: ame.contentIndex,
+            delta: ame.delta,
+          };
+          broadcast(wsHub, payload);
         }
         break;
       }
@@ -260,6 +310,18 @@ export function subscribeToPiSession(
           toolUseId: event.toolCallId as string | undefined,
           result: event.result,
           isError: event.isError as boolean | undefined,
+          timestamp: now,
+          event,
+        };
+        broadcast(wsHub, payload);
+        break;
+      }
+      case "tool_execution_update": {
+        const payload: ToolExecutionUpdateWebSocketEvent = {
+          type: "tool_execution_update",
+          sessionId: session.sessionId,
+          toolUseId: event.toolCallId as string | undefined,
+          partialResult: event.partialResult,
           timestamp: now,
           event,
         };

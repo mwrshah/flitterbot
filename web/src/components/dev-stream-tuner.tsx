@@ -99,13 +99,19 @@ export function DevStreamTuner() {
 
   const handleProfileToggle = useCallback(() => {
     const c = getChunker();
-    if (!c) return;
     if (profiling) {
-      const result = c.stopProfiling();
-      setProfileResult(result);
+      if (c) {
+        const result = c.stopProfiling();
+        setProfileResult(result);
+      }
+      window.__streamProfilingArmed = false;
       setProfiling(false);
     } else {
-      c.startProfiling();
+      if (c) {
+        c.startProfiling();
+      } else {
+        window.__streamProfilingArmed = true;
+      }
       setProfileResult(null);
       setProfiling(true);
     }
