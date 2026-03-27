@@ -129,6 +129,28 @@ export function getRecentDefaultConversation(
   return rows.reverse();
 }
 
+/**
+ * Returns surfaced messages (web/whatsapp inbound + pi_outbound) for the input
+ * surface, scoped to a set of active pi_session_ids.
+ */
+export function getInputSurfaceHistory(
+  db: BlackboardDatabase,
+  piSessionIds: string[],
+): (MessageRow & { workstream_name: string | null })[] {
+  if (piSessionIds.length === 0) return [];
+  const placeholders = piSessionIds.map(() => "?").join(", ");
+  return db.all<MessageRow & { workstream_name: string | null }>(
+    `SELECT m.*, w.name AS workstream_name
+     FROM messages m
+     LEFT JOIN workstreams w ON w.id = m.workstream_id
+     WHERE ((m.source IN ('web', 'whatsapp') AND m.direction = 'inbound')
+            OR (m.source = 'pi_outbound' AND m.direction = 'outbound'))
+       AND m.pi_session_id IN (${placeholders})
+     ORDER BY m.created_at ASC`,
+    ...piSessionIds,
+  );
+}
+
 export function getRecentConversationByWorkstream(
   db: BlackboardDatabase,
   withinHours: number,
