@@ -1,4 +1,5 @@
 export type StreamChunkerStats = {
+  passthrough: boolean;
   bufferDepth: number;
   profiling: boolean;
   profileStartTime: number;
@@ -14,6 +15,7 @@ export type ProfileResult = {
 
 export type StreamChunkerOptions = {
   onChunk: (fullText: string) => void;
+  passthrough?: boolean;
   chunkSize?: number;
   intervalMs?: number;
 };
@@ -22,6 +24,7 @@ export class StreamChunker {
   private buffer = "";
   private fullText = "";
   private onChunk: (fullText: string) => void;
+  private passthrough: boolean;
   private chunkSize: number;
   private intervalMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -32,15 +35,17 @@ export class StreamChunker {
   private lastPushTime = 0;
   private lastRenderTime = 0;
 
-  constructor({ onChunk, chunkSize = 4, intervalMs = 32 }: StreamChunkerOptions) {
+  constructor({ onChunk, passthrough = true, chunkSize = 4, intervalMs = 32 }: StreamChunkerOptions) {
     this.onChunk = onChunk;
+    this.passthrough = passthrough;
     this.chunkSize = chunkSize;
     this.intervalMs = intervalMs;
-    this.startLoop();
+    if (!this.passthrough) {
+      this.startLoop();
+    }
   }
 
   push(delta: string): void {
-    this.buffer += delta;
     const now = performance.now();
     if (this.profiling) {
       if (this.profileStartTime === 0) {
@@ -51,6 +56,36 @@ export class StreamChunker {
       }
       this.lastPushTime = now;
     }
+
+    if (this.passthrough) {
+      this.fullText += delta;
+      this.onChunk(this.fullText);
+      if (this.profiling) {
+        this.lastRenderTime = performance.now();
+      }
+    } else {
+      this.buffer += delta;
+    }
+  }
+
+  setPassthrough(enabled: boolean): void {
+    if (this.passthrough === enabled) return;
+    this.passthrough = enabled;
+    if (enabled) {
+      this.stopLoop();
+      // Flush any remaining buffer immediately
+      if (this.buffer.length > 0) {
+        this.fullText += this.buffer;
+        this.buffer = "";
+        this.onChunk(this.fullText);
+      }
+    } else {
+      this.startLoop();
+    }
+  }
+
+  getPassthrough(): boolean {
+    return this.passthrough;
   }
 
   setChunkSize(n: number): void {
@@ -65,6 +100,7 @@ export class StreamChunker {
 
   getStats(): StreamChunkerStats {
     return {
+      passthrough: this.passthrough,
       bufferDepth: this.buffer.length,
       profiling: this.profiling,
       profileStartTime: this.profileStartTime,
