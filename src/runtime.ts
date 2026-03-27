@@ -849,12 +849,17 @@ export class ControlSurfaceRuntime {
               description:
                 "Short descriptive name, 2-5 words, lowercase, dash-separated (e.g. 'fix-auth-token-refresh')",
             },
+            message: {
+              type: "string",
+              description:
+                "Optional agent-authored context appended to the workstream prompt. Use for supplementary information the orchestrator wouldn't otherwise have: spec paths, constraints, relevant background gathered during triage. Omit if there's nothing to add.",
+            },
           },
           required: ["name"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { name } = params as { name: string };
+          const { name, message: agentMessage } = params as { name: string; message?: string };
           const { insertWorkstream } = await import("./blackboard/query-workstreams.ts");
           const ws = insertWorkstream(this.blackboard, name);
           this.log(`default agent created workstream "${name}" (${ws.id})`);
@@ -902,7 +907,7 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(originalText)) {
                       relevantTexts.push(originalText);
                     }
-                    prompt = formatWorkstreamPrompt(relevantTexts, ws.name, ws.id);
+                    prompt = formatWorkstreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
@@ -911,16 +916,17 @@ export class ControlSurfaceRuntime {
                       originalText,
                       ws.name,
                       ws.id,
+                      agentMessage,
                     );
                   }
                 } else {
-                  prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+                  prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id, agentMessage);
                 }
               } catch (error) {
                 this.log(
                   `context classifier failed, falling back to single message: ${error instanceof Error ? error.message : String(error)}`,
                 );
-                prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id);
+                prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id, agentMessage);
               }
 
               orchestrator.queue.enqueue({
