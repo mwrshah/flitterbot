@@ -14,6 +14,7 @@ export function persistInboundMessage(
     content: string;
     sender?: string;
     workstreamId?: string;
+    piSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -24,6 +25,7 @@ export function persistInboundMessage(
     content: opts.content,
     sender: opts.sender,
     workstreamId: opts.workstreamId,
+    piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
 }
@@ -35,6 +37,7 @@ export function persistOutboundMessage(
     source: UnifiedMessageSource;
     content: string;
     workstreamId?: string;
+    piSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -45,6 +48,7 @@ export function persistOutboundMessage(
     content: opts.content,
     sender: "pi",
     workstreamId: opts.workstreamId,
+    piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
 }
@@ -98,6 +102,30 @@ export function getRecentDefaultMessages(
     limit,
   );
   // Return in chronological order
+  return rows.reverse();
+}
+
+export type DefaultConversationSnippet = {
+  content: string;
+  source: string;
+  created_at: string;
+  direction: "inbound" | "outbound";
+  sender: string | null;
+};
+
+export function getRecentDefaultConversation(
+  db: BlackboardDatabase,
+  piSessionId: string,
+  limit: number = 10,
+): DefaultConversationSnippet[] {
+  const rows = db.all<DefaultConversationSnippet>(
+    `SELECT content, source, created_at, direction, sender
+     FROM messages
+     WHERE pi_session_id = ?
+     ORDER BY created_at DESC LIMIT ?`,
+    piSessionId,
+    limit,
+  );
   return rows.reverse();
 }
 

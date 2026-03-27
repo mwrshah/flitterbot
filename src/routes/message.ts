@@ -61,7 +61,8 @@ async function routeMessage(
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey);
+    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultPiSessionId);
     const meta: WorkstreamRoutingMeta = {
       router_action: result.action,
     };

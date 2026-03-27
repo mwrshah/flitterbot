@@ -1,4 +1,4 @@
--- Autonoma blackboard schema (v11)
+-- Autonoma blackboard schema (v13)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -82,15 +82,24 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 );
 
 CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,
     workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+    pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
     metadata TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS message_id_map (
+    server_id TEXT PRIMARY KEY,
+    agent_id TEXT,
+    pi_session_id TEXT,
+    created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_message_id_map_agent ON message_id_map(agent_id);
 
 CREATE TABLE IF NOT EXISTS health_flags (
     flag TEXT PRIMARY KEY,
@@ -129,3 +138,4 @@ CREATE INDEX IF NOT EXISTS idx_pending_actions_status_created ON pending_actions
 CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_workstream ON messages(workstream_id);
+CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);

@@ -234,12 +234,16 @@ export class ControlSurfaceRuntime {
     try {
       const source = item.source as "whatsapp" | "web" | "hook" | "cron";
       const workstreamId = (input.metadata?.workstream_id as string) ?? undefined;
+      const piSessionId = workstreamId
+        ? this.sessionManager.getByWorkstream(workstreamId)?.piSessionId
+        : this.sessionManager.getDefault()?.piSessionId;
       persistInboundMessage(this.blackboard, {
         id: messageUuid,
         source,
         content: input.text,
         sender: source === "hook" ? "system" : "user",
         workstreamId,
+        piSessionId,
         metadata: input.metadata,
       });
     } catch (error) {
@@ -426,6 +430,7 @@ export class ControlSurfaceRuntime {
         content: text,
         sender: "system",
         workstreamId: targetQueue.workstreamId ?? undefined,
+        piSessionId: targetQueue.piSessionId,
         metadata: { event: normalized, ...payload },
       });
     } catch (error) {
@@ -683,6 +688,7 @@ export class ControlSurfaceRuntime {
           source: "pi_outbound",
           content: finalText,
           workstreamId,
+          piSessionId: managed.piSessionId,
         });
       } catch (error) {
         this.log(
@@ -1035,6 +1041,7 @@ export class ControlSurfaceRuntime {
               content: message,
               sender: "system",
               workstreamId: ws.id,
+              piSessionId: this.sessionManager.getByWorkstream(ws.id)?.piSessionId,
               metadata: {
                 workstream_id: ws.id,
                 workstream_name: ws.name,
@@ -1384,7 +1391,8 @@ export class ControlSurfaceRuntime {
           const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
           const apiKey = resolveGroqApiKey();
           if (!apiKey) throw new Error("No Groq API key available");
-          const result = await classifyMessage(payload.text, this.blackboard, apiKey);
+          const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
+          const result = await classifyMessage(payload.text, this.blackboard, apiKey, defaultPiSessionId);
           routerMeta = { router_action: result.action };
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;

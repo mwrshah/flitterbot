@@ -1,5 +1,8 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { getRecentConversationByWorkstream } from "../blackboard/query-messages.ts";
+import {
+  getRecentConversationByWorkstream,
+  getRecentDefaultConversation,
+} from "../blackboard/query-messages.ts";
 import { listOpenWorkstreams } from "../blackboard/query-workstreams.ts";
 import type { WorkstreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompt } from "../prompts/classifier.ts";
@@ -14,10 +17,14 @@ export async function classifyMessage(
   message: string,
   db: BlackboardDatabase,
   apiKey: string,
+  defaultPiSessionId?: string,
 ): Promise<ClassificationResult> {
   const workstreams = listOpenWorkstreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
-  const prompt = buildClassificationPrompt(message, workstreams, recentConversation);
+  const defaultConversation = defaultPiSessionId
+    ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
+    : [];
+  const prompt = buildClassificationPrompt(message, workstreams, recentConversation, defaultConversation);
   console.log(
     "[router] classifying: %d open workstreams | message: %s",
     workstreams.length,

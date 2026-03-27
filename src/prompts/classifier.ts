@@ -1,4 +1,4 @@
-import type { ConversationSnippet } from "../blackboard/query-messages.ts";
+import type { ConversationSnippet, DefaultConversationSnippet } from "../blackboard/query-messages.ts";
 import type { WorkstreamRow } from "../contracts/index.ts";
 
 function formatWorkstreamLine(ws: WorkstreamRow, label?: string): string {
@@ -58,10 +58,21 @@ function formatWorkstreamWithConversation(
   return `${header}\n${messageLines.join("\n")}`;
 }
 
+function formatDefaultConversation(snippets: DefaultConversationSnippet[]): string {
+  if (snippets.length === 0) return "(no recent conversation)";
+  return snippets
+    .map((s) => {
+      const label = s.direction === "outbound" ? "Agent" : "User";
+      return `  [${s.source}] ${label}: ${truncate(collapseNewlines(s.content), 200)} (${relativeTime(s.created_at)})`;
+    })
+    .join("\n");
+}
+
 export function buildClassificationPrompt(
   message: string,
   workstreams: WorkstreamRow[],
   recentConversation: Map<string, ConversationSnippet[]>,
+  defaultConversation: DefaultConversationSnippet[] = [],
 ): string {
   const latestAgentWsId = findLastAgentResponseWorkstream(recentConversation);
   const workstreamBlock =
@@ -77,6 +88,8 @@ export function buildClassificationPrompt(
           .join("\n")
       : "(none open)";
 
+  const defaultBlock = formatDefaultConversation(defaultConversation);
+
   return `You are a message router for a software development assistant.
 
 Given a user message, decide if it relates to an existing open workstream.
@@ -84,12 +97,16 @@ Given a user message, decide if it relates to an existing open workstream.
 ## Open workstreams
 ${workstreamBlock}
 
+## Default agent conversation
+${defaultBlock}
+
 ## Rules
 1. If the message clearly relates to an existing open workstream, return its id.
 2. If the message does not match any open workstream, return workstream_id: null. The default agent will handle it.
-3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the workstream with the most recent agent message (marked with "← last agent response").
-4. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
-5. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
+3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the workstream OR default agent conversation with the most recent agent message. Check both the workstream marked "← last agent response" and the default agent conversation to decide.
+4. If the user appears to be continuing the default agent conversation (e.g. replying to something the default agent said), return workstream_id: null.
+5. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
+6. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
 
 ## Response format
 Respond with ONLY a JSON object containing two fields: workstream_id and reasoning. No other text or explanation. Example:
