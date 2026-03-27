@@ -16,9 +16,11 @@ function getChunker(): StreamChunker | null {
 
 export function DevStreamTuner() {
   const [visible, setVisible] = useState(false);
+  const [passthrough, setPassthrough] = useState(true);
   const [chunkSize, setChunkSize] = useState(4);
   const [intervalMs, setIntervalMs] = useState(32);
   const [stats, setStats] = useState<StreamChunkerStats>({
+    passthrough: true,
     bufferDepth: 0,
     profiling: false,
     profileStartTime: 0,
@@ -29,7 +31,7 @@ export function DevStreamTuner() {
   const [profileResult, setProfileResult] = useState<ProfileResult | null>(null);
   const rafRef = useRef<number>(0);
   const _containerRef = useRef<HTMLDivElement>(null);
-  useWhyDidYouRender("DevStreamTuner", { visible, chunkSize, intervalMs, stats });
+  useWhyDidYouRender("DevStreamTuner", { visible, passthrough, chunkSize, intervalMs, stats });
 
   // Poll stats via rAF when visible, log summary every ~1s during profiling
   useEffect(() => {
@@ -40,6 +42,7 @@ export function DevStreamTuner() {
       if (c) {
         const s = c.getStats();
         setStats((prev) =>
+          prev.passthrough === s.passthrough &&
           prev.bufferDepth === s.bufferDepth &&
           prev.profiling === s.profiling &&
           prev.profileStartTime === s.profileStartTime &&
@@ -76,6 +79,16 @@ export function DevStreamTuner() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  const handlePassthrough = useCallback(() => {
+    const next = !passthrough;
+    setPassthrough(next);
+    const c = getChunker();
+    if (c) {
+      c.setPassthrough(next);
+      console.log("[StreamTuner] passthrough:", next);
+    }
+  }, [passthrough]);
 
   const handleChunkSize = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
@@ -143,29 +156,50 @@ export function DevStreamTuner() {
             </button>
           </div>
 
-          <label className="block mb-1">
-            Chunk size: {chunkSize}
-            <input
-              type="range"
-              min={1}
-              max={20}
-              value={chunkSize}
-              onChange={handleChunkSize}
-              className="w-full"
-            />
+          <label className="flex items-center justify-between mb-2 cursor-pointer">
+            <span>Passthrough</span>
+            <button
+              type="button"
+              onClick={handlePassthrough}
+              className={`w-8 h-4 rounded-full relative transition-colors ${
+                passthrough ? "bg-green-600" : "bg-zinc-600"
+              }`}
+            >
+              <span
+                className={`block w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${
+                  passthrough ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
           </label>
 
-          <label className="block mb-2">
-            Interval: {intervalMs}ms
-            <input
-              type="range"
-              min={10}
-              max={100}
-              value={intervalMs}
-              onChange={handleInterval}
-              className="w-full"
-            />
-          </label>
+          {!passthrough && (
+            <>
+              <label className="block mb-1">
+                Chunk size: {chunkSize}
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={chunkSize}
+                  onChange={handleChunkSize}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block mb-2">
+                Interval: {intervalMs}ms
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  value={intervalMs}
+                  onChange={handleInterval}
+                  className="w-full"
+                />
+              </label>
+            </>
+          )}
 
           <div className="space-y-0.5 text-zinc-400 font-mono mb-2">
             <div>Buffer: {stats.bufferDepth} chars</div>
