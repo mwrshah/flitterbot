@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -15,7 +15,7 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { mergeTimelines, timelineFingerprint } from "~/lib/utils";
+import { timelineFingerprint } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -323,8 +323,9 @@ const useIsClient = () =>
     () => false,
   );
 
-export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTimelineItem[] }) {
+export function InputSurface() {
   const isClient = useIsClient();
+  const queryClient = useQueryClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
@@ -340,16 +341,14 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
     refetchOnWindowFocus: false,
   });
 
-  // WS-appended items from Query cache (written by ws-query-bridge)
-  const { data: wsAppendedItems = [] } = useQuery(inputSurfaceTimelineQueryOptions());
+  // Timeline from Query cache — seeded by route loader, appended by WS bridge.
+  const { data: timeline = [] } = useQuery(inputSurfaceTimelineQueryOptions(queryClient));
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
-  // Fingerprint both inputs so mergeTimelines + timelineToSurfaceEntries
-  // only rerun when items actually change, not on every new array reference.
-  const mergedFp = `${timelineFingerprint(loaderTimeline)}|${timelineFingerprint(wsAppendedItems)}`;
-  const entries = useStableMemo(mergedFp, () =>
-    timelineToSurfaceEntries(mergeTimelines(loaderTimeline, wsAppendedItems)),
+  // Fingerprint so timelineToSurfaceEntries only reruns when items actually change.
+  const entries = useStableMemo(timelineFingerprint(timeline), () =>
+    timelineToSurfaceEntries(timeline),
   );
 
   const addImageFiles = useCallback((files: FileList | File[]) => {

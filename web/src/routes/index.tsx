@@ -11,19 +11,20 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [{ title: "Autonoma — Input Surface" }],
   }),
-  loader: async () => {
+  loader: async ({ context }) => {
     try {
       const items = await fetchPiInputHistory();
-      return { history: items as ChatTimelineItem[] };
+      const history = items as ChatTimelineItem[];
+      // Seed the Query cache so useQuery returns instantly on mount.
+      context.queryClient.setQueryData(["pi-input-surface-timeline"], history);
     } catch {
-      return { history: [] as ChatTimelineItem[] };
+      // Leave cache unseeded; component falls back to empty array.
     }
   },
   component: InputSurfacePage,
 });
 
 function InputSurfacePage() {
-  const { history } = Route.useLoaderData();
-  useWhyDidYouRender("InputSurfacePage", { history });
-  return <InputSurface loaderTimeline={history} />;
+  useWhyDidYouRender("InputSurfacePage", {});
+  return <InputSurface />;
 }

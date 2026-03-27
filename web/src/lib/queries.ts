@@ -1,6 +1,6 @@
 import type { AutonomaApiClient } from "~/lib/api";
 import type { ChatTimelineItem, ConnectionState, StatusResponse } from "~/lib/types";
-import { fetchPiHistory } from "~/server/pi";
+import { fetchPiHistory, fetchPiInputHistory } from "~/server/pi";
 
 export function statusQueryOptions(apiClient: AutonomaApiClient) {
   return {
@@ -65,11 +65,25 @@ export function connectionStateQueryOptions() {
 }
 
 /** Input surface timeline — pi_surfaced events + user messages from all sessions. */
-export function inputSurfaceTimelineQueryOptions() {
+export function inputSurfaceTimelineQueryOptions(
+  queryClient?: { getQueryData: <T>(key: readonly unknown[]) => T | undefined },
+) {
+  const key = ["pi-input-surface-timeline"] as const;
   return {
-    queryKey: ["pi-input-surface-timeline"] as const,
-    queryFn: (): ChatTimelineItem[] => [],
-    staleTime: Infinity,
-    // Seeded by route loader; WS bridge appends via setQueryData
+    queryKey: key,
+    queryFn: async (): Promise<ChatTimelineItem[]> => {
+      const fetched = (await fetchPiInputHistory()) as ChatTimelineItem[];
+
+      // On refetch (reconnect), merge with WS-accumulated items to avoid
+      // oscillation where server data replaces longer WS-accumulated data,
+      // then WS events re-grow it.
+      const existing = queryClient?.getQueryData<ChatTimelineItem[]>(key);
+      if (!existing?.length) return fetched;
+      const ids = new Set(fetched.map((item) => item.id));
+      const extras = existing.filter((item) => !ids.has(item.id));
+      if (!extras.length) return fetched;
+      return [...fetched, ...extras];
+    },
+    staleTime: Infinity, // WS events keep this fresh via setQueryData
   };
 }
