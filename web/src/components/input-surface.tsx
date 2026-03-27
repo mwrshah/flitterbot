@@ -3,6 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
+import { useStableMemo } from "~/hooks/use-stable-memo";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { connectionStateQueryOptions, inputSurfaceTimelineQueryOptions } from "~/lib/queries";
@@ -14,7 +15,7 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { mergeTimelines } from "~/lib/utils";
+import { mergeTimelines, timelineFingerprint } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -344,11 +345,12 @@ export function InputSurface({ loaderTimeline = [] }: { loaderTimeline?: ChatTim
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
-  const timeline = useMemo(
-    () => mergeTimelines(loaderTimeline, wsAppendedItems),
-    [loaderTimeline, wsAppendedItems],
+  // Fingerprint both inputs so mergeTimelines + timelineToSurfaceEntries
+  // only rerun when items actually change, not on every new array reference.
+  const mergedFp = `${timelineFingerprint(loaderTimeline)}|${timelineFingerprint(wsAppendedItems)}`;
+  const entries = useStableMemo(mergedFp, () =>
+    timelineToSurfaceEntries(mergeTimelines(loaderTimeline, wsAppendedItems)),
   );
-  const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));

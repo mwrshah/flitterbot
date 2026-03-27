@@ -10,17 +10,33 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
   };
 }
 
-export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
+export function piHistoryQueryOptions(
+  sessionId: string | undefined,
+  surface?: "input" | "agent",
+  queryClient?: { getQueryData: <T>(key: readonly unknown[]) => T | undefined },
+) {
+  const key = ["pi-history", sessionId ?? "default", surface ?? "agent"] as const;
   return {
-    queryKey: ["pi-history", sessionId ?? "default", surface ?? "agent"] as const,
+    queryKey: key,
     queryFn: async (): Promise<ChatTimelineItem[]> => {
-      const items = await fetchPiHistory({
+      const fetched = (await fetchPiHistory({
         data: {
           ...(sessionId ? { piSessionId: sessionId } : {}),
           ...(surface ? { surface } : {}),
         },
-      });
-      return items as ChatTimelineItem[];
+      })) as ChatTimelineItem[];
+
+      // On refetch (reconnect), merge with WS-accumulated items to avoid
+      // oscillation where server data replaces longer WS-accumulated data,
+      // then WS events re-grow it.
+      const existing = queryClient?.getQueryData<ChatTimelineItem[]>(key);
+      if (!existing?.length) return fetched;
+
+      const ids = new Set(fetched.map((item) => item.id));
+      const extras = existing.filter((item) => !ids.has(item.id));
+      if (!extras.length) return fetched;
+
+      return [...fetched, ...extras];
     },
     enabled: sessionId !== undefined,
     staleTime: Infinity, // WS events keep this fresh via setQueryData

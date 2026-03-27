@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useSyncExternalStore } from "react";
 import {
@@ -25,9 +25,12 @@ const useIsClient = () =>
  */
 export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const isClient = useIsClient();
+  const queryClient = useQueryClient();
   const { sendMessage } = rootApi.useRouteContext();
 
-  const { data: timeline = loaderHistory } = useQuery(piHistoryQueryOptions(sessionId));
+  const { data: timeline = loaderHistory } = useQuery(
+    piHistoryQueryOptions(sessionId, undefined, queryClient),
+  );
   const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(sessionId ?? "default"));
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
