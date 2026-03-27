@@ -17,12 +17,12 @@ export async function classifyMessage(
   message: string,
   db: BlackboardDatabase,
   apiKey: string,
-  defaultSessionStartedAt?: string,
+  defaultPiSessionId?: string,
 ): Promise<ClassificationResult> {
   const workstreams = listOpenWorkstreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
-  const defaultConversation = defaultSessionStartedAt
-    ? getRecentDefaultConversation(db, defaultSessionStartedAt, 10)
+  const defaultConversation = defaultPiSessionId
+    ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
     : [];
   const prompt = buildClassificationPrompt(message, workstreams, recentConversation, defaultConversation);
   console.log(

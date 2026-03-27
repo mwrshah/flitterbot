@@ -566,6 +566,28 @@ function applyV12Migration(db: DatabaseSync): void {
   }
 }
 
+/**
+ * V13: Add pi_session_id to messages table so messages can be scoped to
+ * the PI session that produced/consumed them.
+ */
+function applyV13Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      ALTER TABLE messages ADD COLUMN pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (13);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -626,6 +648,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 12) {
     applyV12Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 13) {
+    applyV13Migration(db);
   }
 
   return getSchemaVersion(db);
