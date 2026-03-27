@@ -111,19 +111,16 @@ export type DefaultConversationSnippet = {
 
 export function getRecentDefaultConversation(
   db: BlackboardDatabase,
+  sessionStartedAt: string,
   limit: number = 10,
 ): DefaultConversationSnippet[] {
   const rows = db.all<DefaultConversationSnippet>(
     `SELECT content, source, created_at, direction, sender
      FROM messages
      WHERE workstream_id IS NULL
-       AND created_at >= COALESCE(
-         (SELECT started_at FROM pi_sessions
-          WHERE role = 'default' AND status NOT IN ('ended', 'crashed')
-          ORDER BY started_at DESC LIMIT 1),
-         datetime('now', '-1 hour')
-       )
+       AND created_at >= ?
      ORDER BY created_at DESC LIMIT ?`,
+    sessionStartedAt,
     limit,
   );
   return rows.reverse();

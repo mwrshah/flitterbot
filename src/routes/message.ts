@@ -61,7 +61,8 @@ async function routeMessage(
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey);
+    const defaultSessionStartedAt = runtime.sessionManager.getDefault()?.createdAt;
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultSessionStartedAt);
     const meta: WorkstreamRoutingMeta = {
       router_action: result.action,
     };

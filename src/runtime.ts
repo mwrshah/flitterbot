@@ -1384,7 +1384,8 @@ export class ControlSurfaceRuntime {
           const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
           const apiKey = resolveGroqApiKey();
           if (!apiKey) throw new Error("No Groq API key available");
-          const result = await classifyMessage(payload.text, this.blackboard, apiKey);
+          const defaultSessionStartedAt = this.sessionManager.getDefault()?.createdAt;
+          const result = await classifyMessage(payload.text, this.blackboard, apiKey, defaultSessionStartedAt);
           routerMeta = { router_action: result.action };
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;
