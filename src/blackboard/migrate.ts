@@ -329,8 +329,8 @@ function applyV7Migration(db: DatabaseSync): void {
 }
 
 function applyV8Migration(db: DatabaseSync): void {
-  // Add 'init' to the messages source CHECK constraint.
-  // SQLite doesn't support ALTER CHECK — recreate the table.
+  // No-op table recreation — 'init' was already in V6's CHECK constraint.
+  // Kept for migration-chain continuity; V11 later adds 'agent'.
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
