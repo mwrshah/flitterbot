@@ -248,8 +248,9 @@ export class PiSessionManager {
     currentMessage: string,
     workstreamName: string,
     workstreamId: string,
+    agentMessage?: string,
   ): string {
-    return formatWorkstreamPrompt([currentMessage], workstreamName, workstreamId);
+    return formatWorkstreamPrompt([currentMessage], workstreamName, workstreamId, agentMessage);
   }
 
   private logResourceInfo(
