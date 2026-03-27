@@ -10,6 +10,7 @@ type RawConfigJson = {
   controlSurfaceHost?: string;
   controlSurfacePort?: number;
   controlSurfaceToken?: string;
+  controlSurfaceCommand?: string;
   piModel?: string;
   piThinkingLevel?: ThinkingLevel;
   stallMinutes?: number;
@@ -22,6 +23,8 @@ type RawConfigJson = {
   whatsappDaemonPath?: string;
   claudeCliCommand?: string;
   projectsDir?: string;
+  projectRoot?: string;
+  sourceRoot?: string;
   wipeWorkstreamsOnStart?: boolean;
   whatsappEnabled?: boolean;
 };
@@ -107,13 +110,10 @@ export function loadConfig(): AutonomaConfig {
     controlSurfaceHost: raw.controlSurfaceHost ?? "127.0.0.1",
     controlSurfacePort: raw.controlSurfacePort ?? 18820,
     controlSurfaceToken: raw.controlSurfaceToken ?? crypto.randomUUID(),
-    piModel:
-      configuredPiModel && configuredPiModel !== "claude-sonnet-4-6"
-        ? configuredPiModel
-        : "claude-opus-4-6",
+    piModel: configuredPiModel || "claude-opus-4-6",
     piThinkingLevel: raw.piThinkingLevel ?? "medium",
     stallMinutes: raw.stallMinutes ?? 15,
-    toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 60,
+    toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 4,
     blackboardPath,
     whatsappAuthDir,
     whatsappSocketPath,

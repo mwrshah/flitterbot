@@ -65,6 +65,22 @@ node .autonoma/install.mjs --with-scheduler  # also install launchd/systemd sche
 web/.env                         # VITE_AUTONOMA_BASE_URL, VITE_AUTONOMA_TOKEN (auto-generated, gitignored)
 ```
 
+Key config options in `~/.autonoma/config.json`:
+
+| Key | Default | Description |
+|---|---|---|
+| `piModel` | `claude-opus-4-6` | Model used by all Pi agents (default agent + all workstream orchestrators). Set to e.g. `claude-sonnet-4-6` to switch. |
+| `piThinkingLevel` | `medium` | Thinking budget: `off`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `stallMinutes` | `15` | Minutes of inactivity before a session is considered stalled |
+| `toolTimeoutMinutes` | `4` | Minutes before a session waiting on a tool call is considered stalled |
+| `claudeCliCommand` | `claude --dangerously-skip-permissions` | CLI command used to launch Claude Code sessions |
+| `projectsDir` | `~/development` | Root directory for Claude Code working sessions |
+| `controlSurfaceCommand` | _(auto-detected)_ | Shell command to start the control surface server; detected from `projectRoot` during install |
+| `projectRoot` | _(installer-detected)_ | Path to the Autonoma source checkout; used by `autonoma-up` to start the control surface |
+| `sourceRoot` | _(same as projectRoot)_ | Alias for `projectRoot`; kept for backwards compatibility |
+| `wipeWorkstreamsOnStart` | `false` | If `true`, closes all open workstreams on control surface startup |
+| `whatsappEnabled` | `true` | Enable/disable the WhatsApp channel |
+
 ### 5) Authenticate WhatsApp (optional)
 
 ```bash

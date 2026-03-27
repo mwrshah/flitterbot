@@ -530,7 +530,7 @@ async function bootstrapConfig() {
   configAfter.piModel = configAfter.piModel || "claude-opus-4-6";
   configAfter.piThinkingLevel = configAfter.piThinkingLevel || "medium";
   configAfter.stallMinutes = configAfter.stallMinutes || 15;
-  configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 60;
+  configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 4;
   configAfter.blackboardPath = configAfter.blackboardPath || "~/.autonoma/blackboard.db";
   configAfter.whatsappAuthDir = configAfter.whatsappAuthDir || "~/.autonoma/whatsapp/auth";
   configAfter.whatsappSocketPath = configAfter.whatsappSocketPath || "~/.autonoma/whatsapp/daemon.sock";
