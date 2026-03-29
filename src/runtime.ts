@@ -175,12 +175,6 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    // Bootstrap Pi agent with startup skills
-    this.enqueue({
-      text: "/load2-w",
-      source: "init",
-      metadata: { via: "startup" },
-    });
   }
 
   async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {
