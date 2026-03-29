@@ -253,6 +253,13 @@ export function subscribeToPiSession(
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
+        } else if (ame.type === "thinking_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
+          broadcast(wsHub, {
+            type: "thinking_delta",
+            sessionId: session.sessionId,
+            messageId: currentStreamingMessageId,
+            delta: ame.delta,
+          });
         } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
           // Extract toolName and toolUseId from the partial message's content block.
           // At content_block_start the SDK populates id + name but not arguments.
