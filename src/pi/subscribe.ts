@@ -99,6 +99,20 @@ type SubscribablePiSession = {
   subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
 };
 
+/**
+ * Returns true if a tool_execution_update partial result contains actual data
+ * worth forwarding. Filters out empty shells like { content: [] }.
+ */
+function hasPartialContent(partial: unknown): boolean {
+  if (partial == null) return false;
+  if (typeof partial !== "object") return true; // primitive value — meaningful
+  const r = partial as Record<string, unknown>;
+  // { content: [...] } shape — only meaningful if the array is non-empty
+  if ("content" in r) return Array.isArray(r.content) && r.content.length > 0;
+  // Any other object with at least one key is considered meaningful
+  return Object.keys(r).length > 0;
+}
+
 function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEvent): void {
   wsHub.broadcast(payload);
 }
@@ -141,26 +155,32 @@ function extractMessageText(message: unknown): string | undefined {
   if (!message || typeof message !== "object") return undefined;
 
   const record = message as Record<string, unknown>;
-  const directText = [record.text, record.message, record.errorMessage].find(
+
+  // Check content array first — for aborted messages this contains the actual partial
+  // text, while errorMessage contains a generic SDK string ("Request was aborted.").
+  // Falling back to errorMessage ensures non-content error messages still surface.
+  const content = record.content;
+  if (Array.isArray(content)) {
+    const parts = content
+      .flatMap((block) => {
+        if (!block || typeof block !== "object") return [];
+        const item = block as Record<string, unknown>;
+        if (item.type === "text" && typeof item.text === "string") {
+          return [item.text];
+        }
+        return [];
+      })
+      .join("");
+    if (parts.trim().length > 0) return parts;
+  }
+
+  // Fall back to scalar text fields for non-content-array message shapes.
+  // errorMessage is intentionally excluded — it's an SDK-internal diagnostic string
+  // (e.g. "Request was aborted.") not intended for display.
+  const directText = [record.text, record.message].find(
     (value): value is string => typeof value === "string" && value.trim().length > 0,
   );
-  if (directText) return directText;
-
-  const content = record.content;
-  if (!Array.isArray(content)) return undefined;
-
-  const parts = content
-    .flatMap((block) => {
-      if (!block || typeof block !== "object") return [];
-      const item = block as Record<string, unknown>;
-      if (item.type === "text" && typeof item.text === "string") {
-        return [item.text];
-      }
-      return [];
-    })
-    .join("");
-
-  return parts.trim().length > 0 ? parts : undefined;
+  return directText;
 }
 
 function _extractMessageId(message: unknown): string | undefined {
@@ -335,6 +355,9 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_update": {
+        // Only forward if the partial result has actual content — skip empty shells
+        // like { content: [] } that carry no useful information.
+        if (!hasPartialContent(event.partialResult)) break;
         const payload: ToolExecutionUpdateWebSocketEvent = {
           type: "tool_execution_update",
           sessionId: session.sessionId,

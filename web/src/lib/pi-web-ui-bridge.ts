@@ -44,12 +44,17 @@ function assistantBlocksToContent(message: ChatTimelineMessage): AssistantMessag
  * Convert our ChatTimelineItem[] into the AgentMessage[] shape that
  * pi-web-ui's <message-list> web component expects.
  *
- * Processes timeline strictly in chronological order so tool calls
- * appear inline where they occurred, not dumped at the end.
+ * Ordering: toolcall_start is now buffered in the streaming store until
+ * message_end, so tool items always arrive in the Query cache *after* the
+ * assistant message. The forward look-ahead finds them correctly.
+ *
+ * phase "update": tool_execution_update transitions "start" → "update" in-place.
+ * Both phases carry the same toolUseId/name/args so the look-ahead treats them
+ * identically — the tool call block stays visible throughout execution.
  */
 export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMessage[] {
   const messages: AgentMessage[] = [];
-  const consumed = new Set<number>(); // indices consumed by look-ahead
+  const consumed = new Set<number>();
 
   for (let i = 0; i < timeline.length; i++) {
     if (consumed.has(i)) continue;
@@ -83,13 +88,12 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 
     if (item.kind === "message" && item.role === "assistant") {
       const message = item as ChatTimelineMessage;
-      // Look ahead for immediately following tool starts (before next message/divider)
       const toolCalls: ToolCall[] = [];
       for (let j = i + 1; j < timeline.length; j++) {
         const next = timeline[j];
         if (!next) break;
         if (next.kind === "message" || next.kind === "divider") break;
-        if (next.kind === "tool" && next.phase === "start" && next.toolUseId) {
+        if (next.kind === "tool" && (next.phase === "start" || next.phase === "update") && next.toolUseId) {
           toolCalls.push({
             type: "toolCall",
             id: next.toolUseId,
@@ -112,18 +116,16 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
       continue;
     }
 
-    if (item.kind === "tool" && item.phase === "start" && item.toolUseId) {
-      // Orphan tool start (no preceding assistant message) — emit in place
+    if (item.kind === "tool" && (item.phase === "start" || item.phase === "update") && item.toolUseId) {
+      // Orphan tool — no preceding assistant message (e.g. after reconnect).
       messages.push({
         role: "assistant",
-        content: [
-          {
-            type: "toolCall",
-            id: item.toolUseId,
-            name: item.tool,
-            arguments: (item.args as Record<string, unknown>) ?? {},
-          },
-        ],
+        content: [{
+          type: "toolCall",
+          id: item.toolUseId,
+          name: item.tool,
+          arguments: (item.args as Record<string, unknown>) ?? {},
+        }],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);
@@ -131,7 +133,6 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
     }
 
     if (item.kind === "tool" && item.phase === "end" && item.toolUseId) {
-      // Emit ToolResultMessage in place
       messages.push({
         role: "toolResult",
         toolCallId: item.toolUseId,

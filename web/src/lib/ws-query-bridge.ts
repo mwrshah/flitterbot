@@ -313,18 +313,15 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start → immediate pending tool card in timeline ──
-    // This is the earliest event with the tool name (before tool_execution_start).
-    // Creates a timeline item with no args; tool_execution_start upgrades it in-place.
+    // ── toolcall_start → buffer in streaming store ──
+    // toolcall_start fires ~20ms before message_end. Committing to the Query cache
+    // immediately puts the tool item before the assistant message in the array, which
+    // breaks ordering. Buffer it here; message_end flushes it after the message.
     if (message.type === "toolcall_start") {
       if (message.toolUseId) {
-        appendTimelineItem(queryClient, sessionId, {
-          id: createId("tool"),
-          kind: "tool",
-          tool: message.toolName ?? "tool",
-          phase: "start",
+        streamingStore.addPendingToolCall(sessionId, {
           toolUseId: message.toolUseId,
-          createdAt: new Date().toISOString(),
+          toolName: message.toolName,
         });
       }
       return;
@@ -342,6 +339,21 @@ export function setupWsQueryBridge(deps: {
 
       if (msg.content.trim()) {
         upsertTimelineItem(queryClient, sessionId, msg);
+      }
+
+      // Flush tool calls buffered since toolcall_start. Appending them here (after the
+      // assistant message) guarantees correct order: message first, tool items after.
+      // tool_execution_start will then upgrade these "start" stubs with args in-place.
+      const pendingTools = streamingStore.flushPendingToolCalls(sessionId);
+      for (const tool of pendingTools) {
+        appendTimelineItem(queryClient, sessionId, {
+          id: createId("tool"),
+          kind: "tool",
+          tool: tool.toolName ?? "tool",
+          phase: "start",
+          toolUseId: tool.toolUseId,
+          createdAt: new Date().toISOString(),
+        });
       }
 
       streamingStore.clearText(sessionId);
@@ -393,7 +405,7 @@ export function setupWsQueryBridge(deps: {
       const tool = message.tool || extractToolName(message.event);
       const timestamp = message.timestamp ?? new Date().toISOString();
 
-      // Try to upgrade the pending item created by toolcall_start
+      // Try to upgrade the stub committed to cache by the message_end flush
       let upgraded = false;
       if (message.toolUseId) {
         queryClient.setQueryData<ChatTimelineItem[]>(
