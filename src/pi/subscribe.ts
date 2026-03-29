@@ -412,13 +412,8 @@ export function subscribeToPiSession(
         break;
       case "agent_end": {
         if (lastAssistantMessage) {
-          // Re-broadcast final message_end without intermediate to correct the session view.
-          const payload: MessageEndWebSocketEvent = {
-            type: "message_end",
-            sessionId: session.sessionId,
-            message: lastAssistantMessage,
-          };
-          broadcast(wsHub, payload);
+          // Broadcast pi_surfaced for the input surface. The agent timeline already has
+          // the message from the message_end event — no second message_end needed.
           broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
         }
         lastAssistantMessage = null;

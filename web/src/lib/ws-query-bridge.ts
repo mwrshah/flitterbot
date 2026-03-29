@@ -146,15 +146,7 @@ function upsertTimelineItem(
         );
       }
       const updated = [...items];
-      // Preserve blocks (e.g. thinking) from the existing item if the incoming
-      // one has none — agent_end re-broadcasts message_end with the raw SDK
-      // message which never carries blocks.
-      const prevMsg = prev as ChatTimelineMessage;
-      const incoming = item as ChatTimelineMessage;
-      updated[idx] =
-        prevMsg.blocks?.length && !incoming.blocks?.length
-          ? { ...incoming, blocks: prevMsg.blocks }
-          : item;
+      updated[idx] = item;
       return updated;
     }
     return [...items, item];
