@@ -29,17 +29,34 @@ function statusLabel(status: DownstreamSessionItem["status"]): string {
   }
 }
 
-export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string }) {
+export function DownstreamSessionsPanel({
+  piSessionId,
+}: { piSessionId: string | undefined }) {
   const { data, isPending, isError } = useQuery({
     queryKey: ["pi-downstream-sessions", piSessionId],
-    queryFn: () => fetchPiSessions({ data: { piSessionId } }),
+    queryFn: () => fetchPiSessions({ data: { piSessionId: piSessionId! } }),
+    enabled: !!piSessionId,
   });
 
   const worktreeQuery = useQuery({
     queryKey: ["pi-worktree", piSessionId],
-    queryFn: () => fetchPiWorktree({ data: { piSessionId } }),
+    queryFn: () => fetchPiWorktree({ data: { piSessionId: piSessionId! } }),
+    enabled: !!piSessionId,
   });
   const worktree = worktreeQuery.data;
+
+  if (!piSessionId) {
+    return (
+      <div className="flex flex-col h-full border-l border-border bg-background">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Active Sessions</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-xs text-muted-foreground">Waiting for session…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
