@@ -6,6 +6,7 @@ import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
+import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import {
   getLastDatetimeReportedAt,
   touchDatetimeReportedAt,
@@ -853,26 +854,7 @@ export class ControlSurfaceRuntime {
     workstreamId?: string,
   ): CustomToolDefinition[] {
     const tools: CustomToolDefinition[] = [
-      {
-        name: "query_blackboard",
-        label: "Query Blackboard",
-        description: "Run read-only SQL against the Autonoma blackboard.",
-        parameters: {
-          type: "object",
-          properties: {
-            sql: { type: "string", description: "SELECT or PRAGMA SQL statement" },
-          },
-          required: ["sql"],
-          additionalProperties: false,
-        },
-        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const rows = this.queryBlackboard(String(params.sql));
-          return {
-            content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
-            details: rows,
-          };
-        },
-      },
+      createQueryBlackboardTool(this.blackboard),
       {
         name: "reload_resources",
         label: "Reload Resources",
@@ -1260,20 +1242,6 @@ export class ControlSurfaceRuntime {
     }
 
     return tools;
-  }
-
-  private queryBlackboard(sql: string): Array<Record<string, unknown>> {
-    const normalized = String(sql ?? "")
-      .trim()
-      .replace(/;+\s*$/, "");
-    if (!normalized) throw new Error("SQL is required");
-    if (!/^(select|pragma)\b/i.test(normalized)) {
-      throw new Error("query_blackboard only allows SELECT and PRAGMA");
-    }
-    if (normalized.includes(";")) {
-      throw new Error("multiple SQL statements are not allowed");
-    }
-    return this.blackboard.prepare(normalized).all() as Array<Record<string, unknown>>;
   }
 
   private async sendWhatsAppCommand(command: DaemonCommand): Promise<DaemonResponse> {
