@@ -22,7 +22,20 @@ export async function handlePiSessionInterruptRoute(
   }
 
   // Abort the current in-flight Pi turn; the queue pump will pick up the next item naturally
-  managed.session.abort?.();
+  let bashAborted = false;
+  try {
+    managed.session.abort?.();
+  } catch {
+    // Non-fatal — continue to bash abort and CC signals
+  }
+  try {
+    if (managed.session.isBashRunning) {
+      managed.session.abortBash?.();
+      bashAborted = true;
+    }
+  } catch {
+    // Non-fatal — continue to CC signals
+  }
 
   // Send Escape to each linked CC session — graceful interrupt without killing the process
   const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, piSessionId);
@@ -35,7 +48,7 @@ export async function handlePiSessionInterruptRoute(
   }
 
   runtime.log(
-    `pi-session interrupt: aborted turn for ${piSessionId}, signaled ${signaledSessions} CC session(s)`,
+    `pi-session interrupt: aborted turn for ${piSessionId}${bashAborted ? " (bash killed)" : ""}, signaled ${signaledSessions} CC session(s)`,
   );
 
   const body: PiSessionInterruptResponse = { ok: true, piSessionId, signaledSessions };

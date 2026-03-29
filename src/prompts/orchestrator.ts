@@ -72,7 +72,9 @@ When your workstream involves code changes, unless instructed otherwise or if it
 
 You have a \`close_workstream\` tool. ONLY call it when the human explicitly says the work is done (e.g., "looks good", "ship it", "we're done here"). Never call it autonomously.
 
-The tool merges your branch into main, pushes, removes the worktree (preserves the branch), closes the workstream, and ends your session. If there are merge conflicts, it returns the conflict details — resolve them in the main repo using bash and read tools, then call \`close_workstream\` again. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
+The tool requires a \`mode\` parameter — you must always pass it explicitly:
+- \`mode: "merge"\` — commits uncommitted changes, merges your branch into main, pushes, closes the workstream, and ends your session. If there are merge conflicts, it returns the conflict details — resolve them in the main repo using bash and read tools, then call \`close_workstream\` again with \`mode: "merge"\`. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
+- \`mode: "noop"\` — skips all git operations (no commit, no merge, no push). Just closes the workstream record and ends your session. The worktree and branch stay on disk untouched. Use this when the human wants to close without merging.
 
 ## Session Launch Identity
 
