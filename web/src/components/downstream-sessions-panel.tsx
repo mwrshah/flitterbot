@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { DownstreamSessionItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import { fetchPiSessions } from "~/server/pi";
+import { fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
   switch (status) {
@@ -34,6 +34,12 @@ export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string }
     queryKey: ["pi-downstream-sessions", piSessionId],
     queryFn: () => fetchPiSessions({ data: { piSessionId } }),
   });
+
+  const worktreeQuery = useQuery({
+    queryKey: ["pi-worktree", piSessionId],
+    queryFn: () => fetchPiWorktree({ data: { piSessionId } }),
+  });
+  const worktree = worktreeQuery.data;
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
@@ -70,6 +76,26 @@ export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string }
               </li>
             ))}
           </ul>
+        )}
+
+        {worktree?.worktreePath && (
+          <div className="px-4 py-3 border-t border-border">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              Active Worktree
+            </p>
+            <div className="flex flex-col gap-0.5 py-1.5">
+              <span className="truncate text-xs font-medium text-foreground">{worktree.name}</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="truncate">{worktree.worktreePath.split("/").pop()}</span>
+                {worktree.repoPath && (
+                  <>
+                    <span>·</span>
+                    <span className="shrink-0">{worktree.repoPath.split("/").pop()}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
         )}
       </div>
     </div>

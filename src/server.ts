@@ -15,6 +15,7 @@ import {
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserPiHistoryRoute } from "./routes/browser-pi.ts";
 import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
+import { handleBrowserPiSessionWorkstreamRoute } from "./routes/browser-pi-session-workstream.ts";
 import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
@@ -164,6 +165,16 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "sessions"
   ) {
     return handleBrowserPiSessionsRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "GET" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "workstream" &&
+    !segments[4]
+  ) {
+    return handleBrowserPiSessionWorkstreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));
