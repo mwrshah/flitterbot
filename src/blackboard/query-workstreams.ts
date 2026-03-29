@@ -63,6 +63,19 @@ export function getLatestPiSessionId(
   return row?.pi_session_id;
 }
 
+export function getWorkstreamForPiSession(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): WorkstreamRow | null {
+  const row = db.get<WorkstreamRow>(
+    `SELECT w.* FROM workstreams w
+     JOIN pi_sessions p ON p.workstream_id = w.id
+     WHERE p.pi_session_id = ?`,
+    piSessionId,
+  );
+  return row ?? null;
+}
+
 export function closeWorkstream(db: BlackboardDatabase, workstreamId: string): void {
   db.prepare(
     `UPDATE workstreams
