@@ -1,10 +1,6 @@
 # Autonoma
 
-Long-running orchestration runtime for Claude Code. Architecture, design principles, and feature breakdown in [`features/overview.md`](features/overview.md).
-
-Run by cloning the repo locally — not yet packaged as a standalone app.
-
----
+Long-running orchestration runtime for Claude Code. Architecture and design in [`features/overview.md`](features/overview.md).
 
 ## Quick start
 
@@ -19,188 +15,51 @@ pnpm --dir web dev                            # 6. optional: web UI
 
 Stop: `~/.autonoma/bin/autonoma-up stop` — Disable permanently: `node ~/.autonoma/uninstall.mjs`
 
----
+**Prerequisites:** Node.js 22+, pnpm, tmux, Claude Code CLI (`claude`), sqlite3
 
-## Prerequisites
+## Configuration
 
-**Required:** Node.js 22+, pnpm, tmux, Claude Code CLI (`claude`), sqlite3
-**WhatsApp:** A terminal session for manual auth via `autonoma-wa auth`
-**Optional:** A modern browser for the web UI
+The installer (step 3 in quickstart) deploys to `~/.autonoma/`, writes `web/.env` (from repo root), initializes the blackboard, and registers Claude Code hooks. Use `--dry-run` to inspect changes or `--with-scheduler` to also install a launchd/systemd scheduler.
 
-```bash
-node -v && pnpm -v && tmux -V && claude --version && sqlite3 --version
-```
+**`.env`:** `ANTHROPIC_API_KEY` (optional - otherwise fallbacks to Anthropic Oauth token obtained via Pi TUI — Run `pi` in terminal, then `/login` to populate), `GROQ_API_KEY` (required for message classification).
 
----
+**`~/.autonoma/config.json` options:**
+- `piModel` (default `claude-opus-4-6`) — model for all Pi agents
+- `piThinkingLevel` (default `medium`) — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`
+- `stallMinutes` (default `15`) — inactivity before a session is stalled
+- `toolTimeoutMinutes` (default `4`) — tool-waiting timeout before stall
+- `claudeCliCommand` (default `claude --dangerously-skip-permissions`) — CLI used to launch sessions
+- `projectsDir` (default `~/development`) — working directory for Pi agents and default root for Claude Code sessions (overridden by worktree path once created)
+- `wipeWorkstreamsOnStart` (default `false`) — close all open workstreams on startup
+- `whatsappEnabled` (default `true`) — enable/disable WhatsApp channel
 
-## Setup
+**WhatsApp auth:** `~/.autonoma/bin/autonoma-wa auth` (QR) or `--pairing-code`. Auth state at `~/.autonoma/whatsapp/auth/`.
 
-### 1) Clone and install
-
-```bash
-git clone <repo-url> && cd autonoma
-pnpm install
-pnpm --dir web install
-```
-
-### 2) Configure environment
+## Commands
 
 ```bash
-cp .env.example .env
-# ANTHROPIC_API_KEY  — optional with Pi OAuth tokens (`pi auth login`)
-# GROQ_API_KEY       — required for message classification
-```
-
-### 3) Run the installer
-
-Deploys runtime files to `~/.autonoma/`, bootstraps config, writes `web/.env` with the auth token, optionally prompts for WhatsApp phone number, initializes the blackboard, and installs Claude Code hooks into `~/.claude/settings.json`.
-
-```bash
-node .autonoma/install.mjs              # full install
-node .autonoma/install.mjs --dry-run    # inspect changes first
-node .autonoma/install.mjs --with-scheduler  # also install launchd/systemd scheduler
-```
-
-### 4) Review generated config
-
-```bash
-~/.autonoma/config.json          # controlSurfaceHost/Port/Token, piModel, claudeCliCommand, projectRoot/sourceRoot
-~/.autonoma/whatsapp/config.json # pairingPhoneNumber, recipientJid
-web/.env                         # VITE_AUTONOMA_BASE_URL, VITE_AUTONOMA_TOKEN (auto-generated, gitignored)
-```
-
-| Key | Default | Description |
-|---|---|---|
-| `piModel` | `claude-opus-4-6` | Model for all Pi agents (default + workstream orchestrators) |
-| `piThinkingLevel` | `medium` | Thinking budget: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` |
-| `stallMinutes` | `15` | Inactivity minutes before a session is considered stalled |
-| `toolTimeoutMinutes` | `4` | Minutes before a tool-waiting session is considered stalled |
-| `claudeCliCommand` | `claude --dangerously-skip-permissions` | CLI command to launch Claude Code sessions |
-| `projectsDir` | `~/development` | Root directory for Claude Code working sessions |
-| `controlSurfaceCommand` | _(auto-detected)_ | Shell command to start the control surface server |
-| `projectRoot` | _(installer-detected)_ | Path to the Autonoma source checkout; used by `autonoma-up` |
-| `sourceRoot` | _(same as projectRoot)_ | Alias for `projectRoot` |
-| `wipeWorkstreamsOnStart` | `false` | Close all open workstreams on control surface startup |
-| `whatsappEnabled` | `true` | Enable/disable WhatsApp channel |
-
-### 5) Authenticate WhatsApp (optional)
-
-```bash
-~/.autonoma/bin/autonoma-wa auth                # QR mode
-~/.autonoma/bin/autonoma-wa auth --pairing-code  # pairing-code mode
-```
-
-Auth state stored at `~/.autonoma/whatsapp/auth/`.
-
----
-
-## Starting and stopping
-
-### Control surface
-
-```bash
-~/.autonoma/bin/autonoma-up start     # pid cleanup, retries, logging
-~/.autonoma/bin/autonoma-up status
-~/.autonoma/bin/autonoma-up stop      # POST /stop → marks Pi ended, stops WhatsApp, removes pid
-~/.autonoma/bin/autonoma-up restart
-```
-
-### Web app (development)
-
-```bash
-pnpm --dir web dev    # http://127.0.0.1:3188
-```
-
-Not managed by `autonoma-up`.
-
-### WhatsApp (usually auto-managed by control surface)
-
-```bash
+~/.autonoma/bin/autonoma-up start | status | stop | restart
 ~/.autonoma/bin/autonoma-wa start | status | stop | auth
+pnpm --dir web dev                            # http://127.0.0.1:3188
+node ~/.autonoma/uninstall.mjs                # remove hooks + scheduler
+node ~/.autonoma/uninstall.mjs --meta         # also remove ~/.autonoma/
+pnpm run control-surface                      # run from source
+pnpm run audit | audit:ts | audit:shell
 ```
 
-### Scheduler (deferred — not installed by default)
-
-If installed with `--with-scheduler`, periodically runs `~/.autonoma/cron/autonoma-checkin.sh` — may restart the control surface if machine state is actionable and runtime is down. Deferred to post-v1; Pi is reactive (human messages + hook events) until orchestration logic matures.
-
-### Full shutdown
-
-`autonoma-up stop` is temporary — the scheduler may bring the runtime back.
-
-To permanently disable (removes hooks + scheduler entries):
-
-```bash
-node ~/.autonoma/uninstall.mjs          # disable, remove hooks/scheduler
-node ~/.autonoma/uninstall.mjs --meta   # also remove ~/.autonoma/ entirely
-```
-
----
+If `--with-scheduler` was used, `autonoma-up stop` is still permanent — the scheduler only POSTs a tick to an already-running runtime and cannot start a stopped one. To remove the scheduler itself, run the uninstaller.
 
 ## Repo layout
 
-### Runtime source
+`src/server.ts`, `src/runtime.ts` — HTTP server and runtime orchestrator. `src/pi/**` — Pi agent lifecycle, turn queue, session state. `src/routes/**` — one file per HTTP endpoint. `src/classifier/**` — Groq-based message routing. `src/blackboard/**` — SQLite layer. `src/claude-sessions/**` — tmux / Claude integration. `src/whatsapp/**` — WhatsApp daemon / CLI / IPC. `src/contracts/**` — shared API and runtime contracts. `src/custom-tools/**` — worktree, session, workstream tools. `web/**` — browser client. `features/**` — architecture and spec docs.
 
-- `src/server.ts`, `src/runtime.ts` — HTTP server and runtime orchestrator
-- `src/pi/**` — Pi agent lifecycle, turn queue, session state
-- `src/routes/**` — one file per HTTP endpoint
-- `src/classifier/**` — Groq-based message routing
-- `src/blackboard/**` — SQLite layer
-- `src/claude-sessions/**` — tmux / Claude integration
-- `src/whatsapp/**` — WhatsApp daemon / CLI / IPC
-- `src/contracts/**` — shared API and runtime contracts
-- `src/custom-tools/**` — worktree, session, workstream tools
-- `web/**` — browser client
-- `features/**` — architecture and spec docs
+Installed runtime (`~/.autonoma/`): `config.json`, `blackboard.db`, `logs/`, `bin/`, `hooks/`, `scripts/`, `cron/`, `whatsapp/`.
 
-### Installed runtime (`~/.autonoma/`)
-
-```
-~/.autonoma/
-  config.json, manifest.json, blackboard.db
-  logs/          # control-surface.log, cron.log, install.log, whatsapp.log, hooks-errors.log
-  bin/           # autonoma-up, autonoma-wa
-  hooks/         # hook-post.mjs — Node.js dispatcher
-  scripts/, cron/, control-surface/, whatsapp/
-```
-
-External files touched (tracked in `~/.autonoma/manifest.json`):
-
-- `~/.claude/settings.json`
-- `~/Library/LaunchAgents/com.autonoma.scheduler.plist` (macOS)
-- `~/.config/systemd/user/autonoma-scheduler.{service,timer}` (Linux)
-
-### Operational notes
-
-- **`projectRoot` / `sourceRoot`** = this Autonoma checkout, **not** the working directory for Claude sessions.
-- **Session tracking gated by `AUTONOMA_AGENT_MANAGED=1`** — only sessions with this env var are tracked. Set automatically by `launch_claude_code` tool; opt in manually with `AUTONOMA_AGENT_MANAGED=1 claude`.
-- **Hooks are Node.js** (`.mjs`, `node:*` built-ins only). Claude Code invokes `node ~/.autonoma/hooks/hook-post.mjs <event-slug>` → reads JSON from stdin, enriches with `AUTONOMA_*` env vars, POSTs to control surface. Silently skips when control surface is down. Errors in `~/.autonoma/logs/hooks-errors.log`.
-
----
-
-## Dev commands
-
-```bash
-pnpm run control-surface    # run control surface from source
-pnpm run web:dev             # dev server
-pnpm run web:build           # production build
-```
-
-## Audit commands
-
-```bash
-pnpm install                     # install tooling
-pnpm run audit                   # all audits
-pnpm run audit:ts                # TypeScript only
-pnpm run audit:shell             # Shell only
-```
-
----
+`projectRoot` / `sourceRoot` = this checkout, not the working directory for Claude sessions. Only sessions with `AUTONOMA_AGENT_MANAGED=1` are tracked — set automatically by `launch_claude_code`, or manually with `AUTONOMA_AGENT_MANAGED=1 claude`. Hook errors log to `~/.autonoma/logs/hooks-errors.log`; silently skip when control surface is down.
 
 ## Troubleshooting
 
-| Problem | Check |
-|---|---|
-| `autonoma-up start` fails | `~/.autonoma/config.json`, `~/.autonoma/logs/control-surface.log`, `node`/`claude`/`tmux`/`sqlite3` available, `pnpm install` done |
-| WhatsApp auth errors | Re-run `~/.autonoma/bin/autonoma-wa auth` |
-| Hooks not firing | `~/.claude/settings.json`, `~/.autonoma/hooks/hook-post.mjs`, `~/.autonoma/logs/hooks-errors.log` — hooks run async with 15s timeout; silently skip when control surface is down |
-| Runtime keeps restarting after stop | Scheduler still installed — run `node ~/.autonoma/uninstall.mjs` |
+**`autonoma-up start` fails** — check `~/.autonoma/config.json`, `control-surface.log`, and that `node`/`claude`/`tmux`/`sqlite3` are in PATH and `pnpm install` has run.
+**WhatsApp auth errors** — re-run `autonoma-wa auth`.
+**Hooks not firing** — check `~/.claude/settings.json`, `hook-post.mjs`, `hooks-errors.log`; hooks run async with a 15s timeout.
+**Runtime restarts after stop** — scheduler still installed; run `node ~/.autonoma/uninstall.mjs`.

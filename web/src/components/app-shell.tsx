@@ -27,7 +27,7 @@ export function AppShell() {
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
 
   return (
-    <div className="grid grid-cols-[240px_1fr] h-screen overflow-hidden">
+    <div className="grid grid-cols-[240px_1fr] grid-rows-1 h-screen overflow-hidden">
       <Sidebar connectionState={isClient ? connectionState : "disconnected"} onOpenSettings={handleOpenSettings} />
 
       <main className="flex flex-col min-h-0 overflow-hidden">
