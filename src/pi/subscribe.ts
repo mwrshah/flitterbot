@@ -57,7 +57,35 @@ type PiSessionSubscriptionEvent =
       [key: string]: unknown;
     }
   | {
-      type: "turn_end" | "agent_end";
+      type: "turn_start";
+      [key: string]: unknown;
+    }
+  | {
+      type: "turn_end";
+      [key: string]: unknown;
+    }
+  | {
+      type: "agent_start";
+      [key: string]: unknown;
+    }
+  | {
+      type: "agent_end";
+      [key: string]: unknown;
+    }
+  | {
+      type: "auto_compaction_start";
+      [key: string]: unknown;
+    }
+  | {
+      type: "auto_compaction_end";
+      [key: string]: unknown;
+    }
+  | {
+      type: "auto_retry_start";
+      [key: string]: unknown;
+    }
+  | {
+      type: "auto_retry_end";
       [key: string]: unknown;
     }
   | {
@@ -161,10 +189,6 @@ export function subscribeToPiSession(
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
 ): () => void {
-  // Deferred assistant messages: accumulate during a turn, flush on turn_end.
-  // Earlier ones get broadcast with intermediate: true; only the last one is final.
-  const pendingAssistantMessages: ChatTimelineMessage[] = [];
-
   // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
   // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
   // msg-N IDs that match the history path in history.ts.
@@ -173,6 +197,10 @@ export function subscribeToPiSession(
   // Tracks the ordinal ID for the currently-streaming assistant message.
   // Set on message_start (assistant only), cleared on message_end / turn_end.
   let currentStreamingMessageId: string | null = null;
+
+  // Tracks the last assistant message in the current agent run.
+  // Reset on agent_start; used on agent_end to re-broadcast as final + pi_surfaced.
+  let lastAssistantMessage: ChatTimelineMessage | null = null;
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
@@ -259,8 +287,15 @@ export function subscribeToPiSession(
         };
 
         if (role === "assistant") {
-          // Defer — accumulate until turn_end so we can mark intermediate vs final
-          pendingAssistantMessages.push(timelineMessage);
+          // Broadcast immediately with intermediate flag so the session view gets it live.
+          // The final correction (without intermediate) happens on agent_end.
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: { ...timelineMessage, intermediate: true },
+          };
+          broadcast(wsHub, payload);
+          lastAssistantMessage = timelineMessage;
         } else {
           const payload: MessageEndWebSocketEvent = {
             type: "message_end",
@@ -311,24 +346,10 @@ export function subscribeToPiSession(
         broadcast(wsHub, payload);
         break;
       }
+      case "turn_start":
+        console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        break;
       case "turn_end": {
-        // Flush deferred assistant messages: all but last are intermediate
-        for (let i = 0; i < pendingAssistantMessages.length; i++) {
-          const isLast = i === pendingAssistantMessages.length - 1;
-          const msg = isLast
-            ? pendingAssistantMessages[i]!
-            : { ...pendingAssistantMessages[i]!, intermediate: true };
-          const payload: MessageEndWebSocketEvent = {
-            type: "message_end",
-            sessionId: session.sessionId,
-            message: msg,
-          };
-          broadcast(wsHub, payload);
-          if (isLast) {
-            broadcastSurfaced(wsHub, session.sessionId, msg);
-          }
-        }
-        pendingAssistantMessages.length = 0;
         currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
@@ -340,7 +361,31 @@ export function subscribeToPiSession(
         broadcast(wsHub, payload);
         break;
       }
+      case "agent_start":
+        lastAssistantMessage = null;
+        break;
+      case "agent_end": {
+        if (lastAssistantMessage) {
+          // Re-broadcast final message_end without intermediate to correct the session view.
+          const payload: MessageEndWebSocketEvent = {
+            type: "message_end",
+            sessionId: session.sessionId,
+            message: lastAssistantMessage,
+          };
+          broadcast(wsHub, payload);
+          broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
+        }
+        lastAssistantMessage = null;
+        break;
+      }
+      case "auto_compaction_start":
+      case "auto_compaction_end":
+      case "auto_retry_start":
+      case "auto_retry_end":
+        console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        break;
       default:
+        console.warn("pi-subscribe: unhandled event type=%s (sessionId=%s)", event.type, session.sessionId);
         break;
     }
   });

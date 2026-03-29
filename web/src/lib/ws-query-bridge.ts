@@ -103,7 +103,7 @@ function removePill(queryClient: QueryClient, sessionId: string, pillId: string)
   );
 }
 
-/* ── Timeline append helper (deduplicates by ID) ── */
+/* ── Timeline append helper (no dedup — duplicates surface in UI to expose backend bugs) ── */
 
 function appendTimelineItem(
   queryClient: QueryClient,
@@ -112,17 +112,43 @@ function appendTimelineItem(
   surface: "agent" | "input" = "agent",
 ) {
   if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) => {
-      const items = old ?? [];
-      if (items.some((existing) => existing.id === item.id)) return items;
-      return [...items, item];
-    });
+    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) =>
+      [...(old ?? []), item],
+    );
     return;
   }
 
+  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) =>
+    [...(old ?? []), item],
+  );
+}
+
+/* ── Timeline upsert helper (replace existing by ID, or append) ── */
+/* Used for message_end: intermediate→final correction is the one expected replace. */
+
+function upsertTimelineItem(
+  queryClient: QueryClient,
+  sessionId: string,
+  item: ChatTimelineItem,
+) {
   queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
     const items = old ?? [];
-    if (items.some((existing) => existing.id === item.id)) return items;
+    const idx = items.findIndex((existing) => existing.id === item.id);
+    if (idx >= 0) {
+      const prev = items[idx]!;
+      // Expected path: intermediate assistant message replaced by final version on agent_end.
+      // Anything else is a backend bug — log it so it's visible in devtools.
+      const wasIntermediate = "intermediate" in prev && (prev as ChatTimelineMessage).intermediate;
+      if (!wasIntermediate) {
+        console.warn(
+          "[ws-bridge] upsert replaced non-intermediate item id=%s — possible duplicate event",
+          item.id,
+        );
+      }
+      const updated = [...items];
+      updated[idx] = item;
+      return updated;
+    }
     return [...items, item];
   });
 }
@@ -303,29 +329,20 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── message_end → Query cache ──
+    // ── message_end → agent timeline only (upsert) ──
+    // Upsert so the agent_end correction (same id, no intermediate flag)
+    // replaces the earlier intermediate version in-place.
+    // Input surface is handled exclusively by pi_surfaced.
     if (message.type === "message_end") {
       const msg = message.message;
       const msgId = msg.id;
 
-      // Destroy chunker for this message
       destroyChunker(msgId);
 
-      // Add completed message to agent timeline
       if (msg.content.trim()) {
-        appendTimelineItem(queryClient, sessionId, msg);
+        upsertTimelineItem(queryClient, sessionId, msg);
       }
 
-      // Also add to input surface timeline (user messages from web/whatsapp, non-intermediate assistant messages)
-      if (msg.role === "user") {
-        const source = msg.source ?? "web";
-        if (source === "web" || source === "whatsapp") {
-          appendTimelineItem(queryClient, sessionId, msg, "input");
-        }
-      }
-      // Don't add assistant message_end to input surface — only pi_surfaced events appear there
-
-      // Clear streaming state AFTER appending the final message
       streamingStore.clearText(sessionId);
       streamingStore.clearThinking(sessionId);
       return;

@@ -167,6 +167,41 @@ export interface SessionsChangedWebSocketEvent {
   reason: "registered" | "ended" | "stopped";
 }
 
+export interface AgentStartWebSocketEvent {
+  type: "agent_start";
+  sessionId?: string;
+}
+
+export interface AgentEndWebSocketEvent {
+  type: "agent_end";
+  sessionId?: string;
+}
+
+export interface TurnStartWebSocketEvent {
+  type: "turn_start";
+  sessionId?: string;
+}
+
+export interface AutoCompactionStartWebSocketEvent {
+  type: "auto_compaction_start";
+  sessionId?: string;
+}
+
+export interface AutoCompactionEndWebSocketEvent {
+  type: "auto_compaction_end";
+  sessionId?: string;
+}
+
+export interface AutoRetryStartWebSocketEvent {
+  type: "auto_retry_start";
+  sessionId?: string;
+}
+
+export interface AutoRetryEndWebSocketEvent {
+  type: "auto_retry_end";
+  sessionId?: string;
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -179,6 +214,13 @@ export type ControlSurfaceWebSocketServerEvent =
   | ToolExecutionUpdateWebSocketEvent
   | ToolExecutionEndWebSocketEvent
   | TurnEndWebSocketEvent
+  | TurnStartWebSocketEvent
+  | AgentStartWebSocketEvent
+  | AgentEndWebSocketEvent
+  | AutoCompactionStartWebSocketEvent
+  | AutoCompactionEndWebSocketEvent
+  | AutoRetryStartWebSocketEvent
+  | AutoRetryEndWebSocketEvent
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
