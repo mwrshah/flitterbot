@@ -926,6 +926,10 @@ export class ControlSurfaceRuntime {
                 this.log(
                   `context classifier failed, falling back to single message: ${error instanceof Error ? error.message : String(error)}`,
                 );
+                this.wsHub.broadcast({
+                  type: "error",
+                  message: "Context classification failed — workstream context limited to current message.",
+                });
                 prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id, agentMessage);
               }
 

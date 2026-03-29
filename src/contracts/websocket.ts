@@ -160,6 +160,11 @@ export interface PongWebSocketEvent {
   type: "pong";
 }
 
+export interface ErrorWebSocketEvent {
+  type: "error";
+  message: string;
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -176,4 +181,5 @@ export type ControlSurfaceWebSocketServerEvent =
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
-  | PongWebSocketEvent;
+  | PongWebSocketEvent
+  | ErrorWebSocketEvent;
