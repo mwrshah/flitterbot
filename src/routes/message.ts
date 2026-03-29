@@ -30,12 +30,12 @@ export async function handleMessageRoute(
   const deliveryMode: DeliveryMode = body.deliveryMode === "steer" ? "steer" : "followUp";
   const formatted = formatInboundMessage(body.text, source, body.metadata);
 
+  // Only web and whatsapp sources reach this handler (normalizeSource guarantees this).
   // Direct-targeted session (web UI tab input) — skip router
   let workstreamMeta: WorkstreamRoutingMeta = {};
   if (body.targetSessionId) {
     workstreamMeta._targetSessionId = body.targetSessionId;
-  } else if (source === "web" || source === "whatsapp") {
-    // Router: classify human messages against workstreams (hooks/cron bypass)
+  } else {
     const classification = await routeMessage(runtime, body.text);
     if (classification) {
       workstreamMeta = classification.metadata;
@@ -83,8 +83,6 @@ async function routeMessage(
 function normalizeSource(source?: string): MessageSource {
   switch (source) {
     case "whatsapp":
-    case "hook":
-    case "cron":
       return source;
     default:
       return "web";
@@ -93,13 +91,8 @@ function normalizeSource(source?: string): MessageSource {
 
 function formatInboundMessage(
   text: string,
-  source: MessageSource,
+  _source: MessageSource,
   _metadata?: MessageMetadata,
 ): string {
-  // Hook and cron messages are structured content — pass through unchanged
-  if (source === "cron" || source === "hook") {
-    return text;
-  }
-  // Web and WhatsApp: return raw user text (no source prefix or quote wrapping)
   return text;
 }
