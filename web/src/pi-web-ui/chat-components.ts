@@ -310,6 +310,12 @@ export class ThinkingBlock extends LitElement {
     this.style.display = "block";
   }
 
+  override updated(changed: Map<PropertyKey, unknown>): void {
+    if (changed.has("isStreaming")) {
+      this.isExpanded = this.isStreaming;
+    }
+  }
+
   private toggleExpanded = (): void => {
     this.isExpanded = !this.isExpanded;
   };
@@ -925,22 +931,22 @@ export class MessageList extends LitElement {
   /**
    * Imperatively update the streaming assistant-message element.
    * Creates the element on first call, appends it after the repeat() container.
-   * Does NOT trigger Lit re-render of the repeat() block.
+   * isThinkingStreaming controls whether the ThinkingBlock renders expanded with
+   * the shimmer animation (true = thinking in progress, false = thinking done).
    */
-  updateStreaming(msg: AssistantMessageType): void {
+  updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): void {
     if (!this._streamingEl) {
       this._streamingEl = document.createElement(
         "assistant-message",
       ) as unknown as AssistantMessage;
       this._streamingEl.style.display = "block";
-      this._streamingEl.isStreaming = true;
       this._streamingEl.hideToolCalls = false;
-      // Append to the flex container rendered by this component
       const container = this.querySelector(":scope > div");
       if (container) {
         container.appendChild(this._streamingEl as unknown as Node);
       }
     }
+    this._streamingEl.isStreaming = isThinkingStreaming;
     this._streamingEl.message = msg;
     this._streamingEl.style.display = "block";
   }

@@ -307,9 +307,19 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── thinking_delta → streaming store ──
+    // ── thinking lifecycle → streaming store ──
+    if (message.type === "thinking_start") {
+      streamingStore.setThinkingStreaming(sessionId, true, message.messageId);
+      return;
+    }
+
     if (message.type === "thinking_delta") {
       streamingStore.appendThinkingDelta(sessionId, message.messageId, message.delta);
+      return;
+    }
+
+    if (message.type === "thinking_end") {
+      streamingStore.setThinkingStreaming(sessionId, false);
       return;
     }
 

@@ -203,7 +203,9 @@ export type WsMessage =
       timestamp?: string;
       sessionId?: string;
     }
+  | { type: "thinking_start"; sessionId?: string; messageId: string }
   | { type: "thinking_delta"; delta: string; sessionId?: string; messageId: string }
+  | { type: "thinking_end"; sessionId?: string; messageId: string }
   | { type: "toolcall_start"; contentIndex: number; toolName?: string; toolUseId?: string; sessionId?: string }
   | {
       type: "tool_execution_update";

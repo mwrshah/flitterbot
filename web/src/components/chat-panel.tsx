@@ -92,28 +92,31 @@ export function ChatPanel({
 
   // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
-    streamingStore.onStreamingDelta(sessionId, (text, thinking, messageId) => {
+    streamingStore.onStreamingDelta(sessionId, (text, thinking, isThinkingStreaming, messageId) => {
       if (messageId != null) {
-        messageListRef.current?.updateStreaming({
-          role: "assistant",
-          content: [
-            ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
-            ...(text ? [{ type: "text" as const, text }] : []),
-          ],
-          api: "openai-responses",
-          provider: "openai",
-          model: "",
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        messageListRef.current?.updateStreaming(
+          {
+            role: "assistant",
+            content: [
+              ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
+              ...(text ? [{ type: "text" as const, text }] : []),
+            ],
+            api: "openai-responses",
+            provider: "openai",
+            model: "",
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
+            timestamp: Date.now(),
           },
-          stopReason: "stop",
-          timestamp: Date.now(),
-        });
+          isThinkingStreaming,
+        );
       } else {
         messageListRef.current?.clearStreaming();
       }
