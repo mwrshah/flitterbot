@@ -42,8 +42,12 @@ export async function handlePiSessionInterruptRoute(
   let signaledSessions = 0;
   for (const ccSession of ccSessions) {
     if (ccSession.tmuxSession) {
-      await sendEscapeToTmuxSession(ccSession.tmuxSession);
-      signaledSessions++;
+      try {
+        await sendEscapeToTmuxSession(ccSession.tmuxSession);
+        signaledSessions++;
+      } catch {
+        // Stale tmux session reference — skip silently
+      }
     }
   }
 
