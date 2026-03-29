@@ -53,6 +53,12 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const piSessionId = sessionManager.getSessionId();
 
   let systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
+
+  // Mutable ref so the systemPromptOverride closure always reads the final prompt
+  // (skills are appended after resourceLoader is created). Each agent gets its own
+  // ref — no shared file read — which fixes the concurrent-orchestrator race condition.
+  const promptRef = { value: "" };
+
   // Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
   const piAuthPath = path.join(HOME, ".pi", "agent", "auth.json");
   const authPath = fs.existsSync(piAuthPath)
@@ -73,14 +79,16 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
     additionalSkillPaths: [path.join(HOME, ".agents", "skills")].filter((entry) =>
       fs.existsSync(entry),
     ),
-    systemPromptOverride: () => fs.readFileSync(config.controlSurfacePromptPath, "utf8"),
+    systemPromptOverride: () => promptRef.value,
   });
   await resourceLoader.reload();
 
   // Append auto-loaded skills to the system prompt using SDK-discovered paths.
   const { skills } = resourceLoader.getSkills();
   systemPrompt += buildAutoLoadedSkillsBlock(skills);
+  promptRef.value = systemPrompt;
   console.log("[create-agent] system prompt:\n" + "=".repeat(80) + "\n" + systemPrompt + "\n" + "=".repeat(80));
+  // Write prompt file for debugging/logging — no longer the live source for the override.
   ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
 
   // Collect resource info for startup logging
