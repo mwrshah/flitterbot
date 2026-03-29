@@ -65,8 +65,10 @@ export const streamingStore = {
     } else {
       thinking.set(sessionId, { text: delta, messageId });
     }
-    // Trigger text callbacks too so UI re-renders with thinking content
-    fireCallbacks(sessionId);
+    // Do NOT call fireCallbacks here — thinking deltas must not trigger the text
+    // streaming callback. Doing so fires cb(null, null) when no text is in flight,
+    // which calls clearStreaming() and queues rAF hide callbacks. Those callbacks
+    // then fire and hide the streaming element mid-stream when text later starts.
   },
 
   clearThinking(sessionId: string) {

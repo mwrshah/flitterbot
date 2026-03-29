@@ -5,7 +5,6 @@ import type {
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
   PiSurfacedWebSocketEvent,
-  ThinkingDeltaWebSocketEvent,
   ToolCallDeltaWebSocketEvent,
   ToolCallStartWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
@@ -207,18 +206,6 @@ export function subscribeToPiSession(
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
-        } else if (
-          ame.type === "thinking_delta" &&
-          typeof ame.delta === "string" &&
-          currentStreamingMessageId
-        ) {
-          const payload: ThinkingDeltaWebSocketEvent = {
-            type: "thinking_delta",
-            sessionId: session.sessionId,
-            messageId: currentStreamingMessageId,
-            delta: ame.delta,
-          };
-          broadcast(wsHub, payload);
         } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
           // Extract toolName from the partial message's content at contentIndex
           let toolName: string | undefined;
