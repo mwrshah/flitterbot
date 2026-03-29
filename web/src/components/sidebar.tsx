@@ -1,14 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
-import { lazy, memo, Suspense } from "react";
+import { memo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
-
-const DevStreamTuner = import.meta.env.DEV
-  ? lazy(() => import("./dev-stream-tuner").then((m) => ({ default: m.DevStreamTuner })))
-  : null;
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   useWhyDidYouRender("NavItem", { to, label, icon });
@@ -124,11 +120,6 @@ export const Sidebar = memo(function Sidebar({
             <span className="text-xs font-bold text-sidebar-primary-foreground">A</span>
           </div>
           <span className="text-sm font-semibold text-sidebar-foreground">Autonoma</span>
-          {DevStreamTuner && (
-            <Suspense fallback={null}>
-              <DevStreamTuner />
-            </Suspense>
-          )}
         </div>
       </div>
 
