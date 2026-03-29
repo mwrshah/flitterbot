@@ -100,6 +100,27 @@ export function updatePiSessionStatus(
   ).run(status, now, piSessionId);
 }
 
+export function getLastDatetimeReportedAt(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): string | null {
+  const row = db.get<{ last_datetime_reported_at: string | null }>(
+    "SELECT last_datetime_reported_at FROM pi_sessions WHERE pi_session_id = ?",
+    piSessionId,
+  );
+  return row?.last_datetime_reported_at ?? null;
+}
+
+export function touchDatetimeReportedAt(
+  db: BlackboardDatabase,
+  piSessionId: string,
+  timestamp: string,
+): void {
+  db.prepare(
+    "UPDATE pi_sessions SET last_datetime_reported_at = ? WHERE pi_session_id = ?",
+  ).run(timestamp, piSessionId);
+}
+
 export function endPiSession(
   db: BlackboardDatabase,
   piSessionId: string,
