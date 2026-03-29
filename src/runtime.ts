@@ -1213,17 +1213,26 @@ export class ControlSurfaceRuntime {
         name: "close_workstream",
         label: "Close Workstream",
         description:
-          "Close the current workstream. Only call when the human explicitly confirms the work is done. Cleans up the git worktree, closes the workstream, and ends this orchestrator session.",
+          'Close the current workstream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the workstream record. Only call when the human explicitly confirms the work is done.',
         parameters: {
           type: "object",
           properties: {
             workstream_id: { type: "string", description: "ID of the workstream to close" },
+            mode: {
+              type: "string",
+              enum: ["merge", "noop"],
+              description:
+                '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the workstream and ends the session.',
+            },
           },
-          required: ["workstream_id"],
+          required: ["workstream_id", "mode"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { workstream_id } = params as { workstream_id: string };
+          const { workstream_id, mode } = params as {
+            workstream_id: string;
+            mode: "merge" | "noop";
+          };
           const managed = closeWsId ? this.sessionManager.getByWorkstream(closeWsId) : undefined;
           const piSessId = managed?.piSessionId;
           if (!piSessId) {
@@ -1232,7 +1241,12 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseWorkstream(this.blackboard, piSessId, workstream_id);
+          const result = await executeCloseWorkstream(
+            this.blackboard,
+            piSessId,
+            workstream_id,
+            mode,
+          );
           if (result.ok) {
             this.wsHub.broadcast({
               type: "workstreams_changed",
