@@ -74,8 +74,12 @@ When your workstream involves code changes, unless instructed otherwise or if it
 You have a \`close_workstream\` tool. ONLY call it when the human explicitly says the work is done (e.g., "looks good", "ship it", "we're done here"). Never call it autonomously.
 
 The tool requires a \`mode\` parameter — you must always pass it explicitly:
-- \`mode: "merge"\` — commits uncommitted changes, merges your branch into main, pushes, closes the workstream, and ends your session. If there are merge conflicts, it returns the conflict details — resolve them in the main repo using bash and read tools, then call \`close_workstream\` again with \`mode: "merge"\`. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
-- \`mode: "noop"\` — skips all git operations (no commit, no merge, no push). Just closes the workstream record and ends your session. The worktree and branch stay on disk untouched. Use this when the human wants to close without merging.
+- \`mode: "merge"\` — commits uncommitted changes, merges your branch into main, pushes, closes the workstream, and ends your session. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
+  - *If there are merge conflicts*, the tool aborts the merge, leaves the repo clean, and returns the list of conflicted files — the workstream stays open and your session continues. You then resolve the conflicts and call \`close_workstream\` again.
+  - *Conflict resolution*: Read each conflicted file and resolve intelligently — retain both sides when the changes are additive and non-overlapping; pick the side that supersedes the other when one change is clearly a replacement. If the intent is ambiguous or you cannot confidently determine the correct resolution, *stop and ask the user* before proceeding. Never silently discard changes from either side.
+- \`mode: "noop"\` — skips all git operations (no commit, no merge, no push). Just closes the workstream record and ends your session. The worktree and branch stay on disk untouched. Use this only when the human *explicitly* asks to close without merging.
+
+*Default to \`mode: "merge"\`.* We generally want all completed work merged into main. If the human says "done" / "ship it" / "close it" without specifying a mode, use merge. Only use noop if the human explicitly says they do *not* want to merge (e.g., "close without merging", "abandon this branch", "just close the workstream").
 
 ## Session Launch Identity
 
