@@ -11,6 +11,7 @@ type SkillPickerProps = {
   onSelectedValueChange: (value: string) => void;
   onSelect: (skillName: string) => void;
   onClose: () => void;
+  caretLeft?: number;
 };
 
 export const SkillPicker = memo(function SkillPicker({
@@ -21,6 +22,7 @@ export const SkillPicker = memo(function SkillPicker({
   onSelectedValueChange,
   onSelect,
   onClose: _onClose,
+  caretLeft,
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
     open,
@@ -39,7 +41,7 @@ export const SkillPicker = memo(function SkillPicker({
   if (!open || skills.length === 0) return null;
 
   return (
-    <div className="absolute bottom-full left-0 mb-1 w-80 z-50">
+    <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
         value={selectedValue}
         onValueChange={onSelectedValueChange}
