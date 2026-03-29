@@ -41,10 +41,12 @@ export const MessageInput = memo(function MessageInput({
 }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
+  const [caretLeft, setCaretLeft] = useState(0);
   // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
 
@@ -74,6 +76,49 @@ export const MessageInput = memo(function MessageInput({
   });
 
   /**
+   * Compute the pixel X position of a character index in the textarea,
+   * relative to the container div, using the mirror-div technique.
+   */
+  const computeSlashLeft = useCallback((value: string, slashIdx: number) => {
+    const textarea = textareaRef.current;
+    const container = containerRef.current;
+    if (!textarea || !container || slashIdx < 0) return;
+
+    const style = window.getComputedStyle(textarea);
+    const mirror = document.createElement("div");
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.pointerEvents = "none";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.wordWrap = "break-word";
+    mirror.style.fontFamily = style.fontFamily;
+    mirror.style.fontSize = style.fontSize;
+    mirror.style.fontWeight = style.fontWeight;
+    mirror.style.letterSpacing = style.letterSpacing;
+    mirror.style.lineHeight = style.lineHeight;
+    mirror.style.paddingTop = style.paddingTop;
+    mirror.style.paddingRight = style.paddingRight;
+    mirror.style.paddingBottom = style.paddingBottom;
+    mirror.style.paddingLeft = style.paddingLeft;
+    mirror.style.width = `${textarea.offsetWidth}px`;
+    mirror.style.boxSizing = "border-box";
+
+    mirror.appendChild(document.createTextNode(value.slice(0, slashIdx)));
+    const marker = document.createElement("span");
+    marker.textContent = "\u200b"; // zero-width space marks the caret
+    mirror.appendChild(marker);
+
+    document.body.appendChild(mirror);
+    const markerRect = marker.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    document.body.removeChild(mirror);
+
+    const popoverWidth = 320; // w-80
+    const maxLeft = container.offsetWidth - popoverWidth;
+    setCaretLeft(Math.min(Math.max(0, markerRect.left - containerRect.left), maxLeft));
+  }, []);
+
+  /**
    * Detect a slash command token at the cursor position.
    * A slash trigger is "/" preceded by start-of-string or whitespace,
    * followed by zero or more non-whitespace chars up to the cursor.
@@ -98,6 +143,7 @@ export const MessageInput = memo(function MessageInput({
       if (slashIdx >= 0 && skills?.length) {
         const filter = value.slice(slashIdx + 1, cursor);
         slashPositionRef.current = slashIdx;
+        computeSlashLeft(value, slashIdx);
         setPickerOpen(true);
         setPickerFilter(filter);
         setSelectedSkill("");
@@ -106,7 +152,7 @@ export const MessageInput = memo(function MessageInput({
         setPickerOpen(false);
       }
     },
-    [skills],
+    [skills, computeSlashLeft],
   );
 
   const handleSkillSelect = useCallback((name: string) => {
@@ -243,7 +289,7 @@ export const MessageInput = memo(function MessageInput({
             e.target.value = "";
           }}
         />
-        <div className="relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent">
+        <div ref={containerRef} className="relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent">
           <SkillPicker
             open={pickerOpen}
             filter={pickerFilter}
@@ -252,6 +298,7 @@ export const MessageInput = memo(function MessageInput({
             onSelectedValueChange={setSelectedSkill}
             onSelect={handleSkillSelect}
             onClose={() => setPickerOpen(false)}
+            caretLeft={caretLeft}
           />
           <textarea
             ref={textareaRef}
