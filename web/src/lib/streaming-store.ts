@@ -2,7 +2,7 @@
  * Minimal external store for high-frequency streaming state.
  *
  * Text deltas, thinking deltas, and tool-call deltas arrive at ~30Hz via
- * StreamChunker. Routing these through TanStack Query would trigger cache
+ * WebSocket. Routing these through TanStack Query would trigger cache
  * notifications on every chunk — too expensive. Instead, this store holds
  * ephemeral streaming state and exposes imperative per-session callbacks
  * for the Lit web component to consume without React re-renders.

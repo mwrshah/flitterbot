@@ -15,7 +15,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { AutonomaApiClient } from "~/lib/api";
 import type { StatusPill } from "~/lib/queries";
-import { StreamChunker } from "~/lib/stream-chunker";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
@@ -30,23 +29,6 @@ import type {
 import { createId, extractToolName } from "~/lib/utils";
 import { toast } from "sonner";
 import type { AutonomaWsClient } from "~/lib/ws";
-
-/* ── Dev-only debug global ── */
-
-declare global {
-  interface Window {
-    __streamChunker?: StreamChunker | null;
-    __streamProfilingArmed?: boolean;
-  }
-}
-
-function _devStreamChunker(): StreamChunker | null | undefined {
-  return window.__streamChunker;
-}
-
-function _setDevStreamChunker(v: StreamChunker | null) {
-  window.__streamChunker = v;
-}
 
 /* ── Send message factory (provided via router context) ── */
 
@@ -170,30 +152,6 @@ function updateTimelineItem(
   });
 }
 
-/* ── StreamChunker management ── */
-
-const chunkers = new Map<string, { chunker: StreamChunker; flushedLength: number }>();
-
-function destroyChunker(messageId: string) {
-  const entry = chunkers.get(messageId);
-  if (!entry) return;
-  entry.chunker.destroy();
-  chunkers.delete(messageId);
-  if (import.meta.env.DEV && _devStreamChunker() === entry.chunker) {
-    _setDevStreamChunker(null);
-  }
-}
-
-function destroyAllChunkers() {
-  for (const [, entry] of chunkers) {
-    entry.chunker.destroy();
-    if (import.meta.env.DEV && _devStreamChunker() === entry.chunker) {
-      _setDevStreamChunker(null);
-    }
-  }
-  chunkers.clear();
-}
-
 /* ── Main setup ── */
 
 export function setupWsQueryBridge(deps: {
@@ -276,33 +234,9 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── text_delta → StreamChunker → streaming store ──
+    // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
-      const itemId = message.messageId;
-
-      if (!chunkers.has(itemId)) {
-        let flushedLength = 0;
-        const chunker = new StreamChunker({
-          onChunk: (fullText) => {
-            const delta = fullText.slice(flushedLength);
-            flushedLength = fullText.length;
-            if (delta) {
-              streamingStore.appendTextDelta(sessionId, itemId, delta);
-            }
-          },
-        });
-        chunkers.set(itemId, { chunker, flushedLength: 0 });
-
-        if (import.meta.env.DEV) {
-          _setDevStreamChunker(chunker);
-          if (window.__streamProfilingArmed) {
-            chunker.startProfiling();
-            window.__streamProfilingArmed = false;
-          }
-        }
-      }
-
-      chunkers.get(itemId)!.chunker.push(message.delta);
+      streamingStore.appendTextDelta(sessionId, message.messageId, message.delta);
       return;
     }
 
@@ -343,8 +277,6 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "message_end") {
       const msg = message.message;
       const msgId = msg.id;
-
-      destroyChunker(msgId);
 
       if (msg.content.trim()) {
         // Include thinking blocks from the streaming store so the committed
@@ -494,7 +426,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── turn_end ──
     if (message.type === "turn_end") {
-      destroyAllChunkers();
       streamingStore.clearSession(sessionId);
       return;
     }
@@ -514,7 +445,6 @@ export function setupWsQueryBridge(deps: {
           createdAt: new Date().toISOString(),
         });
       }
-      destroyAllChunkers();
       streamingStore.clearSession(sessionId);
       return;
     }
@@ -548,6 +478,5 @@ export function setupWsQueryBridge(deps: {
   return () => {
     unsubscribeMessages();
     unsubscribeConnection();
-    destroyAllChunkers();
   };
 }
