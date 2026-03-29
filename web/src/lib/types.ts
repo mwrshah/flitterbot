@@ -204,8 +204,7 @@ export type WsMessage =
       sessionId?: string;
     }
   | { type: "thinking_delta"; delta: string; sessionId?: string; messageId: string }
-  | { type: "toolcall_start"; contentIndex: number; toolName?: string; sessionId?: string }
-  | { type: "toolcall_delta"; contentIndex: number; delta: string; sessionId?: string }
+  | { type: "toolcall_start"; contentIndex: number; toolName?: string; toolUseId?: string; sessionId?: string }
   | {
       type: "tool_execution_update";
       toolUseId?: string;
