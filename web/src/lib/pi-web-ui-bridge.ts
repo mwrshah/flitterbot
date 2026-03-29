@@ -97,6 +97,11 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
             arguments: (next.args as Record<string, unknown>) ?? {},
           });
           consumed.add(j);
+        } else if (next.kind === "tool" && next.phase !== "start") {
+          console.warn(
+            "[pi-bridge] SKIPPED tool item in look-ahead: phase=%s tool=%s toolUseId=%s (only phase=start is collected)",
+            next.phase, next.tool, next.toolUseId,
+          );
         }
       }
 
@@ -110,6 +115,13 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);
       continue;
+    }
+
+    if (item.kind === "tool" && item.phase !== "start" && item.phase !== "end") {
+      console.warn(
+        "[pi-bridge] SKIPPED orphan tool item: phase=%s tool=%s toolUseId=%s (not start or end)",
+        item.phase, item.tool, item.toolUseId,
+      );
     }
 
     if (item.kind === "tool" && item.phase === "start" && item.toolUseId) {
@@ -155,9 +167,18 @@ export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<
   for (const item of timeline) {
     if (item.kind === "tool" && item.toolUseId) {
       if (item.phase === "start") started.add(item.toolUseId);
-      else ended.add(item.toolUseId);
+      else {
+        if (item.phase === "update") {
+          console.warn(
+            "[pi-bridge] pendingToolCalls: tool with phase=update treated as ended — toolUseId=%s tool=%s",
+            item.toolUseId, item.tool,
+          );
+        }
+        ended.add(item.toolUseId);
+      }
     }
   }
   for (const id of ended) started.delete(id);
+  console.debug("[pi-bridge] pendingToolCalls: started=%d ended=%d pending=%d", started.size + ended.size, ended.size, started.size);
   return started;
 }
