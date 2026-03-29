@@ -164,7 +164,8 @@ export function reassociateOrphanedSessions(
   const result = db
     .prepare(
       `UPDATE sessions
-       SET pi_session_id = ?
+       SET pi_session_id = ?,
+           tmux_session = NULL
        WHERE status NOT IN ('ended')
          AND pi_session_id IS NOT NULL
          AND pi_session_id != ?
