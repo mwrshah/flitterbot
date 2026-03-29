@@ -91,8 +91,8 @@ export const streamingStore = {
     fireCallbacks(sessionId);
   },
 
-  clearThinking(sessionId: string) {
-    thinking.delete(sessionId);
+  getThinkingText(sessionId: string): string | undefined {
+    return thinking.get(sessionId)?.text || undefined;
   },
 
   /* ── Thinking active state (between thinking_start and thinking_end) ── */
