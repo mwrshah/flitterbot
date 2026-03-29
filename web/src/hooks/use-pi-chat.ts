@@ -6,7 +6,7 @@ import {
   piHistoryQueryOptions,
   statusPillsQueryOptions,
 } from "~/lib/queries";
-import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
+import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
 
@@ -40,8 +40,8 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
   const effectiveSessionId = sessionId ?? "default";
 
   const onSendMessage = useCallback(
-    (text: string, deliveryMode: DeliveryMode, images?: ImageAttachment[]) =>
-      sendMessage(text, deliveryMode, images, sessionId),
+    (text: string, images?: ImageAttachment[]) =>
+      sendMessage(text, images, sessionId),
     [sendMessage, sessionId],
   );
 

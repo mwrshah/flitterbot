@@ -22,7 +22,7 @@ import type {
   ChatTimelineMessage,
   ChatTimelineTool,
   ConnectionState,
-  DeliveryMode,
+
   ImageAttachment,
   JsonValue,
   WsMessage,
@@ -52,7 +52,6 @@ function _setDevStreamChunker(v: StreamChunker | null) {
 
 export type SendMessageFn = (
   text: string,
-  deliveryMode: DeliveryMode,
   images?: ImageAttachment[],
   targetSessionId?: string,
 ) => Promise<void>;
@@ -63,16 +62,16 @@ export function createSendMessage(deps: {
   queryClient: QueryClient;
 }): SendMessageFn {
   const { wsClient, apiClient, queryClient } = deps;
-  return async (text, deliveryMode, images, targetSessionId) => {
+  return async (text, images, targetSessionId) => {
     try {
-      await wsClient.sendMessage(text, deliveryMode, images, targetSessionId);
+      await wsClient.sendMessage(text, "followUp", images, targetSessionId);
     } catch (wsError) {
       console.error("WS send failed, trying HTTP fallback:", wsError);
       try {
         await apiClient.sendMessage({
           text,
           source: "web",
-          deliveryMode,
+          deliveryMode: "followUp",
           images,
           targetSessionId,
         });

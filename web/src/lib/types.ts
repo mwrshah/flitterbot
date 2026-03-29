@@ -16,7 +16,7 @@ export type {
 
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
 
-export type DeliveryMode = "followUp" | "steer";
+export type DeliveryMode = "followUp";
 
 /* ── Sessions ── */
 
