@@ -97,11 +97,23 @@ export interface ToolExecutionEndWebSocketEvent {
   event?: unknown;
 }
 
+export interface ThinkingStartWebSocketEvent {
+  type: "thinking_start";
+  sessionId?: string;
+  messageId: string;
+}
+
 export interface ThinkingDeltaWebSocketEvent {
   type: "thinking_delta";
   sessionId?: string;
   messageId: string;
   delta: string;
+}
+
+export interface ThinkingEndWebSocketEvent {
+  type: "thinking_end";
+  sessionId?: string;
+  messageId: string;
 }
 
 export interface ToolCallStartWebSocketEvent {
@@ -207,7 +219,9 @@ export type ControlSurfaceWebSocketServerEvent =
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
   | TextDeltaWebSocketEvent
+  | ThinkingStartWebSocketEvent
   | ThinkingDeltaWebSocketEvent
+  | ThinkingEndWebSocketEvent
   | ToolCallStartWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent

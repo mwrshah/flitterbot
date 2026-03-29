@@ -22,6 +22,7 @@ export type PendingToolCall = { toolUseId: string; toolName: string | undefined 
 type StreamingCallback = (
   text: string | null,
   thinking: string | null,
+  isThinkingStreaming: boolean,
   messageId: string | null,
 ) => void;
 
@@ -31,6 +32,8 @@ const texts = new Map<string, StreamingText>();
 const thinking = new Map<string, StreamingThinking>();
 /** Tool calls seen via toolcall_start, held until message_end commits them after the message. */
 const pendingTools = new Map<string, PendingToolCall[]>();
+/** True between thinking_start and thinking_end — drives ThinkingBlock open/close. */
+const thinkingActive = new Map<string, boolean>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 
 function fireCallbacks(sessionId: string) {
@@ -38,11 +41,13 @@ function fireCallbacks(sessionId: string) {
   if (!cb) return;
   const textState = texts.get(sessionId);
   const thinkingState = thinking.get(sessionId);
+  const isThinkingStreaming = thinkingActive.get(sessionId) ?? false;
   const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
   const hasContent = textState != null || thinkingState != null;
   cb(
     textState?.text ?? null,
     thinkingState?.text ?? null,
+    isThinkingStreaming,
     hasContent ? messageId : null,
   );
 }
@@ -90,6 +95,18 @@ export const streamingStore = {
     thinking.delete(sessionId);
   },
 
+  /* ── Thinking active state (between thinking_start and thinking_end) ── */
+
+  /** Signal that thinking has started/ended. Pre-initialises the thinking store
+   *  with the messageId so callbacks fire immediately even before the first delta. */
+  setThinkingStreaming(sessionId: string, active: boolean, messageId?: string) {
+    thinkingActive.set(sessionId, active);
+    if (active && messageId && !thinking.get(sessionId)) {
+      thinking.set(sessionId, { text: "", messageId });
+    }
+    fireCallbacks(sessionId);
+  },
+
   /* ── Pending tool calls (buffered between toolcall_start and message_end) ── */
 
   addPendingToolCall(sessionId: string, call: PendingToolCall) {
@@ -111,6 +128,7 @@ export const streamingStore = {
     texts.delete(sessionId);
     thinking.delete(sessionId);
     pendingTools.delete(sessionId);
+    thinkingActive.delete(sessionId);
     fireCallbacks(sessionId);
   },
 

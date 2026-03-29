@@ -19,7 +19,7 @@ const EMPTY_TOOLS: AgentTool[] = [];
 const EMPTY_PENDING = new Set<string>();
 
 export type PiMessageListHandle = {
-  updateStreaming(message: AssistantMessage): void;
+  updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean): void;
   clearStreaming(): void;
 };
 
@@ -80,8 +80,8 @@ export const PiMessageList = memo(
     }, []);
 
     useImperativeHandle(ref, () => ({
-      updateStreaming(message: AssistantMessage) {
-        elementRef.current?.updateStreaming(message);
+      updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {
+        elementRef.current?.updateStreaming(message, isThinkingStreaming);
       },
       clearStreaming() {
         elementRef.current?.clearStreaming();
