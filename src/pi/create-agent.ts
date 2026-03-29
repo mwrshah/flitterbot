@@ -34,16 +34,19 @@ type CreateAutonomaAgentOptions = {
   customTools: unknown[];
   role?: PiRole;
   orchestratorContext?: OrchestratorInput;
+  /** When set, resume an existing session from this JSONL file instead of creating a new one. */
+  resumeSessionFile?: string;
 };
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
-  const { config, customTools, role = "default", orchestratorContext } = options;
+  const { config, customTools, role = "default", orchestratorContext, resumeSessionFile } = options;
   const workingDir = config.projectsDir;
 
-  // Create SessionManager early so we can read the piSessionId before building the prompt.
-  // SessionManager generates its sessionId in the constructor (via newSession()),
-  // and createAgentSession reuses this same instance — so the IDs match.
-  const sessionManager = SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
+  // If resuming an existing session, open its JSONL file to preserve the piSessionId
+  // and conversation history. Otherwise create a fresh session.
+  const sessionManager = resumeSessionFile
+    ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
+    : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
   const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);

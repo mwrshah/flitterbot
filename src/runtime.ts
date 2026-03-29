@@ -54,6 +54,7 @@ import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
+import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
@@ -152,15 +153,46 @@ export class ControlSurfaceRuntime {
 
     await this.sessionManager.createDefault(this.createCustomTools("default"));
 
-    // Rehydrate orchestrator sessions for open workstreams persisted in SQLite
+    // Rehydrate dormant orchestrators for open workstreams from the pi_sessions DB.
+    // No live SDK agent is created — just the in-memory maps are populated so that
+    // message lookups find the correct piSessionId. The agent is lazily activated
+    // when the first new message arrives for the workstream.
     const openWorkstreams = listOpenWorkstreams(this.blackboard);
     for (const ws of openWorkstreams) {
-      await this.sessionManager.createOrchestrator(
+      const piRow = this.blackboard.get<{
+        pi_session_id: string;
+        session_file: string | null;
+        started_at: string;
+        model_provider: string | null;
+        model_id: string | null;
+      }>(
+        `SELECT pi_session_id, session_file, started_at, model_provider, model_id
+         FROM pi_sessions
+         WHERE workstream_id = ? AND role = 'orchestrator'
+           AND status NOT IN ('ended', 'crashed')
+         ORDER BY started_at DESC LIMIT 1`,
         ws.id,
-        ws.name,
-        ws.repo_path ?? undefined,
-        this.createCustomTools("orchestrator", ws.id),
       );
+
+      if (piRow) {
+        this.sessionManager.rehydrateOrchestrator(
+          ws.id,
+          ws.name,
+          piRow.pi_session_id,
+          piRow.session_file,
+          piRow.started_at,
+          piRow.model_provider,
+          piRow.model_id,
+        );
+      } else {
+        // No surviving pi_session row — create a fresh orchestrator
+        await this.sessionManager.createOrchestrator(
+          ws.id,
+          ws.name,
+          ws.repo_path ?? undefined,
+          this.createCustomTools("orchestrator", ws.id),
+        );
+      }
     }
     if (openWorkstreams.length > 0) {
       this.log(`rehydrated ${openWorkstreams.length} orchestrator(s) for open workstreams`);
@@ -271,7 +303,9 @@ export class ControlSurfaceRuntime {
 
     // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
     // streamingBehavior: "steer". The Pi SDK handles both streaming and non-streaming states.
-    if (item.deliveryMode === "steer" && target.queue.isBusy()) {
+    // Skip for dormant sessions (no live SDK agent) — the message will go through the queue
+    // and trigger lazy activation instead.
+    if (item.deliveryMode === "steer" && target.queue.isBusy() && target.session) {
       this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`);
       void target.session.prompt(formatPromptWithContext(item), {
         streamingBehavior: "steer",
@@ -634,25 +668,10 @@ export class ControlSurfaceRuntime {
       return text;
     }
 
-    const datetimeStr = new Date(now).toLocaleString("en-US", {
-      timeZone: "Asia/Karachi",
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-      timeZoneName: "short",
-    });
-
     const nowIso = new Date(now).toISOString();
     touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
 
-    return (
-      `<date_time>\nJust so you know, the current date and time is: ${datetimeStr}. ` +
-      `This is injected programmatically, for information only —  you may disregard if not relevant.\n</date_time>\n\n` + text
-    );
+    return `${formatDatetimeBlock()}\n\n${text}`;
   }
 
   /**
@@ -692,6 +711,15 @@ export class ControlSurfaceRuntime {
    * Per-session queue processing callback.
    */
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
+    // Lazily activate dormant orchestrators on first message after restart
+    if (!managed.session && managed.role === "orchestrator" && managed.workstreamId) {
+      this.log(`activating dormant orchestrator for workstream ${managed.workstreamId}`);
+      await this.sessionManager.activateOrchestrator(
+        managed,
+        this.createCustomTools("orchestrator", managed.workstreamId),
+      );
+    }
+
     const session = managed.session;
     if (!session) throw new Error("Pi session not initialized");
 
