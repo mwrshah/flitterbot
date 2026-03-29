@@ -137,6 +137,17 @@ export type SessionListResponse = {
   items: SessionSummary[];
 };
 
+export type DownstreamSessionItem = {
+  sessionId: string;
+  status: "working" | "idle" | "stale" | "ended";
+  workstreamId: string | null;
+  workstreamName: string | null;
+};
+
+export type PiSessionsListResponse = {
+  items: DownstreamSessionItem[];
+};
+
 export type SessionDetailResponse = {
   session: SessionDetail;
   tmux?: TmuxSessionInspection | null;
@@ -216,4 +227,10 @@ export type WsMessage =
       workstreamName?: string;
     }
   | { type: "status_changed"; subsystem: string; timestamp: string }
+  | {
+      type: "sessions_changed";
+      sessionId: string;
+      piSessionId: string;
+      reason: "registered" | "ended" | "stopped";
+    }
   | { type: "error"; message: string };

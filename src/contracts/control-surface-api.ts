@@ -142,6 +142,17 @@ export interface SessionsListResponse {
   items: ClaudeSessionListItem[];
 }
 
+export interface DownstreamSessionItem {
+  sessionId: string;
+  status: ClaudeSessionStatus;
+  workstreamId: string | null;
+  workstreamName: string | null;
+}
+
+export interface PiSessionsListResponse {
+  items: DownstreamSessionItem[];
+}
+
 export interface SessionDetailResponse {
   session: ClaudeSessionDetail;
   tmux?: TmuxSessionInspection | null;
@@ -290,5 +301,10 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     method: "POST",
     path: "/cron/tick",
     auth: "bearer",
+  },
+  piSessions: {
+    method: "GET",
+    path: "/api/pi-sessions/:piSessionId/sessions",
+    auth: "none",
   },
 } as const;

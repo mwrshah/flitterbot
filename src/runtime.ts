@@ -344,6 +344,14 @@ export class ControlSurfaceRuntime {
         pi_session_id: piSessionIdValue,
         workstream_id: workstreamIdValue,
       });
+      if (piSessionIdValue) {
+        this.wsHub.broadcast({
+          type: "sessions_changed",
+          sessionId: piSessionIdValue,
+          piSessionId: piSessionIdValue,
+          reason: "registered",
+        });
+      }
     } else {
       if (!isOwnPiSession) {
         const known = getSessionById(this.blackboard, sessionId);
@@ -354,10 +362,28 @@ export class ControlSurfaceRuntime {
 
       if (normalized === "stop") {
         updateSessionStop(this.blackboard, sessionId);
+        const stoppedSession = getSessionById(this.blackboard, sessionId);
+        if (stoppedSession?.piSessionId) {
+          this.wsHub.broadcast({
+            type: "sessions_changed",
+            sessionId: stoppedSession.piSessionId,
+            piSessionId: stoppedSession.piSessionId,
+            reason: "stopped",
+          });
+        }
       } else if (normalized === "session-end") {
         const reason =
           pickString(payload, ["reason", "stop_reason", "session_end_reason"]) || "ended";
+        const endingSession = getSessionById(this.blackboard, sessionId);
         markSessionEnded(this.blackboard, sessionId, reason);
+        if (endingSession?.piSessionId) {
+          this.wsHub.broadcast({
+            type: "sessions_changed",
+            sessionId: endingSession.piSessionId,
+            piSessionId: endingSession.piSessionId,
+            reason: "ended",
+          });
+        }
       }
     }
 

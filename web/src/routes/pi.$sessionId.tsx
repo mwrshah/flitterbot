@@ -1,8 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
+import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
+import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchPiHistory } from "~/server/pi";
+import { fetchPiHistory, fetchPiSessions } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/$sessionId")({
   staticData: {
@@ -12,17 +14,19 @@ export const Route = createFileRoute("/pi/$sessionId")({
     meta: [{ title: "Autonoma — Pi Session" }],
   }),
   loader: async ({ params, context }) => {
-    const items = await fetchPiHistory({ data: { piSessionId: params.sessionId } }).catch(
-      (error: unknown) => {
+    const [items, sessions] = await Promise.all([
+      fetchPiHistory({ data: { piSessionId: params.sessionId } }).catch((error: unknown) => {
         if (error instanceof Error && /404|not found/i.test(error.message)) {
           throw redirect({ to: "/pi/default" });
         }
         throw error;
-      },
-    );
+      }),
+      fetchPiSessions({ data: { piSessionId: params.sessionId } }).catch(() => []),
+    ]);
     const history = items as ChatTimelineItem[];
     // Seed the Query cache so useQuery returns instantly
     context.queryClient.setQueryData(["pi-history", params.sessionId, "agent"], history);
+    context.queryClient.setQueryData(["pi-downstream-sessions", params.sessionId], sessions);
     return { history };
   },
   errorComponent: ({ error }) => (
@@ -42,12 +46,20 @@ function PiSessionRoute() {
   );
 
   return (
-    <ChatPanel
-      sessionId={effectiveSessionId}
-      timeline={timeline}
-      statusPills={statusPills}
-      connectionState={connectionState}
-      onSendMessage={onSendMessage}
-    />
+    <PanelGroup orientation="horizontal" className="h-full">
+      <Panel defaultSize={75} minSize={40}>
+        <ChatPanel
+          sessionId={effectiveSessionId}
+          timeline={timeline}
+          statusPills={statusPills}
+          connectionState={connectionState}
+          onSendMessage={onSendMessage}
+        />
+      </Panel>
+      <ResizeHandle />
+      <Panel defaultSize={25} minSize={15}>
+        <DownstreamSessionsPanel piSessionId={sessionId} />
+      </Panel>
+    </PanelGroup>
   );
 }
