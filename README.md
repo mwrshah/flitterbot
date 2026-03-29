@@ -1,26 +1,31 @@
 # Autonoma
 
-Long-running orchestration runtime for Claude Code. See [`features/overview.md`](features/overview.md) for architecture, design principles, and feature breakdown.
+Long-running orchestration runtime for Claude Code. Architecture, design principles, and feature breakdown in [`features/overview.md`](features/overview.md).
 
-Run by **cloning the repo locally** — not yet packaged as a standalone app.
+Run by cloning the repo locally — not yet packaged as a standalone app.
+
+---
+
+## Quick start
+
+```bash
+pnpm install && pnpm --dir web install       # 1. dependencies
+cp .env.example .env                          # 2. configure (see below)
+node .autonoma/install.mjs                    # 3. deploy runtime
+~/.autonoma/bin/autonoma-up start             # 4. start control surface
+~/.autonoma/bin/autonoma-wa auth              # 5. optional: WhatsApp
+pnpm --dir web dev                            # 6. optional: web UI
+```
+
+Stop: `~/.autonoma/bin/autonoma-up stop` — Disable permanently: `node ~/.autonoma/uninstall.mjs`
 
 ---
 
 ## Prerequisites
 
-### Required
-
-- **Node.js 22+**, **pnpm**, **tmux**, **Claude Code CLI** (`claude`), **sqlite3**
-
-### Required for WhatsApp
-
-- A working terminal session for manual auth via `autonoma-wa auth`
-
-### Optional
-
-- A modern browser for the web UI
-
-Sanity check:
+**Required:** Node.js 22+, pnpm, tmux, Claude Code CLI (`claude`), sqlite3
+**WhatsApp:** A terminal session for manual auth via `autonoma-wa auth`
+**Optional:** A modern browser for the web UI
 
 ```bash
 node -v && pnpm -v && tmux -V && claude --version && sqlite3 --version
@@ -28,7 +33,7 @@ node -v && pnpm -v && tmux -V && claude --version && sqlite3 --version
 
 ---
 
-## First-time setup
+## Setup
 
 ### 1) Clone and install
 
@@ -42,9 +47,8 @@ pnpm --dir web install
 
 ```bash
 cp .env.example .env
-# Edit .env:
-#   ANTHROPIC_API_KEY  — optional with Pi OAuth tokens (`pi auth login`)
-#   GROQ_API_KEY       — required for message classification
+# ANTHROPIC_API_KEY  — optional with Pi OAuth tokens (`pi auth login`)
+# GROQ_API_KEY       — required for message classification
 ```
 
 ### 3) Run the installer
@@ -65,21 +69,19 @@ node .autonoma/install.mjs --with-scheduler  # also install launchd/systemd sche
 web/.env                         # VITE_AUTONOMA_BASE_URL, VITE_AUTONOMA_TOKEN (auto-generated, gitignored)
 ```
 
-Key config options in `~/.autonoma/config.json`:
-
 | Key | Default | Description |
 |---|---|---|
-| `piModel` | `claude-opus-4-6` | Model used by all Pi agents (default agent + all workstream orchestrators). Set to e.g. `claude-sonnet-4-6` to switch. |
-| `piThinkingLevel` | `medium` | Thinking budget: `off`, `minimal`, `low`, `medium`, `high`, `xhigh` |
-| `stallMinutes` | `15` | Minutes of inactivity before a session is considered stalled |
-| `toolTimeoutMinutes` | `4` | Minutes before a session waiting on a tool call is considered stalled |
-| `claudeCliCommand` | `claude --dangerously-skip-permissions` | CLI command used to launch Claude Code sessions |
+| `piModel` | `claude-opus-4-6` | Model for all Pi agents (default + workstream orchestrators) |
+| `piThinkingLevel` | `medium` | Thinking budget: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` |
+| `stallMinutes` | `15` | Inactivity minutes before a session is considered stalled |
+| `toolTimeoutMinutes` | `4` | Minutes before a tool-waiting session is considered stalled |
+| `claudeCliCommand` | `claude --dangerously-skip-permissions` | CLI command to launch Claude Code sessions |
 | `projectsDir` | `~/development` | Root directory for Claude Code working sessions |
-| `controlSurfaceCommand` | _(auto-detected)_ | Shell command to start the control surface server; detected from `projectRoot` during install |
-| `projectRoot` | _(installer-detected)_ | Path to the Autonoma source checkout; used by `autonoma-up` to start the control surface |
-| `sourceRoot` | _(same as projectRoot)_ | Alias for `projectRoot`; kept for backwards compatibility |
-| `wipeWorkstreamsOnStart` | `false` | If `true`, closes all open workstreams on control surface startup |
-| `whatsappEnabled` | `true` | Enable/disable the WhatsApp channel |
+| `controlSurfaceCommand` | _(auto-detected)_ | Shell command to start the control surface server |
+| `projectRoot` | _(installer-detected)_ | Path to the Autonoma source checkout; used by `autonoma-up` |
+| `sourceRoot` | _(same as projectRoot)_ | Alias for `projectRoot` |
+| `wipeWorkstreamsOnStart` | `false` | Close all open workstreams on control surface startup |
+| `whatsappEnabled` | `true` | Enable/disable WhatsApp channel |
 
 ### 5) Authenticate WhatsApp (optional)
 
@@ -97,7 +99,7 @@ Auth state stored at `~/.autonoma/whatsapp/auth/`.
 ### Control surface
 
 ```bash
-~/.autonoma/bin/autonoma-up start     # handles pid cleanup, retries, logging
+~/.autonoma/bin/autonoma-up start     # pid cleanup, retries, logging
 ~/.autonoma/bin/autonoma-up status
 ~/.autonoma/bin/autonoma-up stop      # POST /stop → marks Pi ended, stops WhatsApp, removes pid
 ~/.autonoma/bin/autonoma-up restart
@@ -132,8 +134,6 @@ node ~/.autonoma/uninstall.mjs          # disable, remove hooks/scheduler
 node ~/.autonoma/uninstall.mjs --meta   # also remove ~/.autonoma/ entirely
 ```
 
-No dedicated "pause but keep installed" command yet — use `stop` for temporary, `uninstall` for permanent.
-
 ---
 
 ## Repo layout
@@ -152,7 +152,7 @@ No dedicated "pause but keep installed" command yet — use `stop` for temporary
 - `web/**` — browser client
 - `features/**` — architecture and spec docs
 
-### Installed runtime assets (`.autonoma/` → deployed to `~/.autonoma/`)
+### Installed runtime (`~/.autonoma/`)
 
 ```
 ~/.autonoma/
@@ -163,17 +163,15 @@ No dedicated "pause but keep installed" command yet — use `stop` for temporary
   scripts/, cron/, control-surface/, whatsapp/
 ```
 
-External files touched:
+External files touched (tracked in `~/.autonoma/manifest.json`):
 
 - `~/.claude/settings.json`
 - `~/Library/LaunchAgents/com.autonoma.scheduler.plist` (macOS)
 - `~/.config/systemd/user/autonoma-scheduler.{service,timer}` (Linux)
 
-Changes tracked in `~/.autonoma/manifest.json`.
-
 ### Operational notes
 
-- **`projectRoot` / `sourceRoot`** in config = this Autonoma checkout, **not** the working directory for Claude sessions.
+- **`projectRoot` / `sourceRoot`** = this Autonoma checkout, **not** the working directory for Claude sessions.
 - **Session tracking gated by `AUTONOMA_AGENT_MANAGED=1`** — only sessions with this env var are tracked. Set automatically by `launch_claude_code` tool; opt in manually with `AUTONOMA_AGENT_MANAGED=1 claude`.
 - **Hooks are Node.js** (`.mjs`, `node:*` built-ins only). Claude Code invokes `node ~/.autonoma/hooks/hook-post.mjs <event-slug>` → reads JSON from stdin, enriches with `AUTONOMA_*` env vars, POSTs to control surface. Silently skips when control surface is down. Errors in `~/.autonoma/logs/hooks-errors.log`.
 
@@ -206,18 +204,3 @@ pnpm run audit:shell             # Shell only
 | WhatsApp auth errors | Re-run `~/.autonoma/bin/autonoma-wa auth` |
 | Hooks not firing | `~/.claude/settings.json`, `~/.autonoma/hooks/hook-post.mjs`, `~/.autonoma/logs/hooks-errors.log` — hooks run async with 15s timeout; silently skip when control surface is down |
 | Runtime keeps restarting after stop | Scheduler still installed — run `node ~/.autonoma/uninstall.mjs` |
-
----
-
-## Quick start
-
-```bash
-pnpm install && pnpm --dir web install       # 1. dependencies
-node .autonoma/install.mjs                    # 2. deploy runtime
-~/.autonoma/bin/autonoma-up start             # 3. start control surface
-~/.autonoma/bin/autonoma-wa auth              # 4. optional: WhatsApp
-pnpm --dir web dev                            # 5. optional: web UI
-```
-
-Stop: `~/.autonoma/bin/autonoma-up stop`
-Disable permanently: `node ~/.autonoma/uninstall.mjs`
