@@ -376,6 +376,9 @@ export function subscribeToPiSession(
           broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
         }
         lastAssistantMessage = null;
+        // Always broadcast agent_end so the frontend can flush any uncommitted streaming
+        // text (e.g. when abort() causes runAgentLoop to throw, skipping message_end/turn_end).
+        broadcast(wsHub, { type: "agent_end", sessionId: session.sessionId });
         break;
       }
       case "auto_compaction_start":

@@ -266,6 +266,7 @@ export function setupWsQueryBridge(deps: {
     // ── queue_item_end ──
     if (message.type === "queue_item_end") {
       removePill(queryClient, sessionId, `processing-${message.itemId}`);
+
       if (message.error) {
         addPill(queryClient, sessionId, {
           id: `error-${message.itemId}`,
@@ -464,6 +465,26 @@ export function setupWsQueryBridge(deps: {
         kind: "divider",
         createdAt: new Date().toISOString(),
       });
+      return;
+    }
+
+    // ── agent_end ──
+    // Always emitted by the Pi SDK, including when runAgentLoop throws (abort exception
+    // path) which skips message_end and turn_end. If streaming text is still in the store
+    // at this point, it was never committed — flush it as a partial assistant message.
+    if (message.type === "agent_end") {
+      const uncommitted = streamingStore.getUncommittedText(sessionId);
+      if (uncommitted?.text.trim()) {
+        upsertTimelineItem(queryClient, sessionId, {
+          id: uncommitted.messageId,
+          kind: "message",
+          role: "assistant",
+          content: uncommitted.text,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      destroyAllChunkers();
+      streamingStore.clearSession(sessionId);
       return;
     }
   });
