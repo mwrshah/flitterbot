@@ -34,20 +34,22 @@ type CreateAutonomaAgentOptions = {
   customTools: unknown[];
   role?: PiRole;
   orchestratorContext?: OrchestratorInput;
+  resumeSessionFile?: string;
 };
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
-  const { config, customTools, role = "default", orchestratorContext } = options;
+  const { config, customTools, role = "default", orchestratorContext, resumeSessionFile } = options;
   const workingDir = config.projectsDir;
 
   // Create SessionManager early so we can read the piSessionId before building the prompt.
   // SessionManager generates its sessionId in the constructor (via newSession()),
   // and createAgentSession reuses this same instance — so the IDs match.
-  const sessionManager = SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
+  const sessionManager = resumeSessionFile
+    ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
+    : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
-  ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
+  let systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
   // Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
   const piAuthPath = path.join(HOME, ".pi", "agent", "auth.json");
   const authPath = fs.existsSync(piAuthPath)
@@ -72,8 +74,13 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   });
   await resourceLoader.reload();
 
-  // Collect resource info for startup logging
+  // Append auto-loaded skills to the system prompt using SDK-discovered paths.
   const { skills } = resourceLoader.getSkills();
+  systemPrompt += buildAutoLoadedSkillsBlock(skills);
+  console.log("[create-agent] system prompt:\n" + "=".repeat(80) + "\n" + systemPrompt + "\n" + "=".repeat(80));
+  ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
+
+  // Collect resource info for startup logging
   const { agentsFiles } = resourceLoader.getAgentsFiles();
   const skillNames = skills.map((s) => s.name);
   const agentsFilePaths = agentsFiles.map((f) => f.path);
@@ -110,12 +117,36 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   };
 }
 
+/** Skill files to auto-load into the system prompt so the agent doesn't need `/load2-w`. */
+const AUTO_LOAD_SKILLS = ["tmux2", "todoist", "my-obsidian"] as const;
+
 function resolveSystemPrompt(role: PiRole, piSessionId: string, ctx?: OrchestratorInput): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
     return buildOrchestratorPrompt({ ...ctx, piSessionId });
   }
   return buildDefaultAgentPrompt(piSessionId);
+}
+
+function buildAutoLoadedSkillsBlock(discoveredSkills: { name: string; filePath: string }[]): string {
+  const skillsByName = new Map(discoveredSkills.map((s) => [s.name, s]));
+  const sections: string[] = [];
+  for (const name of AUTO_LOAD_SKILLS) {
+    const skill = skillsByName.get(name);
+    if (!skill) continue;
+    try {
+      let content = fs.readFileSync(skill.filePath, "utf8");
+      // Strip YAML frontmatter (skill-loader metadata, not useful in the prompt).
+      content = content.replace(/^---\n[\s\S]*?\n---\n*/, "");
+      // Remove $ARGUMENTS placeholders (only meaningful at invocation time).
+      content = content.replaceAll("$ARGUMENTS", "");
+      sections.push(`## ${skill.filePath}\n\n${content.trim()}`);
+    } catch {
+      // Skill file unreadable — skip gracefully.
+    }
+  }
+  if (sections.length === 0) return "";
+  return `\n\n# Auto-loaded Skills\n\n${sections.join("\n\n")}`;
 }
 
 function ensurePromptFile(promptPath: string, content: string): void {
