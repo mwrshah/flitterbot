@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
+import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
+import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchPiHistory } from "~/server/pi";
+import { fetchPiHistory, fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/default")({
   staticData: {
@@ -22,7 +24,13 @@ export const Route = createFileRoute("/pi/default")({
 
     // Seed the Query cache under the real sessionId when available.
     if (defaultSessionId) {
+      const [sessions, worktree] = await Promise.all([
+        fetchPiSessions({ data: { piSessionId: defaultSessionId } }).catch(() => []),
+        fetchPiWorktree({ data: { piSessionId: defaultSessionId } }).catch(() => null),
+      ]);
       context.queryClient.setQueryData(["pi-history", defaultSessionId, "agent"], history);
+      context.queryClient.setQueryData(["pi-downstream-sessions", defaultSessionId], sessions);
+      context.queryClient.setQueryData(["pi-worktree", defaultSessionId], worktree);
     }
 
     return { history, defaultSessionId };
@@ -43,12 +51,24 @@ function PiDefaultRoute() {
   );
 
   return (
-    <ChatPanel
-      sessionId={effectiveSessionId}
-      timeline={timeline}
-      statusPills={statusPills}
-      connectionState={connectionState}
-      onSendMessage={onSendMessage}
-    />
+    <PanelGroup orientation="horizontal" className="h-full">
+      <Panel defaultSize={75} minSize={40}>
+        <ChatPanel
+          sessionId={effectiveSessionId}
+          timeline={timeline}
+          statusPills={statusPills}
+          connectionState={connectionState}
+          onSendMessage={onSendMessage}
+        />
+      </Panel>
+      {effectiveSessionId && (
+        <>
+          <ResizeHandle />
+          <Panel defaultSize={25} minSize={15}>
+            <DownstreamSessionsPanel piSessionId={effectiveSessionId} />
+          </Panel>
+        </>
+      )}
+    </PanelGroup>
   );
 }
