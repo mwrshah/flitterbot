@@ -588,6 +588,26 @@ function applyV13Migration(db: DatabaseSync): void {
   }
 }
 
+/**
+ * V14: Add last_datetime_reported_at to pi_sessions for per-session datetime injection tracking.
+ */
+function applyV14Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      ALTER TABLE pi_sessions ADD COLUMN last_datetime_reported_at DATETIME;
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (14);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
 export function migrateBlackboard(db: DatabaseSync): number {
   ensureMigrationsTable(db);
 
@@ -653,6 +673,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 13) {
     applyV13Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 14) {
+    applyV14Migration(db);
   }
 
   return getSchemaVersion(db);

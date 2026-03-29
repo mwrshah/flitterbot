@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 13;
+export const BLACKBOARD_SCHEMA_VERSION = 14;
 
 // --- Shared types used across multiple files ---
 
@@ -241,7 +241,8 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     last_event_at DATETIME NOT NULL,
     ended_at DATETIME,
     end_reason TEXT,
-    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL
+    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+    last_datetime_reported_at DATETIME
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_workstream ON pi_sessions(workstream_id);

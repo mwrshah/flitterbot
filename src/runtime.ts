@@ -6,7 +6,12 @@ import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
-import { touchPiPrompt, updatePiSessionStatus } from "./blackboard/pi-sessions.ts";
+import {
+  getLastDatetimeReportedAt,
+  touchDatetimeReportedAt,
+  touchPiPrompt,
+  updatePiSessionStatus,
+} from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
 import {
@@ -254,6 +259,13 @@ export class ControlSurfaceRuntime {
     const target = this.resolveTargetSession(input, item);
     if (!target) {
       throw new Error("No target session available");
+    }
+
+    // Datetime injection: append current date+time context to user messages when >= 1 hour
+    // has elapsed since we last told this Pi session what time it is. Injecting via turns
+    // (not the system prompt) keeps the system prompt stable and cache-friendly.
+    if (item.source === "web" || item.source === "whatsapp") {
+      item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
     }
 
     // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
@@ -579,6 +591,41 @@ export class ControlSurfaceRuntime {
 
   handleUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer | undefined): boolean {
     return this.wsHub.handleUpgrade(req, socket, head, this.config.controlSurfaceToken);
+  }
+
+  private static readonly DATETIME_INJECTION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+  /**
+   * Append a datetime context block to `text` if >= 1 hour has elapsed since the last
+   * injection for this Pi session, then update the timestamp in SQLite.
+   */
+  private maybeInjectDatetime(piSessionId: string, text: string): string {
+    const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, piSessionId);
+    const now = Date.now();
+    const lastMs = lastReportedAt ? new Date(lastReportedAt).getTime() : 0;
+    if (now - lastMs < ControlSurfaceRuntime.DATETIME_INJECTION_INTERVAL_MS) {
+      return text;
+    }
+
+    const datetimeStr = new Date(now).toLocaleString("en-US", {
+      timeZone: "Asia/Karachi",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    });
+
+    const nowIso = new Date(now).toISOString();
+    touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
+
+    return (
+      `<date_time>\nJust so you know, the current date and time is: ${datetimeStr}. ` +
+      `This is injected programmatically, for information only —  you may disregard if not relevant.\n</date_time>\n\n` + text
+    );
   }
 
   /**
