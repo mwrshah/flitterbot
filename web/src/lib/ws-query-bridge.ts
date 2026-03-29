@@ -286,15 +286,20 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start → streaming store ──
+    // ── toolcall_start → immediate pending tool card in timeline ──
+    // This is the earliest event with the tool name (before tool_execution_start).
+    // Creates a timeline item with no args; tool_execution_start upgrades it in-place.
     if (message.type === "toolcall_start") {
-      streamingStore.startToolCall(sessionId, message.contentIndex, message.toolName ?? "tool");
-      return;
-    }
-
-    // ── toolcall_delta → streaming store ──
-    if (message.type === "toolcall_delta") {
-      streamingStore.appendToolCallDelta(sessionId, message.contentIndex, message.delta);
+      if (message.toolUseId) {
+        appendTimelineItem(queryClient, sessionId, {
+          id: createId("tool"),
+          kind: "tool",
+          tool: message.toolName ?? "tool",
+          phase: "start",
+          toolUseId: message.toolUseId,
+          createdAt: new Date().toISOString(),
+        });
+      }
       return;
     }
 
@@ -323,7 +328,6 @@ export function setupWsQueryBridge(deps: {
       // Clear streaming state AFTER appending the final message
       streamingStore.clearText(sessionId);
       streamingStore.clearThinking(sessionId);
-      streamingStore.clearToolCalls(sessionId);
       return;
     }
 
@@ -358,8 +362,59 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_execution_start / tool_execution_end ──
-    if (message.type === "tool_execution_start" || message.type === "tool_execution_end") {
+    // ── tool_execution_start → upgrade pending tool card with args ──
+    if (message.type === "tool_execution_start") {
+      const eventRecord =
+        message.event && typeof message.event === "object"
+          ? (message.event as Record<string, unknown>)
+          : undefined;
+      const args = (message.args ??
+        eventRecord?.arguments ??
+        eventRecord?.args ??
+        eventRecord?.toolArguments) as JsonValue | undefined;
+      const tool = message.tool || extractToolName(message.event);
+      const timestamp = message.timestamp ?? new Date().toISOString();
+
+      // Try to upgrade the pending item created by toolcall_start
+      let upgraded = false;
+      if (message.toolUseId) {
+        queryClient.setQueryData<ChatTimelineItem[]>(
+          ["pi-history", sessionId, "agent"],
+          (old) => {
+            if (!old) return old;
+            const idx = old.findIndex(
+              (item) =>
+                item.kind === "tool" &&
+                (item as ChatTimelineTool).toolUseId === message.toolUseId &&
+                (item as ChatTimelineTool).phase === "start" &&
+                (item as ChatTimelineTool).args == null,
+            );
+            if (idx < 0) return old;
+            upgraded = true;
+            const items = [...old];
+            items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
+            return items;
+          },
+        );
+      }
+
+      // Fallback: no pending item (e.g. reconnect) — append fresh
+      if (!upgraded) {
+        appendTimelineItem(queryClient, sessionId, {
+          id: message.id ?? createId("tool"),
+          kind: "tool",
+          tool,
+          phase: "start",
+          toolUseId: message.toolUseId,
+          args,
+          createdAt: timestamp,
+        });
+      }
+      return;
+    }
+
+    // ── tool_execution_end ──
+    if (message.type === "tool_execution_end") {
       const eventRecord =
         message.event && typeof message.event === "object"
           ? (message.event as Record<string, unknown>)
@@ -369,23 +424,13 @@ export function setupWsQueryBridge(deps: {
         id: message.id ?? createId("tool"),
         kind: "tool",
         tool: message.tool || extractToolName(message.event),
-        phase: message.type === "tool_execution_start" ? "start" : "end",
+        phase: "end",
         toolUseId: message.toolUseId,
-        args:
-          message.type === "tool_execution_start"
-            ? ((message.args ??
-                eventRecord?.arguments ??
-                eventRecord?.args ??
-                eventRecord?.toolArguments) as JsonValue | undefined)
-            : undefined,
-        result:
-          message.type === "tool_execution_end"
-            ? ((message.result ??
-                eventRecord?.result ??
-                eventRecord?.output ??
-                eventRecord?.toolResult) as JsonValue | undefined)
-            : undefined,
-        isError: message.type === "tool_execution_end" ? message.isError : undefined,
+        result: (message.result ??
+          eventRecord?.result ??
+          eventRecord?.output ??
+          eventRecord?.toolResult) as JsonValue | undefined,
+        isError: message.isError,
         createdAt: message.timestamp ?? new Date().toISOString(),
       };
       appendTimelineItem(queryClient, sessionId, toolEvent);
