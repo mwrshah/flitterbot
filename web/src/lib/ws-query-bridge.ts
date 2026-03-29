@@ -363,10 +363,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── tool_execution_update ──
     if (message.type === "tool_execution_update") {
-      console.warn(
-        "[ws-bridge] tool_execution_update: mutating phase start→update for toolUseId=%s — this will hide the tool from timelineToAgentMessages",
-        message.toolUseId,
-      );
       updateTimelineItem(
         queryClient,
         sessionId,
