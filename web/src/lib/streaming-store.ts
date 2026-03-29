@@ -15,6 +15,8 @@
 
 export type StreamingText = { text: string; messageId: string };
 export type StreamingThinking = { text: string; messageId: string };
+export type PendingToolCall = { toolUseId: string; toolName: string | undefined };
+
 /* ── Per-session streaming callbacks (for imperative Lit component updates) ── */
 
 type StreamingCallback = (text: string | null, messageId: string | null) => void;
@@ -23,6 +25,8 @@ type StreamingCallback = (text: string | null, messageId: string | null) => void
 
 const texts = new Map<string, StreamingText>();
 const thinking = new Map<string, StreamingThinking>();
+/** Tool calls seen via toolcall_start, held until message_end commits them after the message. */
+const pendingTools = new Map<string, PendingToolCall[]>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 
 function fireCallbacks(sessionId: string) {
@@ -77,11 +81,27 @@ export const streamingStore = {
     thinking.delete(sessionId);
   },
 
-  /* ── Clear all streaming for a session (turn_end / message_end) ── */
+  /* ── Pending tool calls (buffered between toolcall_start and message_end) ── */
+
+  addPendingToolCall(sessionId: string, call: PendingToolCall) {
+    const existing = pendingTools.get(sessionId) ?? [];
+    existing.push(call);
+    pendingTools.set(sessionId, existing);
+  },
+
+  /** Returns and clears all pending tool calls for the session. */
+  flushPendingToolCalls(sessionId: string): PendingToolCall[] {
+    const calls = pendingTools.get(sessionId) ?? [];
+    pendingTools.delete(sessionId);
+    return calls;
+  },
+
+  /* ── Clear all streaming for a session (turn_end / agent_end) ── */
 
   clearSession(sessionId: string) {
     texts.delete(sessionId);
     thinking.delete(sessionId);
+    pendingTools.delete(sessionId);
     fireCallbacks(sessionId);
   },
 

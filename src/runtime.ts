@@ -737,7 +737,7 @@ export class ControlSurfaceRuntime {
     const lastMsg = session.messages[session.messages.length - 1];
     if (lastMsg?.role === "assistant") {
       const assistantMsg = lastMsg as AssistantMessage;
-      if (assistantMsg.stopReason === "error" || assistantMsg.errorMessage) {
+      if (assistantMsg.stopReason === "error") {
         this.log(`queue item ${item.id} API error: ${assistantMsg.errorMessage ?? "unknown"}`);
         throw new Error(`Pi API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`);
       }
