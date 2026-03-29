@@ -202,6 +202,14 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    // ── sessions_changed ──
+    if (message.type === "sessions_changed") {
+      queryClient.invalidateQueries({
+        queryKey: ["pi-downstream-sessions", message.piSessionId],
+      });
+      return;
+    }
+
     // ── error ──
     if (message.type === "error") {
       const defaultSid = getDefaultSessionId();

@@ -160,6 +160,14 @@ export interface PongWebSocketEvent {
   type: "pong";
 }
 
+export interface SessionsChangedWebSocketEvent {
+  type: "sessions_changed";
+  /** equals piSessionId — used by broadcast() for subscription-scoped routing */
+  sessionId: string;
+  piSessionId: string;
+  reason: "registered" | "ended" | "stopped";
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -176,4 +184,5 @@ export type ControlSurfaceWebSocketServerEvent =
   | PiSurfacedWebSocketEvent
   | WorkstreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
+  | SessionsChangedWebSocketEvent
   | PongWebSocketEvent;

@@ -2,6 +2,7 @@ import type { AutonomaConfig } from "../config/load-config.ts";
 import type {
   ClaudeSessionRow,
   ClaudeSessionListItem as SessionListItem,
+  DownstreamSessionItem,
 } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
@@ -324,6 +325,31 @@ export function getActiveManagedSessionsByPi(
     piSessionId,
   );
   return rows.map(mapSessionRow);
+}
+
+interface ClaudeSessionWithWorkstreamRow extends ClaudeSessionRow {
+  workstream_name: string | null;
+}
+
+export function getSessionsByPiSessionId(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): DownstreamSessionItem[] {
+  const rows = db.all<ClaudeSessionWithWorkstreamRow>(
+    `SELECT s.*, w.name AS workstream_name
+       FROM sessions s
+       LEFT JOIN workstreams w ON s.workstream_id = w.id
+       WHERE s.pi_session_id = ?
+         AND s.status != 'ended'
+       ORDER BY s.last_event_at DESC`,
+    piSessionId,
+  );
+  return rows.map((row) => ({
+    sessionId: row.session_id,
+    status: row.status,
+    workstreamId: row.workstream_id,
+    workstreamName: row.workstream_name,
+  }));
 }
 
 export function countActiveManagedSessionsByPi(
