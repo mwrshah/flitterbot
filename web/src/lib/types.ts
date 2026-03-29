@@ -212,6 +212,7 @@ export type WsMessage =
       sessionId?: string;
     }
   | { type: "turn_end"; sessionId?: string }
+  | { type: "agent_end"; sessionId?: string }
   | {
       type: "pi_surfaced";
       message: ChatTimelineMessage;

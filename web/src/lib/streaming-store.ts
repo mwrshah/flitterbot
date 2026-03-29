@@ -36,6 +36,11 @@ function fireCallbacks(sessionId: string) {
 export const streamingStore = {
   /* ── Text streaming ── */
 
+  /** Read current streaming text without side effects. Used by agent_end flush. */
+  getUncommittedText(sessionId: string): StreamingText | undefined {
+    return texts.get(sessionId);
+  },
+
   appendTextDelta(sessionId: string, messageId: string, delta: string) {
     const existing = texts.get(sessionId);
     if (existing) {

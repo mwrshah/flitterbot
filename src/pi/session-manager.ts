@@ -311,6 +311,7 @@ export class PiSessionManager {
       },
       onItemEnd: (item, error) => {
         state.setBusy(false);
+
         if (error) {
           const apiErr = error instanceof Error ? (error as ApiError) : undefined;
           const detail = apiErr
@@ -319,8 +320,6 @@ export class PiSessionManager {
           this.log(
             `queue item ${item.id} failed (${role}${workstreamId ? ` ws=${workstreamId}` : ""}): ${detail}`,
           );
-
-          // If orchestrator crashes, destroy it
           if (role === "orchestrator" && workstreamId) {
             this.destroyOrchestrator(workstreamId, "crashed");
           }
@@ -328,7 +327,7 @@ export class PiSessionManager {
         this.wsHub.broadcast({
           type: "queue_item_end",
           itemId: item.id,
-          error: error instanceof Error ? error.message : error ? String(error) : undefined,
+          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
           sessionId: managed.piSessionId,
           ...(workstreamId ? { workstreamId } : {}),
         });
