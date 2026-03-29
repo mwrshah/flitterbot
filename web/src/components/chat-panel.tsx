@@ -8,7 +8,7 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
-import type { ChatTimelineItem, ConnectionState, DeliveryMode, ImageAttachment } from "~/lib/types";
+import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
 import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
 
 const emptySubscribe = () => () => {};
@@ -51,11 +51,7 @@ type ChatPanelProps = {
   timeline: ChatTimelineItem[];
   statusPills: StatusPill[];
   connectionState: ConnectionState;
-  onSendMessage: (
-    text: string,
-    deliveryMode: DeliveryMode,
-    images?: ImageAttachment[],
-  ) => Promise<void>;
+  onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
 };
 
 export function ChatPanel({
@@ -83,7 +79,7 @@ export function ChatPanel({
   });
 
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
+
   const [isSending, setIsSending] = useState(false);
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
@@ -146,12 +142,10 @@ export function ChatPanel({
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Refs for stable handleSubmit closure
+  // Ref for stable handleSubmit closure
   const pendingImagesRef = useRef(pendingImages);
-  const deliveryModeRef = useRef(deliveryMode);
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
-    deliveryModeRef.current = deliveryMode;
   });
 
   const handleSubmit = useCallback(
@@ -164,7 +158,7 @@ export function ChatPanel({
       engageAndScroll();
 
       try {
-        await onSendMessage(text || "(image)", deliveryModeRef.current, images);
+        await onSendMessage(text || "(image)", images);
       } finally {
         setIsSending(false);
       }
@@ -211,8 +205,7 @@ export function ChatPanel({
       </div>
 
       <MessageInput
-        deliveryMode={deliveryMode}
-        onDeliveryModeChange={setDeliveryMode}
+
         isSending={isSending}
         onSubmit={handleSubmit}
         pendingImages={pendingImages}

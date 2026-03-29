@@ -11,7 +11,7 @@ import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   ConnectionState,
-  DeliveryMode,
+
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
@@ -328,7 +328,7 @@ export function InputSurface() {
   const queryClient = useQueryClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
+
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
   );
@@ -371,12 +371,10 @@ export function InputSurface() {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Refs for stable handleSubmit closure
+  // Ref for stable handleSubmit closure
   const pendingImagesRef = useRef(pendingImages);
-  const deliveryModeRef = useRef(deliveryMode);
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
-    deliveryModeRef.current = deliveryMode;
   });
 
   const handleSubmit = useCallback(
@@ -389,7 +387,7 @@ export function InputSurface() {
       engageAndScroll();
 
       try {
-        await sendMessage(text || "(image)", deliveryModeRef.current, images);
+        await sendMessage(text || "(image)", images);
       } finally {
         setIsSending(false);
       }
@@ -434,8 +432,7 @@ export function InputSurface() {
       </div>
 
       <MessageInput
-        deliveryMode={deliveryMode}
-        onDeliveryModeChange={setDeliveryMode}
+
         isSending={isSending}
         onSubmit={handleSubmit}
         pendingImages={pendingImages}

@@ -10,11 +10,9 @@ import {
 } from "react";
 import { SkillPicker } from "~/components/skill-picker";
 import { Button } from "~/components/ui/button";
-import type { DeliveryMode, ImageAttachment, SkillListItem } from "~/lib/types";
+import type { ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
-  deliveryMode: DeliveryMode;
-  onDeliveryModeChange: (mode: DeliveryMode) => void;
   isSending: boolean;
   onSubmit: (text: string) => void;
   pendingImages: ImageAttachment[];
@@ -27,8 +25,6 @@ type MessageInputProps = {
 };
 
 export const MessageInput = memo(function MessageInput({
-  deliveryMode,
-  onDeliveryModeChange,
   isSending,
   onSubmit,
   pendingImages,
@@ -335,30 +331,6 @@ export const MessageInput = memo(function MessageInput({
           </button>
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
-              <button
-                type="button"
-                onClick={() => onDeliveryModeChange("followUp")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  deliveryMode === "followUp"
-                    ? "bg-background text-foreground shadow-sm font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Follow-up
-              </button>
-              <button
-                type="button"
-                onClick={() => onDeliveryModeChange("steer")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  deliveryMode === "steer"
-                    ? "bg-background text-foreground shadow-sm font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Steer
-              </button>
-            </div>
             <Button type="submit" size="sm" disabled={isSending || !canSend}>
               {isSending ? "Sending…" : "Send"}
             </Button>
