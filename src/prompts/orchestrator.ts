@@ -79,6 +79,8 @@ The tool requires a \`mode\` parameter — you must always pass it explicitly:
   - *Conflict resolution*: Read each conflicted file and resolve intelligently — retain both sides when the changes are additive and non-overlapping; pick the side that supersedes the other when one change is clearly a replacement. If the intent is ambiguous or you cannot confidently determine the correct resolution, *stop and ask the user* before proceeding. Never silently discard changes from either side.
 - \`mode: "noop"\` — skips all git operations (no commit, no merge, no push). Just closes the workstream record and ends your session. The worktree and branch stay on disk untouched. Use this only when the human *explicitly* asks to close without merging.
 
+The tool also accepts an optional \`merge_commit_message\` parameter (string). When provided in merge mode, it is used as the merge commit message instead of git's default. Omit it to keep the default behavior. Ignored in noop mode.
+
 *Default to \`mode: "merge"\`.* We generally want all completed work merged into main. If the human says "done" / "ship it" / "close it" without specifying a mode, use merge. Only use noop if the human explicitly says they do *not* want to merge (e.g., "close without merging", "abandon this branch", "just close the workstream").
 
 ## Session Launch Identity

@@ -72,7 +72,7 @@ function commitUncommittedChanges(worktreePath: string): CommitResult {
 
 type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
 
-function mergeToMain(repoPath: string, branch: string): MergeResult {
+function mergeToMain(repoPath: string, branch: string, commitMessage?: string): MergeResult {
   // Fetch latest
   try {
     exec("git fetch origin", repoPath);
@@ -106,7 +106,10 @@ function mergeToMain(repoPath: string, branch: string): MergeResult {
 
   // Attempt merge
   try {
-    exec(`git merge ${branch} --no-edit`, repoPath);
+    const mergeCmd = commitMessage
+      ? `git merge ${branch} -m '${commitMessage.replace(/'/g, "'\\''")}'`
+      : `git merge ${branch} --no-edit`;
+    exec(mergeCmd, repoPath);
     return { ok: true };
   } catch {
     // Check if it's a conflict or a different error
@@ -148,6 +151,7 @@ export async function executeCloseWorkstream(
   piSessionId: string,
   workstreamId: string,
   mode: "merge" | "noop",
+  mergeCommitMessage?: string,
 ): Promise<CloseWorkstreamResult> {
   const workstream = getWorkstreamById(blackboard, workstreamId);
   if (!workstream) {
@@ -196,7 +200,7 @@ export async function executeCloseWorkstream(
             message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
           };
         }
-        const mergeResult = mergeToMain(repoPath, branch);
+        const mergeResult = mergeToMain(repoPath, branch, mergeCommitMessage);
         if (mergeResult.ok === false) {
           // Return early — Pi resolves conflicts and calls again
           return {
@@ -251,19 +255,25 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
           description:
             '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the workstream and ends the session.',
         },
+        merge_commit_message: {
+          type: "string",
+          description:
+            "Optional commit message for the merge commit when mode is merge. Ignored for noop mode. Falls back to git's default merge commit message if omitted.",
+        },
       },
       required: ["workstream_id", "mode"],
       additionalProperties: false,
     },
     execute: async (
       _toolCallId: string,
-      params: { workstream_id: string; mode: "merge" | "noop" },
+      params: { workstream_id: string; mode: "merge" | "noop"; merge_commit_message?: string },
     ) => {
       const result = await executeCloseWorkstream(
         blackboard,
         piSessionId,
         params.workstream_id,
         params.mode,
+        params.merge_commit_message,
       );
       return {
         content: [{ type: "text", text: result.message }],
