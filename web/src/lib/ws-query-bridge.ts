@@ -236,6 +236,12 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    // ── worktree_changed ──
+    if (message.type === "worktree_changed") {
+      queryClient.invalidateQueries({ queryKey: ["pi-worktree", message.piSessionId] });
+      return;
+    }
+
     // ── error ──
     if (message.type === "error") {
       toast.error(message.message);

@@ -235,4 +235,9 @@ export type WsMessage =
       piSessionId: string;
       reason: "registered" | "ended" | "stopped";
     }
+  | {
+      type: "worktree_changed";
+      piSessionId: string;
+      workstreamId: string;
+    }
   | { type: "error"; message: string };
