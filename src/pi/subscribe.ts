@@ -5,7 +5,6 @@ import type {
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
   PiSurfacedWebSocketEvent,
-  ToolCallDeltaWebSocketEvent,
   ToolCallStartWebSocketEvent,
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
@@ -207,32 +206,29 @@ export function subscribeToPiSession(
             delta: ame.delta,
           });
         } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
-          // Extract toolName from the partial message's content at contentIndex
+          // Extract toolName and toolUseId from the partial message's content block.
+          // At content_block_start the SDK populates id + name but not arguments.
           let toolName: string | undefined;
-          const msg = event.message as { content?: Array<{ name?: string }> } | undefined;
-          if (msg?.content && msg.content[ame.contentIndex]) {
-            toolName = msg.content[ame.contentIndex].name;
+          let toolUseId: string | undefined;
+          const msg = event.message as
+            | { content?: Array<{ name?: string; id?: string }> }
+            | undefined;
+          const block = msg?.content?.[ame.contentIndex];
+          if (block) {
+            toolName = block.name;
+            toolUseId = block.id;
           }
           const payload: ToolCallStartWebSocketEvent = {
             type: "toolcall_start",
             sessionId: session.sessionId,
             contentIndex: ame.contentIndex,
             toolName,
-          };
-          broadcast(wsHub, payload);
-        } else if (
-          ame.type === "toolcall_delta" &&
-          typeof ame.contentIndex === "number" &&
-          typeof ame.delta === "string"
-        ) {
-          const payload: ToolCallDeltaWebSocketEvent = {
-            type: "toolcall_delta",
-            sessionId: session.sessionId,
-            contentIndex: ame.contentIndex,
-            delta: ame.delta,
+            toolUseId,
           };
           broadcast(wsHub, payload);
         }
+        // toolcall_delta (input_json_delta) intentionally suppressed —
+        // tool args arrive via tool_execution_start instead.
         break;
       }
       case "message_end": {

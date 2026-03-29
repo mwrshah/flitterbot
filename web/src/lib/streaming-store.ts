@@ -15,8 +15,6 @@
 
 export type StreamingText = { text: string; messageId: string };
 export type StreamingThinking = { text: string; messageId: string };
-export type StreamingToolCall = { contentIndex: number; toolName: string; argsJson: string };
-
 /* ── Per-session streaming callbacks (for imperative Lit component updates) ── */
 
 type StreamingCallback = (text: string | null, messageId: string | null) => void;
@@ -25,7 +23,6 @@ type StreamingCallback = (text: string | null, messageId: string | null) => void
 
 const texts = new Map<string, StreamingText>();
 const thinking = new Map<string, StreamingThinking>();
-const toolCalls = new Map<string, StreamingToolCall[]>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 
 function fireCallbacks(sessionId: string) {
@@ -75,34 +72,11 @@ export const streamingStore = {
     thinking.delete(sessionId);
   },
 
-  /* ── Tool call streaming ──
-   * These methods receive real data from toolcall_start/toolcall_delta WS events.
-   * No UI component reads tool call state yet — ready for future UI consumption
-   * (e.g. showing in-progress tool call arguments in the chat panel). */
-
-  startToolCall(sessionId: string, contentIndex: number, toolName: string) {
-    const calls = toolCalls.get(sessionId) ?? [];
-    calls.push({ contentIndex, toolName, argsJson: "" });
-    toolCalls.set(sessionId, calls);
-  },
-
-  appendToolCallDelta(sessionId: string, contentIndex: number, delta: string) {
-    const calls = toolCalls.get(sessionId);
-    if (!calls) return;
-    const call = calls.find((c) => c.contentIndex === contentIndex);
-    if (call) call.argsJson += delta;
-  },
-
-  clearToolCalls(sessionId: string) {
-    toolCalls.delete(sessionId);
-  },
-
   /* ── Clear all streaming for a session (turn_end / message_end) ── */
 
   clearSession(sessionId: string) {
     texts.delete(sessionId);
     thinking.delete(sessionId);
-    toolCalls.delete(sessionId);
     fireCallbacks(sessionId);
   },
 

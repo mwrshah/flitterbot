@@ -109,13 +109,7 @@ export interface ToolCallStartWebSocketEvent {
   sessionId?: string;
   contentIndex: number;
   toolName?: string;
-}
-
-export interface ToolCallDeltaWebSocketEvent {
-  type: "toolcall_delta";
-  sessionId?: string;
-  contentIndex: number;
-  delta: string;
+  toolUseId?: string;
 }
 
 export interface ToolExecutionUpdateWebSocketEvent {
@@ -180,7 +174,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | TextDeltaWebSocketEvent
   | ThinkingDeltaWebSocketEvent
   | ToolCallStartWebSocketEvent
-  | ToolCallDeltaWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionUpdateWebSocketEvent
