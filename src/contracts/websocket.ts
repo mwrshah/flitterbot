@@ -179,6 +179,12 @@ export interface SessionsChangedWebSocketEvent {
   reason: "registered" | "ended" | "stopped";
 }
 
+export interface WorktreeChangedWebSocketEvent {
+  type: "worktree_changed";
+  piSessionId: string;
+  workstreamId: string;
+}
+
 export interface AgentStartWebSocketEvent {
   type: "agent_start";
   sessionId?: string;
@@ -239,5 +245,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | WorkstreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
   | SessionsChangedWebSocketEvent
+  | WorktreeChangedWebSocketEvent
   | PongWebSocketEvent
   | ErrorWebSocketEvent;

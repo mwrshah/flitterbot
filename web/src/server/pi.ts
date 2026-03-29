@@ -58,6 +58,24 @@ export const fetchPiSessions = createServerFn({ method: "GET" })
     }
   });
 
+export type PiWorkstreamInfo = {
+  workstreamId: string;
+  name: string;
+  repoPath: string | null;
+  worktreePath: string | null;
+};
+
+export const fetchPiWorktree = createServerFn({ method: "GET" })
+  .inputValidator((input: { piSessionId: string }) => input)
+  .handler(async ({ data }): Promise<PiWorkstreamInfo | null> => {
+    const path = `/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/workstream`;
+    try {
+      return (await piRequest(path)) as PiWorkstreamInfo;
+    } catch {
+      return null;
+    }
+  });
+
 export const fetchPiInputHistory = createServerFn({ method: "GET" }).handler(
   async (): Promise<ChatTimelineItem[]> => {
     try {

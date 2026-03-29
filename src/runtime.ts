@@ -1186,6 +1186,16 @@ export class ControlSurfaceRuntime {
             update_repo_path,
             update_worktree_path,
           );
+          if (result.ok) {
+            const piSessionId = this.sessionManager.getByWorkstream(workstream_id)?.piSessionId;
+            if (piSessionId) {
+              this.wsHub.broadcast({
+                type: "worktree_changed",
+                piSessionId,
+                workstreamId: workstream_id,
+              });
+            }
+          }
           return { content: [{ type: "text", text: result.message }], details: result };
         },
       });

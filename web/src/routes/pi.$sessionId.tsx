@@ -4,7 +4,7 @@ import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel"
 import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchPiHistory, fetchPiSessions } from "~/server/pi";
+import { fetchPiHistory, fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/$sessionId")({
   staticData: {
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
     meta: [{ title: "Autonoma — Pi Session" }],
   }),
   loader: async ({ params, context }) => {
-    const [items, sessions] = await Promise.all([
+    const [items, sessions, worktree] = await Promise.all([
       fetchPiHistory({ data: { piSessionId: params.sessionId } }).catch((error: unknown) => {
         if (error instanceof Error && /404|not found/i.test(error.message)) {
           throw redirect({ to: "/pi/default" });
@@ -22,11 +22,13 @@ export const Route = createFileRoute("/pi/$sessionId")({
         throw error;
       }),
       fetchPiSessions({ data: { piSessionId: params.sessionId } }).catch(() => []),
+      fetchPiWorktree({ data: { piSessionId: params.sessionId } }).catch(() => null),
     ]);
     const history = items as ChatTimelineItem[];
     // Seed the Query cache so useQuery returns instantly
     context.queryClient.setQueryData(["pi-history", params.sessionId, "agent"], history);
     context.queryClient.setQueryData(["pi-downstream-sessions", params.sessionId], sessions);
+    context.queryClient.setQueryData(["pi-worktree", params.sessionId], worktree);
     return { history };
   },
   errorComponent: ({ error }) => (
