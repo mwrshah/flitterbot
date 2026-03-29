@@ -147,6 +147,7 @@ export async function executeCloseWorkstream(
   blackboard: BlackboardDatabase,
   piSessionId: string,
   workstreamId: string,
+  mode: "merge" | "noop",
 ): Promise<CloseWorkstreamResult> {
   const workstream = getWorkstreamById(blackboard, workstreamId);
   if (!workstream) {
@@ -175,41 +176,43 @@ export async function executeCloseWorkstream(
     sessionsKilled++;
   }
 
-  const worktreePath = workstream.worktree_path;
-  const repoPath = workstream.repo_path;
-  let branch: string | null = null;
   let merged = false;
   let pushed = false;
 
-  // Step 1: Merge branch to main (if worktree exists)
-  if (worktreePath && fs.existsSync(worktreePath) && repoPath) {
-    branch = inferBranchFromWorktree(worktreePath);
+  // Step 1: Merge branch to main (only in merge mode)
+  if (mode === "merge") {
+    const worktreePath = workstream.worktree_path;
+    const repoPath = workstream.repo_path;
 
-    if (branch) {
-      const commitResult = commitUncommittedChanges(worktreePath);
-      if (commitResult.hasChanges && !commitResult.ok) {
-        return {
-          ok: false,
-          workstreamId,
-          message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
-        };
-      }
-      const mergeResult = mergeToMain(repoPath, branch);
-      if (mergeResult.ok === false) {
-        // Return early — Pi resolves conflicts and calls again
-        return {
-          ok: false,
-          workstreamId,
-          message:
-            mergeResult.message +
-            ". Resolve conflicts in the main repo, then call close_workstream again.",
-          conflicts: mergeResult.conflicts,
-        };
-      }
-      merged = true;
+    if (worktreePath && fs.existsSync(worktreePath) && repoPath) {
+      const branch = inferBranchFromWorktree(worktreePath);
 
-      // Push main after clean merge
-      pushed = pushMain(repoPath);
+      if (branch) {
+        const commitResult = commitUncommittedChanges(worktreePath);
+        if (commitResult.hasChanges && !commitResult.ok) {
+          return {
+            ok: false,
+            workstreamId,
+            message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
+          };
+        }
+        const mergeResult = mergeToMain(repoPath, branch);
+        if (mergeResult.ok === false) {
+          // Return early — Pi resolves conflicts and calls again
+          return {
+            ok: false,
+            workstreamId,
+            message:
+              mergeResult.message +
+              ". Resolve conflicts in the main repo, then call close_workstream again.",
+            conflicts: mergeResult.conflicts,
+          };
+        }
+        merged = true;
+
+        // Push main after clean merge
+        pushed = pushMain(repoPath);
+      }
     }
   }
 
@@ -219,6 +222,7 @@ export async function executeCloseWorkstream(
 
   const parts = [`Workstream "${workstream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
+  if (mode === "noop") parts.push("Git operations skipped (noop mode).");
   if (merged) parts.push("Branch merged to main.");
   if (pushed) parts.push("Pushed to origin.");
 
@@ -236,17 +240,31 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
     name: "close_workstream",
     label: "Close Workstream",
     description:
-      "Close the current workstream. Merges the branch into main, pushes, closes the workstream, and ends this orchestrator session. The worktree is left on disk. If there are merge conflicts, returns the conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.",
+      'Close the current workstream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the workstream record. The worktree is left on disk. If merge mode hits conflicts, returns conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.',
     parameters: {
       type: "object",
       properties: {
         workstream_id: { type: "string", description: "ID of the workstream to close" },
+        mode: {
+          type: "string",
+          enum: ["merge", "noop"],
+          description:
+            '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the workstream and ends the session.',
+        },
       },
-      required: ["workstream_id"],
+      required: ["workstream_id", "mode"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId: string, params: { workstream_id: string }) => {
-      const result = await executeCloseWorkstream(blackboard, piSessionId, params.workstream_id);
+    execute: async (
+      _toolCallId: string,
+      params: { workstream_id: string; mode: "merge" | "noop" },
+    ) => {
+      const result = await executeCloseWorkstream(
+        blackboard,
+        piSessionId,
+        params.workstream_id,
+        params.mode,
+      );
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
