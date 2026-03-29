@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { ChatTimelineItem } from "~/lib/types";
+import type { ChatTimelineItem, DownstreamSessionItem } from "~/lib/types";
 
 const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
@@ -41,6 +41,19 @@ export const fetchPiHistory = createServerFn({ method: "GET" })
         data.surface ?? "none",
         err,
       );
+      throw err;
+    }
+  });
+
+export const fetchPiSessions = createServerFn({ method: "GET" })
+  .inputValidator((input: { piSessionId: string }) => input)
+  .handler(async ({ data }): Promise<DownstreamSessionItem[]> => {
+    const path = `/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/sessions`;
+    try {
+      const res = (await piRequest(path)) as { items: DownstreamSessionItem[] };
+      return res.items;
+    } catch (err) {
+      console.error("fetchPiSessions failed (piSessionId=%s):", data.piSessionId, err);
       throw err;
     }
   });
