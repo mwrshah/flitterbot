@@ -348,7 +348,21 @@ export function setupWsQueryBridge(deps: {
       destroyChunker(msgId);
 
       if (msg.content.trim()) {
-        upsertTimelineItem(queryClient, sessionId, msg);
+        // Include thinking blocks from the streaming store so the committed
+        // message in the Query cache matches what history loading produces.
+        // Without this, thinking disappears from the live session the moment
+        // the message commits and only reappears after a page refresh.
+        const thinkingText = streamingStore.getThinkingText(sessionId);
+        const committed = thinkingText
+          ? {
+              ...msg,
+              blocks: [
+                { type: "thinking" as const, thinking: thinkingText },
+                { type: "text" as const, text: msg.content },
+              ],
+            }
+          : msg;
+        upsertTimelineItem(queryClient, sessionId, committed);
       }
 
       // Flush tool calls buffered since toolcall_start. Appending them here (after the
@@ -366,8 +380,10 @@ export function setupWsQueryBridge(deps: {
         });
       }
 
-      streamingStore.clearText(sessionId);
-      streamingStore.clearThinking(sessionId);
+      // Clear all streaming state atomically. thinking is now in the cache so
+      // nothing is lost — clearSession fires one callback with all-nulls which
+      // triggers clearStreaming() on the Lit component.
+      streamingStore.clearSession(sessionId);
       return;
     }
 
