@@ -471,12 +471,6 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "turn_end") {
       destroyAllChunkers();
       streamingStore.clearSession(sessionId);
-
-      appendTimelineItem(queryClient, sessionId, {
-        id: createId("divider-turn-end"),
-        kind: "divider",
-        createdAt: new Date().toISOString(),
-      });
       return;
     }
 
