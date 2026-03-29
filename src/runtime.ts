@@ -237,7 +237,7 @@ export class ControlSurfaceRuntime {
     const messageUuid = crypto.randomUUID();
     item.metadata = { ...item.metadata, serverMessageId: messageUuid };
     try {
-      const source = item.source as "whatsapp" | "web" | "hook" | "cron";
+      const source = item.source as "whatsapp" | "web" | "cron";
       const workstreamId = (input.metadata?.workstream_id as string) ?? undefined;
       const piSessionId = workstreamId
         ? this.sessionManager.getByWorkstream(workstreamId)?.piSessionId
@@ -246,7 +246,7 @@ export class ControlSurfaceRuntime {
         id: messageUuid,
         source,
         content: input.text,
-        sender: source === "hook" ? "system" : "user",
+        sender: "user",
         workstreamId,
         piSessionId,
         metadata: input.metadata,
