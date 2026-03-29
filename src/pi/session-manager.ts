@@ -351,8 +351,12 @@ export class PiSessionManager {
       /* ignore */
     }
 
-    const status = reason === "crashed" ? "crashed" : "ended";
-    endPiSession(this.blackboard, managed.piSessionId, status, reason, new Date().toISOString());
+    // On clean shutdown, leave the session in waiting_for_user so the rehydration
+    // query finds it on next restart. Only permanently end on crash or explicit close.
+    if (reason !== "shutdown") {
+      const status = reason === "crashed" ? "crashed" : "ended";
+      endPiSession(this.blackboard, managed.piSessionId, status, reason, new Date().toISOString());
+    }
 
     this.orchestrators.delete(workstreamId);
     this.byPiSessionId.delete(managed.piSessionId);
