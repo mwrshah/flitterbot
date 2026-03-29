@@ -3,6 +3,7 @@ import type { BlackboardDatabase } from "./db.ts";
 import {
   closePiSession,
   markPreviousPiSessionsInactive,
+  reassociateOrphanedSessions as reassociateOrphanedSessionsWrite,
   touchPiSessionEvent,
   touchPiSessionPrompt,
   upsertPiSession as writePiSession,
@@ -119,6 +120,13 @@ export function touchDatetimeReportedAt(
   db.prepare(
     "UPDATE pi_sessions SET last_datetime_reported_at = ? WHERE pi_session_id = ?",
   ).run(timestamp, piSessionId);
+}
+
+export function reassociateOrphanedSessions(
+  db: BlackboardDatabase,
+  newPiSessionId: string,
+): number {
+  return reassociateOrphanedSessionsWrite(db, newPiSessionId);
 }
 
 export function endPiSession(
