@@ -3,6 +3,7 @@ import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,
+  reassociateOrphanedSessions,
   reconcilePreviousPiSessions,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
@@ -115,6 +116,12 @@ export class PiSessionManager {
       startedAt: new Date(this.startedAt).toISOString(),
       lastEventAt: new Date().toISOString(),
     });
+
+    // Re-associate orphaned sessions from ended Pi sessions to this new default session
+    const reassociated = reassociateOrphanedSessions(this.blackboard, managed.piSessionId);
+    if (reassociated > 0) {
+      this.log(`reassociated ${reassociated} orphaned session(s) to new default Pi session`);
+    }
 
     this.defaultSession = managed;
     this.byPiSessionId.set(managed.piSessionId, managed);

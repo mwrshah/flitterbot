@@ -153,6 +153,30 @@ export function touchPiSessionEvent(
   ).run(timestamp, status, piSessionId);
 }
 
+/**
+ * Re-associate orphaned sessions whose pi_session_id points to an ended Pi session.
+ * Moves them to the given new (active) Pi session.
+ */
+export function reassociateOrphanedSessions(
+  db: BlackboardDatabase,
+  newPiSessionId: string,
+): number {
+  const result = db
+    .prepare(
+      `UPDATE sessions
+       SET pi_session_id = ?
+       WHERE status NOT IN ('ended')
+         AND pi_session_id IS NOT NULL
+         AND pi_session_id != ?
+         AND pi_session_id IN (
+           SELECT pi_session_id FROM pi_sessions WHERE status IN ('ended', 'crashed')
+         )`,
+    )
+    .run(newPiSessionId, newPiSessionId);
+
+  return Number(result.changes ?? 0);
+}
+
 export function closePiSession(
   db: BlackboardDatabase,
   piSessionId: string,
