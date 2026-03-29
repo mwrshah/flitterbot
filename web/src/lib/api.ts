@@ -78,6 +78,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
+    interruptPiSession: (piSessionId: string) =>
+      request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, { method: "POST" }),
+
     listSkills: () => request<SkillsListResponse>("/api/skills"),
   };
 }

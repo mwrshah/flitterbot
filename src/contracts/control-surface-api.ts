@@ -208,6 +208,13 @@ export interface StopResponse {
   message: string;
 }
 
+export interface PiSessionInterruptResponse {
+  ok: boolean;
+  piSessionId?: string;
+  signaledSessions?: number;
+  error?: string;
+}
+
 export type CronTickAction = "enqueued" | "skipped";
 export type CronTickReason =
   | "idle_check"
@@ -289,6 +296,11 @@ export const CONTROL_SURFACE_ENDPOINTS = {
   cronTick: {
     method: "POST",
     path: "/cron/tick",
+    auth: "bearer",
+  },
+  piSessionInterrupt: {
+    method: "POST",
+    path: "/api/pi-sessions/:piSessionId/interrupt",
     auth: "bearer",
   },
 } as const;
