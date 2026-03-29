@@ -61,14 +61,10 @@ function PiDefaultRoute() {
           onSendMessage={onSendMessage}
         />
       </Panel>
-      {effectiveSessionId && (
-        <>
-          <ResizeHandle />
-          <Panel defaultSize={25} minSize={15}>
-            <DownstreamSessionsPanel piSessionId={effectiveSessionId} />
-          </Panel>
-        </>
-      )}
+      <ResizeHandle />
+      <Panel defaultSize={25} minSize={15}>
+        <DownstreamSessionsPanel piSessionId={effectiveSessionId} />
+      </Panel>
     </PanelGroup>
   );
 }
