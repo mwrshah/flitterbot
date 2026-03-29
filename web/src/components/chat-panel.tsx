@@ -92,11 +92,14 @@ export function ChatPanel({
 
   // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
-    streamingStore.onStreamingDelta(sessionId, (text, messageId) => {
-      if (text != null && messageId != null) {
+    streamingStore.onStreamingDelta(sessionId, (text, thinking, messageId) => {
+      if (messageId != null) {
         messageListRef.current?.updateStreaming({
           role: "assistant",
-          content: [{ type: "text", text }],
+          content: [
+            ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
+            ...(text ? [{ type: "text" as const, text }] : []),
+          ],
           api: "openai-responses",
           provider: "openai",
           model: "",

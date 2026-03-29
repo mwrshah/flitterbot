@@ -19,7 +19,11 @@ export type PendingToolCall = { toolUseId: string; toolName: string | undefined 
 
 /* ── Per-session streaming callbacks (for imperative Lit component updates) ── */
 
-type StreamingCallback = (text: string | null, messageId: string | null) => void;
+type StreamingCallback = (
+  text: string | null,
+  thinking: string | null,
+  messageId: string | null,
+) => void;
 
 /* ── Store implementation ── */
 
@@ -30,9 +34,17 @@ const pendingTools = new Map<string, PendingToolCall[]>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 
 function fireCallbacks(sessionId: string) {
-  const state = texts.get(sessionId);
   const cb = streamingCallbacks.get(sessionId);
-  if (cb) cb(state?.text ?? null, state?.messageId ?? null);
+  if (!cb) return;
+  const textState = texts.get(sessionId);
+  const thinkingState = thinking.get(sessionId);
+  const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
+  const hasContent = textState != null || thinkingState != null;
+  cb(
+    textState?.text ?? null,
+    thinkingState?.text ?? null,
+    hasContent ? messageId : null,
+  );
 }
 
 /* ── Public API (called by ws-query-bridge) ── */
@@ -71,10 +83,7 @@ export const streamingStore = {
     } else {
       thinking.set(sessionId, { text: delta, messageId });
     }
-    // Do NOT call fireCallbacks here — thinking deltas must not trigger the text
-    // streaming callback. Doing so fires cb(null, null) when no text is in flight,
-    // which calls clearStreaming() and queues rAF hide callbacks. Those callbacks
-    // then fire and hide the streaming element mid-stream when text later starts.
+    fireCallbacks(sessionId);
   },
 
   clearThinking(sessionId: string) {
