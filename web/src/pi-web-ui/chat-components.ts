@@ -310,17 +310,14 @@ export class ThinkingBlock extends LitElement {
     this.style.display = "block";
   }
 
-  override updated(changed: Map<PropertyKey, unknown>): void {
-    if (changed.has("isStreaming")) {
-      this.isExpanded = this.isStreaming;
-    }
-  }
-
   private toggleExpanded = (): void => {
     this.isExpanded = !this.isExpanded;
   };
 
   override render() {
+    // While streaming, content is always visible regardless of isExpanded.
+    // After thinking_end (isStreaming = false), isExpanded follows the user's toggle.
+    const isOpen = this.isStreaming || this.isExpanded;
     const shimmerClasses = this.isStreaming
       ? "animate-shimmer bg-gradient-to-r from-muted-foreground via-foreground to-muted-foreground bg-[length:200%_100%] bg-clip-text text-transparent"
       : "";
@@ -330,7 +327,7 @@ export class ThinkingBlock extends LitElement {
         <button
           type="button"
           class="thinking-header flex w-full items-center justify-between gap-3 rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          aria-expanded=${String(this.isExpanded)}
+          aria-expanded=${String(isOpen)}
           @click=${this.toggleExpanded}
         >
           <span class="flex min-w-0 items-center gap-2">
@@ -338,11 +335,11 @@ export class ThinkingBlock extends LitElement {
             <span class="${shimmerClasses}">${i18n("Thinking…")}</span>
           </span>
           <span class="shrink-0 text-[11px] uppercase tracking-[0.16em] text-muted-foreground/70">
-            ${this.isExpanded ? i18n("Hide") : i18n("Show")}
+            ${isOpen ? i18n("Hide") : i18n("Show")}
           </span>
         </button>
         ${
-          this.isExpanded
+          isOpen
             ? html`<div class="pl-4 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
             : ""
         }
