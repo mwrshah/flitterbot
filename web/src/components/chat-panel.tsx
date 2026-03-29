@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { MessageInput } from "~/components/ui/message-input";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -67,12 +68,20 @@ export function ChatPanel({
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
+  const queryClient = useQueryClient();
   const messageListRef = useRef<PiMessageListHandle>(null);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
     queryFn: () => apiClient.listSkills(),
     staleTime: 5 * 60 * 1000,
   });
+  const isSessionActive = statusPills.some((p) => p.id.startsWith("processing-"));
+
+  const interruptMutation = useMutation({
+    mutationFn: () => apiClient.interruptPiSession(sessionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+  });
+
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("followUp");
   const [isSending, setIsSending] = useState(false);
@@ -163,6 +172,16 @@ export function ChatPanel({
       <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
         <h1 className="text-sm font-semibold text-foreground">Pi</h1>
         <div className="flex items-center gap-2">
+          {isClient && isSessionActive && (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={interruptMutation.isPending}
+              onClick={() => interruptMutation.mutate()}
+            >
+              {interruptMutation.isPending ? "Stopping..." : "Stop"}
+            </Button>
+          )}
           {isClient && statusPills.length > 0 && (
             <div className="flex items-center gap-1.5">
               {statusPills.map((pill) => (

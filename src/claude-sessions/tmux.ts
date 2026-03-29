@@ -177,6 +177,10 @@ export async function sendEnterToTmuxSession(sessionName: string): Promise<void>
   await runTmux(["send-keys", "-t", getPrimaryTarget(sessionName), "Enter"]);
 }
 
+export async function sendEscapeToTmuxSession(sessionName: string): Promise<void> {
+  await runTmux(["send-keys", "-t", getPrimaryTarget(sessionName), "Escape"]);
+}
+
 async function gracefulInterruptTmuxSession(sessionName: string): Promise<void> {
   const target = getPrimaryTarget(sessionName);
   await runTmux(["send-keys", "-t", target, "C-c"]);

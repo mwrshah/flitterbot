@@ -24,6 +24,7 @@ import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
+import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
@@ -156,6 +157,15 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));
+  }
+  if (
+    method === "POST" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "interrupt"
+  ) {
+    return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     (method === CONTROL_SURFACE_ENDPOINTS.runtimeWhatsAppStart.method &&
