@@ -299,7 +299,7 @@ if (!customElements.get("console-block")) {
 export class ThinkingBlock extends LitElement {
   @property() content = "";
   @property({ type: Boolean }) isStreaming = false;
-  @state() private isExpanded = false;
+  @state() private isExpanded = true;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -315,9 +315,7 @@ export class ThinkingBlock extends LitElement {
   };
 
   override render() {
-    // While streaming, content is always visible regardless of isExpanded.
-    // After thinking_end (isStreaming = false), isExpanded follows the user's toggle.
-    const isOpen = this.isStreaming || this.isExpanded;
+    const isOpen = this.isExpanded;
     const shimmerClasses = this.isStreaming
       ? "animate-shimmer bg-gradient-to-r from-muted-foreground via-foreground to-muted-foreground bg-[length:200%_100%] bg-clip-text text-transparent"
       : "";
