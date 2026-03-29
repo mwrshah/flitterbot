@@ -28,6 +28,7 @@ import type {
   WsMessage,
 } from "~/lib/types";
 import { createId, extractToolName } from "~/lib/utils";
+import { toast } from "sonner";
 import type { AutonomaWsClient } from "~/lib/ws";
 
 /* ── Dev-only debug global ── */
@@ -204,14 +205,7 @@ export function setupWsQueryBridge(deps: {
 
     // ── error ──
     if (message.type === "error") {
-      const defaultSid = getDefaultSessionId();
-      if (defaultSid) {
-        addPill(queryClient, defaultSid, {
-          id: createId("error"),
-          label: message.message,
-          variant: "error",
-        });
-      }
+      toast.error(message.message);
       return;
     }
 
