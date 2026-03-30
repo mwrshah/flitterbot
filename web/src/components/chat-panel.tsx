@@ -146,6 +146,15 @@ export function ChatPanel({
       <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
         <h1 className="text-sm font-semibold text-foreground">Pi</h1>
         <div className="flex items-center gap-2">
+          {isClient && statusPills.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {statusPills.map((pill) => (
+                <Badge key={pill.id} variant={pill.variant === "error" ? "error" : "muted"}>
+                  {pill.label}
+                </Badge>
+              ))}
+            </div>
+          )}
           {isClient && isSessionActive && (
             <Button
               variant="destructive"
@@ -155,15 +164,6 @@ export function ChatPanel({
             >
               {interruptMutation.isPending ? "Stopping..." : "Stop"}
             </Button>
-          )}
-          {isClient && statusPills.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {statusPills.map((pill) => (
-                <Badge key={pill.id} variant={pill.variant === "error" ? "error" : "muted"}>
-                  {pill.label}
-                </Badge>
-              ))}
-            </div>
           )}
         </div>
       </div>
