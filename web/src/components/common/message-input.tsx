@@ -262,8 +262,10 @@ export const MessageInput = memo(function MessageInput({
         } else if (atPositionRef.current >= 0) {
           event.preventDefault();
           closePicker(atPositionRef.current, setAtPickerOpen, atPositionRef);
+        } else {
+          // No picker open — defocus the input
+          textareaRef.current?.blur();
         }
-        // No picker open — let browser default (blur or no-op)
         return;
       }
 
