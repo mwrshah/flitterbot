@@ -5,6 +5,35 @@ import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import { fetchPiHistory, fetchPiInputHistory, fetchPiSessions, fetchPiWorktree, type PiWorkstreamInfo } from "~/server/pi";
 import type { DownstreamSessionItem } from "~/lib/types";
 
+/**
+ * structuralSharing callback: merges fetched timeline with the previous cache
+ * value. Items in the old cache that aren't present in the fetched result
+ * (i.e. WS-accumulated items the server doesn't know about yet) are appended.
+ * Returns the old reference unchanged when there's no diff (preserves React
+ * memoization via referential equality, which is structuralSharing's contract).
+ */
+function mergeTimelineItems(
+  oldData: unknown,
+  newData: unknown,
+): unknown {
+  const prev = oldData as ChatTimelineItem[] | undefined;
+  const next = newData as ChatTimelineItem[];
+
+  if (!prev?.length) return next;
+
+  const ids = new Set(next.map((item) => item.id));
+  const extras = prev.filter((item) => !ids.has(item.id));
+  if (!extras.length) {
+    // All old items covered by server — check if identical to preserve reference
+    return prev.length === next.length &&
+      prev.every((item, i) => item.id === next[i]!.id)
+      ? prev
+      : next;
+  }
+
+  return [...next, ...extras];
+}
+
 export function statusQueryOptions(apiClient: AutonomaApiClient) {
   return {
     queryKey: ["status"] as const,
@@ -16,31 +45,16 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
 export function piHistoryQueryOptions(
   sessionId: string | undefined,
   surface?: "input" | "agent",
-  queryClient?: { getQueryData: <T>(key: readonly unknown[]) => T | undefined },
 ) {
-  const key = ["pi-history", sessionId ?? "default", surface ?? "agent"] as const;
   return {
-    queryKey: key,
-    queryFn: async (): Promise<ChatTimelineItem[]> => {
-      const fetched = (await fetchPiHistory({
+    queryKey: ["pi-history", sessionId ?? "default", surface ?? "agent"] as const,
+    queryFn: async (): Promise<ChatTimelineItem[]> =>
+      (await fetchPiHistory({
         data: {
           ...(sessionId ? { piSessionId: sessionId } : {}),
           ...(surface ? { surface } : {}),
         },
-      })) as ChatTimelineItem[];
-
-      // On refetch (reconnect), merge with WS-accumulated items to avoid
-      // oscillation where server data replaces longer WS-accumulated data,
-      // then WS events re-grow it.
-      const existing = queryClient?.getQueryData<ChatTimelineItem[]>(key);
-      if (!existing?.length) return fetched;
-
-      const ids = new Set(fetched.map((item) => item.id));
-      const extras = existing.filter((item) => !ids.has(item.id));
-      if (!extras.length) return fetched;
-
-      return [...fetched, ...extras];
-    },
+      })) as ChatTimelineItem[],
     enabled: sessionId !== undefined,
     staleTime: Infinity, // WS events keep this fresh via setQueryData
     // When the default session restarts with a new ID, the component picks up
@@ -49,6 +63,10 @@ export function piHistoryQueryOptions(
     // back to stale loaderHistory (old session's messages). An empty placeholder
     // avoids showing the old session's data during the transition.
     placeholderData: [],
+    // On refetch (reconnect), merge fetched data with WS-accumulated items
+    // already in cache to prevent oscillation where server data replaces items
+    // that only exist via setQueryData, then WS events re-grow them.
+    structuralSharing: mergeTimelineItems,
   };
 }
 
@@ -102,26 +120,13 @@ export function connectionStateQueryOptions() {
 }
 
 /** Input surface timeline — pi_surfaced events + user messages from all sessions. */
-export function inputSurfaceTimelineQueryOptions(
-  queryClient?: { getQueryData: <T>(key: readonly unknown[]) => T | undefined },
-) {
-  const key = ["pi-input-surface-timeline"] as const;
+export function inputSurfaceTimelineQueryOptions() {
   return {
-    queryKey: key,
-    queryFn: async (): Promise<ChatTimelineItem[]> => {
-      const fetched = (await fetchPiInputHistory()) as ChatTimelineItem[];
-
-      // On refetch (reconnect), merge with WS-accumulated items to avoid
-      // oscillation where server data replaces longer WS-accumulated data,
-      // then WS events re-grow it.
-      const existing = queryClient?.getQueryData<ChatTimelineItem[]>(key);
-      if (!existing?.length) return fetched;
-      const ids = new Set(fetched.map((item) => item.id));
-      const extras = existing.filter((item) => !ids.has(item.id));
-      if (!extras.length) return fetched;
-      return [...fetched, ...extras];
-    },
+    queryKey: ["pi-input-surface-timeline"] as const,
+    queryFn: async (): Promise<ChatTimelineItem[]> =>
+      (await fetchPiInputHistory()) as ChatTimelineItem[],
     staleTime: Infinity, // WS events keep this fresh via setQueryData
+    structuralSharing: mergeTimelineItems,
   };
 }
 

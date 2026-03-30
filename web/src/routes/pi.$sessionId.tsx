@@ -28,7 +28,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
     const [status, history] = await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient
-        .ensureQueryData(piHistoryQueryOptions(params.sessionId, undefined, context.queryClient))
+        .ensureQueryData(piHistoryQueryOptions(params.sessionId))
         .catch((error: unknown) => {
           if (error instanceof Error && /404|not found/i.test(error.message)) {
             throw redirect({ to: "/pi/default" });
