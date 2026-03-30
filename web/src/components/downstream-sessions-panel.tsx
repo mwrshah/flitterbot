@@ -87,6 +87,11 @@ export function DownstreamSessionsPanel({
                     {session.sessionId.slice(0, 8)}
                   </span>
                 </div>
+                {session.tmuxSession && (
+                  <span className="pl-4 text-xs text-muted-foreground truncate font-mono">
+                    {session.tmuxSession}
+                  </span>
+                )}
                 <span className="pl-4 text-xs text-muted-foreground truncate">
                   {session.workstreamName ?? "no workstream"}
                 </span>
