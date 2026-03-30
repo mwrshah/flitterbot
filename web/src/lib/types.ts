@@ -187,6 +187,7 @@ export type WsMessage =
   | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
   | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
   | { type: "text_delta"; delta: string; sessionId?: string; messageId: string }
+  | { type: "message_start"; sessionId?: string; messageId: string }
   | {
       type: "message_end";
       sessionId?: string;
