@@ -1,8 +1,11 @@
-import { execSync } from "node:child_process";
+import { exec as cpExec } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { enrichWorkstream, getWorkstreamById } from "../blackboard/query-workstreams.ts";
+
+const execPromise = promisify(cpExec);
 
 type CreateWorktreeResult = {
   ok: boolean;
@@ -13,23 +16,27 @@ type CreateWorktreeResult = {
   usedGtr: boolean;
 };
 
-function hasGtr(repoPath: string): boolean {
+async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
+  const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
+  return stdout.trim();
+}
+
+async function hasGtr(repoPath: string): Promise<boolean> {
   try {
-    execSync("git gtr version", { cwd: repoPath, timeout: 5_000, stdio: "pipe" });
+    await execPromise("git gtr version", { cwd: repoPath, timeout: 5_000 });
     return true;
   } catch {
     return false;
   }
 }
 
-function getHighestBranchNumber(repoPath: string): number {
+async function getHighestBranchNumber(repoPath: string): Promise<number> {
   try {
-    const output = execSync(
+    const output = await exec(
       "git for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/origin/",
-      { cwd: repoPath, timeout: 10_000, stdio: "pipe" },
-    )
-      .toString()
-      .trim();
+      repoPath,
+      10_000,
+    );
     if (!output) return 0;
     const numbers = output
       .split("\n")
@@ -52,15 +59,9 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function resolveGtrWorktreePath(repoPath: string, branchName: string): string {
+async function resolveGtrWorktreePath(repoPath: string, branchName: string): Promise<string> {
   try {
-    const output = execSync(`git gtr go ${branchName}`, {
-      cwd: repoPath,
-      timeout: 5_000,
-      stdio: "pipe",
-    })
-      .toString()
-      .trim();
+    const output = await exec(`git gtr go ${branchName}`, repoPath, 5_000);
     if (output) return output;
   } catch {
     // fall through to convention
@@ -70,31 +71,38 @@ function resolveGtrWorktreePath(repoPath: string, branchName: string): string {
   return path.resolve(repoPath, "..", `${repoDir}-worktrees`, branchName);
 }
 
-function createWithGtr(repoPath: string, branchName: string): { worktreePath: string } {
-  execSync(`git gtr new ${branchName} --yes`, { cwd: repoPath, timeout: 60_000, stdio: "pipe" });
-  const worktreePath = resolveGtrWorktreePath(repoPath, branchName);
+async function createWithGtr(
+  repoPath: string,
+  branchName: string,
+): Promise<{ worktreePath: string }> {
+  await exec(`git gtr new ${branchName} --yes`, repoPath, 60_000);
+  const worktreePath = await resolveGtrWorktreePath(repoPath, branchName);
   return { worktreePath };
 }
 
-function createWithRawGit(repoPath: string, branchName: string): { worktreePath: string } {
+async function createWithRawGit(
+  repoPath: string,
+  branchName: string,
+): Promise<{ worktreePath: string }> {
   const repoDir = path.basename(repoPath);
   const worktreePath = path.resolve(repoPath, "..", `${repoDir}-worktrees`, branchName);
-  execSync("git fetch origin", { cwd: repoPath, timeout: 30_000, stdio: "pipe" });
-  execSync(
+  await exec("git fetch origin", repoPath, 30_000);
+  await exec(
     `git worktree add ${JSON.stringify(worktreePath)} -b ${JSON.stringify(branchName)} origin/main`,
-    { cwd: repoPath, timeout: 30_000, stdio: "pipe" },
+    repoPath,
+    30_000,
   );
   return { worktreePath };
 }
 
-export function executeCreateWorktree(
+export async function executeCreateWorktree(
   blackboard: BlackboardDatabase,
   workstreamId: string,
   repoPath: string,
   branchName?: string,
   updateRepoPath?: string,
   updateWorktreePath?: string,
-): CreateWorktreeResult {
+): Promise<CreateWorktreeResult> {
   const workstream = getWorkstreamById(blackboard, workstreamId);
   if (!workstream) {
     return {
@@ -131,11 +139,11 @@ export function executeCreateWorktree(
   let cleanupMessage = "";
   if (workstream.worktree_path && workstream.repo_path && workstream.repo_path !== repoPath) {
     try {
-      execSync(`git worktree remove ${JSON.stringify(workstream.worktree_path)} --force`, {
-        cwd: workstream.repo_path,
-        timeout: 15_000,
-        stdio: "pipe",
-      });
+      await exec(
+        `git worktree remove ${JSON.stringify(workstream.worktree_path)} --force`,
+        workstream.repo_path,
+        15_000,
+      );
       cleanupMessage = `Removed orphaned worktree at ${workstream.worktree_path} (old repo: ${workstream.repo_path}). `;
     } catch {
       cleanupMessage = `Warning: could not remove old worktree at ${workstream.worktree_path}. `;
@@ -160,17 +168,13 @@ export function executeCreateWorktree(
   if (branchName) {
     resolvedBranch = branchName;
   } else {
-    const nextNum = getHighestBranchNumber(repoPath) + 1;
+    const nextNum = (await getHighestBranchNumber(repoPath)) + 1;
     resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
   }
 
   // Check if branch already has a worktree
   try {
-    const worktrees = execSync("git worktree list --porcelain", {
-      cwd: repoPath,
-      timeout: 10_000,
-      stdio: "pipe",
-    }).toString();
+    const worktrees = await exec("git worktree list --porcelain", repoPath, 10_000);
     if (worktrees.includes(`branch refs/heads/${resolvedBranch}`)) {
       // Already checked out — find the path
       const lines = worktrees.split("\n");
@@ -198,19 +202,15 @@ export function executeCreateWorktree(
     // ignore — proceed to create
   }
 
-  const useGtr = hasGtr(repoPath);
+  const useGtr = await hasGtr(repoPath);
   try {
     const result = useGtr
-      ? createWithGtr(repoPath, resolvedBranch)
-      : createWithRawGit(repoPath, resolvedBranch);
+      ? await createWithGtr(repoPath, resolvedBranch)
+      : await createWithRawGit(repoPath, resolvedBranch);
 
     // Register Git Town parent if git-town is available
     try {
-      execSync(`git config "git-town-branch.${resolvedBranch}.parent" main`, {
-        cwd: repoPath,
-        timeout: 5_000,
-        stdio: "pipe",
-      });
+      await exec(`git config "git-town-branch.${resolvedBranch}.parent" main`, repoPath, 5_000);
     } catch {
       // Git Town not installed — fine
     }
