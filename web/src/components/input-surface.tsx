@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MessageInput } from "~/components/common/message-input";
 
+import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
@@ -160,6 +162,20 @@ function CollapsibleContent({
   );
 }
 
+function MessageCopyButton({ text }: { text: string }) {
+  const { copied, copy } = useCopyToClipboard();
+  return (
+    <button
+      type="button"
+      onClick={() => copy(text)}
+      className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer"
+      title="Copy message"
+    >
+      {copied ? <CheckIcon className="w-3.5 h-3.5 text-emerald-500" /> : <CopyIcon className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 /* ── Entry Renderers ── */
 
 const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
@@ -178,7 +194,7 @@ const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry
           </span>
         </div>
       </div>
-      <div className="flex-1 min-w-0 rounded-lg border border-border bg-card px-3 py-2">
+      <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-card px-3 py-2">
         {badgeName && (
           <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
             {badgeName}
@@ -189,6 +205,7 @@ const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry
             {displayContent}
           </p>
         </CollapsibleContent>
+        <MessageCopyButton text={displayContent} />
       </div>
     </div>
   );
@@ -260,7 +277,7 @@ const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: Surfac
           <span className="text-[10px] font-medium text-muted-foreground">Pi</span>
         </div>
       </div>
-      <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
+      <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
         {entry.workstreamName && (
           <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
             {entry.workstreamName}
@@ -269,6 +286,7 @@ const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: Surfac
         <CollapsibleContent fadeClassName="from-muted/30">
           <LitMarkdownBlock content={entry.content} />
         </CollapsibleContent>
+        <MessageCopyButton text={entry.content} />
       </div>
     </div>
   );
