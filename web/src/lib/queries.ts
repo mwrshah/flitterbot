@@ -56,7 +56,7 @@ export function piHistoryQueryOptions(
         },
       })) as ChatTimelineItem[],
     enabled: sessionId !== undefined,
-    staleTime: Infinity, // WS events keep this fresh via setQueryData
+    staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     // When the default session restarts with a new ID, the component picks up
     // the new sessionId from the status cache before the route loader re-runs.
     // Without placeholderData, useQuery returns undefined and usePiChat falls
