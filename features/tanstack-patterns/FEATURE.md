@@ -96,3 +96,45 @@ This enables full streaming for an explicit Pi session route.
 ## Boundary
 
 TanStack loaders and `beforeLoad` are for data and route resolution. The actual subscribe/unsubscribe side effect should happen only after the router resolves the active route on the client.
+
+## WS-Driven Query Cache Pattern
+
+### The Problem
+
+WS-driven queries like pi-history are kept live via `setQueryData` while the user is viewing the route. But when the user navigates away, the router-owned subscriber unsubscribes from that session's WS events. The cache silently goes stale with no mechanism to signal this to TanStack Query.
+
+Using `staleTime: Infinity` masks this — the cache reports fresh data indefinitely, even after the WS stops updating it. This forces manual cache manipulation (removeQueries, invalidateQueries) on route leave to work around the lie, defeating the purpose of having a cache.
+
+### The Pattern: staleTime 0 + WS setQueryData
+
+Use `staleTime: 0` so data is considered stale unless it was just updated. The WS lifecycle handles freshness naturally through three phases:
+
+**While viewing** — WS `setQueryData` calls reset `dataUpdatedAt` on every event. Since data was just updated, useQuery observers see it as fresh and do not refetch. The cache is genuinely live.
+
+**On route leave** — The router-owned subscriber unsubscribes from WS events. No more `setQueryData` calls means `dataUpdatedAt` stops advancing, and the data becomes stale naturally. No manual cache manipulation needed.
+
+**On return (revalidation and rehydration)** — This is where stale-while-revalidate pays off:
+
+1. `ensureQueryData` in the route loader finds cached data and returns it instantly. The user sees the last-known messages with zero delay.
+2. `useQuery` mounts in the component, sees the data is stale (`staleTime: 0`), and triggers a background HTTP fetch to the server.
+3. The server queries the DB for the full message history for that session and returns it.
+4. TanStack Query replaces the stale cache with the fresh server response. The `structuralSharing` merge function reconciles any WS-accumulated items that the server might not have yet — preventing oscillation where server data temporarily replaces items that only exist via `setQueryData`.
+5. The UI re-renders with the fresh, complete message history — rehydrated from the DB.
+6. Simultaneously, the WS resubscribes to that session's events, so any new messages arriving after the fetch are pushed live.
+
+The user experience: cached messages appear instantly on navigation, then within milliseconds the data is rehydrated from the database. No spinner, no flash of empty state.
+
+### What Changed
+
+- **`piHistoryQueryOptions`**: `staleTime: Infinity` → `staleTime: 0`. Lets TanStack Query see staleness naturally instead of hiding it.
+- **`ws-route-subscriptions.ts`**: Removed the `removeQueries` call that nuked the cache on every route leave. This was a workaround for `staleTime: Infinity` — without it, `ensureQueryData` would return stale data that looked fresh, so the only option was to destroy the cache entirely and force a blocking refetch. That workaround caused loading spinners on return. With `staleTime: 0`, staleness is visible to TanStack Query and the standard revalidation path handles it.
+
+### Anti-Patterns
+
+- **`staleTime: Infinity` for WS-driven data** — hides staleness and forces imperative cache manipulation on route transitions. The cache reports fresh data that is actually stale.
+- **`removeQueries` / `invalidateQueries` on route leave** — nukes the cache entirely, causing loading spinners on return instead of instant cached responses with background revalidation.
+- **`fetchQuery` in loaders for cached data** — blocks navigation waiting for a network response when cached data would serve the user instantly.
+
+### When staleTime Infinity Is Correct
+
+`staleTime: Infinity` is appropriate for data that is never fetched from the server and is purely managed via `setQueryData` with no subscription lifecycle. Examples: connection-state, status-pills. These are application-global state stored in the query cache for convenience — no route-scoped WS subscription starts or stops updating them, so staleness is not a concern.
