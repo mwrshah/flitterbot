@@ -124,6 +124,8 @@ Use `staleTime: 0` so data is considered stale unless it was just updated. The W
 
 The user experience: cached messages appear instantly on navigation, then within milliseconds the data is rehydrated from the database. No spinner, no flash of empty state.
 
+Both the pi session routes (`/pi/$sessionId`) and the input surface route (`/`) use this pattern. The input surface follows the same `staleTime: 0` + `ensureQueryData` approach — its wildcard WS subscription keeps the cache live while viewing, and on return the stale cache is served instantly while a background refetch rehydrates from the server.
+
 ### What Changed
 
 - **`piHistoryQueryOptions`**: `staleTime: Infinity` → `staleTime: 0`. Lets TanStack Query see staleness naturally instead of hiding it.
