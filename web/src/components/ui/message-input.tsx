@@ -244,6 +244,19 @@ export const MessageInput = memo(function MessageInput({
         if (event.key === "Escape") {
           event.preventDefault();
           setPickerOpen(false);
+          // Remove trigger text from "/" to cursor
+          const pos = slashPositionRef.current;
+          if (pos >= 0) {
+            const value = draftRef.current;
+            const cursor = textareaRef.current?.selectionStart ?? value.length;
+            const newValue = value.slice(0, pos) + value.slice(cursor);
+            setDraft(newValue);
+            slashPositionRef.current = -1;
+            requestAnimationFrame(() => {
+              textareaRef.current?.setSelectionRange(pos, pos);
+              textareaRef.current?.focus();
+            });
+          }
           return;
         }
         if (navKeys.includes(event.key)) {
@@ -259,6 +272,19 @@ export const MessageInput = memo(function MessageInput({
         if (event.key === "Escape") {
           event.preventDefault();
           setAtPickerOpen(false);
+          // Remove trigger text from "@" to cursor
+          const pos = atPositionRef.current;
+          if (pos >= 0) {
+            const value = draftRef.current;
+            const cursor = textareaRef.current?.selectionStart ?? value.length;
+            const newValue = value.slice(0, pos) + value.slice(cursor);
+            setDraft(newValue);
+            atPositionRef.current = -1;
+            requestAnimationFrame(() => {
+              textareaRef.current?.setSelectionRange(pos, pos);
+              textareaRef.current?.focus();
+            });
+          }
           return;
         }
         if (navKeys.includes(event.key)) {
