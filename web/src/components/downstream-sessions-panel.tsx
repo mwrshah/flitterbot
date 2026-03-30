@@ -106,15 +106,16 @@ export function DownstreamSessionsPanel({
               Active Worktree
             </p>
             <div className="flex flex-col gap-0.5 py-1.5">
-              <span className="truncate text-xs font-medium text-foreground">{worktree.name}</span>
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="truncate">{worktree.worktreePath.split("/").pop()}</span>
-                {worktree.repoPath && (
-                  <>
-                    <span>·</span>
-                    <span className="shrink-0">{worktree.repoPath.split("/").pop()}</span>
-                  </>
-                )}
+              <span className="truncate text-xs text-muted-foreground">
+                Branch: <span className="font-medium text-foreground">{worktree.name}</span>
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                Worktree: {(() => {
+                  const parts = (worktree.worktreePath ?? "").split("/");
+                  const parent = parts[parts.length - 2] ?? "";
+                  const leaf = parts[parts.length - 1] ?? "";
+                  return parent ? `${parent}/${leaf}` : leaf;
+                })()}
               </span>
             </div>
           </div>
