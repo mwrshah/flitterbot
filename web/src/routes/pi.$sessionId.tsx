@@ -1,4 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, getRouteApi, redirect } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
@@ -53,6 +54,12 @@ export const Route = createFileRoute("/pi/$sessionId")({
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
+  const { data: status } = useQuery(statusQueryOptions(apiClient));
+  const workstream = status?.workstreams?.find((ws) => ws.piSessionId === sessionId);
+  const isWorkstreamClosed = workstream?.status === "closed";
+
   const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
     sessionId,
     history,
@@ -67,6 +74,8 @@ function PiSessionRoute() {
           statusPills={statusPills}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
+          workstreamId={workstream?.id}
+          isWorkstreamClosed={isWorkstreamClosed}
         />
       </Panel>
       <ResizeHandle />

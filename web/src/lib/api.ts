@@ -82,6 +82,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
     interruptPiSession: (piSessionId: string) =>
       request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, { method: "POST" }),
 
+    reopenWorkstream: (workstreamId: string) =>
+      request<{ ok: boolean }>(`/api/workstreams/${workstreamId}/reopen`, { method: "POST" }),
+
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
     getDirectoryCompletions: (path: string, piSessionId?: string) => {

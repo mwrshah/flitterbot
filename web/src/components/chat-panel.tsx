@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
@@ -25,6 +26,8 @@ type ChatPanelProps = {
   statusPills: StatusPill[];
   isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
+  workstreamId?: string;
+  isWorkstreamClosed?: boolean;
 };
 
 export function ChatPanel({
@@ -33,6 +36,8 @@ export function ChatPanel({
   statusPills,
   isSessionBusy,
   onSendMessage,
+  workstreamId,
+  isWorkstreamClosed,
 }: ChatPanelProps) {
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
@@ -48,6 +53,11 @@ export function ChatPanel({
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(sessionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: () => apiClient.reopenWorkstream(workstreamId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
@@ -169,6 +179,17 @@ export function ChatPanel({
               onClick={() => interruptMutation.mutate()}
             >
               {interruptMutation.isPending ? "Stopping..." : "Stop"}
+            </Button>
+          )}
+          {isClient && !isSessionActive && isWorkstreamClosed && workstreamId && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={reopenMutation.isPending}
+              onClick={() => reopenMutation.mutate()}
+            >
+              <RotateCcw className="size-3.5" />
+              {reopenMutation.isPending ? "Reopening..." : "Reopen"}
             </Button>
           )}
         </div>
