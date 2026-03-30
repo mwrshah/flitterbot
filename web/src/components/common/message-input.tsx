@@ -262,12 +262,8 @@ export const MessageInput = memo(function MessageInput({
         } else if (atPositionRef.current >= 0) {
           event.preventDefault();
           closePicker(atPositionRef.current, setAtPickerOpen, atPositionRef);
-        } else if (draftRef.current) {
-          // No picker open, but has text — clear draft, prevent blur
-          event.preventDefault();
-          setDraft("");
         }
-        // No picker, no text — let browser default (blur)
+        // No picker open — let browser default (blur or no-op)
         return;
       }
 
