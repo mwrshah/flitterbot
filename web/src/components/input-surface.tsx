@@ -3,6 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MessageInput } from "~/components/common/message-input";
+import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -410,6 +411,7 @@ export function InputSurface() {
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
+        <RuntimeHealthIndicator />
       </div>
 
       {/* Activity feed */}
