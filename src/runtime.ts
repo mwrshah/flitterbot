@@ -877,6 +877,72 @@ export class ControlSurfaceRuntime {
     return false;
   }
 
+  async reopenWorkstream(workstreamId: string): Promise<{ ok: boolean; workstreamId: string }> {
+    const { reopenWorkstream, getWorkstreamById } = await import(
+      "./blackboard/query-workstreams.ts"
+    );
+
+    const ws = getWorkstreamById(this.blackboard, workstreamId);
+    if (!ws) throw new Error("Workstream not found");
+    if (ws.status !== "closed") throw new Error("Workstream is not closed");
+
+    // 1. Reopen the workstream and clear stale worktree_path
+    reopenWorkstream(this.blackboard, workstreamId);
+    this.blackboard
+      .prepare(`UPDATE workstreams SET worktree_path = NULL WHERE id = ?`)
+      .run(workstreamId);
+
+    // 2. Revive the pi_session: clear ended_at/end_reason, set status back to waiting_for_user
+    const piRow = this.blackboard.get<{
+      pi_session_id: string;
+      session_file: string | null;
+      started_at: string;
+      model_provider: string | null;
+      model_id: string | null;
+    }>(
+      `SELECT pi_session_id, session_file, started_at, model_provider, model_id
+       FROM pi_sessions
+       WHERE workstream_id = ? AND role = 'orchestrator'
+       ORDER BY started_at DESC LIMIT 1`,
+      workstreamId,
+    );
+
+    if (piRow) {
+      this.blackboard
+        .prepare(
+          `UPDATE pi_sessions
+           SET status = 'waiting_for_user',
+               ended_at = NULL,
+               end_reason = NULL,
+               last_event_at = ?
+           WHERE pi_session_id = ?`,
+        )
+        .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), piRow.pi_session_id);
+
+      // 3. Rehydrate the orchestrator in-memory
+      this.sessionManager.rehydrateOrchestrator(
+        workstreamId,
+        ws.name,
+        piRow.pi_session_id,
+        piRow.session_file,
+        piRow.started_at,
+        piRow.model_provider,
+        piRow.model_id,
+      );
+    }
+
+    // 4. Broadcast so frontend updates
+    this.wsHub.broadcast({
+      type: "workstreams_changed",
+      reason: "reopened",
+      workstreamId,
+      workstreamName: ws.name,
+    });
+
+    this.log(`reopened workstream "${ws.name}" (${workstreamId})`);
+    return { ok: true, workstreamId };
+  }
+
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     workstreamId?: string,
