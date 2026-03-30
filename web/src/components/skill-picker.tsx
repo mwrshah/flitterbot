@@ -13,7 +13,6 @@ type SkillPickerProps = {
   filter: string;
   skills: SkillListItem[];
   onSelect: (skillName: string) => void;
-  onClose: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
 };
@@ -23,7 +22,6 @@ export const SkillPicker = memo(function SkillPicker({
   filter,
   skills,
   onSelect,
-  onClose: _onClose,
   caretLeft,
   commandRef,
 }: SkillPickerProps) {

@@ -12,7 +12,6 @@ type PathPickerProps = {
   items: DirectoryCompletionItem[];
   isFetching: boolean;
   onSelect: (item: DirectoryCompletionItem) => void;
-  onClose: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
 };
@@ -22,7 +21,6 @@ export const PathPicker = memo(function PathPicker({
   items,
   isFetching,
   onSelect,
-  onClose: _onClose,
   caretLeft,
   commandRef,
 }: PathPickerProps) {

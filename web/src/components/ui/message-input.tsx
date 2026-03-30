@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   type ClipboardEvent,
   type DragEvent,
-  type FormEvent,
   memo,
   useCallback,
   useEffect,
@@ -238,18 +237,19 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // When a picker is open, forward navigation keys to cmdk
-      const pickerKeys = ["ArrowDown", "ArrowUp", "Enter", "Home", "End"];
+      // When a picker is open, forward navigation keys to cmdk.
+      // Tab is mapped to Enter so it accepts the highlighted item.
+      const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
       if (pickerOpenRef.current) {
         if (event.key === "Escape") {
           event.preventDefault();
           setPickerOpen(false);
           return;
         }
-        if (pickerKeys.includes(event.key)) {
+        if (navKeys.includes(event.key)) {
           event.preventDefault();
           skillCommandRef.current?.dispatchEvent(
-            new KeyboardEvent("keydown", { key: event.key, bubbles: true }),
+            new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
           );
           return;
         }
@@ -261,10 +261,10 @@ export const MessageInput = memo(function MessageInput({
           setAtPickerOpen(false);
           return;
         }
-        if (pickerKeys.includes(event.key)) {
+        if (navKeys.includes(event.key)) {
           event.preventDefault();
           pathCommandRef.current?.dispatchEvent(
-            new KeyboardEvent("keydown", { key: event.key, bubbles: true }),
+            new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
           );
           return;
         }
@@ -353,7 +353,6 @@ export const MessageInput = memo(function MessageInput({
             filter={pickerFilter}
             skills={skills ?? []}
             onSelect={handleSkillSelect}
-            onClose={() => setPickerOpen(false)}
             caretLeft={caretLeft}
             commandRef={skillCommandRef}
           />
@@ -362,7 +361,6 @@ export const MessageInput = memo(function MessageInput({
             items={pathItems}
             isFetching={isPathFetching}
             onSelect={handlePathSelect}
-            onClose={() => setAtPickerOpen(false)}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}
           />

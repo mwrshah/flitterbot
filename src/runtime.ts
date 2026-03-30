@@ -970,6 +970,9 @@ export class ControlSurfaceRuntime {
               let prompt: string;
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
+                const { getPreviousWorkstreamCreatedAt } = await import(
+                  "./blackboard/query-workstreams.ts"
+                );
                 const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
                 const { classifyContextRelevance } = await import(
                   "./classifier/context-relevance.ts"
@@ -977,7 +980,8 @@ export class ControlSurfaceRuntime {
                 const { formatWorkstreamPrompt } = await import("./pi/format-workstream-prompt.ts");
                 const apiKey = resolveGroqApiKey();
 
-                const recentMessages = getRecentDefaultMessages(this.blackboard, 10);
+                const boundary = getPreviousWorkstreamCreatedAt(this.blackboard, ws.id);
+                const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
 
                 if (apiKey && recentMessages.length > 1) {
                   const relevance = await classifyContextRelevance(recentMessages, ws.name, apiKey);

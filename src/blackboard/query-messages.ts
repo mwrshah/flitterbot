@@ -94,14 +94,22 @@ export type ConversationSnippet = {
 export function getRecentDefaultMessages(
   db: BlackboardDatabase,
   limit: number = 10,
+  after?: string,
 ): Pick<MessageRow, "content" | "created_at">[] {
-  const rows = db.all<Pick<MessageRow, "content" | "created_at">>(
-    `SELECT content, created_at FROM messages
-     WHERE direction = 'inbound' AND workstream_id IS NULL
-     ORDER BY created_at DESC LIMIT ?`,
-    limit,
-  );
-  // Return in chronological order
+  const rows = after
+    ? db.all<Pick<MessageRow, "content" | "created_at">>(
+        `SELECT content, created_at FROM messages
+         WHERE direction = 'inbound' AND workstream_id IS NULL AND created_at > ?
+         ORDER BY created_at DESC LIMIT ?`,
+        after,
+        limit,
+      )
+    : db.all<Pick<MessageRow, "content" | "created_at">>(
+        `SELECT content, created_at FROM messages
+         WHERE direction = 'inbound' AND workstream_id IS NULL
+         ORDER BY created_at DESC LIMIT ?`,
+        limit,
+      );
   return rows.reverse();
 }
 
