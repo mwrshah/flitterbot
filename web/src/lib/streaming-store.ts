@@ -44,11 +44,15 @@ function fireCallbacks(sessionId: string) {
   const isThinkingStreaming = thinkingActive.get(sessionId) ?? false;
   const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
   const hasContent = textState != null || thinkingState != null;
+  const effectiveMessageId = hasContent ? messageId : null;
+  if (effectiveMessageId === null) {
+    console.log("[debug][streaming-store] fireCallbacks: messageId=null (clear signal) for session=%s — textState=%s thinkingState=%s", sessionId, textState != null ? "present" : "null", thinkingState != null ? "present" : "null");
+  }
   cb(
     textState?.text ?? null,
     thinkingState?.text ?? null,
     isThinkingStreaming,
-    hasContent ? messageId : null,
+    effectiveMessageId,
   );
 }
 
@@ -125,6 +129,7 @@ export const streamingStore = {
   /* ── Clear all streaming for a session (turn_end / agent_end) ── */
 
   clearSession(sessionId: string) {
+    console.log("[debug][streaming-store] clearSession for session=%s", sessionId);
     texts.delete(sessionId);
     thinking.delete(sessionId);
     pendingTools.delete(sessionId);

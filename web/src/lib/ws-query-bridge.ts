@@ -99,9 +99,11 @@ function appendTimelineItem(
     return;
   }
 
-  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) =>
-    [...(old ?? []), item],
-  );
+  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+    const next = [...(old ?? []), item];
+    console.log("[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s", item.kind, next.length, sessionId);
+    return next;
+  });
 }
 
 /* ── Timeline upsert helper (replace existing by ID, or append) ── */
@@ -126,10 +128,12 @@ function upsertTimelineItem(
           item.id,
         );
       }
+      console.log("[debug][ws-bridge] upsertTimelineItem: replaced existing id=%s wasIntermediate=%s timeline.length=%d session=%s", item.id, wasIntermediate, items.length, sessionId);
       const updated = [...items];
       updated[idx] = item;
       return updated;
     }
+    console.log("[debug][ws-bridge] upsertTimelineItem: appended (no existing id=%s) → timeline.length=%d session=%s", item.id, items.length + 1, sessionId);
     return [...items, item];
   });
 }
@@ -320,6 +324,7 @@ export function setupWsQueryBridge(deps: {
       // Clear all streaming state atomically. thinking is now in the cache so
       // nothing is lost — clearSession fires one callback with all-nulls which
       // triggers clearStreaming() on the Lit component.
+      console.log("[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s", sessionId, msg.id);
       streamingStore.clearSession(sessionId);
       return;
     }
@@ -432,6 +437,7 @@ export function setupWsQueryBridge(deps: {
 
     // ── turn_end ──
     if (message.type === "turn_end") {
+      console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", sessionId);
       streamingStore.clearSession(sessionId);
       return;
     }
@@ -443,6 +449,7 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "agent_end") {
       const uncommitted = streamingStore.getUncommittedText(sessionId);
       if (uncommitted?.text.trim()) {
+        console.log("[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s", uncommitted.messageId, sessionId);
         upsertTimelineItem(queryClient, sessionId, {
           id: uncommitted.messageId,
           kind: "message",
@@ -451,6 +458,7 @@ export function setupWsQueryBridge(deps: {
           createdAt: new Date().toISOString(),
         });
       }
+      console.log("[debug][ws-bridge] agent_end: calling clearSession hasUncommitted=%s session=%s", uncommitted?.text.trim() ? "yes" : "no", sessionId);
       streamingStore.clearSession(sessionId);
       return;
     }

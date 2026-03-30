@@ -114,6 +114,7 @@ export function ChatPanel({
           isThinkingStreaming,
         );
       } else {
+        console.log("[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s", sessionId);
         messageListRef.current?.clearStreaming();
       }
     });
