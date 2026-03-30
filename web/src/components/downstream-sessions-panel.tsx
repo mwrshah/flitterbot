@@ -48,9 +48,9 @@ export function DownstreamSessionsPanel({
   if (!piSessionId) {
     return (
       <div className="flex flex-col h-full border-l border-border bg-background">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Active Sessions</h2>
-        </div>
+        <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Active Sessions
+        </p>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-xs text-muted-foreground">Waiting for session…</p>
         </div>
@@ -60,11 +60,10 @@ export function DownstreamSessionsPanel({
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground">Active Sessions</h2>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
+        <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Active Sessions
+        </p>
         {isPending && (
           <p className="px-4 py-3 text-xs text-muted-foreground">Loading sessions…</p>
         )}
