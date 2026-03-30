@@ -20,6 +20,7 @@ import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
 } from "./routes/browser-sessions.ts";
+import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
 import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
@@ -144,6 +145,12 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     pathname === CONTROL_SURFACE_ENDPOINTS.skills.path
   ) {
     return handleBrowserSkillsRoute(runtime, req, res);
+  }
+  if (
+    method === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.method &&
+    pathname === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.path
+  ) {
+    return handleBrowserDirectoryCompletionsRoute(runtime, req, res);
   }
   if (
     method === "GET" &&

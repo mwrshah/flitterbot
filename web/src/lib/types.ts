@@ -181,6 +181,19 @@ export type SkillsListResponse = {
   items: SkillListItem[];
 };
 
+/* ── Directory Completions ── */
+
+export type DirectoryCompletionItem = {
+  name: string;
+  kind: "directory" | "file";
+  path: string;
+};
+
+export type DirectoryCompletionsResponse = {
+  items: DirectoryCompletionItem[];
+  cwd: string;
+};
+
 /* ── WebSocket messages (inbound) ── */
 
 export type WsMessage =
