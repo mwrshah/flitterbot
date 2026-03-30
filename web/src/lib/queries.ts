@@ -1,5 +1,7 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
-import type { ChatTimelineItem, ConnectionState, StatusResponse } from "~/lib/types";
+import type { ChatTimelineItem, ConnectionState, DirectoryCompletionItem, StatusResponse } from "~/lib/types";
+import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import { fetchPiHistory, fetchPiInputHistory, fetchPiSessions, fetchPiWorktree, type PiWorkstreamInfo } from "~/server/pi";
 import type { DownstreamSessionItem } from "~/lib/types";
 
@@ -114,5 +116,17 @@ export function inputSurfaceTimelineQueryOptions(
       return [...fetched, ...extras];
     },
     staleTime: Infinity, // WS events keep this fresh via setQueryData
+  };
+}
+
+/** Directory completions for the @-mention path picker. */
+export function directoryCompletionsQueryOptions(pathFilter: string, enabled: boolean) {
+  return {
+    queryKey: ["directory-completions", pathFilter] as const,
+    queryFn: (): Promise<DirectoryCompletionItem[]> =>
+      fetchDirectoryCompletions({ data: { path: pathFilter } }),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 5_000,
   };
 }
