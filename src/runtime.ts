@@ -1206,7 +1206,7 @@ export class ControlSurfaceRuntime {
               update_repo_path?: string;
               update_worktree_path?: string;
             };
-          const result = executeCreateWorktree(
+          const result = await executeCreateWorktree(
             this.blackboard,
             workstream_id,
             repo_path,
