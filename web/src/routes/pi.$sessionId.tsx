@@ -49,7 +49,7 @@ function PiSessionRoute() {
 
   return (
     <PanelGroup orientation="horizontal" className="h-full">
-      <Panel defaultSize={75} minSize={40}>
+      <Panel defaultSize="75%" minSize="40%">
         <ChatPanel
           sessionId={effectiveSessionId}
           timeline={timeline}
@@ -59,7 +59,7 @@ function PiSessionRoute() {
         />
       </Panel>
       <ResizeHandle />
-      <Panel defaultSize={25} minSize={15}>
+      <Panel defaultSize="25%" minSize="15%">
         <DownstreamSessionsPanel piSessionId={sessionId} />
       </Panel>
     </PanelGroup>
