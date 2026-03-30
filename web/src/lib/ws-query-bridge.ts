@@ -84,7 +84,7 @@ function removePill(queryClient: QueryClient, sessionId: string, pillId: string)
   );
 }
 
-/* ── Timeline append helper (no dedup — duplicates surface in UI to expose backend bugs) ── */
+/* ── Timeline append helper with dedup ── */
 
 function appendTimelineItem(
   queryClient: QueryClient,
@@ -100,7 +100,31 @@ function appendTimelineItem(
   }
 
   queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
-    const next = [...(old ?? []), item];
+    const items = old ?? [];
+
+    // Dedup: skip if an item with the same identity already exists.
+    // For tool items, match on toolUseId+phase; for messages, match on id.
+    if (item.kind === "tool" && (item as ChatTimelineTool).toolUseId) {
+      const tool = item as ChatTimelineTool;
+      const dup = items.some(
+        (existing) =>
+          existing.kind === "tool" &&
+          (existing as ChatTimelineTool).toolUseId === tool.toolUseId &&
+          (existing as ChatTimelineTool).phase === tool.phase,
+      );
+      if (dup) {
+        console.log("[debug][ws-bridge] appendTimelineItem DEDUP skipped toolUseId=%s phase=%s session=%s", tool.toolUseId, tool.phase, sessionId);
+        return items;
+      }
+    } else if (item.kind === "message") {
+      const dup = items.some((existing) => existing.id === item.id);
+      if (dup) {
+        console.log("[debug][ws-bridge] appendTimelineItem DEDUP skipped id=%s session=%s", item.id, sessionId);
+        return items;
+      }
+    }
+
+    const next = [...items, item];
     console.log("[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s", item.kind, next.length, sessionId);
     return next;
   });
@@ -211,9 +235,6 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── queue_item_start ──
-    // Handled before the sessionId early-exit so that the fallback to getDefaultSessionId()
-    // can fire. Backend-originated events (agent-to-agent, workstream creation) may arrive
-    // without a sessionId if the session is still being set up, or the event is global-scoped.
     if (message.type === "queue_item_start") {
       const sid = sessionId ?? getDefaultSessionId();
       if (!sid) return;
@@ -240,7 +261,6 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── queue_item_end ──
-    // Same placement before sessionId early-exit — must match the pill key used at start.
     if (message.type === "queue_item_end") {
       const sid = sessionId ?? getDefaultSessionId();
       if (!sid) return;
@@ -258,14 +278,27 @@ export function setupWsQueryBridge(deps: {
 
     if (!sessionId) return;
 
+    // ── message_start → typing indicator ──
+    if (message.type === "message_start") {
+      addPill(queryClient, sessionId, {
+        id: "assistant-typing",
+        label: "Thinking…",
+      });
+      return;
+    }
+
     // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
+      // Remove typing indicator once real content starts flowing
+      removePill(queryClient, sessionId, "assistant-typing");
       streamingStore.appendTextDelta(sessionId, message.messageId, message.delta);
       return;
     }
 
     // ── thinking lifecycle → streaming store ──
     if (message.type === "thinking_start") {
+      // Remove typing indicator once thinking starts
+      removePill(queryClient, sessionId, "assistant-typing");
       streamingStore.setThinkingStreaming(sessionId, true, message.messageId);
       return;
     }
@@ -281,9 +314,6 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── toolcall_start → buffer in streaming store ──
-    // toolcall_start fires ~20ms before message_end. Committing to the Query cache
-    // immediately puts the tool item before the assistant message in the array, which
-    // breaks ordering. Buffer it here; message_end flushes it after the message.
     if (message.type === "toolcall_start") {
       if (message.toolUseId) {
         streamingStore.addPendingToolCall(sessionId, {
@@ -295,34 +325,32 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── message_end → agent timeline only (upsert) ──
-    // Upsert so the agent_end correction (same id, no intermediate flag)
-    // replaces the earlier intermediate version in-place.
-    // Input surface is handled exclusively by pi_surfaced.
     if (message.type === "message_end") {
       const msg = message.message;
-      const msgId = msg.id;
 
-      if (msg.content.trim()) {
-        // Include thinking blocks from the streaming store so the committed
-        // message in the Query cache matches what history loading produces.
-        // Without this, thinking disappears from the live session the moment
-        // the message commits and only reappears after a page refresh.
-        const thinkingText = streamingStore.getThinkingText(sessionId);
-        const committed = thinkingText
-          ? {
-              ...msg,
-              blocks: [
-                { type: "thinking" as const, thinking: thinkingText },
-                { type: "text" as const, text: msg.content },
-              ],
-            }
-          : msg;
+      // Remove typing indicator on message commit
+      removePill(queryClient, sessionId, "assistant-typing");
+
+      // Always capture thinking from the streaming store — it must be committed
+      // to the Query cache regardless of whether there's text content.
+      const thinkingText = streamingStore.getThinkingText(sessionId);
+
+      if (msg.content.trim() || thinkingText) {
+        // Build the committed message with both thinking and text blocks.
+        // Even if content is empty, thinking-only messages are preserved.
+        const blocks: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> = [];
+        if (thinkingText) {
+          blocks.push({ type: "thinking" as const, thinking: thinkingText });
+        }
+        if (msg.content.trim()) {
+          blocks.push({ type: "text" as const, text: msg.content });
+        }
+
+        const committed = { ...msg, blocks };
         upsertTimelineItem(queryClient, sessionId, committed);
       }
 
-      // Flush tool calls buffered since toolcall_start. Appending them here (after the
-      // assistant message) guarantees correct order: message first, tool items after.
-      // tool_execution_start will then upgrade these "start" stubs with args in-place.
+      // Flush tool calls buffered since toolcall_start.
       const pendingTools = streamingStore.flushPendingToolCalls(sessionId);
       for (const tool of pendingTools) {
         appendTimelineItem(queryClient, sessionId, {
@@ -335,9 +363,7 @@ export function setupWsQueryBridge(deps: {
         });
       }
 
-      // Clear all streaming state atomically. thinking is now in the cache so
-      // nothing is lost — clearSession fires one callback with all-nulls which
-      // triggers clearStreaming() on the Lit component.
+      // Clear all streaming state atomically.
       console.log("[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s", sessionId, msg.id);
       streamingStore.clearSession(sessionId);
       return;
@@ -457,10 +483,10 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── agent_end ──
-    // Always emitted by the Pi SDK, including when runAgentLoop throws (abort exception
-    // path) which skips message_end and turn_end. If streaming text is still in the store
-    // at this point, it was never committed — flush it as a partial assistant message.
     if (message.type === "agent_end") {
+      // Remove typing indicator if still present
+      removePill(queryClient, sessionId, "assistant-typing");
+
       const uncommitted = streamingStore.getUncommittedText(sessionId);
       if (uncommitted?.text.trim()) {
         console.log("[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s", uncommitted.messageId, sessionId);

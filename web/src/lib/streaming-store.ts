@@ -128,7 +128,19 @@ export const streamingStore = {
 
   /* ── Clear all streaming for a session (turn_end / agent_end) ── */
 
+  /** Idempotent: only fires callback if there was actually streaming state to clear. */
   clearSession(sessionId: string) {
+    const hadState =
+      texts.has(sessionId) ||
+      thinking.has(sessionId) ||
+      pendingTools.has(sessionId) ||
+      thinkingActive.has(sessionId);
+
+    if (!hadState) {
+      console.log("[debug][streaming-store] clearSession SKIPPED (already clear) for session=%s", sessionId);
+      return;
+    }
+
     console.log("[debug][streaming-store] clearSession for session=%s", sessionId);
     texts.delete(sessionId);
     thinking.delete(sessionId);

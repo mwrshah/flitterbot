@@ -71,15 +71,6 @@ export function safeJsonParse<T>(raw: string | null | undefined): T | null {
     return null;
   }
 }
-
-import type { ChatTimelineItem } from "~/lib/types";
-
-/** Cheap fingerprint for timeline arrays — changes when items are added/removed. */
-export function timelineFingerprint(items: ChatTimelineItem[]): string {
-  if (!items.length) return "0:";
-  return `${items.length}:${items[items.length - 1]!.id}`;
-}
-
 export function extractToolName(event: unknown): string {
   if (typeof event === "object" && event !== null) {
     const record = event as Record<string, unknown>;
