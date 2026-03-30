@@ -8,7 +8,7 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
-import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
+import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
 
 const emptySubscribe = () => () => {};
@@ -19,38 +19,10 @@ const useIsClient = () =>
     () => false,
   );
 
-function connectionLabel(state: ConnectionState): string {
-  switch (state) {
-    case "connected":
-      return "Live";
-    case "connecting":
-      return "Connecting";
-    case "reconnecting":
-      return "Reconnecting";
-    case "stub":
-      return "Stub";
-    default:
-      return "Offline";
-  }
-}
-
-function connectionVariant(state: ConnectionState): "success" | "warning" | "muted" | "default" {
-  switch (state) {
-    case "connected":
-      return "success";
-    case "connecting":
-    case "reconnecting":
-      return "warning";
-    default:
-      return "muted";
-  }
-}
-
 type ChatPanelProps = {
   sessionId: string;
   timeline: ChatTimelineItem[];
   statusPills: StatusPill[];
-  connectionState: ConnectionState;
   isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
 };
@@ -59,7 +31,6 @@ export function ChatPanel({
   sessionId,
   timeline,
   statusPills,
-  connectionState,
   isSessionBusy,
   onSendMessage,
 }: ChatPanelProps) {
@@ -193,11 +164,6 @@ export function ChatPanel({
                 </Badge>
               ))}
             </div>
-          )}
-          {isClient && (
-            <Badge variant={connectionVariant(connectionState)}>
-              {connectionLabel(connectionState)}
-            </Badge>
           )}
         </div>
       </div>

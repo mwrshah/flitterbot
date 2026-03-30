@@ -52,7 +52,7 @@ function PiDefaultRoute() {
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const defaultSessionId = status?.pi?.default?.sessionId;
-  const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
+  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
     defaultSessionId,
     history,
   );
@@ -64,7 +64,6 @@ function PiDefaultRoute() {
           sessionId={effectiveSessionId}
           timeline={timeline}
           statusPills={statusPills}
-          connectionState={connectionState}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
         />
