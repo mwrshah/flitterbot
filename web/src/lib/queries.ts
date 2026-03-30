@@ -125,7 +125,7 @@ export function inputSurfaceTimelineQueryOptions() {
     queryKey: ["pi-input-surface-timeline"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchPiInputHistory()) as ChatTimelineItem[],
-    staleTime: Infinity, // WS events keep this fresh via setQueryData
+    staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     structuralSharing: mergeTimelineItems,
   };
 }
