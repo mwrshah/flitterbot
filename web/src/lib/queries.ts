@@ -1,6 +1,7 @@
 import type { AutonomaApiClient } from "~/lib/api";
 import type { ChatTimelineItem, ConnectionState, StatusResponse } from "~/lib/types";
-import { fetchPiHistory, fetchPiInputHistory } from "~/server/pi";
+import { fetchPiHistory, fetchPiInputHistory, fetchPiSessions, fetchPiWorktree, type PiWorkstreamInfo } from "~/server/pi";
+import type { DownstreamSessionItem } from "~/lib/types";
 
 export function statusQueryOptions(apiClient: AutonomaApiClient) {
   return {
@@ -40,6 +41,34 @@ export function piHistoryQueryOptions(
     },
     enabled: sessionId !== undefined,
     staleTime: Infinity, // WS events keep this fresh via setQueryData
+  };
+}
+
+/**
+ * Downstream Claude Code sessions for a Pi orchestrator session.
+ * WS bridge invalidates ["pi-downstream-sessions", piSessionId] on sessions_changed.
+ */
+export function piDownstreamSessionsQueryOptions(piSessionId: string) {
+  return {
+    queryKey: ["pi-downstream-sessions", piSessionId] as const,
+    queryFn: (): Promise<DownstreamSessionItem[]> =>
+      fetchPiSessions({ data: { piSessionId } }),
+    enabled: !!piSessionId,
+    staleTime: 30_000,
+  };
+}
+
+/**
+ * Worktree info for a Pi orchestrator session.
+ * WS bridge invalidates ["pi-worktree", piSessionId] on worktree_changed.
+ */
+export function piWorktreeQueryOptions(piSessionId: string) {
+  return {
+    queryKey: ["pi-worktree", piSessionId] as const,
+    queryFn: (): Promise<PiWorkstreamInfo | null> =>
+      fetchPiWorktree({ data: { piSessionId } }),
+    enabled: !!piSessionId,
+    staleTime: 30_000,
   };
 }
 

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { piDownstreamSessionsQueryOptions, piWorktreeQueryOptions } from "~/lib/queries";
 import type { DownstreamSessionItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import { fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
   switch (status) {
@@ -32,17 +32,13 @@ function statusLabel(status: DownstreamSessionItem["status"]): string {
 export function DownstreamSessionsPanel({
   piSessionId,
 }: { piSessionId: string | undefined }) {
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["pi-downstream-sessions", piSessionId],
-    queryFn: () => fetchPiSessions({ data: { piSessionId: piSessionId! } }),
-    enabled: !!piSessionId,
-  });
+  const { data, isPending, isError } = useQuery(
+    piDownstreamSessionsQueryOptions(piSessionId ?? ""),
+  );
 
-  const worktreeQuery = useQuery({
-    queryKey: ["pi-worktree", piSessionId],
-    queryFn: () => fetchPiWorktree({ data: { piSessionId: piSessionId! } }),
-    enabled: !!piSessionId,
-  });
+  const worktreeQuery = useQuery(
+    piWorktreeQueryOptions(piSessionId ?? ""),
+  );
   const worktree = worktreeQuery.data;
 
   if (!piSessionId) {
