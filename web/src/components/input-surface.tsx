@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -324,7 +324,6 @@ const useIsClient = () =>
 
 export function InputSurface() {
   const isClient = useIsClient();
-  const queryClient = useQueryClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
@@ -341,7 +340,7 @@ export function InputSurface() {
   });
 
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
-  const { data: timeline = [] } = useQuery(inputSurfaceTimelineQueryOptions(queryClient));
+  const { data: timeline = [] } = useQuery(inputSurfaceTimelineQueryOptions());
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
