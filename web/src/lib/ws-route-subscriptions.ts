@@ -31,8 +31,10 @@ function resolveSubscriptionTarget(router: AnyRouter, queryClient: QueryClient):
     case "input-surface":
       return { sessionId: "*", eventTypes: INPUT_SURFACE_EVENT_TYPES };
     case "pi-default": {
+      // Prefer the live cache value over stale loader data — the default Pi
+      // session may have restarted with a new sessionId since the loader ran.
       const sessionId =
-        activeMatch.loaderData?.defaultSessionId ?? defaultPiSessionIdFromCache(queryClient);
+        defaultPiSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
       return sessionId ? { sessionId } : null;
     }
     case "pi-session":

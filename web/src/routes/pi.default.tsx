@@ -1,10 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import { statusQueryOptions, type StatusPill } from "~/lib/queries";
-import type { ChatTimelineItem } from "~/lib/types";
+import type { ChatTimelineItem, StatusResponse } from "~/lib/types";
 import { fetchPiHistory, fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
 export const Route = createFileRoute("/pi/default")({
@@ -49,7 +50,7 @@ export const Route = createFileRoute("/pi/default")({
       );
     }
 
-    return { history, defaultSessionId };
+    return { history };
   },
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
@@ -60,7 +61,12 @@ export const Route = createFileRoute("/pi/default")({
 });
 
 function PiDefaultRoute() {
-  const { history, defaultSessionId } = Route.useLoaderData();
+  const { history } = Route.useLoaderData();
+  // Derive defaultSessionId reactively from the status query cache so it
+  // updates when the default Pi session restarts with a new ID, rather than
+  // being frozen at the loader-time value.
+  const { data: status } = useQuery<StatusResponse>({ queryKey: ["status"], staleTime: 3_000 });
+  const defaultSessionId = status?.pi?.default?.sessionId;
   const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId } = usePiChat(
     defaultSessionId,
     history,
