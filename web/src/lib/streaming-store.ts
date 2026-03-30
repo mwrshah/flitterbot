@@ -140,6 +140,9 @@ export const streamingStore = {
   /* ── Imperative callbacks for Lit component integration ── */
 
   onStreamingDelta(sessionId: string, callback: StreamingCallback) {
+    if (streamingCallbacks.has(sessionId)) {
+      console.warn("[streaming-store] onStreamingDelta: overwriting existing callback for session=%s — unexpected double-mount?", sessionId);
+    }
     streamingCallbacks.set(sessionId, callback);
   },
 
