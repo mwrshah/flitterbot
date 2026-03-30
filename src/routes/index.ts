@@ -1,7 +1,7 @@
 export { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
+export { handleBrowserDirectoryCompletionsRoute } from "./browser-directory-completions.ts";
 export { handleBrowserPiHistoryRoute } from "./browser-pi.ts";
 export { handleBrowserSessionDetailRoute, handleBrowserSessionsRoute } from "./browser-sessions.ts";
-export { handleBrowserDirectoryCompletionsRoute } from "./browser-directory-completions.ts";
 export { handleBrowserSkillsRoute } from "./browser-skills.ts";
 export { handleBrowserTranscriptRoute } from "./browser-transcript.ts";
 export { handleCronTickRoute } from "./cron-tick.ts";

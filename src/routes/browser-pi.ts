@@ -4,7 +4,11 @@ import {
   getLatestPiSessionId,
   listRecentlyClosedWorkstreams,
 } from "../blackboard/query-workstreams.ts";
-import type { ChatTimelineItem, ChatTimelineMessage, PiHistoryResponse } from "../contracts/index.ts";
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  PiHistoryResponse,
+} from "../contracts/index.ts";
 import { readPiHistory, readPiHistoryFromMessages } from "../pi/history.ts";
 import type { ManagedPiSession } from "../pi/session-manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -97,16 +101,18 @@ async function handleBrowserPiHistoryRouteInner(
       if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
     }
     const rows = getInputSurfaceHistory(runtime.blackboard, piSessionIds);
-    const items: ChatTimelineItem[] = rows.map((row): ChatTimelineMessage => ({
-      id: row.id,
-      kind: "message",
-      role: row.direction === "inbound" ? "user" : "assistant",
-      content: row.content,
-      source: row.source,
-      workstreamId: row.workstream_id ?? undefined,
-      workstreamName: row.workstream_name ?? undefined,
-      createdAt: row.created_at,
-    }));
+    const items: ChatTimelineItem[] = rows.map(
+      (row): ChatTimelineMessage => ({
+        id: row.id,
+        kind: "message",
+        role: row.direction === "inbound" ? "user" : "assistant",
+        content: row.content,
+        source: row.source,
+        workstreamId: row.workstream_id ?? undefined,
+        workstreamName: row.workstream_name ?? undefined,
+        createdAt: row.created_at,
+      }),
+    );
 
     const body: PiHistoryResponse = { sessionId: null, sessionFile: null, items };
     return sendJson(response, 200, body);

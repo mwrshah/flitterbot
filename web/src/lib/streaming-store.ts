@@ -46,14 +46,14 @@ function fireCallbacks(sessionId: string) {
   const hasContent = textState != null || thinkingState != null;
   const effectiveMessageId = hasContent ? messageId : null;
   if (effectiveMessageId === null) {
-    console.log("[debug][streaming-store] fireCallbacks: messageId=null (clear signal) for session=%s — textState=%s thinkingState=%s", sessionId, textState != null ? "present" : "null", thinkingState != null ? "present" : "null");
+    console.log(
+      "[debug][streaming-store] fireCallbacks: messageId=null (clear signal) for session=%s — textState=%s thinkingState=%s",
+      sessionId,
+      textState != null ? "present" : "null",
+      thinkingState != null ? "present" : "null",
+    );
   }
-  cb(
-    textState?.text ?? null,
-    thinkingState?.text ?? null,
-    isThinkingStreaming,
-    effectiveMessageId,
-  );
+  cb(textState?.text ?? null, thinkingState?.text ?? null, isThinkingStreaming, effectiveMessageId);
 }
 
 /* ── Public API (called by ws-query-bridge) ── */
@@ -137,7 +137,10 @@ export const streamingStore = {
       thinkingActive.has(sessionId);
 
     if (!hadState) {
-      console.log("[debug][streaming-store] clearSession SKIPPED (already clear) for session=%s", sessionId);
+      console.log(
+        "[debug][streaming-store] clearSession SKIPPED (already clear) for session=%s",
+        sessionId,
+      );
       return;
     }
 
@@ -153,7 +156,10 @@ export const streamingStore = {
 
   onStreamingDelta(sessionId: string, callback: StreamingCallback) {
     if (streamingCallbacks.has(sessionId)) {
-      console.warn("[streaming-store] onStreamingDelta: overwriting existing callback for session=%s — unexpected double-mount?", sessionId);
+      console.warn(
+        "[streaming-store] onStreamingDelta: overwriting existing callback for session=%s — unexpected double-mount?",
+        sessionId,
+      );
     }
     streamingCallbacks.set(sessionId, callback);
   },

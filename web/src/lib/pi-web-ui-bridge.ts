@@ -93,7 +93,11 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         const next = timeline[j];
         if (!next) break;
         if (next.kind === "message" || next.kind === "divider") break;
-        if (next.kind === "tool" && (next.phase === "start" || next.phase === "update") && next.toolUseId) {
+        if (
+          next.kind === "tool" &&
+          (next.phase === "start" || next.phase === "update") &&
+          next.toolUseId
+        ) {
           toolCalls.push({
             type: "toolCall",
             id: next.toolUseId,
@@ -116,16 +120,22 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
       continue;
     }
 
-    if (item.kind === "tool" && (item.phase === "start" || item.phase === "update") && item.toolUseId) {
+    if (
+      item.kind === "tool" &&
+      (item.phase === "start" || item.phase === "update") &&
+      item.toolUseId
+    ) {
       // Orphan tool — no preceding assistant message (e.g. after reconnect).
       messages.push({
         role: "assistant",
-        content: [{
-          type: "toolCall",
-          id: item.toolUseId,
-          name: item.tool,
-          arguments: (item.args as Record<string, unknown>) ?? {},
-        }],
+        content: [
+          {
+            type: "toolCall",
+            id: item.toolUseId,
+            name: item.tool,
+            arguments: (item.args as Record<string, unknown>) ?? {},
+          },
+        ],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);

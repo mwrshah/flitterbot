@@ -28,9 +28,7 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
   const isClient = useIsClient();
   const { sendMessage, apiClient } = rootApi.useRouteContext();
 
-  const { data: timeline = loaderHistory } = useQuery(
-    piHistoryQueryOptions(sessionId),
-  );
+  const { data: timeline = loaderHistory } = useQuery(piHistoryQueryOptions(sessionId));
   const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(sessionId ?? "default"));
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
@@ -47,10 +45,16 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
   const effectiveSessionId = sessionId ?? "default";
 
   const onSendMessage = useCallback(
-    (text: string, images?: ImageAttachment[]) =>
-      sendMessage(text, images, sessionId),
+    (text: string, images?: ImageAttachment[]) => sendMessage(text, images, sessionId),
     [sendMessage, sessionId],
   );
 
-  return { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId, isSessionBusy };
+  return {
+    timeline,
+    statusPills,
+    connectionState,
+    onSendMessage,
+    effectiveSessionId,
+    isSessionBusy,
+  };
 }

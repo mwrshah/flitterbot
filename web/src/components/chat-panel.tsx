@@ -97,7 +97,10 @@ export function ChatPanel({
           isThinkingStreaming,
         );
       } else {
-        console.log("[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s", sessionId);
+        console.log(
+          "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
+          sessionId,
+        );
         messageListRef.current?.clearStreaming();
       }
     });
@@ -197,7 +200,6 @@ export function ChatPanel({
       </div>
 
       <MessageInput
-
         isSending={isSending}
         onSubmit={handleSubmit}
         pendingImages={pendingImages}

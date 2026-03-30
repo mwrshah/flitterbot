@@ -260,9 +260,7 @@ export class PiSessionManager {
           const detail = apiErr
             ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
             : String(error);
-          this.log(
-            `queue item ${item.id} failed (orchestrator ws=${workstreamId}): ${detail}`,
-          );
+          this.log(`queue item ${item.id} failed (orchestrator ws=${workstreamId}): ${detail}`);
           this.destroyOrchestrator(workstreamId, "crashed");
         }
         this.wsHub.broadcast({
@@ -302,10 +300,7 @@ export class PiSessionManager {
    * resumes from the existing JSONL session_file. Called lazily when the first
    * message arrives for a rehydrated workstream.
    */
-  async activateOrchestrator(
-    managed: ManagedPiSession,
-    customTools?: unknown[],
-  ): Promise<void> {
+  async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
     if (managed.session) return; // already active
     if (!managed.workstreamId) throw new Error("Cannot activate non-workstream session");
 

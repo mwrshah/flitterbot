@@ -42,7 +42,6 @@ const icons = {
   ),
 };
 
-
 export const Sidebar = memo(function Sidebar() {
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
@@ -71,7 +70,6 @@ export const Sidebar = memo(function Sidebar() {
           <span className="text-sm font-semibold text-sidebar-foreground">Autonoma</span>
         </div>
       </div>
-
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">

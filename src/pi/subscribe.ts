@@ -248,7 +248,11 @@ export function subscribeToPiSession(
           | undefined;
         if (!ame?.type) break;
 
-        if (ame.type === "text_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
+        if (
+          ame.type === "text_delta" &&
+          typeof ame.delta === "string" &&
+          currentStreamingMessageId
+        ) {
           broadcast(wsHub, {
             type: "text_delta",
             sessionId: session.sessionId,
@@ -262,7 +266,11 @@ export function subscribeToPiSession(
             messageId: currentStreamingMessageId,
           };
           broadcast(wsHub, payload);
-        } else if (ame.type === "thinking_delta" && typeof ame.delta === "string" && currentStreamingMessageId) {
+        } else if (
+          ame.type === "thinking_delta" &&
+          typeof ame.delta === "string" &&
+          currentStreamingMessageId
+        ) {
           broadcast(wsHub, {
             type: "thinking_delta",
             sessionId: session.sessionId,
@@ -429,7 +437,11 @@ export function subscribeToPiSession(
         console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       default:
-        console.warn("pi-subscribe: unhandled event type=%s (sessionId=%s)", event.type, session.sessionId);
+        console.warn(
+          "pi-subscribe: unhandled event type=%s (sessionId=%s)",
+          event.type,
+          session.sessionId,
+        );
         break;
     }
   });

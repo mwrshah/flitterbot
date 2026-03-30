@@ -1,8 +1,8 @@
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type {
   ClaudeSessionRow,
-  ClaudeSessionListItem as SessionListItem,
   DownstreamSessionItem,
+  ClaudeSessionListItem as SessionListItem,
 } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 

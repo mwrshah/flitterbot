@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
-import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
+import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
@@ -16,9 +16,7 @@ export const Route = createFileRoute("/pi/default")({
     meta: [{ title: "Autonoma — Pi / Default" }],
   }),
   loader: async ({ context }) => {
-    const status = await context.queryClient.ensureQueryData(
-      statusQueryOptions(context.apiClient),
-    );
+    const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
     const defaultSessionId = status.pi?.default?.sessionId;
     const items = await fetchPiHistory({ data: {} });
     const history = items as ChatTimelineItem[];

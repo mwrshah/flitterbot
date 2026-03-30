@@ -1,9 +1,20 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
-import type { ChatTimelineItem, ConnectionState, DirectoryCompletionItem, StatusResponse } from "~/lib/types";
+import type {
+  ChatTimelineItem,
+  ConnectionState,
+  DirectoryCompletionItem,
+  DownstreamSessionItem,
+  StatusResponse,
+} from "~/lib/types";
 import { fetchDirectoryCompletions } from "~/server/directory-completions";
-import { fetchPiHistory, fetchPiInputHistory, fetchPiSessions, fetchPiWorktree, type PiWorkstreamInfo } from "~/server/pi";
-import type { DownstreamSessionItem } from "~/lib/types";
+import {
+  fetchPiHistory,
+  fetchPiInputHistory,
+  fetchPiSessions,
+  fetchPiWorktree,
+  type PiWorkstreamInfo,
+} from "~/server/pi";
 
 /**
  * structuralSharing callback: merges fetched timeline with the previous cache
@@ -12,10 +23,7 @@ import type { DownstreamSessionItem } from "~/lib/types";
  * Returns the old reference unchanged when there's no diff (preserves React
  * memoization via referential equality, which is structuralSharing's contract).
  */
-function mergeTimelineItems(
-  oldData: unknown,
-  newData: unknown,
-): unknown {
+function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
   const prev = oldData as ChatTimelineItem[] | undefined;
   const next = newData as ChatTimelineItem[];
 
@@ -25,8 +33,7 @@ function mergeTimelineItems(
   const extras = prev.filter((item) => !ids.has(item.id));
   if (!extras.length) {
     // All old items covered by server — check if identical to preserve reference
-    return prev.length === next.length &&
-      prev.every((item, i) => item.id === next[i]!.id)
+    return prev.length === next.length && prev.every((item, i) => item.id === next[i]!.id)
       ? prev
       : next;
   }
@@ -42,10 +49,7 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
   };
 }
 
-export function piHistoryQueryOptions(
-  sessionId: string | undefined,
-  surface?: "input" | "agent",
-) {
+export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
   return {
     queryKey: ["pi-history", sessionId ?? "default", surface ?? "agent"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
@@ -77,8 +81,7 @@ export function piHistoryQueryOptions(
 export function piDownstreamSessionsQueryOptions(piSessionId: string) {
   return {
     queryKey: ["pi-downstream-sessions", piSessionId] as const,
-    queryFn: (): Promise<DownstreamSessionItem[]> =>
-      fetchPiSessions({ data: { piSessionId } }),
+    queryFn: (): Promise<DownstreamSessionItem[]> => fetchPiSessions({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };
@@ -91,8 +94,7 @@ export function piDownstreamSessionsQueryOptions(piSessionId: string) {
 export function piWorktreeQueryOptions(piSessionId: string) {
   return {
     queryKey: ["pi-worktree", piSessionId] as const,
-    queryFn: (): Promise<PiWorkstreamInfo | null> =>
-      fetchPiWorktree({ data: { piSessionId } }),
+    queryFn: (): Promise<PiWorkstreamInfo | null> => fetchPiWorktree({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };

@@ -1,7 +1,7 @@
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { cn } from "~/lib/utils";
 
-export { Panel, Group as PanelGroup };
+export { Group as PanelGroup, Panel };
 
 export function ResizeHandle({ className }: { className?: string }) {
   return (

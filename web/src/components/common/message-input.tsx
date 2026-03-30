@@ -8,9 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { Button } from "~/components/common/button";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
-import { Button } from "~/components/common/button";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
@@ -223,32 +223,35 @@ export const MessageInput = memo(function MessageInput({
     });
   }, []);
 
-  const handlePathSelect = useCallback((item: DirectoryCompletionItem) => {
-    const value = draftRef.current;
-    const atIdx = atPositionRef.current;
-    const cursor = textareaRef.current?.selectionStart ?? value.length;
-    const before = value.slice(0, atIdx);
-    const after = value.slice(cursor);
-    // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
-    // Files: insert @path (trailing space, closes picker)
-    const isDir = item.kind === "directory";
-    const inserted = `@${item.path}${isDir ? "" : " "}`;
-    const newValue = before + inserted + after;
-    setDraft(newValue);
-    if (!isDir) {
-      setAtPickerOpen(false);
-      atPositionRef.current = -1;
-    }
-    const newCursor = before.length + inserted.length;
-    requestAnimationFrame(() => {
-      textareaRef.current?.setSelectionRange(newCursor, newCursor);
-      textareaRef.current?.focus();
-      // For directories, re-trigger the change handler so the picker refetches
-      if (isDir) {
-        handleDraftChange(newValue);
+  const handlePathSelect = useCallback(
+    (item: DirectoryCompletionItem) => {
+      const value = draftRef.current;
+      const atIdx = atPositionRef.current;
+      const cursor = textareaRef.current?.selectionStart ?? value.length;
+      const before = value.slice(0, atIdx);
+      const after = value.slice(cursor);
+      // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
+      // Files: insert @path (trailing space, closes picker)
+      const isDir = item.kind === "directory";
+      const inserted = `@${item.path}${isDir ? "" : " "}`;
+      const newValue = before + inserted + after;
+      setDraft(newValue);
+      if (!isDir) {
+        setAtPickerOpen(false);
+        atPositionRef.current = -1;
       }
-    });
-  }, [handleDraftChange]);
+      const newCursor = before.length + inserted.length;
+      requestAnimationFrame(() => {
+        textareaRef.current?.setSelectionRange(newCursor, newCursor);
+        textareaRef.current?.focus();
+        // For directories, re-trigger the change handler so the picker refetches
+        if (isDir) {
+          handleDraftChange(newValue);
+        }
+      });
+    },
+    [handleDraftChange],
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -269,7 +272,13 @@ export const MessageInput = memo(function MessageInput({
       }
 
       // Ctrl+W / Ctrl+Backspace: backward-kill-word
-      if (event.ctrlKey && (event.key === "w" || event.key === "Backspace") && !event.shiftKey && !event.altKey && !event.metaKey) {
+      if (
+        event.ctrlKey &&
+        (event.key === "w" || event.key === "Backspace") &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
         event.preventDefault();
         const value = draftRef.current;
         const cursor = textareaRef.current?.selectionStart ?? value.length;
@@ -294,14 +303,20 @@ export const MessageInput = memo(function MessageInput({
       if (slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
         skillCommandRef.current?.dispatchEvent(
-          new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
+          new KeyboardEvent("keydown", {
+            key: event.key === "Tab" ? "Enter" : event.key,
+            bubbles: true,
+          }),
         );
         return;
       }
       if (atPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
         pathCommandRef.current?.dispatchEvent(
-          new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
+          new KeyboardEvent("keydown", {
+            key: event.key === "Tab" ? "Enter" : event.key,
+            bubbles: true,
+          }),
         );
         return;
       }
@@ -351,7 +366,14 @@ export const MessageInput = memo(function MessageInput({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit(draftRef.current.trim()); setDraft(""); }} className="space-y-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(draftRef.current.trim());
+          setDraft("");
+        }}
+        className="space-y-2"
+      >
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {pendingImages.map((img, i) => (
@@ -383,7 +405,10 @@ export const MessageInput = memo(function MessageInput({
             e.target.value = "";
           }}
         />
-        <div ref={containerRef} className="relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent">
+        <div
+          ref={containerRef}
+          className="relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent"
+        >
           <SkillPicker
             open={pickerOpen}
             filter={pickerFilter}

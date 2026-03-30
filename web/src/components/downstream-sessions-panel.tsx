@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { piDownstreamSessionsQueryOptions, piWorktreeQueryOptions } from "~/lib/queries";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { piDownstreamSessionsQueryOptions, piWorktreeQueryOptions } from "~/lib/queries";
 import type { DownstreamSessionItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -52,16 +52,12 @@ function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.workstreamName ?? "no workstream";
 }
 
-export function DownstreamSessionsPanel({
-  piSessionId,
-}: { piSessionId: string | undefined }) {
+export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string | undefined }) {
   const { data, isPending, isError } = useQuery(
     piDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );
 
-  const worktreeQuery = useQuery(
-    piWorktreeQueryOptions(piSessionId ?? ""),
-  );
+  const worktreeQuery = useQuery(piWorktreeQueryOptions(piSessionId ?? ""));
   const worktree = worktreeQuery.data;
 
   if (!piSessionId) {
@@ -83,12 +79,8 @@ export function DownstreamSessionsPanel({
         <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Active Sessions
         </p>
-        {isPending && (
-          <p className="px-4 py-3 text-xs text-muted-foreground">Loading sessions…</p>
-        )}
-        {isError && (
-          <p className="px-4 py-3 text-xs text-destructive">Failed to load sessions.</p>
-        )}
+        {isPending && <p className="px-4 py-3 text-xs text-muted-foreground">Loading sessions…</p>}
+        {isError && <p className="px-4 py-3 text-xs text-destructive">Failed to load sessions.</p>}
         {data && data.length === 0 && (
           <p className="px-4 py-3 text-xs text-muted-foreground">No active sessions</p>
         )}
@@ -108,8 +100,7 @@ export function DownstreamSessionsPanel({
 
                 {session.tmuxSession && (
                   <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-                    tmux:{" "}
-                    <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
+                    tmux: <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
                   </span>
                 )}
 
@@ -128,8 +119,7 @@ export function DownstreamSessionsPanel({
             </p>
             <div className="flex flex-col gap-0.5 py-1.5">
               <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-                Branch:{" "}
-                <CopyableCode text={worktree.name ?? ""} />
+                Branch: <CopyableCode text={worktree.name ?? ""} />
               </span>
               <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                 Worktree:{" "}

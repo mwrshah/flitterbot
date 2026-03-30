@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { CheckIcon, CopyIcon, SettingsIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
@@ -173,14 +173,22 @@ function MessageCopyButton({ text }: { text: string }) {
       className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer"
       title="Copy message"
     >
-      {copied ? <CheckIcon className="w-3.5 h-3.5 text-emerald-500" /> : <CopyIcon className="w-3.5 h-3.5" />}
+      {copied ? (
+        <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
+      ) : (
+        <CopyIcon className="w-3.5 h-3.5" />
+      )}
     </button>
   );
 }
 
 /* ── Entry Renderers ── */
 
-const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry & { kind: "inbound" } }) {
+const InboundEntry = memo(function InboundEntry({
+  entry,
+}: {
+  entry: SurfaceEntry & { kind: "inbound" };
+}) {
   const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
   const displayContent = parsed ? parsed.cleanContent : entry.content;
   const badgeName = parsed?.workstreamName ?? entry.workstreamName;
@@ -213,7 +221,11 @@ const InboundEntry = memo(function InboundEntry({ entry }: { entry: SurfaceEntry
   );
 });
 
-const OutboundEntry = memo(function OutboundEntry({ entry }: { entry: SurfaceEntry & { kind: "outbound" } }) {
+const OutboundEntry = memo(function OutboundEntry({
+  entry,
+}: {
+  entry: SurfaceEntry & { kind: "outbound" };
+}) {
   const isWhatsApp = entry.channel === "whatsapp";
   return (
     <div className="flex gap-3 items-start">
@@ -269,7 +281,11 @@ const LitMarkdownBlock = memo(function LitMarkdownBlock({ content }: { content: 
   return <div ref={containerRef} />;
 });
 
-const PiResponseEntry = memo(function PiResponseEntry({ entry }: { entry: SurfaceEntry & { kind: "pi-response" } }) {
+const PiResponseEntry = memo(function PiResponseEntry({
+  entry,
+}: {
+  entry: SurfaceEntry & { kind: "pi-response" };
+}) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -314,7 +330,11 @@ const HookEntry = memo(function HookEntry({ entry }: { entry: SurfaceEntry & { k
   );
 });
 
-const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { entry: SurfaceEntry }) {
+const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
+  entry,
+}: {
+  entry: SurfaceEntry;
+}) {
   switch (entry.kind) {
     case "inbound":
       return <InboundEntry entry={entry} />;
@@ -331,16 +351,7 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({ entry }: { ent
 
 const rootApi = getRouteApi("__root__");
 
-const emptySubscribe = () => () => {};
-const useIsClient = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
-
 export function InputSurface() {
-  const isClient = useIsClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
@@ -441,7 +452,6 @@ export function InputSurface() {
       </div>
 
       <MessageInput
-
         isSending={isSending}
         onSubmit={handleSubmit}
         pendingImages={pendingImages}
