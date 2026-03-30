@@ -1,7 +1,12 @@
-import { Command } from "cmdk";
 import { memo, useMemo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
+import {
+  Command,
+  CommandEmpty,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
 
 type SkillPickerProps = {
   open: boolean;
@@ -48,14 +53,14 @@ export const SkillPicker = memo(function SkillPicker({
         shouldFilter={false}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
-        <Command.List className="max-h-48 overflow-y-auto p-1">
+        <CommandList className="max-h-48 overflow-y-auto p-1">
           {filtered.length === 0 && (
-            <Command.Empty className="px-3 py-2 text-sm text-muted-foreground">
+            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
               No matching skills
-            </Command.Empty>
+            </CommandEmpty>
           )}
           {filtered.map((skill) => (
-            <Command.Item
+            <CommandItem
               key={skill.name}
               value={skill.name}
               onSelect={() => onSelect(skill.name)}
@@ -63,9 +68,9 @@ export const SkillPicker = memo(function SkillPicker({
             >
               <span className="font-mono text-foreground shrink-0">/{skill.name}</span>
               <span className="text-xs text-muted-foreground truncate">{skill.description}</span>
-            </Command.Item>
+            </CommandItem>
           ))}
-        </Command.List>
+        </CommandList>
       </Command>
     </div>
   );
