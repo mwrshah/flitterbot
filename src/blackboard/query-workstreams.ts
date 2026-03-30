@@ -100,6 +100,18 @@ export function resetAllWorkstreams(db: BlackboardDatabase): number {
   return count?.count ?? 0;
 }
 
+/** Returns created_at of the most recent workstream before the given one, or undefined if none. */
+export function getPreviousWorkstreamCreatedAt(
+  db: BlackboardDatabase,
+  excludeId: string,
+): string | undefined {
+  const row = db.get<{ created_at: string }>(
+    `SELECT created_at FROM workstreams WHERE id != ? ORDER BY created_at DESC LIMIT 1`,
+    excludeId,
+  );
+  return row?.created_at;
+}
+
 export function listRecentlyClosedWorkstreams(
   db: BlackboardDatabase,
   withinHours: number,
