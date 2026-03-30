@@ -3,7 +3,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
-import { statusQueryOptions } from "~/lib/queries";
+import { statusQueryOptions, type StatusPill } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchPiHistory, fetchPiSessions, fetchPiWorktree } from "~/server/pi";
 
@@ -31,6 +31,22 @@ export const Route = createFileRoute("/pi/default")({
       context.queryClient.setQueryData(["pi-history", defaultSessionId, "agent"], history);
       context.queryClient.setQueryData(["pi-downstream-sessions", defaultSessionId], sessions);
       context.queryClient.setQueryData(["pi-worktree", defaultSessionId], worktree);
+    }
+
+    // If the default session is already busy when we load the page (e.g. navigating
+    // here after queue_item_start has already fired), seed a processing pill so the
+    // Stop button appears immediately rather than waiting for the next WS event.
+    if (defaultSessionId && status.pi?.default?.busy) {
+      context.queryClient.setQueryData<StatusPill[]>(
+        ["pi-status-pills", defaultSessionId],
+        (old) => {
+          if (old?.some((p) => p.id.startsWith("processing-"))) return old;
+          return [
+            ...(old ?? []),
+            { id: "processing-queued", label: "Processing message", variant: "info" as const },
+          ];
+        },
+      );
     }
 
     return { history, defaultSessionId };
