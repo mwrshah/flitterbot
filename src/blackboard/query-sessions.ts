@@ -351,6 +351,8 @@ export function getSessionsByPiSessionId(
     workstreamName: row.workstream_name,
     tmuxSession: row.tmux_session,
     cwd: row.cwd ?? null,
+    taskDescription: row.task_description ?? null,
+    project: row.project ?? null,
   }));
 }
 

@@ -144,6 +144,8 @@ export type DownstreamSessionItem = {
   workstreamName: string | null;
   tmuxSession: string | null;
   cwd: string | null;
+  taskDescription: string | null;
+  project: string | null;
 };
 
 export type PiSessionsListResponse = {

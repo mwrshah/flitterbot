@@ -29,6 +29,10 @@ function statusLabel(status: DownstreamSessionItem["status"]): string {
   }
 }
 
+function sessionDescription(session: DownstreamSessionItem): string {
+  return session.taskDescription ?? session.project ?? session.workstreamName ?? "no workstream";
+}
+
 export function DownstreamSessionsPanel({
   piSessionId,
 }: { piSessionId: string | undefined }) {
@@ -73,7 +77,7 @@ export function DownstreamSessionsPanel({
         {data && data.length > 0 && (
           <ul className="divide-y divide-border">
             {data.map((session) => (
-              <li key={session.sessionId} className="flex flex-col gap-0.5 px-4 py-2.5">
+              <li key={session.sessionId} className="flex flex-col gap-1 px-4 py-2.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className={cn("shrink-0 h-2 w-2 rounded-full", statusDotColor(session.status))}
@@ -84,16 +88,14 @@ export function DownstreamSessionsPanel({
                   </span>
                 </div>
 
+                {session.tmuxSession && (
+                  <span className="pl-4 font-mono text-xs text-blue-400 truncate">
+                    tmux attach -t {session.tmuxSession}
+                  </span>
+                )}
+
                 <span className="pl-4 text-xs text-muted-foreground truncate">
-                  {(() => {
-                    const name = session.workstreamName ?? "no workstream";
-                    if (session.cwd) {
-                      const parts = session.cwd.split("/");
-                      const parentDir = parts[parts.length - 2] ?? "";
-                      return parentDir ? `${parentDir}/${name}` : name;
-                    }
-                    return name;
-                  })()}
+                  {sessionDescription(session)}
                 </span>
               </li>
             ))}
