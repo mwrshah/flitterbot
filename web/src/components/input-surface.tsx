@@ -3,7 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
-import { useStableMemo } from "~/hooks/use-stable-memo";
+
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { connectionStateQueryOptions, inputSurfaceTimelineQueryOptions } from "~/lib/queries";
@@ -15,7 +15,6 @@ import type {
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
-import { timelineFingerprint } from "~/lib/utils";
 
 /* ── Types ── */
 
@@ -346,9 +345,8 @@ export function InputSurface() {
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
-  // Fingerprint so timelineToSurfaceEntries only reruns when items actually change.
-  const entries = useStableMemo(timelineFingerprint(timeline), () =>
-    timelineToSurfaceEntries(timeline),
+  // Recompute only when timeline reference changes (setQueryData creates new arrays)
+  const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
   );
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
