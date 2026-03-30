@@ -64,16 +64,6 @@ export function setupWsRouteSubscriptions(
     const nextTarget = resolveSubscriptionTarget(router, queryClient);
     if (sameTarget(activeTarget, nextTarget)) return;
 
-    // Remove the departing session's pi-history cache so the next
-    // ensureQueryData call triggers a blocking fetch instead of returning
-    // stale data. invalidateQueries is insufficient because ensureQueryData
-    // ignores the isInvalidated flag — it only fetches when no cached data
-    // exists (or revalidateIfStale is set, which still returns stale first).
-    // Skip the wildcard '*' target (input-surface) — it has no session cache.
-    if (activeTarget && activeTarget.sessionId !== "*") {
-      queryClient.removeQueries({ queryKey: ["pi-history", activeTarget.sessionId] });
-    }
-
     activeTarget = nextTarget;
 
     if (nextTarget) {
