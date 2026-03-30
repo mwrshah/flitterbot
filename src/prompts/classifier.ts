@@ -105,8 +105,9 @@ ${defaultBlock}
 2. If the message does not match any open workstream, return workstream_id: null. The default agent will handle it.
 3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the workstream OR default agent conversation with the most recent agent message. Check both the workstream marked "← last agent response" and the default agent conversation to decide.
 4. If the user appears to be continuing the default agent conversation (e.g. replying to something the default agent said), return workstream_id: null.
-5. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
-6. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
+5. *Brainstorm workstreams* — workstreams with "brainstorm" in the name are open-ended ideation sessions for a repo. If the user's message is general brainstorming, ideation, or exploratory discussion about a repo that has an open brainstorm workstream, route to that brainstorm workstream — do NOT let it fall through to the default agent. Exception: if there is a *different* workstream for the same repo that covers a specific issue the message clearly relates to, route to that specific workstream instead. Specific beats general.
+6. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
+7. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
 
 ## Response format
 Respond with ONLY a JSON object containing two fields: workstream_id and reasoning. No other text or explanation. Example:
