@@ -237,6 +237,11 @@ export class PiSessionManager {
       onItemStart: (item) => {
         state.setBusy(true, item);
         this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
+        this.wsHub.broadcast({
           type: "queue_item_start",
           item,
           sessionId: managed.piSessionId,
@@ -245,6 +250,11 @@ export class PiSessionManager {
       },
       onItemEnd: (item, error) => {
         state.setBusy(false);
+        this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
         if (error) {
           const apiErr = error instanceof Error ? (error as ApiError) : undefined;
           const detail = apiErr
@@ -451,6 +461,11 @@ export class PiSessionManager {
       onItemStart: (item) => {
         state.setBusy(true, item);
         this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
+        this.wsHub.broadcast({
           type: "queue_item_start",
           item,
           sessionId: managed.piSessionId,
@@ -459,6 +474,11 @@ export class PiSessionManager {
       },
       onItemEnd: (item, error) => {
         state.setBusy(false);
+        this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
 
         if (error) {
           const apiErr = error instanceof Error ? (error as ApiError) : undefined;
