@@ -349,6 +349,7 @@ export function getSessionsByPiSessionId(
     status: row.status,
     workstreamId: row.workstream_id,
     workstreamName: row.workstream_name,
+    tmuxSession: row.tmux_session,
   }));
 }
 

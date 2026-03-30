@@ -142,6 +142,7 @@ export type DownstreamSessionItem = {
   status: "working" | "idle" | "stale" | "ended";
   workstreamId: string | null;
   workstreamName: string | null;
+  tmuxSession: string | null;
 };
 
 export type PiSessionsListResponse = {

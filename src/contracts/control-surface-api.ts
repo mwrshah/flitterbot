@@ -147,6 +147,7 @@ export interface DownstreamSessionItem {
   status: ClaudeSessionStatus;
   workstreamId: string | null;
   workstreamName: string | null;
+  tmuxSession: string | null;
 }
 
 export interface PiSessionsListResponse {
