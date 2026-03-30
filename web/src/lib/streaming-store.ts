@@ -24,7 +24,6 @@ type StreamingCallback = (
   thinking: string | null,
   isThinkingStreaming: boolean,
   messageId: string | null,
-  pendingToolCalls: PendingToolCall[] | null,
 ) => void;
 
 /* ── Store implementation ── */
@@ -43,11 +42,10 @@ function fireCallbacks(sessionId: string) {
   const textState = texts.get(sessionId);
   const thinkingState = thinking.get(sessionId);
   const isThinkingStreaming = thinkingActive.get(sessionId) ?? false;
-  const tools = pendingTools.get(sessionId);
   const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
-  const hasContent = textState != null || thinkingState != null || (tools != null && tools.length > 0);
+  const hasContent = textState != null || thinkingState != null;
   const effectiveMessageId = hasContent ? messageId : null;
-  if (effectiveMessageId === null && !hasContent) {
+  if (effectiveMessageId === null) {
     console.log("[debug][streaming-store] fireCallbacks: messageId=null (clear signal) for session=%s — textState=%s thinkingState=%s", sessionId, textState != null ? "present" : "null", thinkingState != null ? "present" : "null");
   }
   cb(
@@ -55,7 +53,6 @@ function fireCallbacks(sessionId: string) {
     thinkingState?.text ?? null,
     isThinkingStreaming,
     effectiveMessageId,
-    tools && tools.length > 0 ? tools : null,
   );
 }
 
@@ -120,7 +117,6 @@ export const streamingStore = {
     const existing = pendingTools.get(sessionId) ?? [];
     existing.push(call);
     pendingTools.set(sessionId, existing);
-    fireCallbacks(sessionId);
   },
 
   /** Returns and clears all pending tool calls for the session. */

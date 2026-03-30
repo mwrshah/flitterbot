@@ -313,12 +313,9 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start → buffer in streaming store (fires streaming callback for immediate UI) ──
+    // ── toolcall_start → buffer in streaming store ──
     if (message.type === "toolcall_start") {
       if (message.toolUseId) {
-        // Remove typing indicator once a tool call starts
-        removePill(queryClient, sessionId, "assistant-typing");
-
         streamingStore.addPendingToolCall(sessionId, {
           toolUseId: message.toolUseId,
           toolName: message.toolName,
