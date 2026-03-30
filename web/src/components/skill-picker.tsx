@@ -1,9 +1,10 @@
-import { type Ref, memo, useMemo } from "react";
+import { type Ref, memo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
 import {
   Command,
   CommandEmpty,
+  CommandInput,
   CommandItem,
   CommandList,
 } from "~/components/ui/command";
@@ -31,11 +32,6 @@ export const SkillPicker = memo(function SkillPicker({
     skills,
     onSelect,
   });
-  const filtered = useMemo(() => {
-    if (!filter) return skills;
-    const lower = filter.toLowerCase();
-    return skills.filter((s) => s.name.toLowerCase().includes(lower));
-  }, [skills, filter]);
 
   if (!open || skills.length === 0) return null;
 
@@ -43,17 +39,18 @@ export const SkillPicker = memo(function SkillPicker({
     <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
         ref={commandRef}
-        shouldFilter={false}
         loop
         className="rounded-lg border border-border bg-background shadow-lg"
       >
+        {/* Hidden input bridges the textarea filter into cmdk's internal search */}
+        <div className="h-0 overflow-hidden">
+          <CommandInput value={filter} readOnly tabIndex={-1} />
+        </div>
         <CommandList className="max-h-48 overflow-y-auto p-1">
-          {filtered.length === 0 && (
-            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
-              No matching skills
-            </CommandEmpty>
-          )}
-          {filtered.map((skill) => (
+          <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
+            No matching skills
+          </CommandEmpty>
+          {skills.map((skill) => (
             <CommandItem
               key={skill.name}
               value={skill.name}
