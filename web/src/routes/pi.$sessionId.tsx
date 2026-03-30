@@ -53,7 +53,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
-  const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
+  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
     sessionId,
     history,
   );
@@ -65,7 +65,6 @@ function PiSessionRoute() {
           sessionId={effectiveSessionId}
           timeline={timeline}
           statusPills={statusPills}
-          connectionState={connectionState}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
         />

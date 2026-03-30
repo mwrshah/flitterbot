@@ -1,17 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Badge } from "~/components/ui/badge";
 import { MessageInput } from "~/components/ui/message-input";
 
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
-import { connectionStateQueryOptions, inputSurfaceTimelineQueryOptions } from "~/lib/queries";
+import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
-  ConnectionState,
-
   ImageAttachment,
   MessageSource,
 } from "~/lib/types";
@@ -327,10 +324,6 @@ export function InputSurface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
-  const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
-    connectionStateQueryOptions(),
-  );
-  const connectionState = isClient ? rawConnectionState : ("disconnected" as ConnectionState);
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
@@ -391,19 +384,6 @@ export function InputSurface() {
     [engageAndScroll, sendMessage],
   );
 
-  const connectionLabel =
-    connectionState === "connected"
-      ? "Live"
-      : connectionState === "connecting" || connectionState === "reconnecting"
-        ? "Connecting"
-        : "Offline";
-  const connectionVariant =
-    connectionState === "connected"
-      ? ("success" as const)
-      : connectionState === "connecting" || connectionState === "reconnecting"
-        ? ("warning" as const)
-        : ("muted" as const);
-
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -412,7 +392,6 @@ export function InputSurface() {
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
-        <Badge variant={connectionVariant}>{connectionLabel}</Badge>
       </div>
 
       {/* Activity feed */}

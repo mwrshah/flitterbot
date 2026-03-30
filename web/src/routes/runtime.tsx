@@ -108,10 +108,7 @@ function RuntimePage() {
           {/* Control Surface */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Control Surface</CardTitle>
-                <Badge variant="muted">{status.source ?? "live"}</Badge>
-              </div>
+              <CardTitle>Control Surface</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
