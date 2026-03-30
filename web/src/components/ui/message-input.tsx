@@ -243,6 +243,7 @@ export const MessageInput = memo(function MessageInput({
       if (pickerOpenRef.current) {
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           setPickerOpen(false);
           // Remove trigger text from "/" to cursor
           const pos = slashPositionRef.current;
@@ -271,6 +272,7 @@ export const MessageInput = memo(function MessageInput({
       if (atPickerOpenRef.current) {
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           setAtPickerOpen(false);
           // Remove trigger text from "@" to cursor
           const pos = atPositionRef.current;
