@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { type Ref, memo } from "react";
 import type { DirectoryCompletionItem } from "~/lib/types";
 import {
   Command,
@@ -16,6 +16,7 @@ type PathPickerProps = {
   onSelect: (item: DirectoryCompletionItem) => void;
   onClose: () => void;
   caretLeft?: number;
+  commandRef?: Ref<HTMLDivElement>;
 };
 
 export const PathPicker = memo(function PathPicker({
@@ -27,15 +28,18 @@ export const PathPicker = memo(function PathPicker({
   onSelect,
   onClose: _onClose,
   caretLeft,
+  commandRef,
 }: PathPickerProps) {
   if (!open) return null;
 
   return (
     <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
+        ref={commandRef}
         value={selectedValue}
         onValueChange={onSelectedValueChange}
         shouldFilter={false}
+        loop
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
