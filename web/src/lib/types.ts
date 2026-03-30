@@ -143,6 +143,7 @@ export type DownstreamSessionItem = {
   workstreamId: string | null;
   workstreamName: string | null;
   tmuxSession: string | null;
+  cwd: string | null;
 };
 
 export type PiSessionsListResponse = {

@@ -350,6 +350,7 @@ export function getSessionsByPiSessionId(
     workstreamId: row.workstream_id,
     workstreamName: row.workstream_name,
     tmuxSession: row.tmux_session,
+    cwd: row.cwd ?? null,
   }));
 }
 
