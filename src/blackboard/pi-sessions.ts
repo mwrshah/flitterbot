@@ -117,9 +117,10 @@ export function touchDatetimeReportedAt(
   piSessionId: string,
   timestamp: string,
 ): void {
-  db.prepare(
-    "UPDATE pi_sessions SET last_datetime_reported_at = ? WHERE pi_session_id = ?",
-  ).run(timestamp, piSessionId);
+  db.prepare("UPDATE pi_sessions SET last_datetime_reported_at = ? WHERE pi_session_id = ?").run(
+    timestamp,
+    piSessionId,
+  );
 }
 
 export function reassociateOrphanedSessions(

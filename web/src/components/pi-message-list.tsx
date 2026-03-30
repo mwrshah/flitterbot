@@ -95,8 +95,12 @@ export const PiMessageList = memo(
       const initDetails = getPiWebUiInitError();
       return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-4">
-          <p className="text-xs font-medium text-destructive">Pi Web UI failed to initialize. Check the browser console.</p>
-          {initDetails instanceof Error ? <p className="text-xs text-destructive/70">{initDetails.message}</p> : null}
+          <p className="text-xs font-medium text-destructive">
+            Pi Web UI failed to initialize. Check the browser console.
+          </p>
+          {initDetails instanceof Error ? (
+            <p className="text-xs text-destructive/70">{initDetails.message}</p>
+          ) : null}
         </div>
       );
     }

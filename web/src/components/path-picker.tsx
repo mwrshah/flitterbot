@@ -1,11 +1,6 @@
-import { type Ref, memo, useEffect, useState } from "react";
+import { memo, type Ref, useEffect, useState } from "react";
+import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import type { DirectoryCompletionItem } from "~/lib/types";
-import {
-  Command,
-  CommandEmpty,
-  CommandItem,
-  CommandList,
-} from "~/components/ui/command";
 
 type PathPickerProps = {
   open: boolean;

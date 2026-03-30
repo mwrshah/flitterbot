@@ -24,7 +24,12 @@ export async function classifyMessage(
   const defaultConversation = defaultPiSessionId
     ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
     : [];
-  const prompt = buildClassificationPrompt(message, workstreams, recentConversation, defaultConversation);
+  const prompt = buildClassificationPrompt(
+    message,
+    workstreams,
+    recentConversation,
+    defaultConversation,
+  );
   console.log(
     "[router] classifying: %d open workstreams | message: %s",
     workstreams.length,

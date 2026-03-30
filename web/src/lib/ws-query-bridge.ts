@@ -13,6 +13,7 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
+import { toast } from "sonner";
 import type { AutonomaApiClient } from "~/lib/api";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
@@ -21,13 +22,11 @@ import type {
   ChatTimelineMessage,
   ChatTimelineTool,
   ConnectionState,
-
   ImageAttachment,
   JsonValue,
   WsMessage,
 } from "~/lib/types";
 import { createId, extractToolName } from "~/lib/utils";
-import { toast } from "sonner";
 import type { AutonomaWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
@@ -93,9 +92,10 @@ function appendTimelineItem(
   surface: "agent" | "input" = "agent",
 ) {
   if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) =>
-      [...(old ?? []), item],
-    );
+    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) => [
+      ...(old ?? []),
+      item,
+    ]);
     return;
   }
 
@@ -113,19 +113,33 @@ function appendTimelineItem(
           (existing as ChatTimelineTool).phase === tool.phase,
       );
       if (dup) {
-        console.log("[debug][ws-bridge] appendTimelineItem DEDUP skipped toolUseId=%s phase=%s session=%s", tool.toolUseId, tool.phase, sessionId);
+        console.log(
+          "[debug][ws-bridge] appendTimelineItem DEDUP skipped toolUseId=%s phase=%s session=%s",
+          tool.toolUseId,
+          tool.phase,
+          sessionId,
+        );
         return items;
       }
     } else if (item.kind === "message") {
       const dup = items.some((existing) => existing.id === item.id);
       if (dup) {
-        console.log("[debug][ws-bridge] appendTimelineItem DEDUP skipped id=%s session=%s", item.id, sessionId);
+        console.log(
+          "[debug][ws-bridge] appendTimelineItem DEDUP skipped id=%s session=%s",
+          item.id,
+          sessionId,
+        );
         return items;
       }
     }
 
     const next = [...items, item];
-    console.log("[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s", item.kind, next.length, sessionId);
+    console.log(
+      "[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s",
+      item.kind,
+      next.length,
+      sessionId,
+    );
     return next;
   });
 }
@@ -133,11 +147,7 @@ function appendTimelineItem(
 /* ── Timeline upsert helper (replace existing by ID, or append) ── */
 /* Used for message_end: intermediate→final correction is the one expected replace. */
 
-function upsertTimelineItem(
-  queryClient: QueryClient,
-  sessionId: string,
-  item: ChatTimelineItem,
-) {
+function upsertTimelineItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineItem) {
   queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
     const items = old ?? [];
     const idx = items.findIndex((existing) => existing.id === item.id);
@@ -152,12 +162,23 @@ function upsertTimelineItem(
           item.id,
         );
       }
-      console.log("[debug][ws-bridge] upsertTimelineItem: replaced existing id=%s wasIntermediate=%s timeline.length=%d session=%s", item.id, wasIntermediate, items.length, sessionId);
+      console.log(
+        "[debug][ws-bridge] upsertTimelineItem: replaced existing id=%s wasIntermediate=%s timeline.length=%d session=%s",
+        item.id,
+        wasIntermediate,
+        items.length,
+        sessionId,
+      );
       const updated = [...items];
       updated[idx] = item;
       return updated;
     }
-    console.log("[debug][ws-bridge] upsertTimelineItem: appended (no existing id=%s) → timeline.length=%d session=%s", item.id, items.length + 1, sessionId);
+    console.log(
+      "[debug][ws-bridge] upsertTimelineItem: appended (no existing id=%s) → timeline.length=%d session=%s",
+      item.id,
+      items.length + 1,
+      sessionId,
+    );
     return [...items, item];
   });
 }
@@ -185,11 +206,10 @@ function updateTimelineItem(
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: AutonomaWsClient;
-  apiClient: AutonomaApiClient;
   router: AnyRouter;
   getDefaultSessionId: () => string | undefined;
 }): () => void {
-  const { queryClient, wsClient, apiClient, router, getDefaultSessionId } = deps;
+  const { queryClient, wsClient, router, getDefaultSessionId } = deps;
 
   /* ── WS message handler ── */
 
@@ -338,7 +358,9 @@ export function setupWsQueryBridge(deps: {
       if (msg.content.trim() || thinkingText) {
         // Build the committed message with both thinking and text blocks.
         // Even if content is empty, thinking-only messages are preserved.
-        const blocks: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }> = [];
+        const blocks: Array<
+          { type: "text"; text: string } | { type: "thinking"; thinking: string }
+        > = [];
         if (thinkingText) {
           blocks.push({ type: "thinking" as const, thinking: thinkingText });
         }
@@ -364,7 +386,11 @@ export function setupWsQueryBridge(deps: {
       }
 
       // Clear all streaming state atomically.
-      console.log("[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s", sessionId, msg.id);
+      console.log(
+        "[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s",
+        sessionId,
+        msg.id,
+      );
       streamingStore.clearSession(sessionId);
       return;
     }
@@ -416,24 +442,21 @@ export function setupWsQueryBridge(deps: {
       // Try to upgrade the stub committed to cache by the message_end flush
       let upgraded = false;
       if (message.toolUseId) {
-        queryClient.setQueryData<ChatTimelineItem[]>(
-          ["pi-history", sessionId, "agent"],
-          (old) => {
-            if (!old) return old;
-            const idx = old.findIndex(
-              (item) =>
-                item.kind === "tool" &&
-                (item as ChatTimelineTool).toolUseId === message.toolUseId &&
-                (item as ChatTimelineTool).phase === "start" &&
-                (item as ChatTimelineTool).args == null,
-            );
-            if (idx < 0) return old;
-            upgraded = true;
-            const items = [...old];
-            items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
-            return items;
-          },
-        );
+        queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+          if (!old) return old;
+          const idx = old.findIndex(
+            (item) =>
+              item.kind === "tool" &&
+              (item as ChatTimelineTool).toolUseId === message.toolUseId &&
+              (item as ChatTimelineTool).phase === "start" &&
+              (item as ChatTimelineTool).args == null,
+          );
+          if (idx < 0) return old;
+          upgraded = true;
+          const items = [...old];
+          items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
+          return items;
+        });
       }
 
       // Fallback: no pending item (e.g. reconnect) — append fresh
@@ -489,7 +512,11 @@ export function setupWsQueryBridge(deps: {
 
       const uncommitted = streamingStore.getUncommittedText(sessionId);
       if (uncommitted?.text.trim()) {
-        console.log("[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s", uncommitted.messageId, sessionId);
+        console.log(
+          "[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s",
+          uncommitted.messageId,
+          sessionId,
+        );
         upsertTimelineItem(queryClient, sessionId, {
           id: uncommitted.messageId,
           kind: "message",
@@ -498,7 +525,11 @@ export function setupWsQueryBridge(deps: {
           createdAt: new Date().toISOString(),
         });
       }
-      console.log("[debug][ws-bridge] agent_end: calling clearSession hasUncommitted=%s session=%s", uncommitted?.text.trim() ? "yes" : "no", sessionId);
+      console.log(
+        "[debug][ws-bridge] agent_end: calling clearSession hasUncommitted=%s session=%s",
+        uncommitted?.text.trim() ? "yes" : "no",
+        sessionId,
+      );
       streamingStore.clearSession(sessionId);
       return;
     }

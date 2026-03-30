@@ -13,14 +13,14 @@ import {
   ROUTE_EVENT_TO_HOOK_EVENT,
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
+import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
 import { handleBrowserPiHistoryRoute } from "./routes/browser-pi.ts";
-import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import { handleBrowserPiSessionWorkstreamRoute } from "./routes/browser-pi-session-workstream.ts";
+import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
 } from "./routes/browser-sessions.ts";
-import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
 import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
@@ -182,7 +182,12 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "workstream" &&
     !segments[4]
   ) {
-    return handleBrowserPiSessionWorkstreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handleBrowserPiSessionWorkstreamRoute(
+      runtime,
+      req,
+      res,
+      decodeURIComponent(segments[2]),
+    );
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));

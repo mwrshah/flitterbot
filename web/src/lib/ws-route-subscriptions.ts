@@ -22,7 +22,10 @@ function defaultPiSessionIdFromCache(queryClient: QueryClient): string | undefin
   return queryClient.getQueryData<StatusResponse>(["status"])?.pi?.default?.sessionId;
 }
 
-function resolveSubscriptionTarget(router: AnyRouter, queryClient: QueryClient): SubscriptionTarget | null {
+function resolveSubscriptionTarget(
+  router: AnyRouter,
+  queryClient: QueryClient,
+): SubscriptionTarget | null {
   const matches = router.state.matches as MatchWithWsData[];
   const activeMatch = [...matches].reverse().find((match) => match.staticData?.wsMode);
   if (!activeMatch) return null;
@@ -47,7 +50,8 @@ function resolveSubscriptionTarget(router: AnyRouter, queryClient: QueryClient):
 function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null): boolean {
   if (a === null || b === null) return a === b;
   if (a.sessionId !== b.sessionId) return false;
-  if (a.eventTypes === undefined || b.eventTypes === undefined) return a.eventTypes === b.eventTypes;
+  if (a.eventTypes === undefined || b.eventTypes === undefined)
+    return a.eventTypes === b.eventTypes;
   if (a.eventTypes.length !== b.eventTypes.length) return false;
   const bEventTypes = b.eventTypes;
   return a.eventTypes.every((eventType, index) => eventType === bEventTypes[index]);

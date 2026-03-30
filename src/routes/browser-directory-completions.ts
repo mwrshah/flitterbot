@@ -57,9 +57,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
   });
 
   // Sort: directories first (alphabetical), then files (alphabetical)
-  const dirs = filtered
-    .filter((e) => e.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const dirs = filtered.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
   const files = filtered
     .filter((e) => !e.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name));

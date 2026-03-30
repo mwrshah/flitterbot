@@ -1,6 +1,4 @@
-import { type Ref, memo } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { SkillListItem } from "~/lib/types";
+import { memo, type Ref } from "react";
 import {
   Command,
   CommandEmpty,
@@ -8,6 +6,8 @@ import {
   CommandItem,
   CommandList,
 } from "~/components/ui/command";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import type { SkillListItem } from "~/lib/types";
 
 type SkillPickerProps = {
   open: boolean;

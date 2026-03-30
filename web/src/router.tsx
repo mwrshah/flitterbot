@@ -44,7 +44,6 @@ export function getRouter() {
     setupWsQueryBridge({
       queryClient,
       wsClient,
-      apiClient,
       router,
       getDefaultSessionId: () => {
         const status = queryClient.getQueryData<StatusResponse>(["status"]);

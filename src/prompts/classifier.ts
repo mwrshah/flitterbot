@@ -1,4 +1,7 @@
-import type { ConversationSnippet, DefaultConversationSnippet } from "../blackboard/query-messages.ts";
+import type {
+  ConversationSnippet,
+  DefaultConversationSnippet,
+} from "../blackboard/query-messages.ts";
 import type { WorkstreamRow } from "../contracts/index.ts";
 
 function formatWorkstreamLine(ws: WorkstreamRow, label?: string): string {

@@ -6,7 +6,6 @@ import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
-import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import {
   getLastDatetimeReportedAt,
   touchDatetimeReportedAt,
@@ -31,6 +30,7 @@ import {
   listRecentlyClosedWorkstreams,
   resetAllWorkstreams,
 } from "./blackboard/query-workstreams.ts";
+import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
 import type {
@@ -54,9 +54,9 @@ import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
-import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { type ManagedPiSession, PiSessionManager } from "./pi/session-manager.ts";
 import type { QueueItem, QueueSource } from "./pi/turn-queue.ts";
+import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -439,7 +439,10 @@ export class ControlSurfaceRuntime {
     }
 
     // Use Claude Code's native last_assistant_message from the stop hook payload
-    const lastAssistantText = pickString(payload, ["last_assistant_message", "lastAssistantMessage"]);
+    const lastAssistantText = pickString(payload, [
+      "last_assistant_message",
+      "lastAssistantMessage",
+    ]);
     if (lastAssistantText) {
       payload.lastAssistantText = lastAssistantText;
     }
@@ -1073,7 +1076,12 @@ export class ControlSurfaceRuntime {
                     );
                   }
                 } else {
-                  prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id, agentMessage);
+                  prompt = this.sessionManager.buildWorkstreamPrompt(
+                    originalText,
+                    ws.name,
+                    ws.id,
+                    agentMessage,
+                  );
                 }
               } catch (error) {
                 this.log(
@@ -1081,9 +1089,15 @@ export class ControlSurfaceRuntime {
                 );
                 this.wsHub.broadcast({
                   type: "error",
-                  message: "Context classification failed — workstream context limited to current message.",
+                  message:
+                    "Context classification failed — workstream context limited to current message.",
                 });
-                prompt = this.sessionManager.buildWorkstreamPrompt(originalText, ws.name, ws.id, agentMessage);
+                prompt = this.sessionManager.buildWorkstreamPrompt(
+                  originalText,
+                  ws.name,
+                  ws.id,
+                  agentMessage,
+                );
               }
 
               orchestrator.queue.enqueue({
@@ -1565,7 +1579,12 @@ export class ControlSurfaceRuntime {
           const apiKey = resolveGroqApiKey();
           if (!apiKey) throw new Error("No Groq API key available");
           const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
-          const result = await classifyMessage(payload.text, this.blackboard, apiKey, defaultPiSessionId);
+          const result = await classifyMessage(
+            payload.text,
+            this.blackboard,
+            apiKey,
+            defaultPiSessionId,
+          );
           routerMeta = { router_action: result.action };
           if (result.workstream) {
             routerMeta.workstream_id = result.workstream.id;
@@ -1635,7 +1654,11 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     payload.agentManaged === true ||
     payload.agent_managed === 1 ||
     payload.agentManaged === 1;
-  const lastAssistantText = pickString(payload, ["lastAssistantText", "last_assistant_message", "lastAssistantMessage"]);
+  const lastAssistantText = pickString(payload, [
+    "lastAssistantText",
+    "last_assistant_message",
+    "lastAssistantMessage",
+  ]);
   const lines = [
     `[hook] ${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
