@@ -40,23 +40,11 @@ const icons = {
       <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5.5L3 13.5V11H3a1 1 0 0 1-1-1V3Z" />
     </svg>
   ),
-  settings: (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
-      <path
-        fillRule="evenodd"
-        d="M7.429 1.525a3.5 3.5 0 0 1 1.142 0 .75.75 0 0 1 .618.55l.31 1.16c.136.07.267.148.392.232l1.157-.35a.75.75 0 0 1 .79.29 5.5 5.5 0 0 1 .572.99.75.75 0 0 1-.172.84l-.847.81c.006.14.006.282 0 .423l.847.81a.75.75 0 0 1 .172.84 5.5 5.5 0 0 1-.572.99.75.75 0 0 1-.79.29l-1.157-.35a4 4 0 0 1-.392.232l-.31 1.16a.75.75 0 0 1-.618.55 3.5 3.5 0 0 1-1.142 0 .75.75 0 0 1-.618-.55l-.31-1.16a4 4 0 0 1-.392-.232l-1.157.35a.75.75 0 0 1-.79-.29 5.5 5.5 0 0 1-.572-.99.75.75 0 0 1 .172-.84l.847-.81a4 4 0 0 1 0-.423l-.847-.81a.75.75 0 0 1-.172-.84 5.5 5.5 0 0 1 .572-.99.75.75 0 0 1 .79-.29l1.157.35c.125-.084.256-.162.392-.232l.31-1.16a.75.75 0 0 1 .618-.55ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"
-      />
-    </svg>
-  ),
 };
 
 
-export const Sidebar = memo(function Sidebar({
-  onOpenSettings,
-}: {
-  onOpenSettings: () => void;
-}) {
-  useWhyDidYouRender("Sidebar", { onOpenSettings });
+export const Sidebar = memo(function Sidebar() {
+  useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
 
@@ -148,22 +136,6 @@ export const Sidebar = memo(function Sidebar({
 
       {/* Spacer */}
       {allWorkstreams.length === 0 && <div className="flex-1" />}
-
-      {/* Settings trigger */}
-      <div className="shrink-0 px-3 py-3 border-t border-sidebar-border">
-        <button
-          onClick={onOpenSettings}
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm w-full transition-colors",
-            "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-          )}
-        >
-          <span className="shrink-0 w-4 h-4 flex items-center justify-center">
-            {icons.settings}
-          </span>
-          <span>Settings</span>
-        </button>
-      </div>
     </aside>
   );
 });

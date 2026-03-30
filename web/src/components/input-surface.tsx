@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
+import { SettingsDrawer } from "~/components/settings-drawer";
 
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
@@ -341,6 +342,7 @@ const useIsClient = () =>
 export function InputSurface() {
   const isClient = useIsClient();
   const { apiClient, sendMessage } = rootApi.useRouteContext();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
@@ -411,8 +413,20 @@ export function InputSurface() {
           <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
           <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
         </div>
-        <RuntimeHealthIndicator />
+        <div className="flex items-center gap-2">
+          <RuntimeHealthIndicator />
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="p-1.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors"
+            title="Settings"
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Activity feed */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
