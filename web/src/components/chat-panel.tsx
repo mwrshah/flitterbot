@@ -175,6 +175,7 @@ export function ChatPanel({
             <Button
               variant="destructive"
               size="sm"
+              className="h-6 px-2 text-[11px]"
               disabled={interruptMutation.isPending}
               onClick={() => interruptMutation.mutate()}
             >
@@ -185,10 +186,11 @@ export function ChatPanel({
             <Button
               variant="outline"
               size="sm"
+              className="h-6 px-2 text-[11px]"
               disabled={reopenMutation.isPending}
               onClick={() => reopenMutation.mutate()}
             >
-              <RotateCcw className="size-3.5" />
+              <RotateCcw className="size-3" />
               {reopenMutation.isPending ? "Reopening..." : "Reopen"}
             </Button>
           )}
