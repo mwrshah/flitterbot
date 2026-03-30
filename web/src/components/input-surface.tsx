@@ -347,7 +347,6 @@ export function InputSurface() {
 
   // Recompute only when timeline reference changes (setQueryData creates new arrays)
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
-  );
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
