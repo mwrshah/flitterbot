@@ -226,11 +226,9 @@ export function subscribeToPiSession(
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
-    // FR-3: Only set 'active' during turns. Post-turn transitions (waiting_for_user/waiting_for_sessions)
-    // are handled by runtime.transitionPiAfterTurn(), not the event subscriber.
-    if (event.type !== "turn_end" && event.type !== "agent_end") {
-      touchPiEvent(blackboard, session.sessionId, now, "active");
-    }
+    // FR-3: Update last_event_at only on turn/agent boundary events (not per-delta).
+    // Post-turn status transitions (waiting_for_user/waiting_for_sessions) are handled
+    // by runtime.transitionPiAfterTurn(), not the event subscriber.
 
     switch (event.type) {
       case "message_start": {
@@ -401,9 +399,11 @@ export function subscribeToPiSession(
         break;
       }
       case "turn_start":
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       case "turn_end": {
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
@@ -416,9 +416,11 @@ export function subscribeToPiSession(
         break;
       }
       case "agent_start":
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         lastAssistantMessage = null;
         break;
       case "agent_end": {
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         if (lastAssistantMessage) {
           // Broadcast pi_surfaced for the input surface. The agent timeline already has
           // the message from the message_end event — no second message_end needed.
