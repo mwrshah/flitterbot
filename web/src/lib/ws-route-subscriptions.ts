@@ -64,6 +64,13 @@ export function setupWsRouteSubscriptions(
     const nextTarget = resolveSubscriptionTarget(router, queryClient);
     if (sameTarget(activeTarget, nextTarget)) return;
 
+    // Invalidate the departing session's pi-history cache so the next
+    // ensureQueryData call refetches instead of serving stale data.
+    // Skip the wildcard '*' target (input-surface) — it has no session cache.
+    if (activeTarget && activeTarget.sessionId !== "*") {
+      queryClient.invalidateQueries({ queryKey: ["pi-history", activeTarget.sessionId] });
+    }
+
     activeTarget = nextTarget;
 
     if (nextTarget) {
