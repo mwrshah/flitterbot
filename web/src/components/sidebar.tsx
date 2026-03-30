@@ -40,11 +40,6 @@ const icons = {
       <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5.5L3 13.5V11H3a1 1 0 0 1-1-1V3Z" />
     </svg>
   ),
-  sessions: (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
-      <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3Zm2 0v2h12V3H2Zm0 4v6h12V7H2Z" />
-    </svg>
-  ),
   settings: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
       <path
@@ -94,7 +89,6 @@ export const Sidebar = memo(function Sidebar({
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
         <NavItem to="/" label="Input Surface" icon={icons.inputSurface} />
         <NavItem to="/pi" label="Pi Agent" icon={icons.piAgent} />
-        <NavItem to="/sessions" label="Claude Code" icon={icons.sessions} />
       </nav>
 
       {/* Workstreams */}
