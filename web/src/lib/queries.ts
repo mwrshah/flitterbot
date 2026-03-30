@@ -43,6 +43,12 @@ export function piHistoryQueryOptions(
     },
     enabled: sessionId !== undefined,
     staleTime: Infinity, // WS events keep this fresh via setQueryData
+    // When the default session restarts with a new ID, the component picks up
+    // the new sessionId from the status cache before the route loader re-runs.
+    // Without placeholderData, useQuery returns undefined and usePiChat falls
+    // back to stale loaderHistory (old session's messages). An empty placeholder
+    // avoids showing the old session's data during the transition.
+    placeholderData: [],
   };
 }
 
