@@ -67,17 +67,57 @@ export const MessageInput = memo(function MessageInput({
 
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
-  const pickerOpenRef = useRef(pickerOpen);
-  const atPickerOpenRef = useRef(atPickerOpen);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
   useEffect(() => {
     draftRef.current = draft;
-    pickerOpenRef.current = pickerOpen;
-    atPickerOpenRef.current = atPickerOpen;
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
   });
+
+  // Native keydown listener for Escape — must be on the DOM element directly
+  // so preventDefault() fires before the browser's blur-on-Escape behavior.
+  // Uses position refs (set synchronously in handleDraftChange) instead of
+  // state-synced open refs which lag by one render via useEffect.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const onEscapeNative = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const slashPos = slashPositionRef.current;
+      const atPos = atPositionRef.current;
+      if (slashPos < 0 && atPos < 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (slashPos >= 0) {
+        setPickerOpen(false);
+        const value = draftRef.current;
+        const cursor = textarea.selectionStart ?? value.length;
+        const newValue = value.slice(0, slashPos) + value.slice(cursor);
+        setDraft(newValue);
+        slashPositionRef.current = -1;
+        requestAnimationFrame(() => {
+          textarea.setSelectionRange(slashPos, slashPos);
+          textarea.focus();
+        });
+      } else if (atPos >= 0) {
+        setAtPickerOpen(false);
+        const value = draftRef.current;
+        const cursor = textarea.selectionStart ?? value.length;
+        const newValue = value.slice(0, atPos) + value.slice(cursor);
+        setDraft(newValue);
+        atPositionRef.current = -1;
+        requestAnimationFrame(() => {
+          textarea.setSelectionRange(atPos, atPos);
+          textarea.focus();
+        });
+      }
+    };
+    textarea.addEventListener("keydown", onEscapeNative);
+    return () => textarea.removeEventListener("keydown", onEscapeNative);
+  }, []);
 
   /**
    * Compute the pixel X position of a character index in the textarea,
@@ -237,65 +277,26 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Escape is handled by a native keydown listener (see useEffect above)
+      // so that preventDefault() fires before the browser's blur-on-Escape.
+
       // When a picker is open, forward navigation keys to cmdk.
       // Tab is mapped to Enter so it accepts the highlighted item.
+      // Use position refs (synchronously set) instead of state-synced open refs.
       const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
-      if (pickerOpenRef.current) {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          setPickerOpen(false);
-          // Remove trigger text from "/" to cursor
-          const pos = slashPositionRef.current;
-          if (pos >= 0) {
-            const value = draftRef.current;
-            const cursor = textareaRef.current?.selectionStart ?? value.length;
-            const newValue = value.slice(0, pos) + value.slice(cursor);
-            setDraft(newValue);
-            slashPositionRef.current = -1;
-            requestAnimationFrame(() => {
-              textareaRef.current?.setSelectionRange(pos, pos);
-              textareaRef.current?.focus();
-            });
-          }
-          return;
-        }
-        if (navKeys.includes(event.key)) {
-          event.preventDefault();
-          skillCommandRef.current?.dispatchEvent(
-            new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
-          );
-          return;
-        }
+      if (slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
+        event.preventDefault();
+        skillCommandRef.current?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
+        );
+        return;
       }
-
-      if (atPickerOpenRef.current) {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          setAtPickerOpen(false);
-          // Remove trigger text from "@" to cursor
-          const pos = atPositionRef.current;
-          if (pos >= 0) {
-            const value = draftRef.current;
-            const cursor = textareaRef.current?.selectionStart ?? value.length;
-            const newValue = value.slice(0, pos) + value.slice(cursor);
-            setDraft(newValue);
-            atPositionRef.current = -1;
-            requestAnimationFrame(() => {
-              textareaRef.current?.setSelectionRange(pos, pos);
-              textareaRef.current?.focus();
-            });
-          }
-          return;
-        }
-        if (navKeys.includes(event.key)) {
-          event.preventDefault();
-          pathCommandRef.current?.dispatchEvent(
-            new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
-          );
-          return;
-        }
+      if (atPositionRef.current >= 0 && navKeys.includes(event.key)) {
+        event.preventDefault();
+        pathCommandRef.current?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: event.key === "Tab" ? "Enter" : event.key, bubbles: true }),
+        );
+        return;
       }
 
       if (event.key === "Enter" && !event.shiftKey) {
