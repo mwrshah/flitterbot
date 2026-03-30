@@ -3,7 +3,7 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
-import type { ConnectionState, WorkstreamSummary } from "~/lib/types";
+import type { WorkstreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
@@ -67,28 +67,13 @@ const icons = {
   ),
 };
 
-function connectionColor(state: ConnectionState): string {
-  switch (state) {
-    case "connected":
-      return "bg-emerald-500";
-    case "connecting":
-    case "reconnecting":
-      return "bg-amber-500";
-    case "stub":
-      return "bg-blue-500";
-    default:
-      return "bg-zinc-500";
-  }
-}
 
 export const Sidebar = memo(function Sidebar({
-  connectionState,
   onOpenSettings,
 }: {
-  connectionState: ConnectionState;
   onOpenSettings: () => void;
 }) {
-  useWhyDidYouRender("Sidebar", { connectionState, onOpenSettings });
+  useWhyDidYouRender("Sidebar", { onOpenSettings });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
 
@@ -98,8 +83,6 @@ export const Sidebar = memo(function Sidebar({
   });
 
   const status = statusQuery.data;
-  const piState = status?.pi?.default?.busy ? "active" : "idle";
-  const waStatus = status?.whatsapp.status ?? "unknown";
   const allWorkstreams = status?.workstreams ?? [];
   const openWorkstreams = allWorkstreams.filter((ws: WorkstreamSummary) => ws.status === "open");
   const closedWorkstreams = allWorkstreams.filter(
@@ -118,26 +101,6 @@ export const Sidebar = memo(function Sidebar({
         </div>
       </div>
 
-      {/* Status cluster */}
-      <div className="shrink-0 px-4 py-3 space-y-1.5 border-b border-sidebar-border">
-        <StatusDot
-          color={piState === "active" ? "bg-emerald-500" : "bg-blue-400"}
-          label="Pi"
-          value={piState}
-        />
-        <StatusDot
-          color={
-            waStatus === "connected"
-              ? "bg-emerald-500"
-              : waStatus === "stopped" || waStatus === "disabled"
-                ? "bg-zinc-500"
-                : "bg-amber-500"
-          }
-          label="WA"
-          value={waStatus}
-        />
-        <StatusDot color={connectionColor(connectionState)} label="WS" value={connectionState} />
-      </div>
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
