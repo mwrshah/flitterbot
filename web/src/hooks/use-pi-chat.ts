@@ -5,6 +5,7 @@ import {
   connectionStateQueryOptions,
   piHistoryQueryOptions,
   statusPillsQueryOptions,
+  statusQueryOptions,
 } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
 
@@ -25,7 +26,7 @@ const useIsClient = () =>
  */
 export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const isClient = useIsClient();
-  const { sendMessage } = rootApi.useRouteContext();
+  const { sendMessage, apiClient } = rootApi.useRouteContext();
 
   const { data: timeline = loaderHistory } = useQuery(
     piHistoryQueryOptions(sessionId),
@@ -36,6 +37,13 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
   );
   const connectionState = isClient ? rawConnectionState : ("disconnected" as ConnectionState);
 
+  const { data: status } = useQuery(statusQueryOptions(apiClient));
+  const isSessionBusy = (() => {
+    if (!sessionId || !status?.pi) return false;
+    if (status.pi.default?.sessionId === sessionId) return !!status.pi.default.busy;
+    return !!status.pi.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
+  })();
+
   const effectiveSessionId = sessionId ?? "default";
 
   const onSendMessage = useCallback(
@@ -44,5 +52,5 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
     [sendMessage, sessionId],
   );
 
-  return { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId };
+  return { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId, isSessionBusy };
 }
