@@ -1,4 +1,4 @@
-import { type Ref, memo } from "react";
+import { type Ref, memo, useEffect, useState } from "react";
 import type { DirectoryCompletionItem } from "~/lib/types";
 import {
   Command,
@@ -24,6 +24,13 @@ export const PathPicker = memo(function PathPicker({
   caretLeft,
   commandRef,
 }: PathPickerProps) {
+  // shouldFilter={false} means cmdk won't auto-select on children change.
+  // Manually reset selection to first item when server-filtered results arrive.
+  const [selectedValue, setSelectedValue] = useState("");
+  useEffect(() => {
+    setSelectedValue(items[0]?.path ?? "");
+  }, [items]);
+
   if (!open) return null;
 
   return (
@@ -32,6 +39,8 @@ export const PathPicker = memo(function PathPicker({
         ref={commandRef}
         shouldFilter={false}
         loop
+        value={selectedValue}
+        onValueChange={setSelectedValue}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
