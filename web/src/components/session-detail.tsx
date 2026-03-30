@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/common/badge";
+import { Button } from "~/components/common/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/common/card";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SessionDetail as SessionDetailType, TmuxSessionInspection } from "~/lib/types";
 import { cn, formatDateTime, safeJsonParse } from "~/lib/utils";

@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { MessageInput } from "~/components/ui/message-input";
+import { Badge } from "~/components/common/badge";
+import { Button } from "~/components/common/button";
+import { MessageInput } from "~/components/common/message-input";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { StatusPill } from "~/lib/queries";

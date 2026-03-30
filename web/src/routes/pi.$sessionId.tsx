@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
-import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
+import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import {
   piDownstreamSessionsQueryOptions,

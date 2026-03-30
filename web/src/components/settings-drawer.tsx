@@ -1,7 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { memo } from "react";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
+import { Button } from "~/components/common/button";
+import { Input } from "~/components/common/input";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useSettings } from "~/lib/settings-store";

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
-import { Button } from "~/components/ui/button";
+import { Button } from "~/components/common/button";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
