@@ -1,10 +1,13 @@
-import { execSync } from "node:child_process";
+import { exec as cpExec } from "node:child_process";
 import fs from "node:fs";
+import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeWorkstream, getWorkstreamById } from "../blackboard/query-workstreams.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
+
+const execPromise = promisify(cpExec);
 
 type CloseWorkstreamResult = {
   ok: boolean;
@@ -15,24 +18,28 @@ type CloseWorkstreamResult = {
   pushed?: boolean;
 };
 
-function exec(cmd: string, cwd: string, timeoutMs = 30_000): string {
-  return execSync(cmd, { cwd, timeout: timeoutMs, stdio: "pipe" }).toString().trim();
+async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
+  const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
+  return stdout.trim();
 }
 
-function inferBranchFromWorktree(worktreePath: string): string | null {
+async function inferBranchFromWorktree(worktreePath: string): Promise<string | null> {
   try {
-    return exec("git branch --show-current", worktreePath, 5_000) || null;
+    return (await exec("git branch --show-current", worktreePath, 5_000)) || null;
   } catch {
     return null;
   }
 }
 
-function isBranchAncestorOf(repoPath: string, branch: string, target: string): boolean {
+async function isBranchAncestorOf(
+  repoPath: string,
+  branch: string,
+  target: string,
+): Promise<boolean> {
   try {
-    execSync(`git merge-base --is-ancestor ${branch} ${target}`, {
+    await execPromise(`git merge-base --is-ancestor ${branch} ${target}`, {
       cwd: repoPath,
       timeout: 10_000,
-      stdio: "pipe",
     });
     return true;
   } catch {
@@ -40,9 +47,9 @@ function isBranchAncestorOf(repoPath: string, branch: string, target: string): b
   }
 }
 
-function getConflictedFiles(repoPath: string): string[] {
+async function getConflictedFiles(repoPath: string): Promise<string[]> {
   try {
-    const output = exec("git diff --name-only --diff-filter=U", repoPath, 5_000);
+    const output = await exec("git diff --name-only --diff-filter=U", repoPath, 5_000);
     return output ? output.split("\n").filter(Boolean) : [];
   } catch {
     return [];
@@ -54,12 +61,12 @@ type CommitResult =
   | { hasChanges: true; ok: true }
   | { hasChanges: true; ok: false; message: string };
 
-function commitUncommittedChanges(worktreePath: string): CommitResult {
-  const status = exec("git status --porcelain", worktreePath, 5_000);
+async function commitUncommittedChanges(worktreePath: string): Promise<CommitResult> {
+  const status = await exec("git status --porcelain", worktreePath, 5_000);
   if (!status) return { hasChanges: false };
   try {
-    exec("git add -A", worktreePath);
-    exec(
+    await exec("git add -A", worktreePath);
+    await exec(
       'git commit -m "chore: auto-commit uncommitted changes before workstream close"',
       worktreePath,
     );
@@ -72,22 +79,26 @@ function commitUncommittedChanges(worktreePath: string): CommitResult {
 
 type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
 
-function mergeToMain(repoPath: string, branch: string, commitMessage?: string): MergeResult {
+async function mergeToMain(
+  repoPath: string,
+  branch: string,
+  commitMessage?: string,
+): Promise<MergeResult> {
   // Fetch latest
   try {
-    exec("git fetch origin", repoPath);
+    await exec("git fetch origin", repoPath);
   } catch {
     // Non-fatal — continue with local state
   }
 
   // Check if already merged
-  if (isBranchAncestorOf(repoPath, branch, "main")) {
+  if (await isBranchAncestorOf(repoPath, branch, "main")) {
     return { ok: true };
   }
 
   // Checkout main
   try {
-    exec("git checkout main", repoPath);
+    await exec("git checkout main", repoPath);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     return {
@@ -99,7 +110,7 @@ function mergeToMain(repoPath: string, branch: string, commitMessage?: string): 
 
   // Pull latest main
   try {
-    exec("git pull origin main --ff-only", repoPath);
+    await exec("git pull origin main --ff-only", repoPath);
   } catch {
     // Non-fatal — continue with local main
   }
@@ -109,15 +120,15 @@ function mergeToMain(repoPath: string, branch: string, commitMessage?: string): 
     const mergeCmd = commitMessage
       ? `git merge ${branch} -m '${commitMessage.replace(/'/g, "'\\''")}'`
       : `git merge ${branch} --no-edit`;
-    exec(mergeCmd, repoPath);
+    await exec(mergeCmd, repoPath);
     return { ok: true };
   } catch {
     // Check if it's a conflict or a different error
-    const conflicts = getConflictedFiles(repoPath);
+    const conflicts = await getConflictedFiles(repoPath);
     if (conflicts.length > 0) {
       // Abort the failed merge so the repo isn't left in a dirty state
       try {
-        exec("git merge --abort", repoPath);
+        await exec("git merge --abort", repoPath);
       } catch {
         /* ignore */
       }
@@ -129,7 +140,7 @@ function mergeToMain(repoPath: string, branch: string, commitMessage?: string): 
     }
     // Non-conflict merge failure
     try {
-      exec("git merge --abort", repoPath);
+      await exec("git merge --abort", repoPath);
     } catch {
       /* ignore */
     }
@@ -137,9 +148,9 @@ function mergeToMain(repoPath: string, branch: string, commitMessage?: string): 
   }
 }
 
-function pushMain(repoPath: string): boolean {
+async function pushMain(repoPath: string): Promise<boolean> {
   try {
-    exec("git push origin main", repoPath);
+    await exec("git push origin main", repoPath);
     return true;
   } catch {
     return false;
@@ -189,10 +200,10 @@ export async function executeCloseWorkstream(
     const repoPath = workstream.repo_path;
 
     if (worktreePath && fs.existsSync(worktreePath) && repoPath) {
-      const branch = inferBranchFromWorktree(worktreePath);
+      const branch = await inferBranchFromWorktree(worktreePath);
 
       if (branch) {
-        const commitResult = commitUncommittedChanges(worktreePath);
+        const commitResult = await commitUncommittedChanges(worktreePath);
         if (commitResult.hasChanges && !commitResult.ok) {
           return {
             ok: false,
@@ -200,7 +211,7 @@ export async function executeCloseWorkstream(
             message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
           };
         }
-        const mergeResult = mergeToMain(repoPath, branch, mergeCommitMessage);
+        const mergeResult = await mergeToMain(repoPath, branch, mergeCommitMessage);
         if (mergeResult.ok === false) {
           // Return early — Pi resolves conflicts and calls again
           return {
@@ -215,7 +226,7 @@ export async function executeCloseWorkstream(
         merged = true;
 
         // Push main after clean merge
-        pushed = pushMain(repoPath);
+        pushed = await pushMain(repoPath);
       }
     }
   }
