@@ -86,7 +86,14 @@ export const MessageInput = memo(function MessageInput({
       if (event.key !== "Escape") return;
       const slashPos = slashPositionRef.current;
       const atPos = atPositionRef.current;
-      if (slashPos < 0 && atPos < 0) return;
+      if (slashPos < 0 && atPos < 0) {
+        // No picker open — clear text if any, otherwise let browser default (blur)
+        if (!draftRef.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setDraft("");
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
