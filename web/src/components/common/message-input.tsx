@@ -75,56 +75,24 @@ export const MessageInput = memo(function MessageInput({
     onAddImagesRef.current = onAddImages;
   });
 
-  // Native keydown listener for Escape — must be on the DOM element directly
-  // so preventDefault() fires before the browser's blur-on-Escape behavior.
-  // Uses position refs (set synchronously in handleDraftChange) instead of
-  // state-synced open refs which lag by one render via useEffect.
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const onEscapeNative = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      const slashPos = slashPositionRef.current;
-      const atPos = atPositionRef.current;
-      if (slashPos < 0 && atPos < 0) {
-        // No picker open — clear text if any, otherwise let browser default (blur)
-        if (!draftRef.current) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setDraft("");
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (slashPos >= 0) {
-        setPickerOpen(false);
-        const value = draftRef.current;
-        const cursor = textarea.selectionStart ?? value.length;
-        const newValue = value.slice(0, slashPos) + value.slice(cursor);
-        setDraft(newValue);
-        slashPositionRef.current = -1;
-        requestAnimationFrame(() => {
-          textarea.setSelectionRange(slashPos, slashPos);
-          textarea.focus();
-        });
-      } else if (atPos >= 0) {
-        setAtPickerOpen(false);
-        const value = draftRef.current;
-        const cursor = textarea.selectionStart ?? value.length;
-        const newValue = value.slice(0, atPos) + value.slice(cursor);
-        setDraft(newValue);
-        atPositionRef.current = -1;
-        requestAnimationFrame(() => {
-          textarea.setSelectionRange(atPos, atPos);
-          textarea.focus();
-        });
-      }
-    };
-    textarea.addEventListener("keydown", onEscapeNative);
-    return () => textarea.removeEventListener("keydown", onEscapeNative);
-  }, []);
+  /** Close a picker on Escape: remove trigger text, reset position ref, refocus. */
+  const closePicker = useCallback(
+    (triggerPos: number, setOpen: (v: boolean) => void, posRef: React.MutableRefObject<number>) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      setOpen(false);
+      const value = draftRef.current;
+      const cursor = textarea.selectionStart ?? value.length;
+      const newValue = value.slice(0, triggerPos) + value.slice(cursor);
+      setDraft(newValue);
+      posRef.current = -1;
+      requestAnimationFrame(() => {
+        textarea.setSelectionRange(triggerPos, triggerPos);
+        textarea.focus();
+      });
+    },
+    [],
+  );
 
   /**
    * Compute the pixel X position of a character index in the textarea,
@@ -284,8 +252,40 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Escape is handled by a native keydown listener (see useEffect above)
-      // so that preventDefault() fires before the browser's blur-on-Escape.
+      if (event.key === "Escape") {
+        if (slashPositionRef.current >= 0) {
+          event.preventDefault();
+          closePicker(slashPositionRef.current, setPickerOpen, slashPositionRef);
+        } else if (atPositionRef.current >= 0) {
+          event.preventDefault();
+          closePicker(atPositionRef.current, setAtPickerOpen, atPositionRef);
+        } else if (draftRef.current) {
+          // No picker open, but has text — clear draft, prevent blur
+          event.preventDefault();
+          setDraft("");
+        }
+        // No picker, no text — let browser default (blur)
+        return;
+      }
+
+      // Ctrl+W / Ctrl+Backspace: backward-kill-word
+      if (event.ctrlKey && (event.key === "w" || event.key === "Backspace") && !event.shiftKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        const value = draftRef.current;
+        const cursor = textareaRef.current?.selectionStart ?? value.length;
+        if (cursor === 0) return;
+        let i = cursor;
+        // Skip whitespace before cursor
+        while (i > 0 && /\s/.test(value[i - 1]!)) i--;
+        // Skip word characters
+        while (i > 0 && !/\s/.test(value[i - 1]!)) i--;
+        const newValue = value.slice(0, i) + value.slice(cursor);
+        setDraft(newValue);
+        requestAnimationFrame(() => {
+          textareaRef.current?.setSelectionRange(i, i);
+        });
+        return;
+      }
 
       // When a picker is open, forward navigation keys to cmdk.
       // Tab is mapped to Enter so it accepts the highlighted item.
@@ -313,7 +313,7 @@ export const MessageInput = memo(function MessageInput({
         setDraft("");
       }
     },
-    [],
+    [closePicker],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
