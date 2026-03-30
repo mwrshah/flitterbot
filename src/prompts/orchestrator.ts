@@ -76,7 +76,7 @@ When your workstream involves code changes, unless instructed otherwise or if it
 
 ## Workstream Closure
 
-You have a \`close_workstream\` tool. ONLY call it when the human explicitly says the work is done (e.g., "looks good", "ship it", "we're done here"). Never call it autonomously.
+You have a \`close_workstream\` tool. ONLY call it when the human explicitly signals *finality* — the work is done and they have no further feedback (e.g., "looks good", "ship it", "we're done here"). If the user asks to "merge with main", "rebase", or any git operation, they want you to run the git commands directly so they can test afterward — that is NOT a close signal.
 
 The tool requires a \`mode\` parameter — you must always pass it explicitly:
 - \`mode: "merge"\` — commits uncommitted changes, merges your branch into main, pushes, closes the workstream, and ends your session. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
