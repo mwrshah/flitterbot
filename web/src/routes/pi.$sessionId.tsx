@@ -8,7 +8,6 @@ import {
   piHistoryQueryOptions,
   piWorktreeQueryOptions,
   statusQueryOptions,
-  type StatusPill,
 } from "~/lib/queries";
 
 export const Route = createFileRoute("/pi/$sessionId")({
@@ -25,7 +24,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
     // piHistoryQueryOptions has staleTime: Infinity — WS events keep it fresh,
     // so for any session the user has visited or that has received WS events,
     // this is a synchronous cache hit with zero network round-trips.
-    const [status, history] = await Promise.all([
+    const [, history] = await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient
         .ensureQueryData(piHistoryQueryOptions(params.sessionId, undefined, context.queryClient))
@@ -41,28 +40,6 @@ export const Route = createFileRoute("/pi/$sessionId")({
       context.queryClient.prefetchQuery(piWorktreeQueryOptions(params.sessionId)),
     ]);
 
-    // If the session is already busy when we load the page (e.g. the user navigated
-    // here after queue_item_start already fired), seed a processing pill so the Stop
-    // button appears immediately rather than waiting for the next WS event.
-    const allSessions = [
-      status.pi?.default,
-      ...(status.pi?.orchestrators ?? []),
-    ].filter(Boolean);
-    const thisSession = allSessions.find((s) => s!.sessionId === params.sessionId);
-    if (thisSession?.busy) {
-      context.queryClient.setQueryData<StatusPill[]>(
-        ["pi-status-pills", params.sessionId],
-        (old) => {
-          // Don't duplicate if a real pill was already added by a WS event
-          if (old?.some((p) => p.id.startsWith("processing-"))) return old;
-          return [
-            ...(old ?? []),
-            { id: "processing-queued", label: "Processing message", variant: "info" as const },
-          ];
-        },
-      );
-    }
-
     return { history };
   },
   errorComponent: ({ error }) => (
@@ -76,7 +53,7 @@ export const Route = createFileRoute("/pi/$sessionId")({
 function PiSessionRoute() {
   const { sessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
-  const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId } = usePiChat(
+  const { timeline, statusPills, connectionState, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
     sessionId,
     history,
   );
@@ -89,6 +66,7 @@ function PiSessionRoute() {
           timeline={timeline}
           statusPills={statusPills}
           connectionState={connectionState}
+          isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
         />
       </Panel>
