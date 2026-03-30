@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { type Ref, memo, useMemo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
 import {
@@ -17,6 +17,7 @@ type SkillPickerProps = {
   onSelect: (skillName: string) => void;
   onClose: () => void;
   caretLeft?: number;
+  commandRef?: Ref<HTMLDivElement>;
 };
 
 export const SkillPicker = memo(function SkillPicker({
@@ -28,6 +29,7 @@ export const SkillPicker = memo(function SkillPicker({
   onSelect,
   onClose: _onClose,
   caretLeft,
+  commandRef,
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
     open,
@@ -48,9 +50,11 @@ export const SkillPicker = memo(function SkillPicker({
   return (
     <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
+        ref={commandRef}
         value={selectedValue}
         onValueChange={onSelectedValueChange}
         shouldFilter={false}
+        loop
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">

@@ -48,11 +48,13 @@ export const MessageInput = memo(function MessageInput({
   const [caretLeft, setCaretLeft] = useState(0);
   // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
+  const skillCommandRef = useRef<HTMLDivElement>(null);
 
   // @ path picker state (parallel to slash picker)
   const [atPickerOpen, setAtPickerOpen] = useState(false);
   const [atPickerFilter, setAtPickerFilter] = useState("");
   const [selectedPath, setSelectedPath] = useState("");
+  const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
 
   // Debounce the path filter before querying
@@ -66,25 +68,16 @@ export const MessageInput = memo(function MessageInput({
     directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen),
   );
 
-  const pathItemsRef = useRef(pathItems);
-  useEffect(() => {
-    pathItemsRef.current = pathItems;
-  });
-
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
   const pickerOpenRef = useRef(pickerOpen);
-  const selectedSkillRef = useRef(selectedSkill);
   const atPickerOpenRef = useRef(atPickerOpen);
-  const selectedPathRef = useRef(selectedPath);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
   useEffect(() => {
     draftRef.current = draft;
     pickerOpenRef.current = pickerOpen;
-    selectedSkillRef.current = selectedSkill;
     atPickerOpenRef.current = atPickerOpen;
-    selectedPathRef.current = selectedPath;
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
   });
@@ -94,11 +87,6 @@ export const MessageInput = memo(function MessageInput({
       if (!pickerFilter) return true;
       return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
     }) ?? [];
-
-  const filteredSkillsRef = useRef(filteredSkills);
-  useEffect(() => {
-    filteredSkillsRef.current = filteredSkills;
-  });
 
   /**
    * Compute the pixel X position of a character index in the textarea,
@@ -260,38 +248,19 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Delegate keyboard nav to whichever picker is open
+      // When a picker is open, forward navigation keys to cmdk
+      const pickerKeys = ["ArrowDown", "ArrowUp", "Enter", "Home", "End"];
       if (pickerOpenRef.current) {
         if (event.key === "Escape") {
           event.preventDefault();
           setPickerOpen(false);
           return;
         }
-        if (event.key === "Enter") {
+        if (pickerKeys.includes(event.key)) {
           event.preventDefault();
-          const selected = selectedSkillRef.current;
-          const filtered = filteredSkillsRef.current;
-          if (selected) {
-            handleSkillSelect(selected);
-          } else if (filtered.length > 0) {
-            handleSkillSelect(filtered[0]!.name);
-          }
-          return;
-        }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault();
-          const filtered = filteredSkillsRef.current;
-          const selected = selectedSkillRef.current;
-          const currentIndex = filtered.findIndex((s) => s.name === selected);
-          let nextIndex: number;
-          if (event.key === "ArrowDown") {
-            nextIndex = currentIndex < filtered.length - 1 ? currentIndex + 1 : 0;
-          } else {
-            nextIndex = currentIndex > 0 ? currentIndex - 1 : filtered.length - 1;
-          }
-          if (filtered[nextIndex]) {
-            setSelectedSkill(filtered[nextIndex]!.name);
-          }
+          skillCommandRef.current?.dispatchEvent(
+            new KeyboardEvent("keydown", { key: event.key, bubbles: true }),
+          );
           return;
         }
       }
@@ -302,28 +271,11 @@ export const MessageInput = memo(function MessageInput({
           setAtPickerOpen(false);
           return;
         }
-        if (event.key === "Enter") {
+        if (pickerKeys.includes(event.key)) {
           event.preventDefault();
-          const items = pathItemsRef.current;
-          const selected = selectedPathRef.current;
-          const item = items.find((i) => i.path === selected) ?? items[0];
-          if (item) handlePathSelect(item);
-          return;
-        }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault();
-          const items = pathItemsRef.current;
-          const selected = selectedPathRef.current;
-          const currentIndex = items.findIndex((i) => i.path === selected);
-          let nextIndex: number;
-          if (event.key === "ArrowDown") {
-            nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-          } else {
-            nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-          }
-          if (items[nextIndex]) {
-            setSelectedPath(items[nextIndex]!.path);
-          }
+          pathCommandRef.current?.dispatchEvent(
+            new KeyboardEvent("keydown", { key: event.key, bubbles: true }),
+          );
           return;
         }
       }
@@ -335,7 +287,7 @@ export const MessageInput = memo(function MessageInput({
         setDraft("");
       }
     },
-    [handleSkillSelect, handlePathSelect],
+    [],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -415,6 +367,7 @@ export const MessageInput = memo(function MessageInput({
             onSelect={handleSkillSelect}
             onClose={() => setPickerOpen(false)}
             caretLeft={caretLeft}
+            commandRef={skillCommandRef}
           />
           <PathPicker
             open={atPickerOpen}
@@ -425,6 +378,7 @@ export const MessageInput = memo(function MessageInput({
             onSelect={handlePathSelect}
             onClose={() => setAtPickerOpen(false)}
             caretLeft={caretLeft}
+            commandRef={pathCommandRef}
           />
           <textarea
             ref={textareaRef}
