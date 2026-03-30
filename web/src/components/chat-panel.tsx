@@ -51,6 +51,7 @@ type ChatPanelProps = {
   timeline: ChatTimelineItem[];
   statusPills: StatusPill[];
   connectionState: ConnectionState;
+  isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
 };
 
@@ -59,6 +60,7 @@ export function ChatPanel({
   timeline,
   statusPills,
   connectionState,
+  isSessionBusy,
   onSendMessage,
 }: ChatPanelProps) {
   const isClient = useIsClient();
@@ -71,7 +73,7 @@ export function ChatPanel({
     queryFn: () => apiClient.listSkills(),
     staleTime: 5 * 60 * 1000,
   });
-  const isSessionActive = statusPills.some((p) => p.id.startsWith("processing-"));
+  const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(sessionId),
