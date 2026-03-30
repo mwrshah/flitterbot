@@ -9,12 +9,13 @@ export function formatWorkstreamPrompt(
   agentMessage?: string,
 ): string {
   const header = `[Workstream: "${workstreamName}" (${workstreamId})] [NEW]`;
+  const footer = "IMPORTANT: Before doing anything else, run /load2-w to load essential skills.";
   const agentSection = agentMessage
     ? `\n\n--- Agent context ---\n${agentMessage}`
     : "";
 
   if (messages.length <= 1) {
-    return `${header}\n${messages[0] ?? ""}${agentSection}`;
+    return `${header}\n${messages[0] ?? ""}${agentSection}\n\n${footer}`;
   }
 
   const total = messages.length;
@@ -25,5 +26,5 @@ export function formatWorkstreamPrompt(
     })
     .join("\n\n");
 
-  return `${header}\nThe following user messages provide context for this workstream:\n\n${body}${agentSection}`;
+  return `${header}\nThe following user messages provide context for this workstream:\n\n${body}${agentSection}\n\n${footer}`;
 }
