@@ -28,6 +28,7 @@ import { handleDirectSessionMessageRoute } from "./routes/direct-session-message
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
 import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
+import { handleReopenWorkstreamRoute } from "./routes/reopen-workstream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
@@ -194,6 +195,15 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "interrupt"
   ) {
     return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "POST" &&
+    segments[0] === "api" &&
+    segments[1] === "workstreams" &&
+    segments[2] &&
+    segments[3] === "reopen"
+  ) {
+    return handleReopenWorkstreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     (method === CONTROL_SURFACE_ENDPOINTS.runtimeWhatsAppStart.method &&

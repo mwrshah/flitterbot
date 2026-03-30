@@ -150,7 +150,7 @@ export interface PiSurfacedWebSocketEvent {
 
 export interface WorkstreamsChangedWebSocketEvent {
   type: "workstreams_changed";
-  reason: "created" | "closed";
+  reason: "created" | "closed" | "reopened";
   workstreamId: string;
   workstreamName?: string;
 }
