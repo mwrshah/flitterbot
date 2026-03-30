@@ -29,18 +29,6 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: React.R
   );
 }
 
-function StatusDot({ color, label, value }: { color: string; label: string; value: string }) {
-  useWhyDidYouRender("StatusDot", { color, label, value });
-  return (
-    <div className="flex items-center gap-2 min-w-0">
-      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", color)} />
-      <span className="text-xs text-sidebar-foreground/50 shrink-0">{label}</span>
-      <span className="text-xs text-sidebar-foreground/80 truncate">{value}</span>
-    </div>
-  );
-}
-
-/* Simple inline SVG icons — no dependency needed */
 const icons = {
   inputSurface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
