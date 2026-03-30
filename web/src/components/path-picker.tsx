@@ -1,6 +1,11 @@
-import { Command } from "cmdk";
 import { memo } from "react";
 import type { DirectoryCompletionItem } from "~/lib/types";
+import {
+  Command,
+  CommandEmpty,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
 
 type PathPickerProps = {
   open: boolean;
@@ -33,17 +38,17 @@ export const PathPicker = memo(function PathPicker({
         shouldFilter={false}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
-        <Command.List className="max-h-48 overflow-y-auto p-1">
+        <CommandList className="max-h-48 overflow-y-auto p-1">
           {isFetching && items.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground">Loading...</div>
           )}
           {!isFetching && items.length === 0 && (
-            <Command.Empty className="px-3 py-2 text-sm text-muted-foreground">
+            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
               No matching paths
-            </Command.Empty>
+            </CommandEmpty>
           )}
           {items.map((item) => (
-            <Command.Item
+            <CommandItem
               key={item.path}
               value={item.path}
               onSelect={() => onSelect(item)}
@@ -52,9 +57,9 @@ export const PathPicker = memo(function PathPicker({
               <span className="shrink-0">{item.kind === "directory" ? "📁" : "📄"}</span>
               <span className="font-mono text-foreground shrink-0">{item.name}</span>
               <span className="text-xs text-muted-foreground truncate">{item.path}</span>
-            </Command.Item>
+            </CommandItem>
           ))}
-        </Command.List>
+        </CommandList>
       </Command>
     </div>
   );
