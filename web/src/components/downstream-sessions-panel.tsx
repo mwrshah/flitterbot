@@ -5,16 +5,16 @@ import type { DownstreamSessionItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 function CopyableCode({ text, displayText }: { text: string; displayText?: string }) {
-  const { copied, copy } = useCopyToClipboard();
+  const { copied, copy } = useCopyToClipboard(600);
   return (
     <button
       type="button"
       onClick={() => copy(text)}
       className="inline-block font-mono text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
-      title={text}
+      title={`copy \`${text}\``}
     >
       {copied ? (
-        <span className="text-emerald-500">Copied!</span>
+        <span className="text-muted-foreground">Copied!</span>
       ) : (
         <span>{displayText ?? text}</span>
       )}
@@ -107,13 +107,14 @@ export function DownstreamSessionsPanel({
                 </div>
 
                 {session.tmuxSession && (
-                  <div className="pl-4">
+                  <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                    tmux:{" "}
                     <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
-                  </div>
+                  </span>
                 )}
 
-                <span className="pl-4 text-xs text-muted-foreground truncate">
-                  {sessionDescription(session)}
+                <span className="pl-2 text-xs text-muted-foreground truncate">
+                  cwd: {sessionDescription(session)}
                 </span>
               </li>
             ))}
@@ -126,18 +127,18 @@ export function DownstreamSessionsPanel({
               Active Worktree
             </p>
             <div className="flex flex-col gap-0.5 py-1.5">
-              <span className="truncate text-xs text-muted-foreground">
-                Branch: <span className="font-medium text-foreground">{worktree.name}</span>
+              <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                Branch:{" "}
+                <CopyableCode text={worktree.name ?? ""} />
               </span>
-              <span className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+              <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                 Worktree:{" "}
                 <CopyableCode
                   text={worktree.worktreePath ?? ""}
                   displayText={(() => {
                     const parts = (worktree.worktreePath ?? "").split("/");
-                    const parent = parts[parts.length - 2] ?? "";
                     const leaf = parts[parts.length - 1] ?? "";
-                    return parent ? `${parent}/${leaf}` : leaf;
+                    return `../${leaf}`;
                   })()}
                 />
               </span>
