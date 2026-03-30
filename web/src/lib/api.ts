@@ -1,5 +1,6 @@
 import type {
   DirectMessageResponse,
+  DirectoryCompletionsResponse,
   PiHistoryResponse,
   SendMessageResponse,
   SessionDetailResponse,
@@ -82,5 +83,11 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
       request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, { method: "POST" }),
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
+
+    getDirectoryCompletions: (path: string, piSessionId?: string) => {
+      const params = new URLSearchParams({ path });
+      if (piSessionId) params.set("piSessionId", piSessionId);
+      return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
+    },
   };
 }

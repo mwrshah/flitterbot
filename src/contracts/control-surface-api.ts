@@ -216,6 +216,17 @@ export interface SkillsListResponse {
   items: SkillListItem[];
 }
 
+export interface DirectoryCompletionItem {
+  name: string;
+  kind: "directory" | "file";
+  path: string; // relative to CWD, e.g. "src/routes/"
+}
+
+export interface DirectoryCompletionsResponse {
+  items: DirectoryCompletionItem[];
+  cwd: string;
+}
+
 export interface StopResponse {
   ok: boolean;
   message: string;
@@ -320,5 +331,10 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     method: "POST",
     path: "/api/pi-sessions/:piSessionId/interrupt",
     auth: "bearer",
+  },
+  directoryCompletions: {
+    method: "GET",
+    path: "/api/directory-completions",
+    auth: "none",
   },
 } as const;

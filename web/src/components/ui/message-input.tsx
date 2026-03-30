@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -8,9 +9,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { Button } from "~/components/ui/button";
-import type { ImageAttachment, SkillListItem } from "~/lib/types";
+import { directoryCompletionsQueryOptions } from "~/lib/queries";
+import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
   isSending: boolean;
@@ -33,7 +36,7 @@ export const MessageInput = memo(function MessageInput({
   skills,
   placeholder = "Message Pi…",
   rows = 2,
-  helpText = "Enter to send · Shift+Enter for newline · Type / for skills",
+  helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
 }: MessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -46,16 +49,42 @@ export const MessageInput = memo(function MessageInput({
   // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
 
+  // @ path picker state (parallel to slash picker)
+  const [atPickerOpen, setAtPickerOpen] = useState(false);
+  const [atPickerFilter, setAtPickerFilter] = useState("");
+  const [selectedPath, setSelectedPath] = useState("");
+  const atPositionRef = useRef<number>(-1);
+
+  // Debounce the path filter before querying
+  const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedAtFilter(atPickerFilter), 150);
+    return () => clearTimeout(id);
+  }, [atPickerFilter]);
+
+  const { data: pathItems = [], isFetching: isPathFetching } = useQuery(
+    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen),
+  );
+
+  const pathItemsRef = useRef(pathItems);
+  useEffect(() => {
+    pathItemsRef.current = pathItems;
+  });
+
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
   const pickerOpenRef = useRef(pickerOpen);
   const selectedSkillRef = useRef(selectedSkill);
+  const atPickerOpenRef = useRef(atPickerOpen);
+  const selectedPathRef = useRef(selectedPath);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
   useEffect(() => {
     draftRef.current = draft;
     pickerOpenRef.current = pickerOpen;
     selectedSkillRef.current = selectedSkill;
+    atPickerOpenRef.current = atPickerOpen;
+    selectedPathRef.current = selectedPath;
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
   });
@@ -123,29 +152,60 @@ export const MessageInput = memo(function MessageInput({
     (value: string) => {
       setDraft(value);
       const cursor = textareaRef.current?.selectionStart ?? value.length;
+
       // Scan backwards from cursor to find a "/" trigger
       let slashIdx = -1;
       for (let i = cursor - 1; i >= 0; i--) {
         const ch = value[i];
         if (ch === "/") {
-          // Valid trigger: at start of string or preceded by whitespace
           if (i === 0 || /\s/.test(value[i - 1]!)) {
             slashIdx = i;
           }
           break;
         }
-        if (/\s/.test(ch!)) break; // hit whitespace before finding "/" — no trigger
+        if (/\s/.test(ch!)) break;
       }
-      if (slashIdx >= 0 && skills?.length) {
+
+      // Scan backwards from cursor to find an "@" trigger
+      // Unlike "/" scan, we do NOT stop at "/" characters (paths contain slashes)
+      let atIdx = -1;
+      for (let i = cursor - 1; i >= 0; i--) {
+        const ch = value[i];
+        if (ch === "@") {
+          if (i === 0 || /\s/.test(value[i - 1]!)) {
+            atIdx = i;
+          }
+          break;
+        }
+        if (/\s/.test(ch!)) break;
+      }
+
+      // Only one picker at a time: @ takes priority when both could match
+      if (atIdx >= 0) {
+        const filter = value.slice(atIdx + 1, cursor);
+        atPositionRef.current = atIdx;
+        computeSlashLeft(value, atIdx);
+        setAtPickerOpen(true);
+        setAtPickerFilter(filter);
+        setSelectedPath("");
+        // Close slash picker
+        slashPositionRef.current = -1;
+        setPickerOpen(false);
+      } else if (slashIdx >= 0 && skills?.length) {
         const filter = value.slice(slashIdx + 1, cursor);
         slashPositionRef.current = slashIdx;
         computeSlashLeft(value, slashIdx);
         setPickerOpen(true);
         setPickerFilter(filter);
         setSelectedSkill("");
+        // Close @ picker
+        atPositionRef.current = -1;
+        setAtPickerOpen(false);
       } else {
         slashPositionRef.current = -1;
         setPickerOpen(false);
+        atPositionRef.current = -1;
+        setAtPickerOpen(false);
       }
     },
     [skills, computeSlashLeft],
@@ -171,8 +231,36 @@ export const MessageInput = memo(function MessageInput({
     });
   }, []);
 
+  const handlePathSelect = useCallback((item: DirectoryCompletionItem) => {
+    const value = draftRef.current;
+    const atIdx = atPositionRef.current;
+    const cursor = textareaRef.current?.selectionStart ?? value.length;
+    const before = value.slice(0, atIdx);
+    const after = value.slice(cursor);
+    // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
+    // Files: insert @path (trailing space, closes picker)
+    const isDir = item.kind === "directory";
+    const inserted = `@${item.path}${isDir ? "" : " "}`;
+    const newValue = before + inserted + after;
+    setDraft(newValue);
+    if (!isDir) {
+      setAtPickerOpen(false);
+      atPositionRef.current = -1;
+    }
+    const newCursor = before.length + inserted.length;
+    requestAnimationFrame(() => {
+      textareaRef.current?.setSelectionRange(newCursor, newCursor);
+      textareaRef.current?.focus();
+      // For directories, re-trigger the change handler so the picker refetches
+      if (isDir) {
+        handleDraftChange(newValue);
+      }
+    });
+  }, [handleDraftChange]);
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Delegate keyboard nav to whichever picker is open
       if (pickerOpenRef.current) {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -208,6 +296,38 @@ export const MessageInput = memo(function MessageInput({
         }
       }
 
+      if (atPickerOpenRef.current) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setAtPickerOpen(false);
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const items = pathItemsRef.current;
+          const selected = selectedPathRef.current;
+          const item = items.find((i) => i.path === selected) ?? items[0];
+          if (item) handlePathSelect(item);
+          return;
+        }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const items = pathItemsRef.current;
+          const selected = selectedPathRef.current;
+          const currentIndex = items.findIndex((i) => i.path === selected);
+          let nextIndex: number;
+          if (event.key === "ArrowDown") {
+            nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+          } else {
+            nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+          }
+          if (items[nextIndex]) {
+            setSelectedPath(items[nextIndex]!.path);
+          }
+          return;
+        }
+      }
+
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         const text = draftRef.current.trim();
@@ -215,7 +335,7 @@ export const MessageInput = memo(function MessageInput({
         setDraft("");
       }
     },
-    [handleSkillSelect],
+    [handleSkillSelect, handlePathSelect],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -294,6 +414,16 @@ export const MessageInput = memo(function MessageInput({
             onSelectedValueChange={setSelectedSkill}
             onSelect={handleSkillSelect}
             onClose={() => setPickerOpen(false)}
+            caretLeft={caretLeft}
+          />
+          <PathPicker
+            open={atPickerOpen}
+            items={pathItems}
+            isFetching={isPathFetching}
+            selectedValue={selectedPath}
+            onSelectedValueChange={setSelectedPath}
+            onSelect={handlePathSelect}
+            onClose={() => setAtPickerOpen(false)}
             caretLeft={caretLeft}
           />
           <textarea
