@@ -11,8 +11,6 @@ type PathPickerProps = {
   open: boolean;
   items: DirectoryCompletionItem[];
   isFetching: boolean;
-  selectedValue: string;
-  onSelectedValueChange: (value: string) => void;
   onSelect: (item: DirectoryCompletionItem) => void;
   onClose: () => void;
   caretLeft?: number;
@@ -23,8 +21,6 @@ export const PathPicker = memo(function PathPicker({
   open,
   items,
   isFetching,
-  selectedValue,
-  onSelectedValueChange,
   onSelect,
   onClose: _onClose,
   caretLeft,
@@ -36,8 +32,6 @@ export const PathPicker = memo(function PathPicker({
     <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
         ref={commandRef}
-        value={selectedValue}
-        onValueChange={onSelectedValueChange}
         shouldFilter={false}
         loop
         className="rounded-lg border border-border bg-background shadow-lg"

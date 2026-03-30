@@ -12,8 +12,6 @@ type SkillPickerProps = {
   open: boolean;
   filter: string;
   skills: SkillListItem[];
-  selectedValue: string;
-  onSelectedValueChange: (value: string) => void;
   onSelect: (skillName: string) => void;
   onClose: () => void;
   caretLeft?: number;
@@ -24,8 +22,6 @@ export const SkillPicker = memo(function SkillPicker({
   open,
   filter,
   skills,
-  selectedValue,
-  onSelectedValueChange,
   onSelect,
   onClose: _onClose,
   caretLeft,
@@ -35,8 +31,6 @@ export const SkillPicker = memo(function SkillPicker({
     open,
     filter,
     skills,
-    selectedValue,
-    onSelectedValueChange,
     onSelect,
   });
   const filtered = useMemo(() => {
@@ -51,8 +45,6 @@ export const SkillPicker = memo(function SkillPicker({
     <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
       <Command
         ref={commandRef}
-        value={selectedValue}
-        onValueChange={onSelectedValueChange}
         shouldFilter={false}
         loop
         className="rounded-lg border border-border bg-background shadow-lg"

@@ -44,7 +44,6 @@ export const MessageInput = memo(function MessageInput({
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
-  const [selectedSkill, setSelectedSkill] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
   // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
@@ -53,7 +52,6 @@ export const MessageInput = memo(function MessageInput({
   // @ path picker state (parallel to slash picker)
   const [atPickerOpen, setAtPickerOpen] = useState(false);
   const [atPickerFilter, setAtPickerFilter] = useState("");
-  const [selectedPath, setSelectedPath] = useState("");
   const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
 
@@ -81,12 +79,6 @@ export const MessageInput = memo(function MessageInput({
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
   });
-
-  const filteredSkills =
-    skills?.filter((s) => {
-      if (!pickerFilter) return true;
-      return s.name.toLowerCase().includes(pickerFilter.toLowerCase());
-    }) ?? [];
 
   /**
    * Compute the pixel X position of a character index in the textarea,
@@ -175,7 +167,6 @@ export const MessageInput = memo(function MessageInput({
         computeSlashLeft(value, atIdx);
         setAtPickerOpen(true);
         setAtPickerFilter(filter);
-        setSelectedPath("");
         // Close slash picker
         slashPositionRef.current = -1;
         setPickerOpen(false);
@@ -185,7 +176,6 @@ export const MessageInput = memo(function MessageInput({
         computeSlashLeft(value, slashIdx);
         setPickerOpen(true);
         setPickerFilter(filter);
-        setSelectedSkill("");
         // Close @ picker
         atPositionRef.current = -1;
         setAtPickerOpen(false);
@@ -362,8 +352,6 @@ export const MessageInput = memo(function MessageInput({
             open={pickerOpen}
             filter={pickerFilter}
             skills={skills ?? []}
-            selectedValue={selectedSkill}
-            onSelectedValueChange={setSelectedSkill}
             onSelect={handleSkillSelect}
             onClose={() => setPickerOpen(false)}
             caretLeft={caretLeft}
@@ -373,8 +361,6 @@ export const MessageInput = memo(function MessageInput({
             open={atPickerOpen}
             items={pathItems}
             isFetching={isPathFetching}
-            selectedValue={selectedPath}
-            onSelectedValueChange={setSelectedPath}
             onSelect={handlePathSelect}
             onClose={() => setAtPickerOpen(false)}
             caretLeft={caretLeft}
