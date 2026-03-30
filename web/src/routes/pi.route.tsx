@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 
-import { Badge } from "~/components/ui/badge";
+import { Badge } from "~/components/common/badge";
 import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
 

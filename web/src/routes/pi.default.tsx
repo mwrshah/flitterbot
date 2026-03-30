@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
-import { Panel, PanelGroup, ResizeHandle } from "~/components/ui/resizable";
+import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { usePiChat } from "~/hooks/use-pi-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
