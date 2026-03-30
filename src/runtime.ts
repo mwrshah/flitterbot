@@ -671,7 +671,7 @@ export class ControlSurfaceRuntime {
     const nowIso = new Date(now).toISOString();
     touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
 
-    return `${formatDatetimeBlock()}\n\n${text}`;
+    return `${formatDatetimeBlock()}\n${text}`;
   }
 
   /**
