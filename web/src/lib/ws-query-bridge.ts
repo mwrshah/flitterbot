@@ -206,10 +206,13 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    if (!sessionId) return;
-
     // ── queue_item_start ──
+    // Handled before the sessionId early-exit so that the fallback to getDefaultSessionId()
+    // can fire. Backend-originated events (agent-to-agent, workstream creation) may arrive
+    // without a sessionId if the session is still being set up, or the event is global-scoped.
     if (message.type === "queue_item_start") {
+      const sid = sessionId ?? getDefaultSessionId();
+      if (!sid) return;
       const sourceLabel =
         message.item.source === "whatsapp"
           ? "WhatsApp"
@@ -217,8 +220,14 @@ export function setupWsQueryBridge(deps: {
             ? "Hook"
             : message.item.source === "cron"
               ? "Cron"
-              : "Web";
-      addPill(queryClient, sessionId, {
+              : message.item.source === "agent"
+                ? "Agent"
+                : message.item.source === "init"
+                  ? "System"
+                  : message.item.source === "pi_outbound"
+                    ? "Pi"
+                    : "Web";
+      addPill(queryClient, sid, {
         id: `processing-${message.item.id}`,
         label: `Processing ${sourceLabel} message`,
         variant: message.item.source !== "web" ? "info" : undefined,
@@ -227,11 +236,14 @@ export function setupWsQueryBridge(deps: {
     }
 
     // ── queue_item_end ──
+    // Same placement before sessionId early-exit — must match the pill key used at start.
     if (message.type === "queue_item_end") {
-      removePill(queryClient, sessionId, `processing-${message.itemId}`);
+      const sid = sessionId ?? getDefaultSessionId();
+      if (!sid) return;
+      removePill(queryClient, sid, `processing-${message.itemId}`);
 
       if (message.error) {
-        addPill(queryClient, sessionId, {
+        addPill(queryClient, sid, {
           id: `error-${message.itemId}`,
           label: message.error,
           variant: "error",
@@ -239,6 +251,8 @@ export function setupWsQueryBridge(deps: {
       }
       return;
     }
+
+    if (!sessionId) return;
 
     // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
