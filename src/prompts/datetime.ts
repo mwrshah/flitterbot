@@ -15,8 +15,5 @@ export function formatDatetimeBlock(): string {
     timeZoneName: "short",
   });
 
-  return (
-    `<date_time>\nJust so you know, the current date and time is: ${datetimeStr}. ` +
-    `This is injected programmatically, for information only — you may disregard if not relevant.\n</date_time>`
-  );
+  return `[Now: ${datetimeStr}]`;
 }
