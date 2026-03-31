@@ -35,6 +35,8 @@ export type ChatTimelineMessage = {
   streaming?: boolean;
   /** True for non-final assistant messages in a multi-message turn. */
   intermediate?: boolean;
+  /** Server-generated UUID for optimistic UI correlation. */
+  serverMessageId?: string;
   createdAt: string;
 };
 

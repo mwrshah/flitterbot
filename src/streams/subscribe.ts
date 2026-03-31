@@ -334,6 +334,7 @@ export function subscribeToStreamSession(
           source: currentItem?.source,
           streamId: currentItem?.streamId ?? sessionStreamId ?? undefined,
           streamName: currentItem?.streamName ?? sessionStreamName ?? undefined,
+          serverMessageId: currentItem?.serverMessageId,
           createdAt: extractTimestamp(event.message, now),
         };
 

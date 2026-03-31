@@ -13,6 +13,7 @@ export type QueueItem = {
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
   streamId?: string;
   streamName?: string;
+  serverMessageId?: string;
 };
 
 type TurnQueueOptions = {

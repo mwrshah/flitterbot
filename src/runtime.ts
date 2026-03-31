@@ -91,6 +91,7 @@ type EnqueueInput = {
   deliveryMode?: DeliveryMode;
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
+  serverMessageId?: string;
 };
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
@@ -255,6 +256,8 @@ export class ControlSurfaceRuntime {
       data: img.data,
       mimeType: img.mimeType,
     }));
+    // Use pre-generated serverMessageId if provided (e.g. from WS handler), else generate one
+    const messageUuid = input.serverMessageId ?? crypto.randomUUID();
     const item: QueueItem = {
       id: crypto.randomUUID(),
       source: input.source,
@@ -264,11 +267,9 @@ export class ControlSurfaceRuntime {
       webClientId: input.webClientId,
       deliveryMode: input.deliveryMode ?? "followUp",
       images: images?.length ? images : undefined,
+      serverMessageId: messageUuid,
     };
 
-    // Generate server UUID for this message and persist
-    const messageUuid = crypto.randomUUID();
-    item.metadata = { ...item.metadata, serverMessageId: messageUuid };
     try {
       const source = item.source as "whatsapp" | "web" | "cron";
       const streamId = (input.metadata?.stream_id as string) ?? undefined;
@@ -1557,6 +1558,15 @@ export class ControlSurfaceRuntime {
       const targetSessionId =
         typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
 
+      // Generate server message ID immediately and ACK the client before classification
+      const serverMessageId = crypto.randomUUID();
+      this.wsHub.send(client.id, {
+        type: "message_ack",
+        serverMessageId,
+        text: payload.text,
+        source: "web",
+      });
+
       // Skip router when message targets a specific Streams session (direct tab input)
       let routerMeta: StreamRoutingMeta = {};
       if (targetSessionId) {
@@ -1593,6 +1603,7 @@ export class ControlSurfaceRuntime {
         webClientId: client.id,
         deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
         images: Array.isArray(payload.images) ? payload.images : undefined,
+        serverMessageId,
       });
 
       // Mirror web user message to WhatsApp for complete conversation record
