@@ -61,7 +61,7 @@ function StreamsLayoutRoute() {
           to="/streams/default"
           active={pathname === "/streams/default" || pathname === "/streams"}
         >
-          Default
+          default
           {defaultStreams?.busy && <Badge variant="success">active</Badge>}
         </TabLink>
         {orchestrators.map((o) => (
