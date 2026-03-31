@@ -86,6 +86,7 @@ const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN_ABOVE_RATIO = 0.5;
 const SURFACE_OVERSCAN_BELOW_RATIO = 1;
+const SURFACE_INITIAL_MEASUREMENT_WINDOW_RATIO = 1.5;
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BUBBLE_VERTICAL_PADDING = 16;
 const SURFACE_BADGE_HEIGHT = 22;
@@ -258,9 +259,12 @@ const surfaceMeasurementStore = (() => {
   let pendingSignature = "";
   let pendingEntries: SurfaceEntry[] = [];
   let pendingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
+  let pendingViewportHeight = 0;
   let processingSignature = "";
   let processingEntries: SurfaceEntry[] = [];
   let processingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
+  let processingOrder: number[] = [];
+  let processingPriorityCount = 0;
   let processingResults: MeasuredSurfaceEntry[] = DEFAULT_MEASURED_ENTRIES;
   let processingIndex = 0;
   const listeners = new Set<() => void>();
@@ -319,11 +323,48 @@ const surfaceMeasurementStore = (() => {
     }
   };
 
+  const buildMeasurementOrder = (
+    entries: MeasuredSurfaceEntry[],
+    viewportHeight: number,
+  ) => {
+    const seen = new Set<number>();
+    const order: number[] = [];
+
+    if (entries.length === 0) {
+      return { order, priorityCount: 0 };
+    }
+
+    const priorityTarget =
+      viewportHeight > 0
+        ? viewportHeight * SURFACE_INITIAL_MEASUREMENT_WINDOW_RATIO
+        : Number.POSITIVE_INFINITY;
+
+    let accumulatedHeight = 0;
+    for (let index = entries.length - 1; index >= 0; index--) {
+      order.push(index);
+      seen.add(index);
+      accumulatedHeight += entries[index]!.metrics.estimatedHeight + SURFACE_ROW_GAP;
+      if (accumulatedHeight >= priorityTarget) break;
+    }
+
+    const priorityCount = order.length;
+
+    for (let index = 0; index < entries.length; index++) {
+      if (seen.has(index)) continue;
+      order.push(index);
+    }
+
+    return { order, priorityCount };
+  };
+
   const restartProcessing = () => {
     processingSignature = pendingSignature;
     processingEntries = pendingEntries;
     processingBubbleMaxWidth = pendingBubbleMaxWidth;
-    processingResults = new Array(processingEntries.length);
+    processingResults = buildFallbackMeasuredEntries(processingEntries, processingBubbleMaxWidth);
+    const { order, priorityCount } = buildMeasurementOrder(processingResults, pendingViewportHeight);
+    processingOrder = order;
+    processingPriorityCount = priorityCount;
     processingIndex = 0;
   };
 
@@ -335,17 +376,33 @@ const surfaceMeasurementStore = (() => {
     }
 
     const frameStart = performance.now();
-    while (processingIndex < processingEntries.length) {
-      processingResults[processingIndex] = measureEntry(
-        processingEntries[processingIndex]!,
+    const startIndex = processingIndex;
+    while (processingIndex < processingOrder.length) {
+      const entryIndex = processingOrder[processingIndex]!;
+      processingResults[entryIndex] = measureEntry(
+        processingEntries[entryIndex]!,
         processingBubbleMaxWidth,
       );
       processingIndex += 1;
 
       if (
-        processingIndex < processingEntries.length &&
+        processingIndex < processingOrder.length &&
         performance.now() - frameStart >= MEASUREMENT_FRAME_BUDGET_MS
       ) {
+        if (processingIndex >= processingPriorityCount) {
+          const durationMs = performance.now() - frameStart;
+          console.log(
+            "[surface] measurement flush priority duration=%dms entries=%d/%d",
+            Math.round(durationMs),
+            processingIndex - startIndex,
+            processingOrder.length,
+          );
+          snapshot = {
+            signature: processingSignature,
+            entries: processingResults.slice(),
+          };
+          notify();
+        }
         scheduledHandle = requestAnimationFrame(flush);
         return;
       }
@@ -356,9 +413,16 @@ const surfaceMeasurementStore = (() => {
       return;
     }
 
+    const durationMs = performance.now() - frameStart;
+    console.log(
+      "[surface] measurement flush complete duration=%dms entries=%d/%d",
+      Math.round(durationMs),
+      processingIndex - startIndex,
+      processingOrder.length,
+    );
     snapshot = {
       signature: processingSignature,
-      entries: processingResults,
+      entries: processingResults.slice(),
     };
     notify();
   };
@@ -373,12 +437,13 @@ const surfaceMeasurementStore = (() => {
     getSnapshot() {
       return snapshot;
     },
-    measure(entries: SurfaceEntry[], bubbleMaxWidth: number) {
+    measure(entries: SurfaceEntry[], bubbleMaxWidth: number, viewportHeight: number) {
       const signature = getEntriesSignature(entries, bubbleMaxWidth);
-      if (snapshot.signature === signature) return;
+      if (snapshot.signature === signature && pendingSignature === signature) return;
       pendingSignature = signature;
       pendingEntries = entries;
       pendingBubbleMaxWidth = bubbleMaxWidth;
+      pendingViewportHeight = viewportHeight;
       if (scheduledHandle === null) {
         scheduledHandle = requestAnimationFrame(flush);
       }
@@ -693,14 +758,16 @@ export function Surface() {
     surfaceMeasurementStore.getSnapshot,
     surfaceMeasurementStore.getSnapshot,
   );
-  const measurementReady =
-    bubbleMaxWidth !== null && measurementSnapshot.signature === measurementSignature;
-  const measuredEntries = measurementReady ? measurementSnapshot.entries : fallbackMeasuredEntries;
+  const measurementReady = bubbleMaxWidth !== null;
+  const measuredEntries =
+    measurementSnapshot.signature === measurementSignature
+      ? measurementSnapshot.entries
+      : fallbackMeasuredEntries;
 
   useEffect(() => {
     if (bubbleMaxWidth === null) return;
-    surfaceMeasurementStore.measure(entries, bubbleMaxWidth);
-  }, [entries, bubbleMaxWidth]);
+    surfaceMeasurementStore.measure(entries, bubbleMaxWidth, viewportHeight);
+  }, [entries, bubbleMaxWidth, viewportHeight]);
 
   const virtualRows = useMemo(() => {
     const offsets: number[] = new Array(measuredEntries.length);
