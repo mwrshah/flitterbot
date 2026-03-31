@@ -67,10 +67,10 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
         body: JSON.stringify({ text }),
       }),
 
-    getStreamsHistory: (surface?: "input", piSessionId?: string) => {
+    getStreamsHistory: (surface?: "input", streamsSessionId?: string) => {
       const params = new URLSearchParams();
       if (surface) params.set("surface", surface);
-      if (piSessionId) params.set("piSessionId", piSessionId);
+      if (streamsSessionId) params.set("streamsSessionId", streamsSessionId);
       const qs = params.toString();
       return request<StreamsHistoryResponse>(qs ? `/api/streams/history?${qs}` : "/api/streams/history");
     },
@@ -79,17 +79,17 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
-    interruptStreamsSession: (piSessionId: string) =>
-      request<{ ok: boolean }>(`/api/streams-sessions/${piSessionId}/interrupt`, { method: "POST" }),
+    interruptStreamsSession: (streamsSessionId: string) =>
+      request<{ ok: boolean }>(`/api/stream-sessions/${streamsSessionId}/interrupt`, { method: "POST" }),
 
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
-    getDirectoryCompletions: (path: string, piSessionId?: string) => {
+    getDirectoryCompletions: (path: string, streamsSessionId?: string) => {
       const params = new URLSearchParams({ path });
-      if (piSessionId) params.set("piSessionId", piSessionId);
+      if (streamsSessionId) params.set("streamsSessionId", streamsSessionId);
       return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
     },
   };

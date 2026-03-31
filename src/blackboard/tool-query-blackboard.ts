@@ -5,15 +5,15 @@ import type { BlackboardDatabase } from "./db.ts";
 const MODES: Record<string, string> = {
   active_sessions: `
     SELECT s.session_id, s.tmux_session, s.project, s.status, s.started_at,
-           s.last_event_at, s.task_description, w.name AS workstream_name
+           s.last_event_at, s.task_description, w.name AS stream_name
     FROM sessions s
-    LEFT JOIN workstreams w ON s.workstream_id = w.id
+    LEFT JOIN streams w ON s.stream_id = w.id
     WHERE s.status IN ('working', 'idle')
     ORDER BY s.last_event_at DESC`,
 
   open_streams: `
     SELECT id, name, repo_path, worktree_path, status, created_at
-    FROM workstreams
+    FROM streams
     WHERE status = 'open'
     ORDER BY created_at DESC`,
 
@@ -21,10 +21,10 @@ const MODES: Record<string, string> = {
     SELECT s.session_id, s.project, s.status, s.model, s.agent_managed,
            s.started_at, s.ended_at, s.task_description,
            p.role AS pi_role, p.status AS pi_status,
-           w.name AS workstream_name
+           w.name AS stream_name
     FROM sessions s
     LEFT JOIN pi_sessions p ON s.pi_session_id = p.pi_session_id
-    LEFT JOIN workstreams w ON s.workstream_id = w.id
+    LEFT JOIN streams w ON s.stream_id = w.id
     ORDER BY s.started_at DESC
     LIMIT 20`,
 
@@ -43,7 +43,7 @@ const SCHEMA_DESCRIPTION = `Run read-only SQL against the Autonoma blackboard da
 
 SCHEMA — every table, column, type, and key:
 
-workstreams
+streams
   id TEXT PK, name TEXT, repo_path TEXT, worktree_path TEXT,
   status TEXT ('open'|'closed'), created_at DATETIME, closed_at TEXT
 
@@ -53,7 +53,7 @@ sessions
   status TEXT ('working'|'idle'|'stale'|'ended'),
   transcript_path TEXT, task_description TEXT, todoist_task_id TEXT,
   agent_managed BOOLEAN, session_end_reason TEXT,
-  workstream_id TEXT FK→workstreams.id,
+  stream_id TEXT FK→streams.id,
   pi_session_id TEXT FK→pi_sessions.pi_session_id,
   started_at DATETIME (NOT "created_at"), ended_at DATETIME,
   last_event_at DATETIME, last_tool_started_at DATETIME
@@ -64,7 +64,7 @@ pi_sessions
   agent_dir TEXT, model_provider TEXT, model_id TEXT, thinking_level TEXT,
   started_at DATETIME, last_prompt_at DATETIME, last_event_at DATETIME,
   ended_at DATETIME, end_reason TEXT,
-  workstream_id TEXT FK→workstreams.id,
+  stream_id TEXT FK→streams.id,
   last_datetime_reported_at DATETIME
 
 pending_actions
@@ -76,7 +76,7 @@ pending_actions
 messages
   id TEXT PK, source TEXT ('whatsapp'|'web'|'hook'|'cron'|'init'|'agent'|'pi_outbound'),
   direction TEXT ('inbound'|'outbound'), content TEXT, sender TEXT,
-  workstream_id TEXT FK→workstreams.id, metadata TEXT, created_at DATETIME,
+  stream_id TEXT FK→streams.id, metadata TEXT, created_at DATETIME,
   pi_session_id TEXT FK→pi_sessions.pi_session_id
 
 health_flags
@@ -95,16 +95,16 @@ schema_migrations
   version INTEGER PK, applied_at DATETIME
 
 KEY RELATIONSHIPS:
-  sessions.workstream_id → workstreams.id
+  sessions.stream_id → streams.id
   sessions.pi_session_id → pi_sessions.pi_session_id
-  pi_sessions.workstream_id → workstreams.id
-  messages.workstream_id → workstreams.id
+  pi_sessions.stream_id → streams.id
+  messages.stream_id → streams.id
   messages.pi_session_id → pi_sessions.pi_session_id
 
 COMMON GOTCHAS:
   - sessions PK is "session_id", NOT "id"
   - sessions uses "started_at", NOT "created_at"
-  - workstreams has no "session_id" column; join via sessions.workstream_id
+  - streams has no "session_id" column; join via sessions.stream_id
   - pi_sessions PK is "pi_session_id", NOT "id"
 
 PARAMETERS:

@@ -14,9 +14,9 @@ import {
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
-import { handleBrowserPiHistoryRoute } from "./routes/browser-pi.ts";
-import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
-import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
+import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
+import { handleBrowserStreamsSessionStreamRoute } from "./routes/browser-streams-session-stream.ts";
+import { handleBrowserStreamsSessionsRoute } from "./routes/browser-streams-sessions.ts";
 import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
@@ -27,7 +27,7 @@ import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
-import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
+import { handleStreamsSessionInterruptRoute } from "./routes/streams-session-interrupt.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
@@ -136,10 +136,10 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     return handleBrowserSessionsRoute(runtime, req, res);
   }
   if (
-    method === CONTROL_SURFACE_ENDPOINTS.piHistory.method &&
-    pathname === CONTROL_SURFACE_ENDPOINTS.piHistory.path
+    method === CONTROL_SURFACE_ENDPOINTS.streamsHistory.method &&
+    pathname === CONTROL_SURFACE_ENDPOINTS.streamsHistory.path
   ) {
-    return handleBrowserPiHistoryRoute(runtime, req, res);
+    return handleBrowserStreamsHistoryRoute(runtime, req, res);
   }
   if (
     method === CONTROL_SURFACE_ENDPOINTS.skills.method &&
@@ -168,21 +168,21 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (
     method === "GET" &&
     segments[0] === "api" &&
-    segments[1] === "pi-sessions" &&
+    segments[1] === "stream-sessions" &&
     segments[2] &&
     segments[3] === "sessions"
   ) {
-    return handleBrowserPiSessionsRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handleBrowserStreamsSessionsRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "GET" &&
     segments[0] === "api" &&
-    segments[1] === "pi-sessions" &&
+    segments[1] === "stream-sessions" &&
     segments[2] &&
     segments[3] === "stream" &&
     !segments[4]
   ) {
-    return handleBrowserPiSessionStreamRoute(
+    return handleBrowserStreamsSessionStreamRoute(
       runtime,
       req,
       res,
@@ -195,11 +195,11 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (
     method === "POST" &&
     segments[0] === "api" &&
-    segments[1] === "pi-sessions" &&
+    segments[1] === "stream-sessions" &&
     segments[2] &&
     segments[3] === "interrupt"
   ) {
-    return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handleStreamsSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "POST" &&

@@ -24,10 +24,10 @@ async function streamsRequest(path: string): Promise<unknown> {
 }
 
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
+  .inputValidator((input: { streamsSessionId?: string; surface?: "input" | "agent" }) => input)
   .handler(async ({ data }): Promise<ChatTimelineItem[]> => {
     const params = new URLSearchParams();
-    if (data.piSessionId) params.set("piSessionId", data.piSessionId);
+    if (data.streamsSessionId) params.set("streamsSessionId", data.streamsSessionId);
     if (data.surface) params.set("surface", data.surface);
     const qs = params.toString();
     const path = qs ? `/api/streams/history?${qs}` : "/api/streams/history";
@@ -36,8 +36,8 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
       return res.items;
     } catch (err) {
       console.error(
-        "fetchStreamsHistory failed (piSessionId=%s, surface=%s):",
-        data.piSessionId ?? "none",
+        "fetchStreamsHistory failed (streamsSessionId=%s, surface=%s):",
+        data.streamsSessionId ?? "none",
         data.surface ?? "none",
         err,
       );
@@ -46,14 +46,14 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
   });
 
 export const fetchStreamsSessions = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId: string }) => input)
+  .inputValidator((input: { streamsSessionId: string }) => input)
   .handler(async ({ data }): Promise<DownstreamSessionItem[]> => {
-    const path = `/api/streams-sessions/${encodeURIComponent(data.piSessionId)}/sessions`;
+    const path = `/api/stream-sessions/${encodeURIComponent(data.streamsSessionId)}/sessions`;
     try {
       const res = (await streamsRequest(path)) as { items: DownstreamSessionItem[] };
       return res.items;
     } catch (err) {
-      console.error("fetchStreamsSessions failed (piSessionId=%s):", data.piSessionId, err);
+      console.error("fetchStreamsSessions failed (streamsSessionId=%s):", data.streamsSessionId, err);
       throw err;
     }
   });
@@ -66,9 +66,9 @@ export type StreamInfo = {
 };
 
 export const fetchStreamsWorktree = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId: string }) => input)
+  .inputValidator((input: { streamsSessionId: string }) => input)
   .handler(async ({ data }): Promise<StreamInfo | null> => {
-    const path = `/api/streams-sessions/${encodeURIComponent(data.piSessionId)}/stream`;
+    const path = `/api/stream-sessions/${encodeURIComponent(data.streamsSessionId)}/stream`;
     try {
       return (await streamsRequest(path)) as StreamInfo;
     } catch {

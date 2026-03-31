@@ -1,10 +1,10 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { touchPiEvent } from "../blackboard/pi-sessions.ts";
+import { touchStreamsEvent } from "../blackboard/streams-sessions.ts";
 import type {
   ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
   MessageEndWebSocketEvent,
-  PiSurfacedWebSocketEvent,
+  StreamSurfacedWebSocketEvent,
   ThinkingEndWebSocketEvent,
   ThinkingStartWebSocketEvent,
   ToolCallStartWebSocketEvent,
@@ -14,9 +14,9 @@ import type {
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import type { PiSessionState } from "./session-state.ts";
+import type { StreamsSessionState } from "./session-state.ts";
 
-type PiSessionSubscriptionEvent =
+type StreamsSessionSubscriptionEvent =
   | {
       type: "message_start";
       message?: unknown;
@@ -95,10 +95,10 @@ type PiSessionSubscriptionEvent =
       [key: string]: unknown;
     };
 
-type SubscribablePiSession = {
+type SubscribableStreamsSession = {
   sessionId: string;
   messages: Array<unknown>;
-  subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
+  subscribe: (listener: (event: StreamsSessionSubscriptionEvent) => void) => () => void;
 };
 
 /**
@@ -124,8 +124,8 @@ function broadcastSurfaced(
   sessionId: string,
   message: ChatTimelineMessage,
 ): void {
-  const payload: PiSurfacedWebSocketEvent = {
-    type: "pi_surfaced",
+  const payload: StreamSurfacedWebSocketEvent = {
+    type: "stream_surfaced",
     sessionId,
     message,
     streamId: message.streamId,
@@ -205,9 +205,9 @@ function extractTimestamp(message: unknown, fallback: string): string {
   return fallback;
 }
 
-export function subscribeToPiSession(
-  session: SubscribablePiSession,
-  state: PiSessionState,
+export function subscribeToStreamsSession(
+  session: SubscribableStreamsSession,
+  state: StreamsSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
 ): () => void {
@@ -221,7 +221,7 @@ export function subscribeToPiSession(
   let currentStreamingMessageId: string | null = null;
 
   // Tracks the last assistant message in the current agent run.
-  // Reset on agent_start; used on agent_end to re-broadcast as final + pi_surfaced.
+  // Reset on agent_start; used on agent_end to re-broadcast as final + stream_surfaced.
   let lastAssistantMessage: ChatTimelineMessage | null = null;
 
   return session.subscribe((event) => {
@@ -399,11 +399,11 @@ export function subscribeToPiSession(
         break;
       }
       case "turn_start":
-        touchPiEvent(blackboard, session.sessionId, now, "active");
-        console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        touchStreamsEvent(blackboard, session.sessionId, now, "active");
+        console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       case "turn_end": {
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchStreamsEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
@@ -416,13 +416,13 @@ export function subscribeToPiSession(
         break;
       }
       case "agent_start":
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchStreamsEvent(blackboard, session.sessionId, now, "active");
         lastAssistantMessage = null;
         break;
       case "agent_end": {
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchStreamsEvent(blackboard, session.sessionId, now, "active");
         if (lastAssistantMessage) {
-          // Broadcast pi_surfaced for the Surface. The agent timeline already has
+          // Broadcast stream_surfaced for the Surface. The agent timeline already has
           // the message from the message_end event — no second message_end needed.
           broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
         }
@@ -436,11 +436,11 @@ export function subscribeToPiSession(
       case "auto_compaction_end":
       case "auto_retry_start":
       case "auto_retry_end":
-        console.log("pi-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       default:
         console.warn(
-          "pi-subscribe: unhandled event type=%s (sessionId=%s)",
+          "streams-subscribe: unhandled event type=%s (sessionId=%s)",
           event.type,
           session.sessionId,
         );

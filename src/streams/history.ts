@@ -5,12 +5,12 @@ import type {
   ChatTimelineMessage,
   JsonValue,
   MessageSource,
-  PiHistoryResponse,
+  StreamsHistoryResponse,
 } from "../contracts/index.ts";
 
-type PiHistoryMode = "agent" | "input";
+type StreamsHistoryMode = "agent" | "input";
 
-type PiHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[number];
+type StreamsHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[number];
 
 /**
  * Known bracket prefixes that map to MessageSource values.
@@ -64,7 +64,7 @@ function pushMessage(
   role: "user" | "assistant" | "system",
   content: string,
   createdAt: string,
-  blocks?: PiHistoryMessageBlock[],
+  blocks?: StreamsHistoryMessageBlock[],
 ): void {
   let normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
@@ -109,7 +109,7 @@ function parseMessageContent(
     return;
   }
 
-  const messageBlocks: PiHistoryMessageBlock[] = [];
+  const messageBlocks: StreamsHistoryMessageBlock[] = [];
   let textBuffer = "";
 
   const flushTextBlock = () => {
@@ -250,7 +250,7 @@ function keepOnlySurfaced(items: ChatTimelineItem[]): ChatTimelineItem[] {
     .map(stripThinkingFromMessage);
 }
 
-function shapeHistoryItems(items: ChatTimelineItem[], mode: PiHistoryMode): ChatTimelineItem[] {
+function shapeHistoryItems(items: ChatTimelineItem[], mode: StreamsHistoryMode): ChatTimelineItem[] {
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
@@ -270,12 +270,12 @@ function parseHistoryLine(
   parseMessageRecord(messageRecord, createdAt, messageId, items);
 }
 
-export function readPiHistoryFromMessages(
+export function readStreamsHistoryFromMessages(
   sessionId: string,
   sessionFile: string | null,
   messages: Array<unknown>,
-  mode: PiHistoryMode = "agent",
-): PiHistoryResponse {
+  mode: StreamsHistoryMode = "agent",
+): StreamsHistoryResponse {
   const items: ChatTimelineItem[] = [];
   let ordinal = 0;
 
@@ -294,14 +294,14 @@ export function readPiHistoryFromMessages(
   };
 }
 
-export async function readPiHistory(
+export async function readStreamsHistory(
   sessionId: string,
   sessionFile: string,
-  mode: PiHistoryMode = "agent",
-): Promise<PiHistoryResponse> {
+  mode: StreamsHistoryMode = "agent",
+): Promise<StreamsHistoryResponse> {
   if (!fs.existsSync(sessionFile)) {
     console.warn(
-      "readPiHistory: session file missing on disk (sessionId=%s, file=%s)",
+      "readStreamsHistory: session file missing on disk (sessionId=%s, file=%s)",
       sessionId,
       sessionFile,
     );

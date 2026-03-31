@@ -14,7 +14,7 @@ export function persistInboundMessage(
     content: string;
     sender?: string;
     streamId?: string;
-    piSessionId?: string;
+    streamsSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -25,7 +25,7 @@ export function persistInboundMessage(
     content: opts.content,
     sender: opts.sender,
     streamId: opts.streamId,
-    piSessionId: opts.piSessionId,
+    streamsSessionId: opts.streamsSessionId,
     metadata: opts.metadata,
   });
 }
@@ -37,7 +37,7 @@ export function persistOutboundMessage(
     source: UnifiedMessageSource;
     content: string;
     streamId?: string;
-    piSessionId?: string;
+    streamsSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -48,7 +48,7 @@ export function persistOutboundMessage(
     content: opts.content,
     sender: "pi",
     streamId: opts.streamId,
-    piSessionId: opts.piSessionId,
+    streamsSessionId: opts.streamsSessionId,
     metadata: opts.metadata,
   });
 }
@@ -75,15 +75,15 @@ export function getMessagesByWorkstream(
   limit: number = 100,
 ): MessageRow[] {
   return db.all<MessageRow>(
-    "SELECT * FROM messages WHERE workstream_id = ? ORDER BY created_at ASC LIMIT ?",
+    "SELECT * FROM messages WHERE stream_id = ? ORDER BY created_at ASC LIMIT ?",
     streamId,
     limit,
   );
 }
 
 export type ConversationSnippet = {
-  workstream_id: string;
-  workstream_name: string;
+  stream_id: string;
+  stream_name: string;
   content: string;
   source: string;
   created_at: string;
@@ -99,14 +99,14 @@ export function getRecentDefaultMessages(
   const rows = after
     ? db.all<Pick<MessageRow, "content" | "created_at">>(
         `SELECT content, created_at FROM messages
-         WHERE direction = 'inbound' AND workstream_id IS NULL AND created_at > ?
+         WHERE direction = 'inbound' AND stream_id IS NULL AND created_at > ?
          ORDER BY created_at DESC LIMIT ?`,
         after,
         limit,
       )
     : db.all<Pick<MessageRow, "content" | "created_at">>(
         `SELECT content, created_at FROM messages
-         WHERE direction = 'inbound' AND workstream_id IS NULL
+         WHERE direction = 'inbound' AND stream_id IS NULL
          ORDER BY created_at DESC LIMIT ?`,
         limit,
       );
@@ -123,7 +123,7 @@ export type DefaultConversationSnippet = {
 
 export function getRecentDefaultConversation(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
   limit: number = 10,
 ): DefaultConversationSnippet[] {
   const rows = db.all<DefaultConversationSnippet>(
@@ -131,7 +131,7 @@ export function getRecentDefaultConversation(
      FROM messages
      WHERE pi_session_id = ?
      ORDER BY created_at DESC LIMIT ?`,
-    piSessionId,
+    streamsSessionId,
     limit,
   );
   return rows.reverse();
@@ -143,19 +143,19 @@ export function getRecentDefaultConversation(
  */
 export function getInputSurfaceHistory(
   db: BlackboardDatabase,
-  piSessionIds: string[],
-): (MessageRow & { workstream_name: string | null })[] {
-  if (piSessionIds.length === 0) return [];
-  const placeholders = piSessionIds.map(() => "?").join(", ");
-  return db.all<MessageRow & { workstream_name: string | null }>(
-    `SELECT m.*, w.name AS workstream_name
+  streamsSessionIds: string[],
+): (MessageRow & { stream_name: string | null })[] {
+  if (streamsSessionIds.length === 0) return [];
+  const placeholders = streamsSessionIds.map(() => "?").join(", ");
+  return db.all<MessageRow & { stream_name: string | null }>(
+    `SELECT m.*, w.name AS stream_name
      FROM messages m
-     LEFT JOIN workstreams w ON w.id = m.workstream_id
+     LEFT JOIN streams w ON w.id = m.stream_id
      WHERE ((m.source IN ('web', 'whatsapp') AND m.direction = 'inbound')
             OR (m.source = 'pi_outbound' AND m.direction = 'outbound'))
        AND m.pi_session_id IN (${placeholders})
      ORDER BY m.created_at ASC`,
-    ...piSessionIds,
+    ...streamsSessionIds,
   );
 }
 
@@ -165,22 +165,22 @@ export function getRecentConversationByWorkstream(
   maxPerWorkstream: number,
 ): Map<string, ConversationSnippet[]> {
   const rows = db.all<ConversationSnippet>(
-    `SELECT m.workstream_id, w.name AS workstream_name,
+    `SELECT m.stream_id, w.name AS stream_name,
             m.content, m.source, m.created_at, m.direction, m.sender
      FROM messages m
-     JOIN workstreams w ON w.id = m.workstream_id AND w.status = 'open'
+     JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
      WHERE m.created_at >= datetime('now', '-' || ? || ' hours')
-     ORDER BY m.workstream_id, m.created_at DESC`,
+     ORDER BY m.stream_id, m.created_at DESC`,
     withinHours,
   );
 
   const grouped = new Map<string, ConversationSnippet[]>();
   for (const row of rows) {
-    const list = grouped.get(row.workstream_id) ?? [];
+    const list = grouped.get(row.stream_id) ?? [];
     if (list.length < maxPerWorkstream) {
       list.push(row);
     }
-    grouped.set(row.workstream_id, list);
+    grouped.set(row.stream_id, list);
   }
   return grouped;
 }

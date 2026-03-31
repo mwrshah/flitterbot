@@ -55,7 +55,7 @@ export function streamsHistoryQueryOptions(sessionId: string | undefined, surfac
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsHistory({
         data: {
-          ...(sessionId ? { piSessionId: sessionId } : {}),
+          ...(sessionId ? { streamsSessionId: sessionId } : {}),
           ...(surface ? { surface } : {}),
         },
       })) as ChatTimelineItem[],
@@ -76,26 +76,26 @@ export function streamsHistoryQueryOptions(sessionId: string | undefined, surfac
 
 /**
  * Downstream Claude Code sessions for a Streams orchestrator session.
- * WS bridge invalidates ["streams-downstream-sessions", piSessionId] on sessions_changed.
+ * WS bridge invalidates ["streams-downstream-sessions", streamsSessionId] on sessions_changed.
  */
-export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
+export function streamsDownstreamSessionsQueryOptions(streamsSessionId: string) {
   return {
-    queryKey: ["streams-downstream-sessions", piSessionId] as const,
-    queryFn: (): Promise<DownstreamSessionItem[]> => fetchStreamsSessions({ data: { piSessionId } }),
-    enabled: !!piSessionId,
+    queryKey: ["streams-downstream-sessions", streamsSessionId] as const,
+    queryFn: (): Promise<DownstreamSessionItem[]> => fetchStreamsSessions({ data: { streamsSessionId } }),
+    enabled: !!streamsSessionId,
     staleTime: 30_000,
   };
 }
 
 /**
  * Worktree info for a Streams orchestrator session.
- * WS bridge invalidates ["streams-worktree", piSessionId] on worktree_changed.
+ * WS bridge invalidates ["streams-worktree", streamsSessionId] on worktree_changed.
  */
-export function streamsWorktreeQueryOptions(piSessionId: string) {
+export function streamsWorktreeQueryOptions(streamsSessionId: string) {
   return {
-    queryKey: ["streams-worktree", piSessionId] as const,
-    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { piSessionId } }),
-    enabled: !!piSessionId,
+    queryKey: ["streams-worktree", streamsSessionId] as const,
+    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { streamsSessionId } }),
+    enabled: !!streamsSessionId,
     staleTime: 30_000,
   };
 }
@@ -121,7 +121,7 @@ export function connectionStateQueryOptions() {
   };
 }
 
-/** Surface timeline — pi_surfaced events + user messages from all sessions. */
+/** Surface timeline — stream_surfaced events + user messages from all sessions. */
 export function surfaceTimelineQueryOptions() {
   return {
     queryKey: ["surface-timeline"] as const,

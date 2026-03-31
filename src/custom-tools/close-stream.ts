@@ -2,7 +2,7 @@ import { exec as cpExec } from "node:child_process";
 import fs from "node:fs";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { endPiSession } from "../blackboard/pi-sessions.ts";
+import { endStreamsSession } from "../blackboard/streams-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
@@ -159,7 +159,7 @@ async function pushMain(repoPath: string): Promise<boolean> {
 
 export async function executeCloseStream(
   blackboard: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
   streamId: string,
   mode: "merge" | "noop",
   mergeCommitMessage?: string,
@@ -177,7 +177,7 @@ export async function executeCloseStream(
     .prepare(
       `SELECT session_id, tmux_session
        FROM sessions
-       WHERE workstream_id = ?
+       WHERE stream_id = ?
          AND status IN ('working', 'idle')`,
     )
     .all(streamId) as { session_id: string; tmux_session: string | null }[];
@@ -233,7 +233,7 @@ export async function executeCloseStream(
 
   // Step 2: Close stream and end Pi session (worktree left on disk)
   closeStream(blackboard, streamId);
-  endPiSession(blackboard, piSessionId, "ended", "workstream_closed");
+  endStreamsSession(blackboard, streamsSessionId, "ended", "workstream_closed");
 
   const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
@@ -250,7 +250,7 @@ export async function executeCloseStream(
   };
 }
 
-export function createCloseStreamTool(blackboard: BlackboardDatabase, piSessionId: string) {
+export function createCloseStreamTool(blackboard: BlackboardDatabase, streamsSessionId: string) {
   return {
     name: "close_stream",
     label: "Close Stream",
@@ -259,7 +259,7 @@ export function createCloseStreamTool(blackboard: BlackboardDatabase, piSessionI
     parameters: {
       type: "object",
       properties: {
-        workstream_id: { type: "string", description: "ID of the stream to close" },
+        stream_id: { type: "string", description: "ID of the stream to close" },
         mode: {
           type: "string",
           enum: ["merge", "noop"],
@@ -272,17 +272,17 @@ export function createCloseStreamTool(blackboard: BlackboardDatabase, piSessionI
             "Optional commit message for the merge commit when mode is merge. Ignored for noop mode. Falls back to git's default merge commit message if omitted.",
         },
       },
-      required: ["workstream_id", "mode"],
+      required: ["stream_id", "mode"],
       additionalProperties: false,
     },
     execute: async (
       _toolCallId: string,
-      params: { workstream_id: string; mode: "merge" | "noop"; merge_commit_message?: string },
+      params: { stream_id: string; mode: "merge" | "noop"; merge_commit_message?: string },
     ) => {
       const result = await executeCloseStream(
         blackboard,
-        piSessionId,
-        params.workstream_id,
+        streamsSessionId,
+        params.stream_id,
         params.mode,
         params.merge_commit_message,
       );

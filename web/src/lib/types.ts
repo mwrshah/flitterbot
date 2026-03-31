@@ -99,7 +99,7 @@ export type StatusResponse = {
     pid?: number;
     managedByControlSurface?: boolean;
   };
-  streams?: {
+  streamsAgent?: {
     default?: {
       sessionId?: string;
       busy?: boolean;
@@ -114,7 +114,7 @@ export type StatusResponse = {
       busy: boolean;
     }>;
   };
-  streams_list?: StreamSummary[];
+  streams?: StreamSummary[];
 };
 
 /* ── Streams ── */
@@ -126,7 +126,7 @@ export type StreamSummary = {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  piSessionId?: string;
+  streamsSessionId?: string;
   sessionCount: number;
   createdAt: string;
 };
@@ -240,7 +240,7 @@ export type WsMessage =
   | { type: "turn_end"; sessionId?: string }
   | { type: "agent_end"; sessionId?: string }
   | {
-      type: "pi_surfaced";
+      type: "stream_surfaced";
       message: ChatTimelineMessage;
       sessionId?: string;
       streamId?: string;
@@ -256,12 +256,12 @@ export type WsMessage =
   | {
       type: "sessions_changed";
       sessionId: string;
-      piSessionId: string;
+      streamsSessionId: string;
       reason: "registered" | "ended" | "stopped";
     }
   | {
       type: "worktree_changed";
-      piSessionId: string;
+      streamsSessionId: string;
       streamId: string;
     }
   | { type: "error"; message: string };

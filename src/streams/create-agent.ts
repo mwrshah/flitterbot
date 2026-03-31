@@ -18,12 +18,12 @@ import type { AutonomaConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
 
-/** Orchestrator context as provided by the caller — piSessionId is injected internally. */
-type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
+/** Orchestrator context as provided by the caller — streamsSessionId is injected internally. */
+type OrchestratorInput = Omit<OrchestratorContext, "streamsSessionId">;
 
 const HOME = os.homedir();
 
-type PiRole = "default" | "orchestrator";
+type StreamsRole = "default" | "orchestrator";
 
 /**
  * Custom tools use plain JSON Schema objects for `parameters` (not TypeBox TSchema),
@@ -32,7 +32,7 @@ type PiRole = "default" | "orchestrator";
 type CreateAutonomaAgentOptions = {
   config: AutonomaConfig;
   customTools: unknown[];
-  role?: PiRole;
+  role?: StreamsRole;
   orchestratorContext?: OrchestratorInput;
   /** When set, resume an existing session from this JSONL file instead of creating a new one. */
   resumeSessionFile?: string;
@@ -42,14 +42,14 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const { config, customTools, role = "default", orchestratorContext, resumeSessionFile } = options;
   const workingDir = config.projectsDir;
 
-  // If resuming an existing session, open its JSONL file to preserve the piSessionId
+  // If resuming an existing session, open its JSONL file to preserve the streamsSessionId
   // and conversation history. Otherwise create a fresh session.
   const sessionManager = resumeSessionFile
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
-  const piSessionId = sessionManager.getSessionId();
+  const streamsSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
+  const systemPrompt = resolveSystemPrompt(role, streamsSessionId, orchestratorContext);
   ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
 
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
@@ -119,12 +119,12 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   };
 }
 
-function resolveSystemPrompt(role: PiRole, piSessionId: string, ctx?: OrchestratorInput): string {
+function resolveSystemPrompt(role: StreamsRole, streamsSessionId: string, ctx?: OrchestratorInput): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorPrompt({ ...ctx, piSessionId });
+    return buildOrchestratorPrompt({ ...ctx, streamsSessionId });
   }
-  return buildDefaultAgentPrompt(piSessionId);
+  return buildDefaultAgentPrompt(streamsSessionId);
 }
 
 function ensurePromptFile(promptPath: string, content: string): void {

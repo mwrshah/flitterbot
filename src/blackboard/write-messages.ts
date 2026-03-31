@@ -14,7 +14,7 @@ export type InsertMessageInput = {
   content: string;
   sender?: string | null;
   streamId?: string | null;
-  piSessionId?: string | null;
+  streamsSessionId?: string | null;
   metadata?: MessageMetadata | null;
   createdAt?: string;
 };
@@ -29,7 +29,7 @@ export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput)
   const metadataJson = input.metadata ? JSON.stringify(input.metadata) : null;
 
   db.prepare(
-    `INSERT INTO messages (id, source, direction, content, sender, workstream_id, pi_session_id, metadata, created_at)
+    `INSERT INTO messages (id, source, direction, content, sender, stream_id, pi_session_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
@@ -38,7 +38,7 @@ export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput)
     input.content,
     input.sender ?? null,
     input.streamId ?? null,
-    input.piSessionId ?? null,
+    input.streamsSessionId ?? null,
     metadataJson,
     createdAt,
   );

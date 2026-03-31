@@ -35,7 +35,7 @@ export interface WhatsAppRuntimeStatus {
   requiresManualAuth?: boolean;
 }
 
-export interface PiRuntimeStatus {
+export interface StreamsRuntimeStatus {
   sessionId: string;
   sessionFile: string | null;
   messageCount: number;
@@ -59,7 +59,7 @@ export interface ClaudeSessionListItem {
   agentManaged: boolean;
   sessionEndReason: string | null;
   streamId: string | null;
-  piSessionId: string | null;
+  streamsSessionId: string | null;
   startedAt: string;
   endedAt: string | null;
   lastEventAt: string;
@@ -68,7 +68,7 @@ export interface ClaudeSessionListItem {
 
 export type ClaudeSessionDetail = ClaudeSessionListItem;
 
-export interface PiOrchestratorStatus {
+export interface StreamsOrchestratorStatus {
   sessionId: string;
   streamId: string;
   streamName: string | null;
@@ -76,9 +76,9 @@ export interface PiOrchestratorStatus {
   busy: boolean;
 }
 
-export interface PiMultiSessionStatus {
-  default: PiRuntimeStatus | null;
-  orchestrators: PiOrchestratorStatus[];
+export interface StreamsMultiSessionStatus {
+  default: StreamsRuntimeStatus | null;
+  orchestrators: StreamsOrchestratorStatus[];
 }
 
 export interface StreamSummary {
@@ -88,7 +88,7 @@ export interface StreamSummary {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  piSessionId?: string;
+  streamsSessionId?: string;
   sessionCount: number;
   createdAt: string;
 }
@@ -97,7 +97,7 @@ export interface StatusResponse {
   ok: true;
   pid: number;
   uptime: number;
-  pi: PiMultiSessionStatus;
+  streamsAgent: StreamsMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
@@ -153,7 +153,7 @@ export interface DownstreamSessionItem {
   project: string | null;
 }
 
-export interface PiSessionsListResponse {
+export interface StreamsSessionsListResponse {
   items: DownstreamSessionItem[];
 }
 
@@ -163,13 +163,13 @@ export interface SessionDetailResponse {
 }
 
 /** @deprecated Use ChatTimelineMessage from timeline.ts */
-export type PiHistoryMessageItem = ChatTimelineMessage;
+export type StreamsHistoryMessageItem = ChatTimelineMessage;
 /** @deprecated Use ChatTimelineTool from timeline.ts */
-export type PiHistoryToolItem = ChatTimelineTool;
+export type StreamsHistoryToolItem = ChatTimelineTool;
 /** @deprecated Use ChatTimelineItem from timeline.ts */
-export type PiHistoryItem = ChatTimelineItem;
+export type StreamsHistoryItem = ChatTimelineItem;
 
-export interface PiHistoryResponse {
+export interface StreamsHistoryResponse {
   sessionId: string | null;
   sessionFile: string | null;
   items: ChatTimelineItem[];
@@ -234,9 +234,9 @@ export interface StopResponse {
   message: string;
 }
 
-export interface PiSessionInterruptResponse {
+export interface StreamsSessionInterruptResponse {
   ok: boolean;
-  piSessionId?: string;
+  streamsSessionId?: string;
   signaledSessions?: number;
   error?: string;
 }
@@ -284,9 +284,9 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/api/sessions/:sessionId",
     auth: "none",
   },
-  piHistory: {
+  streamsHistory: {
     method: "GET",
-    path: "/api/pi/history",
+    path: "/api/streams/history",
     auth: "none",
   },
   sessionTranscript: {
@@ -324,14 +324,14 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/cron/tick",
     auth: "bearer",
   },
-  piSessions: {
+  streamsSessions: {
     method: "GET",
-    path: "/api/pi-sessions/:piSessionId/sessions",
+    path: "/api/stream-sessions/:streamsSessionId/sessions",
     auth: "none",
   },
-  piSessionInterrupt: {
+  streamsSessionInterrupt: {
     method: "POST",
-    path: "/api/pi-sessions/:piSessionId/interrupt",
+    path: "/api/stream-sessions/:streamsSessionId/interrupt",
     auth: "bearer",
   },
   directoryCompletions: {
