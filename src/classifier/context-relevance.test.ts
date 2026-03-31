@@ -41,10 +41,10 @@ describe("formatStreamPrompt", () => {
   test("single message produces simple format", () => {
     const result = formatStreamPrompt(["Do the thing"], "my-ws", "ws-123");
 
-    expect(result).toContain('[Stream: "my-ws" (ws-123)] [NEW]');
     expect(result).toContain("Do the thing");
     expect(result).toContain("/load2-w");
     expect(result).not.toContain("User message (");
+    expect(result).not.toContain("[Stream:");
   });
 
   test("multiple messages produces numbered format", () => {
@@ -54,7 +54,7 @@ describe("formatStreamPrompt", () => {
       "ws-456",
     );
 
-    expect(result).toContain('[Stream: "my-feature" (ws-456)] [NEW]');
+    expect(result).not.toContain("[Stream:");
     expect(result).toContain("--- User message (1/3) ---");
     expect(result).toContain("--- User message (2/3) ---");
     expect(result).toContain("--- User message (3/3, most recent) ---");
@@ -64,9 +64,10 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("/load2-w");
   });
 
-  test("empty messages array produces header only", () => {
+  test("empty messages array produces footer only", () => {
     const result = formatStreamPrompt([], "empty-ws", "ws-000");
-    expect(result).toContain('[Stream: "empty-ws" (ws-000)] [NEW]');
+    expect(result).not.toContain("[Stream:");
+    expect(result).toContain("/load2-w");
   });
 });
 
