@@ -129,7 +129,7 @@ function prettyValue(value: unknown): { content: string; language: string } {
 }
 
 export class MessageCopyButton extends LitElement {
-  @property() text = "";
+  @property({ attribute: false }) getText: (() => string) | undefined;
   @state() private copied = false;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -137,8 +137,10 @@ export class MessageCopyButton extends LitElement {
   }
 
   private async copy(): Promise<void> {
+    const text = this.getText?.() ?? "";
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(this.text);
+      await navigator.clipboard.writeText(text);
       this.copied = true;
       setTimeout(() => {
         this.copied = false;
@@ -149,7 +151,7 @@ export class MessageCopyButton extends LitElement {
   }
 
   override render() {
-    if (!this.text) return nothing;
+    if (!this.getText) return nothing;
     return html`
       <button
         @click=${this.copy}
@@ -748,7 +750,7 @@ export class UserMessage extends LitElement {
                 : ""
             }
           </div>
-          <message-copy-button .text=${plainText}></message-copy-button>
+          <message-copy-button .getText=${() => plainText}></message-copy-button>
         </div>
       </div>
     `;
@@ -874,8 +876,8 @@ export class AssistantMessage extends LitElement {
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
-  /** When set, overrides the self-computed text for the copy button. Empty string hides it. */
-  @property({ attribute: false }) copyText?: string;
+  /** When set, overrides the self-computed text for the copy button at click time. Returning empty string hides the button. */
+  @property({ attribute: false }) getCopyText?: () => string;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -916,18 +918,19 @@ export class AssistantMessage extends LitElement {
       }
     }
 
-    // Use copyText override when provided; undefined means use self-computed text
-    const effectiveCopyText = this.copyText !== undefined
-      ? this.copyText
-      : this.message.content
-          .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
-          .map((chunk) => chunk.text)
-          .join("\n");
+    // Determine copy text: use getCopyText callback if provided, otherwise self-compute from this message.
+    // The callback is lazily evaluated by the copy button on click, not during render.
+    const getCopyText = this.getCopyText ?? (() =>
+      this.message.content
+        .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
+        .map((chunk) => chunk.text)
+        .join("\n")
+    );
 
     return html`
       <div class="relative">
         ${orderedParts.length ? html`<div class="px-4 pr-8 flex flex-col gap-3">${orderedParts}</div>` : ""}
-        ${effectiveCopyText ? html`<message-copy-button .text=${effectiveCopyText}></message-copy-button>` : ""}
+        <message-copy-button .getText=${getCopyText}></message-copy-button>
         ${
           this.message.usage && !this.isStreaming
             ? this.onCostClick
@@ -1020,6 +1023,21 @@ export class MessageList extends LitElement {
       .join("\n");
   }
 
+  /** Walk backwards from the given message to collect all assistant text in this turn. */
+  private getTurnCopyText(fromMsg: AssistantMessageType): string {
+    const idx = this.messages.indexOf(fromMsg);
+    const texts: string[] = [];
+    for (let i = idx; i >= 0; i--) {
+      const role = (this.messages[i] as unknown as { role: string }).role;
+      if (role === "user" || role === "user-with-attachments") break;
+      if (role === "assistant") {
+        const text = MessageList.getAssistantPlainText(this.messages[i] as AssistantMessageType);
+        if (text) texts.push(text);
+      }
+    }
+    return texts.reverse().join("\n");
+  }
+
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
@@ -1031,39 +1049,20 @@ export class MessageList extends LitElement {
       }
     }
 
-    // Pre-pass: group assistant messages between user messages so we can
-    // show a single copy button on the last assistant in each group with
-    // the concatenated text of the entire group.
-    // Build groups split by user messages
-    const groups: AssistantMessageType[][] = [];
-    let currentGroup: AssistantMessageType[] = [];
+    // Pre-pass: identify which assistant messages are last in their turn
+    // (turn = assistant messages between user messages). Only these show the copy button.
+    const lastAssistantInTurn = new Set<AssistantMessageType>();
+    let lastAssistant: AssistantMessageType | null = null;
     for (const msg of this.messages) {
       const role = (msg as unknown as { role: string }).role;
       if (role === "user" || role === "user-with-attachments") {
-        if (currentGroup.length > 0) {
-          groups.push(currentGroup);
-          currentGroup = [];
-        }
+        if (lastAssistant) lastAssistantInTurn.add(lastAssistant);
+        lastAssistant = null;
       } else if (role === "assistant") {
-        currentGroup.push(msg as AssistantMessageType);
+        lastAssistant = msg as AssistantMessageType;
       }
     }
-    if (currentGroup.length > 0) {
-      groups.push(currentGroup);
-    }
-
-    // Map each assistant message to its copyText: empty for non-last, concatenated for last
-    const copyTextByTimestamp = new Map<number | undefined, string>();
-    for (const group of groups) {
-      const concatenated = group
-        .map((m) => MessageList.getAssistantPlainText(m))
-        .filter(Boolean)
-        .join("\n");
-      for (let i = 0; i < group.length; i++) {
-        const ts = (group[i] as unknown as { timestamp?: number }).timestamp;
-        copyTextByTimestamp.set(ts, i === group.length - 1 ? concatenated : "");
-      }
-    }
+    if (lastAssistant) lastAssistantInTurn.add(lastAssistant);
 
     const items: Array<{ key: string; template: TemplateResult }> = [];
     let fallbackIndex = 0;
@@ -1087,7 +1086,8 @@ export class MessageList extends LitElement {
       }
 
       if (role === "assistant") {
-        const copyText = copyTextByTimestamp.get(ts) ?? "";
+        const isLast = lastAssistantInTurn.has(msg as AssistantMessageType);
+        const getCopyText = isLast ? () => this.getTurnCopyText(msg as AssistantMessageType) : undefined;
         items.push({
           key,
           template: html`
@@ -1099,7 +1099,7 @@ export class MessageList extends LitElement {
               .toolResultsById=${resultByCallId}
               .hideToolCalls=${false}
               .onCostClick=${this.onCostClick}
-              .copyText=${copyText}
+              .getCopyText=${getCopyText}
             ></assistant-message>
           `,
         });
