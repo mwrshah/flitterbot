@@ -51,14 +51,6 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   stream_outbound: "Streams",
 };
 
-const STREAM_PREFIX_RE = /^\[Stream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
-
-function parseStreamPrefix(content: string): { streamName: string; cleanContent: string } | null {
-  const match = content.match(STREAM_PREFIX_RE);
-  if (!match) return null;
-  return { streamName: match[1] ?? "", cleanContent: content.slice(match[0]!.length) };
-}
-
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, {
@@ -187,9 +179,8 @@ const InboundEntry = memo(function InboundEntry({
 }: {
   entry: SurfaceEntry & { kind: "inbound" };
 }) {
-  const parsed = useMemo(() => parseStreamPrefix(entry.content), [entry.content]);
-  const displayContent = parsed ? parsed.cleanContent : entry.content;
-  const badgeName = parsed?.streamName ?? entry.streamName;
+  const displayContent = entry.content;
+  const badgeName = entry.streamName;
 
   return (
     <div className="flex gap-3 items-start">
