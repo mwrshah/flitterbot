@@ -14,8 +14,8 @@ type StreamsHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[num
 
 /**
  * Known bracket prefixes that map to MessageSource values.
- * Hook and cron embed their own prefixes; web/whatsapp/agent/init/stream_outbound
- * are added by formatPromptWithContext.
+ * Backward-compat: old session JSONL files may still contain decorated text
+ * from the previous formatPromptWithContext behavior. New messages are clean.
  */
 const SOURCE_PREFIX_RE = /^\[(web|whatsapp|hook|cron|init|agent|stream_outbound)\]\s*/i;
 
