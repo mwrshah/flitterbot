@@ -281,7 +281,7 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
         <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-[10px] font-medium text-muted-foreground">Streams</span>
+          <span className="text-[10px] font-medium text-muted-foreground">Agent</span>
         </div>
       </div>
       <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
