@@ -68,7 +68,7 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const piAgentDir = path.join(HOME, ".pi", "agent");
   const agentDir = fs.existsSync(piAgentDir) ? piAgentDir : config.controlSurfaceAgentDir;
 
-  const modelRegistry = new ModelRegistry(authStorage, path.join(agentDir, "models.json"));
+  const modelRegistry = ModelRegistry.create(authStorage, path.join(agentDir, "models.json"));
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
     cwd: workingDir,
