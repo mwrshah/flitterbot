@@ -620,18 +620,19 @@ console.log(
     }
   });
 
-  /* ── Reconnect invalidation ── */
-  // Connection state is no longer stored in the query cache — components read
-  // it directly via useSyncExternalStore (useConnectionState hook).
-  // This subscriber only handles cache invalidation on reconnect.
-  // See: features/tanstack-patterns/references/query.md (lines 69-71)
-  // See: features/tanstack-patterns/references/ssr.md (lines 63-65)
+  /* ── Connection state handler — query cache + reconnect invalidation ── */
+
+  // Seed initial connection state
+  queryClient.setQueryData<ConnectionState>(["connection-state"], wsClient.connectionState);
 
   let prevConnectionState: ConnectionState = wsClient.connectionState;
 
   const unsubscribeConnection = wsClient.subscribeConnection((state: ConnectionState) => {
     const prev = prevConnectionState;
     prevConnectionState = state;
+
+    // Write every transition to query cache
+    queryClient.setQueryData<ConnectionState>(["connection-state"], state);
 
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
       // Re-fetch stale data after reconnect

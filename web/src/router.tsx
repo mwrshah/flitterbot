@@ -27,10 +27,6 @@ export function getRouter() {
     routeTree,
     context: { queryClient, apiClient, wsClient, settingsStore, sendMessage },
     defaultPreload: "intent",
-    // defaultPreloadStaleTime: 0 disables the router's built-in 30s preload cache,
-    // ensuring every navigation triggers the loader so TanStack Query manages its
-    // own staleness via staleTime. See: features/tanstack-patterns/references/preloading.md (line 137)
-    defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
     scrollRestoration: true,

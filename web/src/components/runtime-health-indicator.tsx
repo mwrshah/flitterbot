@@ -1,9 +1,9 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
-import { useConnectionState } from "~/hooks/use-connection-state";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { statusQueryOptions } from "~/lib/queries";
+import { connectionStateQueryOptions, statusQueryOptions } from "~/lib/queries";
+import type { ConnectionState } from "~/lib/types";
 
 function statusDotColor(status: string): string {
   switch (status) {
@@ -28,26 +28,19 @@ function statusLabel(status: string): string {
 const rootApi = getRouteApi("__root__");
 
 export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
-  const { apiClient, wsClient } = rootApi.useRouteContext();
+  const { apiClient } = rootApi.useRouteContext();
   const navigate = useNavigate();
 
-  // useSuspenseQuery executes during SSR and streams resolved data to the client,
-  // unlike useQuery which skips server execution entirely. Status is seeded by the
-  // root route loader via ensureQueryData.
-  // See: features/tanstack-patterns/references/query.md (lines 75-78)
-  const { data: status } = useSuspenseQuery({
+  const { data: status } = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
   });
 
-  // useSyncExternalStore subscribes directly to the WS client's state machine.
-  // getServerSnapshot returns "disconnected" to match SSR, eliminating the
-  // hydration mismatch that the old mounted/useEffect workaround papered over.
-  // See: features/tanstack-patterns/references/query.md (lines 69-71)
-  // See: features/tanstack-patterns/references/ssr.md (lines 63-65)
-  const connectionState = useConnectionState(wsClient);
+  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
+    connectionStateQueryOptions(),
+  );
 
-  const waStatus = status.whatsapp.status;
+  const waStatus = status?.whatsapp.status ?? "unknown";
 
   useWhyDidYouRender("RuntimeHealthIndicator", { waStatus, connectionState });
 
