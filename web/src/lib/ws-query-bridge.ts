@@ -92,10 +92,35 @@ function appendTimelineItem(
   surface: "agent" | "input" = "agent",
 ) {
   if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => [
-      ...(old ?? []),
-      item,
-    ]);
+    queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
+      const items = old ?? [];
+
+      // Dedup: check for an existing entry with same id, same serverMessageId,
+      // or same content+role (catches optimistic entries from message_ack that
+      // won't share an id with the surfaced message).
+      if (item.kind === "message") {
+        const msg = item as ChatTimelineMessage;
+        const dupIdx = items.findIndex((existing) => {
+          if (existing.kind !== "message") return false;
+          const ex = existing as ChatTimelineMessage;
+          if (ex.id === msg.id) return true;
+          if (msg.serverMessageId && ex.serverMessageId === msg.serverMessageId) return true;
+          if (ex.role === msg.role && ex.content === msg.content) return true;
+          return false;
+        });
+        if (dupIdx >= 0) {
+          console.log(
+            "[debug][ws-bridge] appendTimelineItem DEDUP surface-timeline: replacing idx=%d with id=%s role=%s",
+            dupIdx, msg.id, msg.role,
+          );
+          const updated = [...items];
+          updated[dupIdx] = item;
+          return updated;
+        }
+      }
+
+      return [...items, item];
+    });
     return;
   }
 
