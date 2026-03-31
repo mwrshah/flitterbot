@@ -3,6 +3,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type * as React from "react";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "~/components/app-shell";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
@@ -11,6 +12,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
+import type { WsConnectionStore } from "~/lib/ws-connection-store";
 import type { AutonomaWsClient } from "~/lib/ws";
 import type { SendMessageFn } from "~/lib/ws-query-bridge";
 import piWebUiCss from "~/pi-web-ui.css?url";
@@ -21,8 +23,10 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
   apiClient: AutonomaApiClient;
   wsClient: AutonomaWsClient;
+  wsConnectionStore: WsConnectionStore;
   settingsStore: SettingsStore;
   sendMessage: SendMessageFn;
+  startRealtime: () => () => void;
 }>()({
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
@@ -70,7 +74,10 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
+  const { startRealtime } = Route.useRouteContext();
   useWhyDidYouRender("RootComponent", {});
+
+  useEffect(() => startRealtime(), [startRealtime]);
 
   return (
     <RootDocument>

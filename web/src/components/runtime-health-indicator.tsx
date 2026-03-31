@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { connectionStateQueryOptions, statusQueryOptions } from "~/lib/queries";
-import type { ConnectionState } from "~/lib/types";
+import { statusQueryOptions } from "~/lib/queries";
+import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 function statusDotColor(status: string): string {
   switch (status) {
@@ -28,7 +28,7 @@ function statusLabel(status: string): string {
 const rootApi = getRouteApi("__root__");
 
 export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
-  const { apiClient } = rootApi.useRouteContext();
+  const { apiClient, wsConnectionStore } = rootApi.useRouteContext();
   const navigate = useNavigate();
 
   const { data: status } = useQuery({
@@ -36,9 +36,7 @@ export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
     retry: 1,
   });
 
-  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
-    connectionStateQueryOptions(),
-  );
+  const connectionState = useWsConnectionState(wsConnectionStore);
 
   const waStatus = status?.whatsapp.status ?? "unknown";
 

@@ -6,6 +6,7 @@ import { NotFound } from "./components/not-found";
 import { createAutonomaApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
 import type { StatusResponse } from "./lib/types";
+import { createWsConnectionStore } from "./lib/ws-connection-store";
 import { AutonomaWsClient } from "./lib/ws";
 import { createSendMessage, setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { setupWsRouteSubscriptions } from "./lib/ws-route-subscriptions";
@@ -13,6 +14,7 @@ import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
   const queryClient = new QueryClient();
+  let startRealtime = () => () => {};
 
   const settingsStore = createSettingsStore((_settings) => {
     // Reconnect WS when settings change
@@ -21,11 +23,20 @@ export function getRouter() {
 
   const apiClient = createAutonomaApiClient(() => settingsStore.get());
   const wsClient = new AutonomaWsClient(() => settingsStore.get());
+  const wsConnectionStore = createWsConnectionStore(wsClient);
   const sendMessage = createSendMessage({ wsClient, apiClient, queryClient });
 
   const router = createRouter({
     routeTree,
-    context: { queryClient, apiClient, wsClient, settingsStore, sendMessage },
+    context: {
+      queryClient,
+      apiClient,
+      wsClient,
+      wsConnectionStore,
+      settingsStore,
+      sendMessage,
+      startRealtime: () => startRealtime(),
+    },
     defaultPreload: "intent",
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
@@ -37,11 +48,14 @@ export function getRouter() {
     queryClient,
   });
 
-  // ── Client-side WS bootstrap (runs once at router creation) ──
-  if (typeof window !== "undefined") {
-    wsClient.connect();
+  let stopRealtime = () => {};
 
-    setupWsQueryBridge({
+  startRealtime = () => {
+    if (typeof window === "undefined") return () => {};
+
+    stopRealtime();
+
+    const stopWsQueryBridge = setupWsQueryBridge({
       queryClient,
       wsClient,
       router,
@@ -51,8 +65,17 @@ export function getRouter() {
       },
     });
 
-    setupWsRouteSubscriptions(router, wsClient, queryClient);
-  }
+    const stopWsRouteSubscriptions = setupWsRouteSubscriptions(router, wsClient, queryClient);
+    const stopWsConnectionStore = wsConnectionStore.start();
+
+    stopRealtime = () => {
+      stopWsRouteSubscriptions();
+      stopWsQueryBridge();
+      stopWsConnectionStore();
+    };
+
+    return stopRealtime;
+  };
 
   return router;
 }
