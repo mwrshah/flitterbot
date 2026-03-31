@@ -8,7 +8,7 @@ export function formatStreamPrompt(
   streamId: string,
   agentMessage?: string,
 ): string {
-  const header = `[Stream: "${streamName}" (${streamId})] [NEW]`;
+  const header = `[Stream: "${streamName}" (${streamId})]`;
   const footer = "IMPORTANT: Before doing anything else, run /load2-w to load essential skills.";
   const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
 
