@@ -21,7 +21,7 @@ function getClient(apiKey: string): OpenAI {
 }
 
 export type ClassifyResult = {
-  workstream_id: string | null;
+  stream_id: string | null;
   reasoning: string;
 };
 
@@ -72,15 +72,15 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
       }
 
       const result = {
-        workstream_id: parsed.workstream_id || null,
+        stream_id: parsed.stream_id || null,
         reasoning: parsed.reasoning || "",
       };
       if (attempt > 1) {
         console.log("[router] Groq classification succeeded on attempt %d", attempt);
       }
       console.log(
-        "[router] classification: workstream_id=%s reasoning=%s",
-        result.workstream_id ?? "none",
+        "[router] classification: stream_id=%s reasoning=%s",
+        result.stream_id ?? "none",
         result.reasoning.slice(0, 120),
       );
       return result;

@@ -47,7 +47,7 @@ export function getRouter() {
       router,
       getDefaultSessionId: () => {
         const status = queryClient.getQueryData<StatusResponse>(["status"]);
-        return status?.pi?.default?.sessionId;
+        return status?.streamsAgent?.default?.sessionId;
       },
     });
 

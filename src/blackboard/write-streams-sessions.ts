@@ -1,10 +1,10 @@
-import type { PiSessionStatus } from "../contracts/index.ts";
+import type { StreamsSessionStatus } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 
-type PiSessionRecord = {
+type StreamsSessionRecord = {
   pi_session_id: string;
   role: string;
-  status?: PiSessionStatus;
+  status?: StreamsSessionStatus;
   runtime_instance_id?: string;
   pid?: number;
   session_file?: string;
@@ -18,10 +18,10 @@ type PiSessionRecord = {
   last_event_at: string;
   ended_at?: string;
   end_reason?: string;
-  workstream_id?: string;
+  stream_id?: string;
 };
 
-export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
+export function upsertStreamsSession(db: BlackboardDatabase, session: StreamsSessionRecord): void {
   db.prepare(
     `INSERT INTO pi_sessions (
        pi_session_id,
@@ -40,7 +40,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        last_event_at,
        ended_at,
        end_reason,
-       workstream_id,
+       stream_id,
        last_datetime_reported_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(pi_session_id) DO UPDATE SET
@@ -59,7 +59,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        last_event_at = MAX(pi_sessions.last_event_at, excluded.last_event_at),
        ended_at = COALESCE(excluded.ended_at, pi_sessions.ended_at),
        end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
-       workstream_id = COALESCE(excluded.workstream_id, pi_sessions.workstream_id),
+       stream_id = COALESCE(excluded.stream_id, pi_sessions.stream_id),
        last_datetime_reported_at = COALESCE(pi_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)`,
   ).run(
     session.pi_session_id,
@@ -78,19 +78,19 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
     session.last_event_at,
     session.ended_at ?? null,
     session.end_reason ?? null,
-    session.workstream_id ?? null,
+    session.stream_id ?? null,
     session.started_at,
   );
 }
 
-export function markPreviousPiSessionsInactive(
+export function markPreviousStreamsSessionsInactive(
   db: BlackboardDatabase,
   options: {
     role: string;
     runtimeInstanceId?: string;
     endedAt: string;
     endReason: string;
-    status?: Extract<PiSessionStatus, "ended" | "crashed">;
+    status?: Extract<StreamsSessionStatus, "ended" | "crashed">;
   },
 ): number {
   const result = db
@@ -117,12 +117,12 @@ export function markPreviousPiSessionsInactive(
   return Number(result.changes ?? 0);
 }
 
-export function touchPiSessionPrompt(
+export function touchStreamsSessionPrompt(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
   timestamp: string,
   status: Extract<
-    PiSessionStatus,
+    StreamsSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
@@ -134,15 +134,15 @@ export function touchPiSessionPrompt(
          ended_at = NULL,
          end_reason = NULL
      WHERE pi_session_id = ?`,
-  ).run(timestamp, timestamp, status, piSessionId);
+  ).run(timestamp, timestamp, status, streamsSessionId);
 }
 
-export function touchPiSessionEvent(
+export function touchStreamsSessionEvent(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
   timestamp: string,
   status: Extract<
-    PiSessionStatus,
+    StreamsSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
@@ -153,16 +153,16 @@ export function touchPiSessionEvent(
          ended_at = NULL,
          end_reason = NULL
      WHERE pi_session_id = ?`,
-  ).run(timestamp, status, piSessionId);
+  ).run(timestamp, status, streamsSessionId);
 }
 
 /**
- * Re-associate orphaned sessions whose pi_session_id points to an ended Pi session.
- * Moves them to the given new (active) Pi session.
+ * Re-associate orphaned sessions whose pi_session_id points to an ended streams session.
+ * Moves them to the given new (active) streams session.
  */
 export function reassociateOrphanedSessions(
   db: BlackboardDatabase,
-  newPiSessionId: string,
+  newStreamsSessionId: string,
 ): number {
   const result = db
     .prepare(
@@ -176,16 +176,16 @@ export function reassociateOrphanedSessions(
            SELECT pi_session_id FROM pi_sessions WHERE status IN ('ended', 'crashed')
          )`,
     )
-    .run(newPiSessionId, newPiSessionId);
+    .run(newStreamsSessionId, newStreamsSessionId);
 
   return Number(result.changes ?? 0);
 }
 
-export function closePiSession(
+export function closeStreamsSession(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
   options: {
-    status?: Extract<PiSessionStatus, "ended" | "crashed">;
+    status?: Extract<StreamsSessionStatus, "ended" | "crashed">;
     endedAt: string;
     endReason: string;
   },
@@ -202,6 +202,6 @@ export function closePiSession(
     options.endedAt,
     options.endReason,
     options.endedAt,
-    piSessionId,
+    streamsSessionId,
   );
 }

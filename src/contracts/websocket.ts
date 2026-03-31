@@ -140,8 +140,8 @@ export interface TurnEndWebSocketEvent {
   timestamp?: string;
 }
 
-export interface PiSurfacedWebSocketEvent {
-  type: "pi_surfaced";
+export interface StreamSurfacedWebSocketEvent {
+  type: "stream_surfaced";
   message: ChatTimelineMessage;
   sessionId?: string;
   streamId?: string;
@@ -173,15 +173,15 @@ export interface ErrorWebSocketEvent {
 
 export interface SessionsChangedWebSocketEvent {
   type: "sessions_changed";
-  /** equals piSessionId — used by broadcast() for subscription-scoped routing */
+  /** equals streamsSessionId — used by broadcast() for subscription-scoped routing */
   sessionId: string;
-  piSessionId: string;
+  streamsSessionId: string;
   reason: "registered" | "ended" | "stopped";
 }
 
 export interface WorktreeChangedWebSocketEvent {
   type: "worktree_changed";
-  piSessionId: string;
+  streamsSessionId: string;
   streamId: string;
 }
 
@@ -241,7 +241,7 @@ export type ControlSurfaceWebSocketServerEvent =
   | AutoCompactionEndWebSocketEvent
   | AutoRetryStartWebSocketEvent
   | AutoRetryEndWebSocketEvent
-  | PiSurfacedWebSocketEvent
+  | StreamSurfacedWebSocketEvent
   | StreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
   | SessionsChangedWebSocketEvent

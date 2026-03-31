@@ -1,11 +1,11 @@
-export const BLACKBOARD_SCHEMA_VERSION = 14;
+export const BLACKBOARD_SCHEMA_VERSION = 15;
 
 // --- Shared types used across multiple files ---
 
 export type MessageMetadata = {
   router_action?: string;
-  workstream_id?: string;
-  workstream_name?: string;
+  stream_id?: string;
+  stream_name?: string;
   _targetSessionId?: string;
   serverMessageId?: string;
   [key: string]: unknown;
@@ -13,8 +13,8 @@ export type MessageMetadata = {
 
 export type StreamRoutingMeta = {
   router_action?: string;
-  workstream_id?: string;
-  workstream_name?: string;
+  stream_id?: string;
+  stream_name?: string;
   _targetSessionId?: string;
 };
 
@@ -57,7 +57,7 @@ export type ActionResolutionPayload = {
 };
 
 export type ClaudeSessionStatus = "working" | "idle" | "stale" | "ended";
-export type PiSessionStatus =
+export type StreamsSessionStatus =
   | "active"
   | "waiting_for_user"
   | "waiting_for_sessions"
@@ -107,7 +107,7 @@ export interface ClaudeSessionRow {
   todoist_task_id: string | null;
   agent_managed: number | boolean | null;
   session_end_reason: string | null;
-  workstream_id: string | null;
+  stream_id: string | null;
   pi_session_id: string | null;
   started_at: string;
   ended_at: string | null;
@@ -144,7 +144,7 @@ export interface MessageRow {
   direction: UnifiedMessageDirection;
   content: string;
   sender: string | null;
-  workstream_id: string | null;
+  stream_id: string | null;
   pi_session_id: string | null;
   metadata: string | null;
   created_at: string;
@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS workstreams (
+CREATE TABLE IF NOT EXISTS streams (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     repo_path TEXT,
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     todoist_task_id TEXT,
     agent_managed BOOLEAN DEFAULT 0,
     session_end_reason TEXT,
-    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+    stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
     pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
     started_at DATETIME NOT NULL,
     ended_at DATETIME,
@@ -241,11 +241,11 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     last_event_at DATETIME NOT NULL,
     ended_at DATETIME,
     end_reason TEXT,
-    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+    stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
     last_datetime_reported_at DATETIME
 );
 
-CREATE INDEX IF NOT EXISTS idx_pi_sessions_workstream ON pi_sessions(workstream_id);
+CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS messages (
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,
-    workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+    stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
     pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
     metadata TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now'))
@@ -307,9 +307,9 @@ CREATE TABLE IF NOT EXISTS pending_actions (
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
 CREATE INDEX IF NOT EXISTS idx_sessions_last_event_at ON sessions(last_event_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_workstream ON sessions(workstream_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_stream ON sessions(stream_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
-CREATE INDEX IF NOT EXISTS idx_workstreams_name ON workstreams(name);
+CREATE INDEX IF NOT EXISTS idx_streams_name ON streams(name);
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_status ON pi_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_role_status ON pi_sessions(role, status);
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_last_event_at ON pi_sessions(last_event_at);
@@ -317,6 +317,6 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_status_created ON whatsapp_messages(stat
 CREATE INDEX IF NOT EXISTS idx_pending_actions_status_created ON pending_actions(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_messages_workstream ON messages(workstream_id);
+CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
 CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
 `;

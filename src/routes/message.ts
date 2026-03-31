@@ -61,14 +61,14 @@ async function routeMessage(
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
-    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultPiSessionId);
+    const defaultStreamsSessionId = runtime.sessionManager.getDefault()?.streamsSessionId;
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultStreamsSessionId);
     const meta: StreamRoutingMeta = {
       router_action: result.action,
     };
     if (result.stream) {
-      meta.workstream_id = result.stream.id;
-      meta.workstream_name = result.stream.name;
+      meta.stream_id = result.stream.id;
+      meta.stream_name = result.stream.name;
     }
     return { metadata: meta };
   } catch (error) {

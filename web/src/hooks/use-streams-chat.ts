@@ -37,9 +37,9 @@ export function useStreamsChat(sessionId: string | undefined, loaderHistory: Cha
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
-    if (!sessionId || !status?.streams) return false;
-    if (status.streams.default?.sessionId === sessionId) return !!status.streams.default.busy;
-    return !!status.streams.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
+    if (!sessionId || !status?.streamsAgent) return false;
+    if (status.streamsAgent.default?.sessionId === sessionId) return !!status.streamsAgent.default.busy;
+    return !!status.streamsAgent.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
   })();
 
   const effectiveSessionId = sessionId ?? "default";

@@ -17,12 +17,12 @@ export async function classifyMessage(
   message: string,
   db: BlackboardDatabase,
   apiKey: string,
-  defaultPiSessionId?: string,
+  defaultStreamsSessionId?: string,
 ): Promise<ClassificationResult> {
   const streams = listOpenStreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
-  const defaultConversation = defaultPiSessionId
-    ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
+  const defaultConversation = defaultStreamsSessionId
+    ? getRecentDefaultConversation(db, defaultStreamsSessionId, 10)
     : [];
   const prompt = buildClassificationPrompt(
     message,
@@ -47,8 +47,8 @@ export async function classifyMessage(
   }
 
   // Try to match existing open stream
-  if (result.workstream_id) {
-    const existing = streams.find((ws) => ws.id === result.workstream_id);
+  if (result.stream_id) {
+    const existing = streams.find((ws) => ws.id === result.stream_id);
     if (existing) {
       return { stream: existing, action: "matched" };
     }

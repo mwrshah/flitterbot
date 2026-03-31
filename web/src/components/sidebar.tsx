@@ -53,7 +53,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   const status = statusQuery.data;
-  const allStreams = status?.streams_list ?? [];
+  const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
   const closedStreams = allStreams.filter(
     (ws: StreamSummary) => ws.status === "closed",
@@ -87,12 +87,12 @@ export const Sidebar = memo(function Sidebar() {
               </p>
               <div className="space-y-1">
                 {openStreams
-                  .filter((ws) => ws.piSessionId)
+                  .filter((ws) => ws.streamsSessionId)
                   .map((ws) => (
                     <Link
                       key={ws.id}
                       to="/streams/$sessionId"
-                      params={{ sessionId: ws.piSessionId! }}
+                      params={{ sessionId: ws.streamsSessionId! }}
                       className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
                     >
                       <span className="truncate">{ws.name}</span>
@@ -112,12 +112,12 @@ export const Sidebar = memo(function Sidebar() {
               </p>
               <div className="space-y-1">
                 {closedStreams
-                  .filter((ws) => ws.piSessionId)
+                  .filter((ws) => ws.streamsSessionId)
                   .map((ws) => (
                     <Link
                       key={ws.id}
                       to="/streams/$sessionId"
-                      params={{ sessionId: ws.piSessionId! }}
+                      params={{ sessionId: ws.streamsSessionId! }}
                       className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
                     >
                       <span className="truncate">{ws.name}</span>

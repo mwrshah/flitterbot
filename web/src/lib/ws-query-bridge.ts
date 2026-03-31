@@ -237,14 +237,14 @@ export function setupWsQueryBridge(deps: {
     // ── sessions_changed ──
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
-        queryKey: ["streams-downstream-sessions", message.piSessionId],
+        queryKey: ["streams-downstream-sessions", message.streamsSessionId],
       });
       return;
     }
 
     // ── worktree_changed ──
     if (message.type === "worktree_changed") {
-      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.piSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.streamsSessionId] });
       return;
     }
 
@@ -395,8 +395,8 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── pi_surfaced → input surface Query cache ──
-    if (message.type === "pi_surfaced") {
+    // ── stream_surfaced → input surface Query cache ──
+    if (message.type === "stream_surfaced") {
       const surfacedMessage: ChatTimelineMessage = {
         ...message.message,
         streamId: message.message.streamId ?? message.streamId,

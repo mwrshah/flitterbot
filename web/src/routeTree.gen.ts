@@ -10,20 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RuntimeRouteImport } from './routes/runtime'
-import { Route as PiRouteRouteImport } from './routes/pi.route'
+import { Route as StreamsRouteRouteImport } from './routes/streams.route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PiIndexRouteImport } from './routes/pi.index'
-import { Route as PiDefaultRouteImport } from './routes/pi.default'
-import { Route as PiSessionIdRouteImport } from './routes/pi.$sessionId'
+import { Route as StreamsIndexRouteImport } from './routes/streams.index'
+import { Route as StreamsDefaultRouteImport } from './routes/streams.default'
+import { Route as StreamsSessionIdRouteImport } from './routes/streams.$sessionId'
 
 const RuntimeRoute = RuntimeRouteImport.update({
   id: '/runtime',
   path: '/runtime',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PiRouteRoute = PiRouteRouteImport.update({
-  id: '/pi',
-  path: '/pi',
+const StreamsRouteRoute = StreamsRouteRouteImport.update({
+  id: '/streams',
+  path: '/streams',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,70 +31,70 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PiIndexRoute = PiIndexRouteImport.update({
+const StreamsIndexRoute = StreamsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => PiRouteRoute,
+  getParentRoute: () => StreamsRouteRoute,
 } as any)
-const PiDefaultRoute = PiDefaultRouteImport.update({
+const StreamsDefaultRoute = StreamsDefaultRouteImport.update({
   id: '/default',
   path: '/default',
-  getParentRoute: () => PiRouteRoute,
+  getParentRoute: () => StreamsRouteRoute,
 } as any)
-const PiSessionIdRoute = PiSessionIdRouteImport.update({
+const StreamsSessionIdRoute = StreamsSessionIdRouteImport.update({
   id: '/$sessionId',
   path: '/$sessionId',
-  getParentRoute: () => PiRouteRoute,
+  getParentRoute: () => StreamsRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/pi': typeof PiRouteRouteWithChildren
+  '/streams': typeof StreamsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/pi/': typeof PiIndexRoute
+  '/streams/$sessionId': typeof StreamsSessionIdRoute
+  '/streams/default': typeof StreamsDefaultRoute
+  '/streams/': typeof StreamsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/pi': typeof PiIndexRoute
+  '/streams/$sessionId': typeof StreamsSessionIdRoute
+  '/streams/default': typeof StreamsDefaultRoute
+  '/streams': typeof StreamsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/pi': typeof PiRouteRouteWithChildren
+  '/streams': typeof StreamsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
-  '/pi/$sessionId': typeof PiSessionIdRoute
-  '/pi/default': typeof PiDefaultRoute
-  '/pi/': typeof PiIndexRoute
+  '/streams/$sessionId': typeof StreamsSessionIdRoute
+  '/streams/default': typeof StreamsDefaultRoute
+  '/streams/': typeof StreamsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/pi'
+    | '/streams'
     | '/runtime'
-    | '/pi/$sessionId'
-    | '/pi/default'
-    | '/pi/'
+    | '/streams/$sessionId'
+    | '/streams/default'
+    | '/streams/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/runtime' | '/pi/$sessionId' | '/pi/default' | '/pi'
+  to: '/' | '/runtime' | '/streams/$sessionId' | '/streams/default' | '/streams'
   id:
     | '__root__'
     | '/'
-    | '/pi'
+    | '/streams'
     | '/runtime'
-    | '/pi/$sessionId'
-    | '/pi/default'
-    | '/pi/'
+    | '/streams/$sessionId'
+    | '/streams/default'
+    | '/streams/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  PiRouteRoute: typeof PiRouteRouteWithChildren
+  StreamsRouteRoute: typeof StreamsRouteRouteWithChildren
   RuntimeRoute: typeof RuntimeRoute
 }
 
@@ -107,11 +107,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RuntimeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/pi': {
-      id: '/pi'
-      path: '/pi'
-      fullPath: '/pi'
-      preLoaderRoute: typeof PiRouteRouteImport
+    '/streams': {
+      id: '/streams'
+      path: '/streams'
+      fullPath: '/streams'
+      preLoaderRoute: typeof StreamsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -121,48 +121,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/pi/': {
-      id: '/pi/'
+    '/streams/': {
+      id: '/streams/'
       path: '/'
-      fullPath: '/pi/'
-      preLoaderRoute: typeof PiIndexRouteImport
-      parentRoute: typeof PiRouteRoute
+      fullPath: '/streams/'
+      preLoaderRoute: typeof StreamsIndexRouteImport
+      parentRoute: typeof StreamsRouteRoute
     }
-    '/pi/default': {
-      id: '/pi/default'
+    '/streams/default': {
+      id: '/streams/default'
       path: '/default'
-      fullPath: '/pi/default'
-      preLoaderRoute: typeof PiDefaultRouteImport
-      parentRoute: typeof PiRouteRoute
+      fullPath: '/streams/default'
+      preLoaderRoute: typeof StreamsDefaultRouteImport
+      parentRoute: typeof StreamsRouteRoute
     }
-    '/pi/$sessionId': {
-      id: '/pi/$sessionId'
+    '/streams/$sessionId': {
+      id: '/streams/$sessionId'
       path: '/$sessionId'
-      fullPath: '/pi/$sessionId'
-      preLoaderRoute: typeof PiSessionIdRouteImport
-      parentRoute: typeof PiRouteRoute
+      fullPath: '/streams/$sessionId'
+      preLoaderRoute: typeof StreamsSessionIdRouteImport
+      parentRoute: typeof StreamsRouteRoute
     }
   }
 }
 
-interface PiRouteRouteChildren {
-  PiSessionIdRoute: typeof PiSessionIdRoute
-  PiDefaultRoute: typeof PiDefaultRoute
-  PiIndexRoute: typeof PiIndexRoute
+interface StreamsRouteRouteChildren {
+  StreamsSessionIdRoute: typeof StreamsSessionIdRoute
+  StreamsDefaultRoute: typeof StreamsDefaultRoute
+  StreamsIndexRoute: typeof StreamsIndexRoute
 }
 
-const PiRouteRouteChildren: PiRouteRouteChildren = {
-  PiSessionIdRoute: PiSessionIdRoute,
-  PiDefaultRoute: PiDefaultRoute,
-  PiIndexRoute: PiIndexRoute,
+const StreamsRouteRouteChildren: StreamsRouteRouteChildren = {
+  StreamsSessionIdRoute: StreamsSessionIdRoute,
+  StreamsDefaultRoute: StreamsDefaultRoute,
+  StreamsIndexRoute: StreamsIndexRoute,
 }
 
-const PiRouteRouteWithChildren =
-  PiRouteRoute._addFileChildren(PiRouteRouteChildren)
+const StreamsRouteRouteWithChildren =
+  StreamsRouteRoute._addFileChildren(StreamsRouteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  PiRouteRoute: PiRouteRouteWithChildren,
+  StreamsRouteRoute: StreamsRouteRouteWithChildren,
   RuntimeRoute: RuntimeRoute,
 }
 export const routeTree = rootRouteImport

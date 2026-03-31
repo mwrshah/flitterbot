@@ -17,15 +17,15 @@ export const Route = createFileRoute("/streams/default")({
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const defaultSessionId = status.streams?.default?.sessionId;
+    const defaultSessionId = status.streamsAgent?.default?.sessionId;
     const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
     // Seed the Query cache under the real sessionId when available.
     if (defaultSessionId) {
       const [sessions, worktree] = await Promise.all([
-        fetchStreamsSessions({ data: { piSessionId: defaultSessionId } }).catch(() => []),
-        fetchStreamsWorktree({ data: { piSessionId: defaultSessionId } }).catch(() => null),
+        fetchStreamsSessions({ data: { streamsSessionId: defaultSessionId } }).catch(() => []),
+        fetchStreamsWorktree({ data: { streamsSessionId: defaultSessionId } }).catch(() => null),
       ]);
       context.queryClient.setQueryData(["streams-history", defaultSessionId, "agent"], history);
       context.queryClient.setQueryData(["streams-downstream-sessions", defaultSessionId], sessions);
@@ -49,7 +49,7 @@ function StreamsDefaultRoute() {
   // updates when the default Streams session restarts with a new ID, rather than
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const defaultSessionId = status?.streams?.default?.sessionId;
+  const defaultSessionId = status?.streamsAgent?.default?.sessionId;
   const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = useStreamsChat(
     defaultSessionId,
     history,
@@ -68,7 +68,7 @@ function StreamsDefaultRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel piSessionId={effectiveSessionId} />
+        <DownstreamSessionsPanel streamsSessionId={effectiveSessionId} />
       </Panel>
     </PanelGroup>
   );

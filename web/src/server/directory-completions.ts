@@ -5,10 +5,10 @@ const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
 
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
-  .inputValidator((input: { path: string; piSessionId?: string }) => input)
+  .inputValidator((input: { path: string; streamsSessionId?: string }) => input)
   .handler(async ({ data }): Promise<DirectoryCompletionItem[]> => {
     const params = new URLSearchParams({ path: data.path });
-    if (data.piSessionId) params.set("piSessionId", data.piSessionId);
+    if (data.streamsSessionId) params.set("streamsSessionId", data.streamsSessionId);
 
     const url = `${BASE_URL.replace(/\/$/, "")}/api/directory-completions?${params}`;
     const headers: Record<string, string> = {

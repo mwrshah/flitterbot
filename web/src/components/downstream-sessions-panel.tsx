@@ -52,15 +52,15 @@ function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.streamName ?? "no stream";
 }
 
-export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string | undefined }) {
+export function DownstreamSessionsPanel({ streamsSessionId }: { streamsSessionId: string | undefined }) {
   const { data, isPending, isError } = useQuery(
-    streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
+    streamsDownstreamSessionsQueryOptions(streamsSessionId ?? ""),
   );
 
-  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
+  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(streamsSessionId ?? ""));
   const worktree = worktreeQuery.data;
 
-  if (!piSessionId) {
+  if (!streamsSessionId) {
     return (
       <div className="flex flex-col h-full border-l border-border bg-background">
         <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">

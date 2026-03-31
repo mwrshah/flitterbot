@@ -57,7 +57,7 @@ function StreamsSessionRoute() {
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const stream = status?.streams_list?.find((ws) => ws.piSessionId === sessionId);
+  const stream = status?.streams?.find((ws) => ws.streamsSessionId === sessionId);
   const isStreamClosed = stream?.status === "closed";
 
   const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = useStreamsChat(
@@ -80,7 +80,7 @@ function StreamsSessionRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel piSessionId={sessionId} />
+        <DownstreamSessionsPanel streamsSessionId={sessionId} />
       </Panel>
     </PanelGroup>
   );

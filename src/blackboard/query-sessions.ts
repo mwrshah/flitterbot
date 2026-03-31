@@ -18,7 +18,7 @@ export interface SessionStartPayload {
   task_description?: string;
   todoist_task_id?: string;
   pi_session_id?: string;
-  workstream_id?: string;
+  stream_id?: string;
 }
 
 function textOrNull(value: unknown): string | null {
@@ -72,8 +72,8 @@ function mapSessionRow(row: ClaudeSessionRow): SessionListItem {
     todoistTaskId: row.todoist_task_id,
     agentManaged: Boolean(row.agent_managed),
     sessionEndReason: row.session_end_reason,
-    streamId: row.workstream_id,
-    piSessionId: row.pi_session_id,
+    streamId: row.stream_id,
+    streamsSessionId: row.pi_session_id,
     startedAt: row.started_at,
     endedAt: row.ended_at,
     lastEventAt: row.last_event_at,
@@ -255,7 +255,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
        session_id, tmux_session, cwd, project, project_label,
        model, permission_mode, source, status, transcript_path,
        task_description, todoist_task_id, agent_managed,
-       pi_session_id, workstream_id, started_at, last_event_at
+       pi_session_id, stream_id, started_at, last_event_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(session_id) DO UPDATE SET
        tmux_session = COALESCE(excluded.tmux_session, sessions.tmux_session),
@@ -274,7 +274,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
          ELSE sessions.agent_managed
        END,
        pi_session_id = COALESCE(excluded.pi_session_id, sessions.pi_session_id),
-       workstream_id = COALESCE(excluded.workstream_id, sessions.workstream_id),
+       stream_id = COALESCE(excluded.stream_id, sessions.stream_id),
        started_at = MIN(sessions.started_at, excluded.started_at),
        last_event_at = MAX(sessions.last_event_at, excluded.last_event_at)`,
   ).run(
@@ -291,7 +291,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
     textOrNull(payload.todoist_task_id),
     payload.agent_managed ? 1 : 0,
     textOrNull(payload.pi_session_id),
-    textOrNull(payload.workstream_id),
+    textOrNull(payload.stream_id),
     ts,
     ts,
   );
@@ -313,7 +313,7 @@ export function updateSessionStop(db: BlackboardDatabase, sessionId: string): vo
 
 export function getActiveManagedSessionsByPi(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
 ): SessionListItem[] {
   const rows = db.all<ClaudeSessionRow>(
     `SELECT *
@@ -322,33 +322,33 @@ export function getActiveManagedSessionsByPi(
          AND status IN ('working', 'idle')
          AND agent_managed = 1
        ORDER BY last_event_at DESC`,
-    piSessionId,
+    streamsSessionId,
   );
   return rows.map(mapSessionRow);
 }
 
 interface ClaudeSessionWithStreamRow extends ClaudeSessionRow {
-  workstream_name: string | null;
+  stream_name: string | null;
 }
 
-export function getSessionsByPiSessionId(
+export function getSessionsByStreamsSessionId(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
 ): DownstreamSessionItem[] {
   const rows = db.all<ClaudeSessionWithStreamRow>(
-    `SELECT s.*, w.name AS workstream_name
+    `SELECT s.*, w.name AS stream_name
        FROM sessions s
-       LEFT JOIN workstreams w ON s.workstream_id = w.id
+       LEFT JOIN streams w ON s.stream_id = w.id
        WHERE s.pi_session_id = ?
          AND s.status != 'ended'
        ORDER BY s.last_event_at DESC`,
-    piSessionId,
+    streamsSessionId,
   );
   return rows.map((row) => ({
     sessionId: row.session_id,
     status: row.status,
-    streamId: row.workstream_id,
-    streamName: row.workstream_name,
+    streamId: row.stream_id,
+    streamName: row.stream_name,
     tmuxSession: row.tmux_session,
     cwd: row.cwd ?? null,
     taskDescription: row.task_description ?? null,
@@ -358,7 +358,7 @@ export function getSessionsByPiSessionId(
 
 export function countActiveManagedSessionsByPi(
   db: BlackboardDatabase,
-  piSessionId: string,
+  streamsSessionId: string,
 ): number {
   const row = db.get<CountRow>(
     `SELECT COUNT(*) AS count
@@ -366,7 +366,7 @@ export function countActiveManagedSessionsByPi(
        WHERE pi_session_id = ?
          AND status IN ('working', 'idle')
          AND agent_managed = 1`,
-    piSessionId,
+    streamsSessionId,
   );
   return Number(row?.count ?? 0);
 }

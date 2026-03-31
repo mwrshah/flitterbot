@@ -3,7 +3,7 @@ import type { AnyRouter } from "@tanstack/react-router";
 import type { StatusResponse } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
 
-const INPUT_SURFACE_EVENT_TYPES = ["pi_surfaced"];
+const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
 type WsMode = "surface" | "streams-default" | "streams-session";
 
@@ -19,7 +19,7 @@ type MatchWithWsData = {
 };
 
 function defaultStreamsSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.streams?.default?.sessionId;
+  return queryClient.getQueryData<StatusResponse>(["status"])?.streamsAgent?.default?.sessionId;
 }
 
 function resolveSubscriptionTarget(
