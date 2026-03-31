@@ -187,7 +187,7 @@ export async function executeCloseStream(
     if (session.tmux_session) {
       await killTmuxSession(session.tmux_session);
     }
-    markSessionEnded(blackboard, session.session_id, "workstream_closed");
+    markSessionEnded(blackboard, session.session_id, "stream_closed");
     sessionsKilled++;
   }
 
@@ -233,7 +233,7 @@ export async function executeCloseStream(
 
   // Step 2: Close stream and end Pi session (worktree left on disk)
   closeStream(blackboard, streamId);
-  endStreamsSession(blackboard, streamsSessionId, "ended", "workstream_closed");
+  endStreamsSession(blackboard, streamsSessionId, "ended", "stream_closed");
 
   const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
