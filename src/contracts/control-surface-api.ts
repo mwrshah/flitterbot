@@ -59,7 +59,7 @@ export interface ClaudeSessionListItem {
   agentManaged: boolean;
   sessionEndReason: string | null;
   streamId: string | null;
-  streamsSessionId: string | null;
+  streamSessionId: string | null;
   startedAt: string;
   endedAt: string | null;
   lastEventAt: string;
@@ -76,7 +76,7 @@ export interface StreamsOrchestratorStatus {
   busy: boolean;
 }
 
-export interface StreamsMultiSessionStatus {
+export interface StreamMultiSessionStatus {
   default: StreamsRuntimeStatus | null;
   orchestrators: StreamsOrchestratorStatus[];
 }
@@ -88,7 +88,7 @@ export interface StreamSummary {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  streamsSessionId?: string;
+  streamSessionId?: string;
   sessionCount: number;
   createdAt: string;
 }
@@ -97,7 +97,7 @@ export interface StatusResponse {
   ok: true;
   pid: number;
   uptime: number;
-  streamsAgent: StreamsMultiSessionStatus;
+  streamAgent: StreamMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
@@ -153,7 +153,7 @@ export interface DownstreamSessionItem {
   project: string | null;
 }
 
-export interface StreamsSessionsListResponse {
+export interface StreamSessionsListResponse {
   items: DownstreamSessionItem[];
 }
 
@@ -234,9 +234,9 @@ export interface StopResponse {
   message: string;
 }
 
-export interface StreamsSessionInterruptResponse {
+export interface StreamSessionInterruptResponse {
   ok: boolean;
-  streamsSessionId?: string;
+  streamSessionId?: string;
   signaledSessions?: number;
   error?: string;
 }
@@ -324,14 +324,14 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/cron/tick",
     auth: "bearer",
   },
-  streamsSessions: {
+  streamSessions: {
     method: "GET",
-    path: "/api/stream-sessions/:streamsSessionId/sessions",
+    path: "/api/stream-sessions/:streamSessionId/sessions",
     auth: "none",
   },
-  streamsSessionInterrupt: {
+  streamSessionInterrupt: {
     method: "POST",
-    path: "/api/stream-sessions/:streamsSessionId/interrupt",
+    path: "/api/stream-sessions/:streamSessionId/interrupt",
     auth: "bearer",
   },
   directoryCompletions: {

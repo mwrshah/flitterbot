@@ -5,7 +5,7 @@ import type { AutonomaWsClient } from "~/lib/ws";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
-type WsMode = "surface" | "streams-default" | "streams-session";
+type WsMode = "surface" | "streams-default" | "stream-session";
 
 type SubscriptionTarget = {
   sessionId: string;
@@ -18,8 +18,8 @@ type MatchWithWsData = {
   loaderData?: { defaultSessionId?: string };
 };
 
-function defaultStreamsSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.streamsAgent?.default?.sessionId;
+function defaultStreamSessionIdFromCache(queryClient: QueryClient): string | undefined {
+  return queryClient.getQueryData<StatusResponse>(["status"])?.streamAgent?.default?.sessionId;
 }
 
 function resolveSubscriptionTarget(
@@ -37,10 +37,10 @@ function resolveSubscriptionTarget(
       // Prefer the live cache value over stale loader data — the default Streams
       // session may have restarted with a new sessionId since the loader ran.
       const sessionId =
-        defaultStreamsSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
+        defaultStreamSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
       return sessionId ? { sessionId } : null;
     }
-    case "streams-session":
+    case "stream-session":
       return activeMatch.params?.sessionId ? { sessionId: activeMatch.params.sessionId } : null;
     default:
       return null;

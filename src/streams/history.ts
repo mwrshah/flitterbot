@@ -14,10 +14,10 @@ type StreamsHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[num
 
 /**
  * Known bracket prefixes that map to MessageSource values.
- * Hook and cron embed their own prefixes; web/whatsapp/agent/init/pi_outbound
+ * Hook and cron embed their own prefixes; web/whatsapp/agent/init/stream_outbound
  * are added by formatPromptWithContext.
  */
-const SOURCE_PREFIX_RE = /^\[(web|whatsapp|hook|cron|init|agent|pi_outbound)\]\s*/i;
+const SOURCE_PREFIX_RE = /^\[(web|whatsapp|hook|cron|init|agent|stream_outbound)\]\s*/i;
 
 function extractSource(text: string): { source: MessageSource | undefined; content: string } {
   const match = SOURCE_PREFIX_RE.exec(text);

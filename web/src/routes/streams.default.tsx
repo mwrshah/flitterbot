@@ -6,7 +6,7 @@ import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel"
 import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchStreamsHistory, fetchStreamsSessions, fetchStreamsWorktree } from "~/server/streams";
+import { fetchStreamsHistory, fetchStreamSessions, fetchStreamsWorktree } from "~/server/streams";
 
 export const Route = createFileRoute("/streams/default")({
   staticData: {
@@ -17,15 +17,15 @@ export const Route = createFileRoute("/streams/default")({
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const defaultSessionId = status.streamsAgent?.default?.sessionId;
+    const defaultSessionId = status.streamAgent?.default?.sessionId;
     const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
     // Seed the Query cache under the real sessionId when available.
     if (defaultSessionId) {
       const [sessions, worktree] = await Promise.all([
-        fetchStreamsSessions({ data: { streamsSessionId: defaultSessionId } }).catch(() => []),
-        fetchStreamsWorktree({ data: { streamsSessionId: defaultSessionId } }).catch(() => null),
+        fetchStreamSessions({ data: { streamSessionId: defaultSessionId } }).catch(() => []),
+        fetchStreamsWorktree({ data: { streamSessionId: defaultSessionId } }).catch(() => null),
       ]);
       context.queryClient.setQueryData(["streams-history", defaultSessionId, "agent"], history);
       context.queryClient.setQueryData(["streams-downstream-sessions", defaultSessionId], sessions);
@@ -49,7 +49,7 @@ function StreamsDefaultRoute() {
   // updates when the default Streams session restarts with a new ID, rather than
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const defaultSessionId = status?.streamsAgent?.default?.sessionId;
+  const defaultSessionId = status?.streamAgent?.default?.sessionId;
   const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
     useStreamsChat(defaultSessionId, history);
 
@@ -66,7 +66,7 @@ function StreamsDefaultRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel streamsSessionId={effectiveSessionId} />
+        <DownstreamSessionsPanel streamSessionId={effectiveSessionId} />
       </Panel>
     </PanelGroup>
   );

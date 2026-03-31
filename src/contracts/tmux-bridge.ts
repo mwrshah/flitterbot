@@ -28,7 +28,7 @@ export interface LaunchClaudeSessionInput {
   sessionName?: string;
   taskDescription?: string;
   todoistTaskId?: string;
-  streamsSessionId?: string;
+  streamSessionId?: string;
   streamId?: string;
   claudeCommand?: string;
   extraArgs?: string[];

@@ -130,8 +130,8 @@ status_is_ok() {
   " "$body" 2>/dev/null
 }
 
-# Check if JSON body indicates an active Pi session
-status_has_active_pi() {
+# Check if JSON body indicates an active streams session
+status_has_active_stream() {
   local body="$1"
   if ! status_is_ok "$body"; then
     return 1
@@ -140,13 +140,13 @@ status_has_active_pi() {
   node -e "
     try {
       const s = JSON.parse(process.argv[1]);
-      const d = s.pi && s.pi.default;
+      const d = s.streamAgent && s.streamAgent.default;
       process.exit(d && d.sessionId ? 0 : 1);
     } catch { process.exit(1); }
   " "$body" 2>/dev/null
 }
 
-wait_for_active_pi() {
+wait_for_active_stream() {
   local host="$1"
   local port="$2"
   local timeout_seconds="$3"
@@ -155,7 +155,7 @@ wait_for_active_pi() {
   while (( SECONDS < deadline )); do
     local body=""
     body=$(curl_status_json "$host" "$port" 2>/dev/null || true)
-    if status_has_active_pi "$body"; then
+    if status_has_active_stream "$body"; then
       return 0
     fi
     sleep 1

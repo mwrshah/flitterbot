@@ -13,7 +13,7 @@ type StreamsRuntimeSnapshot = Omit<
   currentTurnStartedAt?: string;
 };
 
-export class StreamsSessionState {
+export class StreamSessionState {
   private snapshot: StreamsRuntimeSnapshot = {
     messageCount: 0,
     busy: false,

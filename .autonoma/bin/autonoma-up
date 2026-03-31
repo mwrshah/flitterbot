@@ -126,7 +126,7 @@ status_body() {
 is_healthy() {
   local body=""
   body=$(status_body)
-  status_has_active_pi "$body"
+  status_has_active_stream "$body"
 }
 
 acquire_lock() {
@@ -348,7 +348,7 @@ start_runtime() {
     append_log "$LOG_FILE" "WARN" "managed control surface pid=$existing_pid is unhealthy; restarting"
     stop_runtime || true
   elif status_is_ok "$existing_body"; then
-    append_log "$LOG_FILE" "WARN" "control surface is reachable but Pi is not active; restarting runtime"
+    append_log "$LOG_FILE" "WARN" "control surface is reachable but streams agent is not active; restarting runtime"
     stop_runtime || true
   fi
 
@@ -373,7 +373,7 @@ start_runtime() {
   for attempt in 1 2 3; do
     if pid=$(start_once "$command"); then
       write_state_file "$attempt" "$pid" "$command"
-      if wait_for_active_pi "$(host)" "$current_port" 30; then
+      if wait_for_active_stream "$(host)" "$current_port" 30; then
         append_log "$LOG_FILE" "INFO" "control surface ready pid=$pid attempt=$attempt"
         printf 'started\n'
         return 0
@@ -400,7 +400,7 @@ print_status() {
   local pid=""
   pid=$(managed_pid || true)
 
-  if status_has_active_pi "$body"; then
+  if status_has_active_stream "$body"; then
     printf 'running pid=%s healthy=true\n' "${pid:-unknown}"
   elif [[ -n "$pid" ]] && is_pid_running "$pid"; then
     printf 'running pid=%s healthy=false\n' "$pid"

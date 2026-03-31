@@ -173,15 +173,15 @@ export interface ErrorWebSocketEvent {
 
 export interface SessionsChangedWebSocketEvent {
   type: "sessions_changed";
-  /** equals streamsSessionId — used by broadcast() for subscription-scoped routing */
+  /** equals streamSessionId — used by broadcast() for subscription-scoped routing */
   sessionId: string;
-  streamsSessionId: string;
+  streamSessionId: string;
   reason: "registered" | "ended" | "stopped";
 }
 
 export interface WorktreeChangedWebSocketEvent {
   type: "worktree_changed";
-  streamsSessionId: string;
+  streamSessionId: string;
   streamId: string;
 }
 

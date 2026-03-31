@@ -821,7 +821,216 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 15) {
     applyV15Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 16) {
+    applyV16Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 17) {
+    applyV17Migration(db);
   }
 
   return getSchemaVersion(db);
+}
+
+/**
+ * V16: Rename pi_sessions → stream_sessions table and pi_session_id → stream_session_id columns.
+ * Affects: pi_sessions, sessions (FK column), messages (FK column), message_id_map (column).
+ */
+function applyV16Migration(db: DatabaseSync): void {
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    // 1. Rename pi_sessions table → stream_sessions, rename pi_session_id → stream_session_id
+    db.exec(`
+      CREATE TABLE stream_sessions (
+          stream_session_id TEXT PRIMARY KEY,
+          role TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active'
+            CHECK (status IN ('active', 'waiting_for_user', 'waiting_for_sessions', 'ended', 'crashed')),
+          runtime_instance_id TEXT,
+          pid INTEGER,
+          session_file TEXT,
+          cwd TEXT NOT NULL,
+          agent_dir TEXT,
+          model_provider TEXT,
+          model_id TEXT,
+          thinking_level TEXT,
+          started_at DATETIME NOT NULL,
+          last_prompt_at DATETIME,
+          last_event_at DATETIME NOT NULL,
+          ended_at DATETIME,
+          end_reason TEXT,
+          stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
+          last_datetime_reported_at DATETIME
+      );
+
+      INSERT INTO stream_sessions
+        SELECT pi_session_id, role, status, runtime_instance_id, pid, session_file,
+               cwd, agent_dir, model_provider, model_id, thinking_level,
+               started_at, last_prompt_at, last_event_at, ended_at, end_reason,
+               stream_id, last_datetime_reported_at
+        FROM pi_sessions;
+
+      DROP TABLE pi_sessions;
+
+      CREATE INDEX IF NOT EXISTS idx_stream_sessions_status ON stream_sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_stream_sessions_role_status ON stream_sessions(role, status);
+      CREATE INDEX IF NOT EXISTS idx_stream_sessions_last_event_at ON stream_sessions(last_event_at);
+      CREATE INDEX IF NOT EXISTS idx_stream_sessions_stream ON stream_sessions(stream_id);
+    `);
+
+    // 2. Recreate sessions with stream_session_id instead of pi_session_id
+    db.exec(`
+      CREATE TABLE sessions_v16 (
+          session_id TEXT PRIMARY KEY,
+          tmux_session TEXT,
+          cwd TEXT NOT NULL,
+          project TEXT NOT NULL,
+          project_label TEXT,
+          model TEXT,
+          permission_mode TEXT,
+          source TEXT,
+          status TEXT NOT NULL DEFAULT 'working'
+            CHECK (status IN ('working', 'idle', 'stale', 'ended')),
+          transcript_path TEXT,
+          task_description TEXT,
+          todoist_task_id TEXT,
+          agent_managed BOOLEAN DEFAULT 0,
+          session_end_reason TEXT,
+          stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
+          stream_session_id TEXT REFERENCES stream_sessions(stream_session_id) ON DELETE SET NULL,
+          started_at DATETIME NOT NULL,
+          ended_at DATETIME,
+          last_event_at DATETIME NOT NULL,
+          last_tool_started_at DATETIME
+      );
+
+      INSERT INTO sessions_v16
+        SELECT session_id, tmux_session, cwd, project, project_label,
+               model, permission_mode, source, status, transcript_path,
+               task_description, todoist_task_id, agent_managed, session_end_reason,
+               stream_id, pi_session_id, started_at, ended_at,
+               last_event_at, last_tool_started_at
+        FROM sessions;
+
+      DROP TABLE sessions;
+      ALTER TABLE sessions_v16 RENAME TO sessions;
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
+      CREATE INDEX IF NOT EXISTS idx_sessions_last_event_at ON sessions(last_event_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_stream ON sessions(stream_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_stream_session ON sessions(stream_session_id);
+    `);
+
+    // 3. Recreate messages with stream_session_id instead of pi_session_id
+    db.exec(`
+      CREATE TABLE messages_v16 (
+          id TEXT PRIMARY KEY,
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          content TEXT NOT NULL,
+          sender TEXT,
+          stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
+          stream_session_id TEXT REFERENCES stream_sessions(stream_session_id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO messages_v16
+        SELECT id, source, direction, content, sender, stream_id,
+               pi_session_id, metadata, created_at
+        FROM messages;
+
+      DROP TABLE messages;
+      ALTER TABLE messages_v16 RENAME TO messages;
+
+      CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_stream_session ON messages(stream_session_id);
+    `);
+
+    // 4. Recreate message_id_map with stream_session_id instead of pi_session_id
+    db.exec(`
+      CREATE TABLE message_id_map_v16 (
+          server_id TEXT PRIMARY KEY,
+          agent_id TEXT,
+          stream_session_id TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO message_id_map_v16
+        SELECT server_id, agent_id, pi_session_id, created_at
+        FROM message_id_map;
+
+      DROP TABLE message_id_map;
+      ALTER TABLE message_id_map_v16 RENAME TO message_id_map;
+
+      CREATE INDEX IF NOT EXISTS idx_message_id_map_agent ON message_id_map(agent_id);
+    `);
+
+    db.exec(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (16);`);
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys=ON;");
+  }
+}
+
+/**
+ * V17: Rename pi_outbound → stream_outbound in messages source CHECK constraint.
+ */
+function applyV17Migration(db: DatabaseSync): void {
+  db.exec("PRAGMA foreign_keys=OFF;");
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    // Recreate messages table with updated CHECK constraint,
+    // transforming pi_outbound → stream_outbound during the INSERT
+    // (can't UPDATE in-place — old CHECK constraint rejects 'stream_outbound')
+    db.exec(`
+      CREATE TABLE messages_v17 (
+          id TEXT PRIMARY KEY,
+          source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'stream_outbound')),
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          content TEXT NOT NULL,
+          sender TEXT,
+          stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
+          stream_session_id TEXT REFERENCES stream_sessions(stream_session_id) ON DELETE SET NULL,
+          metadata TEXT,
+          created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO messages_v17
+        SELECT id,
+               CASE WHEN source = 'pi_outbound' THEN 'stream_outbound' ELSE source END,
+               direction, content, sender, stream_id,
+               stream_session_id, metadata, created_at
+        FROM messages;
+
+      DROP TABLE messages;
+      ALTER TABLE messages_v17 RENAME TO messages;
+
+      CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_stream_session ON messages(stream_session_id);
+    `);
+
+    db.exec(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (17);`);
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys=ON;");
+  }
 }

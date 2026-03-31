@@ -1,7 +1,7 @@
 import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
 import {
-  getLatestStreamsSessionId,
+  getLatestStreamSessionId,
   listRecentlyClosedStreams,
 } from "../blackboard/query-streams.ts";
 import type {
@@ -11,11 +11,11 @@ import type {
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readStreamsHistory, readStreamsHistoryFromMessages } from "../streams/history.ts";
-import type { ManagedStreamsSession } from "../streams/session-manager.ts";
+import type { ManagedStreamSession } from "../streams/session-manager.ts";
 import { sendJson } from "./_shared.ts";
 
 async function readSessionHistory(
-  managed: ManagedStreamsSession,
+  managed: ManagedStreamSession,
   historyMode: "input" | "agent",
 ): Promise<ChatTimelineItem[]> {
   const snapshot = managed.state.getSnapshot();
@@ -71,20 +71,20 @@ export async function handleBrowserStreamsHistoryRoute(
 ) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
-  const streamsSessionId = url.searchParams.get("streamsSessionId");
+  const streamSessionId = url.searchParams.get("streamSessionId");
 
   try {
     return await handleBrowserStreamsHistoryRouteInner(
       runtime,
       response,
       historyMode,
-      streamsSessionId,
+      streamSessionId,
     );
   } catch (err) {
-    const ctx = streamsSessionId ? `streamsSessionId=${streamsSessionId}` : "aggregated";
+    const ctx = streamSessionId ? `streamSessionId=${streamSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
     const body: StreamsHistoryResponse = {
-      sessionId: streamsSessionId,
+      sessionId: streamSessionId,
       sessionFile: null,
       items: [],
     };
@@ -96,25 +96,25 @@ async function handleBrowserStreamsHistoryRouteInner(
   runtime: ControlSurfaceRuntime,
   response: http.ServerResponse,
   historyMode: "input" | "agent",
-  streamsSessionId: string | null,
+  streamSessionId: string | null,
 ) {
   // Surface with no specific session — read from the messages table
-  if (historyMode === "input" && !streamsSessionId) {
-    // Collect all relevant streams_session_ids: default + active orchestrators + recently-closed streams
-    const streamsSessionIds: string[] = [];
-    const defaultStreamsSessionId = runtime.sessionManager.getDefault()?.streamsSessionId;
-    if (defaultStreamsSessionId) streamsSessionIds.push(defaultStreamsSessionId);
+  if (historyMode === "input" && !streamSessionId) {
+    // Collect all relevant stream_session_ids: default + active orchestrators + recently-closed streams
+    const streamSessionIds: string[] = [];
+    const defaultStreamSessionId = runtime.sessionManager.getDefault()?.streamSessionId;
+    if (defaultStreamSessionId) streamSessionIds.push(defaultStreamSessionId);
     for (const orch of runtime.sessionManager.listOrchestrators()) {
-      if (orch.streamsSessionId) streamsSessionIds.push(orch.streamsSessionId);
+      if (orch.streamSessionId) streamSessionIds.push(orch.streamSessionId);
     }
-    // Include closed streams (24h) — look up their streams_session_ids
+    // Include closed streams (24h) — look up their stream_session_ids
     const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
     for (const ws of closedStreams) {
-      const wsSessionId = getLatestStreamsSessionId(runtime.blackboard, ws.id);
-      if (wsSessionId && !streamsSessionIds.includes(wsSessionId))
-        streamsSessionIds.push(wsSessionId);
+      const wsSessionId = getLatestStreamSessionId(runtime.blackboard, ws.id);
+      if (wsSessionId && !streamSessionIds.includes(wsSessionId))
+        streamSessionIds.push(wsSessionId);
     }
-    const rows = getInputSurfaceHistory(runtime.blackboard, streamsSessionIds);
+    const rows = getInputSurfaceHistory(runtime.blackboard, streamSessionIds);
     const items: ChatTimelineItem[] = rows.map(
       (row): ChatTimelineMessage => ({
         id: row.id,
@@ -133,21 +133,21 @@ async function handleBrowserStreamsHistoryRouteInner(
   }
 
   // Specific session or agent mode — existing single-session path
-  const targetSession = streamsSessionId
-    ? runtime.sessionManager.getByStreamsSessionId(streamsSessionId)
+  const targetSession = streamSessionId
+    ? runtime.sessionManager.getByStreamSessionId(streamSessionId)
     : runtime.sessionManager.getDefault();
 
   if (!targetSession) {
     // Session not in memory — fall back to reading history from disk (e.g. closed streams)
-    if (streamsSessionId) {
+    if (streamSessionId) {
       const row = runtime.blackboard
-        .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
-        .get(streamsSessionId) as { session_file: string | null } | undefined;
+        .prepare("SELECT session_file FROM stream_sessions WHERE stream_session_id = ?")
+        .get(streamSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
-        const diskBody = await readStreamsHistory(streamsSessionId, row.session_file, historyMode);
+        const diskBody = await readStreamsHistory(streamSessionId, row.session_file, historyMode);
         if (diskBody.items.length > 0) {
           const body: StreamsHistoryResponse = {
-            sessionId: streamsSessionId,
+            sessionId: streamSessionId,
             sessionFile: row.session_file,
             items: diskBody.items,
           };
@@ -155,15 +155,15 @@ async function handleBrowserStreamsHistoryRouteInner(
         }
         // DB row exists but file missing or empty — stale session from a previous runtime
         console.warn(
-          "streams-history: session in DB but no history on disk (streamsSessionId=%s, file=%s)",
-          streamsSessionId,
+          "streams-history: session in DB but no history on disk (streamSessionId=%s, file=%s)",
+          streamSessionId,
           row.session_file,
         );
       }
     }
     console.warn(
-      "streams-history: session not found (streamsSessionId=%s, mode=%s)",
-      streamsSessionId ?? "none",
+      "streams-history: session not found (streamSessionId=%s, mode=%s)",
+      streamSessionId ?? "none",
       historyMode,
     );
     return sendJson(response, 404, { error: "Session not found" });

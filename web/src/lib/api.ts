@@ -67,10 +67,10 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
         body: JSON.stringify({ text }),
       }),
 
-    getStreamsHistory: (surface?: "input", streamsSessionId?: string) => {
+    getStreamsHistory: (surface?: "input", streamSessionId?: string) => {
       const params = new URLSearchParams();
       if (surface) params.set("surface", surface);
-      if (streamsSessionId) params.set("streamsSessionId", streamsSessionId);
+      if (streamSessionId) params.set("streamSessionId", streamSessionId);
       const qs = params.toString();
       return request<StreamsHistoryResponse>(
         qs ? `/api/streams/history?${qs}` : "/api/streams/history",
@@ -81,8 +81,8 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
-    interruptStreamsSession: (streamsSessionId: string) =>
-      request<{ ok: boolean }>(`/api/stream-sessions/${streamsSessionId}/interrupt`, {
+    interruptStreamSession: (streamSessionId: string) =>
+      request<{ ok: boolean }>(`/api/stream-sessions/${streamSessionId}/interrupt`, {
         method: "POST",
       }),
 
@@ -91,9 +91,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
-    getDirectoryCompletions: (path: string, streamsSessionId?: string) => {
+    getDirectoryCompletions: (path: string, streamSessionId?: string) => {
       const params = new URLSearchParams({ path });
-      if (streamsSessionId) params.set("streamsSessionId", streamsSessionId);
+      if (streamSessionId) params.set("streamSessionId", streamSessionId);
       return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
     },
   };

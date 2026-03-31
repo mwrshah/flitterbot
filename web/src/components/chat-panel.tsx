@@ -52,7 +52,7 @@ export function ChatPanel({
   const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
-    mutationFn: () => apiClient.interruptStreamsSession(sessionId),
+    mutationFn: () => apiClient.interruptStreamSession(sessionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
