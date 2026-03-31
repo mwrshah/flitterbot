@@ -264,4 +264,10 @@ export type WsMessage =
       streamSessionId: string;
       streamId: string;
     }
+  | {
+      type: "message_ack";
+      serverMessageId: string;
+      text: string;
+      source: "web";
+    }
   | { type: "error"; message: string };

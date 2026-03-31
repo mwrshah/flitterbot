@@ -248,6 +248,23 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    // ── message_ack → optimistic user message on surface timeline ──
+    if (message.type === "message_ack") {
+      queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => [
+        ...(old ?? []),
+        {
+          id: message.serverMessageId,
+          kind: "message" as const,
+          role: "user" as const,
+          content: message.text,
+          source: message.source,
+          serverMessageId: message.serverMessageId,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      return;
+    }
+
     // ── error ──
     if (message.type === "error") {
       toast.error(message.message);
@@ -402,7 +419,26 @@ export function setupWsQueryBridge(deps: {
         streamId: message.message.streamId ?? message.streamId,
         streamName: message.message.streamName ?? message.streamName,
       };
-      if (surfacedMessage.content.trim()) {
+      if (!surfacedMessage.content.trim()) return;
+
+      // Reconcile: if this message has a serverMessageId, replace the optimistic entry
+      const smId = surfacedMessage.serverMessageId;
+      if (smId) {
+        queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
+          if (!old) return [surfacedMessage];
+          const idx = old.findIndex(
+            (item) =>
+              item.kind === "message" &&
+              (item as ChatTimelineMessage).serverMessageId === smId,
+          );
+          if (idx >= 0) {
+            const updated = [...old];
+            updated[idx] = surfacedMessage;
+            return updated;
+          }
+          return [...old, surfacedMessage];
+        });
+      } else {
         appendTimelineItem(queryClient, sessionId, surfacedMessage, "input");
       }
       return;

@@ -185,6 +185,13 @@ export interface WorktreeChangedWebSocketEvent {
   streamId: string;
 }
 
+export interface MessageAckWebSocketEvent {
+  type: "message_ack";
+  serverMessageId: string;
+  text: string;
+  source: "web";
+}
+
 export interface AgentStartWebSocketEvent {
   type: "agent_start";
   sessionId?: string;
@@ -246,5 +253,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | StatusChangedWebSocketEvent
   | SessionsChangedWebSocketEvent
   | WorktreeChangedWebSocketEvent
+  | MessageAckWebSocketEvent
   | PongWebSocketEvent
   | ErrorWebSocketEvent;
