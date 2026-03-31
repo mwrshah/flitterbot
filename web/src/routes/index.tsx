@@ -1,26 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { InputSurface } from "~/components/input-surface";
+import { Surface } from "~/components/surface";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
+import { surfaceTimelineQueryOptions } from "~/lib/queries";
 
 export const Route = createFileRoute("/")({
   staticData: {
-    wsMode: "input-surface",
+    wsMode: "surface",
   },
   head: () => ({
-    meta: [{ title: "Autonoma — Input Surface" }],
+    meta: [{ title: "Autonoma — Surface" }],
   }),
   loader: async ({ context }) => {
     try {
-      await context.queryClient.ensureQueryData(inputSurfaceTimelineQueryOptions());
+      await context.queryClient.ensureQueryData(surfaceTimelineQueryOptions());
     } catch {
       // Leave cache unseeded; component falls back to empty array.
     }
   },
-  component: InputSurfacePage,
+  component: SurfacePage,
 });
 
-function InputSurfacePage() {
-  useWhyDidYouRender("InputSurfacePage", {});
-  return <InputSurface />;
+function SurfacePage() {
+  useWhyDidYouRender("SurfacePage", {});
+  return <Surface />;
 }

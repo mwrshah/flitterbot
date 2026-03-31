@@ -3,7 +3,7 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
-import type { WorkstreamSummary } from "~/lib/types";
+import type { StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
@@ -30,12 +30,12 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: React.R
 }
 
 const icons = {
-  inputSurface: (
+  surface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
       <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v1A1.5 1.5 0 0 1 13.5 6h-11A1.5 1.5 0 0 1 1 4.5v-1ZM1 8.5A1.5 1.5 0 0 1 2.5 7h11A1.5 1.5 0 0 1 15 8.5v1A1.5 1.5 0 0 1 13.5 11h-11A1.5 1.5 0 0 1 1 9.5v-1ZM2.5 12A1.5 1.5 0 0 0 1 13.5v.5h14v-.5a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
     </svg>
   ),
-  piAgent: (
+  streamsAgent: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
       <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5.5L3 13.5V11H3a1 1 0 0 1-1-1V3Z" />
     </svg>
@@ -53,10 +53,10 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   const status = statusQuery.data;
-  const allWorkstreams = status?.workstreams ?? [];
-  const openWorkstreams = allWorkstreams.filter((ws: WorkstreamSummary) => ws.status === "open");
-  const closedWorkstreams = allWorkstreams.filter(
-    (ws: WorkstreamSummary) => ws.status === "closed",
+  const allStreams = status?.streams_list ?? [];
+  const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
+  const closedStreams = allStreams.filter(
+    (ws: StreamSummary) => ws.status === "closed",
   );
 
   return (
@@ -73,25 +73,25 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
-        <NavItem to="/" label="Input Surface" icon={icons.inputSurface} />
-        <NavItem to="/pi" label="Pi Agent" icon={icons.piAgent} />
+        <NavItem to="/" label="Surface" icon={icons.surface} />
+        <NavItem to="/streams" label="Streams" icon={icons.streamsAgent} />
       </nav>
 
-      {/* Workstreams */}
-      {allWorkstreams.length > 0 && (
+      {/* Streams */}
+      {allStreams.length > 0 && (
         <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
-          {openWorkstreams.length > 0 && (
+          {openStreams.length > 0 && (
             <>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
-                Active workstreams
+                Active streams
               </p>
               <div className="space-y-1">
-                {openWorkstreams
+                {openStreams
                   .filter((ws) => ws.piSessionId)
                   .map((ws) => (
                     <Link
                       key={ws.id}
-                      to="/pi/$sessionId"
+                      to="/streams/$sessionId"
                       params={{ sessionId: ws.piSessionId! }}
                       className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
                     >
@@ -105,18 +105,18 @@ export const Sidebar = memo(function Sidebar() {
             </>
           )}
 
-          {closedWorkstreams.length > 0 && (
-            <div className={openWorkstreams.length > 0 ? "mt-3" : ""}>
+          {closedStreams.length > 0 && (
+            <div className={openStreams.length > 0 ? "mt-3" : ""}>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/30 font-medium mb-2">
                 Recently closed
               </p>
               <div className="space-y-1">
-                {closedWorkstreams
+                {closedStreams
                   .filter((ws) => ws.piSessionId)
                   .map((ws) => (
                     <Link
                       key={ws.id}
-                      to="/pi/$sessionId"
+                      to="/streams/$sessionId"
                       params={{ sessionId: ws.piSessionId! }}
                       className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
                     >
@@ -133,7 +133,7 @@ export const Sidebar = memo(function Sidebar() {
       )}
 
       {/* Spacer */}
-      {allWorkstreams.length === 0 && <div className="flex-1" />}
+      {allStreams.length === 0 && <div className="flex-1" />}
     </aside>
   );
 });

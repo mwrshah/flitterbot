@@ -1,73 +1,73 @@
 import crypto from "node:crypto";
-import type { WorkstreamRow } from "../contracts/index.ts";
+import type { StreamRow } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
-export function listOpenWorkstreams(db: BlackboardDatabase): WorkstreamRow[] {
-  return db.all<WorkstreamRow>(
+export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
+  return db.all<StreamRow>(
     "SELECT * FROM workstreams WHERE status = 'open' ORDER BY created_at DESC",
   );
 }
 
-export function getWorkstreamById(db: BlackboardDatabase, id: string): WorkstreamRow | null {
-  const row = db.get<WorkstreamRow>("SELECT * FROM workstreams WHERE id = ?", id);
+export function getStreamById(db: BlackboardDatabase, id: string): StreamRow | null {
+  const row = db.get<StreamRow>("SELECT * FROM workstreams WHERE id = ?", id);
   return row ?? null;
 }
 
-export function getWorkstreamByName(db: BlackboardDatabase, name: string): WorkstreamRow | null {
-  const row = db.get<WorkstreamRow>(
+export function getStreamByName(db: BlackboardDatabase, name: string): StreamRow | null {
+  const row = db.get<StreamRow>(
     "SELECT * FROM workstreams WHERE name = ? COLLATE NOCASE",
     name,
   );
   return row ?? null;
 }
 
-export function insertWorkstream(db: BlackboardDatabase, name: string): WorkstreamRow {
+export function insertStream(db: BlackboardDatabase, name: string): StreamRow {
   const id = crypto.randomUUID();
   db.prepare("INSERT INTO workstreams (id, name) VALUES (?, ?)").run(id, name);
-  return getWorkstreamById(db, id)!;
+  return getStreamById(db, id)!;
 }
 
-export function enrichWorkstream(
+export function enrichStream(
   db: BlackboardDatabase,
-  workstreamId: string,
+  streamId: string,
   repoPath: string,
   worktreePath?: string,
 ): void {
   db.prepare(`UPDATE workstreams SET repo_path = ?, worktree_path = ? WHERE id = ?`).run(
     repoPath,
     worktreePath ?? null,
-    workstreamId,
+    streamId,
   );
 }
 
 export function getActivePiSessionId(
   db: BlackboardDatabase,
-  workstreamId: string,
+  streamId: string,
 ): string | undefined {
   const row = db.get<{ pi_session_id: string }>(
     `SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,
-    workstreamId,
+    streamId,
   );
   return row?.pi_session_id;
 }
 
-/** Returns the most recent pi_session_id for a workstream, regardless of session status. */
+/** Returns the most recent pi_session_id for a stream, regardless of session status. */
 export function getLatestPiSessionId(
   db: BlackboardDatabase,
-  workstreamId: string,
+  streamId: string,
 ): string | undefined {
   const row = db.get<{ pi_session_id: string }>(
     `SELECT pi_session_id FROM pi_sessions WHERE workstream_id = ? ORDER BY started_at DESC LIMIT 1`,
-    workstreamId,
+    streamId,
   );
   return row?.pi_session_id;
 }
 
-export function getWorkstreamForPiSession(
+export function getStreamForPiSession(
   db: BlackboardDatabase,
   piSessionId: string,
-): WorkstreamRow | null {
-  const row = db.get<WorkstreamRow>(
+): StreamRow | null {
+  const row = db.get<StreamRow>(
     `SELECT w.* FROM workstreams w
      JOIN pi_sessions p ON p.workstream_id = w.id
      WHERE p.pi_session_id = ?`,
@@ -76,32 +76,32 @@ export function getWorkstreamForPiSession(
   return row ?? null;
 }
 
-export function closeWorkstream(db: BlackboardDatabase, workstreamId: string): void {
+export function closeStream(db: BlackboardDatabase, streamId: string): void {
   db.prepare(
     `UPDATE workstreams
 		 SET status = 'closed', closed_at = datetime('now')
 		 WHERE id = ? AND status = 'open'`,
-  ).run(workstreamId);
+  ).run(streamId);
 }
 
-export function reopenWorkstream(
+export function reopenStream(
   db: BlackboardDatabase,
-  workstreamId: string,
-): WorkstreamRow | null {
+  streamId: string,
+): StreamRow | null {
   db.prepare(`UPDATE workstreams SET status = 'open', closed_at = NULL WHERE id = ?`).run(
-    workstreamId,
+    streamId,
   );
-  return getWorkstreamById(db, workstreamId);
+  return getStreamById(db, streamId);
 }
 
-export function resetAllWorkstreams(db: BlackboardDatabase): number {
+export function resetAllStreams(db: BlackboardDatabase): number {
   const count = db.get<CountRow>("SELECT COUNT(*) as count FROM workstreams");
   db.prepare("DELETE FROM workstreams").run();
   return count?.count ?? 0;
 }
 
-/** Returns created_at of the most recent workstream before the given one, or undefined if none. */
-export function getPreviousWorkstreamCreatedAt(
+/** Returns created_at of the most recent stream before the given one, or undefined if none. */
+export function getPreviousStreamCreatedAt(
   db: BlackboardDatabase,
   excludeId: string,
 ): string | undefined {
@@ -112,11 +112,11 @@ export function getPreviousWorkstreamCreatedAt(
   return row?.created_at;
 }
 
-export function listRecentlyClosedWorkstreams(
+export function listRecentlyClosedStreams(
   db: BlackboardDatabase,
   withinHours: number,
-): WorkstreamRow[] {
-  return db.all<WorkstreamRow>(
+): StreamRow[] {
+  return db.all<StreamRow>(
     `SELECT * FROM workstreams
 			 WHERE status = 'closed'
 			   AND closed_at >= datetime('now', '-' || ? || ' hours')

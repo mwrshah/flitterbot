@@ -2,9 +2,9 @@ import type {
   ConversationSnippet,
   DefaultConversationSnippet,
 } from "../blackboard/query-messages.ts";
-import type { WorkstreamRow } from "../contracts/index.ts";
+import type { StreamRow } from "../contracts/index.ts";
 
-function formatWorkstreamLine(ws: WorkstreamRow, label?: string): string {
+function formatStreamLine(ws: StreamRow, label?: string): string {
   const suffix = label ? ` ${label}` : "";
   return `- id: "${ws.id}", name: "${ws.name}"${suffix}${ws.repo_path ? `, repo: ${ws.repo_path}` : ""}`;
 }
@@ -29,7 +29,7 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-function findLastAgentResponseWorkstream(
+function findLastAgentResponseStream(
   recentConversation: Map<string, ConversationSnippet[]>,
 ): string | null {
   let latestWsId: string | null = null;
@@ -45,13 +45,13 @@ function findLastAgentResponseWorkstream(
   return latestWsId;
 }
 
-function formatWorkstreamWithConversation(
-  ws: WorkstreamRow,
+function formatStreamWithConversation(
+  ws: StreamRow,
   snippets: ConversationSnippet[] | undefined,
   isLastAgentResponse: boolean,
 ): string {
   const marker = isLastAgentResponse ? " ← last agent response" : "";
-  const header = formatWorkstreamLine(ws, marker || undefined);
+  const header = formatStreamLine(ws, marker || undefined);
   if (!snippets || snippets.length === 0) return header;
 
   const messageLines = snippets.map((s) => {
@@ -73,19 +73,19 @@ function formatDefaultConversation(snippets: DefaultConversationSnippet[]): stri
 
 export function buildClassificationPrompt(
   message: string,
-  workstreams: WorkstreamRow[],
+  streams: StreamRow[],
   recentConversation: Map<string, ConversationSnippet[]>,
   defaultConversation: DefaultConversationSnippet[] = [],
 ): string {
-  const latestAgentWsId = findLastAgentResponseWorkstream(recentConversation);
-  const workstreamBlock =
-    workstreams.length > 0
-      ? workstreams
+  const latestAgentStreamId = findLastAgentResponseStream(recentConversation);
+  const streamBlock =
+    streams.length > 0
+      ? streams
           .map((ws) =>
-            formatWorkstreamWithConversation(
+            formatStreamWithConversation(
               ws,
               recentConversation.get(ws.id),
-              ws.id === latestAgentWsId,
+              ws.id === latestAgentStreamId,
             ),
           )
           .join("\n")
@@ -95,21 +95,21 @@ export function buildClassificationPrompt(
 
   return `You are a message router for a software development assistant.
 
-Given a user message, decide if it relates to an existing open workstream.
+Given a user message, decide if it relates to an existing open stream.
 
-## Open workstreams
-${workstreamBlock}
+## Open streams
+${streamBlock}
 
 ## Default agent conversation
 ${defaultBlock}
 
 ## Rules
-1. If the message clearly relates to an existing open workstream, return its id.
-2. If the message does not match any open workstream, return workstream_id: null. The default agent will handle it.
-3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the workstream OR default agent conversation with the most recent agent message. Check both the workstream marked "← last agent response" and the default agent conversation to decide.
+1. If the message clearly relates to an existing open stream, return its id.
+2. If the message does not match any open stream, return workstream_id: null. The default agent will handle it.
+3. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the stream OR default agent conversation with the most recent agent message. Check both the stream marked "← last agent response" and the default agent conversation to decide.
 4. If the user appears to be continuing the default agent conversation (e.g. replying to something the default agent said), return workstream_id: null.
-5. *Brainstorm workstreams* — workstreams with "brainstorm" in the name are open-ended ideation sessions for a repo. If the user's message is general brainstorming, ideation, or exploratory discussion about a repo that has an open brainstorm workstream, route to that brainstorm workstream — do NOT let it fall through to the default agent. Exception: if there is a *different* workstream for the same repo that covers a specific issue the message clearly relates to, route to that specific workstream instead. Specific beats general.
-6. If the user asks to create a new workstream, start new work, or requests something that doesn't belong to any existing workstream, return workstream_id: null. Only the default agent can create workstreams.
+5. *Brainstorm streams* — streams with "brainstorm" in the name are open-ended ideation sessions for a repo. If the user's message is general brainstorming, ideation, or exploratory discussion about a repo that has an open brainstorm stream, route to that brainstorm stream — do NOT let it fall through to the default agent. Exception: if there is a *different* stream for the same repo that covers a specific issue the message clearly relates to, route to that specific stream instead. Specific beats general.
+6. If the user asks to create a new stream, start new work, or requests something that doesn't belong to any existing stream, return workstream_id: null. Only the default agent can create streams.
 7. When in doubt, return workstream_id: null — prefer routing to the default agent over a wrong match.
 
 ## Response format
@@ -117,7 +117,7 @@ Respond with ONLY a JSON object containing two fields: workstream_id and reasoni
 \`\`\`json
 {
   "workstream_id": null,
-  "reasoning": "No matching open workstream — routing to default agent"
+  "reasoning": "No matching open stream — routing to default agent"
 }
 \`\`\`
 

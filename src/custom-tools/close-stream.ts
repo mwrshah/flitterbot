@@ -4,14 +4,14 @@ import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
-import { closeWorkstream, getWorkstreamById } from "../blackboard/query-workstreams.ts";
+import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
 
 const execPromise = promisify(cpExec);
 
-type CloseWorkstreamResult = {
+type CloseStreamResult = {
   ok: boolean;
-  workstreamId: string;
+  streamId: string;
   message: string;
   conflicts?: string[];
   merged?: boolean;
@@ -67,7 +67,7 @@ async function commitUncommittedChanges(worktreePath: string): Promise<CommitRes
   try {
     await exec("git add -A", worktreePath);
     await exec(
-      'git commit -m "chore: auto-commit uncommitted changes before workstream close"',
+      'git commit -m "chore: auto-commit uncommitted changes before stream close"',
       worktreePath,
     );
     return { hasChanges: true, ok: true };
@@ -157,22 +157,22 @@ async function pushMain(repoPath: string): Promise<boolean> {
   }
 }
 
-export async function executeCloseWorkstream(
+export async function executeCloseStream(
   blackboard: BlackboardDatabase,
   piSessionId: string,
-  workstreamId: string,
+  streamId: string,
   mode: "merge" | "noop",
   mergeCommitMessage?: string,
-): Promise<CloseWorkstreamResult> {
-  const workstream = getWorkstreamById(blackboard, workstreamId);
-  if (!workstream) {
-    return { ok: false, workstreamId, message: `Workstream ${workstreamId} not found` };
+): Promise<CloseStreamResult> {
+  const stream = getStreamById(blackboard, streamId);
+  if (!stream) {
+    return { ok: false, streamId, message: `Stream ${streamId} not found` };
   }
-  if (workstream.status !== "open") {
-    return { ok: false, workstreamId, message: `Workstream ${workstreamId} is already closed` };
+  if (stream.status !== "open") {
+    return { ok: false, streamId, message: `Stream ${streamId} is already closed` };
   }
 
-  // Step 0: Kill active CC sessions belonging to this workstream
+  // Step 0: Kill active CC sessions belonging to this stream
   const activeSessions = blackboard
     .prepare(
       `SELECT session_id, tmux_session
@@ -180,7 +180,7 @@ export async function executeCloseWorkstream(
        WHERE workstream_id = ?
          AND status IN ('working', 'idle')`,
     )
-    .all(workstreamId) as { session_id: string; tmux_session: string | null }[];
+    .all(streamId) as { session_id: string; tmux_session: string | null }[];
 
   let sessionsKilled = 0;
   for (const session of activeSessions) {
@@ -196,8 +196,8 @@ export async function executeCloseWorkstream(
 
   // Step 1: Merge branch to main (only in merge mode)
   if (mode === "merge") {
-    const worktreePath = workstream.worktree_path;
-    const repoPath = workstream.repo_path;
+    const worktreePath = stream.worktree_path;
+    const repoPath = stream.repo_path;
 
     if (worktreePath && fs.existsSync(worktreePath) && repoPath) {
       const branch = await inferBranchFromWorktree(worktreePath);
@@ -207,19 +207,19 @@ export async function executeCloseWorkstream(
         if (commitResult.hasChanges && !commitResult.ok) {
           return {
             ok: false,
-            workstreamId,
+            streamId,
             message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
           };
         }
         const mergeResult = await mergeToMain(repoPath, branch, mergeCommitMessage);
         if (mergeResult.ok === false) {
-          // Return early — Pi resolves conflicts and calls again
+          // Return early — resolve conflicts and call again
           return {
             ok: false,
-            workstreamId,
+            streamId,
             message:
               mergeResult.message +
-              ". Resolve conflicts in the main repo, then call close_workstream again.",
+              ". Resolve conflicts in the main repo, then call close_stream again.",
             conflicts: mergeResult.conflicts,
           };
         }
@@ -231,11 +231,11 @@ export async function executeCloseWorkstream(
     }
   }
 
-  // Step 2: Close workstream and end Pi session (worktree left on disk)
-  closeWorkstream(blackboard, workstreamId);
+  // Step 2: Close stream and end Pi session (worktree left on disk)
+  closeStream(blackboard, streamId);
   endPiSession(blackboard, piSessionId, "ended", "workstream_closed");
 
-  const parts = [`Workstream "${workstream.name}" closed.`];
+  const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
   if (mode === "noop") parts.push("Git operations skipped (noop mode).");
   if (merged) parts.push("Branch merged to main.");
@@ -243,28 +243,28 @@ export async function executeCloseWorkstream(
 
   return {
     ok: true,
-    workstreamId,
+    streamId,
     message: parts.join(" "),
     merged,
     pushed,
   };
 }
 
-export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSessionId: string) {
+export function createCloseStreamTool(blackboard: BlackboardDatabase, piSessionId: string) {
   return {
-    name: "close_workstream",
-    label: "Close Workstream",
+    name: "close_stream",
+    label: "Close Stream",
     description:
-      'Close the current workstream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the workstream record. The worktree is left on disk. If merge mode hits conflicts, returns conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.',
+      'Close the current stream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the stream record. The worktree is left on disk. If merge mode hits conflicts, returns conflict details — resolve them and call again. Only call when the human explicitly confirms the work is done.',
     parameters: {
       type: "object",
       properties: {
-        workstream_id: { type: "string", description: "ID of the workstream to close" },
+        workstream_id: { type: "string", description: "ID of the stream to close" },
         mode: {
           type: "string",
           enum: ["merge", "noop"],
           description:
-            '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the workstream and ends the session.',
+            '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
         },
         merge_commit_message: {
           type: "string",
@@ -279,7 +279,7 @@ export function createCloseWorkstreamTool(blackboard: BlackboardDatabase, piSess
       _toolCallId: string,
       params: { workstream_id: string; mode: "merge" | "noop"; merge_commit_message?: string },
     ) => {
-      const result = await executeCloseWorkstream(
+      const result = await executeCloseStream(
         blackboard,
         piSessionId,
         params.workstream_id,

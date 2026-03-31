@@ -28,8 +28,8 @@ export type SessionSummary = {
   tmuxSession?: string;
   transcriptPath?: string;
   lastEventAt?: string;
-  workstreamId?: string;
-  workstreamName?: string;
+  streamId?: string;
+  streamName?: string;
 };
 
 export type SessionDetail = {
@@ -43,8 +43,8 @@ export type SessionDetail = {
   startedAt?: string;
   cwd?: string;
   model?: string;
-  workstreamId?: string;
-  workstreamName?: string;
+  streamId?: string;
+  streamName?: string;
   recentEvents: SessionEvent[];
 };
 
@@ -99,7 +99,7 @@ export type StatusResponse = {
     pid?: number;
     managedByControlSurface?: boolean;
   };
-  pi?: {
+  streams?: {
     default?: {
       sessionId?: string;
       busy?: boolean;
@@ -108,18 +108,18 @@ export type StatusResponse = {
     };
     orchestrators?: Array<{
       sessionId: string;
-      workstreamId: string;
-      workstreamName?: string;
+      streamId: string;
+      streamName?: string;
       messageCount: number;
       busy: boolean;
     }>;
   };
-  workstreams?: WorkstreamSummary[];
+  streams_list?: StreamSummary[];
 };
 
-/* ── Workstreams ── */
+/* ── Streams ── */
 
-export type WorkstreamSummary = {
+export type StreamSummary = {
   id: string;
   name: string;
   status: "open" | "closed";
@@ -140,15 +140,15 @@ export type SessionListResponse = {
 export type DownstreamSessionItem = {
   sessionId: string;
   status: "working" | "idle" | "stale" | "ended";
-  workstreamId: string | null;
-  workstreamName: string | null;
+  streamId: string | null;
+  streamName: string | null;
   tmuxSession: string | null;
   cwd: string | null;
   taskDescription: string | null;
   project: string | null;
 };
 
-export type PiSessionsListResponse = {
+export type StreamsSessionsListResponse = {
   items: DownstreamSessionItem[];
 };
 
@@ -167,7 +167,7 @@ export type DirectMessageResponse = {
   reason?: string;
 };
 
-export type PiHistoryResponse = {
+export type StreamsHistoryResponse = {
   items: ChatTimelineItem[];
 };
 
@@ -243,14 +243,14 @@ export type WsMessage =
       type: "pi_surfaced";
       message: ChatTimelineMessage;
       sessionId?: string;
-      workstreamId?: string;
-      workstreamName?: string;
+      streamId?: string;
+      streamName?: string;
     }
   | {
-      type: "workstreams_changed";
+      type: "streams_changed";
       reason: "created" | "closed";
-      workstreamId: string;
-      workstreamName?: string;
+      streamId: string;
+      streamName?: string;
     }
   | { type: "status_changed"; subsystem: string; timestamp: string }
   | {
@@ -262,6 +262,6 @@ export type WsMessage =
   | {
       type: "worktree_changed";
       piSessionId: string;
-      workstreamId: string;
+      streamId: string;
     }
   | { type: "error"; message: string };

@@ -52,7 +52,7 @@ export interface QueueItemStartWebSocketEvent {
   type: "queue_item_start";
   item: QueuedTurnSummary;
   sessionId?: string;
-  workstreamId?: string;
+  streamId?: string;
 }
 
 export interface QueueItemEndWebSocketEvent {
@@ -60,7 +60,7 @@ export interface QueueItemEndWebSocketEvent {
   itemId: string;
   error?: string;
   sessionId?: string;
-  workstreamId?: string;
+  streamId?: string;
 }
 
 export interface TextDeltaWebSocketEvent {
@@ -144,15 +144,15 @@ export interface PiSurfacedWebSocketEvent {
   type: "pi_surfaced";
   message: ChatTimelineMessage;
   sessionId?: string;
-  workstreamId?: string;
-  workstreamName?: string;
+  streamId?: string;
+  streamName?: string;
 }
 
-export interface WorkstreamsChangedWebSocketEvent {
-  type: "workstreams_changed";
+export interface StreamsChangedWebSocketEvent {
+  type: "streams_changed";
   reason: "created" | "closed" | "reopened";
-  workstreamId: string;
-  workstreamName?: string;
+  streamId: string;
+  streamName?: string;
 }
 
 export interface StatusChangedWebSocketEvent {
@@ -182,7 +182,7 @@ export interface SessionsChangedWebSocketEvent {
 export interface WorktreeChangedWebSocketEvent {
   type: "worktree_changed";
   piSessionId: string;
-  workstreamId: string;
+  streamId: string;
 }
 
 export interface AgentStartWebSocketEvent {
@@ -242,7 +242,7 @@ export type ControlSurfaceWebSocketServerEvent =
   | AutoRetryStartWebSocketEvent
   | AutoRetryEndWebSocketEvent
   | PiSurfacedWebSocketEvent
-  | WorkstreamsChangedWebSocketEvent
+  | StreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
   | SessionsChangedWebSocketEvent
   | WorktreeChangedWebSocketEvent

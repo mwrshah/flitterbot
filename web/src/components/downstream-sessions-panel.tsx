@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
-import { piDownstreamSessionsQueryOptions, piWorktreeQueryOptions } from "~/lib/queries";
+import { streamsDownstreamSessionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { DownstreamSessionItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -49,15 +49,15 @@ function statusLabel(status: DownstreamSessionItem["status"]): string {
 }
 
 function sessionDescription(session: DownstreamSessionItem): string {
-  return session.taskDescription ?? session.project ?? session.workstreamName ?? "no workstream";
+  return session.taskDescription ?? session.project ?? session.streamName ?? "no stream";
 }
 
 export function DownstreamSessionsPanel({ piSessionId }: { piSessionId: string | undefined }) {
   const { data, isPending, isError } = useQuery(
-    piDownstreamSessionsQueryOptions(piSessionId ?? ""),
+    streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );
 
-  const worktreeQuery = useQuery(piWorktreeQueryOptions(piSessionId ?? ""));
+  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
   const worktree = worktreeQuery.data;
 
   if (!piSessionId) {

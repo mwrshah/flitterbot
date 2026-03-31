@@ -2,8 +2,8 @@ import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
 import {
   getLatestPiSessionId,
-  listRecentlyClosedWorkstreams,
-} from "../blackboard/query-workstreams.ts";
+  listRecentlyClosedStreams,
+} from "../blackboard/query-streams.ts";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -85,18 +85,18 @@ async function handleBrowserPiHistoryRouteInner(
   historyMode: "input" | "agent",
   piSessionId: string | null,
 ) {
-  // Input surface with no specific session — read from the messages table
+  // Surface with no specific session — read from the messages table
   if (historyMode === "input" && !piSessionId) {
-    // Collect all relevant pi_session_ids: default + active orchestrators + recently-closed workstreams
+    // Collect all relevant pi_session_ids: default + active orchestrators + recently-closed streams
     const piSessionIds: string[] = [];
     const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
     if (defaultPiSessionId) piSessionIds.push(defaultPiSessionId);
     for (const orch of runtime.sessionManager.listOrchestrators()) {
       if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
-    // Include closed workstreams (24h) — look up their pi_session_ids
-    const closedWorkstreams = listRecentlyClosedWorkstreams(runtime.blackboard, 24);
-    for (const ws of closedWorkstreams) {
+    // Include closed streams (24h) — look up their pi_session_ids
+    const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
+    for (const ws of closedStreams) {
       const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
       if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
     }
@@ -108,8 +108,8 @@ async function handleBrowserPiHistoryRouteInner(
         role: row.direction === "inbound" ? "user" : "assistant",
         content: row.content,
         source: row.source,
-        workstreamId: row.workstream_id ?? undefined,
-        workstreamName: row.workstream_name ?? undefined,
+        streamId: row.workstream_id ?? undefined,
+        streamName: row.workstream_name ?? undefined,
         createdAt: row.created_at,
       }),
     );
@@ -124,7 +124,7 @@ async function handleBrowserPiHistoryRouteInner(
     : runtime.sessionManager.getDefault();
 
   if (!targetSession) {
-    // Session not in memory — fall back to reading history from disk (e.g. closed workstreams)
+    // Session not in memory — fall back to reading history from disk (e.g. closed streams)
     if (piSessionId) {
       const row = runtime.blackboard
         .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
@@ -156,10 +156,10 @@ async function handleBrowserPiHistoryRouteInner(
   }
 
   const items = await readSessionHistory(targetSession, historyMode);
-  if (targetSession.workstreamName) {
+  if (targetSession.streamName) {
     for (const item of items) {
       if (item.kind === "message") {
-        item.workstreamName = targetSession.workstreamName;
+        item.streamName = targetSession.streamName;
       }
     }
   }

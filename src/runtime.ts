@@ -26,10 +26,10 @@ import {
 import {
   getActivePiSessionId,
   getLatestPiSessionId,
-  listOpenWorkstreams,
-  listRecentlyClosedWorkstreams,
-  resetAllWorkstreams,
-} from "./blackboard/query-workstreams.ts";
+  listOpenStreams,
+  listRecentlyClosedStreams,
+  resetAllStreams,
+} from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
@@ -48,9 +48,9 @@ import type {
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
   StatusResponse,
-  WorkstreamRoutingMeta,
+  StreamRoutingMeta,
 } from "./contracts/index.ts";
-import { executeCloseWorkstream } from "./custom-tools/close-workstream.ts";
+import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatPromptWithContext } from "./pi/format-prompt.ts";
@@ -145,20 +145,20 @@ export class ControlSurfaceRuntime {
   async start(): Promise<void> {
     this.ensurePidFile();
 
-    if (this.config.wipeWorkstreamsOnStart) {
-      const closed = resetAllWorkstreams(this.blackboard);
+    if (this.config.wipeStreamsOnStart) {
+      const closed = resetAllStreams(this.blackboard);
       if (closed > 0)
-        this.log(`wiped ${closed} open workstream(s) on startup (wipeWorkstreamsOnStart=true)`);
+        this.log(`wiped ${closed} open stream(s) on startup (wipeStreamsOnStart=true)`);
     }
 
     await this.sessionManager.createDefault(this.createCustomTools("default"));
 
-    // Rehydrate dormant orchestrators for open workstreams from the pi_sessions DB.
+    // Rehydrate dormant orchestrators for open streams from the pi_sessions DB.
     // No live SDK agent is created — just the in-memory maps are populated so that
     // message lookups find the correct piSessionId. The agent is lazily activated
-    // when the first new message arrives for the workstream.
-    const openWorkstreams = listOpenWorkstreams(this.blackboard);
-    for (const ws of openWorkstreams) {
+    // when the first new message arrives for the stream.
+    const openStreams = listOpenStreams(this.blackboard);
+    for (const ws of openStreams) {
       const piRow = this.blackboard.get<{
         pi_session_id: string;
         session_file: string | null;
@@ -194,8 +194,8 @@ export class ControlSurfaceRuntime {
         );
       }
     }
-    if (openWorkstreams.length > 0) {
-      this.log(`rehydrated ${openWorkstreams.length} orchestrator(s) for open workstreams`);
+    if (openStreams.length > 0) {
+      this.log(`rehydrated ${openStreams.length} orchestrator(s) for open streams`);
     }
 
     await this.ensureWhatsAppDaemon();
@@ -207,7 +207,7 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    // Bootstrap Pi agent with startup skills
+    // Bootstrap Streams agent with startup skills
     this.enqueue({
       text: "/load2-w",
       source: "init",
@@ -271,16 +271,16 @@ export class ControlSurfaceRuntime {
     item.metadata = { ...item.metadata, serverMessageId: messageUuid };
     try {
       const source = item.source as "whatsapp" | "web" | "cron";
-      const workstreamId = (input.metadata?.workstream_id as string) ?? undefined;
-      const piSessionId = workstreamId
-        ? this.sessionManager.getByWorkstream(workstreamId)?.piSessionId
+      const streamId = (input.metadata?.workstream_id as string) ?? undefined;
+      const piSessionId = streamId
+        ? this.sessionManager.getByStream(streamId)?.piSessionId
         : this.sessionManager.getDefault()?.piSessionId;
       persistInboundMessage(this.blackboard, {
         id: messageUuid,
         source,
         content: input.text,
         sender: "user",
-        workstreamId,
+        streamId,
         piSessionId,
         metadata: input.metadata,
       });
@@ -314,11 +314,11 @@ export class ControlSurfaceRuntime {
       return { ok: true, item };
     }
 
-    item.workstreamId = target.workstreamId ?? undefined;
-    item.workstreamName = target.workstreamName ?? undefined;
+    item.streamId = target.streamId ?? undefined;
+    item.streamName = target.streamName ?? undefined;
     target.queue.enqueue(item);
     this.log(
-      `enqueued ${item.source} item ${item.id} → ${target.role}${target.workstreamId ? ` ws=${target.workstreamId}` : ""}`,
+      `enqueued ${item.source} item ${item.id} → ${target.role}${target.streamId ? ` ws=${target.streamId}` : ""}`,
     );
 
     return { ok: true, item };
@@ -351,21 +351,21 @@ export class ControlSurfaceRuntime {
         "piSessionId",
         "AUTONOMA_PI_SESSION_ID",
       ]);
-      let workstreamIdValue = pickString(payload, [
+      let streamIdValue = pickString(payload, [
         "workstream_id",
         "workstreamId",
         "AUTONOMA_WORKSTREAM_ID",
       ]);
-      if (cwd && !piSessionIdValue && !workstreamIdValue) {
-        const openWorkstreams = listOpenWorkstreams(this.blackboard);
-        const matchingWs = openWorkstreams.find(
+      if (cwd && !piSessionIdValue && !streamIdValue) {
+        const openStreams = listOpenStreams(this.blackboard);
+        const matchingStream = openStreams.find(
           (ws) => ws.worktree_path && cwd.startsWith(ws.worktree_path),
         );
-        if (matchingWs) {
-          const orchestrator = this.sessionManager.getByWorkstream(matchingWs.id);
+        if (matchingStream) {
+          const orchestrator = this.sessionManager.getByStream(matchingStream.id);
           if (orchestrator) {
             piSessionIdValue = orchestrator.piSessionId;
-            workstreamIdValue = matchingWs.id;
+            streamIdValue = matchingStream.id;
           }
         }
       }
@@ -389,7 +389,7 @@ export class ControlSurfaceRuntime {
           "AUTONOMA_TODOIST_TASK_ID",
         ]),
         pi_session_id: piSessionIdValue,
-        workstream_id: workstreamIdValue,
+        workstream_id: streamIdValue,
       });
       if (piSessionIdValue) {
         this.wsHub.broadcast({
@@ -469,13 +469,13 @@ export class ControlSurfaceRuntime {
     if (!targetQueue) {
       const ccCwd = ccSession?.cwd || pickString(payload, ["cwd"]);
       if (ccCwd) {
-        const openWorkstreams = listOpenWorkstreams(this.blackboard);
-        const matchingWs = openWorkstreams.find(
+        const openStreams = listOpenStreams(this.blackboard);
+        const matchingStream = openStreams.find(
           (ws) => ws.worktree_path && ccCwd.startsWith(ws.worktree_path),
         );
-        if (matchingWs) {
-          targetQueue = this.sessionManager.getByWorkstream(matchingWs.id);
-          if (targetQueue) resolvedVia = `cwd-match:${matchingWs.id}`;
+        if (matchingStream) {
+          targetQueue = this.sessionManager.getByStream(matchingStream.id);
+          if (targetQueue) resolvedVia = `cwd-match:${matchingStream.id}`;
         }
       }
     }
@@ -495,8 +495,8 @@ export class ControlSurfaceRuntime {
       metadata: { event: normalized, ...payload },
       receivedAt: new Date().toISOString(),
       deliveryMode: "followUp",
-      workstreamId: targetQueue.workstreamId ?? undefined,
-      workstreamName: targetQueue.workstreamName ?? undefined,
+      streamId: targetQueue.streamId ?? undefined,
+      streamName: targetQueue.streamName ?? undefined,
     };
 
     // Persist inbound
@@ -505,7 +505,7 @@ export class ControlSurfaceRuntime {
         source: "hook",
         content: text,
         sender: "system",
-        workstreamId: targetQueue.workstreamId ?? undefined,
+        streamId: targetQueue.streamId ?? undefined,
         piSessionId: targetQueue.piSessionId,
         metadata: { event: normalized, ...payload },
       });
@@ -515,7 +515,7 @@ export class ControlSurfaceRuntime {
 
     targetQueue.queue.enqueue(hookItem);
     this.log(
-      `hook stop: session_id=${sessionId} → ${targetQueue.role}${targetQueue.workstreamId ? ` ws=${targetQueue.workstreamId}` : ""} (via ${resolvedVia})`,
+      `hook stop: session_id=${sessionId} → ${targetQueue.role}${targetQueue.streamId ? ` ws=${targetQueue.streamId}` : ""} (via ${resolvedVia})`,
     );
     return { ok: true };
   }
@@ -530,21 +530,21 @@ export class ControlSurfaceRuntime {
       const snap = o.state.getSnapshot();
       return {
         sessionId: o.piSessionId,
-        workstreamId: o.workstreamId!,
-        workstreamName: o.workstreamName,
+        streamId: o.streamId!,
+        streamName: o.streamName,
         messageCount: o.session?.messages?.length ?? snap.messageCount,
         busy: snap.busy,
       };
     });
 
-    const openWorkstreams = listOpenWorkstreams(this.blackboard);
-    const closedWorkstreams = listRecentlyClosedWorkstreams(this.blackboard, 24);
-    const sessionCountByWorkstream = new Map<string, number>();
+    const openStreams = listOpenStreams(this.blackboard);
+    const closedStreams = listRecentlyClosedStreams(this.blackboard, 24);
+    const sessionCountByStream = new Map<string, number>();
     for (const session of this.getSessionList()) {
-      if (session.workstreamId) {
-        sessionCountByWorkstream.set(
-          session.workstreamId,
-          (sessionCountByWorkstream.get(session.workstreamId) ?? 0) + 1,
+      if (session.streamId) {
+        sessionCountByStream.set(
+          session.streamId,
+          (sessionCountByStream.get(session.streamId) ?? 0) + 1,
         );
       }
     }
@@ -572,18 +572,18 @@ export class ControlSurfaceRuntime {
         requiresManualAuth: whatsapp.requiresManualAuth,
       },
       blackboard: blackboardStatus,
-      workstreams: [
-        ...openWorkstreams.map((ws) => ({
+      streams: [
+        ...openStreams.map((ws) => ({
           id: ws.id,
           name: ws.name,
           status: "open" as const,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
           piSessionId: getActivePiSessionId(this.blackboard, ws.id),
-          sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
+          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
           createdAt: ws.created_at,
         })),
-        ...closedWorkstreams.map((ws) => ({
+        ...closedStreams.map((ws) => ({
           id: ws.id,
           name: ws.name,
           status: "closed" as const,
@@ -591,7 +591,7 @@ export class ControlSurfaceRuntime {
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
           piSessionId: getLatestPiSessionId(this.blackboard, ws.id),
-          sessionCount: sessionCountByWorkstream.get(ws.id) ?? 0,
+          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
           createdAt: ws.created_at,
         })),
       ],
@@ -699,14 +699,14 @@ export class ControlSurfaceRuntime {
       return this.sessionManager.getDefault();
     }
 
-    // Router matched an existing workstream — route to its orchestrator if running
-    const workstreamId = meta?.workstream_id as string | undefined;
-    if (workstreamId && meta?.router_action === "matched") {
-      const existing = this.sessionManager.getByWorkstream(workstreamId);
+    // Router matched an existing stream — route to its orchestrator if running
+    const streamId = meta?.workstream_id as string | undefined;
+    if (streamId && meta?.router_action === "matched") {
+      const existing = this.sessionManager.getByStream(streamId);
       if (existing) return existing;
     }
 
-    // Everything else goes to the default agent (which can create workstreams via tool)
+    // Everything else goes to the default agent (which can create streams via tool)
     return this.sessionManager.getDefault();
   }
 
@@ -715,11 +715,11 @@ export class ControlSurfaceRuntime {
    */
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
     // Lazily activate dormant orchestrators on first message after restart
-    if (!managed.session && managed.role === "orchestrator" && managed.workstreamId) {
-      this.log(`activating dormant orchestrator for workstream ${managed.workstreamId}`);
+    if (!managed.session && managed.role === "orchestrator" && managed.streamId) {
+      this.log(`activating dormant orchestrator for stream ${managed.streamId}`);
       await this.sessionManager.activateOrchestrator(
         managed,
-        this.createCustomTools("orchestrator", managed.workstreamId),
+        this.createCustomTools("orchestrator", managed.streamId),
       );
     }
 
@@ -729,7 +729,7 @@ export class ControlSurfaceRuntime {
     const piSessionId = session.sessionId;
 
     this.log(
-      `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.workstreamId ? ` ws=${managed.workstreamId}` : ""} text=${item.text.slice(0, 80)}...`,
+      `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""} text=${item.text.slice(0, 80)}...`,
     );
 
     // Turn starts → set Pi status to 'active'
@@ -786,13 +786,13 @@ export class ControlSurfaceRuntime {
 
       // Persist outbound with resolved server UUID (when available)
       try {
-        const workstreamId =
-          managed.workstreamId ?? (item.metadata?.workstream_id as string) ?? undefined;
+        const streamId =
+          managed.streamId ?? (item.metadata?.workstream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
           id: finalMessageId,
           source: "pi_outbound",
           content: finalText,
-          workstreamId,
+          streamId,
           piSessionId: managed.piSessionId,
         });
       } catch (error) {
@@ -801,10 +801,10 @@ export class ControlSurfaceRuntime {
         );
       }
 
-      // Surface with workstream label for orchestrators
+      // Surface with stream label for orchestrators
       const surfaceText =
-        managed.role === "orchestrator" && managed.workstreamName
-          ? `[${managed.workstreamName}] ${finalText}`
+        managed.role === "orchestrator" && managed.streamName
+          ? `[${managed.streamName}] ${finalText}`
           : finalText;
 
       try {
@@ -820,11 +820,11 @@ export class ControlSurfaceRuntime {
       }
     }
 
-    // If orchestrator just ran close_workstream, destroy it
-    if (managed.role === "orchestrator" && managed.workstreamId) {
-      const closedWorkstream = this.detectCloseWorkstream(session);
-      if (closedWorkstream) {
-        this.sessionManager.destroyOrchestrator(managed.workstreamId, "close_workstream");
+    // If orchestrator just ran close_stream, destroy it
+    if (managed.role === "orchestrator" && managed.streamId) {
+      const closedStream = this.detectCloseStream(session);
+      if (closedStream) {
+        this.sessionManager.destroyOrchestrator(managed.streamId, "close_stream");
       }
     }
   }
@@ -852,18 +852,18 @@ export class ControlSurfaceRuntime {
   }
 
   /**
-   * Detect if the last tool call was close_workstream (orchestrator self-destruct).
+   * Detect if the last tool call was close_stream (orchestrator self-destruct).
    */
-  private detectCloseWorkstream(session: AgentSession): boolean {
+  private detectCloseStream(session: AgentSession): boolean {
     const messages = session.messages;
     if (!messages.length) return false;
-    // Look at recent messages for a close_workstream tool result
+    // Look at recent messages for a close_stream tool result
     for (let i = messages.length - 1; i >= Math.max(0, messages.length - 5); i--) {
       const msg = messages[i];
       if (!msg) continue;
       if (msg.role === "toolResult") {
         const toolResult = msg as ToolResultMessage;
-        if (toolResult.toolName === "close_workstream") {
+        if (toolResult.toolName === "close_stream") {
           return true;
         }
       }
@@ -871,7 +871,7 @@ export class ControlSurfaceRuntime {
       if (msg.role === "assistant") {
         const assistantMsg = msg as AssistantMessage;
         for (const block of assistantMsg.content) {
-          if (block.type === "toolCall" && block.name === "close_workstream") {
+          if (block.type === "toolCall" && block.name === "close_stream") {
             return true;
           }
         }
@@ -880,20 +880,20 @@ export class ControlSurfaceRuntime {
     return false;
   }
 
-  async reopenWorkstream(workstreamId: string): Promise<{ ok: boolean; workstreamId: string }> {
-    const { reopenWorkstream, getWorkstreamById } = await import(
-      "./blackboard/query-workstreams.ts"
+  async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {
+    const { reopenStream, getStreamById } = await import(
+      "./blackboard/query-streams.ts"
     );
 
-    const ws = getWorkstreamById(this.blackboard, workstreamId);
-    if (!ws) throw new Error("Workstream not found");
-    if (ws.status !== "closed") throw new Error("Workstream is not closed");
+    const ws = getStreamById(this.blackboard, streamId);
+    if (!ws) throw new Error("Stream not found");
+    if (ws.status !== "closed") throw new Error("Stream is not closed");
 
-    // 1. Reopen the workstream and clear stale worktree_path
-    reopenWorkstream(this.blackboard, workstreamId);
+    // 1. Reopen the stream and clear stale worktree_path
+    reopenStream(this.blackboard, streamId);
     this.blackboard
       .prepare(`UPDATE workstreams SET worktree_path = NULL WHERE id = ?`)
-      .run(workstreamId);
+      .run(streamId);
 
     // 2. Revive the pi_session: clear ended_at/end_reason, set status back to waiting_for_user
     const piRow = this.blackboard.get<{
@@ -907,7 +907,7 @@ export class ControlSurfaceRuntime {
        FROM pi_sessions
        WHERE workstream_id = ? AND role = 'orchestrator'
        ORDER BY started_at DESC LIMIT 1`,
-      workstreamId,
+      streamId,
     );
 
     if (piRow) {
@@ -924,7 +924,7 @@ export class ControlSurfaceRuntime {
 
       // 3. Rehydrate the orchestrator in-memory
       this.sessionManager.rehydrateOrchestrator(
-        workstreamId,
+        streamId,
         ws.name,
         piRow.pi_session_id,
         piRow.session_file,
@@ -936,19 +936,19 @@ export class ControlSurfaceRuntime {
 
     // 4. Broadcast so frontend updates
     this.wsHub.broadcast({
-      type: "workstreams_changed",
+      type: "streams_changed",
       reason: "reopened",
-      workstreamId,
-      workstreamName: ws.name,
+      streamId,
+      streamName: ws.name,
     });
 
-    this.log(`reopened workstream "${ws.name}" (${workstreamId})`);
-    return { ok: true, workstreamId };
+    this.log(`reopened stream "${ws.name}" (${streamId})`);
+    return { ok: true, streamId };
   }
 
   createCustomTools(
     role: "orchestrator" | "default" = "default",
-    workstreamId?: string,
+    streamId?: string,
   ): CustomToolDefinition[] {
     const tools: CustomToolDefinition[] = [
       createQueryBlackboardTool(this.blackboard),
@@ -963,9 +963,9 @@ export class ControlSurfaceRuntime {
           additionalProperties: false,
         },
         execute: async () => {
-          // Reload the session that owns this tool — find by role/workstream
-          const managed = workstreamId
-            ? this.sessionManager.getByWorkstream(workstreamId)
+          // Reload the session that owns this tool — find by role/stream
+          const managed = streamId
+            ? this.sessionManager.getByStream(streamId)
             : this.sessionManager.getDefault();
           if (!managed?.session) {
             return {
@@ -989,10 +989,10 @@ export class ControlSurfaceRuntime {
 
     if (role === "default") {
       tools.push({
-        name: "create_workstream",
-        label: "Create Workstream",
+        name: "create_stream",
+        label: "Create Stream",
         description:
-          "Create a new workstream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. The user's original message is automatically passed through to the new workstream.",
+          "Create a new stream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. The user's original message is automatically passed through to the new stream.",
         parameters: {
           type: "object",
           properties: {
@@ -1004,7 +1004,7 @@ export class ControlSurfaceRuntime {
             message: {
               type: "string",
               description:
-                "Optional agent-authored context appended to the workstream prompt. Use for supplementary information the orchestrator wouldn't otherwise have: spec paths, constraints, relevant background gathered during triage. Omit if there's nothing to add.",
+                "Optional agent-authored context appended to the stream prompt. Use for supplementary information the orchestrator wouldn't otherwise have: spec paths, constraints, relevant background gathered during triage. Omit if there's nothing to add.",
             },
           },
           required: ["name"],
@@ -1012,9 +1012,9 @@ export class ControlSurfaceRuntime {
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
           const { name, message: agentMessage } = params as { name: string; message?: string };
-          const { insertWorkstream } = await import("./blackboard/query-workstreams.ts");
-          const ws = insertWorkstream(this.blackboard, name);
-          this.log(`default agent created workstream "${name}" (${ws.id})`);
+          const { insertStream } = await import("./blackboard/query-streams.ts");
+          const ws = insertStream(this.blackboard, name);
+          this.log(`default agent created stream "${name}" (${ws.id})`);
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
@@ -1025,13 +1025,13 @@ export class ControlSurfaceRuntime {
             );
 
             this.wsHub.broadcast({
-              type: "workstreams_changed",
+              type: "streams_changed",
               reason: "created",
-              workstreamId: ws.id,
-              workstreamName: ws.name,
+              streamId: ws.id,
+              streamName: ws.name,
             });
 
-            // Pass through relevant context messages to the new workstream
+            // Pass through relevant context messages to the new stream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
 
@@ -1039,17 +1039,17 @@ export class ControlSurfaceRuntime {
               let prompt: string;
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
-                const { getPreviousWorkstreamCreatedAt } = await import(
-                  "./blackboard/query-workstreams.ts"
+                const { getPreviousStreamCreatedAt } = await import(
+                  "./blackboard/query-streams.ts"
                 );
                 const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
                 const { classifyContextRelevance } = await import(
                   "./classifier/context-relevance.ts"
                 );
-                const { formatWorkstreamPrompt } = await import("./pi/format-workstream-prompt.ts");
+                const { formatStreamPrompt } = await import("./pi/format-stream-prompt.ts");
                 const apiKey = resolveGroqApiKey();
 
-                const boundary = getPreviousWorkstreamCreatedAt(this.blackboard, ws.id);
+                const boundary = getPreviousStreamCreatedAt(this.blackboard, ws.id);
                 const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
 
                 if (apiKey && recentMessages.length > 1) {
@@ -1063,12 +1063,12 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(originalText)) {
                       relevantTexts.push(originalText);
                     }
-                    prompt = formatWorkstreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
+                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
                   } else {
-                    prompt = this.sessionManager.buildWorkstreamPrompt(
+                    prompt = this.sessionManager.buildStreamPrompt(
                       originalText,
                       ws.name,
                       ws.id,
@@ -1076,7 +1076,7 @@ export class ControlSurfaceRuntime {
                     );
                   }
                 } else {
-                  prompt = this.sessionManager.buildWorkstreamPrompt(
+                  prompt = this.sessionManager.buildStreamPrompt(
                     originalText,
                     ws.name,
                     ws.id,
@@ -1090,9 +1090,9 @@ export class ControlSurfaceRuntime {
                 this.wsHub.broadcast({
                   type: "error",
                   message:
-                    "Context classification failed — workstream context limited to current message.",
+                    "Context classification failed — stream context limited to current message.",
                 });
-                prompt = this.sessionManager.buildWorkstreamPrompt(
+                prompt = this.sessionManager.buildStreamPrompt(
                   originalText,
                   ws.name,
                   ws.id,
@@ -1110,27 +1110,27 @@ export class ControlSurfaceRuntime {
                 },
                 receivedAt: new Date().toISOString(),
               });
-              this.log(`enqueued original user message onto workstream "${ws.name}" (${ws.id})`);
+              this.log(`enqueued original user message onto stream "${ws.name}" (${ws.id})`);
             }
 
             return {
               content: [
                 {
                   type: "text",
-                  text: `Workstream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${originalText ? " and user message passed through" : ""}.`,
+                  text: `Stream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${originalText ? " and user message passed through" : ""}.`,
                 },
               ],
-              details: { workstreamId: ws.id, workstreamName: ws.name },
+              details: { streamId: ws.id, streamName: ws.name },
             };
           } catch (error) {
             return {
               content: [
                 {
                   type: "text",
-                  text: `Workstream "${ws.name}" created (ID: ${ws.id}) but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
+                  text: `Stream "${ws.name}" created (ID: ${ws.id}) but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
-              details: { workstreamId: ws.id, error: true },
+              details: { streamId: ws.id, error: true },
             };
           }
         },
@@ -1140,13 +1140,13 @@ export class ControlSurfaceRuntime {
         name: "enqueue_message",
         label: "Enqueue Message",
         description:
-          "Send a message to an existing orchestrator running on an open workstream. Use to forward user follow-ups, delegate context, or nudge an orchestrator. Does NOT create a workstream or spawn an orchestrator — use create_workstream for that.",
+          "Send a message to an existing orchestrator running on an open stream. Use to forward user follow-ups, delegate context, or nudge an orchestrator. Does NOT create a stream or spawn an orchestrator — use create_stream for that.",
         parameters: {
           type: "object",
           properties: {
             workstream_id: {
               type: "string",
-              description: "ID of the target workstream",
+              description: "ID of the target stream",
             },
             message: {
               type: "string",
@@ -1159,35 +1159,35 @@ export class ControlSurfaceRuntime {
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
           const { workstream_id, message } = params as { workstream_id: string; message: string };
-          const { getWorkstreamById } = await import("./blackboard/query-workstreams.ts");
-          const ws = getWorkstreamById(this.blackboard, workstream_id);
+          const { getStreamById } = await import("./blackboard/query-streams.ts");
+          const ws = getStreamById(this.blackboard, workstream_id);
           if (!ws) {
             return {
-              content: [{ type: "text", text: `Workstream not found: ${workstream_id}` }],
+              content: [{ type: "text", text: `Stream not found: ${workstream_id}` }],
               details: { error: true },
             };
           }
           if (ws.status !== "open") {
             return {
-              content: [{ type: "text", text: `Workstream is closed: ${ws.name}` }],
+              content: [{ type: "text", text: `Stream is closed: ${ws.name}` }],
               details: { error: true },
             };
           }
 
-          const orchestrator = this.sessionManager.getByWorkstream(ws.id);
+          const orchestrator = this.sessionManager.getByStream(ws.id);
           if (!orchestrator) {
             return {
               content: [
                 {
                   type: "text",
-                  text: `No running orchestrator for workstream: ${ws.name}`,
+                  text: `No running orchestrator for stream: ${ws.name}`,
                 },
               ],
               details: { error: true },
             };
           }
 
-          const formattedText = `[Workstream: "${ws.name}" (${ws.id})]\n${message}`;
+          const formattedText = `[Stream: "${ws.name}" (${ws.id})]\n${message}`;
 
           try {
             orchestrator.queue.enqueue({
@@ -1205,7 +1205,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Failed to enqueue message to workstream "${ws.name}": ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+                  text: `Failed to enqueue message to stream "${ws.name}": ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
                 },
               ],
               details: { error: true },
@@ -1217,8 +1217,8 @@ export class ControlSurfaceRuntime {
               source: "agent",
               content: message,
               sender: "system",
-              workstreamId: ws.id,
-              piSessionId: this.sessionManager.getByWorkstream(ws.id)?.piSessionId,
+              streamId: ws.id,
+              piSessionId: this.sessionManager.getByStream(ws.id)?.piSessionId,
               metadata: {
                 workstream_id: ws.id,
                 workstream_name: ws.name,
@@ -1232,19 +1232,19 @@ export class ControlSurfaceRuntime {
           }
 
           this.log(
-            `enqueued message onto workstream "${ws.name}" (${ws.id}), queue depth: ${orchestrator.queue.getDepth()}`,
+            `enqueued message onto stream "${ws.name}" (${ws.id}), queue depth: ${orchestrator.queue.getDepth()}`,
           );
 
           return {
             content: [
               {
                 type: "text",
-                text: `Message enqueued to workstream "${ws.name}" (queue depth: ${orchestrator.queue.getDepth()}).`,
+                text: `Message enqueued to stream "${ws.name}" (queue depth: ${orchestrator.queue.getDepth()}).`,
               },
             ],
             details: {
-              workstreamId: ws.id,
-              workstreamName: ws.name,
+              streamId: ws.id,
+              streamName: ws.name,
               queueDepth: orchestrator.queue.getDepth(),
             },
           };
@@ -1257,11 +1257,11 @@ export class ControlSurfaceRuntime {
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
-          "Create an isolated git worktree for a workstream. Sets up a new branch from origin/main and records the paths on the workstream.",
+          "Create an isolated git worktree for a stream. Sets up a new branch from origin/main and records the paths on the stream.",
         parameters: {
           type: "object",
           properties: {
-            workstream_id: { type: "string", description: "ID of the workstream" },
+            workstream_id: { type: "string", description: "ID of the stream" },
             repo_path: { type: "string", description: "Absolute path to the project repository" },
             branch_name: {
               type: "string",
@@ -1299,12 +1299,12 @@ export class ControlSurfaceRuntime {
             update_worktree_path,
           );
           if (result.ok) {
-            const piSessionId = this.sessionManager.getByWorkstream(workstream_id)?.piSessionId;
+            const piSessionId = this.sessionManager.getByStream(workstream_id)?.piSessionId;
             if (piSessionId) {
               this.wsHub.broadcast({
                 type: "worktree_changed",
                 piSessionId,
-                workstreamId: workstream_id,
+                streamId: workstream_id,
               });
             }
           }
@@ -1312,21 +1312,21 @@ export class ControlSurfaceRuntime {
         },
       });
 
-      const closeWsId = workstreamId;
+      const closeStreamId = streamId;
       tools.push({
-        name: "close_workstream",
-        label: "Close Workstream",
+        name: "close_stream",
+        label: "Close Stream",
         description:
-          'Close the current workstream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the workstream record. Only call when the human explicitly confirms the work is done.',
+          'Close the current stream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the stream record. Only call when the human explicitly confirms the work is done.',
         parameters: {
           type: "object",
           properties: {
-            workstream_id: { type: "string", description: "ID of the workstream to close" },
+            workstream_id: { type: "string", description: "ID of the stream to close" },
             mode: {
               type: "string",
               enum: ["merge", "noop"],
               description:
-                '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the workstream and ends the session.',
+                '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
             },
           },
           required: ["workstream_id", "mode"],
@@ -1337,7 +1337,7 @@ export class ControlSurfaceRuntime {
             workstream_id: string;
             mode: "merge" | "noop";
           };
-          const managed = closeWsId ? this.sessionManager.getByWorkstream(closeWsId) : undefined;
+          const managed = closeStreamId ? this.sessionManager.getByStream(closeStreamId) : undefined;
           const piSessId = managed?.piSessionId;
           if (!piSessId) {
             return {
@@ -1345,7 +1345,7 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseWorkstream(
+          const result = await executeCloseStream(
             this.blackboard,
             piSessId,
             workstream_id,
@@ -1353,9 +1353,9 @@ export class ControlSurfaceRuntime {
           );
           if (result.ok) {
             this.wsHub.broadcast({
-              type: "workstreams_changed",
+              type: "streams_changed",
               reason: "closed",
-              workstreamId: workstream_id,
+              streamId: workstream_id,
             });
           }
           return { content: [{ type: "text", text: result.message }], details: result };
@@ -1505,7 +1505,7 @@ export class ControlSurfaceRuntime {
           if (snapshot.busy && snapshot.currentTurnStartedAt) {
             const age = Date.now() - Date.parse(snapshot.currentTurnStartedAt);
             if (age > this.config.toolTimeoutMinutes * 60_000) {
-              const label = `${managed.role}${managed.workstreamId ? ` ws=${managed.workstreamId}` : ""}`;
+              const label = `${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""}`;
               const ageSeconds = Math.round(age / 1000);
               this.log(`queue turn appears stuck for ${ageSeconds}s (${label})`);
               setHealthFlag(
@@ -1569,7 +1569,7 @@ export class ControlSurfaceRuntime {
         typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
 
       // Skip router when message targets a specific Pi session (direct tab input)
-      let routerMeta: WorkstreamRoutingMeta = {};
+      let routerMeta: StreamRoutingMeta = {};
       if (targetSessionId) {
         routerMeta._targetSessionId = targetSessionId;
       } else {
@@ -1586,9 +1586,9 @@ export class ControlSurfaceRuntime {
             defaultPiSessionId,
           );
           routerMeta = { router_action: result.action };
-          if (result.workstream) {
-            routerMeta.workstream_id = result.workstream.id;
-            routerMeta.workstream_name = result.workstream.name;
+          if (result.stream) {
+            routerMeta.workstream_id = result.stream.id;
+            routerMeta.workstream_name = result.stream.name;
           }
         } catch (error) {
           this.log(
