@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { CheckIcon, CopyIcon, SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -353,8 +353,10 @@ export function Surface() {
     refetchOnWindowFocus: false,
   });
 
-  // Timeline from Query cache — seeded by route loader, appended by WS bridge.
-  const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
+  // useSuspenseQuery executes during SSR and streams resolved data to the client,
+  // unlike useQuery which skips server execution entirely.
+  // See: features/tanstack-patterns/references/query.md (lines 75-78)
+  const { data: timeline } = useSuspenseQuery(surfaceTimelineQueryOptions());
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
