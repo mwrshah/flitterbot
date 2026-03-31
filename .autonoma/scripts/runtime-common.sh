@@ -141,7 +141,7 @@ status_has_active_stream() {
     try {
       const s = JSON.parse(process.argv[1]);
       const d = s.streamAgent && s.streamAgent.default;
-      process.exit(d && d.sessionId ? 0 : 1);
+      process.exit(d && d.piSessionId ? 0 : 1);
     } catch { process.exit(1); }
   " "$body" 2>/dev/null
 }

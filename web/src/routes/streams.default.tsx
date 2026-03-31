@@ -17,19 +17,19 @@ export const Route = createFileRoute("/streams/default")({
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const defaultSessionId = status.streamAgent?.default?.sessionId;
+    const defaultPiSessionId = status.streamAgent?.default?.piSessionId;
     const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
-    // Seed the Query cache under the real sessionId when available.
-    if (defaultSessionId) {
+    // Seed the Query cache under the real piSessionId when available.
+    if (defaultPiSessionId) {
       const [sessions, worktree] = await Promise.all([
-        fetchStreamSessions({ data: { streamSessionId: defaultSessionId } }).catch(() => []),
-        fetchStreamsWorktree({ data: { streamSessionId: defaultSessionId } }).catch(() => null),
+        fetchStreamSessions({ data: { piSessionId: defaultPiSessionId } }).catch(() => []),
+        fetchStreamsWorktree({ data: { piSessionId: defaultPiSessionId } }).catch(() => null),
       ]);
-      context.queryClient.setQueryData(["streams-history", defaultSessionId, "agent"], history);
-      context.queryClient.setQueryData(["streams-downstream-sessions", defaultSessionId], sessions);
-      context.queryClient.setQueryData(["streams-worktree", defaultSessionId], worktree);
+      context.queryClient.setQueryData(["streams-history", defaultPiSessionId, "agent"], history);
+      context.queryClient.setQueryData(["streams-downstream-sessions", defaultPiSessionId], sessions);
+      context.queryClient.setQueryData(["streams-worktree", defaultPiSessionId], worktree);
     }
 
     return { history };
@@ -45,19 +45,19 @@ export const Route = createFileRoute("/streams/default")({
 function StreamsDefaultRoute() {
   const { history } = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
-  // Derive defaultSessionId reactively from the status query cache so it
+  // Derive defaultPiSessionId reactively from the status query cache so it
   // updates when the default Streams session restarts with a new ID, rather than
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const defaultSessionId = status?.streamAgent?.default?.sessionId;
-  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
-    useStreamsChat(defaultSessionId, history);
+  const defaultPiSessionId = status?.streamAgent?.default?.piSessionId;
+  const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
+    useStreamsChat(defaultPiSessionId, history);
 
   return (
     <PanelGroup orientation="horizontal" className="h-full">
       <Panel defaultSize="75%" minSize="40%">
         <ChatPanel
-          sessionId={effectiveSessionId}
+          piSessionId={effectivePiSessionId}
           timeline={timeline}
           statusPills={statusPills}
           isSessionBusy={isSessionBusy}
@@ -66,7 +66,7 @@ function StreamsDefaultRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel streamSessionId={effectiveSessionId} />
+        <DownstreamSessionsPanel piSessionId={effectivePiSessionId} />
       </Panel>
     </PanelGroup>
   );

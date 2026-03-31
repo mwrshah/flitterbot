@@ -41,11 +41,11 @@ function StreamsLayoutRoute() {
   const openOrchestrators = allOrchestrators.filter((o) => openStreamIds.has(o.streamId));
 
   // Ephemeral tab: if current URL points to a closed stream's orchestrator, include it
-  const currentSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
+  const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
   const ephemeralOrchestrator =
-    currentSessionId && currentSessionId !== "default"
+    currentPiSessionId && currentPiSessionId !== "default"
       ? allOrchestrators.find(
-          (o) => o.sessionId === currentSessionId && !openStreamIds.has(o.streamId),
+          (o) => o.piSessionId === currentPiSessionId && !openStreamIds.has(o.streamId),
         )
       : undefined;
 
@@ -66,9 +66,9 @@ function StreamsLayoutRoute() {
         </TabLink>
         {orchestrators.map((o) => (
           <TabLink
-            key={o.sessionId}
-            to={`/streams/${o.sessionId}`}
-            active={pathname === `/streams/${o.sessionId}`}
+            key={o.piSessionId}
+            to={`/streams/${o.piSessionId}`}
+            active={pathname === `/streams/${o.piSessionId}`}
           >
             {o.streamName ?? o.streamId}
             {o.busy && <Badge variant="success">active</Badge>}

@@ -53,12 +53,12 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   const status = statusQuery.data;
-  const defaultSessionId = status?.streamAgent?.default?.sessionId;
+  const defaultPiSessionId = status?.streamAgent?.default?.piSessionId;
   const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
   const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const currentSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
+  const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
@@ -79,20 +79,20 @@ export const Sidebar = memo(function Sidebar() {
       </nav>
 
       {/* Streams */}
-      {(defaultSessionId || allStreams.length > 0) && (
+      {(defaultPiSessionId || allStreams.length > 0) && (
         <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
-          {(defaultSessionId || openStreams.length > 0) && (
+          {(defaultPiSessionId || openStreams.length > 0) && (
             <>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
                 Active streams
               </p>
               <div className="space-y-1">
-                {defaultSessionId && (
+                {defaultPiSessionId && (
                   <Link
                     to="/streams/default"
                     className={cn(
                       "flex items-center px-2 py-1.5 rounded-md text-xs transition-colors",
-                      currentSessionId === "default" || (pathname === "/streams" && !currentSessionId)
+                      currentPiSessionId === "default" || (pathname === "/streams" && !currentPiSessionId)
                         ? "bg-accent text-accent-foreground font-medium"
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
@@ -101,14 +101,14 @@ export const Sidebar = memo(function Sidebar() {
                   </Link>
                 )}
                 {openStreams.map((ws) =>
-                  ws.streamSessionId ? (
+                  ws.piSessionId ? (
                     <Link
                       key={ws.id}
-                      to="/streams/$sessionId"
-                      params={{ sessionId: ws.streamSessionId }}
+to="/streams/$piSessionId"
+                      params={{ piSessionId: ws.piSessionId }}
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
-                        currentSessionId === ws.streamSessionId
+                        currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                       )}
@@ -141,15 +141,15 @@ export const Sidebar = memo(function Sidebar() {
               </p>
               <div className="space-y-1">
                 {closedStreams
-                  .filter((ws) => ws.streamSessionId)
+                  .filter((ws) => ws.piSessionId)
                   .map((ws) => (
                     <Link
                       key={ws.id}
-                      to="/streams/$sessionId"
-                      params={{ sessionId: ws.streamSessionId! }}
+to="/streams/$piSessionId"
+                      params={{ piSessionId: ws.piSessionId! }}
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
-                        currentSessionId === ws.streamSessionId
+                        currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
                       )}
@@ -167,7 +167,7 @@ export const Sidebar = memo(function Sidebar() {
       )}
 
       {/* Spacer */}
-      {!defaultSessionId && allStreams.length === 0 && <div className="flex-1" />}
+      {!defaultPiSessionId && allStreams.length === 0 && <div className="flex-1" />}
     </aside>
   );
 });

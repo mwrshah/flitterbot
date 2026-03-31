@@ -54,7 +54,7 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
       source: string;
       deliveryMode: string;
       images?: Array<{ data: string; mimeType: string }>;
-      targetSessionId?: string;
+      targetPiSessionId?: string;
     }) =>
       request<SendMessageResponse>("/message", {
         method: "POST",
@@ -67,10 +67,10 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
         body: JSON.stringify({ text }),
       }),
 
-    getStreamsHistory: (surface?: "input", streamSessionId?: string) => {
+    getStreamsHistory: (surface?: "input", piSessionId?: string) => {
       const params = new URLSearchParams();
       if (surface) params.set("surface", surface);
-      if (streamSessionId) params.set("streamSessionId", streamSessionId);
+      if (piSessionId) params.set("piSessionId", piSessionId);
       const qs = params.toString();
       return request<StreamsHistoryResponse>(
         qs ? `/api/streams/history?${qs}` : "/api/streams/history",
@@ -81,8 +81,8 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
-    interruptStreamSession: (streamSessionId: string) =>
-      request<{ ok: boolean }>(`/api/stream-sessions/${streamSessionId}/interrupt`, {
+    interruptPiSession: (piSessionId: string) =>
+      request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, {
         method: "POST",
       }),
 
@@ -91,9 +91,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
-    getDirectoryCompletions: (path: string, streamSessionId?: string) => {
+    getDirectoryCompletions: (path: string, piSessionId?: string) => {
       const params = new URLSearchParams({ path });
-      if (streamSessionId) params.set("streamSessionId", streamSessionId);
+      if (piSessionId) params.set("piSessionId", piSessionId);
       return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
     },
   };

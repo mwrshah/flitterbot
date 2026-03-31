@@ -1,5 +1,5 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { touchStreamsEvent } from "../blackboard/stream-sessions.ts";
+import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
   ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
@@ -96,6 +96,7 @@ type StreamSessionSubscriptionEvent =
     };
 
 type SubscribableStreamSession = {
+  /** Pi SDK session ID — equals piSessionId in the database */
   sessionId: string;
   messages: Array<unknown>;
   subscribe: (listener: (event: StreamSessionSubscriptionEvent) => void) => () => void;
@@ -121,12 +122,12 @@ function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEv
 
 function broadcastSurfaced(
   wsHub: WebSocketHub,
-  sessionId: string,
+  piSessionId: string,
   message: ChatTimelineMessage,
 ): void {
   const payload: StreamSurfacedWebSocketEvent = {
     type: "stream_surfaced",
-    sessionId,
+    piSessionId,
     message,
     streamId: message.streamId,
     streamName: message.streamName,
@@ -255,14 +256,14 @@ export function subscribeToStreamSession(
         ) {
           broadcast(wsHub, {
             type: "text_delta",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
         } else if (ame.type === "thinking_start" && currentStreamingMessageId) {
           const payload: ThinkingStartWebSocketEvent = {
             type: "thinking_start",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
           };
           broadcast(wsHub, payload);
@@ -273,14 +274,14 @@ export function subscribeToStreamSession(
         ) {
           broadcast(wsHub, {
             type: "thinking_delta",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
         } else if (ame.type === "thinking_end" && currentStreamingMessageId) {
           const payload: ThinkingEndWebSocketEvent = {
             type: "thinking_end",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
           };
           broadcast(wsHub, payload);
@@ -299,7 +300,7 @@ export function subscribeToStreamSession(
           }
           const payload: ToolCallStartWebSocketEvent = {
             type: "toolcall_start",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             contentIndex: ame.contentIndex,
             toolName,
             toolUseId,
@@ -343,7 +344,7 @@ export function subscribeToStreamSession(
           // The final correction (without intermediate) happens on agent_end.
           const payload: MessageEndWebSocketEvent = {
             type: "message_end",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             message: { ...timelineMessage, intermediate: true },
           };
           broadcast(wsHub, payload);
@@ -351,7 +352,7 @@ export function subscribeToStreamSession(
         } else {
           const payload: MessageEndWebSocketEvent = {
             type: "message_end",
-            sessionId: session.sessionId,
+            piSessionId: session.sessionId,
             message: timelineMessage,
           };
           broadcast(wsHub, payload);
@@ -362,7 +363,7 @@ export function subscribeToStreamSession(
       case "tool_execution_start": {
         const payload: ToolExecutionStartWebSocketEvent = {
           type: "tool_execution_start",
-          sessionId: session.sessionId,
+          piSessionId: session.sessionId,
           tool: event.toolName as string | undefined,
           toolUseId: event.toolCallId as string | undefined,
           args: event.args ?? event.parameters,
@@ -375,7 +376,7 @@ export function subscribeToStreamSession(
       case "tool_execution_end": {
         const payload: ToolExecutionEndWebSocketEvent = {
           type: "tool_execution_end",
-          sessionId: session.sessionId,
+          piSessionId: session.sessionId,
           tool: event.toolName as string | undefined,
           toolUseId: event.toolCallId as string | undefined,
           result: event.result,
@@ -392,7 +393,7 @@ export function subscribeToStreamSession(
         if (!hasPartialContent(event.partialResult)) break;
         const payload: ToolExecutionUpdateWebSocketEvent = {
           type: "tool_execution_update",
-          sessionId: session.sessionId,
+          piSessionId: session.sessionId,
           toolUseId: event.toolCallId as string | undefined,
           partialResult: event.partialResult,
           timestamp: now,
@@ -402,16 +403,16 @@ export function subscribeToStreamSession(
         break;
       }
       case "turn_start":
-        touchStreamsEvent(blackboard, session.sessionId, now, "active");
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       case "turn_end": {
-        touchStreamsEvent(blackboard, session.sessionId, now, "active");
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
 
         const payload: TurnEndWebSocketEvent = {
           type: "turn_end",
-          sessionId: session.sessionId,
+          piSessionId: session.sessionId,
           timestamp: now,
           event,
         };
@@ -419,11 +420,11 @@ export function subscribeToStreamSession(
         break;
       }
       case "agent_start":
-        touchStreamsEvent(blackboard, session.sessionId, now, "active");
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         lastAssistantMessage = null;
         break;
       case "agent_end": {
-        touchStreamsEvent(blackboard, session.sessionId, now, "active");
+        touchPiEvent(blackboard, session.sessionId, now, "active");
         if (lastAssistantMessage) {
           // Broadcast stream_surfaced for the Surface. The agent timeline already has
           // the message from the message_end event — no second message_end needed.
@@ -432,7 +433,7 @@ export function subscribeToStreamSession(
         lastAssistantMessage = null;
         // Always broadcast agent_end so the frontend can flush any uncommitted streaming
         // text (e.g. when abort() causes runAgentLoop to throw, skipping message_end/turn_end).
-        broadcast(wsHub, { type: "agent_end", sessionId: session.sessionId });
+        broadcast(wsHub, { type: "agent_end", piSessionId: session.sessionId });
         break;
       }
       case "compaction_start":

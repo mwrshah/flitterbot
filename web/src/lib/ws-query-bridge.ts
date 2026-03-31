@@ -34,7 +34,7 @@ import type { AutonomaWsClient } from "~/lib/ws";
 export type SendMessageFn = (
   text: string,
   images?: ImageAttachment[],
-  targetSessionId?: string,
+  targetPiSessionId?: string,
 ) => Promise<void>;
 
 export function createSendMessage(deps: {
@@ -43,9 +43,9 @@ export function createSendMessage(deps: {
   queryClient: QueryClient;
 }): SendMessageFn {
   const { wsClient, apiClient, queryClient } = deps;
-  return async (text, images, targetSessionId) => {
+  return async (text, images, targetPiSessionId) => {
     try {
-      await wsClient.sendMessage(text, "followUp", images, targetSessionId);
+      await wsClient.sendMessage(text, "followUp", images, targetPiSessionId);
     } catch (wsError) {
       console.error("WS send failed, trying HTTP fallback:", wsError);
       try {
@@ -54,11 +54,11 @@ export function createSendMessage(deps: {
           source: "web",
           deliveryMode: "followUp",
           images,
-          targetSessionId,
+          targetPiSessionId,
         });
       } catch (httpError) {
         console.error("HTTP fallback also failed:", httpError);
-        const sid = targetSessionId ?? "default";
+        const sid = targetPiSessionId ?? "default";
         addPill(queryClient, sid, {
           id: createId("send-error"),
           label: "Failed to send message",
@@ -207,18 +207,18 @@ export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: AutonomaWsClient;
   router: AnyRouter;
-  getDefaultSessionId: () => string | undefined;
+  getDefaultPiSessionId: () => string | undefined;
 }): () => void {
-  const { queryClient, wsClient, router, getDefaultSessionId } = deps;
+  const { queryClient, wsClient, router, getDefaultPiSessionId } = deps;
 
   /* ── WS message handler ── */
 
   const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
-    const sessionId = "sessionId" in message && message.sessionId ? message.sessionId : undefined;
+    const piSessionId = "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
 
     // ── connected ──
     if (message.type === "connected") {
-      const defaultSid = getDefaultSessionId();
+      const defaultSid = getDefaultPiSessionId();
       if (defaultSid) {
         addPill(queryClient, defaultSid, {
           id: "ws-connected",
@@ -237,14 +237,14 @@ export function setupWsQueryBridge(deps: {
     // ── sessions_changed ──
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
-        queryKey: ["streams-downstream-sessions", message.streamSessionId],
+        queryKey: ["streams-downstream-sessions", message.piSessionId],
       });
       return;
     }
 
     // ── worktree_changed ──
     if (message.type === "worktree_changed") {
-      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.streamSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.piSessionId] });
       return;
     }
 
@@ -278,7 +278,7 @@ export function setupWsQueryBridge(deps: {
 
     // ── queue_item_start ──
     if (message.type === "queue_item_start") {
-      const sid = sessionId ?? getDefaultSessionId();
+      const sid = piSessionId ?? getDefaultPiSessionId();
       if (!sid) return;
       const sourceLabel =
         message.item.source === "whatsapp"
@@ -304,7 +304,7 @@ export function setupWsQueryBridge(deps: {
 
     // ── queue_item_end ──
     if (message.type === "queue_item_end") {
-      const sid = sessionId ?? getDefaultSessionId();
+      const sid = piSessionId ?? getDefaultPiSessionId();
       if (!sid) return;
       removePill(queryClient, sid, `processing-${message.itemId}`);
 
@@ -318,11 +318,11 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    if (!sessionId) return;
+    if (!piSessionId) return;
 
     // ── message_start → typing indicator ──
     if (message.type === "message_start") {
-      addPill(queryClient, sessionId, {
+      addPill(queryClient, piSessionId, {
         id: "assistant-typing",
         label: "Thinking…",
       });
@@ -332,33 +332,33 @@ export function setupWsQueryBridge(deps: {
     // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
       // Remove typing indicator once real content starts flowing
-      removePill(queryClient, sessionId, "assistant-typing");
-      streamingStore.appendTextDelta(sessionId, message.messageId, message.delta);
+      removePill(queryClient, piSessionId, "assistant-typing");
+      streamingStore.appendTextDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     // ── thinking lifecycle → streaming store ──
     if (message.type === "thinking_start") {
       // Remove typing indicator once thinking starts
-      removePill(queryClient, sessionId, "assistant-typing");
-      streamingStore.setThinkingStreaming(sessionId, true, message.messageId);
+      removePill(queryClient, piSessionId, "assistant-typing");
+      streamingStore.setThinkingStreaming(piSessionId, true, message.messageId);
       return;
     }
 
     if (message.type === "thinking_delta") {
-      streamingStore.appendThinkingDelta(sessionId, message.messageId, message.delta);
+      streamingStore.appendThinkingDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     if (message.type === "thinking_end") {
-      streamingStore.setThinkingStreaming(sessionId, false);
+      streamingStore.setThinkingStreaming(piSessionId, false);
       return;
     }
 
     // ── toolcall_start → buffer in streaming store ──
     if (message.type === "toolcall_start") {
       if (message.toolUseId) {
-        streamingStore.addPendingToolCall(sessionId, {
+        streamingStore.addPendingToolCall(piSessionId, {
           toolUseId: message.toolUseId,
           toolName: message.toolName,
         });
@@ -371,11 +371,11 @@ export function setupWsQueryBridge(deps: {
       const msg = message.message;
 
       // Remove typing indicator on message commit
-      removePill(queryClient, sessionId, "assistant-typing");
+      removePill(queryClient, piSessionId, "assistant-typing");
 
       // Always capture thinking from the streaming store — it must be committed
       // to the Query cache regardless of whether there's text content.
-      const thinkingText = streamingStore.getThinkingText(sessionId);
+      const thinkingText = streamingStore.getThinkingText(piSessionId);
 
       if (msg.content.trim() || thinkingText) {
         // Build the committed message with both thinking and text blocks.
@@ -391,13 +391,13 @@ export function setupWsQueryBridge(deps: {
         }
 
         const committed = { ...msg, blocks };
-        upsertTimelineItem(queryClient, sessionId, committed);
+        upsertTimelineItem(queryClient, piSessionId, committed);
       }
 
       // Flush tool calls buffered since toolcall_start.
-      const pendingTools = streamingStore.flushPendingToolCalls(sessionId);
+      const pendingTools = streamingStore.flushPendingToolCalls(piSessionId);
       for (const tool of pendingTools) {
-        appendTimelineItem(queryClient, sessionId, {
+        appendTimelineItem(queryClient, piSessionId, {
           id: createId("tool"),
           kind: "tool",
           tool: tool.toolName ?? "tool",
@@ -410,10 +410,10 @@ export function setupWsQueryBridge(deps: {
       // Clear all streaming state atomically.
       console.log(
         "[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s",
-        sessionId,
+        piSessionId,
         msg.id,
       );
-      streamingStore.clearSession(sessionId);
+      streamingStore.clearSession(piSessionId);
       return;
     }
 
@@ -456,11 +456,11 @@ export function setupWsQueryBridge(deps: {
           return [...old, surfacedMessage];
         });
       } else {
-        console.log(
+console.log(
           "[debug][ws-bridge] stream_surfaced: no serverMessageId, appending via appendTimelineItem. surfacedId=%s role=%s",
           surfacedMessage.id, surfacedMessage.role,
         );
-        appendTimelineItem(queryClient, sessionId, surfacedMessage, "input");
+        appendTimelineItem(queryClient, piSessionId, surfacedMessage, "input");
       }
       return;
     }
@@ -469,7 +469,7 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "tool_execution_update") {
       updateTimelineItem(
         queryClient,
-        sessionId,
+        piSessionId,
         (item) =>
           item.kind === "tool" &&
           (item as ChatTimelineTool).toolUseId === message.toolUseId &&
@@ -500,7 +500,7 @@ export function setupWsQueryBridge(deps: {
       let upgraded = false;
       if (message.toolUseId) {
         queryClient.setQueryData<ChatTimelineItem[]>(
-          ["streams-history", sessionId, "agent"],
+          ["streams-history", piSessionId, "agent"],
           (old) => {
             if (!old) return old;
             const idx = old.findIndex(
@@ -521,7 +521,7 @@ export function setupWsQueryBridge(deps: {
 
       // Fallback: no pending item (e.g. reconnect) — append fresh
       if (!upgraded) {
-        appendTimelineItem(queryClient, sessionId, {
+        appendTimelineItem(queryClient, piSessionId, {
           id: message.id ?? createId("tool"),
           kind: "tool",
           tool,
@@ -554,30 +554,30 @@ export function setupWsQueryBridge(deps: {
         isError: message.isError,
         createdAt: message.timestamp ?? new Date().toISOString(),
       };
-      appendTimelineItem(queryClient, sessionId, toolEvent);
+      appendTimelineItem(queryClient, piSessionId, toolEvent);
       return;
     }
 
     // ── turn_end ──
     if (message.type === "turn_end") {
-      console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", sessionId);
-      streamingStore.clearSession(sessionId);
+      console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", piSessionId);
+      streamingStore.clearSession(piSessionId);
       return;
     }
 
     // ── agent_end ──
     if (message.type === "agent_end") {
       // Remove typing indicator if still present
-      removePill(queryClient, sessionId, "assistant-typing");
+      removePill(queryClient, piSessionId, "assistant-typing");
 
-      const uncommitted = streamingStore.getUncommittedText(sessionId);
+      const uncommitted = streamingStore.getUncommittedText(piSessionId);
       if (uncommitted?.text.trim()) {
         console.log(
           "[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s",
           uncommitted.messageId,
-          sessionId,
+          piSessionId,
         );
-        upsertTimelineItem(queryClient, sessionId, {
+        upsertTimelineItem(queryClient, piSessionId, {
           id: uncommitted.messageId,
           kind: "message",
           role: "assistant",
@@ -588,9 +588,9 @@ export function setupWsQueryBridge(deps: {
       console.log(
         "[debug][ws-bridge] agent_end: calling clearSession hasUncommitted=%s session=%s",
         uncommitted?.text.trim() ? "yes" : "no",
-        sessionId,
+        piSessionId,
       );
-      streamingStore.clearSession(sessionId);
+      streamingStore.clearSession(piSessionId);
       return;
     }
   });

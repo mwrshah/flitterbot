@@ -67,7 +67,7 @@ function RuntimePage() {
               <div className="grid grid-cols-3 gap-4">
                 <MetaItem
                   label="Session ID"
-                  value={status.streamAgent?.default?.sessionId ?? ""}
+                  value={status.streamAgent?.default?.piSessionId ?? ""}
                   mono
                 />
                 <MetaItem
@@ -88,7 +88,7 @@ function RuntimePage() {
                 <div className="space-y-3">
                   {status.streamAgent!.orchestrators!.map((o) => (
                     <div
-                      key={o.sessionId}
+                      key={o.piSessionId}
                       className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                     >
                       <div className="space-y-1">
@@ -96,7 +96,7 @@ function RuntimePage() {
                           {o.streamName ?? o.streamId}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono">
-                          {o.sessionId.slice(0, 12)}
+                          {o.piSessionId.slice(0, 12)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

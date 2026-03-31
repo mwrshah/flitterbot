@@ -8,18 +8,18 @@ const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 type WsMode = "surface" | "streams-default" | "stream-session";
 
 type SubscriptionTarget = {
-  sessionId: string;
+  piSessionId: string;
   eventTypes?: string[];
 };
 
 type MatchWithWsData = {
   staticData?: { wsMode?: WsMode };
-  params?: { sessionId?: string };
-  loaderData?: { defaultSessionId?: string };
+  params?: { piSessionId?: string };
+  loaderData?: { defaultPiSessionId?: string };
 };
 
 function defaultStreamSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.streamAgent?.default?.sessionId;
+  return queryClient.getQueryData<StatusResponse>(["status"])?.streamAgent?.default?.piSessionId;
 }
 
 function resolveSubscriptionTarget(
@@ -32,16 +32,16 @@ function resolveSubscriptionTarget(
 
   switch (activeMatch.staticData?.wsMode) {
     case "surface":
-      return { sessionId: "*", eventTypes: INPUT_SURFACE_EVENT_TYPES };
+      return { piSessionId: "*", eventTypes: INPUT_SURFACE_EVENT_TYPES };
     case "streams-default": {
       // Prefer the live cache value over stale loader data — the default Streams
-      // session may have restarted with a new sessionId since the loader ran.
-      const sessionId =
-        defaultStreamSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
-      return sessionId ? { sessionId } : null;
+      // session may have restarted with a new piSessionId since the loader ran.
+      const piSessionId =
+        defaultStreamSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultPiSessionId;
+      return piSessionId ? { piSessionId } : null;
     }
     case "stream-session":
-      return activeMatch.params?.sessionId ? { sessionId: activeMatch.params.sessionId } : null;
+      return activeMatch.params?.piSessionId ? { piSessionId: activeMatch.params.piSessionId } : null;
     default:
       return null;
   }
@@ -49,7 +49,7 @@ function resolveSubscriptionTarget(
 
 function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null): boolean {
   if (a === null || b === null) return a === b;
-  if (a.sessionId !== b.sessionId) return false;
+  if (a.piSessionId !== b.piSessionId) return false;
   if (a.eventTypes === undefined || b.eventTypes === undefined)
     return a.eventTypes === b.eventTypes;
   if (a.eventTypes.length !== b.eventTypes.length) return false;
@@ -71,7 +71,7 @@ export function setupWsRouteSubscriptions(
     activeTarget = nextTarget;
 
     if (nextTarget) {
-      wsClient.setSessionSubscription(nextTarget.sessionId, nextTarget.eventTypes);
+      wsClient.setSessionSubscription(nextTarget.piSessionId, nextTarget.eventTypes);
     } else {
       wsClient.clearSessionSubscription();
     }

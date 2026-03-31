@@ -35,8 +35,8 @@ export interface WhatsAppRuntimeStatus {
   requiresManualAuth?: boolean;
 }
 
-export interface StreamsRuntimeStatus {
-  sessionId: string;
+export interface PiSessionRuntimeStatus {
+  piSessionId: string;
   sessionFile: string | null;
   messageCount: number;
   lastPromptAt: string | null;
@@ -59,7 +59,7 @@ export interface ClaudeSessionListItem {
   agentManaged: boolean;
   sessionEndReason: string | null;
   streamId: string | null;
-  streamSessionId: string | null;
+  piSessionId: string | null;
   startedAt: string;
   endedAt: string | null;
   lastEventAt: string;
@@ -68,17 +68,17 @@ export interface ClaudeSessionListItem {
 
 export type ClaudeSessionDetail = ClaudeSessionListItem;
 
-export interface StreamsOrchestratorStatus {
-  sessionId: string;
+export interface PiOrchestratorStatus {
+  piSessionId: string;
   streamId: string;
   streamName: string | null;
   messageCount: number;
   busy: boolean;
 }
 
-export interface StreamMultiSessionStatus {
-  default: StreamsRuntimeStatus | null;
-  orchestrators: StreamsOrchestratorStatus[];
+export interface PiMultiSessionStatus {
+  default: PiSessionRuntimeStatus | null;
+  orchestrators: PiOrchestratorStatus[];
 }
 
 export interface StreamSummary {
@@ -88,7 +88,7 @@ export interface StreamSummary {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  streamSessionId?: string;
+  piSessionId?: string;
   sessionCount: number;
   createdAt: string;
 }
@@ -97,7 +97,7 @@ export interface StatusResponse {
   ok: true;
   pid: number;
   uptime: number;
-  streamAgent: StreamMultiSessionStatus;
+  streamAgent: PiMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
@@ -109,7 +109,7 @@ export interface MessageRequest {
   metadata?: Record<string, unknown>;
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
-  targetSessionId?: string;
+  targetPiSessionId?: string;
 }
 
 export interface MessageResponse {
@@ -153,7 +153,7 @@ export interface DownstreamSessionItem {
   project: string | null;
 }
 
-export interface StreamSessionsListResponse {
+export interface PiSessionsListResponse {
   items: DownstreamSessionItem[];
 }
 
@@ -170,7 +170,7 @@ export type StreamsHistoryToolItem = ChatTimelineTool;
 export type StreamsHistoryItem = ChatTimelineItem;
 
 export interface StreamsHistoryResponse {
-  sessionId: string | null;
+  piSessionId: string | null;
   sessionFile: string | null;
   items: ChatTimelineItem[];
 }
@@ -234,9 +234,9 @@ export interface StopResponse {
   message: string;
 }
 
-export interface StreamSessionInterruptResponse {
+export interface PiSessionInterruptResponse {
   ok: boolean;
-  streamSessionId?: string;
+  piSessionId?: string;
   signaledSessions?: number;
   error?: string;
 }
@@ -324,14 +324,14 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/cron/tick",
     auth: "bearer",
   },
-  streamSessions: {
+  piSessions: {
     method: "GET",
-    path: "/api/stream-sessions/:streamSessionId/sessions",
+    path: "/api/pi-sessions/:piSessionId/sessions",
     auth: "none",
   },
-  streamSessionInterrupt: {
+  piSessionInterrupt: {
     method: "POST",
-    path: "/api/stream-sessions/:streamSessionId/interrupt",
+    path: "/api/pi-sessions/:piSessionId/interrupt",
     auth: "bearer",
   },
   directoryCompletions: {

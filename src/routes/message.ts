@@ -33,8 +33,8 @@ export async function handleMessageRoute(
   // Only web and whatsapp sources reach this handler (normalizeSource guarantees this).
   // Direct-targeted session (web UI tab input) — skip router
   let streamMeta: StreamRoutingMeta = {};
-  if (body.targetSessionId) {
-    streamMeta._targetSessionId = body.targetSessionId;
+  if (body.targetPiSessionId) {
+    streamMeta._targetSessionId = body.targetPiSessionId;
   } else {
     const classification = await routeMessage(runtime, body.text);
     if (classification) {
@@ -61,12 +61,12 @@ async function routeMessage(
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
-    const defaultStreamSessionId = runtime.sessionManager.getDefault()?.streamSessionId;
+    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
     const result = await classifyMessage(
       rawText,
       runtime.blackboard,
       apiKey,
-      defaultStreamSessionId,
+      defaultPiSessionId,
     );
     const meta: StreamRoutingMeta = {
       router_action: result.action,
