@@ -53,6 +53,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   const status = statusQuery.data;
+  const defaultSessionId = status?.streamAgent?.default?.sessionId;
   const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
   const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
@@ -76,14 +77,25 @@ export const Sidebar = memo(function Sidebar() {
       </nav>
 
       {/* Streams */}
-      {allStreams.length > 0 && (
+      {(defaultSessionId || allStreams.length > 0) && (
         <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
-          {openStreams.length > 0 && (
+          {(defaultSessionId || openStreams.length > 0) && (
             <>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
                 Active streams
               </p>
               <div className="space-y-1">
+                {defaultSessionId && (
+                  <Link
+                    to="/streams/default"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+                  >
+                    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 shrink-0 text-sidebar-foreground/40">
+                      <path d="M8.5 1.75a.75.75 0 0 0-1.5 0V5H3.75a.75.75 0 0 0-.53 1.28l4.25 4.25a.75.75 0 0 0 1.06 0l4.25-4.25A.75.75 0 0 0 12.25 5H9V1.75ZM2 13.25a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" />
+                    </svg>
+                    <span className="truncate">Default</span>
+                  </Link>
+                )}
                 {openStreams.map((ws) =>
                   ws.streamSessionId ? (
                     <Link
@@ -141,7 +153,7 @@ export const Sidebar = memo(function Sidebar() {
       )}
 
       {/* Spacer */}
-      {allStreams.length === 0 && <div className="flex-1" />}
+      {!defaultSessionId && allStreams.length === 0 && <div className="flex-1" />}
     </aside>
   );
 });
