@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
 import type {
   ChatTimelineItem,
-
+  ConnectionState,
   DirectoryCompletionItem,
   DownstreamSessionItem,
   StatusResponse,
@@ -116,6 +116,14 @@ export function statusPillsQueryOptions(piSessionId: string) {
   };
 }
 
+/** Connection state — managed by WS bridge via setQueryData. */
+export function connectionStateQueryOptions() {
+  return {
+    queryKey: ["connection-state"] as const,
+    queryFn: (): ConnectionState => "disconnected",
+    staleTime: Infinity,
+  };
+}
 
 /** Surface timeline — stream_surfaced events + user messages from all sessions. */
 export function surfaceTimelineQueryOptions() {
@@ -123,11 +131,7 @@ export function surfaceTimelineQueryOptions() {
     queryKey: ["surface-timeline"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsInputHistory()) as ChatTimelineItem[],
-    // Short staleTime prevents the immediate re-fetch flash on route re-entry
-    // (ensureQueryData returns cached data, then useQuery refetches because stale).
-    // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS
-    // unsubscribes so data goes stale naturally after this window.
-    staleTime: 5_000,
+    staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     structuralSharing: mergeTimelineItems,
   };
 }
