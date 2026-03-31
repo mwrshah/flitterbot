@@ -16,8 +16,8 @@ export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
 ## Runtime Facts
 - Your final text response each turn is automatically sent to both WhatsApp and the web client.
 
-- You are an orchestrator Streams agent —  assigned the task on this one stream.
-- Your Streams session ID: \`${ctx.streamSessionId}\`
+- You are an orchestrator Stream agent —  assigned the task on this one stream.
+- Your Stream session ID: \`${ctx.streamSessionId}\`
 - Stream: *${ctx.streamName}* (ID: ${ctx.streamId})${repoLine}
 
 ## How to Prompt Claude Code Agents

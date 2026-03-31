@@ -127,14 +127,12 @@ Pretext requires explicit font strings matching CSS declarations. Current fonts:
 
 ## Incremental Adoption Strategy
 
-See spec stubs in `specs/` for phased rollout:
+Phased rollout, each independently shippable:
 
-1. **01-virtualization-height-prediction**: Core measurement oracle + virtualizer integration
-2. **02-chat-bubble-shrinkwrap**: Tight-fitting bubble widths for plain-text messages
-3. **03-streaming-layout-integration**: Height prediction during streaming for scroll anchoring
-4. **04-sidebar-label-measurement**: Text measurement for sidebar labels and truncation
-
-Each phase is independently shippable and provides standalone value.
+1. **Virtualization height prediction**: Core measurement oracle + virtualizer integration
+2. **Chat bubble shrinkwrap**: Tight-fitting bubble widths for plain-text messages
+3. **Streaming layout integration**: Height prediction during streaming for scroll anchoring
+4. **Sidebar label measurement**: Text measurement for sidebar labels and truncation
 
 ## Risks and Open Questions
 
