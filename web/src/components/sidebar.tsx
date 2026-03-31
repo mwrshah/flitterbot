@@ -19,7 +19,7 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: React.R
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          ? "bg-accent text-accent-foreground font-medium"
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
       )}
     >
@@ -93,7 +93,7 @@ export const Sidebar = memo(function Sidebar() {
                     className={cn(
                       "flex items-center px-2 py-1.5 rounded-md text-xs transition-colors",
                       currentSessionId === "default" || (pathname === "/streams" && !currentSessionId)
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        ? "bg-accent text-accent-foreground font-medium"
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
                   >
@@ -109,7 +109,7 @@ export const Sidebar = memo(function Sidebar() {
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
                         currentSessionId === ws.streamSessionId
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                       )}
                     >
@@ -150,7 +150,7 @@ export const Sidebar = memo(function Sidebar() {
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
                         currentSessionId === ws.streamSessionId
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
                       )}
                     >
