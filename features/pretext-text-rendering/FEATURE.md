@@ -4,7 +4,7 @@
 
 Autonoma's web UI is a text-heavy chat application where text measurement drives layout quality and performance. Current pain points stem from the standard DOM text rendering model:
 
-1. **Virtualization without height prediction**: The chat message list (`streams-message-list.tsx` -> Lit `<message-list>`) renders all messages in DOM. Virtualizing this list requires knowing message heights before rendering -- today that means either DOM measurement (expensive reflow) or fixed-height guesstimates (visually broken). Pretext's `prepare()` + `layout()` can predict heights from cached widths with pure arithmetic (~0.0002ms per block), enabling true virtualization without measurement.
+1. **Virtualization without height prediction**: The chat message list (`pi-message-list.tsx` -> Lit `<message-list>`) renders all messages in DOM. Virtualizing this list requires knowing message heights before rendering -- today that means either DOM measurement (expensive reflow) or fixed-height guesstimates (visually broken). Pretext's `prepare()` + `layout()` can predict heights from cached widths with pure arithmetic (~0.0002ms per block), enabling true virtualization without measurement.
 
 2. **Chat bubble width waste**: Message bubbles use CSS `max-width` which leaves trailing whitespace on wrapped lines. Pretext's `walkLineRanges()` + binary-search shrinkwrap (demonstrated in the bubbles demo) eliminates this waste, producing tighter, more polished bubbles.
 
@@ -99,7 +99,7 @@ Pretext requires explicit font strings matching CSS declarations. Current fonts:
 ## Surfaces to Convert
 
 ### Phase 1: Chat message height prediction
-- **Component**: `streams-message-list.tsx` + Lit `<message-list>`
+- **Component**: `pi-message-list.tsx` + Lit `<message-list>`
 - **What changes**: Add pretext height oracle for plain-text messages, enable virtualization window
 - **Complexity**: Medium -- need to handle mixed content (some messages are plain text, some are markdown with code blocks)
 
@@ -109,12 +109,12 @@ Pretext requires explicit font strings matching CSS declarations. Current fonts:
 - **Complexity**: Low for plain-text bubbles, not applicable to markdown-heavy messages
 
 ### Phase 3: Streaming layout prediction
-- **Component**: `streaming-store.ts`, `streams-message-list.tsx`
+- **Component**: `streaming-store.ts`, `pi-message-list.tsx`
 - **What changes**: Predict height during streaming, pre-allocate space, smooth scroll anchoring
 - **Complexity**: High -- incremental prepare() on deltas, coordination with Lit imperative updates
 
 ### Phase 4: Sidebar label measurement
-- **Component**: `sidebar.tsx` (stream names with `truncate` class)
+- **Component**: `sidebar.tsx` (workstream names with `truncate` class)
 - **What changes**: Use pretext to measure label widths, implement smarter truncation or tooltip triggers based on actual text measurement rather than CSS overflow
 - **Complexity**: Low
 
@@ -127,12 +127,14 @@ Pretext requires explicit font strings matching CSS declarations. Current fonts:
 
 ## Incremental Adoption Strategy
 
-Phased rollout, each independently shippable:
+See spec stubs in `specs/` for phased rollout:
 
-1. **Virtualization height prediction**: Core measurement oracle + virtualizer integration
-2. **Chat bubble shrinkwrap**: Tight-fitting bubble widths for plain-text messages
-3. **Streaming layout integration**: Height prediction during streaming for scroll anchoring
-4. **Sidebar label measurement**: Text measurement for sidebar labels and truncation
+1. **01-virtualization-height-prediction**: Core measurement oracle + virtualizer integration
+2. **02-chat-bubble-shrinkwrap**: Tight-fitting bubble widths for plain-text messages
+3. **03-streaming-layout-integration**: Height prediction during streaming for scroll anchoring
+4. **04-sidebar-label-measurement**: Text measurement for sidebar labels and truncation
+
+Each phase is independently shippable and provides standalone value.
 
 ## Risks and Open Questions
 
