@@ -128,6 +128,44 @@ function prettyValue(value: unknown): { content: string; language: string } {
   }
 }
 
+export class MessageCopyButton extends LitElement {
+  @property() text = "";
+  @state() private copied = false;
+
+  protected override createRenderRoot(): HTMLElement | DocumentFragment {
+    return this;
+  }
+
+  private async copy(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.text);
+      this.copied = true;
+      setTimeout(() => {
+        this.copied = false;
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to copy message", error);
+    }
+  }
+
+  override render() {
+    if (!this.text) return nothing;
+    return html`
+      <button
+        @click=${this.copy}
+        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+        title="${i18n("Copy message")}"
+      >
+        ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
+      </button>
+    `;
+  }
+}
+
+if (!customElements.get("message-copy-button")) {
+  customElements.define("message-copy-button", MessageCopyButton);
+}
+
 export class MarkdownBlock extends LitElement {
   @property() content = "";
   @property({ type: Boolean }) isThinking = false;
@@ -685,10 +723,12 @@ export class UserMessage extends LitElement {
       | undefined;
     const imageBlocks = contentArr.filter((chunk) => chunk.type === "image") as ImageContent[];
 
+    const plainText = textContent?.text || "";
+
     return html`
       <div class="flex justify-start mx-4">
-        <div>
-          <div class="user-message-container py-2 px-4 rounded-xl">
+        <div class="relative">
+          <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
             ${textContent?.text ? html`<markdown-block .content=${textContent.text}></markdown-block>` : ""}
             ${
               imageBlocks.length > 0
@@ -708,6 +748,7 @@ export class UserMessage extends LitElement {
                 : ""
             }
           </div>
+          <message-copy-button .text=${plainText}></message-copy-button>
         </div>
       </div>
     `;
@@ -873,9 +914,15 @@ export class AssistantMessage extends LitElement {
       }
     }
 
+    const plainText = this.message.content
+      .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
+      .map((chunk) => chunk.text)
+      .join("\n");
+
     return html`
-      <div>
-        ${orderedParts.length ? html`<div class="px-4 flex flex-col gap-3">${orderedParts}</div>` : ""}
+      <div class="relative">
+        ${orderedParts.length ? html`<div class="px-4 pr-8 flex flex-col gap-3">${orderedParts}</div>` : ""}
+        ${plainText ? html`<message-copy-button .text=${plainText}></message-copy-button>` : ""}
         ${
           this.message.usage && !this.isStreaming
             ? this.onCostClick

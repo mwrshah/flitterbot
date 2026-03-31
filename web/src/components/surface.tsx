@@ -168,7 +168,7 @@ function MessageCopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={() => copy(text)}
-      className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer"
+      className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
       title="Copy message"
     >
       {copied ? (
