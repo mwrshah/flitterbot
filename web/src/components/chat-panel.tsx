@@ -21,7 +21,7 @@ const useIsClient = () =>
   );
 
 type ChatPanelProps = {
-  sessionId: string;
+  piSessionId: string;
   timeline: ChatTimelineItem[];
   statusPills: StatusPill[];
   isSessionBusy: boolean;
@@ -31,7 +31,7 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({
-  sessionId,
+  piSessionId,
   timeline,
   statusPills,
   isSessionBusy,
@@ -52,7 +52,7 @@ export function ChatPanel({
   const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
-    mutationFn: () => apiClient.interruptStreamSession(sessionId),
+    mutationFn: () => apiClient.interruptPiSession(piSessionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
@@ -71,7 +71,7 @@ export function ChatPanel({
 
   // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
-    streamingStore.onStreamingDelta(sessionId, (text, thinking, isThinkingStreaming, messageId) => {
+    streamingStore.onStreamingDelta(piSessionId, (text, thinking, isThinkingStreaming, messageId) => {
       if (messageId != null) {
         messageListRef.current?.updateStreaming(
           {
@@ -99,16 +99,16 @@ export function ChatPanel({
       } else {
         console.log(
           "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
-          sessionId,
+          piSessionId,
         );
         messageListRef.current?.clearStreaming();
       }
     });
     return () => {
-      streamingStore.offStreamingDelta(sessionId);
+      streamingStore.offStreamingDelta(piSessionId);
       messageListRef.current?.clearStreaming();
     };
-  }, [sessionId]);
+  }, [piSessionId]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));

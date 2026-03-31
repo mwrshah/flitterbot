@@ -18,8 +18,8 @@ import {
   updateSessionStop,
 } from "./blackboard/query-sessions.ts";
 import {
-  getActiveStreamSessionId,
-  getLatestStreamSessionId,
+  getActivePiSessionId,
+  getLatestPiSessionId,
   listOpenStreams,
   listRecentlyClosedStreams,
   resetAllStreams,
@@ -27,9 +27,9 @@ import {
 import {
   getLastDatetimeReportedAt,
   touchDatetimeReportedAt,
-  touchStreamsPrompt,
-  updateStreamSessionStatus,
-} from "./blackboard/stream-sessions.ts";
+  touchPiPrompt,
+  updatePiSessionStatus,
+} from "./blackboard/pi-sessions.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
@@ -156,18 +156,18 @@ export class ControlSurfaceRuntime {
 
     // Rehydrate dormant orchestrators for open streams from the streams sessions DB.
     // No live SDK agent is created — just the in-memory maps are populated so that
-    // message lookups find the correct streamSessionId. The agent is lazily activated
+    // message lookups find the correct piSessionId. The agent is lazily activated
     // when the first new message arrives for the stream.
     const openStreams = listOpenStreams(this.blackboard);
     for (const ws of openStreams) {
       const streamsRow = this.blackboard.get<{
-        stream_session_id: string;
+        pi_session_id: string;
         session_file: string | null;
         started_at: string;
         model_provider: string | null;
         model_id: string | null;
       }>(
-        `SELECT stream_session_id, session_file, started_at, model_provider, model_id
+        `SELECT pi_session_id, session_file, started_at, model_provider, model_id
          FROM stream_sessions
          WHERE stream_id = ? AND role = 'orchestrator'
            AND status NOT IN ('ended', 'crashed')
@@ -179,7 +179,7 @@ export class ControlSurfaceRuntime {
         this.sessionManager.rehydrateOrchestrator(
           ws.id,
           ws.name,
-          streamsRow.stream_session_id,
+          streamsRow.pi_session_id,
           streamsRow.session_file,
           streamsRow.started_at,
           streamsRow.model_provider,
@@ -274,18 +274,18 @@ export class ControlSurfaceRuntime {
       const source = item.source as "whatsapp" | "web" | "cron";
       const streamId = (input.metadata?.stream_id as string) ?? undefined;
       const targetSessionId = (input.metadata?._targetSessionId as string) ?? undefined;
-      const streamSessionId = targetSessionId
+      const piSessionId = targetSessionId
         ? targetSessionId
         : streamId
-          ? this.sessionManager.getByStream(streamId)?.streamSessionId
-          : this.sessionManager.getDefault()?.streamSessionId;
+          ? this.sessionManager.getByStream(streamId)?.piSessionId
+          : this.sessionManager.getDefault()?.piSessionId;
       persistInboundMessage(this.blackboard, {
         id: messageUuid,
         source,
         content: input.text,
         sender: "user",
         streamId,
-        streamSessionId: streamSessionId,
+        piSessionId: piSessionId,
         metadata: input.metadata,
       });
     } catch (error) {
@@ -302,7 +302,7 @@ export class ControlSurfaceRuntime {
     // has elapsed since we last told this Streams session what time it is. Injecting via turns
     // (not the system prompt) keeps the system prompt stable and cache-friendly.
     if (item.source === "web" || item.source === "whatsapp") {
-      item.text = this.maybeInjectDatetime(target.streamSessionId, item.text);
+      item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
     }
 
     // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
@@ -342,7 +342,7 @@ export class ControlSurfaceRuntime {
     }
 
     // Check if this session belongs to any of our Streams sessions
-    const isOwnStreamSession = this.sessionManager.getByStreamSessionId(sessionId) !== undefined;
+    const isOwnStreamSession = this.sessionManager.getByPiSessionId(sessionId) !== undefined;
 
     if (normalized === "session-start") {
       const agentManaged = payload.agent_managed === true || payload.agent_managed === 1;
@@ -350,13 +350,13 @@ export class ControlSurfaceRuntime {
         return { ok: true, filtered: true };
       }
       const cwd = pickString(payload, ["cwd"]);
-      let streamSessionIdValue = pickString(payload, [
-        "stream_session_id",
-        "streamSessionId",
-        "AUTONOMA_STREAM_SESSION_ID",
+      let piSessionIdValue = pickString(payload, [
+        "pi_session_id",
+        "piSessionId",
+        "AUTONOMA_PI_SESSION_ID",
       ]);
       let streamIdValue = pickString(payload, ["stream_id", "streamId", "AUTONOMA_STREAM_ID"]);
-      if (cwd && !streamSessionIdValue && !streamIdValue) {
+      if (cwd && !piSessionIdValue && !streamIdValue) {
         const openStreams = listOpenStreams(this.blackboard);
         const matchingStream = openStreams.find(
           (ws) => ws.worktree_path && cwd.startsWith(ws.worktree_path),
@@ -364,7 +364,7 @@ export class ControlSurfaceRuntime {
         if (matchingStream) {
           const orchestrator = this.sessionManager.getByStream(matchingStream.id);
           if (orchestrator) {
-            streamSessionIdValue = orchestrator.streamSessionId;
+            piSessionIdValue = orchestrator.piSessionId;
             streamIdValue = matchingStream.id;
           }
         }
@@ -388,14 +388,13 @@ export class ControlSurfaceRuntime {
           "todoistTaskId",
           "AUTONOMA_TODOIST_TASK_ID",
         ]),
-        stream_session_id: streamSessionIdValue,
+        pi_session_id: piSessionIdValue,
         stream_id: streamIdValue,
       });
-      if (streamSessionIdValue) {
+      if (piSessionIdValue) {
         this.wsHub.broadcast({
           type: "sessions_changed",
-          sessionId: streamSessionIdValue,
-          streamSessionId: streamSessionIdValue,
+          piSessionId: piSessionIdValue,
           reason: "registered",
         });
       }
@@ -410,11 +409,10 @@ export class ControlSurfaceRuntime {
       if (normalized === "stop") {
         updateSessionStop(this.blackboard, sessionId);
         const stoppedSession = getSessionById(this.blackboard, sessionId);
-        if (stoppedSession?.streamSessionId) {
+        if (stoppedSession?.piSessionId) {
           this.wsHub.broadcast({
             type: "sessions_changed",
-            sessionId: stoppedSession.streamSessionId,
-            streamSessionId: stoppedSession.streamSessionId,
+            piSessionId: stoppedSession.piSessionId,
             reason: "stopped",
           });
         }
@@ -423,11 +421,10 @@ export class ControlSurfaceRuntime {
           pickString(payload, ["reason", "stop_reason", "session_end_reason"]) || "ended";
         const endingSession = getSessionById(this.blackboard, sessionId);
         markSessionEnded(this.blackboard, sessionId, reason);
-        if (endingSession?.streamSessionId) {
+        if (endingSession?.piSessionId) {
           this.wsHub.broadcast({
             type: "sessions_changed",
-            sessionId: endingSession.streamSessionId,
-            streamSessionId: endingSession.streamSessionId,
+            piSessionId: endingSession.piSessionId,
             reason: "ended",
           });
         }
@@ -448,21 +445,21 @@ export class ControlSurfaceRuntime {
     }
 
     // Route stop event to the Streams session that owns this CC session
-    const streamSessionIdFromPayload = pickString(payload, [
-      "stream_session_id",
-      "streamSessionId",
-      "AUTONOMA_STREAM_SESSION_ID",
+    const piSessionIdFromPayload = pickString(payload, [
+      "pi_session_id",
+      "piSessionId",
+      "AUTONOMA_PI_SESSION_ID",
     ]);
     let targetQueue: ManagedStreamSession | undefined;
     let resolvedVia = "default";
-    if (streamSessionIdFromPayload) {
-      targetQueue = this.sessionManager.getByStreamSessionId(streamSessionIdFromPayload);
+    if (piSessionIdFromPayload) {
+      targetQueue = this.sessionManager.getByPiSessionId(piSessionIdFromPayload);
       if (targetQueue) resolvedVia = "payload";
     }
     const ccSession = !targetQueue ? getSessionById(this.blackboard, sessionId) : undefined;
     if (!targetQueue) {
-      if (ccSession?.streamSessionId) {
-        targetQueue = this.sessionManager.getByStreamSessionId(ccSession.streamSessionId);
+      if (ccSession?.piSessionId) {
+        targetQueue = this.sessionManager.getByPiSessionId(ccSession.piSessionId);
         if (targetQueue) resolvedVia = "sessions-table";
       }
     }
@@ -506,7 +503,7 @@ export class ControlSurfaceRuntime {
         content: text,
         sender: "system",
         streamId: targetQueue.streamId ?? undefined,
-        streamSessionId: targetQueue.streamSessionId,
+        piSessionId: targetQueue.piSessionId,
         metadata: { event: normalized, ...payload },
       });
     } catch (error) {
@@ -529,7 +526,7 @@ export class ControlSurfaceRuntime {
     const orchestratorStatuses = this.sessionManager.listOrchestrators().map((o) => {
       const snap = o.state.getSnapshot();
       return {
-        sessionId: o.streamSessionId,
+        piSessionId: o.piSessionId,
         streamId: o.streamId!,
         streamName: o.streamName,
         messageCount: o.session?.messages?.length ?? snap.messageCount,
@@ -556,7 +553,7 @@ export class ControlSurfaceRuntime {
       streamAgent: {
         default: defSnapshot
           ? {
-              sessionId: defSnapshot.sessionId!,
+              piSessionId: defSnapshot.piSessionId!,
               sessionFile: defSnapshot.sessionFile ?? null,
               messageCount: def!.session?.messages?.length ?? defSnapshot.messageCount,
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
@@ -579,7 +576,7 @@ export class ControlSurfaceRuntime {
           status: "open" as const,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
-          streamSessionId: getActiveStreamSessionId(this.blackboard, ws.id),
+          piSessionId: getActivePiSessionId(this.blackboard, ws.id),
           sessionCount: sessionCountByStream.get(ws.id) ?? 0,
           createdAt: ws.created_at,
         })),
@@ -590,7 +587,7 @@ export class ControlSurfaceRuntime {
           closedAt: ws.closed_at ?? undefined,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
-          streamSessionId: getLatestStreamSessionId(this.blackboard, ws.id),
+          piSessionId: getLatestPiSessionId(this.blackboard, ws.id),
           sessionCount: sessionCountByStream.get(ws.id) ?? 0,
           createdAt: ws.created_at,
         })),
@@ -663,8 +660,8 @@ export class ControlSurfaceRuntime {
    * Append a datetime context block to `text` if >= 1 hour has elapsed since the last
    * injection for this Streams session, then update the timestamp in SQLite.
    */
-  private maybeInjectDatetime(streamSessionId: string, text: string): string {
-    const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, streamSessionId);
+  private maybeInjectDatetime(piSessionId: string, text: string): string {
+    const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, piSessionId);
     const now = Date.now();
     const lastMs = lastReportedAt ? new Date(lastReportedAt).getTime() : 0;
     if (now - lastMs < ControlSurfaceRuntime.DATETIME_INJECTION_INTERVAL_MS) {
@@ -672,7 +669,7 @@ export class ControlSurfaceRuntime {
     }
 
     const nowIso = new Date(now).toISOString();
-    touchDatetimeReportedAt(this.blackboard, streamSessionId, nowIso);
+    touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
 
     return `${formatDatetimeBlock()}\n${text}`;
   }
@@ -690,7 +687,7 @@ export class ControlSurfaceRuntime {
     // Direct-targeted session (web UI tab input) — bypass all routing
     const targetSessionId = meta?._targetSessionId as string | undefined;
     if (targetSessionId) {
-      const target = this.sessionManager.getByStreamSessionId(targetSessionId);
+      const target = this.sessionManager.getByPiSessionId(targetSessionId);
       if (target) return target;
     }
 
@@ -726,7 +723,7 @@ export class ControlSurfaceRuntime {
     const session = managed.session;
     if (!session) throw new Error("Streams session not initialized");
 
-    const streamSessionId = session.sessionId;
+    const piSessionId = session.sessionId;
 
     this.log(
       `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""} text=${item.text.slice(0, 80)}...`,
@@ -734,7 +731,7 @@ export class ControlSurfaceRuntime {
 
     // Turn starts → set streams status to 'active'
     const promptAt = managed.state.notePrompt(session.messages.length);
-    touchStreamsPrompt(this.blackboard, streamSessionId, promptAt, "active");
+    touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
 
     const promptText = formatPromptWithContext(item);
 
@@ -779,7 +776,7 @@ export class ControlSurfaceRuntime {
     managed.state.noteEvent(session.messages.length);
 
     // Turn ends → transition state
-    this.transitionStreamsAfterTurn(streamSessionId);
+    this.transitionStreamsAfterTurn(piSessionId);
 
     // Auto-surface final assistant message
     const finalAssistant = extractFinalAssistantMessage(session);
@@ -794,7 +791,7 @@ export class ControlSurfaceRuntime {
           source: "stream_outbound",
           content: finalText,
           streamId,
-          streamSessionId: managed.streamSessionId,
+          piSessionId: managed.piSessionId,
         });
       } catch (error) {
         this.log(
@@ -833,18 +830,18 @@ export class ControlSurfaceRuntime {
   /**
    * After a Streams turn ends, check managed CC sessions to determine next state.
    */
-  private transitionStreamsAfterTurn(streamSessionId: string): void {
+  private transitionStreamsAfterTurn(piSessionId: string): void {
     try {
       const row = this.blackboard
         .prepare(
           `SELECT COUNT(*) as count FROM sessions
-				 WHERE stream_session_id = ? AND status IN ('working', 'idle') AND agent_managed = 1`,
+				 WHERE pi_session_id = ? AND status IN ('working', 'idle') AND agent_managed = 1`,
         )
-        .get(streamSessionId) as { count: number } | undefined;
+        .get(piSessionId) as { count: number } | undefined;
       const activeCount = row?.count ?? 0;
 
       const nextStatus = activeCount > 0 ? "waiting_for_sessions" : "waiting_for_user";
-      updateStreamSessionStatus(this.blackboard, streamSessionId, nextStatus);
+      updatePiSessionStatus(this.blackboard, piSessionId, nextStatus);
     } catch (error) {
       this.log(
         `streams state transition failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -894,13 +891,13 @@ export class ControlSurfaceRuntime {
 
     // 2. Revive the streams session: clear ended_at/end_reason, set status back to waiting_for_user
     const streamsRow = this.blackboard.get<{
-      stream_session_id: string;
+      pi_session_id: string;
       session_file: string | null;
       started_at: string;
       model_provider: string | null;
       model_id: string | null;
     }>(
-      `SELECT stream_session_id, session_file, started_at, model_provider, model_id
+      `SELECT pi_session_id, session_file, started_at, model_provider, model_id
        FROM stream_sessions
        WHERE stream_id = ? AND role = 'orchestrator'
        ORDER BY started_at DESC LIMIT 1`,
@@ -915,15 +912,15 @@ export class ControlSurfaceRuntime {
                ended_at = NULL,
                end_reason = NULL,
                last_event_at = ?
-           WHERE stream_session_id = ?`,
+           WHERE pi_session_id = ?`,
         )
-        .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), streamsRow.stream_session_id);
+        .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), streamsRow.pi_session_id);
 
       // 3. Rehydrate the orchestrator in-memory
       this.sessionManager.rehydrateOrchestrator(
         streamId,
         ws.name,
-        streamsRow.stream_session_id,
+        streamsRow.pi_session_id,
         streamsRow.session_file,
         streamsRow.started_at,
         streamsRow.model_provider,
@@ -1213,7 +1210,7 @@ export class ControlSurfaceRuntime {
               content: message,
               sender: "system",
               streamId: ws.id,
-              streamSessionId: this.sessionManager.getByStream(ws.id)?.streamSessionId,
+              piSessionId: this.sessionManager.getByStream(ws.id)?.piSessionId,
               metadata: {
                 stream_id: ws.id,
                 stream_name: ws.name,
@@ -1294,12 +1291,12 @@ export class ControlSurfaceRuntime {
             update_worktree_path,
           );
           if (result.ok) {
-            const worktreeStreamSessionId =
-              this.sessionManager.getByStream(stream_id)?.streamSessionId;
-            if (worktreeStreamSessionId) {
+            const worktreePiSessionId =
+              this.sessionManager.getByStream(stream_id)?.piSessionId;
+            if (worktreePiSessionId) {
               this.wsHub.broadcast({
                 type: "worktree_changed",
-                streamSessionId: worktreeStreamSessionId,
+                piSessionId: worktreePiSessionId,
                 streamId: stream_id,
               });
             }
@@ -1336,7 +1333,7 @@ export class ControlSurfaceRuntime {
           const managed = closeStreamId
             ? this.sessionManager.getByStream(closeStreamId)
             : undefined;
-          const streamsSessId = managed?.streamSessionId;
+          const streamsSessId = managed?.piSessionId;
           if (!streamsSessId) {
             return {
               content: [{ type: "text", text: "Error: Orchestrator session not found" }],
@@ -1545,21 +1542,21 @@ export class ControlSurfaceRuntime {
       this.wsHub.send(client.id, { type: "pong" });
       return;
     }
-    if (payload.type === "subscribe" && typeof payload.sessionId === "string") {
+    if (payload.type === "subscribe" && typeof payload.piSessionId === "string") {
       this.wsHub.subscribeClient(
         client.id,
-        payload.sessionId,
+        payload.piSessionId,
         Array.isArray(payload.eventTypes) ? payload.eventTypes : undefined,
       );
       return;
     }
-    if (payload.type === "unsubscribe" && typeof payload.sessionId === "string") {
-      this.wsHub.unsubscribeClient(client.id, payload.sessionId);
+    if (payload.type === "unsubscribe" && typeof payload.piSessionId === "string") {
+      this.wsHub.unsubscribeClient(client.id, payload.piSessionId);
       return;
     }
     if (payload.type === "message" && typeof payload.text === "string") {
-      const targetSessionId =
-        typeof payload.targetSessionId === "string" ? payload.targetSessionId : undefined;
+      const targetPiSessionId =
+        typeof payload.targetPiSessionId === "string" ? payload.targetPiSessionId : undefined;
 
       // Generate server message ID immediately and ACK the client before classification
       const serverMessageId = crypto.randomUUID();
@@ -1572,9 +1569,9 @@ export class ControlSurfaceRuntime {
 
       // Skip router when message targets a specific Streams session (direct tab input)
       let routerMeta: StreamRoutingMeta = {};
-      if (targetSessionId) {
-        routerMeta._targetSessionId = targetSessionId;
-        const targetSession = this.sessionManager.getByStreamSessionId(targetSessionId);
+      if (targetPiSessionId) {
+        routerMeta._targetSessionId = targetPiSessionId;
+        const targetSession = this.sessionManager.getByPiSessionId(targetPiSessionId);
         if (targetSession?.streamId) {
           routerMeta.stream_id = targetSession.streamId;
           routerMeta.stream_name = targetSession.streamName ?? undefined;
@@ -1585,12 +1582,12 @@ export class ControlSurfaceRuntime {
           const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
           const apiKey = resolveGroqApiKey();
           if (!apiKey) throw new Error("No Groq API key available");
-          const defaultStreamSessionId = this.sessionManager.getDefault()?.streamSessionId;
+          const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
           const result = await classifyMessage(
             payload.text,
             this.blackboard,
             apiKey,
-            defaultStreamSessionId,
+            defaultPiSessionId,
           );
           routerMeta = { router_action: result.action };
           if (result.stream) {

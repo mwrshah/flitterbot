@@ -3,11 +3,11 @@ import path from "node:path";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
-  endStreamSession,
+  endPiSession,
   reassociateOrphanedSessions,
-  reconcilePreviousStreamSessions,
-  upsertStreamSession,
-} from "../blackboard/stream-sessions.ts";
+  reconcilePreviousPiSessions,
+  upsertPiSession,
+} from "../blackboard/pi-sessions.ts";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -27,7 +27,7 @@ export interface ManagedStreamSession {
   role: "default" | "orchestrator";
   streamId: string | null;
   streamName: string | null;
-  streamSessionId: string;
+  piSessionId: string;
   createdAt: string;
   modelInfo: { provider: string; id: string };
   unsubscribe: () => void;
@@ -41,7 +41,7 @@ export type ProcessQueueItemCallback = (
 export class StreamSessionManager {
   private defaultSession?: ManagedStreamSession;
   private readonly orchestrators = new Map<string, ManagedStreamSession>();
-  private readonly byStreamSessionId = new Map<string, ManagedStreamSession>();
+  private readonly byPiSessionId = new Map<string, ManagedStreamSession>();
   private readonly config: AutonomaConfig;
   private readonly blackboard: BlackboardDatabase;
   private readonly wsHub: WebSocketHub;
@@ -76,8 +76,8 @@ export class StreamSessionManager {
     return this.orchestrators.get(streamId);
   }
 
-  getByStreamSessionId(streamSessionId: string): ManagedStreamSession | undefined {
-    return this.byStreamSessionId.get(streamSessionId);
+  getByPiSessionId(piSessionId: string): ManagedStreamSession | undefined {
+    return this.byPiSessionId.get(piSessionId);
   }
 
   listOrchestrators(): ManagedStreamSession[] {
@@ -86,8 +86,8 @@ export class StreamSessionManager {
 
   async createDefault(customTools: unknown[]): Promise<ManagedStreamSession> {
     // Only reconcile the default session — orchestrator sessions for active streams
-    // must survive restarts so their streamSessionId (and associated messages) are preserved.
-    reconcilePreviousStreamSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
+    // must survive restarts so their piSessionId (and associated messages) are preserved.
+    reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
 
     const created = await createAutonomaAgent({
       config: this.config,
@@ -104,8 +104,8 @@ export class StreamSessionManager {
 
     const managed = this.buildManagedSession(created, state, "default", null, null);
 
-    upsertStreamSession(this.blackboard, {
-      streamSessionId: created.session.sessionId,
+    upsertPiSession(this.blackboard, {
+      piSessionId: created.session.sessionId,
       role: "default",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
@@ -121,13 +121,13 @@ export class StreamSessionManager {
     });
 
     // Re-associate orphaned sessions from ended streams sessions to this new default session
-    const reassociated = reassociateOrphanedSessions(this.blackboard, managed.streamSessionId);
+    const reassociated = reassociateOrphanedSessions(this.blackboard, managed.piSessionId);
     if (reassociated > 0) {
       this.log(`reassociated ${reassociated} orphaned session(s) to new default streams session`);
     }
 
     this.defaultSession = managed;
-    this.byStreamSessionId.set(managed.streamSessionId, managed);
+    this.byPiSessionId.set(managed.piSessionId, managed);
     this.logResourceInfo("default", created.resourceInfo);
     return managed;
   }
@@ -164,8 +164,8 @@ export class StreamSessionManager {
 
     const managed = this.buildManagedSession(created, state, "orchestrator", streamId, streamName);
 
-    upsertStreamSession(this.blackboard, {
-      streamSessionId: created.session.sessionId,
+    upsertPiSession(this.blackboard, {
+      piSessionId: created.session.sessionId,
       role: "orchestrator",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
@@ -182,7 +182,7 @@ export class StreamSessionManager {
     });
 
     this.orchestrators.set(streamId, managed);
-    this.byStreamSessionId.set(managed.streamSessionId, managed);
+    this.byPiSessionId.set(managed.piSessionId, managed);
     this.log(`orchestrator created for stream "${streamName}" (${streamId})`);
     this.logResourceInfo("orchestrator", created.resourceInfo);
     return managed;
@@ -191,7 +191,7 @@ export class StreamSessionManager {
   /**
    * Rehydrate a dormant orchestrator from a stream_sessions DB row.
    * No live SDK agent is created — just the in-memory maps are populated so that
-   * getInputSurfaceHistory() finds messages via the preserved streamSessionId, and
+   * getInputSurfaceHistory() finds messages via the preserved piSessionId, and
    * readSessionHistory() falls through to reading the JSONL file on disk.
    *
    * When a new message arrives for this stream, activateOrchestrator() creates
@@ -200,7 +200,7 @@ export class StreamSessionManager {
   rehydrateOrchestrator(
     streamId: string,
     streamName: string,
-    streamSessionId: string,
+    piSessionId: string,
     sessionFile: string | null,
     createdAt: string,
     modelProvider: string | null,
@@ -210,7 +210,7 @@ export class StreamSessionManager {
     if (existing) return existing;
 
     const state = new StreamSessionState();
-    state.initialize(streamSessionId, sessionFile ?? undefined, 0);
+    state.initialize(piSessionId, sessionFile ?? undefined, 0);
 
     const managed: ManagedStreamSession = {
       session: null,
@@ -219,7 +219,7 @@ export class StreamSessionManager {
       role: "orchestrator",
       streamId,
       streamName,
-      streamSessionId,
+      piSessionId,
       createdAt,
       modelInfo: { provider: modelProvider ?? "unknown", id: modelId ?? "unknown" },
       unsubscribe: () => {},
@@ -238,7 +238,7 @@ export class StreamSessionManager {
         this.wsHub.broadcast({
           type: "queue_item_start",
           item,
-          sessionId: managed.streamSessionId,
+          piSessionId: managed.piSessionId,
           streamId,
         });
       },
@@ -261,15 +261,15 @@ export class StreamSessionManager {
           type: "queue_item_end",
           itemId: item.id,
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
-          sessionId: managed.streamSessionId,
+          piSessionId: managed.piSessionId,
           streamId,
         });
       },
     });
 
     // Update the DB row to reflect the new runtime instance
-    upsertStreamSession(this.blackboard, {
-      streamSessionId: streamSessionId,
+    upsertPiSession(this.blackboard, {
+      piSessionId: piSessionId,
       role: "orchestrator",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
@@ -282,9 +282,9 @@ export class StreamSessionManager {
     });
 
     this.orchestrators.set(streamId, managed);
-    this.byStreamSessionId.set(streamSessionId, managed);
+    this.byPiSessionId.set(piSessionId, managed);
     this.log(
-      `rehydrated dormant orchestrator for stream "${streamName}" (${streamId}) streamSessionId=${streamSessionId}`,
+      `rehydrated dormant orchestrator for stream "${streamName}" (${streamId}) piSessionId=${piSessionId}`,
     );
     return managed;
   }
@@ -359,9 +359,9 @@ export class StreamSessionManager {
     // query finds it on next restart. Only permanently end on crash or explicit close.
     if (reason !== "shutdown") {
       const status = reason === "crashed" ? "crashed" : "ended";
-      endStreamSession(
+      endPiSession(
         this.blackboard,
-        managed.streamSessionId,
+        managed.piSessionId,
         status,
         reason,
         new Date().toISOString(),
@@ -369,7 +369,7 @@ export class StreamSessionManager {
     }
 
     this.orchestrators.delete(streamId);
-    this.byStreamSessionId.delete(managed.streamSessionId);
+    this.byPiSessionId.delete(managed.piSessionId);
     this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
   }
 
@@ -387,9 +387,9 @@ export class StreamSessionManager {
       } catch {
         /* ignore */
       }
-      endStreamSession(
+      endPiSession(
         this.blackboard,
-        this.defaultSession.streamSessionId,
+        this.defaultSession.piSessionId,
         "ended",
         "shutdown",
         new Date().toISOString(),
@@ -399,7 +399,7 @@ export class StreamSessionManager {
       } catch {
         /* ignore */
       }
-      this.byStreamSessionId.delete(this.defaultSession.streamSessionId);
+      this.byPiSessionId.delete(this.defaultSession.piSessionId);
       this.defaultSession = undefined;
     }
   }
@@ -449,7 +449,7 @@ export class StreamSessionManager {
       role,
       streamId,
       streamName,
-      streamSessionId: created.session.sessionId,
+      piSessionId: created.session.sessionId,
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
       unsubscribe: null!,
@@ -468,7 +468,7 @@ export class StreamSessionManager {
         this.wsHub.broadcast({
           type: "queue_item_start",
           item,
-          sessionId: managed.streamSessionId,
+          piSessionId: managed.piSessionId,
           ...(streamId ? { streamId } : {}),
         });
       },
@@ -496,7 +496,7 @@ export class StreamSessionManager {
           type: "queue_item_end",
           itemId: item.id,
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
-          sessionId: managed.streamSessionId,
+          piSessionId: managed.piSessionId,
           ...(streamId ? { streamId } : {}),
         });
       },

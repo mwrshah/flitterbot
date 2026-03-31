@@ -24,12 +24,12 @@ const useIsClient = () =>
  * Pulls timeline, status pills, connection state, and sendMessage from
  * TanStack Query cache and router context — no imperative subscriptions.
  */
-export function useStreamsChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
+export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const isClient = useIsClient();
   const { sendMessage, apiClient } = rootApi.useRouteContext();
 
-  const { data: timeline = loaderHistory } = useQuery(streamsHistoryQueryOptions(sessionId));
-  const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(sessionId ?? "default"));
+  const { data: timeline = loaderHistory } = useQuery(streamsHistoryQueryOptions(piSessionId));
+  const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(piSessionId ?? "default"));
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
   );
@@ -37,17 +37,17 @@ export function useStreamsChat(sessionId: string | undefined, loaderHistory: Cha
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
-    if (!sessionId || !status?.streamAgent) return false;
-    if (status.streamAgent.default?.sessionId === sessionId)
+    if (!piSessionId || !status?.streamAgent) return false;
+    if (status.streamAgent.default?.piSessionId === piSessionId)
       return !!status.streamAgent.default.busy;
-    return !!status.streamAgent.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
+    return !!status.streamAgent.orchestrators?.find((o) => o.piSessionId === piSessionId)?.busy;
   })();
 
-  const effectiveSessionId = sessionId ?? "default";
+  const effectivePiSessionId = piSessionId ?? "default";
 
   const onSendMessage = useCallback(
-    (text: string, images?: ImageAttachment[]) => sendMessage(text, images, sessionId),
-    [sendMessage, sessionId],
+    (text: string, images?: ImageAttachment[]) => sendMessage(text, images, piSessionId),
+    [sendMessage, piSessionId],
   );
 
   return {
@@ -55,7 +55,7 @@ export function useStreamsChat(sessionId: string | undefined, loaderHistory: Cha
     statusPills,
     connectionState,
     onSendMessage,
-    effectiveSessionId,
+    effectivePiSessionId,
     isSessionBusy,
   };
 }

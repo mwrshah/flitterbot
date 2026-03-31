@@ -35,38 +35,38 @@ export function enrichStream(
   );
 }
 
-export function getActiveStreamSessionId(
+export function getActivePiSessionId(
   db: BlackboardDatabase,
   streamId: string,
 ): string | undefined {
-  const row = db.get<{ stream_session_id: string }>(
-    `SELECT stream_session_id FROM stream_sessions WHERE stream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,
+  const row = db.get<{ pi_session_id: string }>(
+    `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,
     streamId,
   );
-  return row?.stream_session_id;
+  return row?.pi_session_id;
 }
 
-/** Returns the most recent stream_session_id for a stream, regardless of session status. */
-export function getLatestStreamSessionId(
+/** Returns the most recent pi_session_id for a stream, regardless of session status. */
+export function getLatestPiSessionId(
   db: BlackboardDatabase,
   streamId: string,
 ): string | undefined {
-  const row = db.get<{ stream_session_id: string }>(
-    `SELECT stream_session_id FROM stream_sessions WHERE stream_id = ? ORDER BY started_at DESC LIMIT 1`,
+  const row = db.get<{ pi_session_id: string }>(
+    `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? ORDER BY started_at DESC LIMIT 1`,
     streamId,
   );
-  return row?.stream_session_id;
+  return row?.pi_session_id;
 }
 
-export function getStreamForStreamSession(
+export function getStreamForPiSession(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
 ): StreamRow | null {
   const row = db.get<StreamRow>(
     `SELECT w.* FROM streams w
-     JOIN stream_sessions p ON p.stream_id = w.id
-     WHERE p.stream_session_id = ?`,
-    streamSessionId,
+     JOIN pi_sessions p ON p.stream_id = w.id
+     WHERE p.pi_session_id = ?`,
+    piSessionId,
   );
   return row ?? null;
 }

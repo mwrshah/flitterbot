@@ -101,13 +101,13 @@ export type StatusResponse = {
   };
   streamAgent?: {
     default?: {
-      sessionId?: string;
+      piSessionId?: string;
       busy?: boolean;
       messageCount?: number;
       state?: string;
     };
     orchestrators?: Array<{
-      sessionId: string;
+      piSessionId: string;
       streamId: string;
       streamName?: string;
       messageCount: number;
@@ -126,7 +126,7 @@ export type StreamSummary = {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  streamSessionId?: string;
+  piSessionId?: string;
   sessionCount: number;
   createdAt: string;
 };
@@ -148,7 +148,7 @@ export type DownstreamSessionItem = {
   project: string | null;
 };
 
-export type StreamSessionsListResponse = {
+export type PiSessionsListResponse = {
   items: DownstreamSessionItem[];
 };
 
@@ -200,13 +200,13 @@ export type DirectoryCompletionsResponse = {
 
 export type WsMessage =
   | { type: "connected"; clientId: string }
-  | { type: "queue_item_start"; item: { id: string; source: string }; sessionId?: string }
-  | { type: "queue_item_end"; itemId: string; error?: string; sessionId?: string }
-  | { type: "text_delta"; delta: string; sessionId?: string; messageId: string }
-  | { type: "message_start"; sessionId?: string; messageId: string }
+  | { type: "queue_item_start"; item: { id: string; source: string }; piSessionId?: string }
+  | { type: "queue_item_end"; itemId: string; error?: string; piSessionId?: string }
+  | { type: "text_delta"; delta: string; piSessionId?: string; messageId: string }
+  | { type: "message_start"; piSessionId?: string; messageId: string }
   | {
       type: "message_end";
-      sessionId?: string;
+      piSessionId?: string;
       message: ChatTimelineMessage;
     }
   | {
@@ -219,30 +219,30 @@ export type WsMessage =
       isError?: boolean;
       event?: unknown;
       timestamp?: string;
-      sessionId?: string;
+      piSessionId?: string;
     }
-  | { type: "thinking_start"; sessionId?: string; messageId: string }
-  | { type: "thinking_delta"; delta: string; sessionId?: string; messageId: string }
-  | { type: "thinking_end"; sessionId?: string; messageId: string }
+  | { type: "thinking_start"; piSessionId?: string; messageId: string }
+  | { type: "thinking_delta"; delta: string; piSessionId?: string; messageId: string }
+  | { type: "thinking_end"; piSessionId?: string; messageId: string }
   | {
       type: "toolcall_start";
       contentIndex: number;
       toolName?: string;
       toolUseId?: string;
-      sessionId?: string;
+      piSessionId?: string;
     }
   | {
       type: "tool_execution_update";
       toolUseId?: string;
       partialResult?: unknown;
-      sessionId?: string;
+      piSessionId?: string;
     }
-  | { type: "turn_end"; sessionId?: string }
-  | { type: "agent_end"; sessionId?: string }
+  | { type: "turn_end"; piSessionId?: string }
+  | { type: "agent_end"; piSessionId?: string }
   | {
       type: "stream_surfaced";
       message: ChatTimelineMessage;
-      sessionId?: string;
+      piSessionId?: string;
       streamId?: string;
       streamName?: string;
     }
@@ -256,12 +256,12 @@ export type WsMessage =
   | {
       type: "sessions_changed";
       sessionId: string;
-      streamSessionId: string;
+      piSessionId: string;
       reason: "registered" | "ended" | "stopped";
     }
   | {
       type: "worktree_changed";
-      streamSessionId: string;
+      piSessionId: string;
       streamId: string;
     }
   | {

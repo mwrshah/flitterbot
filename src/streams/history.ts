@@ -246,7 +246,7 @@ function parseHistoryLine(
 }
 
 export function readStreamsHistoryFromMessages(
-  sessionId: string,
+  piSessionId: string,
   sessionFile: string | null,
   messages: Array<unknown>,
   mode: StreamsHistoryMode = "agent",
@@ -263,25 +263,25 @@ export function readStreamsHistoryFromMessages(
   }
 
   return {
-    sessionId,
+    piSessionId: piSessionId,
     sessionFile,
     items: shapeHistoryItems(items, mode),
   };
 }
 
 export async function readStreamsHistory(
-  sessionId: string,
+  piSessionId: string,
   sessionFile: string,
   mode: StreamsHistoryMode = "agent",
 ): Promise<StreamsHistoryResponse> {
   if (!fs.existsSync(sessionFile)) {
     console.warn(
       "readStreamsHistory: session file missing on disk (sessionId=%s, file=%s)",
-      sessionId,
+      piSessionId,
       sessionFile,
     );
     return {
-      sessionId,
+      piSessionId: piSessionId,
       sessionFile,
       items: [],
     };
@@ -310,7 +310,7 @@ export async function readStreamsHistory(
   }
 
   return {
-    sessionId,
+    piSessionId: piSessionId,
     sessionFile,
     items: shapeHistoryItems(items, mode),
   };

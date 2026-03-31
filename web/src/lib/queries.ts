@@ -50,22 +50,22 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
 }
 
 export function streamsHistoryQueryOptions(
-  sessionId: string | undefined,
+  piSessionId: string | undefined,
   surface?: "input" | "agent",
 ) {
   return {
-    queryKey: ["streams-history", sessionId ?? "default", surface ?? "agent"] as const,
+    queryKey: ["streams-history", piSessionId ?? "default", surface ?? "agent"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsHistory({
         data: {
-          ...(sessionId ? { streamSessionId: sessionId } : {}),
+          ...(piSessionId ? { piSessionId } : {}),
           ...(surface ? { surface } : {}),
         },
       })) as ChatTimelineItem[],
-    enabled: sessionId !== undefined,
+    enabled: piSessionId !== undefined,
     staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     // When the default session restarts with a new ID, the component picks up
-    // the new sessionId from the status cache before the route loader re-runs.
+    // the new piSessionId from the status cache before the route loader re-runs.
     // Without placeholderData, useQuery returns undefined and useStreamsChat falls
     // back to stale loaderHistory (old session's messages). An empty placeholder
     // avoids showing the old session's data during the transition.
@@ -79,27 +79,27 @@ export function streamsHistoryQueryOptions(
 
 /**
  * Downstream Claude Code sessions for a Streams orchestrator session.
- * WS bridge invalidates ["streams-downstream-sessions", streamSessionId] on sessions_changed.
+ * WS bridge invalidates ["streams-downstream-sessions", piSessionId] on sessions_changed.
  */
-export function streamsDownstreamSessionsQueryOptions(streamSessionId: string) {
+export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
   return {
-    queryKey: ["streams-downstream-sessions", streamSessionId] as const,
+    queryKey: ["streams-downstream-sessions", piSessionId] as const,
     queryFn: (): Promise<DownstreamSessionItem[]> =>
-      fetchStreamSessions({ data: { streamSessionId } }),
-    enabled: !!streamSessionId,
+      fetchStreamSessions({ data: { piSessionId } }),
+    enabled: !!piSessionId,
     staleTime: 30_000,
   };
 }
 
 /**
  * Worktree info for a Streams orchestrator session.
- * WS bridge invalidates ["streams-worktree", streamSessionId] on worktree_changed.
+ * WS bridge invalidates ["streams-worktree", piSessionId] on worktree_changed.
  */
-export function streamsWorktreeQueryOptions(streamSessionId: string) {
+export function streamsWorktreeQueryOptions(piSessionId: string) {
   return {
-    queryKey: ["streams-worktree", streamSessionId] as const,
-    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { streamSessionId } }),
-    enabled: !!streamSessionId,
+    queryKey: ["streams-worktree", piSessionId] as const,
+    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { piSessionId } }),
+    enabled: !!piSessionId,
     staleTime: 30_000,
   };
 }
@@ -107,9 +107,9 @@ export function streamsWorktreeQueryOptions(streamSessionId: string) {
 /** Status pills per session — populated by WS bridge, never fetched from server. */
 export type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
-export function statusPillsQueryOptions(sessionId: string) {
+export function statusPillsQueryOptions(piSessionId: string) {
   return {
-    queryKey: ["streams-status-pills", sessionId] as const,
+    queryKey: ["streams-status-pills", piSessionId] as const,
     queryFn: (): StatusPill[] => [],
     staleTime: Infinity,
     // Initialized as empty; WS bridge uses setQueryData to manage pills

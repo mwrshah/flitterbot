@@ -1,23 +1,23 @@
 import type http from "node:http";
 import { getActiveManagedSessionsByPi } from "../blackboard/query-sessions.ts";
 import { sendEscapeToTmuxSession } from "../claude-sessions/tmux.ts";
-import type { StreamSessionInterruptResponse } from "../contracts/index.ts";
+import type { PiSessionInterruptResponse } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
-export async function handleStreamSessionInterruptRoute(
+export async function handlePiSessionInterruptRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  streamSessionId: string,
+  piSessionId: string,
 ): Promise<void> {
   if (!requireBearer(req, runtime.config.controlSurfaceToken)) {
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  const managed = runtime.sessionManager.getByStreamSessionId(streamSessionId);
+  const managed = runtime.sessionManager.getByPiSessionId(piSessionId);
   if (!managed) {
-    const body: StreamSessionInterruptResponse = { ok: false, error: "streams session not found" };
+    const body: PiSessionInterruptResponse = { ok: false, error: "pi session not found" };
     return sendJson(res, 404, body);
   }
 
@@ -40,7 +40,7 @@ export async function handleStreamSessionInterruptRoute(
   }
 
   // Send Escape to each linked CC session — graceful interrupt without killing the process
-  const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, streamSessionId);
+  const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, piSessionId);
   let signaledSessions = 0;
   for (const ccSession of ccSessions) {
     if (ccSession.tmuxSession) {
@@ -54,9 +54,9 @@ export async function handleStreamSessionInterruptRoute(
   }
 
   runtime.log(
-    `stream-session interrupt: aborted turn for ${streamSessionId}${bashAborted ? " (bash killed)" : ""}, signaled ${signaledSessions} CC session(s)`,
+    `pi-session interrupt: aborted turn for ${piSessionId}${bashAborted ? " (bash killed)" : ""}, signaled ${signaledSessions} CC session(s)`,
   );
 
-  const body: StreamSessionInterruptResponse = { ok: true, streamSessionId, signaledSessions };
+  const body: PiSessionInterruptResponse = { ok: true, piSessionId, signaledSessions };
   return sendJson(res, 200, body);
 }
