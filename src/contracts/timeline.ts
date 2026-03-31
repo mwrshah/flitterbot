@@ -29,8 +29,8 @@ export type ChatTimelineMessage = {
   blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
   images?: ImageAttachment[];
   source?: MessageSource;
-  workstreamId?: string;
-  workstreamName?: string;
+  streamId?: string;
+  streamName?: string;
   /** True while the message is still being streamed via text_delta events. */
   streaming?: boolean;
   /** True for non-final assistant messages in a multi-message turn. */

@@ -58,7 +58,7 @@ export interface ClaudeSessionListItem {
   todoistTaskId: string | null;
   agentManaged: boolean;
   sessionEndReason: string | null;
-  workstreamId: string | null;
+  streamId: string | null;
   piSessionId: string | null;
   startedAt: string;
   endedAt: string | null;
@@ -70,8 +70,8 @@ export type ClaudeSessionDetail = ClaudeSessionListItem;
 
 export interface PiOrchestratorStatus {
   sessionId: string;
-  workstreamId: string;
-  workstreamName: string | null;
+  streamId: string;
+  streamName: string | null;
   messageCount: number;
   busy: boolean;
 }
@@ -81,7 +81,7 @@ export interface PiMultiSessionStatus {
   orchestrators: PiOrchestratorStatus[];
 }
 
-export interface WorkstreamSummary {
+export interface StreamSummary {
   id: string;
   name: string;
   status: "open" | "closed";
@@ -100,7 +100,7 @@ export interface StatusResponse {
   pi: PiMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
-  workstreams?: WorkstreamSummary[];
+  streams?: StreamSummary[];
 }
 
 export interface MessageRequest {
@@ -145,8 +145,8 @@ export interface SessionsListResponse {
 export interface DownstreamSessionItem {
   sessionId: string;
   status: ClaudeSessionStatus;
-  workstreamId: string | null;
-  workstreamName: string | null;
+  streamId: string | null;
+  streamName: string | null;
   tmuxSession: string | null;
   cwd: string | null;
   taskDescription: string | null;

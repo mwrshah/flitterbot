@@ -3,7 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useSyncExternalStore } from "react";
 import {
   connectionStateQueryOptions,
-  piHistoryQueryOptions,
+  streamsHistoryQueryOptions,
   statusPillsQueryOptions,
   statusQueryOptions,
 } from "~/lib/queries";
@@ -20,15 +20,15 @@ const useIsClient = () =>
   );
 
 /**
- * Shared hook for Pi chat routes (default + per-session).
+ * Shared hook for Streams chat routes (default + per-session).
  * Pulls timeline, status pills, connection state, and sendMessage from
  * TanStack Query cache and router context — no imperative subscriptions.
  */
-export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
+export function useStreamsChat(sessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const isClient = useIsClient();
   const { sendMessage, apiClient } = rootApi.useRouteContext();
 
-  const { data: timeline = loaderHistory } = useQuery(piHistoryQueryOptions(sessionId));
+  const { data: timeline = loaderHistory } = useQuery(streamsHistoryQueryOptions(sessionId));
   const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(sessionId ?? "default"));
   const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
     connectionStateQueryOptions(),
@@ -37,9 +37,9 @@ export function usePiChat(sessionId: string | undefined, loaderHistory: ChatTime
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
-    if (!sessionId || !status?.pi) return false;
-    if (status.pi.default?.sessionId === sessionId) return !!status.pi.default.busy;
-    return !!status.pi.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
+    if (!sessionId || !status?.streams) return false;
+    if (status.streams.default?.sessionId === sessionId) return !!status.streams.default.busy;
+    return !!status.streams.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
   })();
 
   const effectiveSessionId = sessionId ?? "default";

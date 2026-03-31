@@ -17,13 +17,13 @@ import type { MessageList } from "~/pi-web-ui/chat-components";
 const EMPTY_TOOLS: AgentTool[] = [];
 const EMPTY_PENDING = new Set<string>();
 
-export type PiMessageListHandle = {
+export type StreamsMessageListHandle = {
   updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean): void;
   clearStreaming(): void;
 };
 
-export const PiMessageList = memo(
-  forwardRef<PiMessageListHandle, { messages: AgentMessage[] }>(function PiMessageList(
+export const StreamsMessageList = memo(
+  forwardRef<StreamsMessageListHandle, { messages: AgentMessage[] }>(function StreamsMessageList(
     { messages },
     ref,
   ) {
@@ -34,7 +34,7 @@ export const PiMessageList = memo(
 
     // Debug: trace every time the messages prop reference changes (indicates timeline grew)
     useEffect(() => {
-      console.log("[debug][PiMessageList] messages.length=%d", messages.length);
+      console.log("[debug][StreamsMessageList] messages.length=%d", messages.length);
     }, [messages]);
 
     useEffect(() => {
@@ -43,12 +43,12 @@ export const PiMessageList = memo(
       ensurePiWebUiReady()
         .then(() => {
           if (cancelled) return;
-          console.log("[PiMessageList] pi-web-ui ready");
+          console.log("[StreamsMessageList] pi-web-ui ready");
           setReady(true);
         })
         .catch((initError) => {
           if (cancelled) return;
-          console.log("[PiMessageList] pi-web-ui initialization failed", initError);
+          console.log("[StreamsMessageList] pi-web-ui initialization failed", initError);
           setError(initError);
         });
 
@@ -67,7 +67,7 @@ export const PiMessageList = memo(
         el.style.display = "block";
         container.appendChild(el);
         elementRef.current = el;
-        console.log("[PiMessageList] created <message-list>");
+        console.log("[StreamsMessageList] created <message-list>");
       }
 
       const el = elementRef.current as HTMLElement & MessageList & Record<string, unknown>;
@@ -96,7 +96,7 @@ export const PiMessageList = memo(
       return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-4">
           <p className="text-xs font-medium text-destructive">
-            Pi Web UI failed to initialize. Check the browser console.
+            Streams Web UI failed to initialize. Check the browser console.
           </p>
           {initDetails instanceof Error ? (
             <p className="text-xs text-destructive/70">{initDetails.message}</p>

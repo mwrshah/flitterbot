@@ -53,40 +53,40 @@ function RuntimePage() {
 
       {status && (
         <>
-          {/* Pi Agent */}
+          {/* Streams Agent */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Pi Agent</CardTitle>
-                <Badge variant={status.pi?.default?.busy ? "success" : "default"}>
-                  {status.pi?.default?.busy ? "active" : "idle"}
+                <CardTitle>Streams Agent</CardTitle>
+                <Badge variant={status.streams?.default?.busy ? "success" : "default"}>
+                  {status.streams?.default?.busy ? "active" : "idle"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
-                <MetaItem label="Session ID" value={status.pi?.default?.sessionId ?? ""} mono />
-                <MetaItem label="Messages" value={String(status.pi?.default?.messageCount ?? 0)} />
+                <MetaItem label="Session ID" value={status.streams?.default?.sessionId ?? ""} mono />
+                <MetaItem label="Messages" value={String(status.streams?.default?.messageCount ?? 0)} />
               </div>
             </CardContent>
           </Card>
 
-          {/* Pi Orchestrators */}
-          {(status.pi?.orchestrators?.length ?? 0) > 0 && (
+          {/* Streams Orchestrators */}
+          {(status.streams?.orchestrators?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Pi Orchestrators</CardTitle>
+                <CardTitle>Streams Orchestrators</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {status.pi!.orchestrators!.map((o) => (
+                  {status.streams!.orchestrators!.map((o) => (
                     <div
                       key={o.sessionId}
                       className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                     >
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-foreground">
-                          {o.workstreamName ?? o.workstreamId}
+                          {o.streamName ?? o.streamId}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono">
                           {o.sessionId.slice(0, 12)}

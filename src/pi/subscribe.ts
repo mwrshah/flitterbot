@@ -128,8 +128,8 @@ function broadcastSurfaced(
     type: "pi_surfaced",
     sessionId,
     message,
-    workstreamId: message.workstreamId,
-    workstreamName: message.workstreamName,
+    streamId: message.streamId,
+    streamName: message.streamName,
   };
   broadcast(wsHub, payload);
 }
@@ -332,8 +332,8 @@ export function subscribeToPiSession(
           role,
           content,
           source: currentItem?.source,
-          workstreamId: currentItem?.workstreamId,
-          workstreamName: currentItem?.workstreamName,
+          streamId: currentItem?.streamId,
+          streamName: currentItem?.streamName,
           createdAt: extractTimestamp(event.message, now),
         };
 
@@ -420,7 +420,7 @@ export function subscribeToPiSession(
         break;
       case "agent_end": {
         if (lastAssistantMessage) {
-          // Broadcast pi_surfaced for the input surface. The agent timeline already has
+          // Broadcast pi_surfaced for the Surface. The agent timeline already has
           // the message from the message_end event — no second message_end needed.
           broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
         }

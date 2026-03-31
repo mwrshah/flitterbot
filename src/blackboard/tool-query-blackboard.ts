@@ -11,7 +11,7 @@ const MODES: Record<string, string> = {
     WHERE s.status IN ('working', 'idle')
     ORDER BY s.last_event_at DESC`,
 
-  open_workstreams: `
+  open_streams: `
     SELECT id, name, repo_path, worktree_path, status, created_at
     FROM workstreams
     WHERE status = 'open'
@@ -109,7 +109,7 @@ COMMON GOTCHAS:
 
 PARAMETERS:
   - sql: raw SELECT or PRAGMA statement (required when mode is omitted)
-  - mode: optional shortcut — one of: active_sessions, open_workstreams, session_summary, schema
+  - mode: optional shortcut — one of: active_sessions, open_streams, session_summary, schema
     When mode is provided, sql is ignored.`;
 
 // ── Execution logic ────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export function createQueryBlackboardTool(db: BlackboardDatabase): QueryBlackboa
           type: "string",
           enum: Object.keys(MODES),
           description:
-            "Pre-built query shortcut. When provided, sql is ignored. Options: active_sessions, open_workstreams, session_summary, schema",
+            "Pre-built query shortcut. When provided, sql is ignored. Options: active_sessions, open_streams, session_summary, schema",
         },
       },
       additionalProperties: false,

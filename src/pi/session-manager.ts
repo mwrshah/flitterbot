@@ -12,12 +12,12 @@ import type { AutonomaConfig } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
-import { formatWorkstreamPrompt } from "./format-workstream-prompt.ts";
+import { formatStreamPrompt } from "./format-stream-prompt.ts";
 import { PiSessionState } from "./session-state.ts";
 import { subscribeToPiSession } from "./subscribe.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 
-export { formatWorkstreamPrompt };
+export { formatStreamPrompt };
 
 export interface ManagedPiSession {
   /** Live SDK session. Null for dormant sessions rehydrated from DB on restart. */
@@ -25,8 +25,8 @@ export interface ManagedPiSession {
   queue: TurnQueue;
   state: PiSessionState;
   role: "default" | "orchestrator";
-  workstreamId: string | null;
-  workstreamName: string | null;
+  streamId: string | null;
+  streamName: string | null;
   piSessionId: string;
   createdAt: string;
   modelInfo: { provider: string; id: string };
@@ -72,8 +72,8 @@ export class PiSessionManager {
     return this.defaultSession;
   }
 
-  getByWorkstream(workstreamId: string): ManagedPiSession | undefined {
-    return this.orchestrators.get(workstreamId);
+  getByStream(streamId: string): ManagedPiSession | undefined {
+    return this.orchestrators.get(streamId);
   }
 
   getByPiSessionId(piSessionId: string): ManagedPiSession | undefined {
@@ -85,7 +85,7 @@ export class PiSessionManager {
   }
 
   async createDefault(customTools: unknown[]): Promise<ManagedPiSession> {
-    // Only reconcile the default session — orchestrator sessions for active workstreams
+    // Only reconcile the default session — orchestrator sessions for active streams
     // must survive restarts so their piSessionId (and associated messages) are preserved.
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
 
@@ -133,18 +133,18 @@ export class PiSessionManager {
   }
 
   async createOrchestrator(
-    workstreamId: string,
-    workstreamName: string,
+    streamId: string,
+    streamName: string,
     repoPath?: string,
     customTools?: unknown[],
   ): Promise<ManagedPiSession> {
-    // If one already exists for this workstream, return it
-    const existing = this.orchestrators.get(workstreamId);
+    // If one already exists for this stream, return it
+    const existing = this.orchestrators.get(streamId);
     if (existing) return existing;
 
     const orchestratorContext = {
-      workstreamName,
-      workstreamId,
+      streamName,
+      streamId,
       repoPath,
     };
 
@@ -166,8 +166,8 @@ export class PiSessionManager {
       created,
       state,
       "orchestrator",
-      workstreamId,
-      workstreamName,
+      streamId,
+      streamName,
     );
 
     upsertPiSession(this.blackboard, {
@@ -184,12 +184,12 @@ export class PiSessionManager {
       thinkingLevel: this.config.piThinkingLevel,
       startedAt: new Date().toISOString(),
       lastEventAt: new Date().toISOString(),
-      workstreamId,
+      streamId: streamId,
     });
 
-    this.orchestrators.set(workstreamId, managed);
+    this.orchestrators.set(streamId, managed);
     this.byPiSessionId.set(managed.piSessionId, managed);
-    this.log(`orchestrator created for workstream "${workstreamName}" (${workstreamId})`);
+    this.log(`orchestrator created for stream "${streamName}" (${streamId})`);
     this.logResourceInfo("orchestrator", created.resourceInfo);
     return managed;
   }
@@ -200,19 +200,19 @@ export class PiSessionManager {
    * getInputSurfaceHistory() finds messages via the preserved piSessionId, and
    * readSessionHistory() falls through to reading the JSONL file on disk.
    *
-   * When a new message arrives for this workstream, activateOrchestrator() creates
+   * When a new message arrives for this stream, activateOrchestrator() creates
    * the live agent session pointing at the existing session_file.
    */
   rehydrateOrchestrator(
-    workstreamId: string,
-    workstreamName: string,
+    streamId: string,
+    streamName: string,
     piSessionId: string,
     sessionFile: string | null,
     createdAt: string,
     modelProvider: string | null,
     modelId: string | null,
   ): ManagedPiSession {
-    const existing = this.orchestrators.get(workstreamId);
+    const existing = this.orchestrators.get(streamId);
     if (existing) return existing;
 
     const state = new PiSessionState();
@@ -223,8 +223,8 @@ export class PiSessionManager {
       queue: null!,
       state,
       role: "orchestrator",
-      workstreamId,
-      workstreamName,
+      streamId,
+      streamName,
       piSessionId,
       createdAt,
       modelInfo: { provider: modelProvider ?? "unknown", id: modelId ?? "unknown" },
@@ -245,7 +245,7 @@ export class PiSessionManager {
           type: "queue_item_start",
           item,
           sessionId: managed.piSessionId,
-          workstreamId,
+          streamId,
         });
       },
       onItemEnd: (item, error) => {
@@ -260,15 +260,15 @@ export class PiSessionManager {
           const detail = apiErr
             ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
             : String(error);
-          this.log(`queue item ${item.id} failed (orchestrator ws=${workstreamId}): ${detail}`);
-          this.destroyOrchestrator(workstreamId, "crashed");
+          this.log(`queue item ${item.id} failed (orchestrator stream=${streamId}): ${detail}`);
+          this.destroyOrchestrator(streamId, "crashed");
         }
         this.wsHub.broadcast({
           type: "queue_item_end",
           itemId: item.id,
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
           sessionId: managed.piSessionId,
-          workstreamId,
+          streamId,
         });
       },
     });
@@ -284,13 +284,13 @@ export class PiSessionManager {
       cwd: this.config.projectsDir,
       startedAt: createdAt,
       lastEventAt: new Date().toISOString(),
-      workstreamId,
+      streamId: streamId,
     });
 
-    this.orchestrators.set(workstreamId, managed);
+    this.orchestrators.set(streamId, managed);
     this.byPiSessionId.set(piSessionId, managed);
     this.log(
-      `rehydrated dormant orchestrator for workstream "${workstreamName}" (${workstreamId}) piSessionId=${piSessionId}`,
+      `rehydrated dormant orchestrator for stream "${streamName}" (${streamId}) piSessionId=${piSessionId}`,
     );
     return managed;
   }
@@ -298,11 +298,11 @@ export class PiSessionManager {
   /**
    * Activate a dormant orchestrator by creating a live SDK agent session that
    * resumes from the existing JSONL session_file. Called lazily when the first
-   * message arrives for a rehydrated workstream.
+   * message arrives for a rehydrated stream.
    */
   async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
     if (managed.session) return; // already active
-    if (!managed.workstreamId) throw new Error("Cannot activate non-workstream session");
+    if (!managed.streamId) throw new Error("Cannot activate non-stream session");
 
     const snapshot = managed.state.getSnapshot();
     const sessionFile = snapshot.sessionFile;
@@ -312,8 +312,8 @@ export class PiSessionManager {
       customTools: customTools ?? [],
       role: "orchestrator",
       orchestratorContext: {
-        workstreamName: managed.workstreamName ?? managed.workstreamId,
-        workstreamId: managed.workstreamId,
+        streamName: managed.streamName ?? managed.streamId,
+        streamId: managed.streamId,
       },
       resumeSessionFile: sessionFile && fs.existsSync(sessionFile) ? sessionFile : undefined,
     });
@@ -335,13 +335,13 @@ export class PiSessionManager {
     );
 
     this.log(
-      `activated dormant orchestrator for workstream "${managed.workstreamName}" (${managed.workstreamId})`,
+      `activated dormant orchestrator for stream "${managed.streamName}" (${managed.streamId})`,
     );
     this.logResourceInfo("orchestrator", created.resourceInfo);
   }
 
-  destroyOrchestrator(workstreamId: string, reason: string): void {
-    const managed = this.orchestrators.get(workstreamId);
+  destroyOrchestrator(streamId: string, reason: string): void {
+    const managed = this.orchestrators.get(streamId);
     if (!managed) return;
 
     managed.queue.stop();
@@ -363,17 +363,17 @@ export class PiSessionManager {
       endPiSession(this.blackboard, managed.piSessionId, status, reason, new Date().toISOString());
     }
 
-    this.orchestrators.delete(workstreamId);
+    this.orchestrators.delete(streamId);
     this.byPiSessionId.delete(managed.piSessionId);
     this.log(
-      `orchestrator destroyed for workstream "${managed.workstreamName}" (${workstreamId}): ${reason}`,
+      `orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`,
     );
   }
 
   disposeAll(): void {
     // Dispose orchestrators first
-    for (const [wsId] of this.orchestrators) {
-      this.destroyOrchestrator(wsId, "shutdown");
+    for (const [streamId] of this.orchestrators) {
+      this.destroyOrchestrator(streamId, "shutdown");
     }
 
     // Dispose default
@@ -402,15 +402,15 @@ export class PiSessionManager {
   }
 
   /**
-   * Build the initial prompt for a new orchestrator workstream.
+   * Build the initial prompt for a new orchestrator stream.
    */
-  buildWorkstreamPrompt(
+  buildStreamPrompt(
     currentMessage: string,
-    workstreamName: string,
-    workstreamId: string,
+    streamName: string,
+    streamId: string,
     agentMessage?: string,
   ): string {
-    return formatWorkstreamPrompt([currentMessage], workstreamName, workstreamId, agentMessage);
+    return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage);
   }
 
   private logResourceInfo(
@@ -432,8 +432,8 @@ export class PiSessionManager {
     created: { session: AgentSession; modelInfo: { provider: string; id: string } },
     state: PiSessionState,
     role: "default" | "orchestrator",
-    workstreamId: string | null,
-    workstreamName: string | null,
+    streamId: string | null,
+    streamName: string | null,
   ): ManagedPiSession {
     // Circular init: queue callback closes over `managed`, so the object must exist first.
     // null! signals deferred initialization — both fields are set immediately below.
@@ -442,8 +442,8 @@ export class PiSessionManager {
       queue: null!,
       state,
       role,
-      workstreamId,
-      workstreamName,
+      streamId,
+      streamName,
       piSessionId: created.session.sessionId,
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
@@ -464,7 +464,7 @@ export class PiSessionManager {
           type: "queue_item_start",
           item,
           sessionId: managed.piSessionId,
-          ...(workstreamId ? { workstreamId } : {}),
+          ...(streamId ? { streamId } : {}),
         });
       },
       onItemEnd: (item, error) => {
@@ -481,10 +481,10 @@ export class PiSessionManager {
             ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
             : String(error);
           this.log(
-            `queue item ${item.id} failed (${role}${workstreamId ? ` ws=${workstreamId}` : ""}): ${detail}`,
+            `queue item ${item.id} failed (${role}${streamId ? ` stream=${streamId}` : ""}): ${detail}`,
           );
-          if (role === "orchestrator" && workstreamId) {
-            this.destroyOrchestrator(workstreamId, "crashed");
+          if (role === "orchestrator" && streamId) {
+            this.destroyOrchestrator(streamId, "crashed");
           }
         }
         this.wsHub.broadcast({
@@ -492,7 +492,7 @@ export class PiSessionManager {
           itemId: item.id,
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
           sessionId: managed.piSessionId,
-          ...(workstreamId ? { workstreamId } : {}),
+          ...(streamId ? { streamId } : {}),
         });
       },
     });

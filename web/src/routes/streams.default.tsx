@@ -3,33 +3,33 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
-import { usePiChat } from "~/hooks/use-pi-chat";
+import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchPiHistory, fetchPiSessions, fetchPiWorktree } from "~/server/pi";
+import { fetchStreamsHistory, fetchStreamsSessions, fetchStreamsWorktree } from "~/server/streams";
 
-export const Route = createFileRoute("/pi/default")({
+export const Route = createFileRoute("/streams/default")({
   staticData: {
-    wsMode: "pi-default",
+    wsMode: "streams-default",
   },
   head: () => ({
-    meta: [{ title: "Autonoma — Pi / Default" }],
+    meta: [{ title: "Autonoma — Streams / Default" }],
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const defaultSessionId = status.pi?.default?.sessionId;
-    const items = await fetchPiHistory({ data: {} });
+    const defaultSessionId = status.streams?.default?.sessionId;
+    const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
     // Seed the Query cache under the real sessionId when available.
     if (defaultSessionId) {
       const [sessions, worktree] = await Promise.all([
-        fetchPiSessions({ data: { piSessionId: defaultSessionId } }).catch(() => []),
-        fetchPiWorktree({ data: { piSessionId: defaultSessionId } }).catch(() => null),
+        fetchStreamsSessions({ data: { piSessionId: defaultSessionId } }).catch(() => []),
+        fetchStreamsWorktree({ data: { piSessionId: defaultSessionId } }).catch(() => null),
       ]);
-      context.queryClient.setQueryData(["pi-history", defaultSessionId, "agent"], history);
-      context.queryClient.setQueryData(["pi-downstream-sessions", defaultSessionId], sessions);
-      context.queryClient.setQueryData(["pi-worktree", defaultSessionId], worktree);
+      context.queryClient.setQueryData(["streams-history", defaultSessionId, "agent"], history);
+      context.queryClient.setQueryData(["streams-downstream-sessions", defaultSessionId], sessions);
+      context.queryClient.setQueryData(["streams-worktree", defaultSessionId], worktree);
     }
 
     return { history };
@@ -39,18 +39,18 @@ export const Route = createFileRoute("/pi/default")({
       <p>Failed to load history: {String(error)}</p>
     </div>
   ),
-  component: PiDefaultRoute,
+  component: StreamsDefaultRoute,
 });
 
-function PiDefaultRoute() {
+function StreamsDefaultRoute() {
   const { history } = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
   // Derive defaultSessionId reactively from the status query cache so it
-  // updates when the default Pi session restarts with a new ID, rather than
+  // updates when the default Streams session restarts with a new ID, rather than
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const defaultSessionId = status?.pi?.default?.sessionId;
-  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = usePiChat(
+  const defaultSessionId = status?.streams?.default?.sessionId;
+  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = useStreamsChat(
     defaultSessionId,
     history,
   );

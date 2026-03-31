@@ -11,7 +11,7 @@ export type MessageMetadata = {
   [key: string]: unknown;
 };
 
-export type WorkstreamRoutingMeta = {
+export type StreamRoutingMeta = {
   router_action?: string;
   workstream_id?: string;
   workstream_name?: string;
@@ -63,7 +63,7 @@ export type PiSessionStatus =
   | "waiting_for_sessions"
   | "ended"
   | "crashed";
-export type WorkstreamStatus = "open" | "closed";
+export type StreamStatus = "open" | "closed";
 export type WhatsAppMessageDirection = "inbound" | "outbound";
 export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "failed";
 export type PendingActionKind =
@@ -82,12 +82,12 @@ export const ROUTE_EVENT_TO_HOOK_EVENT: Record<HookRouteEventName, HookEventName
   "session-end": "SessionEnd",
 };
 
-export interface WorkstreamRow {
+export interface StreamRow {
   id: string;
   name: string;
   repo_path: string | null;
   worktree_path: string | null;
-  status: WorkstreamStatus;
+  status: StreamStatus;
   created_at: string;
   closed_at: string | null;
 }

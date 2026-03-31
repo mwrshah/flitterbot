@@ -13,7 +13,7 @@ export function persistInboundMessage(
     source: UnifiedMessageSource;
     content: string;
     sender?: string;
-    workstreamId?: string;
+    streamId?: string;
     piSessionId?: string;
     metadata?: MessageMetadata;
   },
@@ -24,7 +24,7 @@ export function persistInboundMessage(
     direction: "inbound",
     content: opts.content,
     sender: opts.sender,
-    workstreamId: opts.workstreamId,
+    streamId: opts.streamId,
     piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
@@ -36,7 +36,7 @@ export function persistOutboundMessage(
     id?: string;
     source: UnifiedMessageSource;
     content: string;
-    workstreamId?: string;
+    streamId?: string;
     piSessionId?: string;
     metadata?: MessageMetadata;
   },
@@ -47,7 +47,7 @@ export function persistOutboundMessage(
     direction: "outbound",
     content: opts.content,
     sender: "pi",
-    workstreamId: opts.workstreamId,
+    streamId: opts.streamId,
     piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
@@ -71,12 +71,12 @@ export function getMessagesBySource(
 
 export function getMessagesByWorkstream(
   db: BlackboardDatabase,
-  workstreamId: string,
+  streamId: string,
   limit: number = 100,
 ): MessageRow[] {
   return db.all<MessageRow>(
     "SELECT * FROM messages WHERE workstream_id = ? ORDER BY created_at ASC LIMIT ?",
-    workstreamId,
+    streamId,
     limit,
   );
 }
