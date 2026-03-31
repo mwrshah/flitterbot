@@ -4,16 +4,15 @@
  */
 export function formatStreamPrompt(
   messages: string[],
-  streamName: string,
-  streamId: string,
+  _streamName: string,
+  _streamId: string,
   agentMessage?: string,
 ): string {
-  const header = `[Stream: "${streamName}" (${streamId})]`;
   const footer = "IMPORTANT: Before doing anything else, run /load2-w to load essential skills.";
   const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
 
   if (messages.length <= 1) {
-    return `${header}\n${messages[0] ?? ""}${agentSection}\n\n${footer}`;
+    return `${messages[0] ?? ""}${agentSection}\n\n${footer}`;
   }
 
   const total = messages.length;
@@ -24,5 +23,5 @@ export function formatStreamPrompt(
     })
     .join("\n\n");
 
-  return `${header}\nThe following user messages provide context for this stream:\n\n${body}${agentSection}\n\n${footer}`;
+  return `The following user messages provide context for this stream:\n\n${body}${agentSection}\n\n${footer}`;
 }

@@ -4,29 +4,12 @@ import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   JsonValue,
-  MessageSource,
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
 
 type StreamsHistoryMode = "agent" | "input";
 
 type StreamsHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[number];
-
-/**
- * Known bracket prefixes that map to MessageSource values.
- * Backward-compat: old session JSONL files may still contain decorated text
- * from the previous formatPromptWithContext behavior. New messages are clean.
- */
-const SOURCE_PREFIX_RE = /^\[(web|whatsapp|hook|cron|init|agent|stream_outbound)\]\s*/i;
-
-function extractSource(text: string): { source: MessageSource | undefined; content: string } {
-  const match = SOURCE_PREFIX_RE.exec(text);
-  if (!match) return { source: undefined, content: text };
-  return {
-    source: match[1]!.toLowerCase() as MessageSource,
-    content: text.slice(match[0].length),
-  };
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -72,14 +55,6 @@ function pushMessage(
   );
   if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
 
-  // Extract source prefix from user messages (e.g. "[web] Hello" → source: "web", content: "Hello")
-  let source: MessageSource | undefined;
-  if (role === "user") {
-    const extracted = extractSource(normalized);
-    source = extracted.source;
-    normalized = extracted.content;
-  }
-
   const item: ChatTimelineMessage = {
     id,
     kind: "message",
@@ -87,9 +62,6 @@ function pushMessage(
     content: normalized,
     createdAt,
   };
-  if (source) {
-    item.source = source;
-  }
   if (normalizedBlocks && normalizedBlocks.length > 0) {
     item.blocks = normalizedBlocks;
   }

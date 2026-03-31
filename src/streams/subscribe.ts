@@ -210,6 +210,8 @@ export function subscribeToStreamSession(
   state: StreamSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
+  sessionStreamId?: string | null,
+  sessionStreamName?: string | null,
 ): () => void {
   // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
   // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
@@ -330,8 +332,8 @@ export function subscribeToStreamSession(
           role,
           content,
           source: currentItem?.source,
-          streamId: currentItem?.streamId,
-          streamName: currentItem?.streamName,
+          streamId: currentItem?.streamId ?? sessionStreamId ?? undefined,
+          streamName: currentItem?.streamName ?? sessionStreamName ?? undefined,
           createdAt: extractTimestamp(event.message, now),
         };
 
