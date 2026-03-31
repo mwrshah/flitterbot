@@ -874,6 +874,8 @@ export class AssistantMessage extends LitElement {
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
+  /** When set, overrides the self-computed text for the copy button. Empty string hides it. */
+  @property({ attribute: false }) copyText?: string;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -914,15 +916,18 @@ export class AssistantMessage extends LitElement {
       }
     }
 
-    const plainText = this.message.content
-      .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
-      .map((chunk) => chunk.text)
-      .join("\n");
+    // Use copyText override when provided; undefined means use self-computed text
+    const effectiveCopyText = this.copyText !== undefined
+      ? this.copyText
+      : this.message.content
+          .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
+          .map((chunk) => chunk.text)
+          .join("\n");
 
     return html`
       <div class="relative">
         ${orderedParts.length ? html`<div class="px-4 pr-8 flex flex-col gap-3">${orderedParts}</div>` : ""}
-        ${plainText ? html`<message-copy-button .text=${plainText}></message-copy-button>` : ""}
+        ${effectiveCopyText ? html`<message-copy-button .text=${effectiveCopyText}></message-copy-button>` : ""}
         ${
           this.message.usage && !this.isStreaming
             ? this.onCostClick
@@ -1007,6 +1012,14 @@ export class MessageList extends LitElement {
     });
   }
 
+  /** Extract plain text from an assistant message's content chunks. */
+  private static getAssistantPlainText(msg: AssistantMessageType): string {
+    return (msg.content || [])
+      .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
+      .map((chunk) => chunk.text)
+      .join("\n");
+  }
+
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
@@ -1015,6 +1028,40 @@ export class MessageList extends LitElement {
           (message as ToolResultMessageType).toolCallId,
           message as ToolResultMessageType,
         );
+      }
+    }
+
+    // Pre-pass: group assistant messages between user messages so we can
+    // show a single copy button on the last assistant in each group with
+    // the concatenated text of the entire group.
+    // Build groups split by user messages
+    const groups: AssistantMessageType[][] = [];
+    let currentGroup: AssistantMessageType[] = [];
+    for (const msg of this.messages) {
+      const role = (msg as unknown as { role: string }).role;
+      if (role === "user" || role === "user-with-attachments") {
+        if (currentGroup.length > 0) {
+          groups.push(currentGroup);
+          currentGroup = [];
+        }
+      } else if (role === "assistant") {
+        currentGroup.push(msg as AssistantMessageType);
+      }
+    }
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup);
+    }
+
+    // Map each assistant message to its copyText: empty for non-last, concatenated for last
+    const copyTextByTimestamp = new Map<number | undefined, string>();
+    for (const group of groups) {
+      const concatenated = group
+        .map((m) => MessageList.getAssistantPlainText(m))
+        .filter(Boolean)
+        .join("\n");
+      for (let i = 0; i < group.length; i++) {
+        const ts = (group[i] as unknown as { timestamp?: number }).timestamp;
+        copyTextByTimestamp.set(ts, i === group.length - 1 ? concatenated : "");
       }
     }
 
@@ -1040,6 +1087,7 @@ export class MessageList extends LitElement {
       }
 
       if (role === "assistant") {
+        const copyText = copyTextByTimestamp.get(ts) ?? "";
         items.push({
           key,
           template: html`
@@ -1051,6 +1099,7 @@ export class MessageList extends LitElement {
               .toolResultsById=${resultByCallId}
               .hideToolCalls=${false}
               .onCostClick=${this.onCostClick}
+              .copyText=${copyText}
             ></assistant-message>
           `,
         });
