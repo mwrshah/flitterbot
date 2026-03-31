@@ -7,10 +7,9 @@ import { requireBearer, sendJson } from "./_shared.ts";
 
 type CountRow = { count: number };
 
-const CRON_PREFIX = "[cron] ";
-const STALE_PROMPT_PREFIX = `${CRON_PREFIX}Stale session check:`;
+const STALE_PROMPT_PREFIX = "Stale session check:";
 const IDLE_PROMPT =
-  `${CRON_PREFIX}Idle check: All tracked Claude Code sessions appear stopped or idle. ` +
+  "Idle check: All tracked Claude Code sessions appear stopped or idle. " +
   "Review the latest session state, recent transcripts, Obsidian context, and Todoist context. " +
   "Figure out what the user most likely wants to tackle next. If an obvious next prompt exists " +
   "for an idle Claude session, consider continuing it. If parallel Claude Code work would help, " +

@@ -1180,12 +1180,10 @@ export class ControlSurfaceRuntime {
             };
           }
 
-          const formattedText = `[Stream: "${ws.name}" (${ws.id})]\n${message}`;
-
           try {
             orchestrator.queue.enqueue({
               id: `enq-msg-${crypto.randomUUID()}`,
-              text: formattedText,
+              text: message,
               source: "agent",
               metadata: {
                 stream_id: ws.id,
@@ -1651,7 +1649,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     "lastAssistantMessage",
   ]);
   const lines = [
-    `[hook] ${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
+    `${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
     project ? `Project: ${project}` : undefined,
     cwd ? `CWD: ${cwd}` : undefined,
