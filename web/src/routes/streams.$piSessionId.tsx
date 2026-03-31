@@ -13,10 +13,10 @@ import {
 
 export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
-    wsMode: "stream-session",
+    wsMode: "pi-session",
   },
   head: () => ({
-    meta: [{ title: "Autonoma — Streams Session" }],
+    meta: [{ title: "Autonoma — Pi Session" }],
   }),
   loader: async ({ params, context }) => {
     // Use ensureQueryData for all three fetches so that:

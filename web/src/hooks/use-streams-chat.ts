@@ -37,10 +37,10 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
-    if (!piSessionId || !status?.streamAgent) return false;
-    if (status.streamAgent.default?.piSessionId === piSessionId)
-      return !!status.streamAgent.default.busy;
-    return !!status.streamAgent.orchestrators?.find((o) => o.piSessionId === piSessionId)?.busy;
+    if (!piSessionId || !status?.piAgent) return false;
+    if (status.piAgent.default?.piSessionId === piSessionId)
+      return !!status.piAgent.default.busy;
+    return !!status.piAgent.orchestrators?.find((o) => o.piSessionId === piSessionId)?.busy;
   })();
 
   const effectivePiSessionId = piSessionId ?? "default";

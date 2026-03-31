@@ -97,7 +97,7 @@ export interface StatusResponse {
   ok: true;
   pid: number;
   uptime: number;
-  streamAgent: PiMultiSessionStatus;
+  piAgent: PiMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
@@ -153,7 +153,7 @@ export interface DownstreamSessionItem {
   project: string | null;
 }
 
-export interface PiSessionsListResponse {
+export interface DownstreamSessionsListResponse {
   items: DownstreamSessionItem[];
 }
 

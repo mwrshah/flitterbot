@@ -208,7 +208,7 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    // Bootstrap Streams agent with startup skills
+    // Bootstrap default pi session with startup skills
     this.enqueue({
       text: "/load2-w",
       source: "init",
@@ -550,7 +550,7 @@ export class ControlSurfaceRuntime {
       ok: true,
       pid: process.pid,
       uptime: Math.floor((Date.now() - this.startedAt) / 1000),
-      streamAgent: {
+      piAgent: {
         default: defSnapshot
           ? {
               piSessionId: defSnapshot.piSessionId!,
@@ -828,7 +828,7 @@ export class ControlSurfaceRuntime {
   }
 
   /**
-   * After a Streams turn ends, check managed CC sessions to determine next state.
+   * After a pi session turn ends, check managed downstream sessions to determine next state.
    */
   private transitionStreamsAfterTurn(piSessionId: string): void {
     try {

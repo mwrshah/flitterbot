@@ -299,7 +299,7 @@ export class PiSessionManager {
     customTools?: unknown[],
   ): Promise<void> {
     if (managed.session) return; // already active
-    if (!managed.streamId) throw new Error("Cannot activate non-stream session");
+    if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
 
     const snapshot = managed.state.getSnapshot();
     const sessionFile = snapshot.sessionFile;
@@ -423,13 +423,13 @@ export class PiSessionManager {
     const { skillNames, agentsFilePaths } = info;
     if (skillNames.length > 0) {
       this.log(
-        `stream-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`,
+        `pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`,
       );
     } else {
-      this.log(`stream-agent (${role}): no skills loaded`);
+      this.log(`pi-agent (${role}): no skills loaded`);
     }
     for (const filePath of agentsFilePaths) {
-      this.log(`stream-agent (${role}): loaded ${path.basename(filePath)} from ${filePath}`);
+      this.log(`pi-agent (${role}): loaded ${path.basename(filePath)} from ${filePath}`);
     }
   }
 

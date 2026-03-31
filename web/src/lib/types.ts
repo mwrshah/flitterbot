@@ -99,7 +99,7 @@ export type StatusResponse = {
     pid?: number;
     managedByControlSurface?: boolean;
   };
-  streamAgent?: {
+  piAgent?: {
     default?: {
       piSessionId?: string;
       busy?: boolean;
@@ -148,7 +148,7 @@ export type DownstreamSessionItem = {
   project: string | null;
 };
 
-export type PiSessionsListResponse = {
+export type DownstreamSessionsListResponse = {
   items: DownstreamSessionItem[];
 };
 

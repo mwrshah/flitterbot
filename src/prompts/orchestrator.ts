@@ -11,13 +11,13 @@ export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
   const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
   const wsFlag = ctx.streamId ? ` --stream-id ${ctx.streamId}` : "";
 
-  return `You are an orchestrator Stream agent managing a single stream.
+  return `You are an orchestrator pi agent managing a single stream.
 
 ## Runtime Facts
 - Your final text response each turn is automatically sent to both WhatsApp and the web client.
 
-- You are an orchestrator Stream agent —  assigned the task on this one stream.
-- Your Stream session ID: \`\${ctx.piSessionId}\` — pass as \`--pi-session-id\` when launching CC sessions so stop events route back to you
+- You are an orchestrator pi agent — assigned the task on this one stream.
+- Your pi session ID: \`\${ctx.piSessionId}\` — pass as \`--pi-session-id\` when launching CC sessions so stop events route back to you
 - Stream: *\${ctx.streamName}* (ID: \${ctx.streamId})\${repoLine} — pass as \`--stream-id\` when launching CC sessions so their work links to this stream
 
 ## How to Prompt Claude Code Agents
