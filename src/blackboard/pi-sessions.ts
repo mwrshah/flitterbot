@@ -1,18 +1,18 @@
-import type { StreamSessionStatus as PersistedStreamSessionStatus } from "../contracts/index.ts";
+import type { PiSessionStatus as PersistedPiSessionStatus } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 import {
-  closeStreamSession,
-  markPreviousStreamSessionsInactive,
+  closePiSession,
+  markPreviousPiSessionsInactive,
   reassociateOrphanedSessions as reassociateOrphanedSessionsWrite,
-  touchStreamSessionEvent,
-  touchStreamSessionPrompt,
-  upsertStreamSession as writeStreamSession,
-} from "./write-stream-sessions.ts";
+  touchPiSessionEvent,
+  touchPiSessionPrompt,
+  upsertPiSession as writePiSession,
+} from "./write-pi-sessions.ts";
 
-type UpsertStreamSessionInput = {
-  streamSessionId: string;
+type UpsertPiSessionInput = {
+  piSessionId: string;
   role: string;
-  status?: PersistedStreamSessionStatus;
+  status?: PersistedPiSessionStatus;
   runtimeInstanceId?: string;
   pid?: number;
   sessionFile?: string;
@@ -27,14 +27,14 @@ type UpsertStreamSessionInput = {
   streamId?: string;
 };
 
-export function reconcilePreviousStreamSessions(
+export function reconcilePreviousPiSessions(
   db: BlackboardDatabase,
   role: string,
   runtimeInstanceId: string,
   reason: string = "replaced",
-  status: Extract<PersistedStreamSessionStatus, "ended" | "crashed"> = "ended",
+  status: Extract<PersistedPiSessionStatus, "ended" | "crashed"> = "ended",
 ): number {
-  return markPreviousStreamSessionsInactive(db, {
+  return markPreviousPiSessionsInactive(db, {
     role,
     runtimeInstanceId,
     endedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
@@ -43,12 +43,12 @@ export function reconcilePreviousStreamSessions(
   });
 }
 
-export function upsertStreamSession(
+export function upsertPiSession(
   db: BlackboardDatabase,
-  input: UpsertStreamSessionInput,
+  input: UpsertPiSessionInput,
 ): void {
-  writeStreamSession(db, {
-    stream_session_id: input.streamSessionId,
+  writePiSession(db, {
+    pi_session_id: input.piSessionId,
     role: input.role,
     status: input.status ?? "active",
     runtime_instance_id: input.runtimeInstanceId,
@@ -66,81 +66,81 @@ export function upsertStreamSession(
   });
 }
 
-export function touchStreamsPrompt(
+export function touchPiPrompt(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
   timestamp: string,
   status: Extract<
-    PersistedStreamSessionStatus,
+    PersistedPiSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
-  touchStreamSessionPrompt(db, streamSessionId, timestamp, status);
+  touchPiSessionPrompt(db, piSessionId, timestamp, status);
 }
 
-export function touchStreamsEvent(
+export function touchPiEvent(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
   timestamp: string,
   status: Extract<
-    PersistedStreamSessionStatus,
+    PersistedPiSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
-  touchStreamSessionEvent(db, streamSessionId, timestamp, status);
+  touchPiSessionEvent(db, piSessionId, timestamp, status);
 }
 
-export function updateStreamSessionStatus(
+export function updatePiSessionStatus(
   db: BlackboardDatabase,
-  streamSessionId: string,
-  status: PersistedStreamSessionStatus,
+  piSessionId: string,
+  status: PersistedPiSessionStatus,
 ): void {
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   db.prepare(
-    `UPDATE stream_sessions
+    `UPDATE pi_sessions
      SET status = ?,
          last_event_at = MAX(last_event_at, ?)
-     WHERE stream_session_id = ?`,
-  ).run(status, now, streamSessionId);
+     WHERE pi_session_id = ?`,
+  ).run(status, now, piSessionId);
 }
 
 export function getLastDatetimeReportedAt(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
 ): string | null {
   const row = db.get<{ last_datetime_reported_at: string | null }>(
-    "SELECT last_datetime_reported_at FROM stream_sessions WHERE stream_session_id = ?",
-    streamSessionId,
+    "SELECT last_datetime_reported_at FROM pi_sessions WHERE pi_session_id = ?",
+    piSessionId,
   );
   return row?.last_datetime_reported_at ?? null;
 }
 
 export function touchDatetimeReportedAt(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
   timestamp: string,
 ): void {
-  db.prepare("UPDATE stream_sessions SET last_datetime_reported_at = ? WHERE stream_session_id = ?").run(
+  db.prepare("UPDATE pi_sessions SET last_datetime_reported_at = ? WHERE pi_session_id = ?").run(
     timestamp,
-    streamSessionId,
+    piSessionId,
   );
 }
 
 export function reassociateOrphanedSessions(
   db: BlackboardDatabase,
-  newStreamSessionId: string,
+  newPiSessionId: string,
 ): number {
-  return reassociateOrphanedSessionsWrite(db, newStreamSessionId);
+  return reassociateOrphanedSessionsWrite(db, newPiSessionId);
 }
 
-export function endStreamSession(
+export function endPiSession(
   db: BlackboardDatabase,
-  streamSessionId: string,
-  status: Extract<PersistedStreamSessionStatus, "ended" | "crashed">,
+  piSessionId: string,
+  status: Extract<PersistedPiSessionStatus, "ended" | "crashed">,
   reason: string,
   endedAt: string = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
 ): void {
-  closeStreamSession(db, streamSessionId, {
+  closePiSession(db, piSessionId, {
     status,
     endedAt,
     endReason: reason,

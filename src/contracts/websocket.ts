@@ -8,19 +8,19 @@ export interface WebSocketClientMessageEvent {
   text: string;
   deliveryMode?: DeliveryMode;
   images?: ImageAttachment[];
-  targetSessionId?: string;
+  targetPiSessionId?: string;
 }
 
 export interface WebSocketClientSubscribeEvent {
   type: "subscribe";
-  sessionId: string;
+  piSessionId: string;
   /** If provided, only deliver events of these types for this subscription. Omit for all. */
   eventTypes?: string[];
 }
 
 export interface WebSocketClientUnsubscribeEvent {
   type: "unsubscribe";
-  sessionId: string;
+  piSessionId: string;
 }
 
 export interface WebSocketClientPingEvent {
@@ -51,7 +51,7 @@ type QueuedTurnSummary = {
 export interface QueueItemStartWebSocketEvent {
   type: "queue_item_start";
   item: QueuedTurnSummary;
-  sessionId?: string;
+  piSessionId?: string;
   streamId?: string;
 }
 
@@ -59,26 +59,26 @@ export interface QueueItemEndWebSocketEvent {
   type: "queue_item_end";
   itemId: string;
   error?: string;
-  sessionId?: string;
+  piSessionId?: string;
   streamId?: string;
 }
 
 export interface TextDeltaWebSocketEvent {
   type: "text_delta";
-  sessionId?: string;
+  piSessionId?: string;
   messageId: string;
   delta: string;
 }
 
 export interface MessageEndWebSocketEvent {
   type: "message_end";
-  sessionId?: string;
+  piSessionId?: string;
   message: ChatTimelineMessage;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
   type: "tool_execution_start";
-  sessionId?: string;
+  piSessionId?: string;
   tool?: string;
   toolUseId?: string;
   args?: unknown;
@@ -88,7 +88,7 @@ export interface ToolExecutionStartWebSocketEvent {
 
 export interface ToolExecutionEndWebSocketEvent {
   type: "tool_execution_end";
-  sessionId?: string;
+  piSessionId?: string;
   tool?: string;
   toolUseId?: string;
   result?: unknown;
@@ -99,26 +99,26 @@ export interface ToolExecutionEndWebSocketEvent {
 
 export interface ThinkingStartWebSocketEvent {
   type: "thinking_start";
-  sessionId?: string;
+  piSessionId?: string;
   messageId: string;
 }
 
 export interface ThinkingDeltaWebSocketEvent {
   type: "thinking_delta";
-  sessionId?: string;
+  piSessionId?: string;
   messageId: string;
   delta: string;
 }
 
 export interface ThinkingEndWebSocketEvent {
   type: "thinking_end";
-  sessionId?: string;
+  piSessionId?: string;
   messageId: string;
 }
 
 export interface ToolCallStartWebSocketEvent {
   type: "toolcall_start";
-  sessionId?: string;
+  piSessionId?: string;
   contentIndex: number;
   toolName?: string;
   toolUseId?: string;
@@ -126,7 +126,7 @@ export interface ToolCallStartWebSocketEvent {
 
 export interface ToolExecutionUpdateWebSocketEvent {
   type: "tool_execution_update";
-  sessionId?: string;
+  piSessionId?: string;
   toolUseId?: string;
   partialResult?: unknown;
   timestamp?: string;
@@ -135,7 +135,7 @@ export interface ToolExecutionUpdateWebSocketEvent {
 
 export interface TurnEndWebSocketEvent {
   type: "turn_end";
-  sessionId?: string;
+  piSessionId?: string;
   event?: unknown;
   timestamp?: string;
 }
@@ -143,7 +143,7 @@ export interface TurnEndWebSocketEvent {
 export interface StreamSurfacedWebSocketEvent {
   type: "stream_surfaced";
   message: ChatTimelineMessage;
-  sessionId?: string;
+  piSessionId?: string;
   streamId?: string;
   streamName?: string;
 }
@@ -173,15 +173,13 @@ export interface ErrorWebSocketEvent {
 
 export interface SessionsChangedWebSocketEvent {
   type: "sessions_changed";
-  /** equals streamSessionId — used by broadcast() for subscription-scoped routing */
-  sessionId: string;
-  streamSessionId: string;
+  piSessionId: string;
   reason: "registered" | "ended" | "stopped";
 }
 
 export interface WorktreeChangedWebSocketEvent {
   type: "worktree_changed";
-  streamSessionId: string;
+  piSessionId: string;
   streamId: string;
 }
 
@@ -194,37 +192,37 @@ export interface MessageAckWebSocketEvent {
 
 export interface AgentStartWebSocketEvent {
   type: "agent_start";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface AgentEndWebSocketEvent {
   type: "agent_end";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface TurnStartWebSocketEvent {
   type: "turn_start";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface AutoCompactionStartWebSocketEvent {
   type: "auto_compaction_start";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface AutoCompactionEndWebSocketEvent {
   type: "auto_compaction_end";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface AutoRetryStartWebSocketEvent {
   type: "auto_retry_start";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export interface AutoRetryEndWebSocketEvent {
   type: "auto_retry_end";
-  sessionId?: string;
+  piSessionId?: string;
 }
 
 export type ControlSurfaceWebSocketServerEvent =

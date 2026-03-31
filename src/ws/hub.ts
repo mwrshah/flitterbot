@@ -12,7 +12,7 @@ export type WebSocketClient = {
   id: string;
   socket: net.Socket;
   buffer: Buffer;
-  /** sessionId → event type filter (null = all event types) */
+  /** piSessionId → event type filter (null = all event types) */
   subscriptions: Map<string, Set<string> | null>;
 };
 
@@ -84,20 +84,20 @@ export class WebSocketHub {
   }
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
-    const sessionId =
-      "sessionId" in payload ? (payload.sessionId as string | undefined) : undefined;
+    const piSessionId =
+      "piSessionId" in payload ? (payload.piSessionId as string | undefined) : undefined;
     const eventType = payload.type;
     const frame = encodeFrame(JSON.stringify(payload));
     for (const client of this.clients.values()) {
-      // No sessionId on event → global event, deliver to all
-      if (!sessionId) {
+      // No piSessionId on event → global event, deliver to all
+      if (!piSessionId) {
         this.safeWrite(client, frame);
         continue;
       }
       // Client has no subscriptions → skip (they haven't subscribed to anything)
       if (client.subscriptions.size === 0) continue;
       // Check wildcard subscription first, then exact session match
-      const filter = client.subscriptions.get("*") ?? client.subscriptions.get(sessionId);
+      const filter = client.subscriptions.get("*") ?? client.subscriptions.get(piSessionId);
       if (filter === undefined) continue;
       // null filter = all event types; Set filter = only matching types
       if (filter === null || filter.has(eventType)) {
@@ -114,16 +114,16 @@ export class WebSocketHub {
     }
   }
 
-  subscribeClient(clientId: string, sessionId: string, eventTypes?: string[]): void {
+  subscribeClient(clientId: string, piSessionId: string, eventTypes?: string[]): void {
     const client = this.clients.get(clientId);
     if (client) {
-      client.subscriptions.set(sessionId, eventTypes ? new Set(eventTypes) : null);
+      client.subscriptions.set(piSessionId, eventTypes ? new Set(eventTypes) : null);
     }
   }
 
-  unsubscribeClient(clientId: string, sessionId: string): void {
+  unsubscribeClient(clientId: string, piSessionId: string): void {
     const client = this.clients.get(clientId);
-    if (client) client.subscriptions.delete(sessionId);
+    if (client) client.subscriptions.delete(piSessionId);
   }
 
   send(clientId: string, payload: ControlSurfaceWebSocketServerEvent): void {

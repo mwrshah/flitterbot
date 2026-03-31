@@ -11,7 +11,7 @@ import {
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
 
-export const Route = createFileRoute("/streams/$sessionId")({
+export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
     wsMode: "stream-session",
   },
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/streams/$sessionId")({
     const [, history] = await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient
-        .ensureQueryData(streamsHistoryQueryOptions(params.sessionId))
+        .ensureQueryData(streamsHistoryQueryOptions(params.piSessionId))
         .catch((error: unknown) => {
           if (error instanceof Error && /404|not found/i.test(error.message)) {
             throw redirect({ to: "/streams/default" });
@@ -37,8 +37,8 @@ export const Route = createFileRoute("/streams/$sessionId")({
         }),
       // Sessions and worktree are non-blocking — kick off prefetches so they're
       // in cache when DownstreamSessionsPanel mounts, but don't hold up navigation.
-      context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.sessionId)),
-      context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.sessionId)),
+      context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.piSessionId)),
+      context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
     ]);
 
     return { history };
@@ -52,22 +52,22 @@ export const Route = createFileRoute("/streams/$sessionId")({
 });
 
 function StreamSessionRoute() {
-  const { sessionId } = Route.useParams();
+  const { piSessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const stream = status?.streams?.find((ws) => ws.streamSessionId === sessionId);
+  const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
   const isStreamClosed = stream?.status === "closed";
 
-  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
-    useStreamsChat(sessionId, history);
+  const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
+    useStreamsChat(piSessionId, history);
 
   return (
     <PanelGroup orientation="horizontal" className="h-full">
       <Panel defaultSize="75%" minSize="40%">
         <ChatPanel
-          sessionId={effectiveSessionId}
+          piSessionId={effectivePiSessionId}
           timeline={timeline}
           statusPills={statusPills}
           isSessionBusy={isSessionBusy}
@@ -78,7 +78,7 @@ function StreamSessionRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel streamSessionId={sessionId} />
+        <DownstreamSessionsPanel piSessionId={piSessionId} />
       </Panel>
     </PanelGroup>
   );

@@ -65,13 +65,13 @@ export function insertIdMapping(
   db: BlackboardDatabase,
   serverId: string,
   agentId: string,
-  streamSessionId?: string,
+  piSessionId?: string,
 ): void {
   db.run(
-    `INSERT OR IGNORE INTO message_id_map (server_id, agent_id, stream_session_id) VALUES (?, ?, ?)`,
+    `INSERT OR IGNORE INTO message_id_map (server_id, agent_id, pi_session_id) VALUES (?, ?, ?)`,
     serverId,
     agentId,
-    streamSessionId ?? null,
+    piSessionId ?? null,
   );
 }
 

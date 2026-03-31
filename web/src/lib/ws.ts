@@ -3,7 +3,7 @@ import type { ConnectionState, WsMessage } from "./types";
 
 type WsSubscriber = (message: WsMessage) => void;
 type ConnectionSubscriber = (state: ConnectionState) => void;
-type SessionSubscription = { sessionId: string; eventTypes?: string[] };
+type SessionSubscription = { piSessionId: string; eventTypes?: string[] };
 
 // ── Heartbeat config ──
 const HEARTBEAT_INTERVAL = 30_000;
@@ -272,27 +272,27 @@ export class AutonomaWsClient {
     text: string,
     deliveryMode: string,
     images?: Array<{ data: string; mimeType: string }>,
-    targetSessionId?: string,
+    targetPiSessionId?: string,
   ): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
     const payload: Record<string, unknown> = { type: "message", text, deliveryMode };
     if (images?.length) payload.images = images;
-    if (targetSessionId) payload.targetSessionId = targetSessionId;
+    if (targetPiSessionId) payload.targetPiSessionId = targetPiSessionId;
     this.socket.send(JSON.stringify(payload));
   }
 
-  setSessionSubscription(sessionId: string, eventTypes?: string[]): void {
+  setSessionSubscription(piSessionId: string, eventTypes?: string[]): void {
     const next: SessionSubscription = {
-      sessionId,
+      piSessionId,
       eventTypes: normalizeEventTypes(eventTypes),
     };
     const previous = this.activeSessionSubscription;
 
     if (
       previous &&
-      previous.sessionId === next.sessionId &&
+      previous.piSessionId === next.piSessionId &&
       sameEventTypes(previous.eventTypes, next.eventTypes)
     ) {
       return;
@@ -300,17 +300,17 @@ export class AutonomaWsClient {
 
     this.activeSessionSubscription = next;
 
-    if (previous && previous.sessionId !== next.sessionId) {
-      this.sendUnsubscribe(previous.sessionId);
+    if (previous && previous.piSessionId !== next.piSessionId) {
+      this.sendUnsubscribe(previous.piSessionId);
     }
-    this.sendSubscribe(next.sessionId, next.eventTypes);
+    this.sendSubscribe(next.piSessionId, next.eventTypes);
   }
 
   clearSessionSubscription(): void {
     const previous = this.activeSessionSubscription;
     if (!previous) return;
     this.activeSessionSubscription = null;
-    this.sendUnsubscribe(previous.sessionId);
+    this.sendUnsubscribe(previous.piSessionId);
   }
 
   subscribe(fn: WsSubscriber): () => void {
@@ -330,21 +330,21 @@ export class AutonomaWsClient {
   private flushSessionSubscription() {
     if (!this.activeSessionSubscription) return;
     this.sendSubscribe(
-      this.activeSessionSubscription.sessionId,
+      this.activeSessionSubscription.piSessionId,
       this.activeSessionSubscription.eventTypes,
     );
   }
 
-  private sendSubscribe(sessionId: string, eventTypes?: string[]) {
+  private sendSubscribe(piSessionId: string, eventTypes?: string[]) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const payload: Record<string, unknown> = { type: "subscribe", sessionId };
+    const payload: Record<string, unknown> = { type: "subscribe", piSessionId };
     if (eventTypes && eventTypes.length > 0) payload.eventTypes = eventTypes;
     this.socket.send(JSON.stringify(payload));
   }
 
-  private sendUnsubscribe(sessionId: string) {
+  private sendUnsubscribe(piSessionId: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    this.socket.send(JSON.stringify({ type: "unsubscribe", sessionId }));
+    this.socket.send(JSON.stringify({ type: "unsubscribe", piSessionId }));
   }
 }
 

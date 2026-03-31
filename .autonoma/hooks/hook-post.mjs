@@ -48,7 +48,7 @@ function enrichPayload(payload) {
     if (env.AUTONOMA_TMUX_SESSION) payload.tmux_session = env.AUTONOMA_TMUX_SESSION;
     if (env.AUTONOMA_TASK_DESCRIPTION) payload.task_description = env.AUTONOMA_TASK_DESCRIPTION;
     if (env.AUTONOMA_TODOIST_TASK_ID) payload.todoist_task_id = env.AUTONOMA_TODOIST_TASK_ID;
-    if (env.AUTONOMA_STREAM_SESSION_ID) payload.stream_session_id = env.AUTONOMA_STREAM_SESSION_ID;
+    if (env.AUTONOMA_PI_SESSION_ID) payload.pi_session_id = env.AUTONOMA_PI_SESSION_ID;
     if (env.AUTONOMA_STREAM_ID) payload.stream_id = env.AUTONOMA_STREAM_ID;
   }
   return payload;

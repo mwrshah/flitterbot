@@ -1,11 +1,11 @@
-import type { StreamsRuntimeStatus } from "../contracts/index.ts";
+import type { PiSessionRuntimeStatus } from "../contracts/index.ts";
 import type { QueueItem } from "./turn-queue.ts";
 
 type StreamsRuntimeSnapshot = Omit<
-  StreamsRuntimeStatus,
-  "sessionId" | "sessionFile" | "lastPromptAt"
+  PiSessionRuntimeStatus,
+  "piSessionId" | "sessionFile" | "lastPromptAt"
 > & {
-  sessionId?: string;
+  piSessionId?: string;
   sessionFile?: string;
   lastPromptAt?: string;
   lastEventAt?: string;
@@ -19,8 +19,8 @@ export class StreamSessionState {
     busy: false,
   };
 
-  initialize(sessionId: string, sessionFile: string | undefined, messageCount: number): void {
-    this.snapshot.sessionId = sessionId;
+  initialize(piSessionId: string, sessionFile: string | undefined, messageCount: number): void {
+    this.snapshot.piSessionId = piSessionId;
     this.snapshot.sessionFile = sessionFile;
     this.snapshot.messageCount = messageCount;
     this.snapshot.lastEventAt = new Date().toISOString();

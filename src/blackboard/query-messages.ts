@@ -14,7 +14,7 @@ export function persistInboundMessage(
     content: string;
     sender?: string;
     streamId?: string;
-    streamSessionId?: string;
+    piSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -25,7 +25,7 @@ export function persistInboundMessage(
     content: opts.content,
     sender: opts.sender,
     streamId: opts.streamId,
-    streamSessionId: opts.streamSessionId,
+    piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
 }
@@ -37,7 +37,7 @@ export function persistOutboundMessage(
     source: UnifiedMessageSource;
     content: string;
     streamId?: string;
-    streamSessionId?: string;
+    piSessionId?: string;
     metadata?: MessageMetadata;
   },
 ): MessageRow {
@@ -48,7 +48,7 @@ export function persistOutboundMessage(
     content: opts.content,
     sender: "pi",
     streamId: opts.streamId,
-    streamSessionId: opts.streamSessionId,
+    piSessionId: opts.piSessionId,
     metadata: opts.metadata,
   });
 }
@@ -123,15 +123,15 @@ export type DefaultConversationSnippet = {
 
 export function getRecentDefaultConversation(
   db: BlackboardDatabase,
-  streamSessionId: string,
+  piSessionId: string,
   limit: number = 10,
 ): DefaultConversationSnippet[] {
   const rows = db.all<DefaultConversationSnippet>(
     `SELECT content, source, created_at, direction, sender
      FROM messages
-     WHERE stream_session_id = ?
+     WHERE pi_session_id = ?
      ORDER BY created_at DESC LIMIT ?`,
-    streamSessionId,
+    piSessionId,
     limit,
   );
   return rows.reverse();
@@ -139,23 +139,23 @@ export function getRecentDefaultConversation(
 
 /**
  * Returns surfaced messages (web/whatsapp inbound + stream_outbound) for the input
- * surface, scoped to a set of active stream_session_ids.
+ * surface, scoped to a set of active pi_session_ids.
  */
 export function getInputSurfaceHistory(
   db: BlackboardDatabase,
-  streamSessionIds: string[],
+  piSessionIds: string[],
 ): (MessageRow & { stream_name: string | null })[] {
-  if (streamSessionIds.length === 0) return [];
-  const placeholders = streamSessionIds.map(() => "?").join(", ");
+  if (piSessionIds.length === 0) return [];
+  const placeholders = piSessionIds.map(() => "?").join(", ");
   return db.all<MessageRow & { stream_name: string | null }>(
     `SELECT m.*, w.name AS stream_name
      FROM messages m
      LEFT JOIN streams w ON w.id = m.stream_id
      WHERE ((m.source IN ('web', 'whatsapp') AND m.direction = 'inbound')
             OR (m.source = 'stream_outbound' AND m.direction = 'outbound'))
-       AND m.stream_session_id IN (${placeholders})
+       AND m.pi_session_id IN (${placeholders})
      ORDER BY m.created_at ASC`,
-    ...streamSessionIds,
+    ...piSessionIds,
   );
 }
 
