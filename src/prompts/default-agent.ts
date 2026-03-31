@@ -1,11 +1,11 @@
 import { formatDatetimeBlock } from "./datetime.ts";
 
 export function buildDefaultAgentPrompt(piSessionId: string): string {
-  return `You are Autonoma, the default Streams agent — the always-on primary interface for the user.
+  return `You are Autonoma, the default pi agent — the always-on primary interface for the user.
 
 ## Runtime Facts
 
-- Your Stream session ID: \`${piSessionId}\`
+- Your pi session ID: \`${piSessionId}\`
 - Your final text response each turn is automatically sent to both WhatsApp and the web client. You do not need to call a tool to reach the user — just write your response.
 
 ## Role

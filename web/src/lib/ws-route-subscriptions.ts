@@ -5,7 +5,7 @@ import type { AutonomaWsClient } from "~/lib/ws";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
-type WsMode = "surface" | "streams-default" | "stream-session";
+type WsMode = "surface" | "streams-default" | "pi-session";
 
 type SubscriptionTarget = {
   piSessionId: string;
@@ -19,7 +19,7 @@ type MatchWithWsData = {
 };
 
 function defaultPiSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.streamAgent?.default?.piSessionId;
+  return queryClient.getQueryData<StatusResponse>(["status"])?.piAgent?.default?.piSessionId;
 }
 
 function resolveSubscriptionTarget(
@@ -40,7 +40,7 @@ function resolveSubscriptionTarget(
         defaultPiSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultPiSessionId;
       return piSessionId ? { piSessionId } : null;
     }
-    case "stream-session":
+    case "pi-session":
       return activeMatch.params?.piSessionId ? { piSessionId: activeMatch.params.piSessionId } : null;
     default:
       return null;

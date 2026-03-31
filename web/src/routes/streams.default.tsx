@@ -17,7 +17,7 @@ export const Route = createFileRoute("/streams/default")({
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const defaultPiSessionId = status.streamAgent?.default?.piSessionId;
+    const defaultPiSessionId = status.piAgent?.default?.piSessionId;
     const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
@@ -49,7 +49,7 @@ function StreamsDefaultRoute() {
   // updates when the default Streams session restarts with a new ID, rather than
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const defaultPiSessionId = status?.streamAgent?.default?.piSessionId;
+  const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
   const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
     useStreamsChat(defaultPiSessionId, history);
 
