@@ -207,13 +207,13 @@ export interface TurnStartWebSocketEvent {
   sessionId?: string;
 }
 
-export interface AutoCompactionStartWebSocketEvent {
-  type: "auto_compaction_start";
+export interface CompactionStartWebSocketEvent {
+  type: "compaction_start";
   sessionId?: string;
 }
 
-export interface AutoCompactionEndWebSocketEvent {
-  type: "auto_compaction_end";
+export interface CompactionEndWebSocketEvent {
+  type: "compaction_end";
   sessionId?: string;
 }
 
@@ -244,8 +244,8 @@ export type ControlSurfaceWebSocketServerEvent =
   | TurnStartWebSocketEvent
   | AgentStartWebSocketEvent
   | AgentEndWebSocketEvent
-  | AutoCompactionStartWebSocketEvent
-  | AutoCompactionEndWebSocketEvent
+  | CompactionStartWebSocketEvent
+  | CompactionEndWebSocketEvent
   | AutoRetryStartWebSocketEvent
   | AutoRetryEndWebSocketEvent
   | StreamSurfacedWebSocketEvent

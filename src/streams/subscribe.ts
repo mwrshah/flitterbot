@@ -75,11 +75,11 @@ type StreamSessionSubscriptionEvent =
       [key: string]: unknown;
     }
   | {
-      type: "auto_compaction_start";
+      type: "compaction_start";
       [key: string]: unknown;
     }
   | {
-      type: "auto_compaction_end";
+      type: "compaction_end";
       [key: string]: unknown;
     }
   | {
@@ -435,8 +435,8 @@ export function subscribeToStreamSession(
         broadcast(wsHub, { type: "agent_end", sessionId: session.sessionId });
         break;
       }
-      case "auto_compaction_start":
-      case "auto_compaction_end":
+      case "compaction_start":
+      case "compaction_end":
       case "auto_retry_start":
       case "auto_retry_end":
         console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
