@@ -57,6 +57,8 @@ export const Sidebar = memo(function Sidebar() {
   const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
   const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const currentSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
@@ -88,7 +90,12 @@ export const Sidebar = memo(function Sidebar() {
                 {defaultSessionId && (
                   <Link
                     to="/streams/default"
-                    className="flex items-center px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+                    className={cn(
+                      "flex items-center px-2 py-1.5 rounded-md text-xs transition-colors",
+                      currentSessionId === "default" || (pathname === "/streams" && !currentSessionId)
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    )}
                   >
                     <span className="truncate">default</span>
                   </Link>
@@ -99,7 +106,12 @@ export const Sidebar = memo(function Sidebar() {
                       key={ws.id}
                       to="/streams/$sessionId"
                       params={{ sessionId: ws.streamSessionId }}
-                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+                      className={cn(
+                        "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
+                        currentSessionId === ws.streamSessionId
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                      )}
                     >
                       <span className="truncate">{ws.name}</span>
                       <span className="text-sidebar-foreground/40 tabular-nums shrink-0 ml-2">
@@ -135,7 +147,12 @@ export const Sidebar = memo(function Sidebar() {
                       key={ws.id}
                       to="/streams/$sessionId"
                       params={{ sessionId: ws.streamSessionId! }}
-                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50 transition-colors"
+                      className={cn(
+                        "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
+                        currentSessionId === ws.streamSessionId
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
+                      )}
                     >
                       <span className="truncate">{ws.name}</span>
                       <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
