@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
+import logoBlack from "~/assets/autonoma_logo_black_small.png";
+import logoWhite from "~/assets/autonoma_logo_white_small.png";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import autonomaLogo from "~/assets/autonoma_logo_black_small.png";
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   useWhyDidYouRender("NavItem", { to, label, icon });
@@ -66,7 +67,8 @@ export const Sidebar = memo(function Sidebar() {
       {/* Brand */}
       <div className="shrink-0 px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <img src={autonomaLogo} alt="Autonoma" className="w-6 h-6 dark:invert" />
+          <img src={logoBlack} alt="Autonoma" className="w-6 h-6 dark:hidden" />
+          <img src={logoWhite} alt="Autonoma" className="w-6 h-6 hidden dark:block" />
           <span className="text-sm font-semibold text-sidebar-foreground">Autonoma</span>
         </div>
       </div>
