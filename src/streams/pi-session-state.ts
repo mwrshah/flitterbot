@@ -1,7 +1,7 @@
 import type { PiSessionRuntimeStatus } from "../contracts/index.ts";
 import type { QueueItem } from "./turn-queue.ts";
 
-type StreamsRuntimeSnapshot = Omit<
+type PiSessionRuntimeSnapshot = Omit<
   PiSessionRuntimeStatus,
   "piSessionId" | "sessionFile" | "lastPromptAt"
 > & {
@@ -13,8 +13,8 @@ type StreamsRuntimeSnapshot = Omit<
   currentTurnStartedAt?: string;
 };
 
-export class StreamSessionState {
-  private snapshot: StreamsRuntimeSnapshot = {
+export class PiSessionState {
+  private snapshot: PiSessionRuntimeSnapshot = {
     messageCount: 0,
     busy: false,
   };
@@ -50,7 +50,7 @@ export class StreamSessionState {
     }
   }
 
-  getSnapshot(): StreamsRuntimeSnapshot {
+  getSnapshot(): PiSessionRuntimeSnapshot {
     return { ...this.snapshot };
   }
 }

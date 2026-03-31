@@ -13,17 +13,17 @@ import type { ApiError } from "../contracts/blackboard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
-import { StreamSessionState } from "./session-state.ts";
-import { subscribeToStreamSession } from "./subscribe.ts";
+import { PiSessionState } from "./pi-session-state.ts";
+import { subscribeToPiSession } from "./pi-subscribe.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 
 export { formatStreamPrompt };
 
-export interface ManagedStreamSession {
+export interface ManagedPiSession {
   /** Live SDK session. Null for dormant sessions rehydrated from DB on restart. */
   session: AgentSession | null;
   queue: TurnQueue;
-  state: StreamSessionState;
+  state: PiSessionState;
   role: "default" | "orchestrator";
   streamId: string | null;
   streamName: string | null;
@@ -34,14 +34,14 @@ export interface ManagedStreamSession {
 }
 
 export type ProcessQueueItemCallback = (
-  managed: ManagedStreamSession,
+  managed: ManagedPiSession,
   item: QueueItem,
 ) => Promise<void>;
 
-export class StreamSessionManager {
-  private defaultSession?: ManagedStreamSession;
-  private readonly orchestrators = new Map<string, ManagedStreamSession>();
-  private readonly byPiSessionId = new Map<string, ManagedStreamSession>();
+export class PiSessionManager {
+  private defaultSession?: ManagedPiSession;
+  private readonly orchestrators = new Map<string, ManagedPiSession>();
+  private readonly byPiSessionId = new Map<string, ManagedPiSession>();
   private readonly config: AutonomaConfig;
   private readonly blackboard: BlackboardDatabase;
   private readonly wsHub: WebSocketHub;
@@ -68,23 +68,23 @@ export class StreamSessionManager {
     this.log = log;
   }
 
-  getDefault(): ManagedStreamSession | undefined {
+  getDefault(): ManagedPiSession | undefined {
     return this.defaultSession;
   }
 
-  getByStream(streamId: string): ManagedStreamSession | undefined {
+  getByStream(streamId: string): ManagedPiSession | undefined {
     return this.orchestrators.get(streamId);
   }
 
-  getByPiSessionId(piSessionId: string): ManagedStreamSession | undefined {
+  getByPiSessionId(piSessionId: string): ManagedPiSession | undefined {
     return this.byPiSessionId.get(piSessionId);
   }
 
-  listOrchestrators(): ManagedStreamSession[] {
+  listOrchestrators(): ManagedPiSession[] {
     return Array.from(this.orchestrators.values());
   }
 
-  async createDefault(customTools: unknown[]): Promise<ManagedStreamSession> {
+  async createDefault(customTools: unknown[]): Promise<ManagedPiSession> {
     // Only reconcile the default session — orchestrator sessions for active streams
     // must survive restarts so their piSessionId (and associated messages) are preserved.
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
@@ -95,7 +95,7 @@ export class StreamSessionManager {
       role: "default",
     });
 
-    const state = new StreamSessionState();
+    const state = new PiSessionState();
     state.initialize(
       created.session.sessionId,
       created.session.sessionFile,
@@ -137,7 +137,7 @@ export class StreamSessionManager {
     streamName: string,
     repoPath?: string,
     customTools?: unknown[],
-  ): Promise<ManagedStreamSession> {
+  ): Promise<ManagedPiSession> {
     // If one already exists for this stream, return it
     const existing = this.orchestrators.get(streamId);
     if (existing) return existing;
@@ -155,7 +155,7 @@ export class StreamSessionManager {
       orchestratorContext,
     });
 
-    const state = new StreamSessionState();
+    const state = new PiSessionState();
     state.initialize(
       created.session.sessionId,
       created.session.sessionFile,
@@ -189,7 +189,7 @@ export class StreamSessionManager {
   }
 
   /**
-   * Rehydrate a dormant orchestrator from a stream_sessions DB row.
+   * Rehydrate a dormant orchestrator from a pi_sessions DB row.
    * No live SDK agent is created — just the in-memory maps are populated so that
    * getInputSurfaceHistory() finds messages via the preserved piSessionId, and
    * readSessionHistory() falls through to reading the JSONL file on disk.
@@ -205,14 +205,14 @@ export class StreamSessionManager {
     createdAt: string,
     modelProvider: string | null,
     modelId: string | null,
-  ): ManagedStreamSession {
+  ): ManagedPiSession {
     const existing = this.orchestrators.get(streamId);
     if (existing) return existing;
 
-    const state = new StreamSessionState();
+    const state = new PiSessionState();
     state.initialize(piSessionId, sessionFile ?? undefined, 0);
 
-    const managed: ManagedStreamSession = {
+    const managed: ManagedPiSession = {
       session: null,
       queue: null!,
       state,
@@ -295,7 +295,7 @@ export class StreamSessionManager {
    * message arrives for a rehydrated stream.
    */
   async activateOrchestrator(
-    managed: ManagedStreamSession,
+    managed: ManagedPiSession,
     customTools?: unknown[],
   ): Promise<void> {
     if (managed.session) return; // already active
@@ -317,7 +317,7 @@ export class StreamSessionManager {
 
     managed.session = created.session;
     managed.modelInfo = created.modelInfo;
-    managed.unsubscribe = subscribeToStreamSession(
+    managed.unsubscribe = subscribeToPiSession(
       created.session,
       managed.state,
       this.blackboard,
@@ -435,14 +435,14 @@ export class StreamSessionManager {
 
   private buildManagedSession(
     created: { session: AgentSession; modelInfo: { provider: string; id: string } },
-    state: StreamSessionState,
+    state: PiSessionState,
     role: "default" | "orchestrator",
     streamId: string | null,
     streamName: string | null,
-  ): ManagedStreamSession {
+  ): ManagedPiSession {
     // Circular init: queue callback closes over `managed`, so the object must exist first.
     // null! signals deferred initialization — both fields are set immediately below.
-    const managed: ManagedStreamSession = {
+    const managed: ManagedPiSession = {
       session: created.session,
       queue: null!,
       state,
@@ -502,7 +502,7 @@ export class StreamSessionManager {
       },
     });
 
-    managed.unsubscribe = subscribeToStreamSession(
+    managed.unsubscribe = subscribeToPiSession(
       created.session,
       state,
       this.blackboard,

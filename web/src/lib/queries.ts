@@ -11,7 +11,7 @@ import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
   fetchStreamsHistory,
   fetchStreamsInputHistory,
-  fetchStreamSessions,
+  fetchDownstreamSessions,
   fetchStreamsWorktree,
   type StreamInfo,
 } from "~/server/streams";
@@ -85,7 +85,7 @@ export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
   return {
     queryKey: ["streams-downstream-sessions", piSessionId] as const,
     queryFn: (): Promise<DownstreamSessionItem[]> =>
-      fetchStreamSessions({ data: { piSessionId } }),
+      fetchDownstreamSessions({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };

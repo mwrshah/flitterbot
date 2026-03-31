@@ -45,7 +45,7 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
     }
   });
 
-export const fetchStreamSessions = createServerFn({ method: "GET" })
+export const fetchDownstreamSessions = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<DownstreamSessionItem[]> => {
     const path = `/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/sessions`;
@@ -54,7 +54,7 @@ export const fetchStreamSessions = createServerFn({ method: "GET" })
       return res.items;
     } catch (err) {
       console.error(
-        "fetchStreamSessions failed (piSessionId=%s):",
+        "fetchDownstreamSessions failed (piSessionId=%s):",
         data.piSessionId,
         err,
       );
