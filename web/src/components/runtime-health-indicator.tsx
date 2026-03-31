@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
+import { useConnectionState } from "~/hooks/use-connection-state";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { connectionStateQueryOptions, statusQueryOptions } from "~/lib/queries";
-import type { ConnectionState } from "~/lib/types";
+import { statusQueryOptions } from "~/lib/queries";
 
 function statusDotColor(status: string): string {
   switch (status) {
@@ -28,19 +28,26 @@ function statusLabel(status: string): string {
 const rootApi = getRouteApi("__root__");
 
 export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
-  const { apiClient } = rootApi.useRouteContext();
+  const { apiClient, wsClient } = rootApi.useRouteContext();
   const navigate = useNavigate();
 
-  const { data: status } = useQuery({
+  // useSuspenseQuery executes during SSR and streams resolved data to the client,
+  // unlike useQuery which skips server execution entirely. Status is seeded by the
+  // root route loader via ensureQueryData.
+  // See: features/tanstack-patterns/references/query.md (lines 75-78)
+  const { data: status } = useSuspenseQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
   });
 
-  const { data: connectionState = "disconnected" as ConnectionState } = useQuery(
-    connectionStateQueryOptions(),
-  );
+  // useSyncExternalStore subscribes directly to the WS client's state machine.
+  // getServerSnapshot returns "disconnected" to match SSR, eliminating the
+  // hydration mismatch that the old mounted/useEffect workaround papered over.
+  // See: features/tanstack-patterns/references/query.md (lines 69-71)
+  // See: features/tanstack-patterns/references/ssr.md (lines 63-65)
+  const connectionState = useConnectionState(wsClient);
 
-  const waStatus = status?.whatsapp.status ?? "unknown";
+  const waStatus = status.whatsapp.status;
 
   useWhyDidYouRender("RuntimeHealthIndicator", { waStatus, connectionState });
 
