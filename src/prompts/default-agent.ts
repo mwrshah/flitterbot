@@ -5,7 +5,7 @@ export function buildDefaultAgentPrompt(streamSessionId: string): string {
 
 ## Runtime Facts
 
-- Your Streams session ID: \`${streamSessionId}\`
+- Your Stream session ID: \`${streamSessionId}\`
 - Your final text response each turn is automatically sent to both WhatsApp and the web client. You do not need to call a tool to reach the user — just write your response.
 
 ## Role

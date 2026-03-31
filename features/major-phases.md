@@ -28,20 +28,14 @@ Goal: minimize rework, maximize safe parallel execution, reach usable state fast
 
 ### Ready to implement
 
-- **Blackboard** — `features/blackboard/FEATURE.md` + specs
-- **Control Surface** — `features/control-surface/FEATURE.md` + specs
-- **Installer** — `features/installer/FEATURE.md` + specs
-- **Web App** — `features/web-app/FEATURE.md` + specs
-
+- **Blackboard** — `features/blackboard/FEATURE.md`- **Control Surface** — `features/control-surface/FEATURE.md`- **Installer** — `features/installer/FEATURE.md`- **Web App** — `features/web-app/FEATURE.md`
 ### Implementable with baseline already proven locally
 
-- **WhatsApp Channel** — `features/whatsapp-channel/FEATURE.md` + specs
-  Baseline daemon/send/reply flow is considered proven locally. Remaining work is runtime ownership, control-surface integration, and operational hardening.
+- **WhatsApp Channel** — `features/whatsapp-channel/FEATURE.md`  Baseline daemon/send/reply flow is considered proven locally. Remaining work is runtime ownership, control-surface integration, and operational hardening.
 
 ### Deferred
 
-- **Cron Scheduler** — `features/cron-scheduler/FEATURE.md` + specs
-  Deferred to post-v1. Will be implemented once Pi has orchestration prompts worth running on a schedule.
+- **Cron Scheduler** — `features/cron-scheduler/FEATURE.md`  Deferred to post-v1. Will be implemented once Pi has orchestration prompts worth running on a schedule.
 
 ---
 
