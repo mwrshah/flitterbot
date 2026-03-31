@@ -14,9 +14,9 @@ import type {
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import type { StreamSessionState } from "./session-state.ts";
+import type { PiSessionState } from "./pi-session-state.ts";
 
-type StreamSessionSubscriptionEvent =
+type PiSessionSubscriptionEvent =
   | {
       type: "message_start";
       message?: unknown;
@@ -95,11 +95,11 @@ type StreamSessionSubscriptionEvent =
       [key: string]: unknown;
     };
 
-type SubscribableStreamSession = {
+type SubscribablePiSession = {
   /** Pi SDK session ID — equals piSessionId in the database */
   sessionId: string;
   messages: Array<unknown>;
-  subscribe: (listener: (event: StreamSessionSubscriptionEvent) => void) => () => void;
+  subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
 };
 
 /**
@@ -206,9 +206,9 @@ function extractTimestamp(message: unknown, fallback: string): string {
   return fallback;
 }
 
-export function subscribeToStreamSession(
-  session: SubscribableStreamSession,
-  state: StreamSessionState,
+export function subscribeToPiSession(
+  session: SubscribablePiSession,
+  state: PiSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
   sessionStreamId?: string | null,

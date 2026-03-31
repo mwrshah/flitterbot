@@ -11,11 +11,11 @@ import type {
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readStreamsHistory, readStreamsHistoryFromMessages } from "../streams/history.ts";
-import type { ManagedStreamSession } from "../streams/session-manager.ts";
+import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
 import { sendJson } from "./_shared.ts";
 
 async function readSessionHistory(
-  managed: ManagedStreamSession,
+  managed: ManagedPiSession,
   historyMode: "input" | "agent",
 ): Promise<ChatTimelineItem[]> {
   const snapshot = managed.state.getSnapshot();
@@ -141,7 +141,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     // Session not in memory — fall back to reading history from disk (e.g. closed streams)
     if (piSessionId) {
       const row = runtime.blackboard
-        .prepare("SELECT session_file FROM stream_sessions WHERE pi_session_id = ?")
+        .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
         const diskBody = await readStreamsHistory(piSessionId, row.session_file, historyMode);

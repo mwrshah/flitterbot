@@ -6,7 +6,7 @@ import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel"
 import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchStreamsHistory, fetchStreamSessions, fetchStreamsWorktree } from "~/server/streams";
+import { fetchStreamsHistory, fetchDownstreamSessions, fetchStreamsWorktree } from "~/server/streams";
 
 export const Route = createFileRoute("/streams/default")({
   staticData: {
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/streams/default")({
     // Seed the Query cache under the real piSessionId when available.
     if (defaultPiSessionId) {
       const [sessions, worktree] = await Promise.all([
-        fetchStreamSessions({ data: { piSessionId: defaultPiSessionId } }).catch(() => []),
+        fetchDownstreamSessions({ data: { piSessionId: defaultPiSessionId } }).catch(() => []),
         fetchStreamsWorktree({ data: { piSessionId: defaultPiSessionId } }).catch(() => null),
       ]);
       context.queryClient.setQueryData(["streams-history", defaultPiSessionId, "agent"], history);

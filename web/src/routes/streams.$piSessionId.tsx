@@ -48,10 +48,10 @@ export const Route = createFileRoute("/streams/$piSessionId")({
       <p>Failed to load session history: {String(error)}</p>
     </div>
   ),
-  component: StreamSessionRoute,
+  component: PiSessionRoute,
 });
 
-function StreamSessionRoute() {
+function PiSessionRoute() {
   const { piSessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");

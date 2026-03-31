@@ -28,6 +28,11 @@ function hasLegacyMarkers(db: DatabaseSync): boolean {
   if (!hasTable(db, "sessions")) {
     return false;
   }
+  // stream_sessions exists in V16/V17 DBs (pi_sessions was renamed);
+  // these are NOT legacy — they just need V18 to rename back.
+  if (hasTable(db, "stream_sessions")) {
+    return false;
+  }
   if (hasTable(db, "agents") || !hasTable(db, "pi_sessions")) {
     return true;
   }

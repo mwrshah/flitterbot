@@ -55,7 +55,7 @@ import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
-import { type ManagedStreamSession, StreamSessionManager } from "./streams/session-manager.ts";
+import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
@@ -102,7 +102,7 @@ export class ControlSurfaceRuntime {
   readonly runtimeInstanceId = crypto.randomUUID();
   readonly startedAt = Date.now();
   readonly wsHub: WebSocketHub;
-  readonly sessionManager: StreamSessionManager;
+  readonly sessionManager: PiSessionManager;
   server?: http.Server;
   private stopping = false;
   private maintenanceTimer?: NodeJS.Timeout;
@@ -128,7 +128,7 @@ export class ControlSurfaceRuntime {
     }
     this.blackboard = openBlackboard(config.blackboardPath);
     this.wsHub = new WebSocketHub(this.handleWebSocketMessage.bind(this));
-    this.sessionManager = new StreamSessionManager(
+    this.sessionManager = new PiSessionManager(
       config,
       this.blackboard,
       this.wsHub,
@@ -168,7 +168,7 @@ export class ControlSurfaceRuntime {
         model_id: string | null;
       }>(
         `SELECT pi_session_id, session_file, started_at, model_provider, model_id
-         FROM stream_sessions
+         FROM pi_sessions
          WHERE stream_id = ? AND role = 'orchestrator'
            AND status NOT IN ('ended', 'crashed')
          ORDER BY started_at DESC LIMIT 1`,
@@ -342,11 +342,11 @@ export class ControlSurfaceRuntime {
     }
 
     // Check if this session belongs to any of our Streams sessions
-    const isOwnStreamSession = this.sessionManager.getByPiSessionId(sessionId) !== undefined;
+    const isOwnPiSession = this.sessionManager.getByPiSessionId(sessionId) !== undefined;
 
     if (normalized === "session-start") {
       const agentManaged = payload.agent_managed === true || payload.agent_managed === 1;
-      if (!agentManaged && !isOwnStreamSession) {
+      if (!agentManaged && !isOwnPiSession) {
         return { ok: true, filtered: true };
       }
       const cwd = pickString(payload, ["cwd"]);
@@ -399,7 +399,7 @@ export class ControlSurfaceRuntime {
         });
       }
     } else {
-      if (!isOwnStreamSession) {
+      if (!isOwnPiSession) {
         const known = getSessionById(this.blackboard, sessionId);
         if (!known) {
           return { ok: true, filtered: true };
@@ -450,7 +450,7 @@ export class ControlSurfaceRuntime {
       "piSessionId",
       "AUTONOMA_PI_SESSION_ID",
     ]);
-    let targetQueue: ManagedStreamSession | undefined;
+    let targetQueue: ManagedPiSession | undefined;
     let resolvedVia = "default";
     if (piSessionIdFromPayload) {
       targetQueue = this.sessionManager.getByPiSessionId(piSessionIdFromPayload);
@@ -675,13 +675,13 @@ export class ControlSurfaceRuntime {
   }
 
   /**
-   * Resolve which ManagedStreamSession should handle this message.
+   * Resolve which ManagedPiSession should handle this message.
    * May lazily create an orchestrator if needed.
    */
   private resolveTargetSession(
     input: EnqueueInput,
     _item: QueueItem,
-  ): ManagedStreamSession | undefined {
+  ): ManagedPiSession | undefined {
     const meta = input.metadata;
 
     // Direct-targeted session (web UI tab input) — bypass all routing
@@ -710,7 +710,7 @@ export class ControlSurfaceRuntime {
   /**
    * Per-session queue processing callback.
    */
-  private async processQueueItem(managed: ManagedStreamSession, item: QueueItem): Promise<void> {
+  private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
     // Lazily activate dormant orchestrators on first message after restart
     if (!managed.session && managed.role === "orchestrator" && managed.streamId) {
       this.log(`activating dormant orchestrator for stream ${managed.streamId}`);
@@ -898,7 +898,7 @@ export class ControlSurfaceRuntime {
       model_id: string | null;
     }>(
       `SELECT pi_session_id, session_file, started_at, model_provider, model_id
-       FROM stream_sessions
+       FROM pi_sessions
        WHERE stream_id = ? AND role = 'orchestrator'
        ORDER BY started_at DESC LIMIT 1`,
       streamId,
@@ -907,7 +907,7 @@ export class ControlSurfaceRuntime {
     if (streamsRow) {
       this.blackboard
         .prepare(
-          `UPDATE stream_sessions
+          `UPDATE pi_sessions
            SET status = 'waiting_for_user',
                ended_at = NULL,
                end_reason = NULL,

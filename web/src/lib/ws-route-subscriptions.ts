@@ -18,7 +18,7 @@ type MatchWithWsData = {
   loaderData?: { defaultPiSessionId?: string };
 };
 
-function defaultStreamSessionIdFromCache(queryClient: QueryClient): string | undefined {
+function defaultPiSessionIdFromCache(queryClient: QueryClient): string | undefined {
   return queryClient.getQueryData<StatusResponse>(["status"])?.streamAgent?.default?.piSessionId;
 }
 
@@ -37,7 +37,7 @@ function resolveSubscriptionTarget(
       // Prefer the live cache value over stale loader data — the default Streams
       // session may have restarted with a new piSessionId since the loader ran.
       const piSessionId =
-        defaultStreamSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultPiSessionId;
+        defaultPiSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultPiSessionId;
       return piSessionId ? { piSessionId } : null;
     }
     case "stream-session":
