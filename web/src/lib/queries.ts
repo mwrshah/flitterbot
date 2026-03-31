@@ -2,7 +2,6 @@ import { keepPreviousData } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
 import type {
   ChatTimelineItem,
-  ConnectionState,
   DirectoryCompletionItem,
   DownstreamSessionItem,
   StatusResponse,
@@ -113,15 +112,6 @@ export function statusPillsQueryOptions(piSessionId: string) {
     queryFn: (): StatusPill[] => [],
     staleTime: Infinity,
     // Initialized as empty; WS bridge uses setQueryData to manage pills
-  };
-}
-
-/** Connection state — managed by WS bridge via setQueryData. */
-export function connectionStateQueryOptions() {
-  return {
-    queryKey: ["connection-state"] as const,
-    queryFn: (): ConnectionState => "disconnected",
-    staleTime: Infinity,
   };
 }
 

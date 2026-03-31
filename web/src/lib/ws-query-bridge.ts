@@ -21,7 +21,6 @@ import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   ChatTimelineTool,
-  ConnectionState,
   ImageAttachment,
   JsonValue,
   WsMessage,
@@ -622,17 +621,11 @@ console.log(
 
   /* ── Connection state handler — query cache + reconnect invalidation ── */
 
-  // Seed initial connection state
-  queryClient.setQueryData<ConnectionState>(["connection-state"], wsClient.connectionState);
+  let prevConnectionState = wsClient.connectionState;
 
-  let prevConnectionState: ConnectionState = wsClient.connectionState;
-
-  const unsubscribeConnection = wsClient.subscribeConnection((state: ConnectionState) => {
+  const unsubscribeConnection = wsClient.subscribeConnection((state) => {
     const prev = prevConnectionState;
     prevConnectionState = state;
-
-    // Write every transition to query cache
-    queryClient.setQueryData<ConnectionState>(["connection-state"], state);
 
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
       // Re-fetch stale data after reconnect

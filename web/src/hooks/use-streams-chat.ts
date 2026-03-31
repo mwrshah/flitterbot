@@ -1,23 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useSyncExternalStore } from "react";
-import {
-  connectionStateQueryOptions,
-  statusPillsQueryOptions,
-  statusQueryOptions,
-  streamsHistoryQueryOptions,
-} from "~/lib/queries";
-import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
+import { useCallback } from "react";
+import { statusPillsQueryOptions, statusQueryOptions, streamsHistoryQueryOptions } from "~/lib/queries";
+import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
+import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 const rootApi = getRouteApi("__root__");
-
-const emptySubscribe = () => () => {};
-const useIsClient = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
 
 /**
  * Shared hook for Streams chat routes (default + per-session).
@@ -25,15 +13,11 @@ const useIsClient = () =>
  * TanStack Query cache and router context — no imperative subscriptions.
  */
 export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
-  const isClient = useIsClient();
-  const { sendMessage, apiClient } = rootApi.useRouteContext();
+  const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
   const { data: timeline = loaderHistory } = useQuery(streamsHistoryQueryOptions(piSessionId));
   const { data: statusPills = [] } = useQuery(statusPillsQueryOptions(piSessionId ?? "default"));
-  const { data: rawConnectionState = "disconnected" as ConnectionState } = useQuery(
-    connectionStateQueryOptions(),
-  );
-  const connectionState = isClient ? rawConnectionState : ("disconnected" as ConnectionState);
+  const connectionState = useWsConnectionState(wsConnectionStore);
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
