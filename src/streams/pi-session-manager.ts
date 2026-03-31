@@ -120,10 +120,10 @@ export class PiSessionManager {
       lastEventAt: new Date().toISOString(),
     });
 
-    // Re-associate orphaned sessions from ended streams sessions to this new default session
+    // Re-associate orphaned sessions from ended pi sessions to this new default session
     const reassociated = reassociateOrphanedSessions(this.blackboard, managed.piSessionId);
     if (reassociated > 0) {
-      this.log(`reassociated ${reassociated} orphaned session(s) to new default streams session`);
+      this.log(`reassociated ${reassociated} orphaned session(s) to new default pi session`);
     }
 
     this.defaultSession = managed;

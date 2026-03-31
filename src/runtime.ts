@@ -154,7 +154,7 @@ export class ControlSurfaceRuntime {
 
     await this.sessionManager.createDefault(this.createCustomTools("default"));
 
-    // Rehydrate dormant orchestrators for open streams from the streams sessions DB.
+    // Rehydrate dormant orchestrators for open streams from the pi sessions DB.
     // No live SDK agent is created — just the in-memory maps are populated so that
     // message lookups find the correct piSessionId. The agent is lazily activated
     // when the first new message arrives for the stream.
@@ -186,7 +186,7 @@ export class ControlSurfaceRuntime {
           streamsRow.model_id,
         );
       } else {
-        // No surviving streams session row — create a fresh orchestrator
+        // No surviving pi session row — create a fresh orchestrator
         await this.sessionManager.createOrchestrator(
           ws.id,
           ws.name,
@@ -248,7 +248,7 @@ export class ControlSurfaceRuntime {
   }
 
   /**
-   * Route a message to the correct Streams session's queue based on classification metadata.
+   * Route a message to the correct pi session's queue based on classification metadata.
    */
   enqueue(input: EnqueueInput): { ok: true; item: QueueItem } {
     const images = input.images?.map((img) => ({
@@ -299,7 +299,7 @@ export class ControlSurfaceRuntime {
     }
 
     // Datetime injection: append current date+time context to user messages when >= 1 hour
-    // has elapsed since we last told this Streams session what time it is. Injecting via turns
+    // has elapsed since we last told this pi session what time it is. Injecting via turns
     // (not the system prompt) keeps the system prompt stable and cache-friendly.
     if (item.source === "web" || item.source === "whatsapp") {
       item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
@@ -341,7 +341,7 @@ export class ControlSurfaceRuntime {
       return { ok: true, filtered: true };
     }
 
-    // Check if this session belongs to any of our Streams sessions
+    // Check if this session belongs to any of our pi sessions
     const isOwnPiSession = this.sessionManager.getByPiSessionId(sessionId) !== undefined;
 
     if (normalized === "session-start") {
@@ -444,7 +444,7 @@ export class ControlSurfaceRuntime {
       payload.lastAssistantText = lastAssistantText;
     }
 
-    // Route stop event to the Streams session that owns this CC session
+    // Route stop event to the pi session that owns this CC session
     const piSessionIdFromPayload = pickString(payload, [
       "pi_session_id",
       "piSessionId",
@@ -658,7 +658,7 @@ export class ControlSurfaceRuntime {
 
   /**
    * Append a datetime context block to `text` if >= 1 hour has elapsed since the last
-   * injection for this Streams session, then update the timestamp in SQLite.
+   * injection for this pi session, then update the timestamp in SQLite.
    */
   private maybeInjectDatetime(piSessionId: string, text: string): string {
     const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, piSessionId);
@@ -721,7 +721,7 @@ export class ControlSurfaceRuntime {
     }
 
     const session = managed.session;
-    if (!session) throw new Error("Streams session not initialized");
+    if (!session) throw new Error("pi session not initialized");
 
     const piSessionId = session.sessionId;
 
@@ -768,7 +768,7 @@ export class ControlSurfaceRuntime {
       if (assistantMsg.stopReason === "error") {
         this.log(`queue item ${item.id} API error: ${assistantMsg.errorMessage ?? "unknown"}`);
         throw new Error(
-          `Streams API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`,
+          `pi session API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`,
         );
       }
     }
@@ -889,7 +889,7 @@ export class ControlSurfaceRuntime {
     reopenStream(this.blackboard, streamId);
     this.blackboard.prepare(`UPDATE streams SET worktree_path = NULL WHERE id = ?`).run(streamId);
 
-    // 2. Revive the streams session: clear ended_at/end_reason, set status back to waiting_for_user
+    // 2. Revive the pi session: clear ended_at/end_reason, set status back to waiting_for_user
     const streamsRow = this.blackboard.get<{
       pi_session_id: string;
       session_file: string | null;
@@ -963,7 +963,7 @@ export class ControlSurfaceRuntime {
             : this.sessionManager.getDefault();
           if (!managed?.session) {
             return {
-              content: [{ type: "text", text: "Error: Streams session not initialized" }],
+              content: [{ type: "text", text: "Error: pi session not initialized" }],
               details: {},
             };
           }
@@ -1567,7 +1567,7 @@ export class ControlSurfaceRuntime {
         source: "web",
       });
 
-      // Skip router when message targets a specific Streams session (direct tab input)
+      // Skip router when message targets a specific pi session (direct tab input)
       let routerMeta: StreamRoutingMeta = {};
       if (targetPiSessionId) {
         routerMeta._targetSessionId = targetPiSessionId;
