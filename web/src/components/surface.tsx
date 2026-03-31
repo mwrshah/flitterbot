@@ -1,14 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { CheckIcon, CopyIcon, SettingsIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { layout, prepare } from "@chenglou/pretext";
+import { CopyIcon, SettingsIcon } from "lucide-react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+} from "react";
 import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
-import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
@@ -28,6 +37,18 @@ type SurfaceEntry = {
   | { kind: "hook"; eventName: string; detail: string }
   | { kind: "streams-response"; content: string; streamName?: string }
 );
+
+type MeasuredSurfaceEntry = SurfaceEntry & {
+  displayTime: string;
+  metrics: {
+    estimatedHeight: number;
+    isOverflowing: boolean;
+  };
+};
+
+type MeasuredInboundEntry = Extract<MeasuredSurfaceEntry, { kind: "inbound" }>;
+
+type MeasuredStreamsResponseEntry = Extract<MeasuredSurfaceEntry, { kind: "streams-response" }>;
 
 /* ── Helpers ── */
 
@@ -51,12 +72,79 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   stream_outbound: "Streams",
 };
 
+const timeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const MAX_LINES = 30;
+const SURFACE_FONT = '400 14px "Geist Variable", sans-serif';
+const SURFACE_LINE_HEIGHT = 20;
+const SURFACE_MIN_BUBBLE_WIDTH = 240;
+const SURFACE_BUBBLE_CHROME_WIDTH = 24;
+const COPY_RESET_MS = 1500;
+const SURFACE_ROW_GAP = 12;
+const SURFACE_OVERSCAN_ABOVE_RATIO = 0.5;
+const SURFACE_OVERSCAN_BELOW_RATIO = 1;
+const SURFACE_ROW_MIN_HEIGHT = 44;
+const SURFACE_BUBBLE_VERTICAL_PADDING = 16;
+const SURFACE_BADGE_HEIGHT = 22;
+const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
+const SURFACE_HOOK_TITLE_HEIGHT = 20;
+const SURFACE_HOOK_DETAIL_GAP = 8;
+const plainTextMeasureCache = new Map<string, ReturnType<typeof prepare>>();
+const DEFAULT_MEASURED_ENTRIES: MeasuredSurfaceEntry[] = [];
+const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
+
+function getPreparedText(text: string) {
+  const cached = plainTextMeasureCache.get(text);
+  if (cached) return cached;
+
+  const prepared = prepare(text, SURFACE_FONT, { whiteSpace: "pre-wrap" });
+  plainTextMeasureCache.set(text, prepared);
+  return prepared;
+}
+
+function getPlainTextMetrics(text: string, maxWidth: number) {
+  const prepared = getPreparedText(text);
+  const { lineCount } = layout(prepared, maxWidth, SURFACE_LINE_HEIGHT);
+
+  return {
+    lineCount,
+    isOverflowing: lineCount > MAX_LINES,
+  };
+}
+
+function estimateMessageRowHeight(
+  lineCount: number,
+  hasBadge: boolean,
+  isOverflowing: boolean,
+): number {
+  const visibleLines = Math.max(1, Math.min(lineCount, MAX_LINES));
+  const textHeight = visibleLines * SURFACE_LINE_HEIGHT;
+  const badgeHeight = hasBadge ? SURFACE_BADGE_HEIGHT : 0;
+  const collapseHeight = isOverflowing ? SURFACE_COLLAPSE_TOGGLE_HEIGHT : 0;
+  return Math.max(
+    SURFACE_ROW_MIN_HEIGHT,
+    SURFACE_BUBBLE_VERTICAL_PADDING + badgeHeight + textHeight + collapseHeight,
+  );
+}
+
+function estimateHookRowHeight(detail: string): number {
+  if (!detail) return SURFACE_ROW_MIN_HEIGHT;
+  const { lineCount } = getPlainTextMetrics(detail, 520);
+  return Math.max(
+    SURFACE_ROW_MIN_HEIGHT,
+    SURFACE_BUBBLE_VERTICAL_PADDING +
+      SURFACE_HOOK_TITLE_HEIGHT +
+      SURFACE_HOOK_DETAIL_GAP +
+      Math.max(1, lineCount) * SURFACE_LINE_HEIGHT,
+  );
+}
+
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return timeFormatter.format(new Date(iso));
   } catch {
     return "";
   }
@@ -103,38 +191,227 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
   return entries;
 }
 
+function getSurfaceBubbleMaxWidth(viewportWidth: number): number {
+  return Math.max(SURFACE_MIN_BUBBLE_WIDTH, viewportWidth - 92);
+}
+
+function getMeasurementWidth(maxWidth: number): number {
+  return Math.max(SURFACE_MIN_BUBBLE_WIDTH, maxWidth - SURFACE_BUBBLE_CHROME_WIDTH);
+}
+
+function getEntriesSignature(entries: SurfaceEntry[], bubbleMaxWidth: number): string {
+  return `${bubbleMaxWidth}:${entries.map((entry) => `${entry.id}:${entry.timestamp}`).join("|")}`;
+}
+
+function buildFallbackMeasuredEntries(
+  entries: SurfaceEntry[],
+  bubbleMaxWidth: number,
+): MeasuredSurfaceEntry[] {
+  return entries.map((entry) => {
+    const displayTime = formatTime(entry.timestamp);
+    switch (entry.kind) {
+      case "inbound":
+      case "streams-response":
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateMessageRowHeight(1, !!entry.streamName, false),
+            isOverflowing: false,
+          },
+        };
+      case "outbound":
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateMessageRowHeight(1, false, false),
+            isOverflowing: false,
+          },
+        };
+      case "hook":
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateHookRowHeight(entry.detail),
+            isOverflowing: false,
+          },
+        };
+    }
+  });
+}
+
+const surfaceMeasurementStore = (() => {
+  type Snapshot = {
+    signature: string;
+    entries: MeasuredSurfaceEntry[];
+  };
+
+  const MEASUREMENT_FRAME_BUDGET_MS = 6;
+
+  let snapshot: Snapshot = {
+    signature: "",
+    entries: DEFAULT_MEASURED_ENTRIES,
+  };
+  let scheduledHandle: number | null = null;
+  let pendingSignature = "";
+  let pendingEntries: SurfaceEntry[] = [];
+  let pendingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
+  let processingSignature = "";
+  let processingEntries: SurfaceEntry[] = [];
+  let processingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
+  let processingResults: MeasuredSurfaceEntry[] = DEFAULT_MEASURED_ENTRIES;
+  let processingIndex = 0;
+  const listeners = new Set<() => void>();
+
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+
+  const measureEntry = (
+    entry: SurfaceEntry,
+    bubbleMaxWidth: number,
+  ): MeasuredSurfaceEntry => {
+    const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
+    const displayTime = formatTime(entry.timestamp);
+    switch (entry.kind) {
+      case "inbound":
+      case "streams-response": {
+        const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateMessageRowHeight(
+              metrics.lineCount,
+              !!entry.streamName,
+              metrics.isOverflowing,
+            ),
+            isOverflowing: metrics.isOverflowing,
+          },
+        };
+      }
+      case "outbound": {
+        const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateMessageRowHeight(
+              metrics.lineCount,
+              false,
+              metrics.isOverflowing,
+            ),
+            isOverflowing: metrics.isOverflowing,
+          },
+        };
+      }
+      case "hook":
+        return {
+          ...entry,
+          displayTime,
+          metrics: {
+            estimatedHeight: estimateHookRowHeight(entry.detail),
+            isOverflowing: false,
+          },
+        };
+    }
+  };
+
+  const restartProcessing = () => {
+    processingSignature = pendingSignature;
+    processingEntries = pendingEntries;
+    processingBubbleMaxWidth = pendingBubbleMaxWidth;
+    processingResults = new Array(processingEntries.length);
+    processingIndex = 0;
+  };
+
+  const flush = () => {
+    scheduledHandle = null;
+
+    if (processingSignature !== pendingSignature) {
+      restartProcessing();
+    }
+
+    const frameStart = performance.now();
+    while (processingIndex < processingEntries.length) {
+      processingResults[processingIndex] = measureEntry(
+        processingEntries[processingIndex]!,
+        processingBubbleMaxWidth,
+      );
+      processingIndex += 1;
+
+      if (
+        processingIndex < processingEntries.length &&
+        performance.now() - frameStart >= MEASUREMENT_FRAME_BUDGET_MS
+      ) {
+        scheduledHandle = requestAnimationFrame(flush);
+        return;
+      }
+    }
+
+    if (processingSignature !== pendingSignature) {
+      scheduledHandle = requestAnimationFrame(flush);
+      return;
+    }
+
+    snapshot = {
+      signature: processingSignature,
+      entries: processingResults,
+    };
+    notify();
+  };
+
+  return {
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot() {
+      return snapshot;
+    },
+    measure(entries: SurfaceEntry[], bubbleMaxWidth: number) {
+      const signature = getEntriesSignature(entries, bubbleMaxWidth);
+      if (snapshot.signature === signature) return;
+      pendingSignature = signature;
+      pendingEntries = entries;
+      pendingBubbleMaxWidth = bubbleMaxWidth;
+      if (scheduledHandle === null) {
+        scheduledHandle = requestAnimationFrame(flush);
+      }
+    },
+  };
+})();
+
 /* ── Collapsible Content Wrapper ── */
 
-const MAX_LINES = 30;
-
-function CollapsibleContent({
-  children,
+function PlainTextBlock({
+  text,
+  isOverflowing,
   fadeClassName = "from-card",
 }: {
-  children: React.ReactNode;
+  text: string;
+  isOverflowing: boolean;
   fadeClassName?: string;
 }) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const check = () => setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   return (
     <div className="relative">
       <div
-        ref={contentRef}
-        style={!expanded ? { maxHeight: `calc(${MAX_LINES}lh)`, overflow: "hidden" } : undefined}
+        style={
+          !expanded
+            ? {
+                maxHeight: `${MAX_LINES * SURFACE_LINE_HEIGHT}px`,
+                overflow: "hidden",
+              }
+            : undefined
+        }
       >
-        {children}
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{text}</p>
       </div>
       {isOverflowing && !expanded && (
         <div
@@ -154,22 +431,56 @@ function CollapsibleContent({
   );
 }
 
+async function handleSurfaceCopyClick(event: MouseEvent<HTMLButtonElement>, text: string) {
+  const button = event.currentTarget;
+  await navigator.clipboard.writeText(text);
+
+  button.dataset["copied"] = "true";
+  button.title = "Copied";
+
+  const existingTimer = copyResetTimers.get(button);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const timer = setTimeout(() => {
+    if (!button.isConnected) return;
+    delete button.dataset["copied"];
+    button.title = "Copy message";
+  }, COPY_RESET_MS);
+
+  copyResetTimers.set(button, timer);
+}
+
 function MessageCopyButton({ text }: { text: string }) {
-  const { copied, copy } = useCopyToClipboard();
   return (
     <button
       type="button"
-      onClick={() => copy(text)}
-      className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+      onClick={(event) => {
+        void handleSurfaceCopyClick(event, text);
+      }}
+      className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground data-[copied=true]:text-emerald-500 data-[copied=true]:hover:text-emerald-500 opacity-60 hover:opacity-100 data-[copied=true]:opacity-100 data-[copied=true]:hover:opacity-100 transition-opacity cursor-pointer"
       title="Copy message"
     >
-      {copied ? (
-        <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
-      ) : (
-        <CopyIcon className="w-3.5 h-3.5" />
-      )}
+      <CopyIcon className="w-3.5 h-3.5" />
     </button>
   );
+}
+
+function findVirtualIndex(offsets: number[], target: number): number {
+  let low = 0;
+  let high = offsets.length - 1;
+  let result = offsets.length;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (offsets[mid]! >= target) {
+      result = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return result;
 }
 
 /* ── Entry Renderers ── */
@@ -177,7 +488,7 @@ function MessageCopyButton({ text }: { text: string }) {
 const InboundEntry = memo(function InboundEntry({
   entry,
 }: {
-  entry: SurfaceEntry & { kind: "inbound" };
+  entry: MeasuredInboundEntry;
 }) {
   const displayContent = entry.content;
   const badgeName = entry.streamName;
@@ -185,7 +496,7 @@ const InboundEntry = memo(function InboundEntry({
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
-        <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
+        <span className="text-[10px] text-muted-foreground/60">{entry.displayTime}</span>
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${SOURCE_COLORS[entry.source]}`} />
           <span className="text-[10px] font-medium text-muted-foreground">
@@ -199,11 +510,7 @@ const InboundEntry = memo(function InboundEntry({
             {badgeName}
           </span>
         )}
-        <CollapsibleContent>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {displayContent}
-          </p>
-        </CollapsibleContent>
+        <PlainTextBlock text={displayContent} isOverflowing={entry.metrics.isOverflowing} />
         <MessageCopyButton text={displayContent} />
       </div>
     </div>
@@ -213,13 +520,13 @@ const InboundEntry = memo(function InboundEntry({
 const OutboundEntry = memo(function OutboundEntry({
   entry,
 }: {
-  entry: SurfaceEntry & { kind: "outbound" };
+  entry: MeasuredSurfaceEntry & { kind: "outbound" };
 }) {
   const isWhatsApp = entry.channel === "whatsapp";
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
-        <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
+        <span className="text-[10px] text-muted-foreground/60">{entry.displayTime}</span>
         <div className="flex items-center gap-1.5">
           <span
             className={`w-2 h-2 rounded-full ${isWhatsApp ? "bg-emerald-500" : "bg-blue-500"}`}
@@ -240,45 +547,15 @@ const OutboundEntry = memo(function OutboundEntry({
   );
 });
 
-const LitMarkdownBlock = memo(function LitMarkdownBlock({ content }: { content: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const elementRef = useRef<HTMLElement | null>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    ensurePiWebUiReady()
-      .then(() => {
-        if (!cancelled) setReady(true);
-      })
-      .catch((err) => console.error("pi-web-ui init failed:", err));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!ready || !containerRef.current) return;
-    if (!elementRef.current) {
-      const el = document.createElement("markdown-block");
-      containerRef.current.appendChild(el);
-      elementRef.current = el;
-    }
-    (elementRef.current as HTMLElement & { content: string }).content = content;
-  }, [ready, content]);
-
-  return <div ref={containerRef} />;
-});
-
 const StreamsResponseEntry = memo(function StreamsResponseEntry({
   entry,
 }: {
-  entry: SurfaceEntry & { kind: "streams-response" };
+  entry: MeasuredStreamsResponseEntry;
 }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
-        <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
+        <span className="text-[10px] text-muted-foreground/60">{entry.displayTime}</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-blue-400" />
           <span className="text-[10px] font-medium text-muted-foreground">Agent</span>
@@ -290,20 +567,22 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
             {entry.streamName}
           </span>
         )}
-        <CollapsibleContent fadeClassName="from-muted/30">
-          <LitMarkdownBlock content={entry.content} />
-        </CollapsibleContent>
+        <PlainTextBlock
+          text={entry.content}
+          isOverflowing={entry.metrics.isOverflowing}
+          fadeClassName="from-muted/30"
+        />
         <MessageCopyButton text={entry.content} />
       </div>
     </div>
   );
 });
 
-const HookEntry = memo(function HookEntry({ entry }: { entry: SurfaceEntry & { kind: "hook" } }) {
+const HookEntry = memo(function HookEntry({ entry }: { entry: MeasuredSurfaceEntry & { kind: "hook" } }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
-        <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
+        <span className="text-[10px] text-muted-foreground/60">{entry.displayTime}</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-violet-500" />
           <span className="text-[10px] font-medium text-muted-foreground">Hook</span>
@@ -322,15 +601,15 @@ const HookEntry = memo(function HookEntry({ entry }: { entry: SurfaceEntry & { k
 const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
   entry,
 }: {
-  entry: SurfaceEntry;
+  entry: MeasuredSurfaceEntry;
 }) {
   switch (entry.kind) {
     case "inbound":
-      return <InboundEntry entry={entry} />;
+      return <InboundEntry entry={entry as MeasuredInboundEntry} />;
     case "outbound":
       return <OutboundEntry entry={entry} />;
     case "streams-response":
-      return <StreamsResponseEntry entry={entry} />;
+      return <StreamsResponseEntry entry={entry as MeasuredStreamsResponseEntry} />;
     case "hook":
       return <HookEntry entry={entry} />;
   }
@@ -344,6 +623,12 @@ export function Surface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
+  const [surfaceWidth, setSurfaceWidth] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [initialPositionReady, setInitialPositionReady] = useState(false);
+  const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
 
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
@@ -356,10 +641,167 @@ export function Surface() {
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
-  const { viewportRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const didInitialBottomPaintRef = useRef(false);
+  const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
+  const setViewportRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      viewportRef.current = node;
+      if (!node) return;
+      setSurfaceWidth(node.clientWidth);
+      setViewportHeight(node.clientHeight);
+      setScrollTop(node.scrollTop);
+    },
+    [viewportRef],
+  );
+
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      setSurfaceWidth(node.clientWidth);
+      setViewportHeight(node.clientHeight);
+    });
+    resizeObserver.observe(node);
+    const onScroll = () => {
+      setScrollTop(node.scrollTop);
+    };
+    node.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      node.removeEventListener("scroll", onScroll);
+      resizeObserver.disconnect();
+    };
+  }, [viewportRef]);
 
   // Recompute only when timeline reference changes (setQueryData creates new arrays)
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
+  const bubbleMaxWidth = useMemo(
+    () => (surfaceWidth > 0 ? getSurfaceBubbleMaxWidth(surfaceWidth) : null),
+    [surfaceWidth],
+  );
+  const fallbackMeasuredEntries = useMemo(
+    () => (bubbleMaxWidth === null ? DEFAULT_MEASURED_ENTRIES : buildFallbackMeasuredEntries(entries, bubbleMaxWidth)),
+    [entries, bubbleMaxWidth],
+  );
+  const measurementSignature = useMemo(
+    () => (bubbleMaxWidth === null ? "" : getEntriesSignature(entries, bubbleMaxWidth)),
+    [entries, bubbleMaxWidth],
+  );
+  const measurementSnapshot = useSyncExternalStore(
+    surfaceMeasurementStore.subscribe,
+    surfaceMeasurementStore.getSnapshot,
+    surfaceMeasurementStore.getSnapshot,
+  );
+  const measurementReady =
+    bubbleMaxWidth !== null && measurementSnapshot.signature === measurementSignature;
+  const measuredEntries = measurementReady ? measurementSnapshot.entries : fallbackMeasuredEntries;
+
+  useEffect(() => {
+    if (bubbleMaxWidth === null) return;
+    surfaceMeasurementStore.measure(entries, bubbleMaxWidth);
+  }, [entries, bubbleMaxWidth]);
+
+  const virtualRows = useMemo(() => {
+    const offsets: number[] = new Array(measuredEntries.length);
+    let runningOffset = 0;
+    for (let index = 0; index < measuredEntries.length; index++) {
+      offsets[index] = runningOffset;
+      const entry = measuredEntries[index]!;
+      const rowHeight = measuredHeights[entry.id] ?? entry.metrics.estimatedHeight;
+      runningOffset += rowHeight + SURFACE_ROW_GAP;
+    }
+    const totalHeight = measuredEntries.length === 0 ? 0 : runningOffset - SURFACE_ROW_GAP;
+    return {
+      offsets,
+      totalHeight,
+    };
+  }, [measuredEntries, measuredHeights]);
+
+  const visibleVirtualRows = useMemo(() => {
+    if (measuredEntries.length === 0) return [];
+
+    const overscanAbove = viewportHeight * SURFACE_OVERSCAN_ABOVE_RATIO;
+    const overscanBelow = viewportHeight * SURFACE_OVERSCAN_BELOW_RATIO;
+    const windowStart = Math.max(0, scrollTop - overscanAbove);
+    const windowEnd = scrollTop + viewportHeight + overscanBelow;
+
+    const startIndex = Math.max(0, findVirtualIndex(virtualRows.offsets, windowStart) - 1);
+    let endIndex = findVirtualIndex(virtualRows.offsets, windowEnd);
+    if (endIndex === measuredEntries.length) endIndex = measuredEntries.length - 1;
+
+    const items = [];
+    for (let index = startIndex; index <= endIndex; index++) {
+      items.push({
+        entry: measuredEntries[index]!,
+        top: virtualRows.offsets[index]!,
+      });
+    }
+    return items;
+  }, [measuredEntries, scrollTop, viewportHeight, virtualRows]);
+
+  useLayoutEffect(() => {
+    if (!measurementReady || visibleVirtualRows.length === 0) return;
+
+    let hasAllNodes = true;
+    let changed = false;
+
+    setMeasuredHeights((prev) => {
+      const next = { ...prev };
+
+      for (const { entry } of visibleVirtualRows) {
+        const node = rowElementsRef.current.get(entry.id);
+        if (!node) {
+          hasAllNodes = false;
+          continue;
+        }
+        const measuredHeight = Math.ceil(node.getBoundingClientRect().height);
+        if (next[entry.id] !== measuredHeight) {
+          next[entry.id] = measuredHeight;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+
+    if (hasAllNodes) {
+      setVisibleLayoutReady(true);
+    }
+  }, [measurementReady, visibleVirtualRows]);
+
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    if (
+      !node ||
+      !measurementReady ||
+      !visibleLayoutReady ||
+      didInitialBottomPaintRef.current ||
+      measuredEntries.length === 0
+    )
+      return;
+
+    const targetScrollTop = Math.max(0, virtualRows.totalHeight - node.clientHeight);
+    node.scrollTop = targetScrollTop;
+    isAtBottomRef.current = true;
+    setScrollTop(targetScrollTop);
+    didInitialBottomPaintRef.current = true;
+    setInitialPositionReady(true);
+  }, [
+    isAtBottomRef,
+    measuredEntries.length,
+    measurementReady,
+    viewportRef,
+    virtualRows.totalHeight,
+    visibleLayoutReady,
+  ]);
+
+  useEffect(() => {
+    if (measuredEntries.length === 0) {
+      didInitialBottomPaintRef.current = false;
+      setInitialPositionReady(true);
+    }
+  }, [measuredEntries.length]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -379,6 +821,14 @@ export function Surface() {
 
   const removeImage = useCallback((index: number) => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const openSettings = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
   }, []);
 
   // Ref for stable handleSubmit closure
@@ -417,7 +867,7 @@ export function Surface() {
           <RuntimeHealthIndicator />
           <button
             type="button"
-            onClick={() => setSettingsOpen(true)}
+            onClick={openSettings}
             className="p-1.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors"
             title="Settings"
           >
@@ -426,18 +876,45 @@ export function Surface() {
         </div>
       </div>
 
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
 
       {/* Activity feed */}
-      <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
+      <div
+        ref={setViewportRef}
+        className="flex-1 overflow-auto px-6 py-4"
+        style={{
+          visibility:
+            initialPositionReady && measurementReady && visibleLayoutReady ? "visible" : "hidden",
+        }}
+      >
         {entries.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground/50">No activity yet</p>
           </div>
         )}
-        {entries.map((entry) => (
-          <SurfaceEntryRenderer key={entry.id} entry={entry} />
-        ))}
+        {entries.length > 0 && (
+          <div
+            className="relative"
+            style={{ height: `${virtualRows.totalHeight}px` }}
+          >
+            {visibleVirtualRows.map(({ entry, top }) => (
+              <div
+                key={entry.id}
+                ref={(node) => {
+                  if (node) {
+                    rowElementsRef.current.set(entry.id, node);
+                  } else {
+                    rowElementsRef.current.delete(entry.id);
+                  }
+                }}
+                className="absolute left-0 right-0"
+                style={{ top: `${top}px` }}
+              >
+                <SurfaceEntryRenderer entry={entry} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <MessageInput

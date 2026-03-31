@@ -32,23 +32,16 @@ export const StreamsMessageList = memo(
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
 
-    // Debug: trace every time the messages prop reference changes (indicates timeline grew)
-    useEffect(() => {
-      console.log("[debug][StreamsMessageList] messages.length=%d", messages.length);
-    }, [messages]);
-
     useEffect(() => {
       let cancelled = false;
 
       ensurePiWebUiReady()
         .then(() => {
           if (cancelled) return;
-          console.log("[StreamsMessageList] pi-web-ui ready");
           setReady(true);
         })
         .catch((initError) => {
           if (cancelled) return;
-          console.log("[StreamsMessageList] pi-web-ui initialization failed", initError);
           setError(initError);
         });
 
@@ -67,7 +60,6 @@ export const StreamsMessageList = memo(
         el.style.display = "block";
         container.appendChild(el);
         elementRef.current = el;
-        console.log("[StreamsMessageList] created <message-list>");
       }
 
       const el = elementRef.current as HTMLElement & MessageList & Record<string, unknown>;
