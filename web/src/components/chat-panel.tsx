@@ -106,6 +106,7 @@ export function ChatPanel({
     });
     return () => {
       streamingStore.offStreamingDelta(sessionId);
+      messageListRef.current?.clearStreaming();
     };
   }, [sessionId]);
 
