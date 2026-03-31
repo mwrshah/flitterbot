@@ -1,7 +1,7 @@
 import type {
   DirectMessageResponse,
   DirectoryCompletionsResponse,
-  PiHistoryResponse,
+  StreamsHistoryResponse,
   SendMessageResponse,
   SessionDetailResponse,
   SessionListResponse,
@@ -67,23 +67,23 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
         body: JSON.stringify({ text }),
       }),
 
-    getPiHistory: (surface?: "input", piSessionId?: string) => {
+    getStreamsHistory: (surface?: "input", piSessionId?: string) => {
       const params = new URLSearchParams();
       if (surface) params.set("surface", surface);
       if (piSessionId) params.set("piSessionId", piSessionId);
       const qs = params.toString();
-      return request<PiHistoryResponse>(qs ? `/api/pi/history?${qs}` : "/api/pi/history");
+      return request<StreamsHistoryResponse>(qs ? `/api/streams/history?${qs}` : "/api/streams/history");
     },
 
     startWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),
 
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
-    interruptPiSession: (piSessionId: string) =>
-      request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, { method: "POST" }),
+    interruptStreamsSession: (piSessionId: string) =>
+      request<{ ok: boolean }>(`/api/streams-sessions/${piSessionId}/interrupt`, { method: "POST" }),
 
-    reopenWorkstream: (workstreamId: string) =>
-      request<{ ok: boolean }>(`/api/workstreams/${workstreamId}/reopen`, { method: "POST" }),
+    reopenStream: (streamId: string) =>
+      request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 

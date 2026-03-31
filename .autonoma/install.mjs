@@ -538,7 +538,7 @@ async function bootstrapConfig() {
   configAfter.whatsappCliPath = configAfter.whatsappCliPath || "~/.autonoma/whatsapp/cli.js";
   configAfter.whatsappDaemonPath = configAfter.whatsappDaemonPath || "~/.autonoma/whatsapp/daemon.js";
   if (configAfter.whatsappEnabled === undefined) configAfter.whatsappEnabled = true;
-  if (configAfter.wipeWorkstreamsOnStart === undefined) configAfter.wipeWorkstreamsOnStart = false;
+  if (configAfter.wipeStreamsOnStart === undefined) configAfter.wipeStreamsOnStart = false;
   if (!configAfter.projectsDir) {
     const entered = await promptString(
       "Projects directory (absolute path where your repos live, e.g. ~/Documents/coded-programs): ",

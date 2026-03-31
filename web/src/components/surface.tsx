@@ -9,7 +9,7 @@ import { SettingsDrawer } from "~/components/settings-drawer";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { ensurePiWebUiReady } from "~/lib/pi-web-ui-init";
-import { inputSurfaceTimelineQueryOptions } from "~/lib/queries";
+import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -23,10 +23,10 @@ type SurfaceEntry = {
   id: string;
   timestamp: string;
 } & (
-  | { kind: "inbound"; source: MessageSource; content: string; workstreamName?: string }
+  | { kind: "inbound"; source: MessageSource; content: string; streamName?: string }
   | { kind: "outbound"; channel: "whatsapp" | "all"; content: string }
   | { kind: "hook"; eventName: string; detail: string }
-  | { kind: "pi-response"; content: string; workstreamName?: string }
+  | { kind: "streams-response"; content: string; streamName?: string }
 );
 
 /* ── Helpers ── */
@@ -48,17 +48,17 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   cron: "Cron",
   init: "Init",
   agent: "Agent",
-  pi_outbound: "Pi",
+  pi_outbound: "Streams",
 };
 
-const WORKSTREAM_PREFIX_RE = /^\[Workstream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
+const STREAM_PREFIX_RE = /^\[Stream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;
 
-function parseWorkstreamPrefix(
+function parseStreamPrefix(
   content: string,
-): { workstreamName: string; cleanContent: string } | null {
-  const match = content.match(WORKSTREAM_PREFIX_RE);
+): { streamName: string; cleanContent: string } | null {
+  const match = content.match(STREAM_PREFIX_RE);
   if (!match) return null;
-  return { workstreamName: match[1] ?? "", cleanContent: content.slice(match[0]!.length) };
+  return { streamName: match[1] ?? "", cleanContent: content.slice(match[0]!.length) };
 }
 
 function formatTime(iso: string): string {
@@ -88,7 +88,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         kind: "inbound",
         source: msg.source ?? "web",
         content: msg.content,
-        workstreamName: item.workstreamName,
+        streamName: item.streamName,
       });
       continue;
     }
@@ -97,16 +97,16 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
       entries.push({
         id: item.id,
         timestamp: item.createdAt,
-        kind: "pi-response",
+        kind: "streams-response",
         content: item.content,
-        workstreamName: item.workstreamName,
+        streamName: item.streamName,
       });
       continue;
     }
 
     if (item.kind === "tool") {
-      // Skip all tool calls — only user messages and pi responses shown
-      // (mirrors WhatsApp: user message in, pi final text response out)
+      // Skip all tool calls — only user messages and streams responses shown
+      // (mirrors WhatsApp: user message in, streams final text response out)
     }
   }
 
@@ -189,9 +189,9 @@ const InboundEntry = memo(function InboundEntry({
 }: {
   entry: SurfaceEntry & { kind: "inbound" };
 }) {
-  const parsed = useMemo(() => parseWorkstreamPrefix(entry.content), [entry.content]);
+  const parsed = useMemo(() => parseStreamPrefix(entry.content), [entry.content]);
   const displayContent = parsed ? parsed.cleanContent : entry.content;
-  const badgeName = parsed?.workstreamName ?? entry.workstreamName;
+  const badgeName = parsed?.streamName ?? entry.streamName;
 
   return (
     <div className="flex gap-3 items-start">
@@ -281,10 +281,10 @@ const LitMarkdownBlock = memo(function LitMarkdownBlock({ content }: { content: 
   return <div ref={containerRef} />;
 });
 
-const PiResponseEntry = memo(function PiResponseEntry({
+const StreamsResponseEntry = memo(function StreamsResponseEntry({
   entry,
 }: {
-  entry: SurfaceEntry & { kind: "pi-response" };
+  entry: SurfaceEntry & { kind: "streams-response" };
 }) {
   return (
     <div className="flex gap-3 items-start">
@@ -292,13 +292,13 @@ const PiResponseEntry = memo(function PiResponseEntry({
         <span className="text-[10px] text-muted-foreground/60">{formatTime(entry.timestamp)}</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-[10px] font-medium text-muted-foreground">Pi</span>
+          <span className="text-[10px] font-medium text-muted-foreground">Streams</span>
         </div>
       </div>
       <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
-        {entry.workstreamName && (
+        {entry.streamName && (
           <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
-            {entry.workstreamName}
+            {entry.streamName}
           </span>
         )}
         <CollapsibleContent fadeClassName="from-muted/30">
@@ -340,8 +340,8 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
       return <InboundEntry entry={entry} />;
     case "outbound":
       return <OutboundEntry entry={entry} />;
-    case "pi-response":
-      return <PiResponseEntry entry={entry} />;
+    case "streams-response":
+      return <StreamsResponseEntry entry={entry} />;
     case "hook":
       return <HookEntry entry={entry} />;
   }
@@ -351,7 +351,7 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
 
 const rootApi = getRouteApi("__root__");
 
-export function InputSurface() {
+export function Surface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
@@ -365,7 +365,7 @@ export function InputSurface() {
   });
 
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
-  const { data: timeline = [] } = useQuery(inputSurfaceTimelineQueryOptions());
+  const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
   const { viewportRef, engageAndScroll } = useStickToBottom();
 
@@ -421,8 +421,8 @@ export function InputSurface() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
         <div>
-          <h1 className="text-sm font-semibold text-foreground">Input Surface</h1>
-          <p className="text-[10px] text-muted-foreground/60">All channels flowing through Pi</p>
+          <h1 className="text-sm font-semibold text-foreground">Surface</h1>
+          <p className="text-[10px] text-muted-foreground/60">Highlights from all streams</p>
         </div>
         <div className="flex items-center gap-2">
           <RuntimeHealthIndicator />
@@ -458,7 +458,7 @@ export function InputSurface() {
         onAddImages={addImageFiles}
         onRemoveImage={removeImage}
         skills={skillsData?.items}
-        placeholder="Message Pi via Web…"
+        placeholder="Message Streams via Web…"
       />
     </div>
   );

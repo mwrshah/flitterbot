@@ -7,7 +7,7 @@ import type {
   MessageRequest,
   MessageResponse,
   MessageSource,
-  WorkstreamRoutingMeta,
+  StreamRoutingMeta,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
@@ -32,20 +32,20 @@ export async function handleMessageRoute(
 
   // Only web and whatsapp sources reach this handler (normalizeSource guarantees this).
   // Direct-targeted session (web UI tab input) — skip router
-  let workstreamMeta: WorkstreamRoutingMeta = {};
+  let streamMeta: StreamRoutingMeta = {};
   if (body.targetSessionId) {
-    workstreamMeta._targetSessionId = body.targetSessionId;
+    streamMeta._targetSessionId = body.targetSessionId;
   } else {
     const classification = await routeMessage(runtime, body.text);
     if (classification) {
-      workstreamMeta = classification.metadata;
+      streamMeta = classification.metadata;
     }
   }
 
   runtime.enqueue({
     text: formatted,
     source,
-    metadata: { ...body.metadata, ...workstreamMeta },
+    metadata: { ...body.metadata, ...streamMeta },
     deliveryMode,
     images: Array.isArray(body.images) ? body.images : undefined,
   });
@@ -57,18 +57,18 @@ export async function handleMessageRoute(
 async function routeMessage(
   runtime: ControlSurfaceRuntime,
   rawText: string,
-): Promise<{ metadata: WorkstreamRoutingMeta } | null> {
+): Promise<{ metadata: StreamRoutingMeta } | null> {
   try {
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
     const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
     const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultPiSessionId);
-    const meta: WorkstreamRoutingMeta = {
+    const meta: StreamRoutingMeta = {
       router_action: result.action,
     };
-    if (result.workstream) {
-      meta.workstream_id = result.workstream.id;
-      meta.workstream_name = result.workstream.name;
+    if (result.stream) {
+      meta.workstream_id = result.stream.id;
+      meta.workstream_name = result.stream.name;
     }
     return { metadata: meta };
   } catch (error) {

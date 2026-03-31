@@ -9,12 +9,12 @@ import type {
 } from "~/lib/types";
 import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
-  fetchPiHistory,
-  fetchPiInputHistory,
-  fetchPiSessions,
-  fetchPiWorktree,
-  type PiWorkstreamInfo,
-} from "~/server/pi";
+  fetchStreamsHistory,
+  fetchStreamsInputHistory,
+  fetchStreamsSessions,
+  fetchStreamsWorktree,
+  type StreamInfo,
+} from "~/server/streams";
 
 /**
  * structuralSharing callback: merges fetched timeline with the previous cache
@@ -49,11 +49,11 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
   };
 }
 
-export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
+export function streamsHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
   return {
-    queryKey: ["pi-history", sessionId ?? "default", surface ?? "agent"] as const,
+    queryKey: ["streams-history", sessionId ?? "default", surface ?? "agent"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
-      (await fetchPiHistory({
+      (await fetchStreamsHistory({
         data: {
           ...(sessionId ? { piSessionId: sessionId } : {}),
           ...(surface ? { surface } : {}),
@@ -63,7 +63,7 @@ export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "
     staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     // When the default session restarts with a new ID, the component picks up
     // the new sessionId from the status cache before the route loader re-runs.
-    // Without placeholderData, useQuery returns undefined and usePiChat falls
+    // Without placeholderData, useQuery returns undefined and useStreamsChat falls
     // back to stale loaderHistory (old session's messages). An empty placeholder
     // avoids showing the old session's data during the transition.
     placeholderData: [],
@@ -75,26 +75,26 @@ export function piHistoryQueryOptions(sessionId: string | undefined, surface?: "
 }
 
 /**
- * Downstream Claude Code sessions for a Pi orchestrator session.
- * WS bridge invalidates ["pi-downstream-sessions", piSessionId] on sessions_changed.
+ * Downstream Claude Code sessions for a Streams orchestrator session.
+ * WS bridge invalidates ["streams-downstream-sessions", piSessionId] on sessions_changed.
  */
-export function piDownstreamSessionsQueryOptions(piSessionId: string) {
+export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
   return {
-    queryKey: ["pi-downstream-sessions", piSessionId] as const,
-    queryFn: (): Promise<DownstreamSessionItem[]> => fetchPiSessions({ data: { piSessionId } }),
+    queryKey: ["streams-downstream-sessions", piSessionId] as const,
+    queryFn: (): Promise<DownstreamSessionItem[]> => fetchStreamsSessions({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };
 }
 
 /**
- * Worktree info for a Pi orchestrator session.
- * WS bridge invalidates ["pi-worktree", piSessionId] on worktree_changed.
+ * Worktree info for a Streams orchestrator session.
+ * WS bridge invalidates ["streams-worktree", piSessionId] on worktree_changed.
  */
-export function piWorktreeQueryOptions(piSessionId: string) {
+export function streamsWorktreeQueryOptions(piSessionId: string) {
   return {
-    queryKey: ["pi-worktree", piSessionId] as const,
-    queryFn: (): Promise<PiWorkstreamInfo | null> => fetchPiWorktree({ data: { piSessionId } }),
+    queryKey: ["streams-worktree", piSessionId] as const,
+    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };
@@ -105,7 +105,7 @@ export type StatusPill = { id: string; label: string; variant?: "info" | "error"
 
 export function statusPillsQueryOptions(sessionId: string) {
   return {
-    queryKey: ["pi-status-pills", sessionId] as const,
+    queryKey: ["streams-status-pills", sessionId] as const,
     queryFn: (): StatusPill[] => [],
     staleTime: Infinity,
     // Initialized as empty; WS bridge uses setQueryData to manage pills
@@ -121,12 +121,12 @@ export function connectionStateQueryOptions() {
   };
 }
 
-/** Input surface timeline — pi_surfaced events + user messages from all sessions. */
-export function inputSurfaceTimelineQueryOptions() {
+/** Surface timeline — pi_surfaced events + user messages from all sessions. */
+export function surfaceTimelineQueryOptions() {
   return {
-    queryKey: ["pi-input-surface-timeline"] as const,
+    queryKey: ["surface-timeline"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
-      (await fetchPiInputHistory()) as ChatTimelineItem[],
+      (await fetchStreamsInputHistory()) as ChatTimelineItem[],
     staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     structuralSharing: mergeTimelineItems,
   };

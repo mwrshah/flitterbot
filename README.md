@@ -30,7 +30,7 @@ The installer (step 3 in quickstart) deploys to `~/.autonoma/`, writes `web/.env
 - `toolTimeoutMinutes` (default `4`) — tool-waiting timeout before stall
 - `claudeCliCommand` (default `claude --dangerously-skip-permissions`) — CLI used to launch sessions
 - `projectsDir` (default `~/development`) — working directory for Pi agents and default root for Claude Code sessions (overridden by worktree path once created)
-- `wipeWorkstreamsOnStart` (default `false`) — close all open workstreams on startup
+- `wipeStreamsOnStart` (default `false`) — close all open streams on startup
 - `whatsappEnabled` (default `true`) — enable/disable WhatsApp channel
 
 **WhatsApp auth:** `~/.autonoma/bin/autonoma-wa auth` (QR) or `--pairing-code`. Auth state at `~/.autonoma/whatsapp/auth/`.

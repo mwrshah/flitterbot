@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import { formatWorkstreamPrompt } from "../pi/format-workstream-prompt.ts";
+import { formatStreamPrompt } from "../pi/format-stream-prompt.ts";
 import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
 
 // Mock groq-client before importing context-relevance
@@ -11,7 +11,7 @@ mock.module("./groq-client.ts", () => ({
 // --- Prompt builder tests ---
 
 describe("buildContextRelevancePrompt", () => {
-  test("includes workstream name and all messages", () => {
+  test("includes stream name and all messages", () => {
     const messages = [
       { content: "Fix the login bug", created_at: "2026-03-26T10:00:00Z" },
       { content: "It happens on Chrome", created_at: "2026-03-26T10:01:00Z" },
@@ -35,26 +35,26 @@ describe("buildContextRelevancePrompt", () => {
   });
 });
 
-// --- formatWorkstreamPrompt tests ---
+// --- formatStreamPrompt tests ---
 
-describe("formatWorkstreamPrompt", () => {
+describe("formatStreamPrompt", () => {
   test("single message produces simple format", () => {
-    const result = formatWorkstreamPrompt(["Do the thing"], "my-ws", "ws-123");
+    const result = formatStreamPrompt(["Do the thing"], "my-ws", "ws-123");
 
-    expect(result).toContain('[Workstream: "my-ws" (ws-123)] [NEW]');
+    expect(result).toContain('[Stream: "my-ws" (ws-123)] [NEW]');
     expect(result).toContain("Do the thing");
     expect(result).toContain("/load2-w");
     expect(result).not.toContain("User message (");
   });
 
   test("multiple messages produces numbered format", () => {
-    const result = formatWorkstreamPrompt(
+    const result = formatStreamPrompt(
       ["First context", "Second context", "Create the feature"],
       "my-feature",
       "ws-456",
     );
 
-    expect(result).toContain('[Workstream: "my-feature" (ws-456)] [NEW]');
+    expect(result).toContain('[Stream: "my-feature" (ws-456)] [NEW]');
     expect(result).toContain("--- User message (1/3) ---");
     expect(result).toContain("--- User message (2/3) ---");
     expect(result).toContain("--- User message (3/3, most recent) ---");
@@ -65,8 +65,8 @@ describe("formatWorkstreamPrompt", () => {
   });
 
   test("empty messages array produces header only", () => {
-    const result = formatWorkstreamPrompt([], "empty-ws", "ws-000");
-    expect(result).toContain('[Workstream: "empty-ws" (ws-000)] [NEW]');
+    const result = formatStreamPrompt([], "empty-ws", "ws-000");
+    expect(result).toContain('[Stream: "empty-ws" (ws-000)] [NEW]');
   });
 });
 
@@ -82,7 +82,7 @@ describe("classifyContextRelevance", () => {
     const messages = [
       { content: "Hello", created_at: "2026-03-26T10:00:00Z" },
       { content: "Fix auth", created_at: "2026-03-26T10:01:00Z" },
-      { content: "Create workstream for auth fix", created_at: "2026-03-26T10:02:00Z" },
+      { content: "Create stream for auth fix", created_at: "2026-03-26T10:02:00Z" },
     ];
 
     const result = await classifyContextRelevance(messages, "fix-auth", "fake-key");
