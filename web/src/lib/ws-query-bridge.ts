@@ -44,21 +44,6 @@ export function createSendMessage(deps: {
 }): SendMessageFn {
   const { wsClient, apiClient, queryClient } = deps;
   return async (text, images, targetSessionId) => {
-    // Optimistically insert user message into the query cache
-    const optimisticMsg: ChatTimelineMessage = {
-      id: createId("user-msg"),
-      kind: "message",
-      role: "user",
-      content: text,
-      source: "web",
-      images,
-      createdAt: new Date().toISOString(),
-    };
-    appendTimelineItem(queryClient, targetSessionId ?? "default", optimisticMsg, "input");
-    if (targetSessionId) {
-      appendTimelineItem(queryClient, targetSessionId, optimisticMsg);
-    }
-
     try {
       await wsClient.sendMessage(text, "followUp", images, targetSessionId);
     } catch (wsError) {
