@@ -52,7 +52,11 @@ function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.streamName ?? "no stream";
 }
 
-export function DownstreamSessionsPanel({ streamsSessionId }: { streamsSessionId: string | undefined }) {
+export function DownstreamSessionsPanel({
+  streamsSessionId,
+}: {
+  streamsSessionId: string | undefined;
+}) {
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(streamsSessionId ?? ""),
   );

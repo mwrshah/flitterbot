@@ -3,8 +3,8 @@ export { formatPromptWithContext } from "./format-prompt.ts";
 export { readStreamsHistory, readStreamsHistoryFromMessages } from "./history.ts";
 export {
   type ManagedStreamsSession,
-  StreamsSessionManager,
   type ProcessQueueItemCallback,
+  StreamsSessionManager,
 } from "./session-manager.ts";
 export { StreamsSessionState } from "./session-state.ts";
 export { subscribeToStreamsSession } from "./subscribe.ts";

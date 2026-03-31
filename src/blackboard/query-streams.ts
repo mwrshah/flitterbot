@@ -3,9 +3,7 @@ import type { StreamRow } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
 export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
-  return db.all<StreamRow>(
-    "SELECT * FROM streams WHERE status = 'open' ORDER BY created_at DESC",
-  );
+  return db.all<StreamRow>("SELECT * FROM streams WHERE status = 'open' ORDER BY created_at DESC");
 }
 
 export function getStreamById(db: BlackboardDatabase, id: string): StreamRow | null {
@@ -14,10 +12,7 @@ export function getStreamById(db: BlackboardDatabase, id: string): StreamRow | n
 }
 
 export function getStreamByName(db: BlackboardDatabase, name: string): StreamRow | null {
-  const row = db.get<StreamRow>(
-    "SELECT * FROM streams WHERE name = ? COLLATE NOCASE",
-    name,
-  );
+  const row = db.get<StreamRow>("SELECT * FROM streams WHERE name = ? COLLATE NOCASE", name);
   return row ?? null;
 }
 
@@ -84,13 +79,8 @@ export function closeStream(db: BlackboardDatabase, streamId: string): void {
   ).run(streamId);
 }
 
-export function reopenStream(
-  db: BlackboardDatabase,
-  streamId: string,
-): StreamRow | null {
-  db.prepare(`UPDATE streams SET status = 'open', closed_at = NULL WHERE id = ?`).run(
-    streamId,
-  );
+export function reopenStream(db: BlackboardDatabase, streamId: string): StreamRow | null {
+  db.prepare(`UPDATE streams SET status = 'open', closed_at = NULL WHERE id = ?`).run(streamId);
   return getStreamById(db, streamId);
 }
 

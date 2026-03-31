@@ -49,7 +49,10 @@ export function statusQueryOptions(apiClient: AutonomaApiClient) {
   };
 }
 
-export function streamsHistoryQueryOptions(sessionId: string | undefined, surface?: "input" | "agent") {
+export function streamsHistoryQueryOptions(
+  sessionId: string | undefined,
+  surface?: "input" | "agent",
+) {
   return {
     queryKey: ["streams-history", sessionId ?? "default", surface ?? "agent"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
@@ -81,7 +84,8 @@ export function streamsHistoryQueryOptions(sessionId: string | undefined, surfac
 export function streamsDownstreamSessionsQueryOptions(streamsSessionId: string) {
   return {
     queryKey: ["streams-downstream-sessions", streamsSessionId] as const,
-    queryFn: (): Promise<DownstreamSessionItem[]> => fetchStreamsSessions({ data: { streamsSessionId } }),
+    queryFn: (): Promise<DownstreamSessionItem[]> =>
+      fetchStreamsSessions({ data: { streamsSessionId } }),
     enabled: !!streamsSessionId,
     staleTime: 30_000,
   };

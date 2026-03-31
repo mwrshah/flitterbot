@@ -50,10 +50,8 @@ function StreamsDefaultRoute() {
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const defaultSessionId = status?.streamsAgent?.default?.sessionId;
-  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = useStreamsChat(
-    defaultSessionId,
-    history,
-  );
+  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
+    useStreamsChat(defaultSessionId, history);
 
   return (
     <PanelGroup orientation="horizontal" className="h-full">

@@ -97,8 +97,7 @@ export function loadConfig(): AutonomaConfig {
   const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js");
   const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js");
   const projectsDir = expandHome(raw.projectsDir ?? "~/development");
-  const wipeStreamsOnStart =
-    raw.wipeStreamsOnStart ?? process.env.AUTONOMA_WIPE_STREAMS === "1";
+  const wipeStreamsOnStart = raw.wipeStreamsOnStart ?? process.env.AUTONOMA_WIPE_STREAMS === "1";
   const whatsappEnabled =
     process.env.WHATSAPP_ENABLED !== undefined
       ? process.env.WHATSAPP_ENABLED !== "0" &&

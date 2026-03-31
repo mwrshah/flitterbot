@@ -43,7 +43,10 @@ export function reconcilePreviousStreamsSessions(
   });
 }
 
-export function upsertStreamsSession(db: BlackboardDatabase, input: UpsertStreamsSessionInput): void {
+export function upsertStreamsSession(
+  db: BlackboardDatabase,
+  input: UpsertStreamsSessionInput,
+): void {
   writeStreamsSession(db, {
     pi_session_id: input.streamsSessionId,
     role: input.role,

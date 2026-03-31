@@ -9,9 +9,9 @@ import type {
   ChatTimelineMessage,
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
+import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readStreamsHistory, readStreamsHistoryFromMessages } from "../streams/history.ts";
 import type { ManagedStreamsSession } from "../streams/session-manager.ts";
-import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
 async function readSessionHistory(
@@ -36,7 +36,11 @@ async function readSessionHistory(
     if (body.items.length > 0 || !snapshot.sessionFile) {
       items = body.items;
     } else if (snapshot.sessionFile) {
-      const fileBody = await readStreamsHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
+      const fileBody = await readStreamsHistory(
+        snapshot.sessionId,
+        snapshot.sessionFile,
+        historyMode,
+      );
       items = fileBody.items;
     } else {
       return [];
@@ -70,11 +74,20 @@ export async function handleBrowserStreamsHistoryRoute(
   const streamsSessionId = url.searchParams.get("streamsSessionId");
 
   try {
-    return await handleBrowserStreamsHistoryRouteInner(runtime, response, historyMode, streamsSessionId);
+    return await handleBrowserStreamsHistoryRouteInner(
+      runtime,
+      response,
+      historyMode,
+      streamsSessionId,
+    );
   } catch (err) {
     const ctx = streamsSessionId ? `streamsSessionId=${streamsSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
-    const body: StreamsHistoryResponse = { sessionId: streamsSessionId, sessionFile: null, items: [] };
+    const body: StreamsHistoryResponse = {
+      sessionId: streamsSessionId,
+      sessionFile: null,
+      items: [],
+    };
     return sendJson(response, 500, body);
   }
 }
@@ -98,7 +111,8 @@ async function handleBrowserStreamsHistoryRouteInner(
     const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
     for (const ws of closedStreams) {
       const wsSessionId = getLatestStreamsSessionId(runtime.blackboard, ws.id);
-      if (wsSessionId && !streamsSessionIds.includes(wsSessionId)) streamsSessionIds.push(wsSessionId);
+      if (wsSessionId && !streamsSessionIds.includes(wsSessionId))
+        streamsSessionIds.push(wsSessionId);
     }
     const rows = getInputSurfaceHistory(runtime.blackboard, streamsSessionIds);
     const items: ChatTimelineItem[] = rows.map(
