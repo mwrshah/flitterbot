@@ -10,7 +10,7 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
-import { PiMessageList, type PiMessageListHandle } from "./pi-message-list";
+import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const emptySubscribe = () => () => {};
 const useIsClient = () =>
@@ -26,8 +26,8 @@ type ChatPanelProps = {
   statusPills: StatusPill[];
   isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
-  workstreamId?: string;
-  isWorkstreamClosed?: boolean;
+  streamId?: string;
+  isStreamClosed?: boolean;
 };
 
 export function ChatPanel({
@@ -36,14 +36,14 @@ export function ChatPanel({
   statusPills,
   isSessionBusy,
   onSendMessage,
-  workstreamId,
-  isWorkstreamClosed,
+  streamId,
+  isStreamClosed,
 }: ChatPanelProps) {
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
-  const messageListRef = useRef<PiMessageListHandle>(null);
+  const messageListRef = useRef<StreamsMessageListHandle>(null);
   const { data: skillsData } = useQuery({
     queryKey: ["skills"],
     queryFn: () => apiClient.listSkills(),
@@ -52,12 +52,12 @@ export function ChatPanel({
   const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
-    mutationFn: () => apiClient.interruptPiSession(sessionId),
+    mutationFn: () => apiClient.interruptStreamsSession(sessionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
   const reopenMutation = useMutation({
-    mutationFn: () => apiClient.reopenWorkstream(workstreamId!),
+    mutationFn: () => apiClient.reopenStream(streamId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
@@ -157,7 +157,7 @@ export function ChatPanel({
     <div className="flex flex-col h-full">
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-2 border-b border-border shrink-0 min-h-11">
-        <h1 className="text-sm font-semibold text-foreground">Pi</h1>
+        <h1 className="text-sm font-semibold text-foreground">Streams</h1>
         <div className="flex items-center gap-2">
           {isClient && statusPills.length > 0 && (
             <div className="flex items-center gap-1.5">
@@ -179,7 +179,7 @@ export function ChatPanel({
               {interruptMutation.isPending ? "Stopping..." : "Stop"}
             </Button>
           )}
-          {isClient && !isSessionActive && isWorkstreamClosed && workstreamId && (
+          {isClient && !isSessionActive && isStreamClosed && streamId && (
             <Button
               variant="outline"
               size="sm"
@@ -196,7 +196,7 @@ export function ChatPanel({
 
       {/* Message area — fills all available space */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
-        <PiMessageList ref={messageListRef} messages={agentMessages} />
+        <StreamsMessageList ref={messageListRef} messages={agentMessages} />
       </div>
 
       <MessageInput

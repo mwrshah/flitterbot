@@ -33,7 +33,7 @@ export const MessageInput = memo(function MessageInput({
   onAddImages,
   onRemoveImage,
   skills,
-  placeholder = "Message Pi…",
+  placeholder = "Message Streams…",
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
 }: MessageInputProps) {

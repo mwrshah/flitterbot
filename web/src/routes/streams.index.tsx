@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/pi/")({
+export const Route = createFileRoute("/streams/")({
   beforeLoad: () => {
-    throw redirect({ to: "/pi/default" });
+    throw redirect({ to: "/streams/default" });
   },
 });

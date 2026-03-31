@@ -5,7 +5,7 @@ import type { AutonomaWsClient } from "~/lib/ws";
 
 const INPUT_SURFACE_EVENT_TYPES = ["pi_surfaced"];
 
-type WsMode = "input-surface" | "pi-default" | "pi-session";
+type WsMode = "surface" | "streams-default" | "streams-session";
 
 type SubscriptionTarget = {
   sessionId: string;
@@ -18,8 +18,8 @@ type MatchWithWsData = {
   loaderData?: { defaultSessionId?: string };
 };
 
-function defaultPiSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.pi?.default?.sessionId;
+function defaultStreamsSessionIdFromCache(queryClient: QueryClient): string | undefined {
+  return queryClient.getQueryData<StatusResponse>(["status"])?.streams?.default?.sessionId;
 }
 
 function resolveSubscriptionTarget(
@@ -31,16 +31,16 @@ function resolveSubscriptionTarget(
   if (!activeMatch) return null;
 
   switch (activeMatch.staticData?.wsMode) {
-    case "input-surface":
+    case "surface":
       return { sessionId: "*", eventTypes: INPUT_SURFACE_EVENT_TYPES };
-    case "pi-default": {
-      // Prefer the live cache value over stale loader data — the default Pi
+    case "streams-default": {
+      // Prefer the live cache value over stale loader data — the default Streams
       // session may have restarted with a new sessionId since the loader ran.
       const sessionId =
-        defaultPiSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
+        defaultStreamsSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultSessionId;
       return sessionId ? { sessionId } : null;
     }
-    case "pi-session":
+    case "streams-session":
       return activeMatch.params?.sessionId ? { sessionId: activeMatch.params.sessionId } : null;
     default:
       return null;

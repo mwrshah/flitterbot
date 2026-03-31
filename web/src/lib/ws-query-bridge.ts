@@ -72,13 +72,13 @@ export function createSendMessage(deps: {
 /* ── Pill management helpers ── */
 
 function addPill(queryClient: QueryClient, sessionId: string, pill: StatusPill) {
-  queryClient.setQueryData<StatusPill[]>(["pi-status-pills", sessionId], (old) =>
+  queryClient.setQueryData<StatusPill[]>(["streams-status-pills", sessionId], (old) =>
     [...(old ?? []).filter((p) => p.id !== pill.id), pill].slice(-6),
   );
 }
 
 function removePill(queryClient: QueryClient, sessionId: string, pillId: string) {
-  queryClient.setQueryData<StatusPill[]>(["pi-status-pills", sessionId], (old) =>
+  queryClient.setQueryData<StatusPill[]>(["streams-status-pills", sessionId], (old) =>
     (old ?? []).filter((p) => p.id !== pillId),
   );
 }
@@ -92,14 +92,14 @@ function appendTimelineItem(
   surface: "agent" | "input" = "agent",
 ) {
   if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(["pi-input-surface-timeline"], (old) => [
+    queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => [
       ...(old ?? []),
       item,
     ]);
     return;
   }
 
-  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
     const items = old ?? [];
 
     // Dedup: skip if an item with the same identity already exists.
@@ -148,7 +148,7 @@ function appendTimelineItem(
 /* Used for message_end: intermediate→final correction is the one expected replace. */
 
 function upsertTimelineItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineItem) {
-  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
     const items = old ?? [];
     const idx = items.findIndex((existing) => existing.id === item.id);
     if (idx >= 0) {
@@ -191,7 +191,7 @@ function updateTimelineItem(
   predicate: (item: ChatTimelineItem) => boolean,
   updater: (item: ChatTimelineItem) => ChatTimelineItem,
 ) {
-  queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
     if (!old) return old;
     const idx = old.findIndex(predicate);
     if (idx < 0) return old;
@@ -228,8 +228,8 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── workstreams_changed / status_changed ──
-    if (message.type === "workstreams_changed" || message.type === "status_changed") {
+    // ── streams_changed / status_changed ──
+    if (message.type === "streams_changed" || message.type === "status_changed") {
       queryClient.invalidateQueries({ queryKey: ["status"] });
       return;
     }
@@ -237,14 +237,14 @@ export function setupWsQueryBridge(deps: {
     // ── sessions_changed ──
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
-        queryKey: ["pi-downstream-sessions", message.piSessionId],
+        queryKey: ["streams-downstream-sessions", message.piSessionId],
       });
       return;
     }
 
     // ── worktree_changed ──
     if (message.type === "worktree_changed") {
-      queryClient.invalidateQueries({ queryKey: ["pi-worktree", message.piSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.piSessionId] });
       return;
     }
 
@@ -270,7 +270,7 @@ export function setupWsQueryBridge(deps: {
                 : message.item.source === "init"
                   ? "System"
                   : message.item.source === "pi_outbound"
-                    ? "Pi"
+                    ? "Streams"
                     : "Web";
       addPill(queryClient, sid, {
         id: `processing-${message.item.id}`,
@@ -399,8 +399,8 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "pi_surfaced") {
       const surfacedMessage: ChatTimelineMessage = {
         ...message.message,
-        workstreamId: message.message.workstreamId ?? message.workstreamId,
-        workstreamName: message.message.workstreamName ?? message.workstreamName,
+        streamId: message.message.streamId ?? message.streamId,
+        streamName: message.message.streamName ?? message.streamName,
       };
       if (surfacedMessage.content.trim()) {
         appendTimelineItem(queryClient, sessionId, surfacedMessage, "input");
@@ -442,7 +442,7 @@ export function setupWsQueryBridge(deps: {
       // Try to upgrade the stub committed to cache by the message_end flush
       let upgraded = false;
       if (message.toolUseId) {
-        queryClient.setQueryData<ChatTimelineItem[]>(["pi-history", sessionId, "agent"], (old) => {
+        queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
           if (!old) return old;
           const idx = old.findIndex(
             (item) =>
@@ -552,8 +552,8 @@ export function setupWsQueryBridge(deps: {
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
       // Re-fetch stale data after reconnect
       queryClient.invalidateQueries({ queryKey: ["status"] });
-      queryClient.invalidateQueries({ queryKey: ["pi-history"] });
-      queryClient.invalidateQueries({ queryKey: ["pi-input-surface-timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["streams-history"] });
+      queryClient.invalidateQueries({ queryKey: ["surface-timeline"] });
       router.invalidate();
     }
   });

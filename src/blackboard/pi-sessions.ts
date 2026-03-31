@@ -24,7 +24,7 @@ type UpsertPiSessionInput = {
   startedAt: string;
   lastEventAt: string;
   lastPromptAt?: string;
-  workstreamId?: string;
+  streamId?: string;
 };
 
 export function reconcilePreviousPiSessions(
@@ -59,7 +59,7 @@ export function upsertPiSession(db: BlackboardDatabase, input: UpsertPiSessionIn
     started_at: input.startedAt,
     last_prompt_at: input.lastPromptAt,
     last_event_at: input.lastEventAt,
-    workstream_id: input.workstreamId,
+    workstream_id: input.streamId,
   });
 }
 

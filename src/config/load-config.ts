@@ -25,7 +25,7 @@ type RawConfigJson = {
   projectsDir?: string;
   projectRoot?: string;
   sourceRoot?: string;
-  wipeWorkstreamsOnStart?: boolean;
+  wipeStreamsOnStart?: boolean;
   whatsappEnabled?: boolean;
 };
 
@@ -51,7 +51,7 @@ export type AutonomaConfig = {
   controlSurfaceLogPath: string;
   controlSurfacePromptPath: string;
   projectsDir: string;
-  wipeWorkstreamsOnStart: boolean;
+  wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
 };
 
@@ -97,8 +97,8 @@ export function loadConfig(): AutonomaConfig {
   const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js");
   const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js");
   const projectsDir = expandHome(raw.projectsDir ?? "~/development");
-  const wipeWorkstreamsOnStart =
-    raw.wipeWorkstreamsOnStart ?? process.env.AUTONOMA_WIPE_WORKSTREAMS === "1";
+  const wipeStreamsOnStart =
+    raw.wipeStreamsOnStart ?? process.env.AUTONOMA_WIPE_STREAMS === "1";
   const whatsappEnabled =
     process.env.WHATSAPP_ENABLED !== undefined
       ? process.env.WHATSAPP_ENABLED !== "0" &&
@@ -125,7 +125,7 @@ export function loadConfig(): AutonomaConfig {
         ? configuredClaudeCliCommand
         : "claude --dangerously-skip-permissions",
     projectsDir,
-    wipeWorkstreamsOnStart,
+    wipeStreamsOnStart,
     whatsappEnabled,
 
     controlSurfaceDir,
@@ -163,7 +163,7 @@ export function loadConfig(): AutonomaConfig {
     whatsappDaemonPath: config.whatsappDaemonPath,
     claudeCliCommand: config.claudeCliCommand,
     projectsDir: config.projectsDir,
-    wipeWorkstreamsOnStart: config.wipeWorkstreamsOnStart,
+    wipeStreamsOnStart: config.wipeStreamsOnStart,
     whatsappEnabled: config.whatsappEnabled,
   };
 

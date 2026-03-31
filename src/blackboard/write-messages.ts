@@ -13,7 +13,7 @@ export type InsertMessageInput = {
   direction: UnifiedMessageDirection;
   content: string;
   sender?: string | null;
-  workstreamId?: string | null;
+  streamId?: string | null;
   piSessionId?: string | null;
   metadata?: MessageMetadata | null;
   createdAt?: string;
@@ -37,7 +37,7 @@ export function insertMessage(db: BlackboardDatabase, input: InsertMessageInput)
     input.direction,
     input.content,
     input.sender ?? null,
-    input.workstreamId ?? null,
+    input.streamId ?? null,
     input.piSessionId ?? null,
     metadataJson,
     createdAt,

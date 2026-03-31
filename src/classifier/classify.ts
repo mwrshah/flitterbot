@@ -3,13 +3,13 @@ import {
   getRecentConversationByWorkstream,
   getRecentDefaultConversation,
 } from "../blackboard/query-messages.ts";
-import { listOpenWorkstreams } from "../blackboard/query-workstreams.ts";
-import type { WorkstreamRow } from "../contracts/index.ts";
+import { listOpenStreams } from "../blackboard/query-streams.ts";
+import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompt } from "../prompts/classifier.ts";
 import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
 export type ClassificationResult = {
-  workstream: WorkstreamRow | null;
+  stream: StreamRow | null;
   action: "matched" | "none";
 };
 
@@ -19,20 +19,20 @@ export async function classifyMessage(
   apiKey: string,
   defaultPiSessionId?: string,
 ): Promise<ClassificationResult> {
-  const workstreams = listOpenWorkstreams(db);
+  const streams = listOpenStreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
   const defaultConversation = defaultPiSessionId
     ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
     : [];
   const prompt = buildClassificationPrompt(
     message,
-    workstreams,
+    streams,
     recentConversation,
     defaultConversation,
   );
   console.log(
-    "[router] classifying: %d open workstreams | message: %s",
-    workstreams.length,
+    "[router] classifying: %d open streams | message: %s",
+    streams.length,
     message.slice(0, 120),
   );
 
@@ -43,18 +43,18 @@ export async function classifyMessage(
     console.error(
       `[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return { workstream: null, action: "none" };
+    return { stream: null, action: "none" };
   }
 
-  // Try to match existing open workstream
+  // Try to match existing open stream
   if (result.workstream_id) {
-    const existing = workstreams.find((ws) => ws.id === result.workstream_id);
+    const existing = streams.find((ws) => ws.id === result.workstream_id);
     if (existing) {
-      return { workstream: existing, action: "matched" };
+      return { stream: existing, action: "matched" };
     }
     // LLM returned an id that doesn't exist — fall through to default
   }
 
-  // No match — default agent will handle (and may create a workstream via tool)
-  return { workstream: null, action: "none" };
+  // No match — default agent will handle (and may create a stream via tool)
+  return { stream: null, action: "none" };
 }

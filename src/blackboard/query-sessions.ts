@@ -72,7 +72,7 @@ function mapSessionRow(row: ClaudeSessionRow): SessionListItem {
     todoistTaskId: row.todoist_task_id,
     agentManaged: Boolean(row.agent_managed),
     sessionEndReason: row.session_end_reason,
-    workstreamId: row.workstream_id,
+    streamId: row.workstream_id,
     piSessionId: row.pi_session_id,
     startedAt: row.started_at,
     endedAt: row.ended_at,
@@ -327,7 +327,7 @@ export function getActiveManagedSessionsByPi(
   return rows.map(mapSessionRow);
 }
 
-interface ClaudeSessionWithWorkstreamRow extends ClaudeSessionRow {
+interface ClaudeSessionWithStreamRow extends ClaudeSessionRow {
   workstream_name: string | null;
 }
 
@@ -335,7 +335,7 @@ export function getSessionsByPiSessionId(
   db: BlackboardDatabase,
   piSessionId: string,
 ): DownstreamSessionItem[] {
-  const rows = db.all<ClaudeSessionWithWorkstreamRow>(
+  const rows = db.all<ClaudeSessionWithStreamRow>(
     `SELECT s.*, w.name AS workstream_name
        FROM sessions s
        LEFT JOIN workstreams w ON s.workstream_id = w.id
@@ -347,8 +347,8 @@ export function getSessionsByPiSessionId(
   return rows.map((row) => ({
     sessionId: row.session_id,
     status: row.status,
-    workstreamId: row.workstream_id,
-    workstreamName: row.workstream_name,
+    streamId: row.workstream_id,
+    streamName: row.workstream_name,
     tmuxSession: row.tmux_session,
     cwd: row.cwd ?? null,
     taskDescription: row.task_description ?? null,
