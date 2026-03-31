@@ -1,4 +1,5 @@
 import { Outlet } from "@tanstack/react-router";
+import { Suspense } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { Sidebar } from "./sidebar";
 
@@ -10,7 +11,11 @@ export function AppShell() {
       <Sidebar />
 
       <main className="flex flex-col min-h-0 overflow-hidden">
-        <Outlet />
+        {/* Suspense boundary required for useSuspenseQuery in child routes.
+            Loaders seed data via ensureQueryData so this won't suspend in normal flow. */}
+        <Suspense>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );
