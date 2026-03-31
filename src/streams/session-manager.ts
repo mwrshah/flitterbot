@@ -322,6 +322,8 @@ export class StreamSessionManager {
       managed.state,
       this.blackboard,
       this.wsHub,
+      managed.streamId,
+      managed.streamName,
     );
 
     // Re-initialize state with actual message count from the resumed session
@@ -505,6 +507,8 @@ export class StreamSessionManager {
       state,
       this.blackboard,
       this.wsHub,
+      streamId,
+      streamName,
     );
 
     return managed;
