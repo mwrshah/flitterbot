@@ -20,8 +20,8 @@ import {
 } from "./routes/browser-sessions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
 import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
-import { handleBrowserStreamSessionStreamRoute } from "./routes/browser-stream-session-stream.ts";
-import { handleBrowserStreamSessionsRoute } from "./routes/browser-stream-sessions.ts";
+import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
+import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
@@ -31,7 +31,7 @@ import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
-import { handleStreamSessionInterruptRoute } from "./routes/stream-session-interrupt.ts";
+import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
 import { ControlSurfaceRuntime } from "./runtime.ts";
 
 const runtime = new ControlSurfaceRuntime();
@@ -168,21 +168,21 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (
     method === "GET" &&
     segments[0] === "api" &&
-    segments[1] === "stream-sessions" &&
+    segments[1] === "pi-sessions" &&
     segments[2] &&
     segments[3] === "sessions"
   ) {
-    return handleBrowserStreamSessionsRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handleBrowserPiSessionsRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "GET" &&
     segments[0] === "api" &&
-    segments[1] === "stream-sessions" &&
+    segments[1] === "pi-sessions" &&
     segments[2] &&
     segments[3] === "stream" &&
     !segments[4]
   ) {
-    return handleBrowserStreamSessionStreamRoute(
+    return handleBrowserPiSessionStreamRoute(
       runtime,
       req,
       res,
@@ -195,11 +195,11 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (
     method === "POST" &&
     segments[0] === "api" &&
-    segments[1] === "stream-sessions" &&
+    segments[1] === "pi-sessions" &&
     segments[2] &&
     segments[3] === "interrupt"
   ) {
-    return handleStreamSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "POST" &&

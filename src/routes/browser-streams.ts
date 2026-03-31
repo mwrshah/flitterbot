@@ -1,7 +1,7 @@
 import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
 import {
-  getLatestStreamSessionId,
+  getLatestPiSessionId,
   listRecentlyClosedStreams,
 } from "../blackboard/query-streams.ts";
 import type {
@@ -19,16 +19,16 @@ async function readSessionHistory(
   historyMode: "input" | "agent",
 ): Promise<ChatTimelineItem[]> {
   const snapshot = managed.state.getSnapshot();
-  if (!snapshot.sessionId) return [];
+  if (!snapshot.piSessionId) return [];
 
   let items: ChatTimelineItem[];
 
   if (
-    managed.session?.sessionId === snapshot.sessionId &&
+    managed.session?.sessionId === snapshot.piSessionId &&
     Array.isArray(managed.session.messages)
   ) {
     const body = readStreamsHistoryFromMessages(
-      snapshot.sessionId,
+      snapshot.piSessionId,
       snapshot.sessionFile ?? null,
       managed.session.messages,
       historyMode,
@@ -37,7 +37,7 @@ async function readSessionHistory(
       items = body.items;
     } else if (snapshot.sessionFile) {
       const fileBody = await readStreamsHistory(
-        snapshot.sessionId,
+        snapshot.piSessionId,
         snapshot.sessionFile,
         historyMode,
       );
@@ -46,7 +46,7 @@ async function readSessionHistory(
       return [];
     }
   } else if (snapshot.sessionFile) {
-    const body = await readStreamsHistory(snapshot.sessionId, snapshot.sessionFile, historyMode);
+    const body = await readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
     items = body.items;
   } else {
     return [];
@@ -71,20 +71,20 @@ export async function handleBrowserStreamsHistoryRoute(
 ) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
-  const streamSessionId = url.searchParams.get("streamSessionId");
+  const piSessionId = url.searchParams.get("piSessionId");
 
   try {
     return await handleBrowserStreamsHistoryRouteInner(
       runtime,
       response,
       historyMode,
-      streamSessionId,
+      piSessionId,
     );
   } catch (err) {
-    const ctx = streamSessionId ? `streamSessionId=${streamSessionId}` : "aggregated";
+    const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
     const body: StreamsHistoryResponse = {
-      sessionId: streamSessionId,
+      piSessionId: piSessionId,
       sessionFile: null,
       items: [],
     };
@@ -96,25 +96,25 @@ async function handleBrowserStreamsHistoryRouteInner(
   runtime: ControlSurfaceRuntime,
   response: http.ServerResponse,
   historyMode: "input" | "agent",
-  streamSessionId: string | null,
+  piSessionId: string | null,
 ) {
   // Surface with no specific session — read from the messages table
-  if (historyMode === "input" && !streamSessionId) {
-    // Collect all relevant stream_session_ids: default + active orchestrators + recently-closed streams
-    const streamSessionIds: string[] = [];
-    const defaultStreamSessionId = runtime.sessionManager.getDefault()?.streamSessionId;
-    if (defaultStreamSessionId) streamSessionIds.push(defaultStreamSessionId);
+  if (historyMode === "input" && !piSessionId) {
+    // Collect all relevant pi_session_ids: default + active orchestrators + recently-closed streams
+    const piSessionIds: string[] = [];
+    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
+    if (defaultPiSessionId) piSessionIds.push(defaultPiSessionId);
     for (const orch of runtime.sessionManager.listOrchestrators()) {
-      if (orch.streamSessionId) streamSessionIds.push(orch.streamSessionId);
+      if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
-    // Include closed streams (24h) — look up their stream_session_ids
+    // Include closed streams (24h) — look up their pi_session_ids
     const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
     for (const ws of closedStreams) {
-      const wsSessionId = getLatestStreamSessionId(runtime.blackboard, ws.id);
-      if (wsSessionId && !streamSessionIds.includes(wsSessionId))
-        streamSessionIds.push(wsSessionId);
+      const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
+      if (wsSessionId && !piSessionIds.includes(wsSessionId))
+        piSessionIds.push(wsSessionId);
     }
-    const rows = getInputSurfaceHistory(runtime.blackboard, streamSessionIds);
+    const rows = getInputSurfaceHistory(runtime.blackboard, piSessionIds);
     const items: ChatTimelineItem[] = rows.map(
       (row): ChatTimelineMessage => ({
         id: row.id,
@@ -128,26 +128,26 @@ async function handleBrowserStreamsHistoryRouteInner(
       }),
     );
 
-    const body: StreamsHistoryResponse = { sessionId: null, sessionFile: null, items };
+    const body: StreamsHistoryResponse = { piSessionId: null, sessionFile: null, items };
     return sendJson(response, 200, body);
   }
 
   // Specific session or agent mode — existing single-session path
-  const targetSession = streamSessionId
-    ? runtime.sessionManager.getByStreamSessionId(streamSessionId)
+  const targetSession = piSessionId
+    ? runtime.sessionManager.getByPiSessionId(piSessionId)
     : runtime.sessionManager.getDefault();
 
   if (!targetSession) {
     // Session not in memory — fall back to reading history from disk (e.g. closed streams)
-    if (streamSessionId) {
+    if (piSessionId) {
       const row = runtime.blackboard
-        .prepare("SELECT session_file FROM stream_sessions WHERE stream_session_id = ?")
-        .get(streamSessionId) as { session_file: string | null } | undefined;
+        .prepare("SELECT session_file FROM stream_sessions WHERE pi_session_id = ?")
+        .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
-        const diskBody = await readStreamsHistory(streamSessionId, row.session_file, historyMode);
+        const diskBody = await readStreamsHistory(piSessionId, row.session_file, historyMode);
         if (diskBody.items.length > 0) {
           const body: StreamsHistoryResponse = {
-            sessionId: streamSessionId,
+            piSessionId: piSessionId,
             sessionFile: row.session_file,
             items: diskBody.items,
           };
@@ -155,15 +155,15 @@ async function handleBrowserStreamsHistoryRouteInner(
         }
         // DB row exists but file missing or empty — stale session from a previous runtime
         console.warn(
-          "streams-history: session in DB but no history on disk (streamSessionId=%s, file=%s)",
-          streamSessionId,
+          "streams-history: session in DB but no history on disk (piSessionId=%s, file=%s)",
+          piSessionId,
           row.session_file,
         );
       }
     }
     console.warn(
-      "streams-history: session not found (streamSessionId=%s, mode=%s)",
-      streamSessionId ?? "none",
+      "streams-history: session not found (piSessionId=%s, mode=%s)",
+      piSessionId ?? "none",
       historyMode,
     );
     return sendJson(response, 404, { error: "Session not found" });
@@ -179,7 +179,7 @@ async function handleBrowserStreamsHistoryRouteInner(
   }
   const snapshot = targetSession.state.getSnapshot();
   const body: StreamsHistoryResponse = {
-    sessionId: snapshot.sessionId ?? null,
+    piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,
     items,
   };

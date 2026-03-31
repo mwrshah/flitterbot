@@ -23,7 +23,7 @@ const MODES: Record<string, string> = {
            p.role AS pi_role, p.status AS pi_status,
            w.name AS stream_name
     FROM sessions s
-    LEFT JOIN stream_sessions p ON s.stream_session_id = p.stream_session_id
+    LEFT JOIN pi_sessions p ON s.pi_session_id = p.pi_session_id
     LEFT JOIN streams w ON s.stream_id = w.id
     ORDER BY s.started_at DESC
     LIMIT 20`,
@@ -54,12 +54,12 @@ sessions
   transcript_path TEXT, task_description TEXT, todoist_task_id TEXT,
   agent_managed BOOLEAN, session_end_reason TEXT,
   stream_id TEXT FK→streams.id,
-  stream_session_id TEXT FK→stream_sessions.stream_session_id,
+  pi_session_id TEXT FK→pi_sessions.pi_session_id,
   started_at DATETIME (NOT "created_at"), ended_at DATETIME,
   last_event_at DATETIME, last_tool_started_at DATETIME
 
-stream_sessions
-  stream_session_id TEXT PK, role TEXT, status TEXT ('active'|'waiting_for_user'|'waiting_for_sessions'|'ended'|'crashed'),
+pi_sessions
+  pi_session_id TEXT PK, role TEXT, status TEXT ('active'|'waiting_for_user'|'waiting_for_sessions'|'ended'|'crashed'),
   runtime_instance_id TEXT, pid INTEGER, session_file TEXT, cwd TEXT,
   agent_dir TEXT, model_provider TEXT, model_id TEXT, thinking_level TEXT,
   started_at DATETIME, last_prompt_at DATETIME, last_event_at DATETIME,
@@ -77,7 +77,7 @@ messages
   id TEXT PK, source TEXT ('whatsapp'|'web'|'hook'|'cron'|'init'|'agent'|'stream_outbound'),
   direction TEXT ('inbound'|'outbound'), content TEXT, sender TEXT,
   stream_id TEXT FK→streams.id, metadata TEXT, created_at DATETIME,
-  stream_session_id TEXT FK→stream_sessions.stream_session_id
+  pi_session_id TEXT FK→pi_sessions.pi_session_id
 
 health_flags
   flag TEXT PK, reason TEXT, set_at DATETIME, expires_at DATETIME, cleared_at DATETIME
@@ -89,23 +89,23 @@ whatsapp_messages
   created_at DATETIME, processed_at DATETIME
 
 message_id_map
-  server_id TEXT PK, agent_id TEXT, stream_session_id TEXT, created_at DATETIME
+  server_id TEXT PK, agent_id TEXT, pi_session_id TEXT, created_at DATETIME
 
 schema_migrations
   version INTEGER PK, applied_at DATETIME
 
 KEY RELATIONSHIPS:
   sessions.stream_id → streams.id
-  sessions.stream_session_id → stream_sessions.stream_session_id
-  stream_sessions.stream_id → streams.id
+  sessions.pi_session_id → pi_sessions.pi_session_id
+  pi_sessions.stream_id → streams.id
   messages.stream_id → streams.id
-  messages.stream_session_id → stream_sessions.stream_session_id
+  messages.pi_session_id → pi_sessions.pi_session_id
 
 COMMON GOTCHAS:
   - sessions PK is "session_id", NOT "id"
   - sessions uses "started_at", NOT "created_at"
   - streams has no "session_id" column; join via sessions.stream_id
-  - stream_sessions PK is "stream_session_id", NOT "id"
+  - pi_sessions PK is "pi_session_id", NOT "id"
 
 PARAMETERS:
   - sql: raw SELECT or PRAGMA statement (required when mode is omitted)
