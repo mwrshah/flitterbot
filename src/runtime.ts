@@ -273,9 +273,12 @@ export class ControlSurfaceRuntime {
     try {
       const source = item.source as "whatsapp" | "web" | "cron";
       const streamId = (input.metadata?.stream_id as string) ?? undefined;
-      const streamSessionId = streamId
-        ? this.sessionManager.getByStream(streamId)?.streamSessionId
-        : this.sessionManager.getDefault()?.streamSessionId;
+      const targetSessionId = (input.metadata?._targetSessionId as string) ?? undefined;
+      const streamSessionId = targetSessionId
+        ? targetSessionId
+        : streamId
+          ? this.sessionManager.getByStream(streamId)?.streamSessionId
+          : this.sessionManager.getDefault()?.streamSessionId;
       persistInboundMessage(this.blackboard, {
         id: messageUuid,
         source,
@@ -1571,6 +1574,11 @@ export class ControlSurfaceRuntime {
       let routerMeta: StreamRoutingMeta = {};
       if (targetSessionId) {
         routerMeta._targetSessionId = targetSessionId;
+        const targetSession = this.sessionManager.getByStreamSessionId(targetSessionId);
+        if (targetSession?.streamId) {
+          routerMeta.stream_id = targetSession.streamId;
+          routerMeta.stream_name = targetSession.streamName ?? undefined;
+        }
       } else {
         try {
           const { classifyMessage } = await import("./classifier/classify.ts");
