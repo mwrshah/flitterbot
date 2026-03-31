@@ -390,13 +390,6 @@ const surfaceMeasurementStore = (() => {
         performance.now() - frameStart >= MEASUREMENT_FRAME_BUDGET_MS
       ) {
         if (processingIndex >= processingPriorityCount) {
-          const durationMs = performance.now() - frameStart;
-          console.log(
-            "[surface] measurement flush priority duration=%dms entries=%d/%d",
-            Math.round(durationMs),
-            processingIndex - startIndex,
-            processingOrder.length,
-          );
           snapshot = {
             signature: processingSignature,
             entries: processingResults.slice(),
@@ -413,13 +406,6 @@ const surfaceMeasurementStore = (() => {
       return;
     }
 
-    const durationMs = performance.now() - frameStart;
-    console.log(
-      "[surface] measurement flush complete duration=%dms entries=%d/%d",
-      Math.round(durationMs),
-      processingIndex - startIndex,
-      processingOrder.length,
-    );
     snapshot = {
       signature: processingSignature,
       entries: processingResults.slice(),
