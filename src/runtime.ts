@@ -6,12 +6,6 @@ import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
-import {
-  getLastDatetimeReportedAt,
-  touchDatetimeReportedAt,
-  touchStreamsPrompt,
-  updateStreamsSessionStatus,
-} from "./blackboard/streams-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
 import {
@@ -30,6 +24,12 @@ import {
   listRecentlyClosedStreams,
   resetAllStreams,
 } from "./blackboard/query-streams.ts";
+import {
+  getLastDatetimeReportedAt,
+  touchDatetimeReportedAt,
+  touchStreamsPrompt,
+  updateStreamsSessionStatus,
+} from "./blackboard/streams-sessions.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
@@ -53,10 +53,10 @@ import type {
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
+import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { type ManagedStreamsSession, StreamsSessionManager } from "./streams/session-manager.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
-import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -351,11 +351,7 @@ export class ControlSurfaceRuntime {
         "streamsSessionId",
         "AUTONOMA_STREAMS_SESSION_ID",
       ]);
-      let streamIdValue = pickString(payload, [
-        "stream_id",
-        "streamId",
-        "AUTONOMA_STREAM_ID",
-      ]);
+      let streamIdValue = pickString(payload, ["stream_id", "streamId", "AUTONOMA_STREAM_ID"]);
       if (cwd && !streamsSessionIdValue && !streamIdValue) {
         const openStreams = listOpenStreams(this.blackboard);
         const matchingStream = openStreams.find(
@@ -770,7 +766,9 @@ export class ControlSurfaceRuntime {
       const assistantMsg = lastMsg as AssistantMessage;
       if (assistantMsg.stopReason === "error") {
         this.log(`queue item ${item.id} API error: ${assistantMsg.errorMessage ?? "unknown"}`);
-        throw new Error(`Streams API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`);
+        throw new Error(
+          `Streams API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`,
+        );
       }
     }
 
@@ -786,8 +784,7 @@ export class ControlSurfaceRuntime {
 
       // Persist outbound with resolved server UUID (when available)
       try {
-        const streamId =
-          managed.streamId ?? (item.metadata?.stream_id as string) ?? undefined;
+        const streamId = managed.streamId ?? (item.metadata?.stream_id as string) ?? undefined;
         persistOutboundMessage(this.blackboard, {
           id: finalMessageId,
           source: "pi_outbound",
@@ -881,9 +878,7 @@ export class ControlSurfaceRuntime {
   }
 
   async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {
-    const { reopenStream, getStreamById } = await import(
-      "./blackboard/query-streams.ts"
-    );
+    const { reopenStream, getStreamById } = await import("./blackboard/query-streams.ts");
 
     const ws = getStreamById(this.blackboard, streamId);
     if (!ws) throw new Error("Stream not found");
@@ -891,9 +886,7 @@ export class ControlSurfaceRuntime {
 
     // 1. Reopen the stream and clear stale worktree_path
     reopenStream(this.blackboard, streamId);
-    this.blackboard
-      .prepare(`UPDATE streams SET worktree_path = NULL WHERE id = ?`)
-      .run(streamId);
+    this.blackboard.prepare(`UPDATE streams SET worktree_path = NULL WHERE id = ?`).run(streamId);
 
     // 2. Revive the streams session: clear ended_at/end_reason, set status back to waiting_for_user
     const streamsRow = this.blackboard.get<{
@@ -1299,7 +1292,8 @@ export class ControlSurfaceRuntime {
             update_worktree_path,
           );
           if (result.ok) {
-            const worktreeStreamsSessionId = this.sessionManager.getByStream(stream_id)?.streamsSessionId;
+            const worktreeStreamsSessionId =
+              this.sessionManager.getByStream(stream_id)?.streamsSessionId;
             if (worktreeStreamsSessionId) {
               this.wsHub.broadcast({
                 type: "worktree_changed",
@@ -1337,7 +1331,9 @@ export class ControlSurfaceRuntime {
             stream_id: string;
             mode: "merge" | "noop";
           };
-          const managed = closeStreamId ? this.sessionManager.getByStream(closeStreamId) : undefined;
+          const managed = closeStreamId
+            ? this.sessionManager.getByStream(closeStreamId)
+            : undefined;
           const streamsSessId = managed?.streamsSessionId;
           if (!streamsSessId) {
             return {
@@ -1345,12 +1341,7 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseStream(
-            this.blackboard,
-            streamsSessId,
-            stream_id,
-            mode,
-          );
+          const result = await executeCloseStream(this.blackboard, streamsSessId, stream_id, mode);
           if (result.ok) {
             this.wsHub.broadcast({
               type: "streams_changed",

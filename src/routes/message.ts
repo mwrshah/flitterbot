@@ -62,7 +62,12 @@ async function routeMessage(
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
     const defaultStreamsSessionId = runtime.sessionManager.getDefault()?.streamsSessionId;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultStreamsSessionId);
+    const result = await classifyMessage(
+      rawText,
+      runtime.blackboard,
+      apiKey,
+      defaultStreamsSessionId,
+    );
     const meta: StreamRoutingMeta = {
       router_action: result.action,
     };

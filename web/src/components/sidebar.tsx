@@ -55,9 +55,7 @@ export const Sidebar = memo(function Sidebar() {
   const status = statusQuery.data;
   const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
-  const closedStreams = allStreams.filter(
-    (ws: StreamSummary) => ws.status === "closed",
-  );
+  const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">

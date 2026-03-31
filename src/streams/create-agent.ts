@@ -119,7 +119,11 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   };
 }
 
-function resolveSystemPrompt(role: StreamsRole, streamsSessionId: string, ctx?: OrchestratorInput): string {
+function resolveSystemPrompt(
+  role: StreamsRole,
+  streamsSessionId: string,
+  ctx?: OrchestratorInput,
+): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
     return buildOrchestratorPrompt({ ...ctx, streamsSessionId });

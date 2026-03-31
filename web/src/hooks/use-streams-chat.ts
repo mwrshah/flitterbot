@@ -3,9 +3,9 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useSyncExternalStore } from "react";
 import {
   connectionStateQueryOptions,
-  streamsHistoryQueryOptions,
   statusPillsQueryOptions,
   statusQueryOptions,
+  streamsHistoryQueryOptions,
 } from "~/lib/queries";
 import type { ChatTimelineItem, ConnectionState, ImageAttachment } from "~/lib/types";
 
@@ -38,7 +38,8 @@ export function useStreamsChat(sessionId: string | undefined, loaderHistory: Cha
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
     if (!sessionId || !status?.streamsAgent) return false;
-    if (status.streamsAgent.default?.sessionId === sessionId) return !!status.streamsAgent.default.busy;
+    if (status.streamsAgent.default?.sessionId === sessionId)
+      return !!status.streamsAgent.default.busy;
     return !!status.streamsAgent.orchestrators?.find((o) => o.sessionId === sessionId)?.busy;
   })();
 

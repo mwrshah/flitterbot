@@ -1,7 +1,10 @@
 import type { StreamsRuntimeStatus } from "../contracts/index.ts";
 import type { QueueItem } from "./turn-queue.ts";
 
-type StreamsRuntimeSnapshot = Omit<StreamsRuntimeStatus, "sessionId" | "sessionFile" | "lastPromptAt"> & {
+type StreamsRuntimeSnapshot = Omit<
+  StreamsRuntimeStatus,
+  "sessionId" | "sessionFile" | "lastPromptAt"
+> & {
   sessionId?: string;
   sessionFile?: string;
   lastPromptAt?: string;

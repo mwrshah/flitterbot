@@ -250,7 +250,10 @@ function keepOnlySurfaced(items: ChatTimelineItem[]): ChatTimelineItem[] {
     .map(stripThinkingFromMessage);
 }
 
-function shapeHistoryItems(items: ChatTimelineItem[], mode: StreamsHistoryMode): ChatTimelineItem[] {
+function shapeHistoryItems(
+  items: ChatTimelineItem[],
+  mode: StreamsHistoryMode,
+): ChatTimelineItem[] {
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 

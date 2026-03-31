@@ -162,13 +162,7 @@ export class StreamsSessionManager {
       created.session.messages.length,
     );
 
-    const managed = this.buildManagedSession(
-      created,
-      state,
-      "orchestrator",
-      streamId,
-      streamName,
-    );
+    const managed = this.buildManagedSession(created, state, "orchestrator", streamId, streamName);
 
     upsertStreamsSession(this.blackboard, {
       streamsSessionId: created.session.sessionId,
@@ -300,7 +294,10 @@ export class StreamsSessionManager {
    * resumes from the existing JSONL session_file. Called lazily when the first
    * message arrives for a rehydrated stream.
    */
-  async activateOrchestrator(managed: ManagedStreamsSession, customTools?: unknown[]): Promise<void> {
+  async activateOrchestrator(
+    managed: ManagedStreamsSession,
+    customTools?: unknown[],
+  ): Promise<void> {
     if (managed.session) return; // already active
     if (!managed.streamId) throw new Error("Cannot activate non-stream session");
 
@@ -360,14 +357,18 @@ export class StreamsSessionManager {
     // query finds it on next restart. Only permanently end on crash or explicit close.
     if (reason !== "shutdown") {
       const status = reason === "crashed" ? "crashed" : "ended";
-      endStreamsSession(this.blackboard, managed.streamsSessionId, status, reason, new Date().toISOString());
+      endStreamsSession(
+        this.blackboard,
+        managed.streamsSessionId,
+        status,
+        reason,
+        new Date().toISOString(),
+      );
     }
 
     this.orchestrators.delete(streamId);
     this.byStreamsSessionId.delete(managed.streamsSessionId);
-    this.log(
-      `orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`,
-    );
+    this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
   }
 
   disposeAll(): void {
@@ -419,7 +420,9 @@ export class StreamsSessionManager {
   ): void {
     const { skillNames, agentsFilePaths } = info;
     if (skillNames.length > 0) {
-      this.log(`streams-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`);
+      this.log(
+        `streams-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`,
+      );
     } else {
       this.log(`streams-agent (${role}): no skills loaded`);
     }
@@ -497,7 +500,12 @@ export class StreamsSessionManager {
       },
     });
 
-    managed.unsubscribe = subscribeToStreamsSession(created.session, state, this.blackboard, this.wsHub);
+    managed.unsubscribe = subscribeToStreamsSession(
+      created.session,
+      state,
+      this.blackboard,
+      this.wsHub,
+    );
 
     return managed;
   }

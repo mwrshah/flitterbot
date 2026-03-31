@@ -5,10 +5,10 @@ import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
 import {
+  statusQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsHistoryQueryOptions,
   streamsWorktreeQueryOptions,
-  statusQueryOptions,
 } from "~/lib/queries";
 
 export const Route = createFileRoute("/streams/$sessionId")({
@@ -60,10 +60,8 @@ function StreamsSessionRoute() {
   const stream = status?.streams?.find((ws) => ws.streamsSessionId === sessionId);
   const isStreamClosed = stream?.status === "closed";
 
-  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } = useStreamsChat(
-    sessionId,
-    history,
-  );
+  const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
+    useStreamsChat(sessionId, history);
 
   return (
     <PanelGroup orientation="horizontal" className="h-full">

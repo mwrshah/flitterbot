@@ -157,8 +157,9 @@ const StreamsRouteRouteChildren: StreamsRouteRouteChildren = {
   StreamsIndexRoute: StreamsIndexRoute,
 }
 
-const StreamsRouteRouteWithChildren =
-  StreamsRouteRoute._addFileChildren(StreamsRouteRouteChildren)
+const StreamsRouteRouteWithChildren = StreamsRouteRoute._addFileChildren(
+  StreamsRouteRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,

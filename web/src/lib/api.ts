@@ -1,12 +1,12 @@
 import type {
   DirectMessageResponse,
   DirectoryCompletionsResponse,
-  StreamsHistoryResponse,
   SendMessageResponse,
   SessionDetailResponse,
   SessionListResponse,
   SkillsListResponse,
   StatusResponse,
+  StreamsHistoryResponse,
   TranscriptPage,
 } from "./types";
 
@@ -72,7 +72,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
       if (surface) params.set("surface", surface);
       if (streamsSessionId) params.set("streamsSessionId", streamsSessionId);
       const qs = params.toString();
-      return request<StreamsHistoryResponse>(qs ? `/api/streams/history?${qs}` : "/api/streams/history");
+      return request<StreamsHistoryResponse>(
+        qs ? `/api/streams/history?${qs}` : "/api/streams/history",
+      );
     },
 
     startWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),
@@ -80,7 +82,9 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
     stopWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/stop", { method: "POST" }),
 
     interruptStreamsSession: (streamsSessionId: string) =>
-      request<{ ok: boolean }>(`/api/stream-sessions/${streamsSessionId}/interrupt`, { method: "POST" }),
+      request<{ ok: boolean }>(`/api/stream-sessions/${streamsSessionId}/interrupt`, {
+        method: "POST",
+      }),
 
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),

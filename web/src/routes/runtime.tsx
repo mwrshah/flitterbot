@@ -65,8 +65,15 @@ function RuntimePage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
-                <MetaItem label="Session ID" value={status.streamsAgent?.default?.sessionId ?? ""} mono />
-                <MetaItem label="Messages" value={String(status.streamsAgent?.default?.messageCount ?? 0)} />
+                <MetaItem
+                  label="Session ID"
+                  value={status.streamsAgent?.default?.sessionId ?? ""}
+                  mono
+                />
+                <MetaItem
+                  label="Messages"
+                  value={String(status.streamsAgent?.default?.messageCount ?? 0)}
+                />
               </div>
             </CardContent>
           </Card>

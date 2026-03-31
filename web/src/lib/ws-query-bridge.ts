@@ -442,21 +442,24 @@ export function setupWsQueryBridge(deps: {
       // Try to upgrade the stub committed to cache by the message_end flush
       let upgraded = false;
       if (message.toolUseId) {
-        queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
-          if (!old) return old;
-          const idx = old.findIndex(
-            (item) =>
-              item.kind === "tool" &&
-              (item as ChatTimelineTool).toolUseId === message.toolUseId &&
-              (item as ChatTimelineTool).phase === "start" &&
-              (item as ChatTimelineTool).args == null,
-          );
-          if (idx < 0) return old;
-          upgraded = true;
-          const items = [...old];
-          items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
-          return items;
-        });
+        queryClient.setQueryData<ChatTimelineItem[]>(
+          ["streams-history", sessionId, "agent"],
+          (old) => {
+            if (!old) return old;
+            const idx = old.findIndex(
+              (item) =>
+                item.kind === "tool" &&
+                (item as ChatTimelineTool).toolUseId === message.toolUseId &&
+                (item as ChatTimelineTool).phase === "start" &&
+                (item as ChatTimelineTool).args == null,
+            );
+            if (idx < 0) return old;
+            upgraded = true;
+            const items = [...old];
+            items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
+            return items;
+          },
+        );
       }
 
       // Fallback: no pending item (e.g. reconnect) — append fresh
