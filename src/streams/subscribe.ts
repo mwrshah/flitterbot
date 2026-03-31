@@ -1,5 +1,5 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { touchStreamsEvent } from "../blackboard/streams-sessions.ts";
+import { touchStreamsEvent } from "../blackboard/stream-sessions.ts";
 import type {
   ChatTimelineMessage,
   ControlSurfaceWebSocketServerEvent,
@@ -14,9 +14,9 @@ import type {
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import type { StreamsSessionState } from "./session-state.ts";
+import type { StreamSessionState } from "./session-state.ts";
 
-type StreamsSessionSubscriptionEvent =
+type StreamSessionSubscriptionEvent =
   | {
       type: "message_start";
       message?: unknown;
@@ -95,10 +95,10 @@ type StreamsSessionSubscriptionEvent =
       [key: string]: unknown;
     };
 
-type SubscribableStreamsSession = {
+type SubscribableStreamSession = {
   sessionId: string;
   messages: Array<unknown>;
-  subscribe: (listener: (event: StreamsSessionSubscriptionEvent) => void) => () => void;
+  subscribe: (listener: (event: StreamSessionSubscriptionEvent) => void) => () => void;
 };
 
 /**
@@ -205,9 +205,9 @@ function extractTimestamp(message: unknown, fallback: string): string {
   return fallback;
 }
 
-export function subscribeToStreamsSession(
-  session: SubscribableStreamsSession,
-  state: StreamsSessionState,
+export function subscribeToStreamSession(
+  session: SubscribableStreamSession,
+  state: StreamSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
 ): () => void {

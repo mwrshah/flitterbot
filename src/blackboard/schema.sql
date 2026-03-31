@@ -1,4 +1,4 @@
--- Autonoma blackboard schema (v13)
+-- Autonoma blackboard schema (v17)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -37,15 +37,15 @@ CREATE TABLE IF NOT EXISTS sessions (
     agent_managed BOOLEAN DEFAULT 0,
     session_end_reason TEXT,
     stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
-    pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
+    stream_session_id TEXT REFERENCES stream_sessions(stream_session_id) ON DELETE SET NULL,
     started_at DATETIME NOT NULL,
     ended_at DATETIME,
     last_event_at DATETIME NOT NULL,
     last_tool_started_at DATETIME
 );
 
-CREATE TABLE IF NOT EXISTS pi_sessions (
-    pi_session_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS stream_sessions (
+    stream_session_id TEXT PRIMARY KEY,
     role TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active'
       CHECK (status IN ('active', 'waiting_for_user', 'waiting_for_sessions', 'ended', 'crashed')),
@@ -62,10 +62,11 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     last_event_at DATETIME NOT NULL,
     ended_at DATETIME,
     end_reason TEXT,
-    stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL
+    stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
+    last_datetime_reported_at DATETIME
 );
 
-CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_stream ON stream_sessions(stream_id);
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,12 +84,12 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
-    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'pi_outbound')),
+    source TEXT NOT NULL CHECK (source IN ('whatsapp', 'web', 'hook', 'cron', 'init', 'agent', 'stream_outbound')),
     direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     content TEXT NOT NULL,
     sender TEXT,
     stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
-    pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL,
+    stream_session_id TEXT REFERENCES stream_sessions(stream_session_id) ON DELETE SET NULL,
     metadata TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
@@ -96,7 +97,7 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS message_id_map (
     server_id TEXT PRIMARY KEY,
     agent_id TEXT,
-    pi_session_id TEXT,
+    stream_session_id TEXT,
     created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_message_id_map_agent ON message_id_map(agent_id);
@@ -128,14 +129,14 @@ CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
 CREATE INDEX IF NOT EXISTS idx_sessions_last_event_at ON sessions(last_event_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_stream ON sessions(stream_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_stream_session ON sessions(stream_session_id);
 CREATE INDEX IF NOT EXISTS idx_streams_name ON streams(name);
-CREATE INDEX IF NOT EXISTS idx_pi_sessions_status ON pi_sessions(status);
-CREATE INDEX IF NOT EXISTS idx_pi_sessions_role_status ON pi_sessions(role, status);
-CREATE INDEX IF NOT EXISTS idx_pi_sessions_last_event_at ON pi_sessions(last_event_at);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_status ON stream_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_role_status ON stream_sessions(role, status);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_last_event_at ON stream_sessions(last_event_at);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_status_created ON whatsapp_messages(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_pending_actions_status_created ON pending_actions(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
-CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
+CREATE INDEX IF NOT EXISTS idx_messages_stream_session ON messages(stream_session_id);

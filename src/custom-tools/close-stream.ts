@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
-import { endStreamsSession } from "../blackboard/streams-sessions.ts";
+import { endStreamSession } from "../blackboard/stream-sessions.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
 
 const execPromise = promisify(cpExec);
@@ -159,7 +159,7 @@ async function pushMain(repoPath: string): Promise<boolean> {
 
 export async function executeCloseStream(
   blackboard: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
   streamId: string,
   mode: "merge" | "noop",
   mergeCommitMessage?: string,
@@ -233,7 +233,7 @@ export async function executeCloseStream(
 
   // Step 2: Close stream and end Pi session (worktree left on disk)
   closeStream(blackboard, streamId);
-  endStreamsSession(blackboard, streamsSessionId, "ended", "stream_closed");
+  endStreamSession(blackboard, streamSessionId, "ended", "stream_closed");
 
   const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
@@ -250,7 +250,7 @@ export async function executeCloseStream(
   };
 }
 
-export function createCloseStreamTool(blackboard: BlackboardDatabase, streamsSessionId: string) {
+export function createCloseStreamTool(blackboard: BlackboardDatabase, streamSessionId: string) {
   return {
     name: "close_stream",
     label: "Close Stream",
@@ -281,7 +281,7 @@ export function createCloseStreamTool(blackboard: BlackboardDatabase, streamsSes
     ) => {
       const result = await executeCloseStream(
         blackboard,
-        streamsSessionId,
+        streamSessionId,
         params.stream_id,
         params.mode,
         params.merge_commit_message,

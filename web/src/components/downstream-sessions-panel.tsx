@@ -53,18 +53,18 @@ function sessionDescription(session: DownstreamSessionItem): string {
 }
 
 export function DownstreamSessionsPanel({
-  streamsSessionId,
+  streamSessionId,
 }: {
-  streamsSessionId: string | undefined;
+  streamSessionId: string | undefined;
 }) {
   const { data, isPending, isError } = useQuery(
-    streamsDownstreamSessionsQueryOptions(streamsSessionId ?? ""),
+    streamsDownstreamSessionsQueryOptions(streamSessionId ?? ""),
   );
 
-  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(streamsSessionId ?? ""));
+  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(streamSessionId ?? ""));
   const worktree = worktreeQuery.data;
 
-  if (!streamsSessionId) {
+  if (!streamSessionId) {
     return (
       <div className="flex flex-col h-full border-l border-border bg-background">
         <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">

@@ -99,7 +99,7 @@ export type StatusResponse = {
     pid?: number;
     managedByControlSurface?: boolean;
   };
-  streamsAgent?: {
+  streamAgent?: {
     default?: {
       sessionId?: string;
       busy?: boolean;
@@ -126,7 +126,7 @@ export type StreamSummary = {
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
-  streamsSessionId?: string;
+  streamSessionId?: string;
   sessionCount: number;
   createdAt: string;
 };
@@ -148,7 +148,7 @@ export type DownstreamSessionItem = {
   project: string | null;
 };
 
-export type StreamsSessionsListResponse = {
+export type StreamSessionsListResponse = {
   items: DownstreamSessionItem[];
 };
 
@@ -256,12 +256,12 @@ export type WsMessage =
   | {
       type: "sessions_changed";
       sessionId: string;
-      streamsSessionId: string;
+      streamSessionId: string;
       reason: "registered" | "ended" | "stopped";
     }
   | {
       type: "worktree_changed";
-      streamsSessionId: string;
+      streamSessionId: string;
       streamId: string;
     }
   | { type: "error"; message: string };

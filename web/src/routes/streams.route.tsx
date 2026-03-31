@@ -30,8 +30,8 @@ function StreamsLayoutRoute() {
     retry: 1,
   });
 
-  const allOrchestrators = statusQuery.data?.streamsAgent?.orchestrators ?? [];
-  const defaultStreams = statusQuery.data?.streamsAgent?.default;
+  const allOrchestrators = statusQuery.data?.streamAgent?.orchestrators ?? [];
+  const defaultStreams = statusQuery.data?.streamAgent?.default;
   const streams = statusQuery.data?.streams ?? [];
 
   // Build set of open stream IDs

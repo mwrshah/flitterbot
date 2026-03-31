@@ -1,15 +1,15 @@
 import type http from "node:http";
-import { getStreamForStreamsSession } from "../blackboard/query-streams.ts";
+import { getStreamForStreamSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
-export async function handleBrowserStreamsSessionStreamRoute(
+export async function handleBrowserStreamSessionStreamRoute(
   runtime: ControlSurfaceRuntime,
   _request: http.IncomingMessage,
   response: http.ServerResponse,
-  streamsSessionId: string,
+  streamSessionId: string,
 ) {
-  const ws = getStreamForStreamsSession(runtime.blackboard, streamsSessionId);
+  const ws = getStreamForStreamSession(runtime.blackboard, streamSessionId);
   if (!ws) {
     return sendJson(response, 404, { ok: false, error: "No stream for this pi session" });
   }

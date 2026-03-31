@@ -11,4 +11,4 @@ export { handleMessageRoute } from "./message.ts";
 export { handleRuntimeWhatsAppRoute } from "./runtime-whatsapp.ts";
 export { handleStatusRoute } from "./status.ts";
 export { handleStopRoute } from "./stop.ts";
-export { handleStreamsSessionInterruptRoute } from "./streams-session-interrupt.ts";
+export { handleStreamSessionInterruptRoute } from "./stream-session-interrupt.ts";

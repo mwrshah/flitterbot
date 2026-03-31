@@ -2,7 +2,7 @@
  * WS → Query Cache bridge.
  *
  * Routes WebSocket events to TanStack Query cache via queryClient.setQueryData().
- * Replaces usePiWsHandler — this is a plain function, not a React hook.
+ * Replaces useStreamWsHandler — this is a plain function, not a React hook.
  *
  * Lifecycle: call setupWsQueryBridge() once at app startup (in router.tsx or
  * root route). It returns a teardown function for cleanup.
@@ -237,14 +237,14 @@ export function setupWsQueryBridge(deps: {
     // ── sessions_changed ──
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
-        queryKey: ["streams-downstream-sessions", message.streamsSessionId],
+        queryKey: ["streams-downstream-sessions", message.streamSessionId],
       });
       return;
     }
 
     // ── worktree_changed ──
     if (message.type === "worktree_changed") {
-      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.streamsSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.streamSessionId] });
       return;
     }
 
@@ -269,7 +269,7 @@ export function setupWsQueryBridge(deps: {
                 ? "Agent"
                 : message.item.source === "init"
                   ? "System"
-                  : message.item.source === "pi_outbound"
+                  : message.item.source === "stream_outbound"
                     ? "Streams"
                     : "Web";
       addPill(queryClient, sid, {

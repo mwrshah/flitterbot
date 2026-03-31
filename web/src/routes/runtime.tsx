@@ -58,8 +58,8 @@ function RuntimePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Streams Agent</CardTitle>
-                <Badge variant={status.streamsAgent?.default?.busy ? "success" : "default"}>
-                  {status.streamsAgent?.default?.busy ? "active" : "idle"}
+                <Badge variant={status.streamAgent?.default?.busy ? "success" : "default"}>
+                  {status.streamAgent?.default?.busy ? "active" : "idle"}
                 </Badge>
               </div>
             </CardHeader>
@@ -67,26 +67,26 @@ function RuntimePage() {
               <div className="grid grid-cols-3 gap-4">
                 <MetaItem
                   label="Session ID"
-                  value={status.streamsAgent?.default?.sessionId ?? ""}
+                  value={status.streamAgent?.default?.sessionId ?? ""}
                   mono
                 />
                 <MetaItem
                   label="Messages"
-                  value={String(status.streamsAgent?.default?.messageCount ?? 0)}
+                  value={String(status.streamAgent?.default?.messageCount ?? 0)}
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Streams Orchestrators */}
-          {(status.streamsAgent?.orchestrators?.length ?? 0) > 0 && (
+          {(status.streamAgent?.orchestrators?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Streams Orchestrators</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {status.streamsAgent!.orchestrators!.map((o) => (
+                  {status.streamAgent!.orchestrators!.map((o) => (
                     <div
                       key={o.sessionId}
                       className="flex items-center justify-between rounded-lg border border-border px-4 py-3"

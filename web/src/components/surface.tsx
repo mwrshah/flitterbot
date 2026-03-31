@@ -38,7 +38,7 @@ const SOURCE_COLORS: Record<MessageSource, string> = {
   cron: "bg-cyan-500",
   init: "bg-gray-400",
   agent: "bg-blue-500",
-  pi_outbound: "bg-amber-500",
+  stream_outbound: "bg-amber-500",
 };
 
 const SOURCE_LABELS: Record<MessageSource, string> = {
@@ -48,7 +48,7 @@ const SOURCE_LABELS: Record<MessageSource, string> = {
   cron: "Cron",
   init: "Init",
   agent: "Agent",
-  pi_outbound: "Streams",
+  stream_outbound: "Streams",
 };
 
 const STREAM_PREFIX_RE = /^\[Stream: "([^"]+)" \([0-9a-f-]+\)\]\s*(?:\[NEW\]\s*)?/;

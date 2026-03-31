@@ -11,7 +11,7 @@ import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
   fetchStreamsHistory,
   fetchStreamsInputHistory,
-  fetchStreamsSessions,
+  fetchStreamSessions,
   fetchStreamsWorktree,
   type StreamInfo,
 } from "~/server/streams";
@@ -58,7 +58,7 @@ export function streamsHistoryQueryOptions(
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsHistory({
         data: {
-          ...(sessionId ? { streamsSessionId: sessionId } : {}),
+          ...(sessionId ? { streamSessionId: sessionId } : {}),
           ...(surface ? { surface } : {}),
         },
       })) as ChatTimelineItem[],
@@ -79,27 +79,27 @@ export function streamsHistoryQueryOptions(
 
 /**
  * Downstream Claude Code sessions for a Streams orchestrator session.
- * WS bridge invalidates ["streams-downstream-sessions", streamsSessionId] on sessions_changed.
+ * WS bridge invalidates ["streams-downstream-sessions", streamSessionId] on sessions_changed.
  */
-export function streamsDownstreamSessionsQueryOptions(streamsSessionId: string) {
+export function streamsDownstreamSessionsQueryOptions(streamSessionId: string) {
   return {
-    queryKey: ["streams-downstream-sessions", streamsSessionId] as const,
+    queryKey: ["streams-downstream-sessions", streamSessionId] as const,
     queryFn: (): Promise<DownstreamSessionItem[]> =>
-      fetchStreamsSessions({ data: { streamsSessionId } }),
-    enabled: !!streamsSessionId,
+      fetchStreamSessions({ data: { streamSessionId } }),
+    enabled: !!streamSessionId,
     staleTime: 30_000,
   };
 }
 
 /**
  * Worktree info for a Streams orchestrator session.
- * WS bridge invalidates ["streams-worktree", streamsSessionId] on worktree_changed.
+ * WS bridge invalidates ["streams-worktree", streamSessionId] on worktree_changed.
  */
-export function streamsWorktreeQueryOptions(streamsSessionId: string) {
+export function streamsWorktreeQueryOptions(streamSessionId: string) {
   return {
-    queryKey: ["streams-worktree", streamsSessionId] as const,
-    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { streamsSessionId } }),
-    enabled: !!streamsSessionId,
+    queryKey: ["streams-worktree", streamSessionId] as const,
+    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { streamSessionId } }),
+    enabled: !!streamSessionId,
     staleTime: 30_000,
   };
 }

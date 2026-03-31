@@ -17,7 +17,7 @@ export interface SessionStartPayload {
   tmux_session?: string;
   task_description?: string;
   todoist_task_id?: string;
-  pi_session_id?: string;
+  stream_session_id?: string;
   stream_id?: string;
 }
 
@@ -73,7 +73,7 @@ function mapSessionRow(row: ClaudeSessionRow): SessionListItem {
     agentManaged: Boolean(row.agent_managed),
     sessionEndReason: row.session_end_reason,
     streamId: row.stream_id,
-    streamsSessionId: row.pi_session_id,
+    streamSessionId: row.stream_session_id,
     startedAt: row.started_at,
     endedAt: row.ended_at,
     lastEventAt: row.last_event_at,
@@ -255,7 +255,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
        session_id, tmux_session, cwd, project, project_label,
        model, permission_mode, source, status, transcript_path,
        task_description, todoist_task_id, agent_managed,
-       pi_session_id, stream_id, started_at, last_event_at
+       stream_session_id, stream_id, started_at, last_event_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(session_id) DO UPDATE SET
        tmux_session = COALESCE(excluded.tmux_session, sessions.tmux_session),
@@ -273,7 +273,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
          WHEN excluded.agent_managed IS NOT NULL THEN excluded.agent_managed
          ELSE sessions.agent_managed
        END,
-       pi_session_id = COALESCE(excluded.pi_session_id, sessions.pi_session_id),
+       stream_session_id = COALESCE(excluded.stream_session_id, sessions.stream_session_id),
        stream_id = COALESCE(excluded.stream_id, sessions.stream_id),
        started_at = MIN(sessions.started_at, excluded.started_at),
        last_event_at = MAX(sessions.last_event_at, excluded.last_event_at)`,
@@ -290,7 +290,7 @@ export function insertSession(db: BlackboardDatabase, payload: SessionStartPaylo
     textOrNull(payload.task_description),
     textOrNull(payload.todoist_task_id),
     payload.agent_managed ? 1 : 0,
-    textOrNull(payload.pi_session_id),
+    textOrNull(payload.stream_session_id),
     textOrNull(payload.stream_id),
     ts,
     ts,
@@ -313,16 +313,16 @@ export function updateSessionStop(db: BlackboardDatabase, sessionId: string): vo
 
 export function getActiveManagedSessionsByPi(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
 ): SessionListItem[] {
   const rows = db.all<ClaudeSessionRow>(
     `SELECT *
        FROM sessions
-       WHERE pi_session_id = ?
+       WHERE stream_session_id = ?
          AND status IN ('working', 'idle')
          AND agent_managed = 1
        ORDER BY last_event_at DESC`,
-    streamsSessionId,
+    streamSessionId,
   );
   return rows.map(mapSessionRow);
 }
@@ -331,18 +331,18 @@ interface ClaudeSessionWithStreamRow extends ClaudeSessionRow {
   stream_name: string | null;
 }
 
-export function getSessionsByStreamsSessionId(
+export function getSessionsByStreamSessionId(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
 ): DownstreamSessionItem[] {
   const rows = db.all<ClaudeSessionWithStreamRow>(
     `SELECT s.*, w.name AS stream_name
        FROM sessions s
        LEFT JOIN streams w ON s.stream_id = w.id
-       WHERE s.pi_session_id = ?
+       WHERE s.stream_session_id = ?
          AND s.status != 'ended'
        ORDER BY s.last_event_at DESC`,
-    streamsSessionId,
+    streamSessionId,
   );
   return rows.map((row) => ({
     sessionId: row.session_id,
@@ -358,15 +358,15 @@ export function getSessionsByStreamsSessionId(
 
 export function countActiveManagedSessionsByPi(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
 ): number {
   const row = db.get<CountRow>(
     `SELECT COUNT(*) AS count
        FROM sessions
-       WHERE pi_session_id = ?
+       WHERE stream_session_id = ?
          AND status IN ('working', 'idle')
          AND agent_managed = 1`,
-    streamsSessionId,
+    streamSessionId,
   );
   return Number(row?.count ?? 0);
 }

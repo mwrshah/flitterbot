@@ -13,7 +13,7 @@ import {
 
 export const Route = createFileRoute("/streams/$sessionId")({
   staticData: {
-    wsMode: "streams-session",
+    wsMode: "stream-session",
   },
   head: () => ({
     meta: [{ title: "Autonoma — Streams Session" }],
@@ -48,16 +48,16 @@ export const Route = createFileRoute("/streams/$sessionId")({
       <p>Failed to load session history: {String(error)}</p>
     </div>
   ),
-  component: StreamsSessionRoute,
+  component: StreamSessionRoute,
 });
 
-function StreamsSessionRoute() {
+function StreamSessionRoute() {
   const { sessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const stream = status?.streams?.find((ws) => ws.streamsSessionId === sessionId);
+  const stream = status?.streams?.find((ws) => ws.streamSessionId === sessionId);
   const isStreamClosed = stream?.status === "closed";
 
   const { timeline, statusPills, onSendMessage, effectiveSessionId, isSessionBusy } =
@@ -78,7 +78,7 @@ function StreamsSessionRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel streamsSessionId={sessionId} />
+        <DownstreamSessionsPanel streamSessionId={sessionId} />
       </Panel>
     </PanelGroup>
   );

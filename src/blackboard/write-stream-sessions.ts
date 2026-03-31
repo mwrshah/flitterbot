@@ -1,10 +1,10 @@
-import type { StreamsSessionStatus } from "../contracts/index.ts";
+import type { StreamSessionStatus } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 
-type StreamsSessionRecord = {
-  pi_session_id: string;
+type StreamSessionRecord = {
+  stream_session_id: string;
   role: string;
-  status?: StreamsSessionStatus;
+  status?: StreamSessionStatus;
   runtime_instance_id?: string;
   pid?: number;
   session_file?: string;
@@ -21,10 +21,10 @@ type StreamsSessionRecord = {
   stream_id?: string;
 };
 
-export function upsertStreamsSession(db: BlackboardDatabase, session: StreamsSessionRecord): void {
+export function upsertStreamSession(db: BlackboardDatabase, session: StreamSessionRecord): void {
   db.prepare(
-    `INSERT INTO pi_sessions (
-       pi_session_id,
+    `INSERT INTO stream_sessions (
+       stream_session_id,
        role,
        status,
        runtime_instance_id,
@@ -43,26 +43,26 @@ export function upsertStreamsSession(db: BlackboardDatabase, session: StreamsSes
        stream_id,
        last_datetime_reported_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(pi_session_id) DO UPDATE SET
+     ON CONFLICT(stream_session_id) DO UPDATE SET
        role = excluded.role,
        status = excluded.status,
-       runtime_instance_id = COALESCE(excluded.runtime_instance_id, pi_sessions.runtime_instance_id),
-       pid = COALESCE(excluded.pid, pi_sessions.pid),
-       session_file = COALESCE(excluded.session_file, pi_sessions.session_file),
+       runtime_instance_id = COALESCE(excluded.runtime_instance_id, stream_sessions.runtime_instance_id),
+       pid = COALESCE(excluded.pid, stream_sessions.pid),
+       session_file = COALESCE(excluded.session_file, stream_sessions.session_file),
        cwd = excluded.cwd,
-       agent_dir = COALESCE(excluded.agent_dir, pi_sessions.agent_dir),
-       model_provider = COALESCE(excluded.model_provider, pi_sessions.model_provider),
-       model_id = COALESCE(excluded.model_id, pi_sessions.model_id),
-       thinking_level = COALESCE(excluded.thinking_level, pi_sessions.thinking_level),
-       started_at = MIN(pi_sessions.started_at, excluded.started_at),
-       last_prompt_at = COALESCE(excluded.last_prompt_at, pi_sessions.last_prompt_at),
-       last_event_at = MAX(pi_sessions.last_event_at, excluded.last_event_at),
-       ended_at = COALESCE(excluded.ended_at, pi_sessions.ended_at),
-       end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
-       stream_id = COALESCE(excluded.stream_id, pi_sessions.stream_id),
-       last_datetime_reported_at = COALESCE(pi_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)`,
+       agent_dir = COALESCE(excluded.agent_dir, stream_sessions.agent_dir),
+       model_provider = COALESCE(excluded.model_provider, stream_sessions.model_provider),
+       model_id = COALESCE(excluded.model_id, stream_sessions.model_id),
+       thinking_level = COALESCE(excluded.thinking_level, stream_sessions.thinking_level),
+       started_at = MIN(stream_sessions.started_at, excluded.started_at),
+       last_prompt_at = COALESCE(excluded.last_prompt_at, stream_sessions.last_prompt_at),
+       last_event_at = MAX(stream_sessions.last_event_at, excluded.last_event_at),
+       ended_at = COALESCE(excluded.ended_at, stream_sessions.ended_at),
+       end_reason = COALESCE(excluded.end_reason, stream_sessions.end_reason),
+       stream_id = COALESCE(excluded.stream_id, stream_sessions.stream_id),
+       last_datetime_reported_at = COALESCE(stream_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)`,
   ).run(
-    session.pi_session_id,
+    session.stream_session_id,
     session.role,
     session.status ?? "active",
     session.runtime_instance_id ?? null,
@@ -83,19 +83,19 @@ export function upsertStreamsSession(db: BlackboardDatabase, session: StreamsSes
   );
 }
 
-export function markPreviousStreamsSessionsInactive(
+export function markPreviousStreamSessionsInactive(
   db: BlackboardDatabase,
   options: {
     role: string;
     runtimeInstanceId?: string;
     endedAt: string;
     endReason: string;
-    status?: Extract<StreamsSessionStatus, "ended" | "crashed">;
+    status?: Extract<StreamSessionStatus, "ended" | "crashed">;
   },
 ): number {
   const result = db
     .prepare(
-      `UPDATE pi_sessions
+      `UPDATE stream_sessions
      SET status = ?,
          ended_at = ?,
          end_reason = ?,
@@ -117,91 +117,91 @@ export function markPreviousStreamsSessionsInactive(
   return Number(result.changes ?? 0);
 }
 
-export function touchStreamsSessionPrompt(
+export function touchStreamSessionPrompt(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
   timestamp: string,
   status: Extract<
-    StreamsSessionStatus,
+    StreamSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
   db.prepare(
-    `UPDATE pi_sessions
+    `UPDATE stream_sessions
      SET last_prompt_at = ?,
          last_event_at = MAX(last_event_at, ?),
          status = ?,
          ended_at = NULL,
          end_reason = NULL
-     WHERE pi_session_id = ?`,
-  ).run(timestamp, timestamp, status, streamsSessionId);
+     WHERE stream_session_id = ?`,
+  ).run(timestamp, timestamp, status, streamSessionId);
 }
 
-export function touchStreamsSessionEvent(
+export function touchStreamSessionEvent(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
   timestamp: string,
   status: Extract<
-    StreamsSessionStatus,
+    StreamSessionStatus,
     "active" | "waiting_for_user" | "waiting_for_sessions"
   > = "active",
 ): void {
   db.prepare(
-    `UPDATE pi_sessions
+    `UPDATE stream_sessions
      SET last_event_at = MAX(last_event_at, ?),
          status = ?,
          ended_at = NULL,
          end_reason = NULL
-     WHERE pi_session_id = ?`,
-  ).run(timestamp, status, streamsSessionId);
+     WHERE stream_session_id = ?`,
+  ).run(timestamp, status, streamSessionId);
 }
 
 /**
- * Re-associate orphaned sessions whose pi_session_id points to an ended streams session.
+ * Re-associate orphaned sessions whose stream_session_id points to an ended streams session.
  * Moves them to the given new (active) streams session.
  */
 export function reassociateOrphanedSessions(
   db: BlackboardDatabase,
-  newStreamsSessionId: string,
+  newStreamSessionId: string,
 ): number {
   const result = db
     .prepare(
       `UPDATE sessions
-       SET pi_session_id = ?,
+       SET stream_session_id = ?,
            tmux_session = NULL
        WHERE status NOT IN ('ended')
-         AND pi_session_id IS NOT NULL
-         AND pi_session_id != ?
-         AND pi_session_id IN (
-           SELECT pi_session_id FROM pi_sessions WHERE status IN ('ended', 'crashed')
+         AND stream_session_id IS NOT NULL
+         AND stream_session_id != ?
+         AND stream_session_id IN (
+           SELECT stream_session_id FROM stream_sessions WHERE status IN ('ended', 'crashed')
          )`,
     )
-    .run(newStreamsSessionId, newStreamsSessionId);
+    .run(newStreamSessionId, newStreamSessionId);
 
   return Number(result.changes ?? 0);
 }
 
-export function closeStreamsSession(
+export function closeStreamSession(
   db: BlackboardDatabase,
-  streamsSessionId: string,
+  streamSessionId: string,
   options: {
-    status?: Extract<StreamsSessionStatus, "ended" | "crashed">;
+    status?: Extract<StreamSessionStatus, "ended" | "crashed">;
     endedAt: string;
     endReason: string;
   },
 ): void {
   db.prepare(
-    `UPDATE pi_sessions
+    `UPDATE stream_sessions
      SET status = ?,
          ended_at = ?,
          end_reason = ?,
          last_event_at = MAX(last_event_at, ?)
-     WHERE pi_session_id = ?`,
+     WHERE stream_session_id = ?`,
   ).run(
     options.status ?? "ended",
     options.endedAt,
     options.endReason,
     options.endedAt,
-    streamsSessionId,
+    streamSessionId,
   );
 }
