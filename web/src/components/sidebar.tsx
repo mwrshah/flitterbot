@@ -84,13 +84,12 @@ export const Sidebar = memo(function Sidebar() {
                 Active streams
               </p>
               <div className="space-y-1">
-                {openStreams
-                  .filter((ws) => ws.streamSessionId)
-                  .map((ws) => (
+                {openStreams.map((ws) =>
+                  ws.streamSessionId ? (
                     <Link
                       key={ws.id}
                       to="/streams/$sessionId"
-                      params={{ sessionId: ws.streamSessionId! }}
+                      params={{ sessionId: ws.streamSessionId }}
                       className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
                     >
                       <span className="truncate">{ws.name}</span>
@@ -98,7 +97,18 @@ export const Sidebar = memo(function Sidebar() {
                         {ws.sessionCount}
                       </span>
                     </Link>
-                  ))}
+                  ) : (
+                    <div
+                      key={ws.id}
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/40"
+                    >
+                      <span className="truncate">{ws.name}</span>
+                      <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
+                        {ws.sessionCount}
+                      </span>
+                    </div>
+                  ),
+                )}
               </div>
             </>
           )}
