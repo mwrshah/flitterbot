@@ -920,12 +920,16 @@ export class AssistantMessage extends LitElement {
 
     // Determine copy text: use getCopyText callback if provided, otherwise self-compute from this message.
     // The callback is lazily evaluated by the copy button on click, not during render.
-    const getCopyText = this.getCopyText ?? (() =>
-      this.message.content
-        .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
-        .map((chunk) => chunk.text)
-        .join("\n")
-    );
+    const getCopyText =
+      this.getCopyText ??
+      (() =>
+        this.message.content
+          .filter(
+            (chunk): chunk is { type: "text"; text: string } =>
+              chunk.type === "text" && chunk.text.trim() !== "",
+          )
+          .map((chunk) => chunk.text)
+          .join("\n"));
 
     return html`
       <div class="relative">
@@ -1018,7 +1022,10 @@ export class MessageList extends LitElement {
   /** Extract plain text from an assistant message's content chunks. */
   private static getAssistantPlainText(msg: AssistantMessageType): string {
     return (msg.content || [])
-      .filter((chunk): chunk is { type: "text"; text: string } => chunk.type === "text" && chunk.text.trim() !== "")
+      .filter(
+        (chunk): chunk is { type: "text"; text: string } =>
+          chunk.type === "text" && chunk.text.trim() !== "",
+      )
       .map((chunk) => chunk.text)
       .join("\n");
   }
@@ -1087,7 +1094,9 @@ export class MessageList extends LitElement {
 
       if (role === "assistant") {
         const isLast = lastAssistantInTurn.has(msg as AssistantMessageType);
-        const getCopyText = isLast ? () => this.getTurnCopyText(msg as AssistantMessageType) : undefined;
+        const getCopyText = isLast
+          ? () => this.getTurnCopyText(msg as AssistantMessageType)
+          : undefined;
         items.push({
           key,
           template: html`

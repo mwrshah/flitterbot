@@ -8,11 +8,20 @@ import { cn } from "~/lib/utils";
 function piStatusBanner(status: PiSessionStatus | undefined) {
   switch (status) {
     case "active":
-      return { label: "Inferring", colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" };
+      return {
+        label: "Inferring",
+        colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+      };
     case "waiting_for_sessions":
-      return { label: "Waiting for sessions", colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400" };
+      return {
+        label: "Waiting for sessions",
+        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+      };
     case "waiting_for_user":
-      return { label: "Waiting for user", colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400" };
+      return {
+        label: "Waiting for user",
+        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+      };
     case "ended":
       return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
@@ -104,7 +113,12 @@ export function DownstreamSessionsPanel({
         {(() => {
           const banner = piStatusBanner(piSessionStatus);
           return banner ? (
-            <div className={cn("mx-3 mt-3 mb-2 px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
+            <div
+              className={cn(
+                "mx-3 mt-3 mb-2 px-3 py-1.5 rounded-md text-xs font-medium",
+                banner.colorClass,
+              )}
+            >
               {banner.label}
             </div>
           ) : null;

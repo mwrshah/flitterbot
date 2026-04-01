@@ -43,10 +43,7 @@ export function reconcilePreviousPiSessions(
   });
 }
 
-export function upsertPiSession(
-  db: BlackboardDatabase,
-  input: UpsertPiSessionInput,
-): void {
+export function upsertPiSession(db: BlackboardDatabase, input: UpsertPiSessionInput): void {
   writePiSession(db, {
     pi_session_id: input.piSessionId,
     role: input.role,

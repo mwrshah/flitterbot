@@ -50,8 +50,7 @@ export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean 
         isProgrammaticScrollRef.current = false;
         return;
       }
-      isAtBottomRef.current =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD;
+      isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD;
     };
     el.addEventListener("scroll", onScroll, { passive: true });
 

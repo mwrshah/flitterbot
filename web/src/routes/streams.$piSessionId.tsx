@@ -80,7 +80,10 @@ function PiSessionRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel piSessionId={piSessionId} piSessionStatus={stream?.piSessionStatus} />
+        <DownstreamSessionsPanel
+          piSessionId={piSessionId}
+          piSessionStatus={stream?.piSessionStatus}
+        />
       </Panel>
     </PanelGroup>
   );

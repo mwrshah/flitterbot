@@ -106,7 +106,8 @@ export const Sidebar = memo(function Sidebar() {
                     to="/streams/default"
                     className={cn(
                       "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
-                      currentPiSessionId === "default" || (pathname === "/streams" && !currentPiSessionId)
+                      currentPiSessionId === "default" ||
+                        (pathname === "/streams" && !currentPiSessionId)
                         ? "bg-accent text-accent-foreground font-medium"
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
@@ -167,7 +168,7 @@ export const Sidebar = memo(function Sidebar() {
                   .map((ws) => (
                     <Link
                       key={ws.id}
-to="/streams/$piSessionId"
+                      to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId! }}
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",

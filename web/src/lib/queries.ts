@@ -8,9 +8,9 @@ import type {
 } from "~/lib/types";
 import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
+  fetchDownstreamSessions,
   fetchStreamsHistory,
   fetchStreamsInputHistory,
-  fetchDownstreamSessions,
   fetchStreamsWorktree,
   type StreamInfo,
 } from "~/server/streams";

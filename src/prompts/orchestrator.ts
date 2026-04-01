@@ -8,7 +8,7 @@ export type OrchestratorContext = {
 };
 
 export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
-  const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
+  const _repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
   const wsFlag = ctx.streamId ? ` --stream-id ${ctx.streamId}` : "";
 
   return `You are an orchestrator agent managing a single stream.

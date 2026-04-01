@@ -6,8 +6,8 @@ import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
@@ -40,7 +40,14 @@ export function ChatPanel({
   streamId,
   isStreamClosed,
 }: ChatPanelProps) {
-  useWhyDidYouRender("ChatPanel", { piSessionId, timeline, statusPills, isSessionBusy, streamId, isStreamClosed });
+  useWhyDidYouRender("ChatPanel", {
+    piSessionId,
+    timeline,
+    statusPills,
+    isSessionBusy,
+    streamId,
+    isStreamClosed,
+  });
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
@@ -73,39 +80,42 @@ export function ChatPanel({
 
   // Wire streaming deltas from the streaming store to the Lit web component
   useEffect(() => {
-    streamingStore.onStreamingDelta(piSessionId, (text, thinking, isThinkingStreaming, messageId) => {
-      if (messageId != null) {
-        messageListRef.current?.updateStreaming(
-          {
-            role: "assistant",
-            content: [
-              ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
-              ...(text ? [{ type: "text" as const, text }] : []),
-            ],
-            api: "openai-responses",
-            provider: "openai",
-            model: "",
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    streamingStore.onStreamingDelta(
+      piSessionId,
+      (text, thinking, isThinkingStreaming, messageId) => {
+        if (messageId != null) {
+          messageListRef.current?.updateStreaming(
+            {
+              role: "assistant",
+              content: [
+                ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
+                ...(text ? [{ type: "text" as const, text }] : []),
+              ],
+              api: "openai-responses",
+              provider: "openai",
+              model: "",
+              usage: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: 0,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              },
+              stopReason: "stop",
+              timestamp: Date.now(),
             },
-            stopReason: "stop",
-            timestamp: Date.now(),
-          },
-          isThinkingStreaming,
-        );
-      } else {
-        console.log(
-          "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
-          piSessionId,
-        );
-        messageListRef.current?.clearStreaming();
-      }
-    });
+            isThinkingStreaming,
+          );
+        } else {
+          console.log(
+            "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
+            piSessionId,
+          );
+          messageListRef.current?.clearStreaming();
+        }
+      },
+    );
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
       messageListRef.current?.clearStreaming();

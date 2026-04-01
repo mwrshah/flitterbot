@@ -1,9 +1,6 @@
 import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
-import {
-  getLatestPiSessionId,
-  listRecentlyClosedStreams,
-} from "../blackboard/query-streams.ts";
+import { getLatestPiSessionId, listRecentlyClosedStreams } from "../blackboard/query-streams.ts";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -74,12 +71,7 @@ export async function handleBrowserStreamsHistoryRoute(
   const piSessionId = url.searchParams.get("piSessionId");
 
   try {
-    return await handleBrowserStreamsHistoryRouteInner(
-      runtime,
-      response,
-      historyMode,
-      piSessionId,
-    );
+    return await handleBrowserStreamsHistoryRouteInner(runtime, response, historyMode, piSessionId);
   } catch (err) {
     const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
@@ -111,8 +103,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
     for (const ws of closedStreams) {
       const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
-      if (wsSessionId && !piSessionIds.includes(wsSessionId))
-        piSessionIds.push(wsSessionId);
+      if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
     }
     const rows = getInputSurfaceHistory(runtime.blackboard, piSessionIds);
     const items: ChatTimelineItem[] = rows.map(

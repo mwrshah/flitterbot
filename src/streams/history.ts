@@ -49,7 +49,7 @@ function pushMessage(
   createdAt: string,
   blocks?: StreamsHistoryMessageBlock[],
 ): void {
-  let normalized = content.trim();
+  const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );

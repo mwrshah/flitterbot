@@ -44,7 +44,9 @@ export function createWsConnectionStore(wsClient: AutonomaWsClient): WsConnectio
         setState(next);
       });
 
-      setState(wsClient.connectionState === "disconnected" ? "connecting" : wsClient.connectionState);
+      setState(
+        wsClient.connectionState === "disconnected" ? "connecting" : wsClient.connectionState,
+      );
       wsClient.connect();
 
       return () => {
