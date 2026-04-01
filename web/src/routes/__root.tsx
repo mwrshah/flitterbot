@@ -1,9 +1,10 @@
 /// <reference types="vite/client" />
 
 import type { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "~/components/app-shell";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
@@ -74,10 +75,23 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
+function useStreamPaths(apiClient: AutonomaApiClient): string[] {
+  const { data } = useQuery({ ...statusQueryOptions(apiClient), retry: 1 });
+  return useMemo(() => {
+    const paths: string[] = [];
+    if (data?.piAgent?.default?.piSessionId) paths.push("/streams/default");
+    for (const s of data?.streams ?? []) {
+      if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
+    }
+    return paths.slice(0, 9);
+  }, [data]);
+}
+
 function RootComponent() {
-  const { startRealtime } = Route.useRouteContext();
+  const { startRealtime, apiClient } = Route.useRouteContext();
   useWhyDidYouRender("RootComponent", {});
-  useGlobalShortcuts();
+  const streamPaths = useStreamPaths(apiClient);
+  useGlobalShortcuts(streamPaths);
 
   useEffect(() => startRealtime(), [startRealtime]);
 
