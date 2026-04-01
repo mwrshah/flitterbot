@@ -19,14 +19,23 @@ const BOTTOM_THRESHOLD = 50;
  * In both modes:
  * - `scrollToBottom()` — programmatic scroll; does NOT change pinned state.
  * - `engageAndScroll()` — pins AND scrolls (e.g. after sending a message).
- * - The hook does NOT do initial scroll — the parent owns initial positioning
- *   (unless `observeDOM: true`, which scrolls on initial rAF).
+ * - `initialScrollWhen` can be used to perform a one-time initial scroll when
+ *   the parent knows content is ready.
  */
-export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean } = {}) {
+export function useStickToBottom({
+  observeDOM = false,
+  initialScrollWhen = false,
+  initialScrollKey,
+}: {
+  observeDOM?: boolean;
+  initialScrollWhen?: boolean;
+  initialScrollKey?: string;
+} = {}) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
   /** Set before programmatic scrolls so the scroll handler ignores them. */
   const isProgrammaticScrollRef = useRef(false);
+  const didInitialScrollRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     const el = viewportRef.current;
@@ -39,6 +48,10 @@ export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean 
     isAtBottomRef.current = true;
     scrollToBottom();
   }, [scrollToBottom]);
+
+  useEffect(() => {
+    didInitialScrollRef.current = false;
+  }, [initialScrollKey]);
 
   // Scroll tracking — always active
   useEffect(() => {
@@ -58,6 +71,18 @@ export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean 
       el.removeEventListener("scroll", onScroll);
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialScrollWhen || didInitialScrollRef.current) return;
+    didInitialScrollRef.current = true;
+
+    // Wait until downstream renderers have mounted and painted their initial content.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        engageAndScroll();
+      });
+    });
+  }, [engageAndScroll, initialScrollWhen]);
 
   // DOM observation — only for non-virtual scroll containers
   useEffect(() => {
@@ -89,12 +114,6 @@ export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean 
       }
     });
     mo.observe(el, { childList: true, subtree: true });
-
-    // Initial scroll for non-virtual containers
-    requestAnimationFrame(() => {
-      isProgrammaticScrollRef.current = true;
-      el.scrollTop = el.scrollHeight;
-    });
 
     return () => {
       ro.disconnect();
