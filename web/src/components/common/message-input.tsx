@@ -177,6 +177,24 @@ export const MessageInput = memo(function MessageInput({
       // Only one picker at a time: @ takes priority when both could match
       if (atIdx >= 0) {
         const filter = value.slice(atIdx + 1, cursor);
+
+        // Auto-append "/" when user types @~ so the picker queries home dir contents
+        if (filter === "~") {
+          const newValue = value.slice(0, cursor) + "/" + value.slice(cursor);
+          const newCursor = cursor + 1;
+          setDraft(newValue);
+          atPositionRef.current = atIdx;
+          computeSlashLeft(newValue, atIdx);
+          setAtPickerOpen(true);
+          setAtPickerFilter("~/");
+          slashPositionRef.current = -1;
+          setPickerOpen(false);
+          requestAnimationFrame(() => {
+            textareaRef.current?.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+
         atPositionRef.current = atIdx;
         computeSlashLeft(value, atIdx);
         setAtPickerOpen(true);
