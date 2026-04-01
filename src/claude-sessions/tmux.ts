@@ -181,16 +181,34 @@ export async function sendEscapeToTmuxSession(sessionName: string): Promise<void
   await runTmux(["send-keys", "-t", getPrimaryTarget(sessionName), "Escape"]);
 }
 
-async function gracefulInterruptTmuxSession(sessionName: string): Promise<void> {
+async function sendInterruptPair(sessionName: string): Promise<void> {
   const target = getPrimaryTarget(sessionName);
+  await runTmux(["send-keys", "-t", target, "Escape"]);
+  await new Promise<void>((resolve) => setTimeout(resolve, 100));
   await runTmux(["send-keys", "-t", target, "C-c"]);
   await new Promise<void>((resolve) => setTimeout(resolve, 500));
   await runTmux(["send-keys", "-t", target, "C-c"]);
 }
 
+async function isSessionFree(sessionName: string): Promise<boolean> {
+  const pane = await getPaneSnapshot(getPrimaryTarget(sessionName));
+  if (!pane?.panePid) return true;
+  try {
+    await execFile("pgrep", ["-P", String(pane.panePid)]);
+    return false; // has children → busy
+  } catch {
+    return true; // no children → free
+  }
+}
+
+const KILL_POLL_INTERVAL_MS = 500;
+const KILL_MAX_WAIT_MS = 8000;
+const KILL_MAX_ATTEMPTS = 3;
+
 /**
  * Quit Claude Code running in a tmux session without destroying the session.
- * Sends Ctrl+C twice (Claude's quit sequence) and waits for the process to exit.
+ * Sends Escape + Ctrl+C twice, then polls until the process exits.
+ * Retries up to 3 times with a total timeout of ~8s per attempt.
  * The tmux session remains alive and FREE for reuse.
  */
 export async function killTmuxSession(sessionName: string): Promise<void> {
@@ -198,10 +216,20 @@ export async function killTmuxSession(sessionName: string): Promise<void> {
     return;
   }
 
-  const inspection = await inspectTmuxSession(sessionName);
-  if (inspection.pane?.currentCommand === "claude") {
-    await gracefulInterruptTmuxSession(sessionName);
-    await new Promise<void>((resolve) => setTimeout(resolve, 750));
+  if (await isSessionFree(sessionName)) {
+    return;
+  }
+
+  for (let attempt = 0; attempt < KILL_MAX_ATTEMPTS; attempt++) {
+    await sendInterruptPair(sessionName);
+
+    const deadline = Date.now() + KILL_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, KILL_POLL_INTERVAL_MS));
+      if (await isSessionFree(sessionName)) {
+        return;
+      }
+    }
   }
 }
 
