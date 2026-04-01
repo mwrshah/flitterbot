@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 
 import { Badge } from "~/components/common/badge";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
 
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/streams")({
 /* ── Layout component ── */
 
 function StreamsLayoutRoute() {
+  useWhyDidYouRender("StreamsLayoutRoute", {});
   const { apiClient } = Route.useRouteContext();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -95,6 +97,7 @@ function TabLink({
   active: boolean;
   children: React.ReactNode;
 }) {
+  useWhyDidYouRender("TabLink", { to, active });
   return (
     <Link
       to={to}

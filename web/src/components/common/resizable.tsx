@@ -1,9 +1,11 @@
 import { Group, Panel, Separator } from "react-resizable-panels";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
 export { Group as PanelGroup, Panel };
 
 export function ResizeHandle({ className }: { className?: string }) {
+  useWhyDidYouRender("ResizeHandle", { className });
   return (
     <Separator
       className={cn(
