@@ -32,6 +32,7 @@ import MessageSquare from "lucide/dist/esm/icons/message-square.js";
 import Search from "lucide/dist/esm/icons/search.js";
 import SquareTerminal from "lucide/dist/esm/icons/square-terminal.js";
 import { marked } from "marked";
+import { streamingPerf } from "~/lib/streaming-perf";
 
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("typescript", typescript);
@@ -888,6 +889,10 @@ export class AssistantMessage extends LitElement {
     this.style.display = "block";
   }
 
+  override updated(): void {
+    streamingPerf.markAssistantUpdated(this.isStreaming);
+  }
+
   override render() {
     if (!this.message?.content) return nothing;
 
@@ -982,6 +987,10 @@ export class MessageList extends LitElement {
     this.style.display = "block";
   }
 
+  override updated(): void {
+    streamingPerf.markMessageListUpdated();
+  }
+
   /**
    * Imperatively update the streaming assistant-message element.
    * Creates the element on first call, appends it after the repeat() container.
@@ -989,6 +998,7 @@ export class MessageList extends LitElement {
    * the shimmer animation (true = thinking in progress, false = thinking done).
    */
   updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): void {
+    const domWriteToken = streamingPerf.beginStreamingDomWrite();
     if (!this._streamingEl) {
       this._streamingEl = document.createElement(
         "assistant-message",
@@ -1003,6 +1013,12 @@ export class MessageList extends LitElement {
     this._streamingEl.isStreaming = isThinkingStreaming;
     this._streamingEl.message = msg;
     this._streamingEl.style.display = "block";
+    streamingPerf.endStreamingDomWrite(domWriteToken);
+
+    const renderToken = streamingPerf.beginStreamingLitRender();
+    void this._streamingEl.updateComplete.then(() => {
+      streamingPerf.endStreamingLitRender(renderToken);
+    });
   }
 
   /**
