@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 
-import { Badge } from "~/components/common/badge";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
@@ -64,7 +63,6 @@ function StreamsLayoutRoute() {
           active={pathname === "/streams/default" || pathname === "/streams"}
         >
           default
-          {defaultStreams?.busy && <Badge variant="success">active</Badge>}
         </TabLink>
         {orchestrators.map((o) => (
           <TabLink
@@ -73,7 +71,6 @@ function StreamsLayoutRoute() {
             active={pathname === `/streams/${o.piSessionId}`}
           >
             {o.streamName ?? o.streamId}
-            {o.busy && <Badge variant="success">active</Badge>}
           </TabLink>
         ))}
       </div>
