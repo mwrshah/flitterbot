@@ -203,6 +203,24 @@ export const MessageInput = memo(function MessageInput({
           tildeExpandedRef.current = false;
         }
 
+        // Collapse ~// → ~/ when user's own "/" keystroke doubles the auto-inserted one
+        if (filter.startsWith("~//")) {
+          const extra = atIdx + 1 + 2; // position of the second slash
+          const newValue = value.slice(0, extra) + value.slice(extra + 1);
+          const newCursor = cursor - 1;
+          setDraft(newValue);
+          atPositionRef.current = atIdx;
+          computeSlashLeft(newValue, atIdx);
+          setAtPickerOpen(true);
+          setAtPickerFilter(filter.slice(0, 2) + filter.slice(3));
+          slashPositionRef.current = -1;
+          setPickerOpen(false);
+          requestAnimationFrame(() => {
+            textareaRef.current?.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+
         atPositionRef.current = atIdx;
         computeSlashLeft(value, atIdx);
         setAtPickerOpen(true);
