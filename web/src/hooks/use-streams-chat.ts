@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import {
   type StatusPill,
   statusPillsQueryOptions,
@@ -20,47 +20,14 @@ const EMPTY_STATUS_PILLS: StatusPill[] = [];
  */
 export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
-  const queryClient = useQueryClient();
-  const mountRef = useRef(false);
 
-  // Debug: log cache state on mount and piSessionId change
-  useEffect(() => {
-    const queryKey = ["streams-history", piSessionId ?? "default", "agent"];
-    const queryState = queryClient.getQueryState(queryKey);
-    console.log("[useStreamsChat] mount/key change", {
-      now: Date.now(),
-      piSessionId,
-      loaderHistoryLength: loaderHistory.length,
-      isFirstMount: !mountRef.current,
-      cacheState: {
-        dataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
-        isFetching: queryState?.fetchStatus === "fetching",
-        isStale: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt > 0 : null,
-        dataLength: Array.isArray(queryState?.data) ? queryState.data.length : null,
-      },
-    });
-    mountRef.current = true;
-  }, [piSessionId, queryClient, loaderHistory.length]);
-
-  const { data: timeline = [], isFetching, isStale, dataUpdatedAt } = useQuery({
+  const { data: timeline = [] } = useQuery({
     ...streamsHistoryQueryOptions(piSessionId),
     // Stale-while-revalidate: render cached/loader history immediately, then
     // always revalidate session history in the background on mount/key change.
     initialData: loaderHistory,
     refetchOnMount: "always",
   });
-
-  // Debug: log when query state changes
-  useEffect(() => {
-    console.log("[useStreamsChat] query state", {
-      now: Date.now(),
-      piSessionId,
-      timelineLength: timeline.length,
-      isFetching,
-      isStale,
-      dataUpdatedAt: dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : null,
-    });
-  }, [piSessionId, timeline.length, isFetching, isStale, dataUpdatedAt]);
   const { data: statusPills } = useQuery(statusPillsQueryOptions(piSessionId ?? "default"));
   const statusPillsStable = statusPills ?? EMPTY_STATUS_PILLS;
   const connectionState = useWsConnectionState(wsConnectionStore);
