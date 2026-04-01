@@ -37,7 +37,7 @@ export const MessageInput = memo(function MessageInput({
   onAddImages,
   onRemoveImage,
   skills,
-  placeholder = "Message Streams…",
+  placeholder = "Message streams...",
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
   autoFocus = false,

@@ -29,6 +29,7 @@ type ChatPanelProps = {
   isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
   streamId?: string;
+  streamName?: string;
   isStreamClosed?: boolean;
 };
 
@@ -39,6 +40,7 @@ export function ChatPanel({
   isSessionBusy,
   onSendMessage,
   streamId,
+  streamName,
   isStreamClosed,
 }: ChatPanelProps) {
   useWhyDidYouRender("ChatPanel", {
@@ -237,6 +239,7 @@ export function ChatPanel({
         onAddImages={addImageFiles}
         onRemoveImage={removeImage}
         skills={skillsData?.items}
+        placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
         rows={2}
         autoFocus
       />

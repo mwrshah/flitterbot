@@ -72,6 +72,7 @@ function PiSessionRoute() {
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
           streamId={stream?.id}
+          streamName={stream?.name}
           isStreamClosed={isStreamClosed}
         />
       </Panel>
