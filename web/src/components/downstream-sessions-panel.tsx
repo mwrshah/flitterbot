@@ -1,8 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { streamsDownstreamSessionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
-import type { DownstreamSessionItem } from "~/lib/types";
+import type { DownstreamSessionItem, PiSessionStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
+
+function piStatusBanner(status: PiSessionStatus | undefined) {
+  switch (status) {
+    case "active":
+      return { label: "Inferring", colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" };
+    case "waiting_for_sessions":
+      return { label: "Waiting for sessions", colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400" };
+    case "waiting_for_user":
+      return { label: "Waiting for user", colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400" };
+    case "ended":
+      return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
+    case "crashed":
+      return { label: "Crashed", colorClass: "bg-red-500/15 text-red-600 dark:text-red-400" };
+    default:
+      return null;
+  }
+}
 
 function CopyableCode({ text, displayText }: { text: string; displayText?: string }) {
   const { copied, copy } = useCopyToClipboard(600);
@@ -54,8 +71,10 @@ function sessionDescription(session: DownstreamSessionItem): string {
 
 export function DownstreamSessionsPanel({
   piSessionId,
+  piSessionStatus,
 }: {
   piSessionId: string | undefined;
+  piSessionStatus?: PiSessionStatus;
 }) {
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
@@ -80,6 +99,14 @@ export function DownstreamSessionsPanel({
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
       <div className="flex-1 overflow-y-auto">
+        {(() => {
+          const banner = piStatusBanner(piSessionStatus);
+          return banner ? (
+            <div className={cn("mx-3 mt-3 mb-2 px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
+              {banner.label}
+            </div>
+          ) : null;
+        })()}
         <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Active Sessions
         </p>
