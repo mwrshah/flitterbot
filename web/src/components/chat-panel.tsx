@@ -238,6 +238,7 @@ export function ChatPanel({
         onRemoveImage={removeImage}
         skills={skillsData?.items}
         rows={2}
+        autoFocus
       />
     </div>
   );
