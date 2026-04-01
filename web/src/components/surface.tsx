@@ -669,6 +669,16 @@ export function Surface() {
     visibleLayoutReady,
   ]);
 
+  // Re-settle scroll when virtual height changes after initial paint.
+  // Catches measurement settling: bottom rows render after the initial scroll
+  // repositions the viewport, and their actual heights differ from estimates.
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    if (!node || !didInitialBottomPaintRef.current || !isAtBottomRef.current) return;
+    scrollToBottom();
+    setScrollTop(node.scrollTop);
+  }, [virtualRows.totalHeight, viewportRef, isAtBottomRef, scrollToBottom]);
+
   useEffect(() => {
     if (measuredEntries.length === 0) {
       didInitialBottomPaintRef.current = false;
