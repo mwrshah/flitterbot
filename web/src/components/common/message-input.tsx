@@ -53,6 +53,7 @@ export const MessageInput = memo(function MessageInput({
   const [atPickerFilter, setAtPickerFilter] = useState("");
   const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
+  const tildeExpandedRef = useRef(false);
 
   // Debounce the path filter before querying
   const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
@@ -179,7 +180,9 @@ export const MessageInput = memo(function MessageInput({
         const filter = value.slice(atIdx + 1, cursor);
 
         // Auto-append "/" when user types @~ so the picker queries home dir contents
-        if (filter === "~") {
+        // One-shot: skip if we already expanded ~ to ~/ this session
+        if (filter === "~" && !tildeExpandedRef.current) {
+          tildeExpandedRef.current = true;
           const newValue = value.slice(0, cursor) + "/" + value.slice(cursor);
           const newCursor = cursor + 1;
           setDraft(newValue);
@@ -193,6 +196,11 @@ export const MessageInput = memo(function MessageInput({
             textareaRef.current?.setSelectionRange(newCursor, newCursor);
           });
           return;
+        }
+
+        // Reset one-shot tilde flag when filter no longer starts with ~
+        if (!filter.startsWith("~")) {
+          tildeExpandedRef.current = false;
         }
 
         atPositionRef.current = atIdx;
@@ -216,6 +224,7 @@ export const MessageInput = memo(function MessageInput({
         setPickerOpen(false);
         atPositionRef.current = -1;
         setAtPickerOpen(false);
+        tildeExpandedRef.current = false;
       }
     },
     [skills, computeSlashLeft],
