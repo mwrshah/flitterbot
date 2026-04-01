@@ -294,10 +294,7 @@ export class PiSessionManager {
    * resumes from the existing JSONL session_file. Called lazily when the first
    * message arrives for a rehydrated stream.
    */
-  async activateOrchestrator(
-    managed: ManagedPiSession,
-    customTools?: unknown[],
-  ): Promise<void> {
+  async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
     if (managed.session) return; // already active
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
 
@@ -359,13 +356,7 @@ export class PiSessionManager {
     // query finds it on next restart. Only permanently end on crash or explicit close.
     if (reason !== "shutdown") {
       const status = reason === "crashed" ? "crashed" : "ended";
-      endPiSession(
-        this.blackboard,
-        managed.piSessionId,
-        status,
-        reason,
-        new Date().toISOString(),
-      );
+      endPiSession(this.blackboard, managed.piSessionId, status, reason, new Date().toISOString());
       this.wsHub.broadcast({
         type: "status_changed",
         subsystem: "pi_session",
@@ -427,9 +418,7 @@ export class PiSessionManager {
   ): void {
     const { skillNames, agentsFilePaths } = info;
     if (skillNames.length > 0) {
-      this.log(
-        `pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`,
-      );
+      this.log(`pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`);
     } else {
       this.log(`pi-agent (${role}): no skills loaded`);
     }

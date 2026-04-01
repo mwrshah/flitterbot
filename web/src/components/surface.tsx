@@ -1,8 +1,9 @@
+import { layout, prepare } from "@chenglou/pretext";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { layout, prepare } from "@chenglou/pretext";
 import { CopyIcon, SettingsIcon } from "lucide-react";
 import {
+  type MouseEvent,
   memo,
   useCallback,
   useEffect,
@@ -10,7 +11,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
 } from "react";
 import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
@@ -213,10 +213,7 @@ function getMeasurementWidth(maxWidth: number): number {
  * For 200 entries, total measurement time is ~0.04ms (all cache hits).
  * First-time measurement of 200 unique texts is ~8ms (prepare + layout).
  */
-function measureEntry(
-  entry: SurfaceEntry,
-  bubbleMaxWidth: number,
-): MeasuredSurfaceEntry {
+function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurfaceEntry {
   const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
   const displayTime = formatTime(entry.timestamp);
   switch (entry.kind) {
@@ -317,7 +314,7 @@ async function handleSurfaceCopyClick(event: MouseEvent<HTMLButtonElement>, text
   const button = event.currentTarget;
   await navigator.clipboard.writeText(text);
 
-  button.dataset["copied"] = "true";
+  button.dataset.copied = "true";
   button.title = "Copied";
 
   const existingTimer = copyResetTimers.get(button);
@@ -325,7 +322,7 @@ async function handleSurfaceCopyClick(event: MouseEvent<HTMLButtonElement>, text
 
   const timer = setTimeout(() => {
     if (!button.isConnected) return;
-    delete button.dataset["copied"];
+    delete button.dataset.copied;
     button.title = "Copy message";
   }, COPY_RESET_MS);
 
@@ -394,7 +391,11 @@ const InboundEntry = memo(function InboundEntry({
             {badgeName}
           </span>
         )}
-        <PlainTextBlock text={displayContent} isOverflowing={entry.metrics.isOverflowing} onExpandToggle={onExpandToggle} />
+        <PlainTextBlock
+          text={displayContent}
+          isOverflowing={entry.metrics.isOverflowing}
+          onExpandToggle={onExpandToggle}
+        />
         <MessageCopyButton text={displayContent} />
       </div>
     </div>
@@ -465,7 +466,11 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
   );
 });
 
-const HookEntry = memo(function HookEntry({ entry }: { entry: MeasuredSurfaceEntry & { kind: "hook" } }) {
+const HookEntry = memo(function HookEntry({
+  entry,
+}: {
+  entry: MeasuredSurfaceEntry & { kind: "hook" };
+}) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
@@ -498,7 +503,12 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
     case "outbound":
       return <OutboundEntry entry={entry} />;
     case "streams-response":
-      return <StreamsResponseEntry entry={entry as MeasuredStreamsResponseEntry} onExpandToggle={onExpandToggle} />;
+      return (
+        <StreamsResponseEntry
+          entry={entry as MeasuredStreamsResponseEntry}
+          onExpandToggle={onExpandToggle}
+        />
+      );
     case "hook":
       return <HookEntry entry={entry} />;
   }
@@ -799,10 +809,7 @@ export function Surface() {
           </div>
         )}
         {entries.length > 0 && (
-          <div
-            className="relative"
-            style={{ height: `${virtualRows.totalHeight}px` }}
-          >
+          <div className="relative" style={{ height: `${virtualRows.totalHeight}px` }}>
             {visibleVirtualRows.map(({ entry, top }) => (
               <div
                 key={entry.id}

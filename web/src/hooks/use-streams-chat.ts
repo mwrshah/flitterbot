@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
-import { type StatusPill, statusPillsQueryOptions, statusQueryOptions, streamsHistoryQueryOptions } from "~/lib/queries";
+import {
+  type StatusPill,
+  statusPillsQueryOptions,
+  statusQueryOptions,
+  streamsHistoryQueryOptions,
+} from "~/lib/queries";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
@@ -24,8 +29,7 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const isSessionBusy = (() => {
     if (!piSessionId || !status?.piAgent) return false;
-    if (status.piAgent.default?.piSessionId === piSessionId)
-      return !!status.piAgent.default.busy;
+    if (status.piAgent.default?.piSessionId === piSessionId) return !!status.piAgent.default.busy;
     return !!status.piAgent.orchestrators?.find((o) => o.piSessionId === piSessionId)?.busy;
   })();
 

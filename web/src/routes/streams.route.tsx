@@ -32,7 +32,7 @@ function StreamsLayoutRoute() {
   });
 
   const allOrchestrators = statusQuery.data?.piAgent?.orchestrators ?? [];
-  const defaultStreams = statusQuery.data?.piAgent?.default;
+  const _defaultStreams = statusQuery.data?.piAgent?.default;
   const streams = statusQuery.data?.streams ?? [];
 
   // Build set of open stream IDs

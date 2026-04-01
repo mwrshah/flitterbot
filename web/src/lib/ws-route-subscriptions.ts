@@ -41,7 +41,9 @@ function resolveSubscriptionTarget(
       return piSessionId ? { piSessionId } : null;
     }
     case "pi-session":
-      return activeMatch.params?.piSessionId ? { piSessionId: activeMatch.params.piSessionId } : null;
+      return activeMatch.params?.piSessionId
+        ? { piSessionId: activeMatch.params.piSessionId }
+        : null;
     default:
       return null;
   }

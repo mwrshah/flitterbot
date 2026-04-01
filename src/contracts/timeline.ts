@@ -14,7 +14,14 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-export type MessageSource = "whatsapp" | "hook" | "cron" | "web" | "init" | "agent" | "stream_outbound";
+export type MessageSource =
+  | "whatsapp"
+  | "hook"
+  | "cron"
+  | "web"
+  | "init"
+  | "agent"
+  | "stream_outbound";
 
 export type ImageAttachment = {
   data: string;

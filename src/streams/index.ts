@@ -3,8 +3,8 @@ export { formatPromptWithContext } from "./format-prompt.ts";
 export { readStreamsHistory, readStreamsHistoryFromMessages } from "./history.ts";
 export {
   type ManagedPiSession,
-  type ProcessQueueItemCallback,
   PiSessionManager,
+  type ProcessQueueItemCallback,
 } from "./pi-session-manager.ts";
 export { PiSessionState } from "./pi-session-state.ts";
 export { subscribeToPiSession } from "./pi-subscribe.ts";

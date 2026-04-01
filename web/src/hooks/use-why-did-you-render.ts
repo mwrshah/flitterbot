@@ -181,6 +181,4 @@ export const useWhyDidYouRender: (
   componentName: string,
   trackedValues: Record<string, unknown>,
 ) => void =
-  import.meta.env.DEV && import.meta.env.VITE_DEBUG_WDYR === "true"
-    ? useWhyDidYouRenderImpl
-    : noop;
+  import.meta.env.DEV && import.meta.env.VITE_DEBUG_WDYR === "true" ? useWhyDidYouRenderImpl : noop;

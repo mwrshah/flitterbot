@@ -8,7 +8,7 @@ export { handleCronTickRoute } from "./cron-tick.ts";
 export { handleDirectSessionMessageRoute } from "./direct-session-message.ts";
 export { handleHookRoute } from "./hooks.ts";
 export { handleMessageRoute } from "./message.ts";
+export { handlePiSessionInterruptRoute } from "./pi-session-interrupt.ts";
 export { handleRuntimeWhatsAppRoute } from "./runtime-whatsapp.ts";
 export { handleStatusRoute } from "./status.ts";
 export { handleStopRoute } from "./stop.ts";
-export { handlePiSessionInterruptRoute } from "./pi-session-interrupt.ts";

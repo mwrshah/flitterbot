@@ -6,6 +6,12 @@ import path from "node:path";
 import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
+import {
+  getLastDatetimeReportedAt,
+  touchDatetimeReportedAt,
+  touchPiPrompt,
+  updatePiSessionStatus,
+} from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
 import {
@@ -25,12 +31,6 @@ import {
   listRecentlyClosedStreams,
   resetAllStreams,
 } from "./blackboard/query-streams.ts";
-import {
-  getLastDatetimeReportedAt,
-  touchDatetimeReportedAt,
-  touchPiPrompt,
-  updatePiSessionStatus,
-} from "./blackboard/pi-sessions.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
@@ -1306,8 +1306,7 @@ export class ControlSurfaceRuntime {
             update_worktree_path,
           );
           if (result.ok) {
-            const worktreePiSessionId =
-              this.sessionManager.getByStream(stream_id)?.piSessionId;
+            const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;
             if (worktreePiSessionId) {
               this.wsHub.broadcast({
                 type: "worktree_changed",

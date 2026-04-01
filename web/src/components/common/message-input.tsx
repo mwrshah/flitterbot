@@ -11,8 +11,8 @@ import {
 import { Button } from "~/components/common/button";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
-import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
 const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
@@ -188,7 +188,7 @@ export const MessageInput = memo(function MessageInput({
         // One-shot: skip if we already expanded ~ to ~/ this session
         if (filter === "~" && !tildeExpandedRef.current) {
           tildeExpandedRef.current = true;
-          const newValue = value.slice(0, cursor) + "/" + value.slice(cursor);
+          const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
           const newCursor = cursor + 1;
           setDraft(newValue);
           atPositionRef.current = atIdx;
@@ -338,12 +338,10 @@ export const MessageInput = memo(function MessageInput({
         // If on a delimiter, eat delimiters then continue eating word chars
         if (i > 0 && isDelim(value[i - 1]!)) {
           while (i > 0 && isDelim(value[i - 1]!)) i--;
-          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!))
-            i--;
+          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
         } else {
           // Skip word characters, stopping at whitespace or delimiters
-          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!))
-            i--;
+          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
         }
         const newValue = value.slice(0, i) + value.slice(cursor);
         setDraft(newValue);

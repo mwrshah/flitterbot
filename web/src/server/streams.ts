@@ -53,11 +53,7 @@ export const fetchDownstreamSessions = createServerFn({ method: "GET" })
       const res = (await streamsRequest(path)) as { items: DownstreamSessionItem[] };
       return res.items;
     } catch (err) {
-      console.error(
-        "fetchDownstreamSessions failed (piSessionId=%s):",
-        data.piSessionId,
-        err,
-      );
+      console.error("fetchDownstreamSessions failed (piSessionId=%s):", data.piSessionId, err);
       throw err;
     }
   });

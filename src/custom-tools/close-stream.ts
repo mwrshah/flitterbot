@@ -2,9 +2,9 @@ import { exec as cpExec } from "node:child_process";
 import fs from "node:fs";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
+import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
-import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { killTmuxSession } from "../claude-sessions/tmux.ts";
 
 const execPromise = promisify(cpExec);

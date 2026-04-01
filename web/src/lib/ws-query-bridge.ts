@@ -110,7 +110,9 @@ function appendTimelineItem(
         if (dupIdx >= 0) {
           console.log(
             "[debug][ws-bridge] appendTimelineItem DEDUP surface-timeline: replacing idx=%d with id=%s role=%s",
-            dupIdx, msg.id, msg.role,
+            dupIdx,
+            msg.id,
+            msg.role,
           );
           const updated = [...items];
           updated[dupIdx] = item;
@@ -238,7 +240,8 @@ export function setupWsQueryBridge(deps: {
   /* ── WS message handler ── */
 
   const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
-    const piSessionId = "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
+    const piSessionId =
+      "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
 
     // ── connected ──
     if (message.type === "connected") {
@@ -455,13 +458,15 @@ export function setupWsQueryBridge(deps: {
       if (smId) {
         queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
           if (!old) {
-            console.log("[debug][ws-bridge] stream_surfaced: no cache, creating fresh smId=%s", smId);
+            console.log(
+              "[debug][ws-bridge] stream_surfaced: no cache, creating fresh smId=%s",
+              smId,
+            );
             return [surfacedMessage];
           }
           const idx = old.findIndex(
             (item) =>
-              item.kind === "message" &&
-              (item as ChatTimelineMessage).serverMessageId === smId,
+              item.kind === "message" && (item as ChatTimelineMessage).serverMessageId === smId,
           );
           if (idx >= 0) {
             const updated = [...old];
@@ -471,9 +476,10 @@ export function setupWsQueryBridge(deps: {
           return [...old, surfacedMessage];
         });
       } else {
-console.log(
+        console.log(
           "[debug][ws-bridge] stream_surfaced: no serverMessageId, appending via appendTimelineItem. surfacedId=%s role=%s",
-          surfacedMessage.id, surfacedMessage.role,
+          surfacedMessage.id,
+          surfacedMessage.role,
         );
         appendTimelineItem(queryClient, piSessionId, surfacedMessage, "input");
       }

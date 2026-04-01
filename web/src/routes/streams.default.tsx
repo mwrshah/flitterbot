@@ -7,7 +7,11 @@ import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
-import { fetchStreamsHistory, fetchDownstreamSessions, fetchStreamsWorktree } from "~/server/streams";
+import {
+  fetchDownstreamSessions,
+  fetchStreamsHistory,
+  fetchStreamsWorktree,
+} from "~/server/streams";
 
 export const Route = createFileRoute("/streams/default")({
   staticData: {
@@ -29,7 +33,10 @@ export const Route = createFileRoute("/streams/default")({
         fetchStreamsWorktree({ data: { piSessionId: defaultPiSessionId } }).catch(() => null),
       ]);
       context.queryClient.setQueryData(["streams-history", defaultPiSessionId, "agent"], history);
-      context.queryClient.setQueryData(["streams-downstream-sessions", defaultPiSessionId], sessions);
+      context.queryClient.setQueryData(
+        ["streams-downstream-sessions", defaultPiSessionId],
+        sessions,
+      );
       context.queryClient.setQueryData(["streams-worktree", defaultPiSessionId], worktree);
     }
 
@@ -69,7 +76,10 @@ function StreamsDefaultRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel piSessionId={effectivePiSessionId} piSessionStatus={defaultStream?.piSessionStatus} />
+        <DownstreamSessionsPanel
+          piSessionId={effectivePiSessionId}
+          piSessionStatus={defaultStream?.piSessionStatus}
+        />
       </Panel>
     </PanelGroup>
   );

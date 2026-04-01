@@ -14,24 +14,24 @@ import {
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
+import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
+import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
 } from "./routes/browser-sessions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
 import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
-import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
-import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
+import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
-import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
 import { ControlSurfaceRuntime } from "./runtime.ts";
 
 const runtime = new ControlSurfaceRuntime();
@@ -182,12 +182,7 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "stream" &&
     !segments[4]
   ) {
-    return handleBrowserPiSessionStreamRoute(
-      runtime,
-      req,
-      res,
-      decodeURIComponent(segments[2]),
-    );
+    return handleBrowserPiSessionStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));
