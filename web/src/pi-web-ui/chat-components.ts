@@ -877,7 +877,7 @@ export class AssistantMessage extends LitElement {
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
-  /** When set, overrides the self-computed text for the copy button at click time. Returning empty string hides the button. */
+  /** Injected by MessageList for the last assistant message in a turn. When set, a copy button renders with this callback providing the aggregated turn text on click. When undefined, no copy button is shown. */
   @property({ attribute: false }) getCopyText?: () => string;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -923,23 +923,10 @@ export class AssistantMessage extends LitElement {
       }
     }
 
-    // Determine copy text: use getCopyText callback if provided, otherwise self-compute from this message.
-    // The callback is lazily evaluated by the copy button on click, not during render.
-    const getCopyText =
-      this.getCopyText ??
-      (() =>
-        this.message.content
-          .filter(
-            (chunk): chunk is { type: "text"; text: string } =>
-              chunk.type === "text" && chunk.text.trim() !== "",
-          )
-          .map((chunk) => chunk.text)
-          .join("\n"));
-
     return html`
       <div class="relative">
         ${orderedParts.length ? html`<div class="px-4 pr-8 flex flex-col gap-3">${orderedParts}</div>` : ""}
-        <message-copy-button .getText=${getCopyText}></message-copy-button>
+        ${this.getCopyText ? html`<message-copy-button .getText=${this.getCopyText}></message-copy-button>` : nothing}
         ${
           this.message.usage && !this.isStreaming
             ? this.onCostClick
@@ -1110,9 +1097,6 @@ export class MessageList extends LitElement {
 
       if (role === "assistant") {
         const isLast = lastAssistantInTurn.has(msg as AssistantMessageType);
-        const getCopyText = isLast
-          ? () => this.getTurnCopyText(msg as AssistantMessageType)
-          : undefined;
         items.push({
           key,
           template: html`
@@ -1124,7 +1108,8 @@ export class MessageList extends LitElement {
               .toolResultsById=${resultByCallId}
               .hideToolCalls=${false}
               .onCostClick=${this.onCostClick}
-              .getCopyText=${getCopyText}
+
+              .getCopyText=${isLast ? () => this.getTurnCopyText(msg as AssistantMessageType) : undefined}
             ></assistant-message>
           `,
         });
