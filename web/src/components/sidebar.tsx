@@ -3,7 +3,6 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import logoBlack from "~/assets/autonoma_logo_black_small.png";
 import logoWhite from "~/assets/autonoma_logo_white_small.png";
-import { getModifierLabel } from "~/hooks/platform";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
@@ -22,13 +21,8 @@ function piStatusDotClass(status: PiSessionStatus | undefined): string {
   }
 }
 
-function NavItem({
-  to,
-  label,
-  icon,
-  shortcutHint,
-}: { to: string; label: string; icon: React.ReactNode; shortcutHint?: string }) {
-  useWhyDidYouRender("NavItem", { to, label, icon, shortcutHint });
+function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
+  useWhyDidYouRender("NavItem", { to, label, icon });
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -46,9 +40,6 @@ function NavItem({
     >
       <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
-      {shortcutHint && (
-        <span className="ml-auto text-xs text-sidebar-foreground/60">{shortcutHint}</span>
-      )}
     </Link>
   );
 }
@@ -65,8 +56,6 @@ const icons = {
     </svg>
   ),
 };
-
-const mod = getModifierLabel();
 
 export const Sidebar = memo(function Sidebar() {
   useWhyDidYouRender("Sidebar", {});
@@ -99,8 +88,8 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
-        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod}S`} />
-        <NavItem to="/streams" label="Streams" icon={icons.piAgent} shortcutHint={`${mod}R`} />
+        <NavItem to="/" label="Surface" icon={icons.surface} />
+        <NavItem to="/streams" label="Streams" icon={icons.piAgent} />
       </nav>
 
       {/* Streams */}

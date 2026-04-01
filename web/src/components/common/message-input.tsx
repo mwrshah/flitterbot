@@ -27,7 +27,6 @@ type MessageInputProps = {
   placeholder?: string;
   rows?: number;
   helpText?: string;
-  autoFocus?: boolean;
 };
 
 export const MessageInput = memo(function MessageInput({
@@ -40,7 +39,6 @@ export const MessageInput = memo(function MessageInput({
   placeholder = "Message Streams…",
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
-  autoFocus = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -60,13 +58,6 @@ export const MessageInput = memo(function MessageInput({
   const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
   const tildeExpandedRef = useRef(false);
-
-  // Auto-focus textarea on mount when requested
-  useEffect(() => {
-    if (autoFocus) {
-      textareaRef.current?.focus();
-    }
-  }, [autoFocus]);
 
   // Debounce the path filter before querying
   const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
