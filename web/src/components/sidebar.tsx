@@ -3,7 +3,7 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import logoBlack from "~/assets/autonoma_logo_black_small.png";
 import logoWhite from "~/assets/autonoma_logo_white_small.png";
-import { getModifierLabel } from "~/hooks/platform";
+import { useModifierLabel } from "~/hooks/platform";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
@@ -47,7 +47,7 @@ function NavItem({
       <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
       {shortcutHint && (
-        <span className="ml-auto text-xs text-sidebar-foreground/60">{shortcutHint}</span>
+        <span className="ml-auto text-xs text-sidebar-foreground/30">{shortcutHint}</span>
       )}
     </Link>
   );
@@ -66,9 +66,8 @@ const icons = {
   ),
 };
 
-const mod = getModifierLabel();
-
 export const Sidebar = memo(function Sidebar() {
+  const mod = useModifierLabel();
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
@@ -83,6 +82,16 @@ export const Sidebar = memo(function Sidebar() {
   const allStreams = status?.streams ?? [];
   const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
   const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
+
+  // Build shortcut index: default gets 1 (if present), then open streams with piSessionId
+  let nextShortcut = 1;
+  const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
+  const streamShortcuts = new Map<string, number>();
+  for (const ws of openStreams) {
+    if (ws.piSessionId && nextShortcut <= 9) {
+      streamShortcuts.set(ws.id, nextShortcut++);
+    }
+  }
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
 
@@ -99,8 +108,8 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
-        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod}S`} />
-        <NavItem to="/streams" label="Streams" icon={icons.piAgent} shortcutHint={`${mod}R`} />
+        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod} + S`} />
+        <NavItem to="/streams" label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + R`} />
       </nav>
 
       {/* Streams */}
@@ -125,6 +134,11 @@ export const Sidebar = memo(function Sidebar() {
                   >
                     <span className="shrink-0 h-2 w-2 rounded-full bg-sidebar-foreground/25" />
                     <span className="truncate flex-1">default</span>
+                    {defaultShortcut && (
+                      <span className="text-sidebar-foreground/30 tabular-nums shrink-0 ml-2 text-xs">
+                        {defaultShortcut}
+                      </span>
+                    )}
                   </Link>
                 )}
                 {openStreams.map((ws) =>
@@ -147,9 +161,11 @@ export const Sidebar = memo(function Sidebar() {
                         )}
                       />
                       <span className="truncate flex-1">{ws.name}</span>
-                      <span className="text-sidebar-foreground/40 tabular-nums shrink-0 ml-2">
-                        {ws.sessionCount}
-                      </span>
+                      {streamShortcuts.has(ws.id) && (
+                        <span className="text-sidebar-foreground/30 tabular-nums shrink-0 ml-2 text-xs">
+                          {streamShortcuts.get(ws.id)}
+                        </span>
+                      )}
                     </Link>
                   ) : (
                     <div
@@ -158,9 +174,6 @@ export const Sidebar = memo(function Sidebar() {
                     >
                       <span className={cn("shrink-0 h-2 w-2 rounded-full", "bg-zinc-500")} />
                       <span className="truncate flex-1">{ws.name}</span>
-                      <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
-                        {ws.sessionCount}
-                      </span>
                     </div>
                   ),
                 )}
@@ -189,9 +202,6 @@ export const Sidebar = memo(function Sidebar() {
                       )}
                     >
                       <span className="truncate">{ws.name}</span>
-                      <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
-                        {ws.sessionCount}
-                      </span>
                     </Link>
                   ))}
               </div>
