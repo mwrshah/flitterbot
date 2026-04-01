@@ -9,6 +9,7 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusPill } from "~/lib/queries";
+import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -73,12 +74,24 @@ export function ChatPanel({
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
-
-  const { viewportRef, engageAndScroll } = useStickToBottom({ observeDOM: true });
-
   const agentMessages = useAgentMessages(timeline);
 
-  // Wire streaming deltas from the streaming store to the Lit web component
+  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
+    initialScrollWhen: agentMessages.length > 0,
+    initialScrollKey: piSessionId,
+  });
+
+  const settleToBottomIfPinned = useCallback(() => {
+    if (!isAtBottomRef.current) return;
+    const scrollToken = streamingPerf.beginScroll();
+    scrollToBottom();
+    streamingPerf.endScroll(scrollToken);
+  }, [isAtBottomRef, scrollToBottom]);
+
+  // Wire streaming deltas from the streaming store to the Lit web component.
+  // We drive scroll explicitly here instead of using MutationObserver /
+  // ResizeObserver so streaming updates do not create an observer-driven
+  // scroll feedback loop.
   useEffect(() => {
     streamingStore.onStreamingDelta(
       piSessionId,
@@ -107,6 +120,7 @@ export function ChatPanel({
             },
             isThinkingStreaming,
           );
+          settleToBottomIfPinned();
         } else {
           console.log(
             "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
@@ -120,7 +134,7 @@ export function ChatPanel({
       streamingStore.offStreamingDelta(piSessionId);
       messageListRef.current?.clearStreaming();
     };
-  }, [piSessionId]);
+  }, [piSessionId, settleToBottomIfPinned]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -209,7 +223,11 @@ export function ChatPanel({
 
       {/* Message area — fills all available space */}
       <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
-        <StreamsMessageList ref={messageListRef} messages={agentMessages} />
+        <StreamsMessageList
+          ref={messageListRef}
+          messages={agentMessages}
+          onMessagesRendered={settleToBottomIfPinned}
+        />
       </div>
 
       <MessageInput

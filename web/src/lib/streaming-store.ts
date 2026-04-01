@@ -11,6 +11,8 @@
  * subsequent deltas, and cleared on message_end / turn_end.
  */
 
+import { streamingPerf } from "./streaming-perf";
+
 /* ── Types ── */
 
 export type StreamingText = { text: string; messageId: string };
@@ -45,14 +47,6 @@ function fireCallbacks(sessionId: string) {
   const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
   const hasContent = textState != null || thinkingState != null;
   const effectiveMessageId = hasContent ? messageId : null;
-  if (effectiveMessageId === null) {
-    console.log(
-      "[debug][streaming-store] fireCallbacks: messageId=null (clear signal) for session=%s — textState=%s thinkingState=%s",
-      sessionId,
-      textState != null ? "present" : "null",
-      thinkingState != null ? "present" : "null",
-    );
-  }
   cb(textState?.text ?? null, thinkingState?.text ?? null, isThinkingStreaming, effectiveMessageId);
 }
 
@@ -67,6 +61,7 @@ export const streamingStore = {
   },
 
   appendTextDelta(sessionId: string, messageId: string, delta: string) {
+    const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = texts.get(sessionId);
     if (existing) {
       existing.text += delta;
@@ -75,6 +70,7 @@ export const streamingStore = {
       texts.set(sessionId, { text: delta, messageId });
     }
     fireCallbacks(sessionId);
+    streamingPerf.endDeltaToCallback(deltaToken);
   },
 
   clearText(sessionId: string) {
@@ -85,6 +81,7 @@ export const streamingStore = {
   /* ── Thinking streaming ── */
 
   appendThinkingDelta(sessionId: string, messageId: string, delta: string) {
+    const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = thinking.get(sessionId);
     if (existing) {
       existing.text += delta;
@@ -93,6 +90,7 @@ export const streamingStore = {
       thinking.set(sessionId, { text: delta, messageId });
     }
     fireCallbacks(sessionId);
+    streamingPerf.endDeltaToCallback(deltaToken);
   },
 
   getThinkingText(sessionId: string): string | undefined {

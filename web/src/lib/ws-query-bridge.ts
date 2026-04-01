@@ -129,9 +129,26 @@ function appendTimelineItem(
     const items = old ?? [];
 
     // Dedup: skip if an item with the same identity already exists.
-    // For tool items, match on toolUseId+phase; for messages, match on id.
+    // For tool end items, match on toolUseId+phase; for messages, match on id.
     if (item.kind === "tool" && (item as ChatTimelineTool).toolUseId) {
       const tool = item as ChatTimelineTool;
+      if (tool.phase !== "end") {
+        const dup = items.some(
+          (existing) =>
+            existing.kind === "tool" &&
+            (existing as ChatTimelineTool).toolUseId === tool.toolUseId &&
+            (existing as ChatTimelineTool).phase !== "end",
+        );
+        if (dup) {
+          console.log(
+            "[debug][ws-bridge] appendTimelineItem DEDUP skipped active toolUseId=%s phase=%s session=%s",
+            tool.toolUseId,
+            tool.phase,
+            sessionId,
+          );
+          return items;
+        }
+      }
       const dup = items.some(
         (existing) =>
           existing.kind === "tool" &&
@@ -167,6 +184,60 @@ function appendTimelineItem(
       sessionId,
     );
     return next;
+  });
+}
+
+function mergeToolItem(prev: ChatTimelineTool, next: ChatTimelineTool): ChatTimelineTool {
+  return {
+    ...prev,
+    ...next,
+    id: prev.id,
+    tool: next.tool === "tool" && prev.tool !== "tool" ? prev.tool : next.tool,
+    toolUseId: next.toolUseId ?? prev.toolUseId,
+    args: next.args ?? prev.args,
+    result: next.result ?? prev.result,
+    isError: next.isError ?? prev.isError,
+    createdAt: next.createdAt ?? prev.createdAt,
+  };
+}
+
+function upsertActiveToolItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineTool) {
+  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
+    const items = old ?? [];
+    if (!item.toolUseId || item.phase === "end") {
+      return [...items, item];
+    }
+
+    const idx = items.findIndex(
+      (existing) =>
+        existing.kind === "tool" &&
+        (existing as ChatTimelineTool).toolUseId === item.toolUseId &&
+        (existing as ChatTimelineTool).phase !== "end",
+    );
+
+    if (idx < 0) {
+      console.log(
+        "[debug][ws-bridge] upsertActiveToolItem: appended toolUseId=%s phase=%s timeline.length=%d session=%s",
+        item.toolUseId,
+        item.phase,
+        items.length + 1,
+        sessionId,
+      );
+      return [...items, item];
+    }
+
+    const prev = items[idx] as ChatTimelineTool;
+    const updated = [...items];
+    updated[idx] = mergeToolItem(prev, item);
+    console.log(
+      "[debug][ws-bridge] upsertActiveToolItem: replaced toolUseId=%s prevPhase=%s nextPhase=%s timeline.length=%d session=%s",
+      item.toolUseId,
+      prev.phase,
+      item.phase,
+      items.length,
+      sessionId,
+    );
+    return updated;
   });
 }
 
@@ -206,24 +277,6 @@ function upsertTimelineItem(queryClient: QueryClient, sessionId: string, item: C
       sessionId,
     );
     return [...items, item];
-  });
-}
-
-/* ── Update timeline item in-place ── */
-
-function updateTimelineItem(
-  queryClient: QueryClient,
-  sessionId: string,
-  predicate: (item: ChatTimelineItem) => boolean,
-  updater: (item: ChatTimelineItem) => ChatTimelineItem,
-) {
-  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
-    if (!old) return old;
-    const idx = old.findIndex(predicate);
-    if (idx < 0) return old;
-    const items = [...old];
-    items[idx] = updater(items[idx]!);
-    return items;
   });
 }
 
@@ -424,7 +477,7 @@ export function setupWsQueryBridge(deps: {
       // Flush tool calls buffered since toolcall_start.
       const pendingTools = streamingStore.flushPendingToolCalls(piSessionId);
       for (const tool of pendingTools) {
-        appendTimelineItem(queryClient, piSessionId, {
+        upsertActiveToolItem(queryClient, piSessionId, {
           id: createId("tool"),
           kind: "tool",
           tool: tool.toolName ?? "tool",
@@ -488,19 +541,15 @@ export function setupWsQueryBridge(deps: {
 
     // ── tool_execution_update ──
     if (message.type === "tool_execution_update") {
-      updateTimelineItem(
-        queryClient,
-        piSessionId,
-        (item) =>
-          item.kind === "tool" &&
-          (item as ChatTimelineTool).toolUseId === message.toolUseId &&
-          (item as ChatTimelineTool).phase === "start",
-        (item) => ({
-          ...(item as ChatTimelineTool),
-          phase: "update" as const,
-          result: message.partialResult as JsonValue | undefined,
-        }),
-      );
+      upsertActiveToolItem(queryClient, piSessionId, {
+        id: createId("tool"),
+        kind: "tool",
+        tool: "tool",
+        phase: "update",
+        toolUseId: message.toolUseId,
+        result: message.partialResult as JsonValue | undefined,
+        createdAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -517,41 +566,15 @@ export function setupWsQueryBridge(deps: {
       const tool = message.tool || extractToolName(message.event);
       const timestamp = message.timestamp ?? new Date().toISOString();
 
-      // Try to upgrade the stub committed to cache by the message_end flush
-      let upgraded = false;
-      if (message.toolUseId) {
-        queryClient.setQueryData<ChatTimelineItem[]>(
-          ["streams-history", piSessionId, "agent"],
-          (old) => {
-            if (!old) return old;
-            const idx = old.findIndex(
-              (item) =>
-                item.kind === "tool" &&
-                (item as ChatTimelineTool).toolUseId === message.toolUseId &&
-                (item as ChatTimelineTool).phase === "start" &&
-                (item as ChatTimelineTool).args == null,
-            );
-            if (idx < 0) return old;
-            upgraded = true;
-            const items = [...old];
-            items[idx] = { ...(items[idx] as ChatTimelineTool), tool, args, createdAt: timestamp };
-            return items;
-          },
-        );
-      }
-
-      // Fallback: no pending item (e.g. reconnect) — append fresh
-      if (!upgraded) {
-        appendTimelineItem(queryClient, piSessionId, {
-          id: message.id ?? createId("tool"),
-          kind: "tool",
-          tool,
-          phase: "start",
-          toolUseId: message.toolUseId,
-          args,
-          createdAt: timestamp,
-        });
-      }
+      upsertActiveToolItem(queryClient, piSessionId, {
+        id: message.id ?? createId("tool"),
+        kind: "tool",
+        tool,
+        phase: "start",
+        toolUseId: message.toolUseId,
+        args,
+        createdAt: timestamp,
+      });
       return;
     }
 
@@ -592,23 +615,37 @@ export function setupWsQueryBridge(deps: {
       removePill(queryClient, piSessionId, "assistant-typing");
 
       const uncommitted = streamingStore.getUncommittedText(piSessionId);
-      if (uncommitted?.text.trim()) {
+      const thinkingText = streamingStore.getThinkingText(piSessionId);
+      if (uncommitted?.text.trim() || thinkingText) {
         console.log(
-          "[debug][ws-bridge] agent_end: flushing uncommitted text msgId=%s session=%s",
-          uncommitted.messageId,
+          "[debug][ws-bridge] agent_end: flushing uncommitted content msgId=%s hasText=%s hasThinking=%s session=%s",
+          uncommitted?.messageId ?? "none",
+          uncommitted?.text.trim() ? "yes" : "no",
+          thinkingText ? "yes" : "no",
           piSessionId,
         );
+        const blocks: Array<
+          { type: "text"; text: string } | { type: "thinking"; thinking: string }
+        > = [];
+        if (thinkingText) {
+          blocks.push({ type: "thinking" as const, thinking: thinkingText });
+        }
+        if (uncommitted?.text.trim()) {
+          blocks.push({ type: "text" as const, text: uncommitted.text });
+        }
         upsertTimelineItem(queryClient, piSessionId, {
-          id: uncommitted.messageId,
+          id: uncommitted?.messageId ?? `msg-agent-end-${Date.now()}`,
           kind: "message",
           role: "assistant",
-          content: uncommitted.text,
+          content: uncommitted?.text ?? "",
+          blocks,
           createdAt: new Date().toISOString(),
         });
       }
       console.log(
-        "[debug][ws-bridge] agent_end: calling clearSession hasUncommitted=%s session=%s",
+        "[debug][ws-bridge] agent_end: calling clearSession hasText=%s hasThinking=%s session=%s",
         uncommitted?.text.trim() ? "yes" : "no",
+        thinkingText ? "yes" : "no",
         piSessionId,
       );
       streamingStore.clearSession(piSessionId);
