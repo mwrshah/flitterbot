@@ -54,13 +54,18 @@ export function streamsHistoryQueryOptions(
 ) {
   return {
     queryKey: ["streams-history", piSessionId ?? "default", surface ?? "agent"] as const,
-    queryFn: async (): Promise<ChatTimelineItem[]> =>
-      (await fetchStreamsHistory({
+    queryFn: async (): Promise<ChatTimelineItem[]> => {
+      const t0 = Date.now();
+      console.log("[query:streams-history] queryFn start", piSessionId ?? "default", t0);
+      const result = (await fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
           ...(surface ? { surface } : {}),
         },
-      })) as ChatTimelineItem[],
+      })) as ChatTimelineItem[];
+      console.log("[query:streams-history] queryFn done", piSessionId ?? "default", Date.now(), result.length, "items", "elapsed:", Date.now() - t0, "ms");
+      return result;
+    },
     enabled: piSessionId !== undefined,
     staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     // When the default session restarts with a new ID, the component picks up
