@@ -73,7 +73,12 @@ export const StreamsMessageList = memo(
       el.pendingToolCalls = EMPTY_PENDING;
       void el.updateComplete.then(() => {
         streamingPerf.endCommittedLitRender(renderToken);
-        onMessagesRendered?.();
+        // Defer scroll until after the browser runs layout — updateComplete
+        // resolves when the parent Lit element finishes, but child components
+        // may still be rendering.  rAF ensures scrollHeight reflects final DOM.
+        requestAnimationFrame(() => {
+          onMessagesRendered?.();
+        });
       });
     }, [ready, messages, onMessagesRendered]);
 
