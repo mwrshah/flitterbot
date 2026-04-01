@@ -4,6 +4,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
 import { fetchStreamsHistory, fetchDownstreamSessions, fetchStreamsWorktree } from "~/server/streams";
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/streams/default")({
 });
 
 function StreamsDefaultRoute() {
+  useWhyDidYouRender("StreamsDefaultRoute", {});
   const { history } = Route.useLoaderData();
   const { apiClient } = Route.useRouteContext();
   // Derive defaultPiSessionId reactively from the status query cache so it

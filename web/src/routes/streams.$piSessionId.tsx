@@ -4,6 +4,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   statusQueryOptions,
   streamsDownstreamSessionsQueryOptions,
@@ -52,6 +53,7 @@ export const Route = createFileRoute("/streams/$piSessionId")({
 });
 
 function PiSessionRoute() {
+  useWhyDidYouRender("PiSessionRoute", {});
   const { piSessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");

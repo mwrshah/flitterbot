@@ -11,6 +11,7 @@
 import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import type { MessageList } from "~/pi-web-ui/chat-components";
 
@@ -27,6 +28,7 @@ export const StreamsMessageList = memo(
     { messages },
     ref,
   ) {
+    useWhyDidYouRender("StreamsMessageList", { messages });
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<(HTMLElement & MessageList) | null>(null);
     const [ready, setReady] = useState(false);

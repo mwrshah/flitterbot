@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { streamsDownstreamSessionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { DownstreamSessionItem, PiSessionStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -76,6 +77,7 @@ export function DownstreamSessionsPanel({
   piSessionId: string | undefined;
   piSessionStatus?: PiSessionStatus;
 }) {
+  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );

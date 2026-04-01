@@ -1,5 +1,6 @@
 import { memo, type Ref, useEffect, useState } from "react";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
 
 type PathPickerProps = {
@@ -19,6 +20,7 @@ export const PathPicker = memo(function PathPicker({
   caretLeft,
   commandRef,
 }: PathPickerProps) {
+  useWhyDidYouRender("PathPicker", { open, items, isFetching, caretLeft });
   // shouldFilter={false} means cmdk won't auto-select on children change.
   // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
