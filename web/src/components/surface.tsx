@@ -838,7 +838,7 @@ export function Surface() {
         onAddImages={addImageFiles}
         onRemoveImage={removeImage}
         skills={skillsData?.items}
-        placeholder="Message Streams via Web…"
+        placeholder="Message streams..."
         autoFocus
       />
     </div>
