@@ -1,0 +1,1 @@
+sudo journalctl -u klair* --since "1 hour ago" --no-pager | grep -i "error.*comment" | tail -30
