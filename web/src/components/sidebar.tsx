@@ -114,7 +114,7 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Streams */}
       {(defaultPiSessionId || allStreams.length > 0) && (
-        <div className="px-4 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
+        <div className="pl-4 pr-3.5 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
           {(defaultPiSessionId || openStreams.length > 0) && (
             <>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
