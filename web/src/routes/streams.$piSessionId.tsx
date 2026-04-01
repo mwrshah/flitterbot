@@ -20,6 +20,19 @@ export const Route = createFileRoute("/streams/$piSessionId")({
     meta: [{ title: "Autonoma — Pi Session" }],
   }),
   loader: async ({ params, context }) => {
+    const t0 = performance.now();
+    const queryKey = ["streams-history", params.piSessionId, "agent"];
+    const cachedData = context.queryClient.getQueryData(queryKey);
+    const queryState = context.queryClient.getQueryState(queryKey);
+    console.log("[loader:/streams/$piSessionId] START", {
+      piSessionId: params.piSessionId,
+      ts: new Date().toISOString(),
+      hasCachedData: !!cachedData,
+      cachedDataLength: Array.isArray(cachedData) ? cachedData.length : null,
+      dataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
+      isStale: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt > 0 : null,
+    });
+
     // Seed from cache when available so route transitions stay instant.
     // The component query revalidates in the background on mount, giving us
     // stale-while-revalidate behavior instead of trusting cached history forever.
@@ -39,6 +52,11 @@ export const Route = createFileRoute("/streams/$piSessionId")({
       context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
     ]);
 
+    console.log("[loader:/streams/$piSessionId] END", {
+      piSessionId: params.piSessionId,
+      historyLength: history.length,
+      elapsed: `${(performance.now() - t0).toFixed(1)}ms`,
+    });
     return { history };
   },
   errorComponent: ({ error }) => (

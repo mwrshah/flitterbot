@@ -7,7 +7,15 @@ import { cn } from "~/lib/utils";
 
 export const Route = createFileRoute("/streams")({
   loader: async ({ context }) => {
+    const t0 = performance.now();
+    const queryState = context.queryClient.getQueryState(["status"]);
+    console.log("[loader:/streams] START", {
+      ts: new Date().toISOString(),
+      hasStatusCache: !!queryState?.data,
+      statusDataAge: queryState?.dataUpdatedAt ? `${(Date.now() - queryState.dataUpdatedAt).toFixed(0)}ms ago` : null,
+    });
     await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+    console.log("[loader:/streams] END", { elapsed: `${(performance.now() - t0).toFixed(1)}ms` });
   },
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">

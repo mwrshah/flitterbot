@@ -12,11 +12,24 @@ export const Route = createFileRoute("/")({
     meta: [{ title: "Autonoma — Surface" }],
   }),
   loader: async ({ context }) => {
+    const t0 = performance.now();
+    const queryKey = ["surface-timeline"];
+    const cachedData = context.queryClient.getQueryData(queryKey);
+    const queryState = context.queryClient.getQueryState(queryKey);
+    console.log("[loader:/] START", {
+      ts: new Date().toISOString(),
+      hasCachedData: !!cachedData,
+      cachedDataLength: Array.isArray(cachedData) ? cachedData.length : null,
+      dataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
+    });
+
     try {
       await context.queryClient.ensureQueryData(surfaceTimelineQueryOptions());
     } catch {
       // Leave cache unseeded; component falls back to empty array.
     }
+
+    console.log("[loader:/] END", { elapsed: `${(performance.now() - t0).toFixed(1)}ms` });
   },
   pendingComponent: SurfacePending,
   component: SurfacePage,
