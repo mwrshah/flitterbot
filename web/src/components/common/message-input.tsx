@@ -15,6 +15,8 @@ import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
+const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
+
 type MessageInputProps = {
   isSending: boolean;
   onSubmit: (text: string) => void;
@@ -64,9 +66,10 @@ export const MessageInput = memo(function MessageInput({
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
-  const { data: pathItems = [], isFetching: isPathFetching } = useQuery(
+  const { data: pathItems, isFetching: isPathFetching } = useQuery(
     directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen),
   );
+  const pathItemsStable = pathItems ?? EMPTY_PATH_ITEMS;
 
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
@@ -473,7 +476,7 @@ export const MessageInput = memo(function MessageInput({
           />
           <PathPicker
             open={atPickerOpen}
-            items={pathItems}
+            items={pathItemsStable}
             isFetching={isPathFetching}
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
