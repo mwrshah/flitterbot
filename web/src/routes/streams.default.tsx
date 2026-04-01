@@ -21,13 +21,31 @@ export const Route = createFileRoute("/streams/default")({
     meta: [{ title: "Autonoma — Streams / Default" }],
   }),
   loader: async ({ context }) => {
+    const t0 = performance.now();
+    console.log("[loader:/streams/default] START", { ts: new Date().toISOString() });
+
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
     const defaultPiSessionId = status.piAgent?.default?.piSessionId;
+    console.log("[loader:/streams/default] ensureQueryData(status) done", {
+      defaultPiSessionId,
+      elapsed: `${(performance.now() - t0).toFixed(1)}ms`,
+    });
+
     const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
+    console.log("[loader:/streams/default] fetchStreamsHistory done", {
+      itemCount: history.length,
+      elapsed: `${(performance.now() - t0).toFixed(1)}ms`,
+    });
 
     // Seed the Query cache under the real piSessionId when available.
     if (defaultPiSessionId) {
+      const cachedHistory = context.queryClient.getQueryData(["streams-history", defaultPiSessionId, "agent"]);
+      console.log("[loader:/streams/default] cache state before seed", {
+        hasCachedHistory: !!cachedHistory,
+        cachedHistoryLength: Array.isArray(cachedHistory) ? cachedHistory.length : null,
+      });
+
       const [sessions, worktree] = await Promise.all([
         fetchDownstreamSessions({ data: { piSessionId: defaultPiSessionId } }).catch(() => []),
         fetchStreamsWorktree({ data: { piSessionId: defaultPiSessionId } }).catch(() => null),
@@ -40,6 +58,9 @@ export const Route = createFileRoute("/streams/default")({
       context.queryClient.setQueryData(["streams-worktree", defaultPiSessionId], worktree);
     }
 
+    console.log("[loader:/streams/default] END", {
+      elapsed: `${(performance.now() - t0).toFixed(1)}ms`,
+    });
     return { history };
   },
   errorComponent: ({ error }) => (
