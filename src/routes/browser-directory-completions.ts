@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import type http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import type { DirectoryCompletionsResponse } from "../contracts/control-surface-api.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -23,17 +24,27 @@ export async function handleBrowserDirectoryCompletionsRoute(
 
   const empty: DirectoryCompletionsResponse = { items: [], cwd };
 
+  // Expand leading ~ to the user's home directory
+  const isAbsolute = pathParam.startsWith("/");
+  const isTilde = pathParam.startsWith("~");
+  const expandedParam = isTilde
+    ? os.homedir() + (pathParam.length === 1 ? "/" : pathParam.slice(1)) // ~ → /home/user/, ~/foo → /home/user/foo
+    : pathParam;
+
   // Split path into directory prefix and filter suffix
   // e.g. "src/ro" → dir="src/", filter="ro"
   // e.g. "src/"   → dir="src/", filter=""
   // e.g. ""       → dir="",     filter=""
-  const lastSlash = pathParam.lastIndexOf("/");
-  const dirPrefix = lastSlash >= 0 ? pathParam.slice(0, lastSlash + 1) : "";
-  const filter = lastSlash >= 0 ? pathParam.slice(lastSlash + 1) : pathParam;
+  const lastSlash = expandedParam.lastIndexOf("/");
+  const dirPrefix = lastSlash >= 0 ? expandedParam.slice(0, lastSlash + 1) : "";
+  const filter = lastSlash >= 0 ? expandedParam.slice(lastSlash + 1) : expandedParam;
 
   // Resolve and validate the target directory
   const targetDir = path.resolve(cwd, dirPrefix);
-  if (!targetDir.startsWith(cwd)) {
+
+  // Security: allow explicit absolute paths and tilde-expanded paths.
+  // For relative paths, ensure they don't escape the project directory via traversal.
+  if (!isAbsolute && !isTilde && !targetDir.startsWith(cwd)) {
     return sendJson(res, 200, empty);
   }
 
@@ -64,10 +75,14 @@ export async function handleBrowserDirectoryCompletionsRoute(
 
   const sorted = [...dirs, ...files].slice(0, MAX_ITEMS);
 
+  // For tilde paths, return items with the original ~/ prefix so ~ stays in the UX.
+  const displayPrefix = isTilde
+    ? pathParam.slice(0, pathParam.lastIndexOf("/") + 1) || "~/"
+    : dirPrefix;
   const items = sorted.map((entry) => ({
     name: entry.name,
     kind: entry.isDirectory() ? ("directory" as const) : ("file" as const),
-    path: dirPrefix + entry.name + (entry.isDirectory() ? "/" : ""),
+    path: displayPrefix + entry.name + (entry.isDirectory() ? "/" : ""),
   }));
 
   return sendJson(res, 200, { items, cwd } satisfies DirectoryCompletionsResponse);
