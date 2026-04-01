@@ -56,7 +56,7 @@ function StreamsLayoutRoute() {
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-6 py-3 border-b border-border shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-1 px-6 py-1.5 border-b border-border shrink-0 overflow-x-auto">
         <TabLink
           to="/streams/default"
           active={pathname === "/streams/default" || pathname === "/streams"}
