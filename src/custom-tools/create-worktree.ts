@@ -1,5 +1,5 @@
 import { exec as cpExec } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
@@ -93,6 +93,62 @@ async function createWithRawGit(
     30_000,
   );
   return { worktreePath };
+}
+
+const INSTALL_RULES: Array<{ files: string[]; cmd: string }> = [
+  { files: ["pyproject.toml"], cmd: "uv sync" },
+  { files: ["pnpm-lock.yaml"], cmd: "pnpm install" },
+  { files: ["bun.lockb", "bun.lock"], cmd: "bun install" },
+];
+
+function detectInstallCmd(dir: string): string | null {
+  for (const rule of INSTALL_RULES) {
+    if (rule.files.some((f) => existsSync(path.join(dir, f)))) {
+      return rule.cmd;
+    }
+  }
+  return null;
+}
+
+async function installDependencies(worktreePath: string): Promise<string[]> {
+  const dirs: Array<{ dir: string; cmd: string }> = [];
+
+  // Check worktree root
+  const rootCmd = detectInstallCmd(worktreePath);
+  if (rootCmd) dirs.push({ dir: worktreePath, cmd: rootCmd });
+
+  // Check immediate subdirectories
+  try {
+    for (const entry of readdirSync(worktreePath)) {
+      const full = path.join(worktreePath, entry);
+      try {
+        if (!statSync(full).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      if (entry.startsWith(".") || entry === "node_modules") continue;
+      const cmd = detectInstallCmd(full);
+      if (cmd) dirs.push({ dir: full, cmd });
+    }
+  } catch {
+    // readdir failed — skip subdirectory scan
+  }
+
+  if (dirs.length === 0) return [];
+
+  const results = await Promise.all(
+    dirs.map(async ({ dir, cmd }) => {
+      const label = dir === worktreePath ? "/" : path.basename(dir);
+      try {
+        await exec(cmd, dir, 120_000);
+        return `${cmd} in ${label} (ok)`;
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return `${cmd} in ${label} (failed: ${msg})`;
+      }
+    }),
+  );
+  return results;
 }
 
 export async function executeCreateWorktree(
@@ -217,12 +273,23 @@ export async function executeCreateWorktree(
 
     enrichStream(blackboard, streamId, repoPath, result.worktreePath);
 
+    // Best-effort dependency installation
+    let installSummary = "";
+    try {
+      const installResults = await installDependencies(result.worktreePath);
+      if (installResults.length > 0) {
+        installSummary = `\nDeps: ${installResults.join(", ")}`;
+      }
+    } catch {
+      // Never let install scanning fail the overall operation
+    }
+
     return {
       ok: true,
       streamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}`,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}`,
       usedGtr: useGtr,
     };
   } catch (error: unknown) {
