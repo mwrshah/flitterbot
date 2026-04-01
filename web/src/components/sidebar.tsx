@@ -105,13 +105,14 @@ export const Sidebar = memo(function Sidebar() {
                   <Link
                     to="/streams/default"
                     className={cn(
-                      "flex items-center px-2 py-1.5 rounded-md text-xs transition-colors",
+                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
                       currentPiSessionId === "default" || (pathname === "/streams" && !currentPiSessionId)
                         ? "bg-accent text-accent-foreground font-medium"
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
                   >
-                    <span className="truncate">default</span>
+                    <span className="shrink-0 h-2 w-2 rounded-full bg-sidebar-foreground/25" />
+                    <span className="truncate flex-1">default</span>
                   </Link>
                 )}
                 {openStreams.map((ws) =>
