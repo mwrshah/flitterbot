@@ -20,12 +20,9 @@ export const Route = createFileRoute("/streams/$piSessionId")({
     meta: [{ title: "Autonoma — Pi Session" }],
   }),
   loader: async ({ params, context }) => {
-    // Use ensureQueryData for all three fetches so that:
-    // - Active sessions (data already in cache from WS events) navigate instantly
-    // - Cold/first visits still fetch normally
-    // streamsHistoryQueryOptions has staleTime: Infinity — WS events keep it fresh,
-    // so for any session the user has visited or that has received WS events,
-    // this is a synchronous cache hit with zero network round-trips.
+    // Seed from cache when available so route transitions stay instant.
+    // The component query revalidates in the background on mount, giving us
+    // stale-while-revalidate behavior instead of trusting cached history forever.
     const [, history] = await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient

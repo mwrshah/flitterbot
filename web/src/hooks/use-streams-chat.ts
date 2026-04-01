@@ -21,7 +21,13 @@ const EMPTY_STATUS_PILLS: StatusPill[] = [];
 export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
-  const { data: timeline = loaderHistory } = useQuery(streamsHistoryQueryOptions(piSessionId));
+  const { data: timeline = [] } = useQuery({
+    ...streamsHistoryQueryOptions(piSessionId),
+    // Stale-while-revalidate: render cached/loader history immediately, then
+    // always revalidate session history in the background on mount/key change.
+    initialData: loaderHistory,
+    refetchOnMount: "always",
+  });
   const { data: statusPills } = useQuery(statusPillsQueryOptions(piSessionId ?? "default"));
   const statusPillsStable = statusPills ?? EMPTY_STATUS_PILLS;
   const connectionState = useWsConnectionState(wsConnectionStore);
