@@ -797,6 +797,7 @@ export function Surface() {
       {/* Activity feed */}
       <div
         ref={setViewportRef}
+        data-scroll-container
         className="flex-1 overflow-auto px-6 py-4"
         style={{
           visibility:

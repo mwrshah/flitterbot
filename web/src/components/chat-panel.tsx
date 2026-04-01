@@ -222,7 +222,7 @@ export function ChatPanel({
       </div>
 
       {/* Message area — fills all available space */}
-      <div ref={viewportRef} className="flex-1 overflow-auto px-6 py-4 space-y-3">
+      <div ref={viewportRef} data-scroll-container className="flex-1 overflow-auto px-6 py-4 space-y-3">
         <StreamsMessageList
           ref={messageListRef}
           messages={agentMessages}
