@@ -849,7 +849,7 @@ export class ControlSurfaceRuntime {
       const row = this.blackboard
         .prepare(
           `SELECT COUNT(*) as count FROM sessions
-				 WHERE pi_session_id = ? AND status IN ('working', 'idle') AND agent_managed = 1`,
+				 WHERE pi_session_id = ? AND status = 'working' AND agent_managed = 1`,
         )
         .get(piSessionId) as { count: number } | undefined;
       const activeCount = row?.count ?? 0;
