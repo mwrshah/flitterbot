@@ -10,14 +10,12 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type MouseEvent,
 } from "react";
 import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
@@ -87,23 +85,27 @@ const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN_ABOVE_RATIO = 0.5;
 const SURFACE_OVERSCAN_BELOW_RATIO = 1;
-const SURFACE_INITIAL_MEASUREMENT_WINDOW_RATIO = 1.5;
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BUBBLE_VERTICAL_PADDING = 16;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
 const SURFACE_HOOK_TITLE_HEIGHT = 20;
 const SURFACE_HOOK_DETAIL_GAP = 8;
-const plainTextMeasureCache = new Map<string, ReturnType<typeof prepare>>();
-const DEFAULT_MEASURED_ENTRIES: MeasuredSurfaceEntry[] = [];
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
+/**
+ * Module-level cache for pretext prepare() results, keyed by text content.
+ * prepare() is the expensive one-time pass (~0.04ms per text).
+ * layout() is pure arithmetic (~0.0002ms) and doesn't need caching.
+ */
+const plainTextPrepareCache = new Map<string, ReturnType<typeof prepare>>();
+
 function getPreparedText(text: string) {
-  const cached = plainTextMeasureCache.get(text);
+  const cached = plainTextPrepareCache.get(text);
   if (cached) return cached;
 
   const prepared = prepare(text, SURFACE_FONT, { whiteSpace: "pre-wrap" });
-  plainTextMeasureCache.set(text, prepared);
+  plainTextPrepareCache.set(text, prepared);
   return prepared;
 }
 
@@ -201,242 +203,65 @@ function getMeasurementWidth(maxWidth: number): number {
   return Math.max(SURFACE_MIN_BUBBLE_WIDTH, maxWidth - SURFACE_BUBBLE_CHROME_WIDTH);
 }
 
-function getEntriesSignature(entries: SurfaceEntry[], bubbleMaxWidth: number): string {
-  return `${bubbleMaxWidth}:${entries.map((entry) => `${entry.id}:${entry.timestamp}`).join("|")}`;
-}
-
-function buildFallbackMeasuredEntries(
-  entries: SurfaceEntry[],
+/**
+ * Synchronously measure a single entry using pretext.
+ *
+ * This is fast because:
+ * - prepare() results are cached in plainTextPrepareCache by text content
+ * - layout() is pure arithmetic (~0.0002ms per call)
+ *
+ * For 200 entries, total measurement time is ~0.04ms (all cache hits).
+ * First-time measurement of 200 unique texts is ~8ms (prepare + layout).
+ */
+function measureEntry(
+  entry: SurfaceEntry,
   bubbleMaxWidth: number,
-): MeasuredSurfaceEntry[] {
-  return entries.map((entry) => {
-    const displayTime = formatTime(entry.timestamp);
-    switch (entry.kind) {
-      case "inbound":
-      case "streams-response":
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateMessageRowHeight(1, !!entry.streamName, false),
-            isOverflowing: false,
-          },
-        };
-      case "outbound":
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateMessageRowHeight(1, false, false),
-            isOverflowing: false,
-          },
-        };
-      case "hook":
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateHookRowHeight(entry.detail),
-            isOverflowing: false,
-          },
-        };
-    }
-  });
-}
-
-const surfaceMeasurementStore = (() => {
-  type Snapshot = {
-    signature: string;
-    entries: MeasuredSurfaceEntry[];
-  };
-
-  const MEASUREMENT_FRAME_BUDGET_MS = 6;
-
-  let snapshot: Snapshot = {
-    signature: "",
-    entries: DEFAULT_MEASURED_ENTRIES,
-  };
-  let scheduledHandle: number | null = null;
-  let pendingSignature = "";
-  let pendingEntries: SurfaceEntry[] = [];
-  let pendingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
-  let pendingViewportHeight = 0;
-  let processingSignature = "";
-  let processingEntries: SurfaceEntry[] = [];
-  let processingBubbleMaxWidth = SURFACE_MIN_BUBBLE_WIDTH;
-  let processingOrder: number[] = [];
-  let processingPriorityCount = 0;
-  let processingResults: MeasuredSurfaceEntry[] = DEFAULT_MEASURED_ENTRIES;
-  let processingIndex = 0;
-  const listeners = new Set<() => void>();
-
-  const notify = () => {
-    for (const listener of listeners) listener();
-  };
-
-  const measureEntry = (
-    entry: SurfaceEntry,
-    bubbleMaxWidth: number,
-  ): MeasuredSurfaceEntry => {
-    const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
-    const displayTime = formatTime(entry.timestamp);
-    switch (entry.kind) {
-      case "inbound":
-      case "streams-response": {
-        const metrics = getPlainTextMetrics(entry.content, measurementWidth);
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateMessageRowHeight(
-              metrics.lineCount,
-              !!entry.streamName,
-              metrics.isOverflowing,
-            ),
-            isOverflowing: metrics.isOverflowing,
-          },
-        };
-      }
-      case "outbound": {
-        const metrics = getPlainTextMetrics(entry.content, measurementWidth);
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateMessageRowHeight(
-              metrics.lineCount,
-              false,
-              metrics.isOverflowing,
-            ),
-            isOverflowing: metrics.isOverflowing,
-          },
-        };
-      }
-      case "hook":
-        return {
-          ...entry,
-          displayTime,
-          metrics: {
-            estimatedHeight: estimateHookRowHeight(entry.detail),
-            isOverflowing: false,
-          },
-        };
-    }
-  };
-
-  const buildMeasurementOrder = (
-    entries: MeasuredSurfaceEntry[],
-    viewportHeight: number,
-  ) => {
-    const seen = new Set<number>();
-    const order: number[] = [];
-
-    if (entries.length === 0) {
-      return { order, priorityCount: 0 };
-    }
-
-    const priorityTarget =
-      viewportHeight > 0
-        ? viewportHeight * SURFACE_INITIAL_MEASUREMENT_WINDOW_RATIO
-        : Number.POSITIVE_INFINITY;
-
-    let accumulatedHeight = 0;
-    for (let index = entries.length - 1; index >= 0; index--) {
-      order.push(index);
-      seen.add(index);
-      accumulatedHeight += entries[index]!.metrics.estimatedHeight + SURFACE_ROW_GAP;
-      if (accumulatedHeight >= priorityTarget) break;
-    }
-
-    const priorityCount = order.length;
-
-    for (let index = 0; index < entries.length; index++) {
-      if (seen.has(index)) continue;
-      order.push(index);
-    }
-
-    return { order, priorityCount };
-  };
-
-  const restartProcessing = () => {
-    processingSignature = pendingSignature;
-    processingEntries = pendingEntries;
-    processingBubbleMaxWidth = pendingBubbleMaxWidth;
-    processingResults = buildFallbackMeasuredEntries(processingEntries, processingBubbleMaxWidth);
-    const { order, priorityCount } = buildMeasurementOrder(processingResults, pendingViewportHeight);
-    processingOrder = order;
-    processingPriorityCount = priorityCount;
-    processingIndex = 0;
-  };
-
-  const flush = () => {
-    scheduledHandle = null;
-
-    if (processingSignature !== pendingSignature) {
-      restartProcessing();
-    }
-
-    const frameStart = performance.now();
-    const startIndex = processingIndex;
-    while (processingIndex < processingOrder.length) {
-      const entryIndex = processingOrder[processingIndex]!;
-      processingResults[entryIndex] = measureEntry(
-        processingEntries[entryIndex]!,
-        processingBubbleMaxWidth,
-      );
-      processingIndex += 1;
-
-      if (
-        processingIndex < processingOrder.length &&
-        performance.now() - frameStart >= MEASUREMENT_FRAME_BUDGET_MS
-      ) {
-        if (processingIndex >= processingPriorityCount) {
-          snapshot = {
-            signature: processingSignature,
-            entries: processingResults.slice(),
-          };
-          notify();
-        }
-        scheduledHandle = requestAnimationFrame(flush);
-        return;
-      }
-    }
-
-    if (processingSignature !== pendingSignature) {
-      scheduledHandle = requestAnimationFrame(flush);
-      return;
-    }
-
-    snapshot = {
-      signature: processingSignature,
-      entries: processingResults.slice(),
-    };
-    notify();
-  };
-
-  return {
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
+): MeasuredSurfaceEntry {
+  const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
+  const displayTime = formatTime(entry.timestamp);
+  switch (entry.kind) {
+    case "inbound":
+    case "streams-response": {
+      const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+      return {
+        ...entry,
+        displayTime,
+        metrics: {
+          estimatedHeight: estimateMessageRowHeight(
+            metrics.lineCount,
+            !!entry.streamName,
+            metrics.isOverflowing,
+          ),
+          isOverflowing: metrics.isOverflowing,
+        },
       };
-    },
-    getSnapshot() {
-      return snapshot;
-    },
-    measure(entries: SurfaceEntry[], bubbleMaxWidth: number, viewportHeight: number) {
-      const signature = getEntriesSignature(entries, bubbleMaxWidth);
-      if (snapshot.signature === signature && pendingSignature === signature) return;
-      pendingSignature = signature;
-      pendingEntries = entries;
-      pendingBubbleMaxWidth = bubbleMaxWidth;
-      pendingViewportHeight = viewportHeight;
-      if (scheduledHandle === null) {
-        scheduledHandle = requestAnimationFrame(flush);
-      }
-    },
-  };
-})();
+    }
+    case "outbound": {
+      const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+      return {
+        ...entry,
+        displayTime,
+        metrics: {
+          estimatedHeight: estimateMessageRowHeight(
+            metrics.lineCount,
+            false,
+            metrics.isOverflowing,
+          ),
+          isOverflowing: metrics.isOverflowing,
+        },
+      };
+    }
+    case "hook":
+      return {
+        ...entry,
+        displayTime,
+        metrics: {
+          estimatedHeight: estimateHookRowHeight(entry.detail),
+          isOverflowing: false,
+        },
+      };
+  }
+}
 
 /* ── Collapsible Content Wrapper ── */
 
@@ -673,7 +498,6 @@ const rootApi = getRouteApi("__root__");
 
 export function Surface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
-  useWhyDidYouRender("Surface", {});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [surfaceWidth, setSurfaceWidth] = useState(0);
@@ -694,7 +518,8 @@ export function Surface() {
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
-  const { viewportRef, isAtBottomRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, isAtBottomRef, scrollToBottom, engageAndScroll } = useStickToBottom();
+  const prevEntryCountRef = useRef(0);
   const didInitialBottomPaintRef = useRef(false);
   const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
   const setViewportRef = useCallback(
@@ -733,29 +558,23 @@ export function Surface() {
     () => (surfaceWidth > 0 ? getSurfaceBubbleMaxWidth(surfaceWidth) : null),
     [surfaceWidth],
   );
-  const fallbackMeasuredEntries = useMemo(
-    () => (bubbleMaxWidth === null ? DEFAULT_MEASURED_ENTRIES : buildFallbackMeasuredEntries(entries, bubbleMaxWidth)),
-    [entries, bubbleMaxWidth],
-  );
-  const measurementSignature = useMemo(
-    () => (bubbleMaxWidth === null ? "" : getEntriesSignature(entries, bubbleMaxWidth)),
-    [entries, bubbleMaxWidth],
-  );
-  const measurementSnapshot = useSyncExternalStore(
-    surfaceMeasurementStore.subscribe,
-    surfaceMeasurementStore.getSnapshot,
-    surfaceMeasurementStore.getSnapshot,
-  );
   const measurementReady = bubbleMaxWidth !== null;
-  const measuredEntries =
-    measurementSnapshot.signature === measurementSignature
-      ? measurementSnapshot.entries
-      : fallbackMeasuredEntries;
 
-  useEffect(() => {
-    if (bubbleMaxWidth === null) return;
-    surfaceMeasurementStore.measure(entries, bubbleMaxWidth, viewportHeight);
-  }, [entries, bubbleMaxWidth, viewportHeight]);
+  /**
+   * Synchronous measurement of all entries via pretext.
+   *
+   * This replaces the old async surfaceMeasurementStore. It's fast because:
+   * - prepare() results are cached in plainTextPrepareCache (keyed by text)
+   * - layout() is pure arithmetic (~0.0002ms per entry)
+   *
+   * When a new message appends, only its prepare() runs (~0.04ms). All
+   * existing entries hit the cache, so layout() is the only work — ~0.04ms
+   * total for 200 entries. No fallback heights, no async, no flash.
+   */
+  const measuredEntries = useMemo(() => {
+    if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
+    return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
+  }, [entries, bubbleMaxWidth]);
 
   const virtualRows = useMemo(() => {
     const offsets: number[] = new Array(measuredEntries.length);
@@ -857,6 +676,15 @@ export function Surface() {
       setInitialPositionReady(true);
     }
   }, [measuredEntries.length]);
+
+  // Auto-scroll when new entries arrive while pinned to bottom
+  useEffect(() => {
+    const prev = prevEntryCountRef.current;
+    prevEntryCountRef.current = measuredEntries.length;
+    if (prev > 0 && measuredEntries.length > prev && isAtBottomRef.current) {
+      scrollToBottom();
+    }
+  }, [measuredEntries.length, isAtBottomRef, scrollToBottom]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));

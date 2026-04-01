@@ -3,24 +3,36 @@ import { useCallback, useEffect, useRef } from "react";
 const BOTTOM_THRESHOLD = 50;
 
 /**
- * Stick-to-bottom scroll behavior for chat containers.
+ * Stick-to-bottom scroll behavior for scrollable containers.
  *
- * - Auto-scrolls to bottom when new content appears (new children or size changes)
- * - Stops auto-scrolling when the user scrolls up past a threshold
- * - Re-engages auto-scroll when the user scrolls back to the bottom
+ * Two modes controlled by `observeDOM`:
  *
- * Returns a ref to attach to the scrollable viewport and a function to
- * programmatically force scroll-to-bottom (e.g. after sending a message).
+ * - `observeDOM: false` (default) — for virtual lists. Tracks pinned state
+ *   via scroll events only. The parent calls `scrollToBottom()` when new
+ *   content arrives. No MutationObserver / ResizeObserver (those create
+ *   feedback loops with virtual lists where scrolling causes DOM mutations).
+ *
+ * - `observeDOM: true` — for regular (non-virtual) scroll containers.
+ *   Uses MutationObserver + ResizeObserver to auto-scroll when children
+ *   are added or resized. Safe here because DOM changes = real new content.
+ *
+ * In both modes:
+ * - `scrollToBottom()` — programmatic scroll; does NOT change pinned state.
+ * - `engageAndScroll()` — pins AND scrolls (e.g. after sending a message).
+ * - The hook does NOT do initial scroll — the parent owns initial positioning
+ *   (unless `observeDOM: true`, which scrolls on initial rAF).
  */
-export function useStickToBottom() {
+export function useStickToBottom({ observeDOM = false }: { observeDOM?: boolean } = {}) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
-  const roRef = useRef<ResizeObserver | null>(null);
-  const moRef = useRef<MutationObserver | null>(null);
+  /** Set before programmatic scrolls so the scroll handler ignores them. */
+  const isProgrammaticScrollRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     const el = viewportRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    isProgrammaticScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
   }, []);
 
   const engageAndScroll = useCallback(() => {
@@ -28,30 +40,42 @@ export function useStickToBottom() {
     scrollToBottom();
   }, [scrollToBottom]);
 
+  // Scroll tracking — always active
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
 
-    // --- Scroll listener: track whether user is at bottom ---
     const onScroll = () => {
-      isAtBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD;
+      if (isProgrammaticScrollRef.current) {
+        isProgrammaticScrollRef.current = false;
+        return;
+      }
+      isAtBottomRef.current =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD;
     };
     el.addEventListener("scroll", onScroll, { passive: true });
 
-    // --- ResizeObserver: when any child resizes, scroll if anchored ---
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // DOM observation — only for non-virtual scroll containers
+  useEffect(() => {
+    if (!observeDOM) return;
+    const el = viewportRef.current;
+    if (!el) return;
+
     const ro = new ResizeObserver(() => {
       if (isAtBottomRef.current) {
+        isProgrammaticScrollRef.current = true;
         el.scrollTop = el.scrollHeight;
       }
     });
-    roRef.current = ro;
-
-    // Observe all current children
     for (const child of el.children) {
       ro.observe(child);
     }
 
-    // --- MutationObserver: observe new children added to viewport ---
     const mo = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
@@ -60,25 +84,24 @@ export function useStickToBottom() {
           }
         }
       }
-      // Scroll after new content is added
       if (isAtBottomRef.current) {
+        isProgrammaticScrollRef.current = true;
         el.scrollTop = el.scrollHeight;
       }
     });
-    moRef.current = mo;
     mo.observe(el, { childList: true, subtree: true });
 
-    // Initial scroll
+    // Initial scroll for non-virtual containers
     requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = true;
       el.scrollTop = el.scrollHeight;
     });
 
     return () => {
-      el.removeEventListener("scroll", onScroll);
       ro.disconnect();
       mo.disconnect();
     };
-  }, []);
+  }, [observeDOM]);
 
   return { viewportRef, isAtBottomRef, scrollToBottom, engageAndScroll };
 }
