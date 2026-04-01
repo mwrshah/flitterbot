@@ -22,7 +22,6 @@ import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import createElement from "lucide/dist/esm/createElement.js";
-import Check from "lucide/dist/esm/icons/check.js";
 import ChevronRight from "lucide/dist/esm/icons/chevron-right.js";
 import Code from "lucide/dist/esm/icons/code.js";
 import Copy from "lucide/dist/esm/icons/copy.js";
@@ -155,10 +154,11 @@ export class MessageCopyButton extends LitElement {
     return html`
       <button
         @click=${this.copy}
-        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+        data-copied=${this.copied ? "true" : "false"}
+        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
         title="${i18n("Copy message")}"
       >
-        ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
+        ${unsafeHTML(iconSvg(Copy, "sm"))}
       </button>
     `;
   }
@@ -256,11 +256,11 @@ export class CodeBlock extends LitElement {
           <span class="text-xs text-muted-foreground font-mono">${displayLanguage}</span>
           <button
             @click=${this.copy}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+            data-copied=${this.copied ? "true" : "false"}
+            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground data-[copied=true]:text-emerald-500 transition-colors"
             title="${i18n("Copy code")}"
           >
-            ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
-            ${this.copied ? html`<span>${i18n("Copied!")}</span>` : ""}
+            ${unsafeHTML(iconSvg(Copy, "sm"))}
           </button>
         </div>
         <div class="overflow-auto max-h-96">
@@ -317,11 +317,11 @@ export class ConsoleBlock extends LitElement {
           <span class="text-xs text-muted-foreground font-mono">${i18n("console")}</span>
           <button
             @click=${this.copy}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+            data-copied=${this.copied ? "true" : "false"}
+            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground data-[copied=true]:text-emerald-500 transition-colors"
             title="${i18n("Copy output")}"
           >
-            ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
-            ${this.copied ? html`<span>${i18n("Copied!")}</span>` : ""}
+            ${unsafeHTML(iconSvg(Copy, "sm"))}
           </button>
         </div>
         <div class="console-scroll overflow-auto max-h-64">
