@@ -50,6 +50,7 @@ function StreamsDefaultRoute() {
   // being frozen at the loader-time value.
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
+  const defaultStream = status?.streams?.find((ws) => ws.piSessionId === defaultPiSessionId);
   const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
     useStreamsChat(defaultPiSessionId, history);
 
@@ -66,7 +67,7 @@ function StreamsDefaultRoute() {
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
-        <DownstreamSessionsPanel piSessionId={effectivePiSessionId} />
+        <DownstreamSessionsPanel piSessionId={effectivePiSessionId} piSessionStatus={defaultStream?.piSessionStatus} />
       </Panel>
     </PanelGroup>
   );

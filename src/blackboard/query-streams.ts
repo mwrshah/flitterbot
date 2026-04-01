@@ -46,6 +46,17 @@ export function getActivePiSessionId(
   return row?.pi_session_id;
 }
 
+export function getPiSessionStatus(
+  db: BlackboardDatabase,
+  piSessionId: string,
+): string | undefined {
+  const row = db.get<{ status: string }>(
+    `SELECT status FROM pi_sessions WHERE pi_session_id = ?`,
+    piSessionId,
+  );
+  return row?.status;
+}
+
 /** Returns the most recent pi_session_id for a stream, regardless of session status. */
 export function getLatestPiSessionId(
   db: BlackboardDatabase,

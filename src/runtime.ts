@@ -20,6 +20,7 @@ import {
 import {
   getActivePiSessionId,
   getLatestPiSessionId,
+  getPiSessionStatus,
   listOpenStreams,
   listRecentlyClosedStreams,
   resetAllStreams,
@@ -570,27 +571,39 @@ export class ControlSurfaceRuntime {
       },
       blackboard: blackboardStatus,
       streams: [
-        ...openStreams.map((ws) => ({
-          id: ws.id,
-          name: ws.name,
-          status: "open" as const,
-          repoPath: ws.repo_path ?? undefined,
-          worktreePath: ws.worktree_path ?? undefined,
-          piSessionId: getActivePiSessionId(this.blackboard, ws.id),
-          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
-          createdAt: ws.created_at,
-        })),
-        ...closedStreams.map((ws) => ({
-          id: ws.id,
-          name: ws.name,
-          status: "closed" as const,
-          closedAt: ws.closed_at ?? undefined,
-          repoPath: ws.repo_path ?? undefined,
-          worktreePath: ws.worktree_path ?? undefined,
-          piSessionId: getLatestPiSessionId(this.blackboard, ws.id),
-          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
-          createdAt: ws.created_at,
-        })),
+        ...openStreams.map((ws) => {
+          const piSessionId = getActivePiSessionId(this.blackboard, ws.id);
+          return {
+            id: ws.id,
+            name: ws.name,
+            status: "open" as const,
+            repoPath: ws.repo_path ?? undefined,
+            worktreePath: ws.worktree_path ?? undefined,
+            piSessionId,
+            piSessionStatus: piSessionId
+              ? getPiSessionStatus(this.blackboard, piSessionId)
+              : undefined,
+            sessionCount: sessionCountByStream.get(ws.id) ?? 0,
+            createdAt: ws.created_at,
+          };
+        }),
+        ...closedStreams.map((ws) => {
+          const piSessionId = getLatestPiSessionId(this.blackboard, ws.id);
+          return {
+            id: ws.id,
+            name: ws.name,
+            status: "closed" as const,
+            closedAt: ws.closed_at ?? undefined,
+            repoPath: ws.repo_path ?? undefined,
+            worktreePath: ws.worktree_path ?? undefined,
+            piSessionId,
+            piSessionStatus: piSessionId
+              ? getPiSessionStatus(this.blackboard, piSessionId)
+              : undefined,
+            sessionCount: sessionCountByStream.get(ws.id) ?? 0,
+            createdAt: ws.created_at,
+          };
+        }),
       ],
     };
   }
@@ -732,6 +745,7 @@ export class ControlSurfaceRuntime {
     // Turn starts → set streams status to 'active'
     const promptAt = managed.state.notePrompt(session.messages.length);
     touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
+    this.broadcastStatusChanged("pi_session");
 
     const promptText = formatPromptWithContext(item);
 
@@ -842,6 +856,7 @@ export class ControlSurfaceRuntime {
 
       const nextStatus = activeCount > 0 ? "waiting_for_sessions" : "waiting_for_user";
       updatePiSessionStatus(this.blackboard, piSessionId, nextStatus);
+      this.broadcastStatusChanged("pi_session");
     } catch (error) {
       this.log(
         `streams state transition failed: ${error instanceof Error ? error.message : String(error)}`,
