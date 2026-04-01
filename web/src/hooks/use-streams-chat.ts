@@ -28,6 +28,7 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
     const queryKey = ["streams-history", piSessionId ?? "default", "agent"];
     const queryState = queryClient.getQueryState(queryKey);
     console.log("[useStreamsChat] mount/key change", {
+      now: Date.now(),
       piSessionId,
       loaderHistoryLength: loaderHistory.length,
       isFirstMount: !mountRef.current,
@@ -52,6 +53,7 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
   // Debug: log when query state changes
   useEffect(() => {
     console.log("[useStreamsChat] query state", {
+      now: Date.now(),
       piSessionId,
       timelineLength: timeline.length,
       isFetching,
