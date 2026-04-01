@@ -70,12 +70,6 @@ export function setupWsRouteSubscriptions(
     const nextTarget = resolveSubscriptionTarget(router, queryClient);
     if (sameTarget(activeTarget, nextTarget)) return;
 
-    console.log("[ws-route-subscriptions] subscription change", {
-      ts: new Date().toISOString(),
-      from: activeTarget ? { piSessionId: activeTarget.piSessionId, eventTypes: activeTarget.eventTypes } : null,
-      to: nextTarget ? { piSessionId: nextTarget.piSessionId, eventTypes: nextTarget.eventTypes } : null,
-    });
-
     activeTarget = nextTarget;
 
     if (nextTarget) {
