@@ -464,19 +464,10 @@ export function setupWsQueryBridge(deps: {
               (item as ChatTimelineMessage).serverMessageId === smId,
           );
           if (idx >= 0) {
-            console.log(
-              "[debug][ws-bridge] stream_surfaced: DEDUP SUCCESS smId=%s matched at idx=%d cacheSize=%d existingId=%s",
-              smId, idx, old.length, old[idx]!.id,
-            );
             const updated = [...old];
             updated[idx] = surfacedMessage;
             return updated;
           }
-          console.log(
-            "[debug][ws-bridge] stream_surfaced: DEDUP FAILED smId=%s not found in cache, appending. cacheSize=%d items=%s",
-            smId, old.length,
-            JSON.stringify(old.map((item) => ({ id: item.id, kind: item.kind, smId: (item as ChatTimelineMessage).serverMessageId }))),
-          );
           return [...old, surfacedMessage];
         });
       } else {
