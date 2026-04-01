@@ -17,6 +17,7 @@ import { MessageInput } from "~/components/common/message-input";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
@@ -672,6 +673,7 @@ const rootApi = getRouteApi("__root__");
 
 export function Surface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
+  useWhyDidYouRender("Surface", {});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [surfaceWidth, setSurfaceWidth] = useState(0);
