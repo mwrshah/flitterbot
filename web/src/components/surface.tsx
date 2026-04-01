@@ -655,10 +655,9 @@ export function Surface() {
     )
       return;
 
-    const targetScrollTop = Math.max(0, virtualRows.totalHeight - node.clientHeight);
-    node.scrollTop = targetScrollTop;
+    node.scrollTop = node.scrollHeight;
     isAtBottomRef.current = true;
-    setScrollTop(targetScrollTop);
+    setScrollTop(node.scrollTop);
     didInitialBottomPaintRef.current = true;
     setInitialPositionReady(true);
   }, [
