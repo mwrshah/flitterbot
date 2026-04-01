@@ -67,7 +67,7 @@ export function ChatPanel({
 
   const [isSending, setIsSending] = useState(false);
 
-  const { viewportRef, engageAndScroll } = useStickToBottom();
+  const { viewportRef, engageAndScroll } = useStickToBottom({ observeDOM: true });
 
   const agentMessages = useAgentMessages(timeline);
 
