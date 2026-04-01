@@ -1560,12 +1560,13 @@ export class ControlSurfaceRuntime {
 
       // Generate server message ID immediately and ACK the client before classification
       const serverMessageId = crypto.randomUUID();
-      this.wsHub.send(client.id, {
-        type: "message_ack",
-        serverMessageId,
-        text: payload.text,
-        source: "web",
-      });
+      // TEMPORARILY DISABLED — message_ack ws event
+      // this.wsHub.send(client.id, {
+      //   type: "message_ack",
+      //   serverMessageId,
+      //   text: payload.text,
+      //   source: "web",
+      // });
 
       // Skip router when message targets a specific pi session (direct tab input)
       let routerMeta: StreamRoutingMeta = {};
