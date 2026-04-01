@@ -12,6 +12,7 @@ import { Button } from "~/components/common/button";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 
 type MessageInputProps = {
@@ -37,6 +38,7 @@ export const MessageInput = memo(function MessageInput({
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
 }: MessageInputProps) {
+  useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

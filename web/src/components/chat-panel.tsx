@@ -6,6 +6,7 @@ import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
+import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
@@ -39,6 +40,7 @@ export function ChatPanel({
   streamId,
   isStreamClosed,
 }: ChatPanelProps) {
+  useWhyDidYouRender("ChatPanel", { piSessionId, timeline, statusPills, isSessionBusy, streamId, isStreamClosed });
   const isClient = useIsClient();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
