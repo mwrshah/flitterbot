@@ -309,10 +309,17 @@ export const MessageInput = memo(function MessageInput({
         const cursor = textareaRef.current?.selectionStart ?? value.length;
         if (cursor === 0) return;
         let i = cursor;
+        const isDelim = (ch: string) => ch === "/" || ch === "@";
         // Skip whitespace before cursor
         while (i > 0 && /\s/.test(value[i - 1]!)) i--;
-        // Skip word characters
-        while (i > 0 && !/\s/.test(value[i - 1]!)) i--;
+        // If on a delimiter, delete consecutive delimiters as a "word"
+        if (i > 0 && isDelim(value[i - 1]!)) {
+          while (i > 0 && isDelim(value[i - 1]!)) i--;
+        } else {
+          // Skip word characters, stopping at whitespace or delimiters
+          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!))
+            i--;
+        }
         const newValue = value.slice(0, i) + value.slice(cursor);
         setDraft(newValue);
         requestAnimationFrame(() => {
