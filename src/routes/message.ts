@@ -75,12 +75,16 @@ async function routeMessage(
       meta.stream_id = result.stream.id;
       meta.stream_name = result.stream.name;
     }
+    runtime.log(
+      result.stream
+        ? `router: matched stream "${result.stream.name}" (${result.stream.id.slice(0, 8)})`
+        : "router: no stream match",
+    );
     return { metadata: meta };
   } catch (error) {
-    console.error(
-      "[router] classification failed:",
-      error instanceof Error ? error.message : String(error),
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[router] classification failed:", msg);
+    runtime.log(`router: classification failed — ${msg}`);
     return null;
   }
 }
