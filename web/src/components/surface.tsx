@@ -269,10 +269,12 @@ function PlainTextBlock({
   text,
   isOverflowing,
   fadeClassName = "from-card",
+  onExpandToggle,
 }: {
   text: string;
   isOverflowing: boolean;
   fadeClassName?: string;
+  onExpandToggle?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -298,7 +300,10 @@ function PlainTextBlock({
       {(isOverflowing || expanded) && (
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            setExpanded((v) => !v);
+            onExpandToggle?.();
+          }}
           className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           {expanded ? "Show less" : "Read more"}
@@ -364,8 +369,10 @@ function findVirtualIndex(offsets: number[], target: number): number {
 
 const InboundEntry = memo(function InboundEntry({
   entry,
+  onExpandToggle,
 }: {
   entry: MeasuredInboundEntry;
+  onExpandToggle?: () => void;
 }) {
   const displayContent = entry.content;
   const badgeName = entry.streamName;
@@ -387,7 +394,7 @@ const InboundEntry = memo(function InboundEntry({
             {badgeName}
           </span>
         )}
-        <PlainTextBlock text={displayContent} isOverflowing={entry.metrics.isOverflowing} />
+        <PlainTextBlock text={displayContent} isOverflowing={entry.metrics.isOverflowing} onExpandToggle={onExpandToggle} />
         <MessageCopyButton text={displayContent} />
       </div>
     </div>
@@ -426,8 +433,10 @@ const OutboundEntry = memo(function OutboundEntry({
 
 const StreamsResponseEntry = memo(function StreamsResponseEntry({
   entry,
+  onExpandToggle,
 }: {
   entry: MeasuredStreamsResponseEntry;
+  onExpandToggle?: () => void;
 }) {
   return (
     <div className="flex gap-3 items-start">
@@ -448,6 +457,7 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
           text={entry.content}
           isOverflowing={entry.metrics.isOverflowing}
           fadeClassName="from-muted/30"
+          onExpandToggle={onExpandToggle}
         />
         <MessageCopyButton text={entry.content} />
       </div>
@@ -477,16 +487,18 @@ const HookEntry = memo(function HookEntry({ entry }: { entry: MeasuredSurfaceEnt
 
 const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
   entry,
+  onExpandToggle,
 }: {
   entry: MeasuredSurfaceEntry;
+  onExpandToggle?: () => void;
 }) {
   switch (entry.kind) {
     case "inbound":
-      return <InboundEntry entry={entry as MeasuredInboundEntry} />;
+      return <InboundEntry entry={entry as MeasuredInboundEntry} onExpandToggle={onExpandToggle} />;
     case "outbound":
       return <OutboundEntry entry={entry} />;
     case "streams-response":
-      return <StreamsResponseEntry entry={entry as MeasuredStreamsResponseEntry} />;
+      return <StreamsResponseEntry entry={entry as MeasuredStreamsResponseEntry} onExpandToggle={onExpandToggle} />;
     case "hook":
       return <HookEntry entry={entry} />;
   }
@@ -506,6 +518,8 @@ export function Surface() {
   const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
+  const [measurementToken, setMeasurementToken] = useState(0);
+  const invalidateMeasurement = useCallback(() => setMeasurementToken((t) => t + 1), []);
 
   const [isSending, setIsSending] = useState(false);
   const { data: skillsData } = useQuery({
@@ -642,7 +656,7 @@ export function Surface() {
     if (hasAllNodes) {
       setVisibleLayoutReady(true);
     }
-  }, [measurementReady, visibleVirtualRows]);
+  }, [measurementReady, visibleVirtualRows, measurementToken]);
 
   useLayoutEffect(() => {
     const node = viewportRef.current;
@@ -802,7 +816,7 @@ export function Surface() {
                 className="absolute left-0 right-0"
                 style={{ top: `${top}px` }}
               >
-                <SurfaceEntryRenderer entry={entry} />
+                <SurfaceEntryRenderer entry={entry} onExpandToggle={invalidateMeasurement} />
               </div>
             ))}
           </div>
