@@ -366,6 +366,11 @@ export class PiSessionManager {
         reason,
         new Date().toISOString(),
       );
+      this.wsHub.broadcast({
+        type: "status_changed",
+        subsystem: "pi_session",
+        timestamp: new Date().toISOString(),
+      });
     }
 
     this.orchestrators.delete(streamId);

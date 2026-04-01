@@ -119,6 +119,13 @@ export type StatusResponse = {
 
 /* ── Streams ── */
 
+export type PiSessionStatus =
+  | "active"
+  | "waiting_for_user"
+  | "waiting_for_sessions"
+  | "ended"
+  | "crashed";
+
 export type StreamSummary = {
   id: string;
   name: string;
@@ -127,6 +134,7 @@ export type StreamSummary = {
   repoPath?: string;
   worktreePath?: string;
   piSessionId?: string;
+  piSessionStatus?: PiSessionStatus;
   sessionCount: number;
   createdAt: string;
 };

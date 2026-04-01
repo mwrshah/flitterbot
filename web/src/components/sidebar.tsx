@@ -5,8 +5,21 @@ import logoBlack from "~/assets/autonoma_logo_black_small.png";
 import logoWhite from "~/assets/autonoma_logo_white_small.png";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
-import type { StreamSummary } from "~/lib/types";
+import type { PiSessionStatus, StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
+
+function piStatusDotClass(status: PiSessionStatus | undefined): string {
+  switch (status) {
+    case "active":
+      return "bg-emerald-500 animate-pulse";
+    case "waiting_for_sessions":
+      return "bg-amber-500";
+    case "waiting_for_user":
+      return "bg-blue-400";
+    default:
+      return "bg-zinc-500";
+  }
+}
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   useWhyDidYouRender("NavItem", { to, label, icon });
@@ -105,16 +118,22 @@ export const Sidebar = memo(function Sidebar() {
                   ws.piSessionId ? (
                     <Link
                       key={ws.id}
-to="/streams/$piSessionId"
+                      to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId }}
                       className={cn(
-                        "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
+                        "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
                         currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                       )}
                     >
-                      <span className="truncate">{ws.name}</span>
+                      <span
+                        className={cn(
+                          "shrink-0 h-2 w-2 rounded-full",
+                          piStatusDotClass(ws.piSessionStatus),
+                        )}
+                      />
+                      <span className="truncate flex-1">{ws.name}</span>
                       <span className="text-sidebar-foreground/40 tabular-nums shrink-0 ml-2">
                         {ws.sessionCount}
                       </span>
@@ -122,9 +141,10 @@ to="/streams/$piSessionId"
                   ) : (
                     <div
                       key={ws.id}
-                      className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/40"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/40"
                     >
-                      <span className="truncate">{ws.name}</span>
+                      <span className={cn("shrink-0 h-2 w-2 rounded-full", "bg-zinc-500")} />
+                      <span className="truncate flex-1">{ws.name}</span>
                       <span className="text-sidebar-foreground/20 tabular-nums shrink-0 ml-2">
                         {ws.sessionCount}
                       </span>
