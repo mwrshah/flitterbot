@@ -8,7 +8,6 @@ import { Toaster } from "sonner";
 import { AppShell } from "~/components/app-shell";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
 import { NotFound } from "~/components/not-found";
-import { useGlobalShortcuts } from "~/hooks/use-global-shortcuts";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
@@ -77,7 +76,6 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const { startRealtime } = Route.useRouteContext();
   useWhyDidYouRender("RootComponent", {});
-  useGlobalShortcuts();
 
   useEffect(() => startRealtime(), [startRealtime]);
 
