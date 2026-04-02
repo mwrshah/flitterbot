@@ -91,6 +91,14 @@ code,
   color: var(--color-muted-foreground);
 }
 
+/* diff2html overrides — allow vertical scroll inside the diff panel */
+.diff-viewer-panel .d2h-file-diff {
+  overflow-y: auto;
+}
+.diff-viewer-panel .d2h-file-wrapper {
+  overflow: visible;
+}
+
 /* Hide scrollbars while keeping scroll functionality */
 .no-scrollbar {
   scrollbar-width: none !important;
