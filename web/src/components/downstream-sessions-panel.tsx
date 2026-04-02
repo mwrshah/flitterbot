@@ -155,7 +155,7 @@ export function DownstreamSessionsPanel({
           disabled={!hasWorktree}
           aria-pressed={showDiff}
           onClick={() => setShowDiff((v) => !v)}
-          className={cn(showDiff && "bg-accent text-accent-foreground")}
+          className={cn(showDiff && "bg-primary text-primary-foreground hover:bg-primary/80")}
         >
           Diff
         </Button>
