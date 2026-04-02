@@ -46,10 +46,21 @@ export async function handleBrowserPiSessionDiffRoute(
     maxBuffer: 5 * 1024 * 1024,
   };
 
+  // Find the fork point from main
+  let base: string;
+  try {
+    const { stdout: mergeBase } = await execFileAsync("git", ["merge-base", "main", "HEAD"], execOpts);
+    base = mergeBase.trim();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    runtime.log(`merge-base error: ${message}`);
+    return sendJson(response, 500, { ok: false, error: "Failed to find merge base" });
+  }
+
   // Preflight: cheap --stat to check size
   let stat: string;
   try {
-    const { stdout } = await execFileAsync("git", ["diff", "main...HEAD", "--stat"], execOpts);
+    const { stdout } = await execFileAsync("git", ["diff", base, "--stat"], execOpts);
     stat = stdout;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -78,7 +89,7 @@ export async function handleBrowserPiSessionDiffRoute(
   // Full diff
   let diff: string;
   try {
-    const { stdout } = await execFileAsync("git", ["diff", "main...HEAD"], execOpts);
+    const { stdout } = await execFileAsync("git", ["diff", base], execOpts);
     diff = stdout;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
