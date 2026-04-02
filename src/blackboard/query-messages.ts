@@ -99,7 +99,7 @@ export function getRecentDefaultMessages(
   const rows = after
     ? db.all<Pick<MessageRow, "content" | "created_at">>(
         `SELECT content, created_at FROM messages
-         WHERE direction = 'inbound' AND stream_id IS NULL AND created_at > ?
+         WHERE direction = 'inbound' AND stream_id IS NULL AND datetime(created_at) > datetime(?)
          ORDER BY created_at DESC LIMIT ?`,
         after,
         limit,
@@ -169,7 +169,7 @@ export function getRecentConversationByWorkstream(
             m.content, m.source, m.created_at, m.direction, m.sender
      FROM messages m
      JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
-     WHERE m.created_at >= datetime('now', '-' || ? || ' hours')
+     WHERE datetime(m.created_at) >= datetime('now', '-' || ? || ' hours')
      ORDER BY m.stream_id, m.created_at DESC`,
     withinHours,
   );

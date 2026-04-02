@@ -1,5 +1,6 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 
 const DIGIT_CODES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"];
 const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU", "KeyI", "KeyO"];
@@ -37,12 +38,7 @@ function isInputFocused(): boolean {
  */
 export function useGlobalShortcuts(streamPaths: string[] = []) {
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const lastStreamRef = useRef<string | null>(null);
-
-  if (pathname.startsWith("/streams/")) {
-    lastStreamRef.current = pathname;
-  }
+  useLastStreamPath();
 
   useEffect(() => {
     let lastGPress = 0;
@@ -57,7 +53,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
             return;
           case "KeyR":
             event.preventDefault();
-            navigate({ to: lastStreamRef.current ?? "/streams" });
+            navigate({ to: getLastStreamPath() });
             return;
         }
 
@@ -148,7 +144,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         // r: last-visited stream
         if (event.key === "r") {
           event.preventDefault();
-          navigate({ to: lastStreamRef.current ?? "/streams" });
+          navigate({ to: getLastStreamPath() });
           return;
         }
 
