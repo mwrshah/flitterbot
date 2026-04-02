@@ -1,3 +1,4 @@
+import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import { useQuery } from "@tanstack/react-query";
 import {
   type ClipboardEvent,
@@ -111,7 +112,7 @@ export const MessageInput = memo(function MessageInput({
 
   /**
    * Compute the pixel X position of a character index in the textarea,
-   * relative to the container div, using the mirror-div technique.
+   * relative to the container div, using pretext's prepare + layout.
    */
   const computeSlashLeft = useCallback((value: string, slashIdx: number) => {
     const textarea = textareaRef.current;
@@ -119,37 +120,22 @@ export const MessageInput = memo(function MessageInput({
     if (!textarea || !container || slashIdx < 0) return;
 
     const style = window.getComputedStyle(textarea);
-    const mirror = document.createElement("div");
-    mirror.style.position = "absolute";
-    mirror.style.visibility = "hidden";
-    mirror.style.pointerEvents = "none";
-    mirror.style.whiteSpace = "pre-wrap";
-    mirror.style.wordWrap = "break-word";
-    mirror.style.fontFamily = style.fontFamily;
-    mirror.style.fontSize = style.fontSize;
-    mirror.style.fontWeight = style.fontWeight;
-    mirror.style.letterSpacing = style.letterSpacing;
-    mirror.style.lineHeight = style.lineHeight;
-    mirror.style.paddingTop = style.paddingTop;
-    mirror.style.paddingRight = style.paddingRight;
-    mirror.style.paddingBottom = style.paddingBottom;
-    mirror.style.paddingLeft = style.paddingLeft;
-    mirror.style.width = `${textarea.offsetWidth}px`;
-    mirror.style.boxSizing = "border-box";
+    const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const paddingLeft = parseFloat(style.paddingLeft);
+    const paddingRight = parseFloat(style.paddingRight);
+    const contentWidth = textarea.offsetWidth - paddingLeft - paddingRight;
+    const lineHeight = parseFloat(style.lineHeight);
 
-    mirror.appendChild(document.createTextNode(value.slice(0, slashIdx)));
-    const marker = document.createElement("span");
-    marker.textContent = "\u200b"; // zero-width space marks the caret
-    mirror.appendChild(marker);
+    const textBeforeTrigger = value.slice(0, slashIdx);
+    const prepared = prepareWithSegments(textBeforeTrigger, font, { whiteSpace: "pre-wrap" });
+    const result = layoutWithLines(prepared, contentWidth, lineHeight);
 
-    document.body.appendChild(mirror);
-    const markerRect = marker.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    document.body.removeChild(mirror);
+    const lastLine = result.lines[result.lines.length - 1];
+    const xOffset = lastLine ? lastLine.width : 0;
 
     const popoverWidth = 320; // w-80
     const maxLeft = container.offsetWidth - popoverWidth;
-    setCaretLeft(Math.min(Math.max(0, markerRect.left - containerRect.left), maxLeft));
+    setCaretLeft(Math.min(Math.max(0, paddingLeft + xOffset), maxLeft));
   }, []);
 
   /**
