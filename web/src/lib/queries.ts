@@ -39,12 +39,14 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
     serverIds.add(item.id);
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string") serverIds.add(smId);
+    if (item.kind === "tool" && item.toolUseId) serverIds.add(item.toolUseId);
   }
 
   const extras = prev.filter((item) => {
     if (serverIds.has(item.id)) return false;
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string" && serverIds.has(smId)) return false;
+    if (item.kind === "tool" && item.toolUseId && serverIds.has(item.toolUseId)) return false;
     return true;
   });
 
