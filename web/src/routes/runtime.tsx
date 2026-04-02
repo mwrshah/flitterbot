@@ -10,7 +10,7 @@ import { formatDuration } from "~/lib/utils";
 
 export const Route = createFileRoute("/runtime")({
   head: () => ({
-    meta: [{ title: "Autonoma — Runtime" }],
+    meta: [{ title: "Autonoma" }],
   }),
   component: RuntimePage,
 });

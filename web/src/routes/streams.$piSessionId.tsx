@@ -17,7 +17,7 @@ export const Route = createFileRoute("/streams/$piSessionId")({
     wsMode: "pi-session",
   },
   head: () => ({
-    meta: [{ title: "Autonoma — Pi Session" }],
+    meta: [{ title: "Autonoma" }],
   }),
   loader: async ({ params, context }) => {
     // Seed from cache when available so route transitions stay instant.
