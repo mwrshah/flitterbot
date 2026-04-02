@@ -11,6 +11,8 @@ export function isInputFocused(): boolean {
   return false;
 }
 
+// The app currently exposes one primary composer at a time, so a single
+// registered focus target keeps global shortcut ownership centralized.
 export function registerComposerFocusTarget(handler: (() => void) | null) {
   focusComposer = handler;
 }
