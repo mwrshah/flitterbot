@@ -1,20 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { focusComposerInput, isInputFocused } from "~/lib/global-shortcuts";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 
 const DIGIT_CODES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"];
 const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU", "KeyI", "KeyO"];
-
-/** Returns true when the active element is an input, textarea, contenteditable, or role=textbox. */
-function isInputFocused(): boolean {
-  const el = document.activeElement;
-  if (!el) return false;
-  const tag = el.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA") return true;
-  if ((el as HTMLElement).isContentEditable) return true;
-  if (el.getAttribute("role") === "textbox") return true;
-  return false;
-}
 
 /**
  * Global keyboard shortcuts.
@@ -32,9 +22,9 @@ function isInputFocused(): boolean {
  * - f / b: Scroll down/up full page
  * - gg: Scroll to top (two g presses within 500ms)
  * - Shift+G: Scroll to bottom
+ * - i: Focus composer
  * - s: Surface view (/)
  * - r: Last-visited stream (falls back to /streams)
- * - {m,comma,period,j,k,l,i,o}: Navigate to stream 1-8 (home-row, u excluded — bare u scrolls up)
  */
 export function useGlobalShortcuts(streamPaths: string[] = []) {
   const navigate = useNavigate();
@@ -134,6 +124,13 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
           return;
         }
 
+        // i: focus composer (vim-style)
+        if (event.key === "i") {
+          event.preventDefault();
+          focusComposerInput();
+          return;
+        }
+
         // s: surface view
         if (event.key === "s") {
           event.preventDefault();
@@ -148,18 +145,6 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
           return;
         }
 
-        // Home-row stream switching (excluding u — bare u scrolls up)
-        const bareHomeRowCodes = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyI", "KeyO"];
-        const bareHomeRowIndices = [0, 1, 2, 3, 4, 5, 7, 8]; // maps to stream 1-6, 8-9 (skip 7/u)
-        const bareIdx = bareHomeRowCodes.indexOf(event.code);
-        if (bareIdx !== -1) {
-          const streamIdx = bareHomeRowIndices[bareIdx];
-          if (streamIdx !== undefined && streamIdx < streamPaths.length) {
-            event.preventDefault();
-            navigate({ to: streamPaths[streamIdx] });
-          }
-          return;
-        }
       }
     }
 
