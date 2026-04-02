@@ -30,8 +30,24 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
 
   if (!prev?.length) return next;
 
-  const ids = new Set(next.map((item) => item.id));
-  const extras = prev.filter((item) => !ids.has(item.id));
+  // Build a set of all identifiers from the server response: both `id` and any
+  // `serverMessageId` values.  WS-accumulated items use ordinal IDs ("msg-N")
+  // while the server returns the DB UUID as `id`.  The WS item's
+  // `serverMessageId` matches the server's `id`, so we need to check both.
+  const serverIds = new Set<string>();
+  for (const item of next) {
+    serverIds.add(item.id);
+    const smId = (item as Record<string, unknown>).serverMessageId;
+    if (typeof smId === "string") serverIds.add(smId);
+  }
+
+  const extras = prev.filter((item) => {
+    if (serverIds.has(item.id)) return false;
+    const smId = (item as Record<string, unknown>).serverMessageId;
+    if (typeof smId === "string" && serverIds.has(smId)) return false;
+    return true;
+  });
+
   if (!extras.length) {
     // All old items covered by server — check if identical to preserve reference
     return prev.length === next.length && prev.every((item, i) => item.id === next[i]!.id)
