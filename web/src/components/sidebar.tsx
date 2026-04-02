@@ -98,9 +98,9 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Brand */}
-      <div className="shrink-0 flex justify-center px-1 py-0 border-b border-sidebar-border">
-        <img src={logoBlack} alt="Autonoma" className="h-[3.75rem] w-auto -my-2 dark:hidden" />
-        <img src={logoWhite} alt="Autonoma" className="h-[3.75rem] w-auto -my-2 hidden dark:block" />
+      <div className="shrink-0 px-10 py-0 border-b border-sidebar-border">
+        <img src={logoBlack} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 dark:hidden" />
+        <img src={logoWhite} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 hidden dark:block" />
       </div>
 
       {/* Navigation */}
