@@ -18,7 +18,7 @@ export const Route = createFileRoute("/streams/default")({
     wsMode: "streams-default",
   },
   head: () => ({
-    meta: [{ title: "Autonoma — Streams / Default" }],
+    meta: [{ title: "Autonoma" }],
   }),
   loader: async ({ context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
