@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import { getStreamById } from "../blackboard/query-streams.ts";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,
@@ -153,6 +154,7 @@ export class PiSessionManager {
       customTools: customTools ?? [],
       role: "orchestrator",
       orchestratorContext,
+      cwd: repoPath,
     });
 
     const state = new PiSessionState();
@@ -171,7 +173,7 @@ export class PiSessionManager {
       runtimeInstanceId: this.runtimeInstanceId,
       pid: process.pid,
       sessionFile: created.session.sessionFile,
-      cwd: this.config.projectsDir,
+      cwd: repoPath ?? this.config.projectsDir,
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: created.modelInfo.provider,
       modelId: created.modelInfo.id,
@@ -211,6 +213,9 @@ export class PiSessionManager {
 
     const state = new PiSessionState();
     state.initialize(piSessionId, sessionFile ?? undefined, 0);
+
+    const stream = getStreamById(this.blackboard, streamId);
+    const repoPath = stream?.repo_path ?? undefined;
 
     const managed: ManagedPiSession = {
       session: null,
@@ -275,7 +280,7 @@ export class PiSessionManager {
       runtimeInstanceId: this.runtimeInstanceId,
       pid: process.pid,
       sessionFile: sessionFile ?? undefined,
-      cwd: this.config.projectsDir,
+      cwd: repoPath ?? this.config.projectsDir,
       startedAt: createdAt,
       lastEventAt: new Date().toISOString(),
       streamId: streamId,
@@ -300,6 +305,8 @@ export class PiSessionManager {
 
     const snapshot = managed.state.getSnapshot();
     const sessionFile = snapshot.sessionFile;
+    const stream = getStreamById(this.blackboard, managed.streamId);
+    const repoPath = stream?.repo_path ?? undefined;
 
     const created = await createAutonomaAgent({
       config: this.config,
@@ -308,7 +315,9 @@ export class PiSessionManager {
       orchestratorContext: {
         streamName: managed.streamName ?? managed.streamId,
         streamId: managed.streamId,
+        repoPath,
       },
+      cwd: repoPath,
       resumeSessionFile: sessionFile && fs.existsSync(sessionFile) ? sessionFile : undefined,
     });
 

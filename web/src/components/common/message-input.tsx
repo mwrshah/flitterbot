@@ -17,8 +17,9 @@ import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
+import type { DirectoryCompletionsResult } from "~/server/directory-completions";
 
-const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
+const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "", query: "" };
 
 type MessageInputProps = {
   isSending: boolean;
@@ -31,6 +32,8 @@ type MessageInputProps = {
   rows?: number;
   helpText?: string;
   autoFocus?: boolean;
+  /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
+  streamId?: string;
   fillHeight?: boolean;
 };
 
@@ -45,6 +48,7 @@ export const MessageInput = memo(function MessageInput({
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
   autoFocus = false,
+  streamId,
   fillHeight = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
@@ -85,10 +89,30 @@ export const MessageInput = memo(function MessageInput({
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
-  const { data: pathItems, isFetching: isPathFetching } = useQuery(
-    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen),
+  const [activeSearchQuery, setActiveSearchQuery] = useState("");
+  const { data: pathResult, isFetching: isPathFetching } = useQuery(
+    directoryCompletionsQueryOptions(activeSearchQuery, atPickerOpen, { streamId }),
   );
-  const pathItemsStable = pathItems ?? EMPTY_PATH_ITEMS;
+  useEffect(() => {
+    if (!atPickerOpen) {
+      setActiveSearchQuery("");
+      return;
+    }
+    if (!isPathFetching && debouncedAtFilter !== activeSearchQuery) {
+      setActiveSearchQuery(debouncedAtFilter);
+    }
+  }, [activeSearchQuery, atPickerOpen, debouncedAtFilter, isPathFetching]);
+  const [settledPathData, setSettledPathData] = useState<DirectoryCompletionsResult>(EMPTY_RESULT);
+  useEffect(() => {
+    if (!atPickerOpen) {
+      setSettledPathData(EMPTY_RESULT);
+      return;
+    }
+    if (!isPathFetching && pathResult && pathResult.query === activeSearchQuery) {
+      setSettledPathData(pathResult);
+    }
+  }, [activeSearchQuery, atPickerOpen, isPathFetching, pathResult]);
+  const pathData = settledPathData;
 
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
@@ -287,7 +311,7 @@ export const MessageInput = memo(function MessageInput({
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
-      const inserted = `@${item.path}${isDir ? "" : " "}`;
+      const inserted = `@${item.insertText}${isDir ? "" : " "}`;
       const newValue = before + inserted + after;
       setDraft(newValue);
       if (!isDir) {
@@ -492,12 +516,13 @@ export const MessageInput = memo(function MessageInput({
           />
           <PathPicker
             open={atPickerOpen}
-            items={pathItemsStable}
+            items={pathData.items}
             isFetching={isPathFetching}
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}
             anchorRef={containerRef}
+            fuzzy
           />
           <textarea
             ref={textareaRef}

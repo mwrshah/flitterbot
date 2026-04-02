@@ -197,11 +197,13 @@ export type DirectoryCompletionItem = {
   name: string;
   kind: "directory" | "file";
   path: string;
+  insertText: string;
 };
 
 export type DirectoryCompletionsResponse = {
   items: DirectoryCompletionItem[];
   cwd: string;
+  query: string;
 };
 
 /* ── WebSocket messages (inbound) ── */

@@ -36,11 +36,14 @@ type CreateAutonomaAgentOptions = {
   orchestratorContext?: OrchestratorInput;
   /** When set, resume an existing session from this JSONL file instead of creating a new one. */
   resumeSessionFile?: string;
+  /** Override the working directory (e.g. a specific repo root). Defaults to config.projectsDir. */
+  cwd?: string;
 };
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
-  const { config, customTools, role = "default", orchestratorContext, resumeSessionFile } = options;
-  const workingDir = config.projectsDir;
+  const { config, customTools, role = "default", orchestratorContext, resumeSessionFile, cwd } =
+    options;
+  const workingDir = cwd ?? config.projectsDir;
 
   // If resuming an existing session, open its JSONL file to preserve the piSessionId
   // and conversation history. Otherwise create a fresh session.
