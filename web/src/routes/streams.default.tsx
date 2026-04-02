@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
+import { StreamsTabBar } from "~/components/streams-tab-bar";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
@@ -67,13 +68,18 @@ function StreamsDefaultRoute() {
   return (
     <PanelGroup orientation="horizontal" className="h-full">
       <Panel defaultSize="75%" minSize="40%">
-        <ChatPanel
-          piSessionId={effectivePiSessionId}
-          timeline={timeline}
-          statusPills={statusPills}
-          isSessionBusy={isSessionBusy}
-          onSendMessage={onSendMessage}
-        />
+        <div className="flex flex-col h-full">
+          <StreamsTabBar />
+          <div className="flex-1 min-h-0">
+            <ChatPanel
+              piSessionId={effectivePiSessionId}
+              timeline={timeline}
+              statusPills={statusPills}
+              isSessionBusy={isSessionBusy}
+              onSendMessage={onSendMessage}
+            />
+          </div>
+        </div>
       </Panel>
       <ResizeHandle />
       <Panel defaultSize="25%" minSize="15%">
