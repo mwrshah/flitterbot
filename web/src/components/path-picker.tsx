@@ -10,7 +10,7 @@ type PathPickerProps = {
   onSelect: (item: DirectoryCompletionItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
-  /** When true, display results in fuzzy file search style (no folder emoji, path as secondary). */
+  /** When true, display compact mixed search results with path as secondary text. */
   fuzzy?: boolean;
 };
 
@@ -61,6 +61,7 @@ export const PathPicker = memo(function PathPicker({
             >
               {fuzzy ? (
                 <>
+                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
                   <span className="font-mono text-foreground shrink-0">{item.name}</span>
                   <span className="text-xs text-muted-foreground truncate">{item.path}</span>
                 </>

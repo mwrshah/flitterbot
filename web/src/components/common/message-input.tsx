@@ -103,6 +103,9 @@ export const MessageInput = memo(function MessageInput({
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
+  // Track cwd from directory responses for main surface root resolution
+  const lastCwdRef = useRef("");
+
   // Derive completion mode + root from the filter and context.
   // Stream views: first char after @ triggers fuzzy with streamId for root resolution.
   // Main surface: @repo/query triggers fuzzy with root = cwd/repo.
@@ -146,8 +149,6 @@ export const MessageInput = memo(function MessageInput({
   );
   const pathData = pathResult ?? EMPTY_RESULT;
 
-  // Track cwd from directory responses for main surface root resolution
-  const lastCwdRef = useRef("");
   useEffect(() => {
     if (pathData.cwd) lastCwdRef.current = pathData.cwd;
   }, [pathData.cwd]);
@@ -351,7 +352,15 @@ export const MessageInput = memo(function MessageInput({
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
-      const inserted = `@${item.path}${isDir ? "" : " "}`;
+      let insertedPath = item.path;
+      if (!streamId && completionOpts.mode === "fuzzy") {
+        const slashIdx = debouncedAtFilter.indexOf("/");
+        if (slashIdx > 0) {
+          const repoSegment = debouncedAtFilter.slice(0, slashIdx);
+          insertedPath = `${repoSegment}/${item.path}`;
+        }
+      }
+      const inserted = `@${insertedPath}${isDir ? "" : " "}`;
       const newValue = before + inserted + after;
       setDraft(newValue);
       if (!isDir) {
@@ -368,7 +377,7 @@ export const MessageInput = memo(function MessageInput({
         }
       });
     },
-    [handleDraftChange],
+    [completionOpts.mode, debouncedAtFilter, handleDraftChange, streamId],
   );
 
   const handleKeyDown = useCallback(
