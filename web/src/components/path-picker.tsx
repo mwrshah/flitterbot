@@ -4,6 +4,18 @@ import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
 
+function dirFromPath(path: string, name: string): string {
+  if (path.endsWith("/" + name)) return path.slice(0, -(name.length + 1));
+  if (path === name) return "";
+  return path;
+}
+
+function middleTruncate(str: string, maxLen = 32): string {
+  if (str.length <= maxLen) return str;
+  const tail = maxLen - 3;
+  return str.slice(0, 2) + "\u2026" + str.slice(-tail);
+}
+
 type PathPickerProps = {
   open: boolean;
   items: DirectoryCompletionItem[];
@@ -80,19 +92,17 @@ export const PathPicker = memo(function PathPicker({
               onSelect={() => onSelect(item)}
               className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
             >
-              {fuzzy ? (
-                <>
-                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
-                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
-                  <span className="text-xs text-muted-foreground truncate">{item.path}</span>
-                </>
-              ) : (
-                <>
-                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
-                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
-                  <span className="text-xs text-muted-foreground truncate">{item.path}</span>
-                </>
-              )}
+              {(() => {
+                const dir = dirFromPath(item.path, item.name);
+                const displayDir = dir ? middleTruncate(dir) : "";
+                return (
+                  <>
+                    <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                    <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
+                    {displayDir && <span className="text-xs text-muted-foreground">{displayDir}</span>}
+                  </>
+                );
+              })()}
             </CommandItem>
           ))}
         </CommandList>
