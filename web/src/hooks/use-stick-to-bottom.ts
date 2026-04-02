@@ -82,7 +82,7 @@ export function useStickToBottom({
         engageAndScroll();
       });
     });
-  }, [engageAndScroll, initialScrollWhen]);
+  }, [engageAndScroll, initialScrollWhen, initialScrollKey]);
 
   // DOM observation — only for non-virtual scroll containers
   useEffect(() => {
