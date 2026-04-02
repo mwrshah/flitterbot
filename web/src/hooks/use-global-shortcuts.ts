@@ -158,7 +158,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         const bareIdx = bareHomeRowCodes.indexOf(event.code);
         if (bareIdx !== -1) {
           const streamIdx = bareHomeRowIndices[bareIdx];
-          if (streamIdx < streamPaths.length) {
+          if (streamIdx !== undefined && streamIdx < streamPaths.length) {
             event.preventDefault();
             navigate({ to: streamPaths[streamIdx] });
           }
