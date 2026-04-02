@@ -15,6 +15,7 @@ import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
+import { cn } from "~/lib/utils";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 import type { DirectoryCompletionsResult } from "~/server/directory-completions";
 
@@ -33,6 +34,7 @@ type MessageInputProps = {
   autoFocus?: boolean;
   /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
   streamId?: string;
+  fillHeight?: boolean;
 };
 
 export const MessageInput = memo(function MessageInput({
@@ -47,6 +49,7 @@ export const MessageInput = memo(function MessageInput({
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
   autoFocus = false,
   streamId,
+  fillHeight = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -73,6 +76,25 @@ export const MessageInput = memo(function MessageInput({
       textareaRef.current?.focus();
     }
   }, [autoFocus]);
+
+  // Global "i" key: focus textarea when no input/textarea/contenteditable is focused (vim-style)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "i" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const el = document.activeElement;
+      if (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      textareaRef.current?.focus();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   // Debounce the path filter before querying
   const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
@@ -397,6 +419,13 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
+      // Ctrl+L: clear input (terminal-style)
+      if (event.ctrlKey && event.key === "l" && !event.shiftKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        setDraft("");
+        return;
+      }
+
       // When a picker is open, forward navigation keys to cmdk.
       // Tab is mapped to Enter so it accepts the highlighted item.
       // Use position refs (synchronously set) instead of state-synced open refs.
@@ -463,7 +492,10 @@ export const MessageInput = memo(function MessageInput({
 
   return (
     <div
-      className="shrink-0 border-t border-border px-6 py-3"
+      className={cn(
+        "border-t border-border px-6 py-3",
+        fillHeight ? "h-full flex flex-col min-h-0" : "shrink-0",
+      )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -473,7 +505,7 @@ export const MessageInput = memo(function MessageInput({
           onSubmit(draftRef.current.trim());
           setDraft("");
         }}
-        className="space-y-2"
+        className={cn("space-y-2", fillHeight && "flex-1 flex flex-col min-h-0")}
       >
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -508,7 +540,10 @@ export const MessageInput = memo(function MessageInput({
         />
         <div
           ref={containerRef}
-          className="relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent"
+          className={cn(
+            "relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent",
+            fillHeight && "flex-1 flex flex-col min-h-0",
+          )}
         >
           <SkillPicker
             open={pickerOpen}
@@ -533,9 +568,12 @@ export const MessageInput = memo(function MessageInput({
             onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            rows={rows}
+            rows={fillHeight ? undefined : rows}
             placeholder={placeholder}
-            className="w-full bg-transparent pl-10 pr-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none"
+            className={cn(
+              "w-full bg-transparent pl-10 pr-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none",
+              fillHeight && "flex-1 min-h-0",
+            )}
           />
           {/* Attach button — top left */}
           <button

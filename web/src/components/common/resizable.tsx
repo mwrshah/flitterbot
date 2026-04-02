@@ -15,3 +15,15 @@ export function ResizeHandle({ className }: { className?: string }) {
     />
   );
 }
+
+export function HorizontalResizeHandle({ className }: { className?: string }) {
+  useWhyDidYouRender("HorizontalResizeHandle", { className });
+  return (
+    <Separator
+      className={cn(
+        "relative flex h-px items-center justify-center bg-border after:absolute after:inset-x-0 after:top-1/2 after:h-1 after:-translate-y-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[resize-handle-active]:bg-accent",
+        className,
+      )}
+    />
+  );
+}

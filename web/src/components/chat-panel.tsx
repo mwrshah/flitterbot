@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
+import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -223,27 +224,35 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Message area — fills all available space */}
-      <div ref={viewportRef} data-scroll-container className="flex-1 overflow-auto px-6 py-4 space-y-3">
-        <StreamsMessageList
-          ref={messageListRef}
-          messages={agentMessages}
-          onMessagesRendered={settleToBottomIfPinned}
-        />
-      </div>
+      <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+        {/* Message area */}
+        <Panel defaultSize={85} minSize={20}>
+          <div ref={viewportRef} data-scroll-container className="h-full overflow-auto px-6 py-4 space-y-3">
+            <StreamsMessageList
+              ref={messageListRef}
+              messages={agentMessages}
+              onMessagesRendered={settleToBottomIfPinned}
+            />
+          </div>
+        </Panel>
 
-      <MessageInput
-        isSending={isSending}
-        onSubmit={handleSubmit}
-        pendingImages={pendingImages}
-        onAddImages={addImageFiles}
-        onRemoveImage={removeImage}
-        skills={skillsData?.items}
-        placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
-        rows={2}
-        autoFocus
-        streamId={streamId}
-      />
+        <HorizontalResizeHandle />
+
+        <Panel defaultSize={15} minSize={8}>
+          <MessageInput
+            isSending={isSending}
+            onSubmit={handleSubmit}
+            pendingImages={pendingImages}
+            onAddImages={addImageFiles}
+            onRemoveImage={removeImage}
+            skills={skillsData?.items}
+            placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
+            fillHeight
+            autoFocus
+            streamId={streamId}
+          />
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }
