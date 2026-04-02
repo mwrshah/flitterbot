@@ -13,6 +13,7 @@ import { Button } from "~/components/common/button";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import { cn } from "~/lib/utils";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
@@ -72,23 +73,9 @@ export const MessageInput = memo(function MessageInput({
     }
   }, [autoFocus]);
 
-  // Global "i" key: focus textarea when no input/textarea/contenteditable is focused (vim-style)
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "i" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-      const el = document.activeElement;
-      if (
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLTextAreaElement ||
-        (el instanceof HTMLElement && el.isContentEditable)
-      ) {
-        return;
-      }
-      e.preventDefault();
-      textareaRef.current?.focus();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    registerComposerFocusTarget(() => textareaRef.current?.focus());
+    return () => registerComposerFocusTarget(null);
   }, []);
 
   // Debounce the path filter before querying
