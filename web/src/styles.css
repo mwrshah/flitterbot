@@ -97,13 +97,6 @@ code,
   display: table-cell;
   width: 7.5em;
 }
-.diff-viewer-panel .d2h-code-linenumber .line-num1,
-.diff-viewer-panel .d2h-code-linenumber .line-num2 {
-  display: inline-block;
-  float: none;
-  width: 3.5em;
-  text-align: right;
-}
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
 }
