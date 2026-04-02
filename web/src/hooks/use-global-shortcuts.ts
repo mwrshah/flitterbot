@@ -36,6 +36,8 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
     function handleKeyDown(event: KeyboardEvent) {
       // Alt+key: navigation shortcuts
       if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        // Use physical key codes here so Option/Alt combinations still map to
+        // the intended home-row stream slots even when event.key varies by layout.
         switch (event.code) {
           case "KeyS":
             event.preventDefault();
@@ -124,7 +126,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
           return;
         }
 
-        // i: focus composer (vim-style)
+        // i: focus the registered composer target after the input has been blurred.
         if (event.key === "i") {
           event.preventDefault();
           focusComposerInput();
