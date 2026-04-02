@@ -89,7 +89,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         const container = document.querySelector<HTMLElement>("[data-scroll-container]");
         if (!container) return;
         event.preventDefault();
-        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+        container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
         return;
       }
 
@@ -103,7 +103,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
             const container = document.querySelector<HTMLElement>("[data-scroll-container]");
             if (!container) return;
             event.preventDefault();
-            container.scrollTo({ top: 0, behavior: "smooth" });
+            container.scrollTo({ top: 0, behavior: "auto" });
           } else {
             lastGPress = now;
           }
