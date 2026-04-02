@@ -211,7 +211,7 @@ export function findIdleCleanupCandidates(
       `SELECT *
          FROM sessions
          WHERE status IN ('working', 'stale')
-           AND last_event_at < ?
+           AND datetime(last_event_at) < datetime(?)
          ORDER BY last_event_at ASC`,
       idleBeforeIsoOrHours,
     );
@@ -232,7 +232,7 @@ export function markSessionEnded(
   db: BlackboardDatabase,
   sessionId: string,
   reason: string,
-  endedAt = new Date().toISOString(),
+  endedAt = nowIso(),
 ): void {
   db.prepare(
     `UPDATE sessions
@@ -304,7 +304,7 @@ export function updateSessionStop(db: BlackboardDatabase, sessionId: string): vo
      SET last_event_at = MAX(last_event_at, ?),
          status = CASE
            WHEN status = 'ended' THEN status
-           WHEN ? >= last_event_at THEN 'idle'
+           WHEN datetime(?) >= datetime(last_event_at) THEN 'idle'
            ELSE status
          END
      WHERE session_id = ?`,

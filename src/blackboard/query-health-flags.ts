@@ -12,7 +12,9 @@ export function setHealthFlag(
   ttlMinutes?: number,
 ): void {
   const expiresAt =
-    ttlMinutes != null ? new Date(Date.now() + ttlMinutes * 60_000).toISOString() : null;
+    ttlMinutes != null
+      ? new Date(Date.now() + ttlMinutes * 60_000).toISOString().replace(/\.\d+Z$/, "Z")
+      : null;
   db.prepare(
     `INSERT INTO health_flags (flag, reason, set_at, expires_at, cleared_at)
      VALUES (?, ?, datetime('now'), ?, NULL)
@@ -31,7 +33,7 @@ export function getActiveHealthFlags(db: BlackboardDatabase): HealthFlagRow[] {
   return db.all<HealthFlagRow>(
     `SELECT * FROM health_flags
      WHERE cleared_at IS NULL
-       AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+       AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))`,
   );
 }
 
