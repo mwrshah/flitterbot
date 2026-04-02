@@ -76,6 +76,31 @@ export const fetchStreamsWorktree = createServerFn({ method: "GET" })
     }
   });
 
+export type DiffResult =
+  | { mode: "diff"; diff: string }
+  | { mode: "summary"; stat: string; files: number; insertions: number; deletions: number };
+
+export const fetchStreamsDiff = createServerFn({ method: "GET" })
+  .inputValidator((input: { piSessionId: string }) => input)
+  .handler(async ({ data }): Promise<DiffResult | null> => {
+    const url = `${BASE_URL.replace(/\/$/, "")}/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/diff`;
+    const headers: Record<string, string> = {
+      ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const res = await fetch(url, { headers, signal: controller.signal });
+      if (res.status === 204) return null;
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return (await res.json()) as DiffResult;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
 export const fetchStreamsInputHistory = createServerFn({ method: "GET" }).handler(
   async (): Promise<ChatTimelineItem[]> => {
     try {

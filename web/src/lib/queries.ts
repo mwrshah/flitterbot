@@ -9,9 +9,11 @@ import type {
 import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
   fetchDownstreamSessions,
+  fetchStreamsDiff,
   fetchStreamsHistory,
   fetchStreamsInputHistory,
   fetchStreamsWorktree,
+  type DiffResult,
   type StreamInfo,
 } from "~/server/streams";
 
@@ -100,6 +102,19 @@ export function streamsWorktreeQueryOptions(piSessionId: string) {
     queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { piSessionId } }),
     enabled: !!piSessionId,
     staleTime: 30_000,
+  };
+}
+
+/**
+ * Git diff (against main) for a stream's worktree.
+ * Only fetched when the diff panel toggle is active.
+ */
+export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
+  return {
+    queryKey: ["streams-diff", piSessionId] as const,
+    queryFn: (): Promise<DiffResult | null> => fetchStreamsDiff({ data: { piSessionId } }),
+    enabled: !!piSessionId && enabled,
+    staleTime: 10_000,
   };
 }
 

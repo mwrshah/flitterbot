@@ -14,6 +14,7 @@ import {
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
+import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
 import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
 import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
 import {
@@ -183,6 +184,16 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     !segments[4]
   ) {
     return handleBrowserPiSessionStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "GET" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "diff" &&
+    !segments[4]
+  ) {
+    return handleBrowserPiSessionDiffRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));
