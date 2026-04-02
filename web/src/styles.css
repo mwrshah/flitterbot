@@ -99,8 +99,10 @@ code,
 }
 .diff-viewer-panel .d2h-code-linenumber .line-num1,
 .diff-viewer-panel .d2h-code-linenumber .line-num2 {
+  display: inline-block;
   float: none;
-  display: inline;
+  width: 3.5em;
+  text-align: right;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
