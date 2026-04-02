@@ -57,7 +57,7 @@ export const SkillPicker = memo(function SkillPicker({
   if (!open || skills.length === 0) return null;
 
   return createPortal(
-    <div ref={pickerRef} className="fixed w-80 z-50" style={{ top: pos.top, left: pos.left }}>
+    <div ref={pickerRef} className="fixed w-[28rem] z-50" style={{ top: pos.top, left: pos.left }}>
       <Command
         ref={commandRef}
         loop
@@ -78,7 +78,7 @@ export const SkillPicker = memo(function SkillPicker({
               onSelect={() => onSelect(skill.name)}
               className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
             >
-              <span className="font-mono text-foreground shrink-0">/{skill.name}</span>
+              <span className="font-mono text-xs text-foreground shrink-0">/{skill.name}</span>
               <span className="text-xs text-muted-foreground truncate">{skill.description}</span>
             </CommandItem>
           ))}

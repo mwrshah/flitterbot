@@ -55,7 +55,7 @@ export const PathPicker = memo(function PathPicker({
   if (!open) return null;
 
   return createPortal(
-    <div ref={pickerRef} className="fixed w-80 z-50" style={{ top: pos.top, left: pos.left }}>
+    <div ref={pickerRef} className="fixed w-[28rem] z-50" style={{ top: pos.top, left: pos.left }}>
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -83,13 +83,13 @@ export const PathPicker = memo(function PathPicker({
               {fuzzy ? (
                 <>
                   <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
-                  <span className="font-mono text-foreground shrink-0">{item.name}</span>
+                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
                   <span className="text-xs text-muted-foreground truncate">{item.path}</span>
                 </>
               ) : (
                 <>
                   <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
-                  <span className="font-mono text-foreground shrink-0">{item.name}</span>
+                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
                   <span className="text-xs text-muted-foreground truncate">{item.path}</span>
                 </>
               )}
