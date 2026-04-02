@@ -162,8 +162,8 @@ export function DownstreamSessionsPanel({
           variant="outline"
           size="sm"
         >
-          <ToggleGroupItem value="info">Info</ToggleGroupItem>
-          <ToggleGroupItem value="diff" disabled={!hasWorktree}>Diff</ToggleGroupItem>
+          <ToggleGroupItem value="info" className="aria-pressed:text-accent-foreground">Info</ToggleGroupItem>
+          <ToggleGroupItem value="diff" disabled={!hasWorktree} className="aria-pressed:text-accent-foreground">Diff</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
