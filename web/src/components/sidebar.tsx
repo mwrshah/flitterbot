@@ -3,6 +3,7 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import logoBlack from "~/assets/autonoma_logo_black_small.png";
 import logoWhite from "~/assets/autonoma_logo_white_small.png";
+import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useModifierLabel } from "~/hooks/platform";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
@@ -68,6 +69,7 @@ const icons = {
 
 export const Sidebar = memo(function Sidebar() {
   const mod = useModifierLabel();
+  const lastStreamPath = useLastStreamPath();
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
@@ -107,7 +109,7 @@ export const Sidebar = memo(function Sidebar() {
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod} + S`} />
-        <NavItem to="/streams" label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + R`} />
+        <NavItem to={lastStreamPath} label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + R`} />
       </nav>
 
       {/* Streams */}
