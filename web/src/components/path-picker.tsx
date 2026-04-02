@@ -6,9 +6,11 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
 
 function dirFromPath(path: string, name: string): string {
-  if (path.endsWith("/" + name)) return path.slice(0, -(name.length + 1));
-  if (path === name) return "";
-  return path;
+  // Strip trailing slash for directory entries (e.g. "features/" -> "features")
+  const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
+  if (cleanPath.endsWith("/" + name)) return cleanPath.slice(0, -(name.length + 1));
+  if (cleanPath === name) return "";
+  return cleanPath;
 }
 
 const DIR_FONT = '400 12px "Geist Variable", ui-sans-serif, system-ui, sans-serif';
@@ -126,7 +128,7 @@ export const PathPicker = memo(function PathPicker({
                 key={item.path}
                 value={item.path}
                 onSelect={() => onSelect(item)}
-                className="flex flex-col gap-0 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
+                className="!flex !flex-col !items-start gap-0 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
               >
                 <span className="flex items-baseline gap-2">
                   <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
