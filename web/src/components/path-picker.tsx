@@ -77,17 +77,23 @@ export const PathPicker = memo(function PathPicker({
   // shouldFilter={false} means cmdk won't auto-select on children change.
   // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // When items change, reset selection to first item and scroll list to top
   useEffect(() => {
     setSelectedValue(items[0]?.path ?? "");
+    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
+    if (list) list.scrollTop = 0;
   }, [items]);
 
+  // On keyboard navigation, keep the selected item visible
   useEffect(() => {
     if (!selectedValue) return;
-    const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
-    el?.scrollIntoView({ block: "nearest" });
+    requestAnimationFrame(() => {
+      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
+      el?.scrollIntoView({ block: "nearest" });
+    });
   }, [selectedValue]);
-
-  const pickerRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const updatePosition = useCallback(() => {
