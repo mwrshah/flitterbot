@@ -12,6 +12,8 @@ type PathPickerProps = {
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
   anchorRef: RefObject<HTMLDivElement | null>;
+  /** When true, display compact mixed search results with path as secondary text. */
+  fuzzy?: boolean;
 };
 
 export const PathPicker = memo(function PathPicker({
@@ -22,8 +24,9 @@ export const PathPicker = memo(function PathPicker({
   caretLeft,
   commandRef,
   anchorRef,
+  fuzzy,
 }: PathPickerProps) {
-  useWhyDidYouRender("PathPicker", { open, items, isFetching, caretLeft });
+  useWhyDidYouRender("PathPicker", { open, items, isFetching, caretLeft, fuzzy });
   // shouldFilter={false} means cmdk won't auto-select on children change.
   // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
@@ -77,9 +80,19 @@ export const PathPicker = memo(function PathPicker({
               onSelect={() => onSelect(item)}
               className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
             >
-              <span className="shrink-0">{item.kind === "directory" ? "📁" : "📄"}</span>
-              <span className="font-mono text-foreground shrink-0">{item.name}</span>
-              <span className="text-xs text-muted-foreground truncate">{item.path}</span>
+              {fuzzy ? (
+                <>
+                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                  <span className="font-mono text-foreground shrink-0">{item.name}</span>
+                  <span className="text-xs text-muted-foreground truncate">{item.path}</span>
+                </>
+              ) : (
+                <>
+                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                  <span className="font-mono text-foreground shrink-0">{item.name}</span>
+                  <span className="text-xs text-muted-foreground truncate">{item.path}</span>
+                </>
+              )}
             </CommandItem>
           ))}
         </CommandList>

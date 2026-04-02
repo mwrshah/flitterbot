@@ -249,6 +249,7 @@ export function ChatPanel({
             placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
             fillHeight
             autoFocus
+            streamId={streamId}
           />
         </Panel>
       </PanelGroup>

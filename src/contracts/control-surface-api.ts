@@ -222,11 +222,13 @@ export interface DirectoryCompletionItem {
   name: string;
   kind: "directory" | "file";
   path: string; // relative to CWD, e.g. "src/routes/"
+  insertText: string;
 }
 
 export interface DirectoryCompletionsResponse {
   items: DirectoryCompletionItem[];
   cwd: string;
+  query: string;
 }
 
 export interface StopResponse {
