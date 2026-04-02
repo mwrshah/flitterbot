@@ -6,6 +6,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -15,8 +16,9 @@ import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
+import type { DirectoryCompletionsResult } from "~/server/directory-completions";
 
-const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
+const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "" };
 
 type MessageInputProps = {
   isSending: boolean;
@@ -29,6 +31,8 @@ type MessageInputProps = {
   rows?: number;
   helpText?: string;
   autoFocus?: boolean;
+  /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
+  streamId?: string;
 };
 
 export const MessageInput = memo(function MessageInput({
@@ -42,6 +46,7 @@ export const MessageInput = memo(function MessageInput({
   rows = 2,
   helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
   autoFocus = false,
+  streamId,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -76,10 +81,56 @@ export const MessageInput = memo(function MessageInput({
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
-  const { data: pathItems, isFetching: isPathFetching } = useQuery(
-    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen),
+  // Derive completion mode + root from the filter and context.
+  // Stream views: first char after @ triggers fuzzy with streamId for root resolution.
+  // Main surface: @repo/query triggers fuzzy with root = cwd/repo.
+  const completionOpts = useMemo(() => {
+    if (streamId) {
+      // Stream view: any non-empty filter with no leading slash → fuzzy
+      // Empty or pure-directory prefix (ends with /) → directory drill-down
+      if (debouncedAtFilter && !debouncedAtFilter.endsWith("/")) {
+        return { mode: "fuzzy" as const, streamId };
+      }
+      return {};
+    }
+    // Main surface: @repo/query → fuzzy when there's text after first /
+    const slashIdx = debouncedAtFilter.indexOf("/");
+    if (slashIdx > 0) {
+      const afterSlash = debouncedAtFilter.slice(slashIdx + 1);
+      if (afterSlash && !afterSlash.endsWith("/")) {
+        // Compute root from the cached cwd + repo segment
+        const repoSegment = debouncedAtFilter.slice(0, slashIdx);
+        const rootFromCwd = lastCwdRef.current
+          ? `${lastCwdRef.current}/${repoSegment}`
+          : undefined;
+        return {
+          mode: "fuzzy" as const,
+          root: rootFromCwd,
+          // The backend fuzzy filter is just the part after "repo/"
+          filterOverride: afterSlash,
+        };
+      }
+    }
+    return {};
+  }, [debouncedAtFilter, streamId]);
+
+  const queryFilter =
+    "filterOverride" in completionOpts && completionOpts.filterOverride !== undefined
+      ? completionOpts.filterOverride
+      : debouncedAtFilter;
+
+  const { data: pathResult, isFetching: isPathFetching } = useQuery(
+    directoryCompletionsQueryOptions(queryFilter, atPickerOpen, completionOpts),
   );
-  const pathItemsStable = pathItems ?? EMPTY_PATH_ITEMS;
+  const pathData = pathResult ?? EMPTY_RESULT;
+
+  // Track cwd from directory responses for main surface root resolution
+  const lastCwdRef = useRef("");
+  useEffect(() => {
+    if (pathData.cwd) lastCwdRef.current = pathData.cwd;
+  }, [pathData.cwd]);
+
+  const isFuzzyMode = completionOpts.mode === "fuzzy";
 
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
@@ -469,11 +520,12 @@ export const MessageInput = memo(function MessageInput({
           />
           <PathPicker
             open={atPickerOpen}
-            items={pathItemsStable}
+            items={pathData.items}
             isFetching={isPathFetching}
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}
+            fuzzy={isFuzzyMode}
           />
           <textarea
             ref={textareaRef}

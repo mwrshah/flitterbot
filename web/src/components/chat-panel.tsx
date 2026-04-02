@@ -242,6 +242,7 @@ export function ChatPanel({
         placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
         rows={2}
         autoFocus
+        streamId={streamId}
       />
     </div>
   );

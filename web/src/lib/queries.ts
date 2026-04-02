@@ -1,12 +1,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
-import type {
-  ChatTimelineItem,
-  DirectoryCompletionItem,
-  DownstreamSessionItem,
-  StatusResponse,
-} from "~/lib/types";
-import { fetchDirectoryCompletions } from "~/server/directory-completions";
+import type { ChatTimelineItem, DownstreamSessionItem, StatusResponse } from "~/lib/types";
+import {
+  type DirectoryCompletionsResult,
+  fetchDirectoryCompletions,
+} from "~/server/directory-completions";
 import {
   fetchDownstreamSessions,
   fetchStreamsDiff,
@@ -160,11 +158,20 @@ export function surfaceTimelineQueryOptions() {
 }
 
 /** Directory completions for the @-mention path picker. */
-export function directoryCompletionsQueryOptions(pathFilter: string, enabled: boolean) {
+export function directoryCompletionsQueryOptions(
+  pathFilter: string,
+  enabled: boolean,
+  opts?: { mode?: "directory" | "fuzzy"; root?: string; streamId?: string },
+) {
+  const mode = opts?.mode;
+  const root = opts?.root;
+  const streamId = opts?.streamId;
   return {
-    queryKey: ["directory-completions", pathFilter] as const,
-    queryFn: (): Promise<DirectoryCompletionItem[]> =>
-      fetchDirectoryCompletions({ data: { path: pathFilter } }),
+    queryKey: ["directory-completions", pathFilter, mode ?? "directory", root ?? "", streamId ?? ""] as const,
+    queryFn: (): Promise<DirectoryCompletionsResult> =>
+      fetchDirectoryCompletions({
+        data: { path: pathFilter, mode, root, streamId },
+      }),
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 5_000,
