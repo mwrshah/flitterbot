@@ -1,4 +1,5 @@
-import { memo, type Ref } from "react";
+import { memo, type Ref, type RefObject, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Command,
   CommandEmpty,
@@ -16,6 +17,7 @@ type SkillPickerProps = {
   onSelect: (skillName: string) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
+  anchorRef: RefObject<HTMLDivElement | null>;
 };
 
 export const SkillPicker = memo(function SkillPicker({
@@ -25,6 +27,7 @@ export const SkillPicker = memo(function SkillPicker({
   onSelect,
   caretLeft,
   commandRef,
+  anchorRef,
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
     open,
@@ -33,10 +36,28 @@ export const SkillPicker = memo(function SkillPicker({
     onSelect,
   });
 
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    const picker = pickerRef.current;
+    if (!anchor || !picker) return;
+    const rect = anchor.getBoundingClientRect();
+    const pickerHeight = picker.offsetHeight;
+    const top = Math.max(0, rect.top - pickerHeight - 4); // 4px gap (mb-1)
+    const left = rect.left + (caretLeft ?? 0);
+    setPos({ top, left });
+  }, [anchorRef, caretLeft]);
+
+  useLayoutEffect(() => {
+    if (open) updatePosition();
+  }, [open, updatePosition, filter]);
+
   if (!open || skills.length === 0) return null;
 
-  return (
-    <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
+  return createPortal(
+    <div ref={pickerRef} className="fixed w-80 z-50" style={{ top: pos.top, left: pos.left }}>
       <Command
         ref={commandRef}
         loop
@@ -63,6 +84,7 @@ export const SkillPicker = memo(function SkillPicker({
           ))}
         </CommandList>
       </Command>
-    </div>
+    </div>,
+    document.body,
   );
 });
