@@ -3,6 +3,7 @@ import type http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { DirectoryCompletionsResponse } from "../contracts/control-surface-api.ts";
+import { getOrCreate } from "../file-finder/manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
@@ -16,6 +17,64 @@ export async function handleBrowserDirectoryCompletionsRoute(
   res: http.ServerResponse,
 ) {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  const mode = url.searchParams.get("mode");
+  const root = url.searchParams.get("root");
+  const streamId = url.searchParams.get("streamId");
+
+  // Fuzzy file search mode via FileFinder
+  if (mode === "fuzzy") {
+    const filter = url.searchParams.get("path") ?? "";
+
+    // Determine the repo root: explicit param, or look up from streamId
+    let repoRoot = root;
+    if (!repoRoot && streamId) {
+      const { getStreamById } = await import("../blackboard/query-streams.ts");
+      const stream = getStreamById(runtime.blackboard, streamId);
+      repoRoot = stream?.repo_path ?? null;
+    }
+
+    if (!repoRoot) {
+      return sendJson(res, 200, { items: [], cwd: "" } satisfies DirectoryCompletionsResponse);
+    }
+
+    // Empty filter: return empty (frontend shows first-level dirs via directory mode)
+    if (!filter) {
+      return sendJson(
+        res,
+        200,
+        { items: [], cwd: repoRoot } satisfies DirectoryCompletionsResponse,
+      );
+    }
+
+    try {
+      const finder = getOrCreate(repoRoot);
+      const result = finder.fileSearch(filter, { pageSize: MAX_ITEMS });
+
+      if (!result.ok) {
+        return sendJson(
+          res,
+          200,
+          { items: [], cwd: repoRoot } satisfies DirectoryCompletionsResponse,
+        );
+      }
+
+      const items = result.value.items.map((item) => ({
+        name: item.fileName,
+        kind: "file" as const,
+        path: item.relativePath,
+      }));
+
+      return sendJson(res, 200, { items, cwd: repoRoot } satisfies DirectoryCompletionsResponse);
+    } catch {
+      return sendJson(
+        res,
+        200,
+        { items: [], cwd: repoRoot } satisfies DirectoryCompletionsResponse,
+      );
+    }
+  }
+
+  // --- Existing directory completion mode (unchanged) ---
   const pathParam = url.searchParams.get("path") ?? "";
 
   // Resolve CWD from default Pi session's config, fallback to process.cwd()

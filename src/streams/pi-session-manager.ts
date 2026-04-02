@@ -153,6 +153,7 @@ export class PiSessionManager {
       customTools: customTools ?? [],
       role: "orchestrator",
       orchestratorContext,
+      cwd: repoPath,
     });
 
     const state = new PiSessionState();

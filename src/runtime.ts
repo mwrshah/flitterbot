@@ -246,6 +246,8 @@ export class ControlSurfaceRuntime {
       // ignore
     }
     this.blackboard.close();
+    const { destroyAll: destroyAllFileFinders } = await import("./file-finder/manager.ts");
+    destroyAllFileFinders();
   }
 
   /**
@@ -1015,21 +1017,57 @@ export class ControlSurfaceRuntime {
               description:
                 "Optional agent-authored context appended to the stream prompt. Use for supplementary information the orchestrator wouldn't otherwise have: spec paths, constraints, relevant background gathered during triage. Omit if there's nothing to add.",
             },
+            repo: {
+              type: "string",
+              description:
+                "Optional repository name (relative to projects dir, e.g. 'autonoma' or 'KLAIR'). When provided, the stream's orchestrator and agents will use this repo as their working directory.",
+            },
           },
           required: ["name"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { name, message: agentMessage } = params as { name: string; message?: string };
-          const { insertStream } = await import("./blackboard/query-streams.ts");
+          const { name, message: agentMessage, repo } = params as {
+            name: string;
+            message?: string;
+            repo?: string;
+          };
+
+          // Resolve and validate repo path if provided
+          let repoPath: string | undefined;
+          if (repo) {
+            const resolved = path.join(this.config.projectsDir, repo);
+            if (
+              !fs.existsSync(resolved) ||
+              !fs.existsSync(path.join(resolved, ".git"))
+            ) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Error: "${repo}" is not a valid git repository in ${this.config.projectsDir}`,
+                  },
+                ],
+                details: {},
+              };
+            }
+            repoPath = resolved;
+          }
+
+          const { insertStream, enrichStream } = await import("./blackboard/query-streams.ts");
           const ws = insertStream(this.blackboard, name);
-          this.log(`default agent created stream "${name}" (${ws.id})`);
+
+          if (repoPath) {
+            enrichStream(this.blackboard, ws.id, repoPath);
+          }
+
+          this.log(`default agent created stream "${name}" (${ws.id})${repoPath ? ` repo=${repoPath}` : ""}`);
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
               ws.id,
               ws.name,
-              undefined,
+              repoPath,
               this.createCustomTools("orchestrator", ws.id),
             );
 
