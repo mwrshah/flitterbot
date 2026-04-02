@@ -129,20 +129,16 @@ function mergeCompletionItems(
   primary: DirectoryCompletionItem[],
   secondary: DirectoryCompletionItem[],
 ): DirectoryCompletionItem[] {
-  const directories = primary.filter((item) => item.kind === "directory");
-  const topRanked = [directories[0], secondary[0], secondary[1], directories[1], directories[2]].filter(
-    (item): item is DirectoryCompletionItem => Boolean(item),
-  );
-  const remainder = [
+  const sorted = [
+    ...primary.filter((item) => item.kind === "directory"),
     ...primary.filter((item) => item.kind !== "directory"),
-    ...directories.slice(3),
-    ...secondary.slice(2),
+    ...secondary,
   ];
 
   const merged: DirectoryCompletionItem[] = [];
   const seen = new Set<string>();
 
-  for (const item of [...topRanked, ...remainder]) {
+  for (const item of sorted) {
     if (seen.has(item.path)) continue;
     seen.add(item.path);
     merged.push(item);

@@ -81,6 +81,12 @@ export const PathPicker = memo(function PathPicker({
     setSelectedValue(items[0]?.path ?? "");
   }, [items]);
 
+  useEffect(() => {
+    if (!selectedValue) return;
+    const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
+    el?.scrollIntoView({ block: "nearest" });
+  }, [selectedValue]);
+
   const pickerRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
