@@ -1,4 +1,5 @@
-import { memo, type Ref, useEffect, useState } from "react";
+import { memo, type Ref, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
@@ -10,6 +11,7 @@ type PathPickerProps = {
   onSelect: (item: DirectoryCompletionItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
+  anchorRef: RefObject<HTMLDivElement | null>;
 };
 
 export const PathPicker = memo(function PathPicker({
@@ -19,6 +21,7 @@ export const PathPicker = memo(function PathPicker({
   onSelect,
   caretLeft,
   commandRef,
+  anchorRef,
 }: PathPickerProps) {
   useWhyDidYouRender("PathPicker", { open, items, isFetching, caretLeft });
   // shouldFilter={false} means cmdk won't auto-select on children change.
@@ -28,10 +31,28 @@ export const PathPicker = memo(function PathPicker({
     setSelectedValue(items[0]?.path ?? "");
   }, [items]);
 
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    const picker = pickerRef.current;
+    if (!anchor || !picker) return;
+    const rect = anchor.getBoundingClientRect();
+    const pickerHeight = picker.offsetHeight;
+    const top = Math.max(0, rect.top - pickerHeight - 4);
+    const left = rect.left + (caretLeft ?? 0);
+    setPos({ top, left });
+  }, [anchorRef, caretLeft]);
+
+  useLayoutEffect(() => {
+    if (open) updatePosition();
+  }, [open, updatePosition, items]);
+
   if (!open) return null;
 
-  return (
-    <div className="absolute bottom-full mb-1 w-80 z-50" style={{ left: caretLeft ?? 0 }}>
+  return createPortal(
+    <div ref={pickerRef} className="fixed w-80 z-50" style={{ top: pos.top, left: pos.left }}>
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -63,6 +84,7 @@ export const PathPicker = memo(function PathPicker({
           ))}
         </CommandList>
       </Command>
-    </div>
+    </div>,
+    document.body,
   );
 });
