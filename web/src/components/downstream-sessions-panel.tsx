@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { html as diff2html } from "diff2html";
 import { ColorSchemeType } from "diff2html/lib/types";
 import "diff2html/bundles/css/diff2html.min.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useTheme } from "~/hooks/use-theme";
@@ -99,6 +99,9 @@ export function DownstreamSessionsPanel({
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const { resolvedTheme } = useTheme();
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
+  useEffect(() => {
+    setPanelView("info");
+  }, [piSessionId]);
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );
