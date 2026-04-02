@@ -3,7 +3,7 @@ import { html as diff2html } from "diff2html";
 import { ColorSchemeType } from "diff2html/lib/types";
 import "diff2html/bundles/css/diff2html.min.css";
 import { useMemo, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -98,7 +98,7 @@ export function DownstreamSessionsPanel({
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const { resolvedTheme } = useTheme();
-  const [showDiff, setShowDiff] = useState(false);
+  const [panelView, setPanelView] = useState<"info" | "diff">("info");
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );
@@ -106,6 +106,7 @@ export function DownstreamSessionsPanel({
   const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
   const worktree = worktreeQuery.data;
   const hasWorktree = !!worktree?.worktreePath;
+  const showDiff = panelView === "diff";
 
   const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
 
@@ -149,16 +150,18 @@ export function DownstreamSessionsPanel({
             <div />
           );
         })()}
-        <Button
+        <ToggleGroup
+          value={[panelView]}
+          onValueChange={(newValue) => {
+            const val = newValue[newValue.length - 1];
+            if (val === "info" || val === "diff") setPanelView(val);
+          }}
           variant="outline"
-          size="xs"
-          disabled={!hasWorktree}
-          aria-pressed={showDiff}
-          onClick={() => setShowDiff((v) => !v)}
-          className={cn(showDiff && "bg-primary text-primary-foreground hover:bg-primary/80")}
+          size="sm"
         >
-          Diff
-        </Button>
+          <ToggleGroupItem value="info">Info</ToggleGroupItem>
+          <ToggleGroupItem value="diff" disabled={!hasWorktree}>Diff</ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {showDiff && hasWorktree ? (
