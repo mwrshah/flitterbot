@@ -91,11 +91,17 @@ code,
   color: var(--color-muted-foreground);
 }
 
-/* diff2html overrides — fix line number positioning and vertical scroll */
+/* diff2html overrides — table-cell layout for narrow panel context */
 .diff-viewer-panel .d2h-code-linenumber {
   position: static;
   display: table-cell;
-  width: 7.5em;
+  white-space: nowrap;
+  width: max-content;
+}
+.diff-viewer-panel .line-num1,
+.diff-viewer-panel .line-num2 {
+  float: none;
+  display: inline-block;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
