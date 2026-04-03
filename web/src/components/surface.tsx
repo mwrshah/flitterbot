@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { MessageInput } from "~/components/common/message-input";
+import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
@@ -794,53 +795,62 @@ export function Surface() {
 
       <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
 
-      {/* Activity feed */}
-      <div
-        ref={setViewportRef}
-        data-scroll-container
-        className="flex-1 overflow-auto px-6 py-4"
-        style={{
-          visibility:
-            initialPositionReady && measurementReady && visibleLayoutReady ? "visible" : "hidden",
-        }}
-      >
-        {entries.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground/50">No activity yet</p>
-          </div>
-        )}
-        {entries.length > 0 && (
-          <div className="relative" style={{ height: `${virtualRows.totalHeight}px` }}>
-            {visibleVirtualRows.map(({ entry, top }) => (
-              <div
-                key={entry.id}
-                ref={(node) => {
-                  if (node) {
-                    rowElementsRef.current.set(entry.id, node);
-                  } else {
-                    rowElementsRef.current.delete(entry.id);
-                  }
-                }}
-                className="absolute left-0 right-0"
-                style={{ top: `${top}px` }}
-              >
-                <SurfaceEntryRenderer entry={entry} onExpandToggle={invalidateMeasurement} />
+      <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+        {/* Activity feed */}
+        <Panel defaultSize={85} minSize={20}>
+          <div
+            ref={setViewportRef}
+            data-scroll-container
+            className="h-full overflow-auto px-6 py-4"
+            style={{
+              visibility:
+                initialPositionReady && measurementReady && visibleLayoutReady ? "visible" : "hidden",
+            }}
+          >
+            {entries.length === 0 && (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-muted-foreground/50">No activity yet</p>
               </div>
-            ))}
+            )}
+            {entries.length > 0 && (
+              <div className="relative" style={{ height: `${virtualRows.totalHeight}px` }}>
+                {visibleVirtualRows.map(({ entry, top }) => (
+                  <div
+                    key={entry.id}
+                    ref={(node) => {
+                      if (node) {
+                        rowElementsRef.current.set(entry.id, node);
+                      } else {
+                        rowElementsRef.current.delete(entry.id);
+                      }
+                    }}
+                    className="absolute left-0 right-0"
+                    style={{ top: `${top}px` }}
+                  >
+                    <SurfaceEntryRenderer entry={entry} onExpandToggle={invalidateMeasurement} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </Panel>
 
-      <MessageInput
-        isSending={isSending}
-        onSubmit={handleSubmit}
-        pendingImages={pendingImages}
-        onAddImages={addImageFiles}
-        onRemoveImage={removeImage}
-        skills={skillsData?.items}
-        placeholder="Message streams..."
-        autoFocus
-      />
+        <HorizontalResizeHandle />
+
+        <Panel defaultSize={15} minSize={8}>
+          <MessageInput
+            isSending={isSending}
+            onSubmit={handleSubmit}
+            pendingImages={pendingImages}
+            onAddImages={addImageFiles}
+            onRemoveImage={removeImage}
+            skills={skillsData?.items}
+            placeholder="Message streams..."
+            fillHeight
+            autoFocus
+          />
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }
