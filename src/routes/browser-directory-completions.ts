@@ -28,6 +28,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
 
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
   if (!resolution?.repoRoot || !resolution.searchTerm) {
+    runtime.log(`[@] directory query="${rawQuery}" cwd=${baseCwd} → ${directoryItems.length} items`);
     return sendJson(res, 200, {
       items: directoryItems,
       cwd: baseCwd,
@@ -46,16 +47,45 @@ export async function handleBrowserDirectoryCompletionsRoute(
       } satisfies DirectoryCompletionsResponse);
     }
 
-    const fuzzyItems = result.value.items.map((item) =>
+    // Extract directories whose NAME matches the search term, deduped.
+    // Only check segments DOWNSTREAM of the path prefix — upstream dirs are already locked in.
+    const spaceIdx = resolution.searchTerm.lastIndexOf(" ");
+    const pathPrefix = spaceIdx >= 0 ? resolution.searchTerm.slice(0, spaceIdx) : "";
+    const pureTerm = spaceIdx >= 0 ? resolution.searchTerm.slice(spaceIdx + 1) : resolution.searchTerm;
+    const prefixDepth = pathPrefix ? pathPrefix.split("/").filter(Boolean).length : 0;
+    const termLower = pureTerm.toLowerCase();
+    const seenDirs = new Set<string>();
+    const matchingDirItems: DirectoryCompletionItem[] = [];
+    for (const item of result.value.items) {
+      // Walk only downstream directories (skip upstream prefix segments)
+      const parts = item.relativePath.split("/");
+      for (let i = prefixDepth; i < parts.length - 1; i++) {
+        if (parts[i]!.toLowerCase().includes(termLower)) {
+          const dirRel = parts.slice(0, i + 1).join("/");
+          if (!seenDirs.has(dirRel)) {
+            seenDirs.add(dirRel);
+            matchingDirItems.push(
+              toCompletionItem(path.join(resolution.repoRoot, dirRel), "directory", baseCwd, rawQuery),
+            );
+          }
+        }
+      }
+    }
+
+    const fuzzyFileItems = result.value.items.map((item) =>
       toCompletionItem(path.join(resolution.repoRoot, item.relativePath), "file", baseCwd, rawQuery),
     );
+    // Directories first, then files, within the limit
+    const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, MAX_ITEMS);
     const items = mergeCompletionItems(directoryItems, fuzzyItems);
+    runtime.log(`[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyItems.length} fuzzy + ${directoryItems.length} dir`);
     return sendJson(res, 200, {
       items,
       cwd: baseCwd,
       query: rawQuery,
     } satisfies DirectoryCompletionsResponse);
-  } catch {
+  } catch (err) {
+    runtime.log(`[@] fuzzy error repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}": ${err instanceof Error ? err.message : String(err)}`);
     return sendJson(res, 200, {
       items: directoryItems,
       cwd: baseCwd,

@@ -65,6 +65,8 @@ When a CC session completes (you receive a stop event):
 4. Compose a concise response with actionable options
 5. When re-prompting, use the tmux2 \`message\` command (not \`send\`) — it verifies inference started and retries if needed; reserve \`send\` for raw keystrokes like bare Enter to accept permission prompts
 
+If you receive multiple stop events from a CC session you did not prompt, assume another user (e.g. a senior engineer) is interacting with it directly — do not act, just read the responses to stay in the loop.
+
 When the user replies:
 1. Inspect pending actions and recent context for this stream
 2. Execute the chosen action (launch session, re-prompt, query status, etc.)
