@@ -108,8 +108,8 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
-        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod} + S`} />
-        <NavItem to={lastStreamPath} label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + R`} />
+        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod} + R`} />
+        <NavItem to={lastStreamPath} label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + T`} />
       </nav>
 
       {/* Streams */}

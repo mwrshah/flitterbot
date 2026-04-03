@@ -10,8 +10,8 @@ const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU
  * Global keyboard shortcuts.
  *
  * Modifier shortcuts (always fire):
- * - Option/Alt+S: Surface view (/)
- * - Option/Alt+R: Last-visited stream (falls back to /streams)
+ * - Option/Alt+R: Surface view (/)
+ * - Option/Alt+T: Last-visited stream (falls back to /streams)
  * - Option/Alt+1-9: Navigate to stream by index
  * - Option/Alt+{m,comma,period,j,k,l,u,i,o}: Navigate to stream 1-9 (home-row)
  * - Ctrl+U / Ctrl+D: Scroll up/down 70% page
@@ -23,8 +23,8 @@ const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU
  * - gg: Scroll to top (two g presses within 500ms)
  * - Shift+G: Scroll to bottom
  * - i: Focus composer
- * - s: Surface view (/)
- * - r: Last-visited stream (falls back to /streams)
+ * - r: Surface view (/)
+ * - t: Last-visited stream (falls back to /streams)
  */
 export function useGlobalShortcuts(streamPaths: string[] = []) {
   const navigate = useNavigate();
@@ -39,11 +39,11 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         // Use physical key codes here so Option/Alt combinations still map to
         // the intended home-row stream slots even when event.key varies by layout.
         switch (event.code) {
-          case "KeyS":
+          case "KeyR":
             event.preventDefault();
             navigate({ to: "/" });
             return;
-          case "KeyR":
+          case "KeyT":
             event.preventDefault();
             navigate({ to: getLastStreamPath() });
             return;
@@ -133,15 +133,15 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
           return;
         }
 
-        // s: surface view
-        if (event.key === "s") {
+        // r: surface view
+        if (event.key === "r") {
           event.preventDefault();
           navigate({ to: "/" });
           return;
         }
 
-        // r: last-visited stream
-        if (event.key === "r") {
+        // t: last-visited stream
+        if (event.key === "t") {
           event.preventDefault();
           navigate({ to: getLastStreamPath() });
           return;
