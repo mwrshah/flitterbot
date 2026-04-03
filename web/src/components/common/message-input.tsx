@@ -46,7 +46,7 @@ export const MessageInput = memo(function MessageInput({
   skills,
   placeholder = "Message streams...",
   rows = 2,
-  helpText = "Enter to send · Shift+Enter for newline · Type / for skills · @ for paths",
+  helpText = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
   autoFocus = false,
   streamId,
   fillHeight = false,
@@ -533,6 +533,7 @@ export const MessageInput = memo(function MessageInput({
           />
           <textarea
             ref={textareaRef}
+            tabIndex={-1}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -547,6 +548,7 @@ export const MessageInput = memo(function MessageInput({
           {/* Attach button — top left */}
           <button
             type="button"
+            tabIndex={-1}
             onClick={() => fileInputRef.current?.click()}
             className="absolute left-2.5 top-3.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded p-0.5"
             title="Attach image"
