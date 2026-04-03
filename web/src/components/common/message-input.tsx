@@ -1,4 +1,5 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
+import { ArrowUpIcon, Loader2Icon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   type ClipboardEvent,
@@ -576,7 +577,7 @@ export const MessageInput = memo(function MessageInput({
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
             <Button type="submit" size="sm" disabled={isSending || !canSend}>
-              {isSending ? "Sending…" : "Send"}
+              {isSending ? <Loader2Icon className="w-4 h-4 animate-spin" /> : <ArrowUpIcon className="w-4 h-4" />}
             </Button>
           </div>
         </div>
