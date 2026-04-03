@@ -78,7 +78,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
     // Directories first, then files, within the limit
     const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, MAX_ITEMS);
     const items = mergeCompletionItems(directoryItems, fuzzyItems);
-    runtime.log(`[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyItems.length} fuzzy + ${directoryItems.length} dir`);
+    runtime.log(`[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyFileItems.length} files + ${matchingDirItems.length} dirs (+ ${directoryItems.length} fallback)`);
     return sendJson(res, 200, {
       items,
       cwd: baseCwd,
