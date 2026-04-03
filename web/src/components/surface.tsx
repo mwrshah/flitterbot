@@ -837,7 +837,7 @@ export function Surface() {
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize="15%" minSize="7%">
+        <Panel defaultSize="15%" minSize="8%">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
