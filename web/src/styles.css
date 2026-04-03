@@ -111,3 +111,9 @@ code,
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
 }
+
+/* diff2html override — remove excessive padding on code lines */
+.diff-viewer-panel .d2h-code-line {
+  padding: 0;
+  width: 100%;
+}

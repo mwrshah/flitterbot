@@ -362,11 +362,18 @@ export const MessageInput = memo(function MessageInput({
         let i = cursor;
         const isDelim = (ch: string) => ch === "/" || ch === "@";
         // Skip whitespace before cursor
+        const beforeWS = i;
         while (i > 0 && /\s/.test(value[i - 1]!)) i--;
-        // If on a delimiter, eat delimiters then continue eating word chars
+        const skippedWhitespace = i < beforeWS;
         if (i > 0 && isDelim(value[i - 1]!)) {
-          while (i > 0 && isDelim(value[i - 1]!)) i--;
-          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
+          if (skippedWhitespace) {
+            // Whitespace separated cursor from delimiter — eat delimiter(s) but stop before the word
+            while (i > 0 && isDelim(value[i - 1]!)) i--;
+          } else {
+            // Cursor was right next to delimiter — eat it and the word before it
+            while (i > 0 && isDelim(value[i - 1]!)) i--;
+            while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
+          }
         } else {
           // Skip word characters, stopping at whitespace or delimiters
           while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
