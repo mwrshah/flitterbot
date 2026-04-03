@@ -238,7 +238,7 @@ export function ChatPanel({
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize={8} minSize="80px">
+        <Panel defaultSize={8} minSize="120px">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
