@@ -226,7 +226,7 @@ export function ChatPanel({
 
       <PanelGroup orientation="vertical" className="flex-1 min-h-0">
         {/* Message area */}
-        <Panel defaultSize={85} minSize={20}>
+        <Panel defaultSize="85%" minSize="20%">
           <div ref={viewportRef} data-scroll-container className="h-full overflow-auto px-6 py-4 space-y-3">
             <StreamsMessageList
               ref={messageListRef}
@@ -238,7 +238,7 @@ export function ChatPanel({
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize={15} minSize={12}>
+        <Panel defaultSize="15%" minSize="12%">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
