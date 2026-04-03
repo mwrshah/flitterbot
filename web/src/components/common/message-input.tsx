@@ -547,7 +547,7 @@ export const MessageInput = memo(function MessageInput({
             placeholder={placeholder}
             className={cn(
               "w-full bg-transparent pl-10 pr-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none",
-              fillHeight && "flex-1 min-h-0",
+              fillHeight && "h-full overflow-y-auto",
             )}
           />
           {/* Attach button — top left */}
