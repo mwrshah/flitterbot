@@ -169,8 +169,15 @@ function resolveRepoSearch(
   const repoRoot = findDeepestGitRepo(absoluteQuery);
   if (!repoRoot) return null;
   const relativeToRepo = path.relative(repoRoot, absoluteQuery).replaceAll(path.sep, "/");
-  const searchTerm = relativeToRepo.replace(/^(\.\/|\/)+/, "").trim();
-  if (!searchTerm || searchTerm === ".") return null;
+  const cleaned = relativeToRepo.replace(/^(\.\/|\/)+/, "").trim();
+  if (!cleaned || cleaned === ".") return null;
+  // Split into fff-node's "pathPrefix/ searchTerm" format:
+  // "src/file-finder/smt" → "src/file-finder/ smt"
+  const lastSlash = cleaned.lastIndexOf("/");
+  const searchTerm =
+    lastSlash >= 0 && cleaned.length > lastSlash + 1
+      ? cleaned.slice(0, lastSlash + 1) + " " + cleaned.slice(lastSlash + 1)
+      : cleaned;
   return { repoRoot, searchTerm };
 }
 
