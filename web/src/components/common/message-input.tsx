@@ -21,6 +21,21 @@ import type { DirectoryCompletionsResult } from "~/server/directory-completions"
 
 const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "" };
 
+/**
+ * Split a path-like filter into fff-node's `{pathPrefix} {searchTerm}` format.
+ * 'src/file-finder/smt' → 'src/file-finder/ smt'
+ * 'smt' → 'smt' (no path prefix)
+ * 'src/file-finder/' → 'src/file-finder/' (no search term yet)
+ */
+function buildFuzzyQuery(filter: string): string {
+  const lastSlash = filter.lastIndexOf("/");
+  if (lastSlash < 0) return filter;
+  const searchTerm = filter.slice(lastSlash + 1);
+  if (!searchTerm) return filter;
+  const pathPrefix = filter.slice(0, lastSlash + 1);
+  return pathPrefix + " " + searchTerm;
+}
+
 type MessageInputProps = {
   isSending: boolean;
   onSubmit: (text: string) => void;
@@ -139,10 +154,13 @@ export const MessageInput = memo(function MessageInput({
     return {};
   }, [debouncedAtFilter, streamId]);
 
-  const queryFilter =
-    "filterOverride" in completionOpts && completionOpts.filterOverride !== undefined
-      ? completionOpts.filterOverride
-      : debouncedAtFilter;
+  const queryFilter = useMemo(() => {
+    const raw =
+      "filterOverride" in completionOpts && completionOpts.filterOverride !== undefined
+        ? completionOpts.filterOverride
+        : debouncedAtFilter;
+    return completionOpts.mode === "fuzzy" ? buildFuzzyQuery(raw) : raw;
+  }, [completionOpts, debouncedAtFilter]);
 
   const { data: pathResult, isFetching: isPathFetching } = useQuery(
     directoryCompletionsQueryOptions(queryFilter, atPickerOpen, completionOpts),
