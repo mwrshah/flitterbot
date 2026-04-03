@@ -123,3 +123,8 @@ code,
   padding: 0;
   width: 100%;
 }
+
+/* diff2html override — align file list header padding */
+.d2h-file-list-header {
+  padding-inline: 0.5rem;
+}
