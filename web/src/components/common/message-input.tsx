@@ -284,10 +284,12 @@ export const MessageInput = memo(function MessageInput({
   const handleSkillSelect = useCallback((name: string) => {
     const value = draftRef.current;
     const slashIdx = slashPositionRef.current;
-    const cursor = textareaRef.current?.selectionStart ?? value.length;
-    // Replace from the "/" through the current filter text with "/<name> "
+    // Find end of the trigger token (non-whitespace run from trigger position)
+    let tokenEnd = slashIdx + 1;
+    while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
+    // Replace from the "/" through the full token with "/<name> "
     const before = value.slice(0, slashIdx);
-    const after = value.slice(cursor);
+    const after = value.slice(tokenEnd);
     const inserted = `/${name} `;
     const newValue = before + inserted + after;
     setDraft(newValue);
@@ -305,9 +307,11 @@ export const MessageInput = memo(function MessageInput({
     (item: DirectoryCompletionItem) => {
       const value = draftRef.current;
       const atIdx = atPositionRef.current;
-      const cursor = textareaRef.current?.selectionStart ?? value.length;
+      // Find end of the trigger token (non-whitespace run from trigger position)
+      let tokenEnd = atIdx + 1;
+      while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
       const before = value.slice(0, atIdx);
-      const after = value.slice(cursor);
+      const after = value.slice(tokenEnd);
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
@@ -379,7 +383,7 @@ export const MessageInput = memo(function MessageInput({
           while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
         }
         const newValue = value.slice(0, i) + value.slice(cursor);
-        setDraft(newValue);
+        handleDraftChange(newValue);
         requestAnimationFrame(() => {
           textareaRef.current?.setSelectionRange(i, i);
         });
@@ -389,7 +393,7 @@ export const MessageInput = memo(function MessageInput({
       // Ctrl+L: clear input (terminal-style)
       if (event.ctrlKey && event.key === "l" && !event.shiftKey && !event.altKey && !event.metaKey) {
         event.preventDefault();
-        setDraft("");
+        handleDraftChange("");
         return;
       }
 
@@ -425,7 +429,7 @@ export const MessageInput = memo(function MessageInput({
         setDraft("");
       }
     },
-    [closePicker],
+    [closePicker, handleDraftChange],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
