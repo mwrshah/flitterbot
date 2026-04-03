@@ -797,7 +797,7 @@ export function Surface() {
 
       <PanelGroup orientation="vertical" className="flex-1 min-h-0">
         {/* Activity feed */}
-        <Panel defaultSize={85} minSize={20}>
+        <Panel defaultSize={92} minSize={20}>
           <div
             ref={setViewportRef}
             data-scroll-container
@@ -837,7 +837,7 @@ export function Surface() {
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize={15} minSize="120px">
+        <Panel defaultSize={8} minSize="80px">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
