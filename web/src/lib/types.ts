@@ -258,7 +258,7 @@ export type WsMessage =
     }
   | {
       type: "streams_changed";
-      reason: "created" | "closed";
+      reason: "created" | "closed" | "reopened";
       streamId: string;
       streamName?: string;
     }

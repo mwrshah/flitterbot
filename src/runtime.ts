@@ -834,13 +834,6 @@ export class ControlSurfaceRuntime {
       }
     }
 
-    // If orchestrator just ran close_stream, destroy it
-    if (managed.role === "orchestrator" && managed.streamId) {
-      const closedStream = this.detectCloseStream(session);
-      if (closedStream) {
-        this.sessionManager.destroyOrchestrator(managed.streamId, "close_stream");
-      }
-    }
   }
 
   /**
@@ -866,44 +859,32 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  /**
-   * Detect if the last tool call was close_stream (orchestrator self-destruct).
-   */
-  private detectCloseStream(session: AgentSession): boolean {
-    const messages = session.messages;
-    if (!messages.length) return false;
-    // Look at recent messages for a close_stream tool result
-    for (let i = messages.length - 1; i >= Math.max(0, messages.length - 5); i--) {
-      const msg = messages[i];
-      if (!msg) continue;
-      if (msg.role === "toolResult") {
-        const toolResult = msg as ToolResultMessage;
-        if (toolResult.toolName === "close_stream") {
-          return true;
-        }
-      }
-      // Also check content array for tool_use blocks
-      if (msg.role === "assistant") {
-        const assistantMsg = msg as AssistantMessage;
-        for (const block of assistantMsg.content) {
-          if (block.type === "toolCall" && block.name === "close_stream") {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
   async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {
     const { reopenStream, getStreamById } = await import("./blackboard/query-streams.ts");
 
     const ws = getStreamById(this.blackboard, streamId);
     if (!ws) throw new Error("Stream not found");
-    if (ws.status !== "closed") throw new Error("Stream is not closed");
 
-    // 1. Reopen the stream and clear stale worktree_path
-    reopenStream(this.blackboard, streamId);
+    // Allow reopen for closed streams AND for open streams with an ended
+    // pi_session (broken state from legacy detectCloseStream destroying the
+    // orchestrator without closing the stream).
+    const hasEndedPiSession =
+      ws.status === "open" &&
+      !!this.blackboard.get<{ pi_session_id: string }>(
+        `SELECT pi_session_id FROM pi_sessions
+         WHERE stream_id = ? AND role = 'orchestrator' AND status = 'ended'
+         ORDER BY started_at DESC LIMIT 1`,
+        streamId,
+      );
+
+    if (ws.status !== "closed" && !hasEndedPiSession) {
+      throw new Error("Stream is not closed");
+    }
+
+    // 1. Reopen the stream (if closed) and clear stale worktree_path
+    if (ws.status === "closed") {
+      reopenStream(this.blackboard, streamId);
+    }
     this.blackboard.prepare(`UPDATE streams SET worktree_path = NULL WHERE id = ?`).run(streamId);
 
     // 2. Revive the pi session: clear ended_at/end_reason, set status back to waiting_for_user
@@ -1373,14 +1354,20 @@ export class ControlSurfaceRuntime {
               description:
                 '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
             },
+            merge_commit_message: {
+              type: "string",
+              description:
+                "Optional commit message for the merge commit when mode is merge. Ignored for noop mode. Falls back to git's default merge commit message if omitted.",
+            },
           },
           required: ["stream_id", "mode"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, mode } = params as {
+          const { stream_id, mode, merge_commit_message } = params as {
             stream_id: string;
             mode: "merge" | "noop";
+            merge_commit_message?: string;
           };
           const managed = closeStreamId
             ? this.sessionManager.getByStream(closeStreamId)
@@ -1392,8 +1379,18 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseStream(this.blackboard, streamsSessId, stream_id, mode);
+          const result = await executeCloseStream(
+            this.blackboard,
+            streamsSessId,
+            stream_id,
+            mode,
+            merge_commit_message,
+          );
           if (result.ok) {
+            // Destroy in-memory orchestrator immediately — no post-turn detection needed
+            if (closeStreamId) {
+              this.sessionManager.destroyOrchestrator(closeStreamId, "close_stream");
+            }
             this.wsHub.broadcast({
               type: "streams_changed",
               reason: "closed",

@@ -57,7 +57,10 @@ function PiSessionRoute() {
   const { apiClient } = rootApi.useRouteContext();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
-  const isStreamClosed = stream?.status === "closed";
+  // Also treat open streams with ended pi_session as "closed" so the Reopen
+  // button appears (handles the broken state from legacy close detection).
+  const isStreamClosed =
+    stream?.status === "closed" || stream?.piSessionStatus === "ended";
 
   const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
     useStreamsChat(piSessionId, history);
