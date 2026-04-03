@@ -1387,9 +1387,10 @@ export class ControlSurfaceRuntime {
             merge_commit_message,
           );
           if (result.ok) {
-            // Destroy in-memory orchestrator immediately — no post-turn detection needed
-            if (closeStreamId) {
-              this.sessionManager.destroyOrchestrator(closeStreamId, "close_stream");
+            // Flag for post-turn destruction — destroying mid-turn would prevent the
+            // tool result and final assistant message from reaching the websocket/sqlite.
+            if (managed) {
+              managed.pendingDestroy = true;
             }
             this.wsHub.broadcast({
               type: "streams_changed",
