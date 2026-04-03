@@ -14,11 +14,11 @@ const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU
  * - Option/Alt+R: Last-visited stream (falls back to /streams)
  * - Option/Alt+1-9: Navigate to stream by index
  * - Option/Alt+{m,comma,period,j,k,l,u,i,o}: Navigate to stream 1-9 (home-row)
- * - Ctrl+U / Ctrl+D: Scroll up/down half page
+ * - Ctrl+U / Ctrl+D: Scroll up/down 70% page
  * - Ctrl+B / Ctrl+F: Scroll up/down full page
  *
  * Bare-key shortcuts (only when no input element is focused):
- * - d / u: Scroll down/up half page
+ * - d / u: Scroll down/up 70% page
  * - f / b: Scroll down/up full page
  * - gg: Scroll to top (two g presses within 500ms)
  * - Shift+G: Scroll to bottom
@@ -64,7 +64,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         }
       }
 
-      // Ctrl+U/D: scroll half-page, Ctrl+B/F: scroll full page — always, regardless of focus
+      // Ctrl+U/D: scroll 70% page, Ctrl+B/F: scroll full page — always, regardless of focus
       if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
         const scrollKey = event.key;
         if (scrollKey !== "u" && scrollKey !== "d" && scrollKey !== "b" && scrollKey !== "f") return;
@@ -73,7 +73,7 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
         if (!container) return;
 
         event.preventDefault();
-        const half = container.clientHeight / 2;
+        const half = container.clientHeight * 0.7;
         const full = container.clientHeight;
         const isDown = scrollKey === "d" || scrollKey === "f";
         const isFull = scrollKey === "b" || scrollKey === "f";
@@ -110,12 +110,12 @@ export function useGlobalShortcuts(streamPaths: string[] = []) {
           return;
         }
 
-        // d/u: scroll half page, f/b: scroll full page
+        // d/u: scroll 70% page, f/b: scroll full page
         if (event.key === "d" || event.key === "u" || event.key === "f" || event.key === "b") {
           const container = document.querySelector<HTMLElement>("[data-scroll-container]");
           if (!container) return;
           event.preventDefault();
-          const half = container.clientHeight / 2;
+          const half = container.clientHeight * 0.7;
           const full = container.clientHeight;
           const isDown = event.key === "d" || event.key === "f";
           const isFull = event.key === "f" || event.key === "b";
