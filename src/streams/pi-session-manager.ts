@@ -32,6 +32,8 @@ export interface ManagedPiSession {
   createdAt: string;
   modelInfo: { provider: string; id: string };
   unsubscribe: () => void;
+  /** Set during close_stream tool execution; checked post-turn to destroy after the turn completes. */
+  pendingDestroy?: boolean;
 }
 
 export type ProcessQueueItemCallback = (
@@ -330,6 +332,11 @@ export class PiSessionManager {
       this.wsHub,
       managed.streamId,
       managed.streamName,
+      () => {
+        if (managed.pendingDestroy && managed.streamId) {
+          this.destroyOrchestrator(managed.streamId, "close_stream");
+        }
+      },
     );
 
     // Re-initialize state with actual message count from the resumed session
@@ -512,6 +519,11 @@ export class PiSessionManager {
       this.wsHub,
       streamId,
       streamName,
+      () => {
+        if (managed.pendingDestroy && managed.streamId) {
+          this.destroyOrchestrator(managed.streamId, "close_stream");
+        }
+      },
     );
 
     return managed;

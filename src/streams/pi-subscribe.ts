@@ -213,6 +213,7 @@ export function subscribeToPiSession(
   wsHub: WebSocketHub,
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
+  onAgentEnd?: () => void,
 ): () => void {
   // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
   // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
@@ -434,6 +435,7 @@ export function subscribeToPiSession(
         // Always broadcast agent_end so the frontend can flush any uncommitted streaming
         // text (e.g. when abort() causes runAgentLoop to throw, skipping message_end/turn_end).
         broadcast(wsHub, { type: "agent_end", piSessionId: session.sessionId });
+        onAgentEnd?.();
         break;
       }
       case "compaction_start":
