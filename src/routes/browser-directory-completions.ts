@@ -195,6 +195,9 @@ function resolveRepoSearch(
   baseCwd: string,
   rawQuery: string,
 ): { repoRoot: string; searchTerm: string } | null {
+  // Trailing slash = directory drill-down, not a fuzzy search
+  if (rawQuery.endsWith("/")) return null;
+
   const absoluteQuery = resolveAbsoluteQuery(baseCwd, rawQuery);
   const repoRoot = findDeepestGitRepo(absoluteQuery);
   if (!repoRoot) return null;
