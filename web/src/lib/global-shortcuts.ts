@@ -119,6 +119,8 @@ export const SHORTCUT_ACTIONS = {
   composerFocus: "composer.focus",
   streamCopyTmuxAttach: "stream.copy-tmux-attach",
   streamCopyWorktreePath: "stream.copy-worktree-path",
+  panelViewInfo: "panel.view.info",
+  panelViewDiff: "panel.view.diff",
 } as const;
 
 /** Returns true when the active element is an input, textarea, contenteditable, or role=textbox. */
@@ -653,6 +655,12 @@ function registerBuiltInShortcutDefinitions() {
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyWorktreePath, {
     defaultBindings: [{ spec: "c w", when: "no-input-focus" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.panelViewInfo, {
+    defaultBindings: [{ spec: "Ctrl+KeyI", when: "always" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.panelViewDiff, {
+    defaultBindings: [{ spec: "Ctrl+KeyK", when: "always" }],
   });
 
   for (let slot = 0; slot < STREAM_SLOT_DIGIT_CODES.length; slot++) {
