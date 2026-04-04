@@ -93,6 +93,8 @@ export interface StreamSummary {
   createdAt: string;
 }
 
+export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
+
 export interface StatusResponse {
   ok: true;
   pid: number;
@@ -101,6 +103,7 @@ export interface StatusResponse {
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
+  shortcuts?: ShortcutBindingsConfig;
 }
 
 export interface MessageRequest {
