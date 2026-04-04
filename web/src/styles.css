@@ -91,6 +91,15 @@ code,
   color: var(--color-muted-foreground);
 }
 
+/* diff2html base overrides */
+.line-num1, .line-num2 {
+  width: unset;
+  float: unset;
+}
+.line-num2 {
+  margin-left: 2rem;
+}
+
 /* diff2html overrides — table-cell layout for narrow panel context */
 .diff-viewer-panel .d2h-code-linenumber {
   position: static;
@@ -100,7 +109,6 @@ code,
 }
 .diff-viewer-panel .line-num1,
 .diff-viewer-panel .line-num2 {
-  float: none;
   display: inline-block;
 }
 .diff-viewer-panel .d2h-file-diff {
