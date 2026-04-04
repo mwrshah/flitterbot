@@ -1,18 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { userConfigQueryOptions } from "~/lib/queries";
-
-const rootApi = getRouteApi("__root__");
+import { saveUserConfig } from "~/server/user-config";
 
 export function useUserConfig() {
   const queryClient = useQueryClient();
-  const { apiClient } = rootApi.useRouteContext();
-  const { data: config = {} } = useQuery(userConfigQueryOptions(apiClient));
+  const { data: config = {} } = useQuery(userConfigQueryOptions());
 
   const { mutate } = useMutation({
     mutationFn: (entries: Record<string, string>) =>
-      apiClient.setUserConfig("default_user", entries),
+      saveUserConfig({ data: { config: entries } }),
     onMutate: async (entries) => {
       await queryClient.cancelQueries({ queryKey: ["user-config"] });
       const previous = queryClient.getQueryData<Record<string, string>>(["user-config"]);
