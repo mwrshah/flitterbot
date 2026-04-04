@@ -100,7 +100,6 @@ code,
 }
 .diff-viewer-panel .line-num1,
 .diff-viewer-panel .line-num2 {
-  float: none;
   display: inline-block;
   width: unset;
 }
