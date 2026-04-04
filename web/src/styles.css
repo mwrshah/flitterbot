@@ -91,10 +91,10 @@ code,
   color: var(--color-muted-foreground);
 }
 
-/* diff2html base overrides */
+/* diff2html base overrides — must use !important to beat library specificity */
 .line-num1, .line-num2 {
-  width: unset;
-  float: unset;
+  width: unset !important;
+  float: unset !important;
 }
 .line-num2 {
   margin-left: 2rem;
@@ -109,7 +109,7 @@ code,
 }
 .diff-viewer-panel .line-num1,
 .diff-viewer-panel .line-num2 {
-  display: inline-block;
+  display: inline-block !important;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
