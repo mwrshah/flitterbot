@@ -227,7 +227,7 @@ export function ChatPanel({
       <PanelGroup orientation="vertical" className="flex-1 min-h-0">
         {/* Message area */}
         <Panel defaultSize="85%" minSize="20%">
-          <div ref={viewportRef} data-scroll-container className="h-full overflow-auto px-6 py-4 space-y-3">
+          <div ref={viewportRef} data-scroll-target="main" data-scroll-container className="h-full overflow-auto px-6 py-4 space-y-3">
             <StreamsMessageList
               ref={messageListRef}
               messages={agentMessages}
