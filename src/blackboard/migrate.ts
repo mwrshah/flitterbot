@@ -841,6 +841,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 18) {
     applyV18Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 19) {
+    applyV19Migration(db);
   }
 
   return getSchemaVersion(db);
@@ -1191,5 +1196,31 @@ function applyV18Migration(db: DatabaseSync): void {
     throw error;
   } finally {
     db.exec("PRAGMA foreign_keys=ON;");
+  }
+}
+
+/**
+ * V19: Add user_config table for persistent user preferences (panel layouts, theme, etc.).
+ */
+function applyV19Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_config (
+          user_id TEXT NOT NULL,
+          key TEXT NOT NULL,
+          value TEXT NOT NULL,
+          updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, key)
+      );
+
+      INSERT OR IGNORE INTO schema_migrations(version) VALUES (19);
+    `);
+
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
   }
 }

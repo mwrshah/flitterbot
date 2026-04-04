@@ -9,9 +9,10 @@ import { AppShell } from "~/components/app-shell";
 import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
 import { NotFound } from "~/components/not-found";
 import { useGlobalShortcuts } from "~/hooks/use-global-shortcuts";
+import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { AutonomaApiClient } from "~/lib/api";
-import { statusQueryOptions } from "~/lib/queries";
+import { statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { StatusResponse } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
@@ -31,7 +32,10 @@ export const Route = createRootRouteWithContext<{
   startRealtime: () => () => void;
 }>()({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+    await Promise.all([
+      context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
+      context.queryClient.ensureQueryData(userConfigQueryOptions(context.apiClient)).catch(() => ({})),
+    ]);
   },
   head: () => ({
     meta: [
@@ -94,6 +98,7 @@ function useStreamPaths(status: StatusResponse | undefined): string[] {
 function RootComponent() {
   const { startRealtime, apiClient } = Route.useRouteContext();
   useWhyDidYouRender("RootComponent", {});
+  const { resolvedTheme } = useTheme();
   const shortcutStatus = useShortcutStatus(apiClient);
   const streamPaths = useStreamPaths(shortcutStatus);
   useGlobalShortcuts({ streamPaths, shortcutBindings: shortcutStatus?.shortcuts });
@@ -101,25 +106,22 @@ function RootComponent() {
   useEffect(() => startRealtime(), [startRealtime]);
 
   return (
-    <RootDocument>
+    <RootDocument resolvedTheme={resolvedTheme}>
       <AppShell />
       <TanStackRouterDevtools position="bottom-right" />
     </RootDocument>
   );
 }
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({
+  children,
+  resolvedTheme = "light",
+}: { children: React.ReactNode; resolvedTheme?: "light" | "dark" }) {
   useWhyDidYouRender("RootDocument", { children });
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={resolvedTheme === "dark" ? "dark" : ""} style={{ colorScheme: resolvedTheme }} suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: static inline script for theme flash prevention
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var t=localStorage.getItem("autonoma-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light":t;if(d==="dark")document.documentElement.classList.add("dark");document.documentElement.style.colorScheme=d})()`,
-          }}
-        />
       </head>
       <body>
         {children}

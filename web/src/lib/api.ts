@@ -96,5 +96,14 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
       if (piSessionId) params.set("piSessionId", piSessionId);
       return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
     },
+
+    getUserConfig: (userId: string) =>
+      request<{ config: Record<string, string> }>(`/api/user-config/${userId}`),
+
+    setUserConfig: (userId: string, config: Record<string, string>) =>
+      request<{ ok: boolean }>(`/api/user-config/${userId}`, {
+        method: "PUT",
+        body: JSON.stringify({ config }),
+      }),
   };
 }

@@ -4,6 +4,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
+import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   statusQueryOptions,
@@ -49,8 +50,13 @@ export const Route = createFileRoute("/streams/$piSessionId")({
   component: PiSessionRoute,
 });
 
+const STREAMS_MAIN_KEY = "panel:streams-main";
+const STREAMS_MAIN_DEFAULT: Record<string, number> = { chat: 50, downstream: 50 };
+
 function PiSessionRoute() {
   useWhyDidYouRender("PiSessionRoute", {});
+  const { config, setConfig } = useUserConfig();
+  const streamsLayout = parsePanelLayout(config, STREAMS_MAIN_KEY, STREAMS_MAIN_DEFAULT);
   const { piSessionId } = Route.useParams();
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");
@@ -66,8 +72,13 @@ function PiSessionRoute() {
     useStreamsChat(piSessionId, history);
 
   return (
-    <PanelGroup orientation="horizontal" className="h-full">
-      <Panel defaultSize="50%" minSize="30%">
+    <PanelGroup
+      orientation="horizontal"
+      className="h-full"
+      defaultLayout={streamsLayout}
+      onLayoutChanged={(layout) => setConfig(STREAMS_MAIN_KEY, JSON.stringify(layout))}
+    >
+      <Panel id="chat" defaultSize="50%" minSize="30%">
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
@@ -80,7 +91,7 @@ function PiSessionRoute() {
         />
       </Panel>
       <ResizeHandle />
-      <Panel defaultSize="50%" minSize="20%">
+      <Panel id="downstream" defaultSize="50%" minSize="20%">
         <DownstreamSessionsPanel
           piSessionId={piSessionId}
           piSessionStatus={stream?.piSessionStatus}

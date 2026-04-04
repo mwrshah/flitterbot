@@ -4,6 +4,7 @@ import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
+import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem } from "~/lib/types";
@@ -51,9 +52,14 @@ export const Route = createFileRoute("/streams/default")({
   component: StreamsDefaultRoute,
 });
 
+const STREAMS_MAIN_KEY = "panel:streams-main";
+const STREAMS_MAIN_DEFAULT: Record<string, number> = { chat: 50, downstream: 50 };
+
 function StreamsDefaultRoute() {
   useWhyDidYouRender("StreamsDefaultRoute", {});
   const { history } = Route.useLoaderData();
+  const { config, setConfig } = useUserConfig();
+  const streamsLayout = parsePanelLayout(config, STREAMS_MAIN_KEY, STREAMS_MAIN_DEFAULT);
   const { apiClient } = Route.useRouteContext();
   // Derive defaultPiSessionId reactively from the status query cache so it
   // updates when the default Streams session restarts with a new ID, rather than
@@ -65,8 +71,13 @@ function StreamsDefaultRoute() {
     useStreamsChat(defaultPiSessionId, history);
 
   return (
-    <PanelGroup orientation="horizontal" className="h-full">
-      <Panel defaultSize="50%" minSize="30%">
+    <PanelGroup
+      orientation="horizontal"
+      className="h-full"
+      defaultLayout={streamsLayout}
+      onLayoutChanged={(layout) => setConfig(STREAMS_MAIN_KEY, JSON.stringify(layout))}
+    >
+      <Panel id="chat" defaultSize="50%" minSize="30%">
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
@@ -76,7 +87,7 @@ function StreamsDefaultRoute() {
         />
       </Panel>
       <ResizeHandle />
-      <Panel defaultSize="50%" minSize="20%">
+      <Panel id="downstream" defaultSize="50%" minSize="20%">
         <DownstreamSessionsPanel
           piSessionId={effectivePiSessionId}
           piSessionStatus={defaultStream?.piSessionStatus}

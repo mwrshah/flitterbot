@@ -1,4 +1,4 @@
--- Autonoma blackboard schema (v18)
+-- Autonoma blackboard schema (v19)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -140,3 +140,11 @@ CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, creat
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
 CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
+
+CREATE TABLE IF NOT EXISTS user_config (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, key)
+);

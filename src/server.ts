@@ -22,6 +22,10 @@ import {
   handleBrowserSessionsRoute,
 } from "./routes/browser-sessions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
+import {
+  handleBrowserUserConfigGetRoute,
+  handleBrowserUserConfigPutRoute,
+} from "./routes/browser-user-config.ts";
 import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
 import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
@@ -85,7 +89,7 @@ server.listen(runtime.config.controlSurfacePort, runtime.config.controlSurfaceHo
 
 function applyCorsHeaders(res: http.ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 }
 
@@ -228,6 +232,21 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
       res,
       pathname.endsWith("/start") ? "start" : "stop",
     );
+  }
+
+  if (
+    segments[0] === "api" &&
+    segments[1] === "user-config" &&
+    segments[2] &&
+    !segments[3]
+  ) {
+    const userId = decodeURIComponent(segments[2]);
+    if (method === "GET") {
+      return handleBrowserUserConfigGetRoute(runtime, req, res, userId);
+    }
+    if (method === "PUT") {
+      return handleBrowserUserConfigPutRoute(runtime, req, res, userId);
+    }
   }
 
   return sendJson(res, 404, { ok: false, error: `No route for ${method} ${pathname}` });

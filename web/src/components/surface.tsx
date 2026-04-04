@@ -18,6 +18,7 @@ import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
+import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
@@ -519,8 +520,13 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
 
 const rootApi = getRouteApi("__root__");
 
+const CHAT_LAYOUT_KEY = "panel:chat-layout";
+const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
+
 export function Surface() {
   const { apiClient, sendMessage } = rootApi.useRouteContext();
+  const { config, setConfig } = useUserConfig();
+  const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [surfaceWidth, setSurfaceWidth] = useState(0);
@@ -795,9 +801,14 @@ export function Surface() {
 
       <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
 
-      <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+      <PanelGroup
+        orientation="vertical"
+        className="flex-1 min-h-0"
+        defaultLayout={chatLayout}
+        onLayoutChanged={(layout) => setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))}
+      >
         {/* Activity feed */}
-        <Panel defaultSize="85%" minSize="20%">
+        <Panel id="feed" defaultSize="85%" minSize="20%">
           <div
             ref={setViewportRef}
             data-scroll-container="main"
@@ -837,7 +848,7 @@ export function Surface() {
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize="15%" minSize="9%">
+        <Panel id="input" defaultSize="15%" minSize="9%">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
