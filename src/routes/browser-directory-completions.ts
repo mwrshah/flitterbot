@@ -131,7 +131,7 @@ async function listDirectoryCompletionItems(
   const filtered = entries.filter((entry) => {
     if (HIDDEN_PREFIXES.some((p) => entry.name.startsWith(p))) return false;
     if (EXCLUDED_NAMES.has(entry.name)) return false;
-    if (filterLower && !entry.name.toLowerCase().startsWith(filterLower)) return false;
+    if (filterLower && !entry.name.toLowerCase().includes(filterLower)) return false;
     return true;
   });
 
