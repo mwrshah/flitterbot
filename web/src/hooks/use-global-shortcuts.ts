@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent } from "react";
 import { toast } from "sonner";
 import {
   focusComposerInput,
+  getActiveScrollContainerSelector,
   getStreamSlotShortcutActionId,
   handleRegisteredShortcutKeyDown,
   registerShortcutHandlers,
@@ -53,7 +54,7 @@ export function useGlobalShortcuts({
   });
 
   const scrollByPage = useEffectEvent((mode: "half-up" | "half-down" | "full-up" | "full-down") => {
-    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
     if (!container) return false;
 
     const half = container.clientHeight * 0.7;
@@ -75,14 +76,14 @@ export function useGlobalShortcuts({
   });
 
   const scrollToTop = useEffectEvent(() => {
-    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
     if (!container) return false;
     container.scrollTo({ top: 0, behavior: "auto" });
     return true;
   });
 
   const scrollToBottom = useEffectEvent(() => {
-    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
     if (!container) return false;
     container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
     return true;

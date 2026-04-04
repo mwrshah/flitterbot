@@ -144,11 +144,14 @@ export function focusComposerInput() {
   focusComposer?.();
 }
 
+let activeScrollTarget: "main" | "diff" = "main";
+
 export function setActiveScrollContainer(target: "main" | "diff") {
-  document.querySelector("[data-scroll-container]")?.removeAttribute("data-scroll-container");
-  document
-    .querySelector(`[data-scroll-target="${target}"]`)
-    ?.setAttribute("data-scroll-container", "");
+  activeScrollTarget = target;
+}
+
+export function getActiveScrollContainerSelector(): string {
+  return `[data-scroll-container="${activeScrollTarget}"]`;
 }
 
 export function defineShortcutAction(actionId: string, definition: ShortcutDefinition) {

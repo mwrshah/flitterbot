@@ -265,7 +265,7 @@ export function DownstreamSessionsPanel({
 
       {showDiff && hasWorktree ? (
         /* Diff panel */
-        <div data-scroll-target="diff" className="flex-1 overflow-y-auto">
+        <div data-scroll-container="diff" className="flex-1 overflow-y-auto">
           {diffQuery.isPending && (
             <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
           )}
