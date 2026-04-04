@@ -104,7 +104,7 @@ export const PathPicker = memo(function PathPicker({
     const pickerHeight = picker.offsetHeight;
     const top = Math.max(0, rect.top - pickerHeight - 4);
     const left = rect.left + (caretLeft ?? 0);
-    setPos({ top, left });
+    setPos(prev => (prev.top === top && prev.left === left) ? prev : { top, left });
   }, [anchorRef, caretLeft]);
 
   useLayoutEffect(() => {
