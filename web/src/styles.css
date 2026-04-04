@@ -102,6 +102,11 @@ code,
 .diff-viewer-panel .line-num2 {
   float: none;
   display: inline-block;
+  width: unset;
+}
+.diff-viewer-panel .line-num2 {
+  float: right;
+  margin-left: 1rem;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
