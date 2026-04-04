@@ -10,6 +10,7 @@ import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
+  setActiveScrollContainer,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
@@ -120,6 +121,7 @@ export function DownstreamSessionsPanel({
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   useEffect(() => {
     setPanelView("info");
+    setActiveScrollContainer("main");
   }, [piSessionId]);
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
@@ -171,6 +173,8 @@ export function DownstreamSessionsPanel({
       {
         actionId: SHORTCUT_ACTIONS.panelViewInfo,
         handler: () => {
+          (document.activeElement as HTMLElement)?.blur?.();
+          setActiveScrollContainer("main");
           setPanelView("info");
           return true;
         },
@@ -179,6 +183,8 @@ export function DownstreamSessionsPanel({
         actionId: SHORTCUT_ACTIONS.panelViewDiff,
         handler: () => {
           if (!hasWorktree) return false;
+          (document.activeElement as HTMLElement)?.blur?.();
+          setActiveScrollContainer("diff");
           setPanelView("diff");
           return true;
         },
@@ -227,7 +233,10 @@ export function DownstreamSessionsPanel({
           value={[panelView]}
           onValueChange={(newValue) => {
             const val = newValue[newValue.length - 1];
-            if (val === "info" || val === "diff") setPanelView(val);
+            if (val === "info" || val === "diff") {
+              setActiveScrollContainer(val === "diff" ? "diff" : "main");
+              setPanelView(val);
+            }
           }}
           variant="outline"
           size="sm"
@@ -256,7 +265,7 @@ export function DownstreamSessionsPanel({
 
       {showDiff && hasWorktree ? (
         /* Diff panel */
-        <div className="flex-1 overflow-y-auto">
+        <div data-scroll-target="diff" className="flex-1 overflow-y-auto">
           {diffQuery.isPending && (
             <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
           )}

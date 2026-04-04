@@ -144,6 +144,13 @@ export function focusComposerInput() {
   focusComposer?.();
 }
 
+export function setActiveScrollContainer(target: "main" | "diff") {
+  document.querySelector("[data-scroll-container]")?.removeAttribute("data-scroll-container");
+  document
+    .querySelector(`[data-scroll-target="${target}"]`)
+    ?.setAttribute("data-scroll-container", "");
+}
+
 export function defineShortcutAction(actionId: string, definition: ShortcutDefinition) {
   definitions.set(actionId, {
     defaultBindings: [...definition.defaultBindings],
