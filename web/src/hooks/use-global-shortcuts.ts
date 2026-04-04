@@ -57,7 +57,7 @@ export function useGlobalShortcuts({
     const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
     if (!container) return false;
 
-    const half = container.clientHeight * 0.7;
+    const half = container.clientHeight * 0.65;
     const full = container.clientHeight * 0.9;
     const small = container.clientHeight * 0.2;
     const delta =
