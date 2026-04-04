@@ -800,8 +800,7 @@ export function Surface() {
         <Panel defaultSize="85%" minSize="20%">
           <div
             ref={setViewportRef}
-            data-scroll-target="main"
-            data-scroll-container
+            data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
             style={{
               visibility:
