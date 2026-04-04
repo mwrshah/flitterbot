@@ -47,16 +47,29 @@ function piStatusBanner(status: PiSessionStatus | undefined) {
   }
 }
 
-function CopyableCode({ text, displayText }: { text: string; displayText?: string }) {
-  const { copied, copy } = useCopyToClipboard(600);
+function CopyableCode({
+  text,
+  displayText,
+  copied: externalCopied,
+  onCopy,
+}: {
+  text: string;
+  displayText?: string;
+  copied?: boolean;
+  onCopy?: () => void;
+}) {
+  const internal = useCopyToClipboard(600);
+  const isControlled = onCopy !== undefined;
+  const isCopied = isControlled ? (externalCopied ?? false) : internal.copied;
+
   return (
     <button
       type="button"
-      onClick={() => copy(text)}
+      onClick={() => (isControlled ? onCopy() : internal.copy(text))}
       className="inline-block font-mono text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
       title={`copy \`${text}\``}
     >
-      {copied ? (
+      {isCopied ? (
         <span className="text-muted-foreground">Copied!</span>
       ) : (
         <span>{displayText ?? text}</span>
@@ -124,9 +137,12 @@ export function DownstreamSessionsPanel({
   const firstTmuxSession = data?.find((s) => s.tmuxSession)?.tmuxSession ?? null;
   const currentWorktreePath = worktree?.worktreePath ?? null;
   const tmuxShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "CT";
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "c then t";
   const worktreeShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) || "CW";
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) || "c then w";
+
+  const tmuxCopy = useCopyToClipboard(600);
+  const worktreeCopy = useCopyToClipboard(600);
 
   useEffect(() => {
     return registerShortcutHandlers([
@@ -136,10 +152,7 @@ export function DownstreamSessionsPanel({
         handler: () => {
           if (!firstTmuxSession) return false;
           const cmd = `tmux attach -t ${firstTmuxSession}`;
-          void navigator.clipboard.writeText(cmd).then(
-            () => toast.success("Copied tmux attach command"),
-            () => toast.error("Failed to copy"),
-          );
+          void tmuxCopy.copy(cmd).catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
@@ -148,15 +161,12 @@ export function DownstreamSessionsPanel({
         priority: 10,
         handler: () => {
           if (!currentWorktreePath) return false;
-          void navigator.clipboard.writeText(currentWorktreePath).then(
-            () => toast.success("Copied worktree path"),
-            () => toast.error("Failed to copy"),
-          );
+          void worktreeCopy.copy(currentWorktreePath).catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
     ]);
-  }, [firstTmuxSession, currentWorktreePath]);
+  }, [firstTmuxSession, currentWorktreePath, tmuxCopy.copy, worktreeCopy.copy]);
 
   const renderedDiff = useMemo(() => {
     if (diffQuery.data?.mode !== "diff") return "";
@@ -285,7 +295,18 @@ export function DownstreamSessionsPanel({
 
                   {session.tmuxSession && (
                     <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-                      tmux: <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
+                      tmux:{" "}
+                      {session.sessionId === ctTargetSessionId ? (
+                        <CopyableCode
+                          text={`tmux attach -t ${session.tmuxSession}`}
+                          copied={tmuxCopy.copied}
+                          onCopy={() =>
+                            tmuxCopy.copy(`tmux attach -t ${session.tmuxSession}`)
+                          }
+                        />
+                      ) : (
+                        <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
+                      )}
                       {session.sessionId === ctTargetSessionId && (
                         <span className="text-muted-foreground/50 text-[10px]">
                           {tmuxShortcutLabel}
@@ -320,6 +341,8 @@ export function DownstreamSessionsPanel({
                       const leaf = parts[parts.length - 1] ?? "";
                       return `../${leaf}`;
                     })()}
+                    copied={worktreeCopy.copied}
+                    onCopy={() => worktreeCopy.copy(worktree.worktreePath ?? "")}
                   />
                   <span className="text-muted-foreground/50 text-[10px]">
                     {worktreeShortcutLabel}
