@@ -6,6 +6,7 @@ import {
   getStreamSlotShortcutActionId,
   handleRegisteredShortcutKeyDown,
   registerShortcutHandlers,
+  setActiveScrollContainer,
   SHORTCUT_ACTIONS,
   setShortcutBindingOverrides,
 } from "~/lib/global-shortcuts";
@@ -88,6 +89,7 @@ export function useGlobalShortcuts({
   });
 
   const focusComposer = useEffectEvent(() => {
+    setActiveScrollContainer("main");
     focusComposerInput();
     return true;
   });
