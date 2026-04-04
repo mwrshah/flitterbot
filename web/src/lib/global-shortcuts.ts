@@ -631,12 +631,14 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [
       { spec: "Ctrl+KeyD", when: "always" },
       { spec: "d", when: "no-input-focus" },
+      { spec: "j", when: "no-input-focus" },
     ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageUp, {
     defaultBindings: [
       { spec: "Ctrl+KeyU", when: "always" },
       { spec: "u", when: "no-input-focus" },
+      { spec: "k", when: "no-input-focus" },
     ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollFullPageDown, {
