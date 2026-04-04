@@ -3,10 +3,16 @@ import { html as diff2html } from "diff2html";
 import { ColorSchemeType } from "diff2html/lib/types";
 import "diff2html/bundles/css/diff2html.min.css";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import {
+  registerShortcutHandlers,
+  SHORTCUT_ACTIONS,
+  useShortcutBindingLabel,
+} from "~/lib/global-shortcuts";
 import {
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
@@ -113,14 +119,52 @@ export function DownstreamSessionsPanel({
 
   const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
 
+  // Register stream copy handlers with higher priority than the root fallback.
+  const ctTargetSessionId = data?.find((s) => s.tmuxSession)?.sessionId ?? null;
+  const firstTmuxSession = data?.find((s) => s.tmuxSession)?.tmuxSession ?? null;
+  const currentWorktreePath = worktree?.worktreePath ?? null;
+  const tmuxShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "CT";
+  const worktreeShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) || "CW";
+
+  useEffect(() => {
+    return registerShortcutHandlers([
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyTmuxAttach,
+        priority: 10,
+        handler: () => {
+          if (!firstTmuxSession) return false;
+          const cmd = `tmux attach -t ${firstTmuxSession}`;
+          void navigator.clipboard.writeText(cmd).then(
+            () => toast.success("Copied tmux attach command"),
+            () => toast.error("Failed to copy"),
+          );
+          return true;
+        },
+      },
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath,
+        priority: 10,
+        handler: () => {
+          if (!currentWorktreePath) return false;
+          void navigator.clipboard.writeText(currentWorktreePath).then(
+            () => toast.success("Copied worktree path"),
+            () => toast.error("Failed to copy"),
+          );
+          return true;
+        },
+      },
+    ]);
+  }, [firstTmuxSession, currentWorktreePath]);
+
   const renderedDiff = useMemo(() => {
     if (diffQuery.data?.mode !== "diff") return "";
     return diff2html(diffQuery.data.diff, {
       outputFormat: "line-by-line",
       drawFileList: true,
       matching: "lines",
-      colorScheme:
-        resolvedTheme === "dark" ? ColorSchemeType.DARK : ColorSchemeType.LIGHT,
+      colorScheme: resolvedTheme === "dark" ? ColorSchemeType.DARK : ColorSchemeType.LIGHT,
     });
   }, [diffQuery.data, resolvedTheme]);
 
@@ -144,9 +188,7 @@ export function DownstreamSessionsPanel({
         {(() => {
           const banner = piStatusBanner(piSessionStatus);
           return banner ? (
-            <div
-              className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}
-            >
+            <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
               {banner.label}
             </div>
           ) : (
@@ -162,8 +204,19 @@ export function DownstreamSessionsPanel({
           variant="outline"
           size="sm"
         >
-          <ToggleGroupItem value="info" className="aria-pressed:bg-accent aria-pressed:text-accent-foreground">Info</ToggleGroupItem>
-          <ToggleGroupItem value="diff" disabled={!hasWorktree} className="aria-pressed:bg-accent aria-pressed:text-accent-foreground">Diff</ToggleGroupItem>
+          <ToggleGroupItem
+            value="info"
+            className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+          >
+            Info
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="diff"
+            disabled={!hasWorktree}
+            className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+          >
+            Diff
+          </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
@@ -233,6 +286,11 @@ export function DownstreamSessionsPanel({
                   {session.tmuxSession && (
                     <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                       tmux: <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
+                      {session.sessionId === ctTargetSessionId && (
+                        <span className="text-muted-foreground/50 text-[10px]">
+                          {tmuxShortcutLabel}
+                        </span>
+                      )}
                     </span>
                   )}
 
@@ -263,6 +321,9 @@ export function DownstreamSessionsPanel({
                       return `../${leaf}`;
                     })()}
                   />
+                  <span className="text-muted-foreground/50 text-[10px]">
+                    {worktreeShortcutLabel}
+                  </span>
                 </span>
               </div>
             </div>
