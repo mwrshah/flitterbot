@@ -58,7 +58,7 @@ export function useGlobalShortcuts({
     if (!container) return false;
 
     const half = container.clientHeight * 0.7;
-    const full = container.clientHeight;
+    const full = container.clientHeight * 0.9;
     const delta =
       mode === "half-down"
         ? half
