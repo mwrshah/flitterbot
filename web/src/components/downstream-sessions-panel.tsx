@@ -143,6 +143,7 @@ export function DownstreamSessionsPanel({
 
   const tmuxCopy = useCopyToClipboard(600);
   const worktreeCopy = useCopyToClipboard(600);
+  const branchCopy = useCopyToClipboard(600);
 
   useEffect(() => {
     return registerShortcutHandlers([
@@ -330,7 +331,15 @@ export function DownstreamSessionsPanel({
               </p>
               <div className="flex flex-col gap-0.5 py-1.5">
                 <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-                  Branch: <CopyableCode text={worktree.name ?? ""} />
+                  Branch:{" "}
+                  <CopyableCode
+                    text={worktree.name ?? ""}
+                    copied={branchCopy.copied}
+                    onCopy={() => branchCopy.copy(worktree.name ?? "")}
+                  />
+                  <span className="text-muted-foreground/50 text-[10px]">
+                    {branchCopy.copied ? "Copied!" : ""}
+                  </span>
                 </span>
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Worktree:{" "}
