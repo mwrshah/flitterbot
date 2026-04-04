@@ -89,6 +89,8 @@ export type TranscriptPage = {
 
 /* ── Status ── */
 
+export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
+
 export type StatusResponse = {
   source?: string;
   pid?: number;
@@ -115,6 +117,7 @@ export type StatusResponse = {
     }>;
   };
   streams?: StreamSummary[];
+  shortcuts?: ShortcutBindingsConfig;
 };
 
 /* ── Streams ── */

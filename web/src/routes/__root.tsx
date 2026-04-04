@@ -13,6 +13,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { AutonomaApiClient } from "~/lib/api";
 import { statusQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
+import type { StatusResponse } from "~/lib/types";
 import type { AutonomaWsClient } from "~/lib/ws";
 import type { WsConnectionStore } from "~/lib/ws-connection-store";
 import type { SendMessageFn } from "~/lib/ws-query-bridge";
@@ -74,23 +75,28 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
-function useStreamPaths(apiClient: AutonomaApiClient): string[] {
+function useShortcutStatus(apiClient: AutonomaApiClient) {
   const { data } = useQuery({ ...statusQueryOptions(apiClient), retry: 1 });
+  return data;
+}
+
+function useStreamPaths(status: StatusResponse | undefined): string[] {
   return useMemo(() => {
     const paths: string[] = [];
-    if (data?.piAgent?.default?.piSessionId) paths.push("/streams/default");
-    for (const s of data?.streams ?? []) {
+    if (status?.piAgent?.default?.piSessionId) paths.push("/streams/default");
+    for (const s of status?.streams ?? []) {
       if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
     }
     return paths.slice(0, 9);
-  }, [data]);
+  }, [status]);
 }
 
 function RootComponent() {
   const { startRealtime, apiClient } = Route.useRouteContext();
   useWhyDidYouRender("RootComponent", {});
-  const streamPaths = useStreamPaths(apiClient);
-  useGlobalShortcuts(streamPaths);
+  const shortcutStatus = useShortcutStatus(apiClient);
+  const streamPaths = useStreamPaths(shortcutStatus);
+  useGlobalShortcuts({ streamPaths, shortcutBindings: shortcutStatus?.shortcuts });
 
   useEffect(() => startRealtime(), [startRealtime]);
 

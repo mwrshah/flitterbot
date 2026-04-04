@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -27,6 +28,7 @@ type RawConfigJson = {
   sourceRoot?: string;
   wipeStreamsOnStart?: boolean;
   whatsappEnabled?: boolean;
+  shortcuts?: ShortcutBindingsConfig;
 };
 
 export type AutonomaConfig = {
@@ -53,6 +55,7 @@ export type AutonomaConfig = {
   projectsDir: string;
   wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
+  shortcuts: ShortcutBindingsConfig;
 };
 
 const HOME = os.homedir();
@@ -103,6 +106,7 @@ export function loadConfig(): AutonomaConfig {
       ? process.env.WHATSAPP_ENABLED !== "0" &&
         process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
       : (raw.whatsappEnabled ?? true);
+  const shortcuts = raw.shortcuts ?? {};
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: AutonomaConfig = {
@@ -126,6 +130,7 @@ export function loadConfig(): AutonomaConfig {
     projectsDir,
     wipeStreamsOnStart,
     whatsappEnabled,
+    shortcuts,
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
@@ -164,6 +169,7 @@ export function loadConfig(): AutonomaConfig {
     projectsDir: config.projectsDir,
     wipeStreamsOnStart: config.wipeStreamsOnStart,
     whatsappEnabled: config.whatsappEnabled,
+    shortcuts: config.shortcuts,
   };
 
   fs.writeFileSync(CONFIG_PATH, `${JSON.stringify(nextPersisted, null, 2)}\n`, "utf8");

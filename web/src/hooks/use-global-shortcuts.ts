@@ -1,156 +1,139 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { focusComposerInput, isInputFocused } from "~/lib/global-shortcuts";
+import { useEffect, useEffectEvent } from "react";
+import { toast } from "sonner";
+import {
+  focusComposerInput,
+  getStreamSlotShortcutActionId,
+  handleRegisteredShortcutKeyDown,
+  registerShortcutHandlers,
+  SHORTCUT_ACTIONS,
+  setShortcutBindingOverrides,
+} from "~/lib/global-shortcuts";
+import type { ShortcutBindingsConfig } from "~/lib/types";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 
-const DIGIT_CODES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"];
-const HOME_ROW_CODES = ["KeyM", "Comma", "Period", "KeyJ", "KeyK", "KeyL", "KeyU", "KeyI", "KeyO"];
+type UseGlobalShortcutsOptions = {
+  streamPaths?: string[];
+  shortcutBindings?: ShortcutBindingsConfig;
+};
 
 /**
  * Global keyboard shortcuts.
  *
- * Modifier shortcuts (always fire):
- * - Option/Alt+R: Surface view (/)
- * - Option/Alt+T: Last-visited stream (falls back to /streams)
- * - Option/Alt+1-9: Navigate to stream by index
- * - Option/Alt+{m,comma,period,j,k,l,u,i,o}: Navigate to stream 1-9 (home-row)
- * - Ctrl+U / Ctrl+D: Scroll up/down 70% page
- * - Ctrl+B / Ctrl+F: Scroll up/down full page
+ * Supports:
+ * - modifier combos like Alt+R / Ctrl+D
+ * - multi-key sequences like g g and c t
  *
- * Bare-key shortcuts (only when no input element is focused):
- * - d / u: Scroll down/up 70% page
- * - f / b: Scroll down/up full page
- * - gg: Scroll to top (two g presses within 500ms)
- * - Shift+G: Scroll to bottom
- * - i: Focus composer
- * - r: Surface view (/)
- * - t: Last-visited stream (falls back to /streams)
+ * Bindings are resolved by action id so user overrides can come from config
+ * without changing the matching logic.
  */
-export function useGlobalShortcuts(streamPaths: string[] = []) {
+export function useGlobalShortcuts({
+  streamPaths = [],
+  shortcutBindings,
+}: UseGlobalShortcutsOptions = {}) {
   const navigate = useNavigate();
   useLastStreamPath();
 
+  const navigateHome = useEffectEvent(() => {
+    navigate({ to: "/" });
+    return true;
+  });
+
+  const navigateLastStream = useEffectEvent(() => {
+    navigate({ to: getLastStreamPath() });
+    return true;
+  });
+
+  const navigateStreamSlot = useEffectEvent((slot: number) => {
+    const to = streamPaths[slot - 1];
+    if (!to) return false;
+    navigate({ to });
+    return true;
+  });
+
+  const scrollByPage = useEffectEvent((mode: "half-up" | "half-down" | "full-up" | "full-down") => {
+    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    if (!container) return false;
+
+    const half = container.clientHeight * 0.7;
+    const full = container.clientHeight;
+    const delta =
+      mode === "half-down"
+        ? half
+        : mode === "half-up"
+          ? -half
+          : mode === "full-down"
+            ? full
+            : -full;
+
+    container.scrollBy({
+      top: delta,
+      behavior: "smooth",
+    });
+    return true;
+  });
+
+  const scrollToTop = useEffectEvent(() => {
+    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    if (!container) return false;
+    container.scrollTo({ top: 0, behavior: "auto" });
+    return true;
+  });
+
+  const scrollToBottom = useEffectEvent(() => {
+    const container = document.querySelector<HTMLElement>("[data-scroll-container]");
+    if (!container) return false;
+    container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+    return true;
+  });
+
+  const focusComposer = useEffectEvent(() => {
+    focusComposerInput();
+    return true;
+  });
+
+  const copyTmuxFallback = useEffectEvent(() => {
+    toast.error("No tmux session available");
+    return true;
+  });
+
+  const copyWorktreeFallback = useEffectEvent(() => {
+    toast.error("No worktree path available");
+    return true;
+  });
+
   useEffect(() => {
-    let lastGPress = 0;
+    setShortcutBindingOverrides(shortcutBindings);
+    return () => setShortcutBindingOverrides(undefined);
+  }, [shortcutBindings]);
+
+  useEffect(() => {
+    const cleanupHandlers = registerShortcutHandlers([
+      { actionId: SHORTCUT_ACTIONS.navSurface, handler: () => navigateHome() },
+      { actionId: SHORTCUT_ACTIONS.navLastStream, handler: () => navigateLastStream() },
+      { actionId: SHORTCUT_ACTIONS.scrollHalfPageDown, handler: () => scrollByPage("half-down") },
+      { actionId: SHORTCUT_ACTIONS.scrollHalfPageUp, handler: () => scrollByPage("half-up") },
+      { actionId: SHORTCUT_ACTIONS.scrollFullPageDown, handler: () => scrollByPage("full-down") },
+      { actionId: SHORTCUT_ACTIONS.scrollFullPageUp, handler: () => scrollByPage("full-up") },
+      { actionId: SHORTCUT_ACTIONS.scrollTop, handler: () => scrollToTop() },
+      { actionId: SHORTCUT_ACTIONS.scrollBottom, handler: () => scrollToBottom() },
+      { actionId: SHORTCUT_ACTIONS.composerFocus, handler: () => focusComposer() },
+      { actionId: SHORTCUT_ACTIONS.streamCopyTmuxAttach, handler: () => copyTmuxFallback() },
+      { actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath, handler: () => copyWorktreeFallback() },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        actionId: getStreamSlotShortcutActionId(index + 1),
+        handler: () => navigateStreamSlot(index + 1),
+      })),
+    ]);
 
     function handleKeyDown(event: KeyboardEvent) {
-      // Alt+key: navigation shortcuts
-      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-        // Use physical key codes here so Option/Alt combinations still map to
-        // the intended home-row stream slots even when event.key varies by layout.
-        switch (event.code) {
-          case "KeyR":
-            event.preventDefault();
-            navigate({ to: "/" });
-            return;
-          case "KeyT":
-            event.preventDefault();
-            navigate({ to: getLastStreamPath() });
-            return;
-        }
-
-        const digitIdx = DIGIT_CODES.indexOf(event.code);
-        if (digitIdx !== -1 && digitIdx < streamPaths.length) {
-          event.preventDefault();
-          navigate({ to: streamPaths[digitIdx] });
-          return;
-        }
-
-        const homeRowIdx = HOME_ROW_CODES.indexOf(event.code);
-        if (homeRowIdx !== -1 && homeRowIdx < streamPaths.length) {
-          event.preventDefault();
-          navigate({ to: streamPaths[homeRowIdx] });
-          return;
-        }
-      }
-
-      // Ctrl+U/D: scroll 70% page, Ctrl+B/F: scroll full page — always, regardless of focus
-      if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
-        const scrollKey = event.key;
-        if (scrollKey !== "u" && scrollKey !== "d" && scrollKey !== "b" && scrollKey !== "f") return;
-
-        const container = document.querySelector<HTMLElement>("[data-scroll-container]");
-        if (!container) return;
-
-        event.preventDefault();
-        const half = container.clientHeight * 0.7;
-        const full = container.clientHeight;
-        const isDown = scrollKey === "d" || scrollKey === "f";
-        const isFull = scrollKey === "b" || scrollKey === "f";
-        container.scrollBy({
-          top: isDown ? (isFull ? full : half) : -(isFull ? full : half),
-          behavior: "smooth",
-        });
-        return;
-      }
-
-      // Shift+G: scroll to bottom — only when no input is focused
-      if (event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && event.key === "G" && !isInputFocused()) {
-        const container = document.querySelector<HTMLElement>("[data-scroll-container]");
-        if (!container) return;
-        event.preventDefault();
-        container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
-        return;
-      }
-
-      // Bare-key shortcuts — only when no modifier is held and no input is focused
-      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !isInputFocused()) {
-        // gg: scroll to top (two g presses within 500ms)
-        if (event.key === "g") {
-          const now = Date.now();
-          if (now - lastGPress < 500) {
-            lastGPress = 0;
-            const container = document.querySelector<HTMLElement>("[data-scroll-container]");
-            if (!container) return;
-            event.preventDefault();
-            container.scrollTo({ top: 0, behavior: "auto" });
-          } else {
-            lastGPress = now;
-          }
-          return;
-        }
-
-        // d/u: scroll 70% page, f/b: scroll full page
-        if (event.key === "d" || event.key === "u" || event.key === "f" || event.key === "b") {
-          const container = document.querySelector<HTMLElement>("[data-scroll-container]");
-          if (!container) return;
-          event.preventDefault();
-          const half = container.clientHeight * 0.7;
-          const full = container.clientHeight;
-          const isDown = event.key === "d" || event.key === "f";
-          const isFull = event.key === "f" || event.key === "b";
-          container.scrollBy({
-            top: isDown ? (isFull ? full : half) : -(isFull ? full : half),
-            behavior: "smooth",
-          });
-          return;
-        }
-
-        // i: focus the registered composer target after the input has been blurred.
-        if (event.key === "i") {
-          event.preventDefault();
-          focusComposerInput();
-          return;
-        }
-
-        // r: surface view
-        if (event.key === "r") {
-          event.preventDefault();
-          navigate({ to: "/" });
-          return;
-        }
-
-        // t: last-visited stream
-        if (event.key === "t") {
-          event.preventDefault();
-          navigate({ to: getLastStreamPath() });
-          return;
-        }
-
-      }
+      handleRegisteredShortcutKeyDown(event);
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, streamPaths]);
+    return () => {
+      cleanupHandlers();
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 }
