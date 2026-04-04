@@ -69,7 +69,7 @@ function CopyableCode({
       className="inline-block font-mono text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
       title={`copy \`${text}\``}
     >
-      {isCopied ? (
+      {!isControlled && isCopied ? (
         <span className="text-muted-foreground">Copied!</span>
       ) : (
         <span>{displayText ?? text}</span>
@@ -309,7 +309,7 @@ export function DownstreamSessionsPanel({
                       )}
                       {session.sessionId === ctTargetSessionId && (
                         <span className="text-muted-foreground/50 text-[10px]">
-                          {tmuxShortcutLabel}
+                          {tmuxCopy.copied ? "Copied!" : tmuxShortcutLabel}
                         </span>
                       )}
                     </span>
@@ -345,7 +345,7 @@ export function DownstreamSessionsPanel({
                     onCopy={() => worktreeCopy.copy(worktree.worktreePath ?? "")}
                   />
                   <span className="text-muted-foreground/50 text-[10px]">
-                    {worktreeShortcutLabel}
+                    {worktreeCopy.copied ? "Copied!" : worktreeShortcutLabel}
                   </span>
                 </span>
               </div>
