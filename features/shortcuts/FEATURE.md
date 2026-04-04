@@ -48,6 +48,10 @@ type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 | `panel.view.diff` | `Ctrl+K` | Switch to Diff panel view |
 | `nav.stream.slot.{1-9}` | `Alt+{1-9}`, `Alt+{m,comma,period,j,k,l,u,i,o}` | Navigate to stream by slot |
 
+## Scroll Target Switching
+
+When `Ctrl+K` activates the diff panel, scroll shortcuts (`Ctrl+D/U/F/B`, bare `d/u/f/b`, `g g`, `Shift+G`) retarget to the diff panel's scrollable area. `Ctrl+I` or `i` (composer focus) restores the scroll target to the main message list. Implemented via imperative DOM attribute toggling — `data-scroll-container` moves between `data-scroll-target` elements, zero React re-renders.
+
 ## Files
 
 | File | Role |
