@@ -526,6 +526,12 @@ function formatShortcutBinding(
     options.compact &&
     binding.steps.every((step) => step.modifiers.length === 0 && isCompactStep(step))
   ) {
+    if (binding.steps.length > 1) {
+      return binding.steps
+        .map((step) => formatStepKey(step))
+        .join(" then ")
+        .toLowerCase();
+    }
     return binding.steps
       .map((step) => formatStepKey(step))
       .join("")
