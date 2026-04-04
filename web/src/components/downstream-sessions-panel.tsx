@@ -140,6 +140,8 @@ export function DownstreamSessionsPanel({
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "c then t";
   const worktreeShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) || "c then w";
+  const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo);
+  const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff);
 
   const tmuxCopy = useCopyToClipboard(600);
   const worktreeCopy = useCopyToClipboard(600);
@@ -166,8 +168,23 @@ export function DownstreamSessionsPanel({
           return true;
         },
       },
+      {
+        actionId: SHORTCUT_ACTIONS.panelViewInfo,
+        handler: () => {
+          setPanelView("info");
+          return true;
+        },
+      },
+      {
+        actionId: SHORTCUT_ACTIONS.panelViewDiff,
+        handler: () => {
+          if (!hasWorktree) return false;
+          setPanelView("diff");
+          return true;
+        },
+      },
     ]);
-  }, [firstTmuxSession, currentWorktreePath, tmuxCopy.copy, worktreeCopy.copy]);
+  }, [firstTmuxSession, currentWorktreePath, tmuxCopy.copy, worktreeCopy.copy, hasWorktree]);
 
   const renderedDiff = useMemo(() => {
     if (diffQuery.data?.mode !== "diff") return "";
@@ -220,6 +237,9 @@ export function DownstreamSessionsPanel({
             className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
           >
             Info
+            {infoShortcutLabel && (
+              <span className="text-muted-foreground/50 text-[10px] ml-1">{infoShortcutLabel}</span>
+            )}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="diff"
@@ -227,6 +247,9 @@ export function DownstreamSessionsPanel({
             className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
           >
             Diff
+            {diffShortcutLabel && (
+              <span className="text-muted-foreground/50 text-[10px] ml-1">{diffShortcutLabel}</span>
+            )}
           </ToggleGroupItem>
         </ToggleGroup>
       </div>

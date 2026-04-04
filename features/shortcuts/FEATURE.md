@@ -44,6 +44,8 @@ type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 | `composer.focus` | `i` | Focus the composer input |
 | `stream.copy-tmux-attach` | `c t` | Copy tmux attach command |
 | `stream.copy-worktree-path` | `c w` | Copy worktree path |
+| `panel.view.info` | `Ctrl+I` | Switch to Info panel view |
+| `panel.view.diff` | `Ctrl+K` | Switch to Diff panel view |
 | `nav.stream.slot.{1-9}` | `Alt+{1-9}`, `Alt+{m,comma,period,j,k,l,u,i,o}` | Navigate to stream by slot |
 
 ## Files
