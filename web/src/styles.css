@@ -94,7 +94,6 @@ code,
 /* diff2html base overrides — must use !important to beat library specificity */
 .line-num1, .line-num2 {
   width: unset !important;
-  float: unset !important;
 }
 .line-num2 {
   margin-left: 2rem;
