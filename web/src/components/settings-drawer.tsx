@@ -1,5 +1,5 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { Button } from "~/components/common/button";
 import { Input } from "~/components/common/input";
 import { useTheme } from "~/hooks/use-theme";
@@ -22,6 +22,16 @@ export const SettingsDrawer = memo(function SettingsDrawer({
   onClose: () => void;
 }) {
   useWhyDidYouRender("SettingsDrawer", { open, onClose });
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);
   const updateSettings = settingsStore.set;
