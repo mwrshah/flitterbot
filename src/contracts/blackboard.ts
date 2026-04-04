@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 18;
+export const BLACKBOARD_SCHEMA_VERSION = 19;
 
 // --- Shared types used across multiple files ---
 
@@ -179,6 +179,13 @@ export interface HealthFlagRow {
   cleared_at: string | null;
 }
 
+export interface UserConfigRow {
+  user_id: string;
+  key: string;
+  value: string;
+  updated_at: string;
+}
+
 export const BLACKBOARD_SCHEMA_SQL = `
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
@@ -319,4 +326,12 @@ CREATE INDEX IF NOT EXISTS idx_messages_source_created ON messages(source, creat
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages(stream_id);
 CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
+
+CREATE TABLE IF NOT EXISTS user_config (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, key)
+);
 `;

@@ -137,6 +137,18 @@ export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
 /** Status pills per session — populated by WS bridge, never fetched from server. */
 export type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
+/** User config (panel layouts, theme, etc.) — prefetched in root loader. */
+export function userConfigQueryOptions(apiClient: AutonomaApiClient) {
+  return {
+    queryKey: ["user-config"] as const,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const res = await apiClient.getUserConfig("default_user");
+      return res.config;
+    },
+    staleTime: 30_000,
+  };
+}
+
 export function statusPillsQueryOptions(piSessionId: string) {
   return {
     queryKey: ["streams-status-pills", piSessionId] as const,

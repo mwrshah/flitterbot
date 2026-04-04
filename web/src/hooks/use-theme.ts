@@ -1,17 +1,13 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect } from "react";
+import { useUserConfig } from "~/hooks/use-user-config";
 
 type Theme = "light" | "dark" | "system";
 
-const STORAGE_KEY = "autonoma-theme";
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(STORAGE_KEY) as Theme) ?? "system";
-}
+const CONFIG_KEY = "theme";
 
 function getResolvedTheme(theme: Theme): "light" | "dark" {
   if (theme !== "system") return theme;
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -21,41 +17,31 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = resolved;
 }
 
-// Simple pub/sub for useSyncExternalStore
-let listeners: Array<() => void> = [];
-function subscribe(cb: () => void) {
-  listeners.push(cb);
-  return () => {
-    listeners = listeners.filter((l) => l !== cb);
-  };
-}
-function getSnapshot(): Theme {
-  return getStoredTheme();
-}
-
 export function useTheme() {
-  const theme = useSyncExternalStore(subscribe, getSnapshot, () => "system" as Theme);
+  const { config, setConfig } = useUserConfig();
+  const theme = (config[CONFIG_KEY] as Theme) || "system";
 
-  // Apply on mount and when theme changes
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
-  // Listen to system preference changes when in "system" mode
+  // Re-apply when system preference changes while in "system" mode
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {
-      if (getStoredTheme() === "system") applyTheme("system");
+      if (theme === "system") applyTheme("system");
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, []);
+  }, [theme]);
 
-  const setTheme = useCallback((next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next);
-    applyTheme(next);
-    listeners.forEach((l) => l());
-  }, []);
+  const setTheme = useCallback(
+    (next: Theme) => {
+      applyTheme(next);
+      setConfig(CONFIG_KEY, next);
+    },
+    [setConfig],
+  );
 
   return { theme, setTheme, resolvedTheme: getResolvedTheme(theme) };
 }

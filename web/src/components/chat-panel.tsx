@@ -7,6 +7,7 @@ import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
+import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusPill } from "~/lib/queries";
@@ -22,6 +23,9 @@ const useIsClient = () =>
     () => true,
     () => false,
   );
+
+const CHAT_LAYOUT_KEY = "panel:chat-layout";
+const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
 
 type ChatPanelProps = {
   piSessionId: string;
@@ -53,6 +57,8 @@ export function ChatPanel({
     isStreamClosed,
   });
   const isClient = useIsClient();
+  const { config, setConfig } = useUserConfig();
+  const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
@@ -224,9 +230,14 @@ export function ChatPanel({
         </div>
       </div>
 
-      <PanelGroup orientation="vertical" className="flex-1 min-h-0">
+      <PanelGroup
+        orientation="vertical"
+        className="flex-1 min-h-0"
+        defaultLayout={chatLayout}
+        onLayoutChanged={(layout) => setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))}
+      >
         {/* Message area */}
-        <Panel defaultSize="85%" minSize="20%">
+        <Panel id="feed" defaultSize="85%" minSize="20%">
           <div ref={viewportRef} data-scroll-container="main" className="h-full overflow-auto px-6 py-4 space-y-3">
             <StreamsMessageList
               ref={messageListRef}
@@ -238,7 +249,7 @@ export function ChatPanel({
 
         <HorizontalResizeHandle />
 
-        <Panel defaultSize="15%" minSize="9%">
+        <Panel id="input" defaultSize="15%" minSize="9%">
           <MessageInput
             isSending={isSending}
             onSubmit={handleSubmit}
