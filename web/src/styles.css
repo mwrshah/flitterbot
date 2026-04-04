@@ -91,6 +91,11 @@ code,
   color: var(--color-muted-foreground);
 }
 
+/* diff2html base overrides */
+.line-num1, .line-num2 {
+  width: unset;
+}
+
 /* diff2html overrides — table-cell layout for narrow panel context */
 .diff-viewer-panel .d2h-code-linenumber {
   position: static;
