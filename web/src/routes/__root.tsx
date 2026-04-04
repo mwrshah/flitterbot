@@ -116,10 +116,18 @@ function RootComponent() {
 function RootDocument({
   children,
   resolvedTheme = "light",
-}: { children: React.ReactNode; resolvedTheme?: "light" | "dark" }) {
+}: {
+  children: React.ReactNode;
+  resolvedTheme?: "light" | "dark";
+}) {
   useWhyDidYouRender("RootDocument", { children });
   return (
-    <html lang="en" className={resolvedTheme === "dark" ? "dark" : ""} style={{ colorScheme: resolvedTheme }} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={resolvedTheme === "dark" ? "dark" : ""}
+      style={{ colorScheme: resolvedTheme }}
+      suppressHydrationWarning
+    >
       <head>
         <HeadContent />
       </head>

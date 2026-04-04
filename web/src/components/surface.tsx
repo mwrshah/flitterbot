@@ -815,7 +815,9 @@ export function Surface() {
             className="h-full overflow-auto px-6 py-4"
             style={{
               visibility:
-                initialPositionReady && measurementReady && visibleLayoutReady ? "visible" : "hidden",
+                initialPositionReady && measurementReady && visibleLayoutReady
+                  ? "visible"
+                  : "hidden",
             }}
           >
             {entries.length === 0 && (

@@ -1,5 +1,14 @@
-import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
-import { memo, type Ref, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
+import {
+  memo,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -8,7 +17,7 @@ import type { DirectoryCompletionItem } from "~/lib/types";
 function dirFromPath(path: string, name: string): string {
   // Strip trailing slash for directory entries (e.g. "features/" -> "features")
   const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
-  if (cleanPath.endsWith("/" + name)) return cleanPath.slice(0, -(name.length + 1));
+  if (cleanPath.endsWith(`/${name}`)) return cleanPath.slice(0, -(name.length + 1));
   if (cleanPath === name) return "";
   return cleanPath;
 }
@@ -104,7 +113,7 @@ export const PathPicker = memo(function PathPicker({
     const pickerHeight = picker.offsetHeight;
     const top = Math.max(0, rect.top - pickerHeight - 4);
     const left = rect.left + (caretLeft ?? 0);
-    setPos(prev => (prev.top === top && prev.left === left) ? prev : { top, left });
+    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, [anchorRef, caretLeft]);
 
   useLayoutEffect(() => {
@@ -143,11 +152,15 @@ export const PathPicker = memo(function PathPicker({
                 className="!flex !flex-col !items-start gap-0 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
               >
                 <span className="flex items-baseline gap-2">
-                  <span className="shrink-0">{item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                  <span className="shrink-0">
+                    {item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}
+                  </span>
                   <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
                 </span>
                 {displayDir && (
-                  <span className="text-xs text-muted-foreground pl-[calc(1em+0.5rem)]">{displayDir}</span>
+                  <span className="text-xs text-muted-foreground pl-[calc(1em+0.5rem)]">
+                    {displayDir}
+                  </span>
                 )}
               </CommandItem>
             );

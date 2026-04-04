@@ -1,10 +1,16 @@
-import { memo, type Ref, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
-  Command,
-  CommandItem,
-  CommandList,
-} from "~/components/ui/command";
+  memo,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { Command, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
 
@@ -37,7 +43,7 @@ export const SkillPicker = memo(function SkillPicker({
   const filtered = useMemo(() => {
     if (!filter) return skills;
     const lower = filter.toLowerCase();
-    return skills.filter(s => s.name.toLowerCase().includes(lower));
+    return skills.filter((s) => s.name.toLowerCase().includes(lower));
   }, [skills, filter]);
 
   // Manual selection management (cmdk won't auto-select with shouldFilter={false})
@@ -58,7 +64,7 @@ export const SkillPicker = memo(function SkillPicker({
     const pickerHeight = picker.offsetHeight;
     const top = Math.max(0, rect.top - pickerHeight - 4); // 4px gap (mb-1)
     const left = rect.left + (caretLeft ?? 0);
-    setPos(prev => (prev.top === top && prev.left === left) ? prev : { top, left });
+    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, [anchorRef, caretLeft]);
 
   useLayoutEffect(() => {

@@ -7,8 +7,8 @@ import {
   getStreamSlotShortcutActionId,
   handleRegisteredShortcutKeyDown,
   registerShortcutHandlers,
-  setActiveScrollContainer,
   SHORTCUT_ACTIONS,
+  setActiveScrollContainer,
   setShortcutBindingOverrides,
 } from "~/lib/global-shortcuts";
 import type { ShortcutBindingsConfig } from "~/lib/types";
@@ -53,32 +53,34 @@ export function useGlobalShortcuts({
     return true;
   });
 
-  const scrollByPage = useEffectEvent((mode: "half-up" | "half-down" | "full-up" | "full-down" | "small-up" | "small-down") => {
-    const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
-    if (!container) return false;
+  const scrollByPage = useEffectEvent(
+    (mode: "half-up" | "half-down" | "full-up" | "full-down" | "small-up" | "small-down") => {
+      const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
+      if (!container) return false;
 
-    const half = container.clientHeight * 0.6;
-    const full = container.clientHeight * 0.9;
-    const small = container.clientHeight * 0.2;
-    const delta =
-      mode === "half-down"
-        ? half
-        : mode === "half-up"
-          ? -half
-          : mode === "full-down"
-            ? full
-            : mode === "full-up"
-              ? -full
-              : mode === "small-down"
-                ? small
-                : -small;
+      const half = container.clientHeight * 0.6;
+      const full = container.clientHeight * 0.9;
+      const small = container.clientHeight * 0.2;
+      const delta =
+        mode === "half-down"
+          ? half
+          : mode === "half-up"
+            ? -half
+            : mode === "full-down"
+              ? full
+              : mode === "full-up"
+                ? -full
+                : mode === "small-down"
+                  ? small
+                  : -small;
 
-    container.scrollBy({
-      top: delta,
-      behavior: "smooth",
-    });
-    return true;
-  });
+      container.scrollBy({
+        top: delta,
+        behavior: "smooth",
+      });
+      return true;
+    },
+  );
 
   const scrollToTop = useEffectEvent(() => {
     const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());

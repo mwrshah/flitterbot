@@ -1,5 +1,4 @@
 import { useRouterState } from "@tanstack/react-router";
-import { useRef } from "react";
 
 const lastStreamPath: { current: string | null } = { current: null };
 

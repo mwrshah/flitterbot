@@ -22,12 +22,12 @@ import {
   handleBrowserSessionsRoute,
 } from "./routes/browser-sessions.ts";
 import { handleBrowserSkillsRoute } from "./routes/browser-skills.ts";
+import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
+import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import {
   handleBrowserUserConfigGetRoute,
   handleBrowserUserConfigPutRoute,
 } from "./routes/browser-user-config.ts";
-import { handleBrowserStreamsHistoryRoute } from "./routes/browser-streams.ts";
-import { handleBrowserTranscriptRoute } from "./routes/browser-transcript.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
@@ -234,12 +234,7 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     );
   }
 
-  if (
-    segments[0] === "api" &&
-    segments[1] === "user-config" &&
-    segments[2] &&
-    !segments[3]
-  ) {
+  if (segments[0] === "api" && segments[1] === "user-config" && segments[2] && !segments[3]) {
     const userId = decodeURIComponent(segments[2]);
     if (method === "GET") {
       return handleBrowserUserConfigGetRoute(runtime, req, res, userId);

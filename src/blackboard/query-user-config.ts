@@ -1,10 +1,7 @@
 import type { UserConfigRow } from "../contracts/blackboard.ts";
 import type { BlackboardDatabase } from "./db.ts";
 
-export function getUserConfig(
-  db: BlackboardDatabase,
-  userId: string,
-): Record<string, string> {
+export function getUserConfig(db: BlackboardDatabase, userId: string): Record<string, string> {
   const rows = db.all<UserConfigRow>(
     "SELECT key, value FROM user_config WHERE user_id = ?",
     userId,

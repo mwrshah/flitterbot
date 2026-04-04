@@ -28,7 +28,9 @@ export async function handleBrowserDirectoryCompletionsRoute(
 
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
   if (!resolution?.repoRoot || !resolution.searchTerm) {
-    runtime.log(`[@] directory query="${rawQuery}" cwd=${baseCwd} → ${directoryItems.length} items`);
+    runtime.log(
+      `[@] directory query="${rawQuery}" cwd=${baseCwd} → ${directoryItems.length} items`,
+    );
     return sendJson(res, 200, {
       items: directoryItems,
       cwd: baseCwd,
@@ -51,7 +53,8 @@ export async function handleBrowserDirectoryCompletionsRoute(
     // Only check segments DOWNSTREAM of the path prefix — upstream dirs are already locked in.
     const spaceIdx = resolution.searchTerm.lastIndexOf(" ");
     const pathPrefix = spaceIdx >= 0 ? resolution.searchTerm.slice(0, spaceIdx) : "";
-    const pureTerm = spaceIdx >= 0 ? resolution.searchTerm.slice(spaceIdx + 1) : resolution.searchTerm;
+    const pureTerm =
+      spaceIdx >= 0 ? resolution.searchTerm.slice(spaceIdx + 1) : resolution.searchTerm;
     const prefixDepth = pathPrefix ? pathPrefix.split("/").filter(Boolean).length : 0;
     const termLower = pureTerm.toLowerCase();
     const seenDirs = new Set<string>();
@@ -65,7 +68,12 @@ export async function handleBrowserDirectoryCompletionsRoute(
           if (!seenDirs.has(dirRel)) {
             seenDirs.add(dirRel);
             matchingDirItems.push(
-              toCompletionItem(path.join(resolution.repoRoot, dirRel), "directory", baseCwd, rawQuery),
+              toCompletionItem(
+                path.join(resolution.repoRoot, dirRel),
+                "directory",
+                baseCwd,
+                rawQuery,
+              ),
             );
           }
         }
@@ -73,19 +81,28 @@ export async function handleBrowserDirectoryCompletionsRoute(
     }
 
     const fuzzyFileItems = result.value.items.map((item) =>
-      toCompletionItem(path.join(resolution.repoRoot, item.relativePath), "file", baseCwd, rawQuery),
+      toCompletionItem(
+        path.join(resolution.repoRoot, item.relativePath),
+        "file",
+        baseCwd,
+        rawQuery,
+      ),
     );
     // Directories first, then files, within the limit
     const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, MAX_ITEMS);
     const items = mergeCompletionItems(directoryItems, fuzzyItems);
-    runtime.log(`[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyFileItems.length} files + ${matchingDirItems.length} dirs (+ ${directoryItems.length} fallback)`);
+    runtime.log(
+      `[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyFileItems.length} files + ${matchingDirItems.length} dirs (+ ${directoryItems.length} fallback)`,
+    );
     return sendJson(res, 200, {
       items,
       cwd: baseCwd,
       query: rawQuery,
     } satisfies DirectoryCompletionsResponse);
   } catch (err) {
-    runtime.log(`[@] fuzzy error repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}": ${err instanceof Error ? err.message : String(err)}`);
+    runtime.log(
+      `[@] fuzzy error repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}": ${err instanceof Error ? err.message : String(err)}`,
+    );
     return sendJson(res, 200, {
       items: directoryItems,
       cwd: baseCwd,
@@ -209,7 +226,7 @@ function resolveRepoSearch(
   const lastSlash = cleaned.lastIndexOf("/");
   const searchTerm =
     lastSlash >= 0 && cleaned.length > lastSlash + 1
-      ? cleaned.slice(0, lastSlash + 1) + " " + cleaned.slice(lastSlash + 1)
+      ? `${cleaned.slice(0, lastSlash + 1)} ${cleaned.slice(lastSlash + 1)}`
       : cleaned;
   return { repoRoot, searchTerm };
 }
@@ -270,7 +287,9 @@ function formatTokenPath(
   let tokenPath: string;
   if (rawQuery.startsWith("~")) {
     const home = os.homedir().replaceAll(path.sep, "/");
-    tokenPath = normalized.startsWith(home) ? `~${normalized.slice(home.length)}` || "~" : normalized;
+    tokenPath = normalized.startsWith(home)
+      ? `~${normalized.slice(home.length)}` || "~"
+      : normalized;
   } else if (path.isAbsolute(rawQuery)) {
     tokenPath = normalized;
   } else {

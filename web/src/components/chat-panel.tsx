@@ -7,8 +7,8 @@ import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
-import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
+import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusPill } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
@@ -238,7 +238,11 @@ export function ChatPanel({
       >
         {/* Message area */}
         <Panel id="feed" defaultSize="85%" minSize="20%">
-          <div ref={viewportRef} data-scroll-container="main" className="h-full overflow-auto px-6 py-4 space-y-3">
+          <div
+            ref={viewportRef}
+            data-scroll-container="main"
+            className="h-full overflow-auto px-6 py-4 space-y-3"
+          >
             <StreamsMessageList
               ref={messageListRef}
               messages={agentMessages}

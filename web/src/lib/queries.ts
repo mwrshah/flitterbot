@@ -6,12 +6,12 @@ import {
   fetchDirectoryCompletions,
 } from "~/server/directory-completions";
 import {
+  type DiffResult,
   fetchDownstreamSessions,
   fetchStreamsDiff,
   fetchStreamsHistory,
   fetchStreamsInputHistory,
   fetchStreamsWorktree,
-  type DiffResult,
   type StreamInfo,
 } from "~/server/streams";
 import { fetchUserConfig } from "~/server/user-config";

@@ -1,6 +1,6 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
-import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -16,8 +16,8 @@ import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
-import { cn } from "~/lib/utils";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
+import { cn } from "~/lib/utils";
 import type { DirectoryCompletionsResult } from "~/server/directory-completions";
 
 const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "", query: "" };
@@ -392,7 +392,13 @@ export const MessageInput = memo(function MessageInput({
       }
 
       // Ctrl+L: clear input (terminal-style)
-      if (event.ctrlKey && event.key === "l" && !event.shiftKey && !event.altKey && !event.metaKey) {
+      if (
+        event.ctrlKey &&
+        event.key === "l" &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
         event.preventDefault();
         handleDraftChange("");
         return;
@@ -577,7 +583,11 @@ export const MessageInput = memo(function MessageInput({
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
             <Button type="submit" size="sm" disabled={isSending || !canSend}>
-              {isSending ? <Loader2Icon className="w-4 h-4 animate-spin" /> : <ArrowRightIcon className="w-4 h-4" />}
+              {isSending ? (
+                <Loader2Icon className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRightIcon className="w-4 h-4" />
+              )}
             </Button>
           </div>
         </div>
