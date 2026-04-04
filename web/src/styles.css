@@ -94,6 +94,10 @@ code,
 /* diff2html base overrides */
 .line-num1, .line-num2 {
   width: unset;
+  float: unset;
+}
+.line-num2 {
+  margin-left: 2rem;
 }
 
 /* diff2html overrides — table-cell layout for narrow panel context */
@@ -106,11 +110,6 @@ code,
 .diff-viewer-panel .line-num1,
 .diff-viewer-panel .line-num2 {
   display: inline-block;
-  width: unset;
-}
-.diff-viewer-panel .line-num2 {
-  float: right;
-  margin-left: 1rem;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
