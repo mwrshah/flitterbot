@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
-import { getStreamById } from "../blackboard/query-streams.ts";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,
@@ -9,6 +8,7 @@ import {
   reconcilePreviousPiSessions,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
+import { getStreamById } from "../blackboard/query-streams.ts";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";

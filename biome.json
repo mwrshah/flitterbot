@@ -7,7 +7,13 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["src/**/*.ts", "web/src/**/*.ts", "web/src/**/*.tsx", "!web/src/routeTree.gen.ts"]
+    "includes": [
+      "src/**/*.ts",
+      "web/src/**/*.ts",
+      "web/src/**/*.tsx",
+      "!web/src/routeTree.gen.ts",
+      "!web/src/components/ui/**"
+    ]
   },
   "formatter": {
     "enabled": true,

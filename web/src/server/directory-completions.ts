@@ -11,13 +11,7 @@ export type DirectoryCompletionsResult = {
 };
 
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
-  .inputValidator(
-    (input: {
-      query: string;
-      piSessionId?: string;
-      streamId?: string;
-    }) => input,
-  )
+  .inputValidator((input: { query: string; piSessionId?: string; streamId?: string }) => input)
   .handler(async ({ data }): Promise<DirectoryCompletionsResult> => {
     const params = new URLSearchParams({ query: data.query });
     if (data.piSessionId) params.set("piSessionId", data.piSessionId);

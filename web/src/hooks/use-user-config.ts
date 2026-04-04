@@ -8,8 +8,7 @@ export function useUserConfig() {
   const { data: config = {} } = useQuery(userConfigQueryOptions());
 
   const { mutate } = useMutation({
-    mutationFn: (entries: Record<string, string>) =>
-      saveUserConfig({ data: { config: entries } }),
+    mutationFn: (entries: Record<string, string>) => saveUserConfig({ data: { config: entries } }),
     onMutate: async (entries) => {
       await queryClient.cancelQueries({ queryKey: ["user-config"] });
       const previous = queryClient.getQueryData<Record<string, string>>(["user-config"]);

@@ -3,6 +3,7 @@ import type http from "node:http";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
@@ -49,7 +50,11 @@ export async function handleBrowserPiSessionDiffRoute(
   // Find the fork point from main
   let base: string;
   try {
-    const { stdout: mergeBase } = await execFileAsync("git", ["merge-base", "main", "HEAD"], execOpts);
+    const { stdout: mergeBase } = await execFileAsync(
+      "git",
+      ["merge-base", "main", "HEAD"],
+      execOpts,
+    );
     base = mergeBase.trim();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

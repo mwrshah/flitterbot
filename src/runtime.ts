@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
-import type { AssistantMessage, TextContent, ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage, TextContent } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {

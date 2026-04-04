@@ -41,8 +41,14 @@ type CreateAutonomaAgentOptions = {
 };
 
 export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
-  const { config, customTools, role = "default", orchestratorContext, resumeSessionFile, cwd } =
-    options;
+  const {
+    config,
+    customTools,
+    role = "default",
+    orchestratorContext,
+    resumeSessionFile,
+    cwd,
+  } = options;
   const workingDir = cwd ?? config.projectsDir;
 
   // If resuming an existing session, open its JSONL file to preserve the piSessionId

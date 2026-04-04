@@ -10,8 +10,8 @@ import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
-  setActiveScrollContainer,
   SHORTCUT_ACTIONS,
+  setActiveScrollContainer,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
 import {
@@ -141,7 +141,8 @@ export function DownstreamSessionsPanel({
   const tmuxShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "c then t";
   const worktreeShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) || "c then w";
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
+    "c then w";
   const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo);
   const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff);
 
@@ -290,6 +291,7 @@ export function DownstreamSessionsPanel({
           {diffQuery.isSuccess && diffQuery.data?.mode === "diff" && (
             <div
               className="diff-viewer-panel text-xs"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: diff HTML is generated server-side by diff2html, not from user input
               dangerouslySetInnerHTML={{ __html: renderedDiff }}
             />
           )}
@@ -333,9 +335,7 @@ export function DownstreamSessionsPanel({
                         <CopyableCode
                           text={`tmux attach -t ${session.tmuxSession}`}
                           copied={tmuxCopy.copied}
-                          onCopy={() =>
-                            tmuxCopy.copy(`tmux attach -t ${session.tmuxSession}`)
-                          }
+                          onCopy={() => tmuxCopy.copy(`tmux attach -t ${session.tmuxSession}`)}
                         />
                       ) : (
                         <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
