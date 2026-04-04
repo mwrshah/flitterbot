@@ -53,12 +53,13 @@ export function useGlobalShortcuts({
     return true;
   });
 
-  const scrollByPage = useEffectEvent((mode: "half-up" | "half-down" | "full-up" | "full-down") => {
+  const scrollByPage = useEffectEvent((mode: "half-up" | "half-down" | "full-up" | "full-down" | "small-up" | "small-down") => {
     const container = document.querySelector<HTMLElement>(getActiveScrollContainerSelector());
     if (!container) return false;
 
     const half = container.clientHeight * 0.7;
     const full = container.clientHeight * 0.9;
+    const small = container.clientHeight * 0.2;
     const delta =
       mode === "half-down"
         ? half
@@ -66,7 +67,11 @@ export function useGlobalShortcuts({
           ? -half
           : mode === "full-down"
             ? full
-            : -full;
+            : mode === "full-up"
+              ? -full
+              : mode === "small-down"
+                ? small
+                : -small;
 
     container.scrollBy({
       top: delta,
@@ -118,6 +123,8 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageUp, handler: () => scrollByPage("half-up") },
       { actionId: SHORTCUT_ACTIONS.scrollFullPageDown, handler: () => scrollByPage("full-down") },
       { actionId: SHORTCUT_ACTIONS.scrollFullPageUp, handler: () => scrollByPage("full-up") },
+      { actionId: SHORTCUT_ACTIONS.scrollSmallDown, handler: () => scrollByPage("small-down") },
+      { actionId: SHORTCUT_ACTIONS.scrollSmallUp, handler: () => scrollByPage("small-up") },
       { actionId: SHORTCUT_ACTIONS.scrollTop, handler: () => scrollToTop() },
       { actionId: SHORTCUT_ACTIONS.scrollBottom, handler: () => scrollToBottom() },
       { actionId: SHORTCUT_ACTIONS.composerFocus, handler: () => focusComposer() },

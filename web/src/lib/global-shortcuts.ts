@@ -119,6 +119,8 @@ export const SHORTCUT_ACTIONS = {
   composerFocus: "composer.focus",
   streamCopyTmuxAttach: "stream.copy-tmux-attach",
   streamCopyWorktreePath: "stream.copy-worktree-path",
+  scrollSmallDown: "scroll.small-down",
+  scrollSmallUp: "scroll.small-up",
   panelViewInfo: "panel.view.info",
   panelViewDiff: "panel.view.diff",
 } as const;
@@ -631,15 +633,19 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [
       { spec: "Ctrl+KeyD", when: "always" },
       { spec: "d", when: "no-input-focus" },
-      { spec: "j", when: "no-input-focus" },
     ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageUp, {
     defaultBindings: [
       { spec: "Ctrl+KeyU", when: "always" },
       { spec: "u", when: "no-input-focus" },
-      { spec: "k", when: "no-input-focus" },
     ],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.scrollSmallDown, {
+    defaultBindings: [{ spec: "j", when: "no-input-focus" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.scrollSmallUp, {
+    defaultBindings: [{ spec: "k", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollFullPageDown, {
     defaultBindings: [
