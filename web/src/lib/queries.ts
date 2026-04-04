@@ -14,6 +14,7 @@ import {
   type DiffResult,
   type StreamInfo,
 } from "~/server/streams";
+import { fetchUserConfig } from "~/server/user-config";
 
 /**
  * structuralSharing callback: merges fetched timeline with the previous cache
@@ -138,13 +139,10 @@ export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
 export type StatusPill = { id: string; label: string; variant?: "info" | "error" };
 
 /** User config (panel layouts, theme, etc.) — prefetched in root loader. */
-export function userConfigQueryOptions(apiClient: AutonomaApiClient) {
+export function userConfigQueryOptions() {
   return {
     queryKey: ["user-config"] as const,
-    queryFn: async (): Promise<Record<string, string>> => {
-      const res = await apiClient.getUserConfig("default_user");
-      return res.config;
-    },
+    queryFn: () => fetchUserConfig(),
     staleTime: 30_000,
   };
 }

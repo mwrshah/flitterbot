@@ -34,7 +34,7 @@ export const Route = createRootRouteWithContext<{
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
-      context.queryClient.ensureQueryData(userConfigQueryOptions(context.apiClient)).catch(() => ({})),
+      context.queryClient.ensureQueryData(userConfigQueryOptions()).catch(() => ({})),
     ]);
   },
   head: () => ({
