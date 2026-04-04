@@ -3,9 +3,10 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import logoBlack from "~/assets/autonoma_logo_black_small.png";
 import logoWhite from "~/assets/autonoma_logo_white_small.png";
-import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useModifierLabel } from "~/hooks/platform";
+import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { SHORTCUT_ACTIONS, useShortcutBindingLabel } from "~/lib/global-shortcuts";
 import { statusQueryOptions } from "~/lib/queries";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -28,7 +29,12 @@ function NavItem({
   label,
   icon,
   shortcutHint,
-}: { to: string; label: string; icon: React.ReactNode; shortcutHint?: string }) {
+}: {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  shortcutHint?: string;
+}) {
   useWhyDidYouRender("NavItem", { to, label, icon, shortcutHint });
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -96,6 +102,12 @@ export const Sidebar = memo(function Sidebar() {
   }
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
+  const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
+    altLabel: mod,
+  });
+  const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
+    altLabel: mod,
+  });
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
@@ -108,8 +120,13 @@ export const Sidebar = memo(function Sidebar() {
 
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
-        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={`${mod} + R`} />
-        <NavItem to={lastStreamPath} label="Streams" icon={icons.piAgent} shortcutHint={`${mod} + T`} />
+        <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
+        <NavItem
+          to={lastStreamPath}
+          label="Streams"
+          icon={icons.piAgent}
+          shortcutHint={streamsShortcutHint}
+        />
       </nav>
 
       {/* Streams */}

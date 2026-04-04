@@ -607,6 +607,7 @@ export class ControlSurfaceRuntime {
           };
         }),
       ],
+      shortcuts: this.config.shortcuts,
     };
   }
 
@@ -833,7 +834,6 @@ export class ControlSurfaceRuntime {
         );
       }
     }
-
   }
 
   /**
@@ -1008,7 +1008,11 @@ export class ControlSurfaceRuntime {
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { name, message: agentMessage, repo } = params as {
+          const {
+            name,
+            message: agentMessage,
+            repo,
+          } = params as {
             name: string;
             message?: string;
             repo?: string;
@@ -1018,10 +1022,7 @@ export class ControlSurfaceRuntime {
           let repoPath: string | undefined;
           if (repo) {
             const resolved = path.join(this.config.projectsDir, repo);
-            if (
-              !fs.existsSync(resolved) ||
-              !fs.existsSync(path.join(resolved, ".git"))
-            ) {
+            if (!fs.existsSync(resolved) || !fs.existsSync(path.join(resolved, ".git"))) {
               return {
                 content: [
                   {
@@ -1042,7 +1043,9 @@ export class ControlSurfaceRuntime {
             enrichStream(this.blackboard, ws.id, repoPath);
           }
 
-          this.log(`default agent created stream "${name}" (${ws.id})${repoPath ? ` repo=${repoPath}` : ""}`);
+          this.log(
+            `default agent created stream "${name}" (${ws.id})${repoPath ? ` repo=${repoPath}` : ""}`,
+          );
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
