@@ -4,7 +4,7 @@ Canonical reference for how server-side SDK events reach the web UI and how clie
 
 ## Architecture Overview
 
-Three layers, two state stores, zero React re-renders during streaming.
+Three layers, three state paths, zero React re-renders during streaming and message commit.
 
 ```
 PI SDK (Claude)
@@ -23,10 +23,16 @@ ws-query-bridge.ts ── routes WS events to the correct state layer
   │     • Lit web component reads imperatively via callback — zero React re-renders
   │     • Cleared on message_end / turn_end / agent_end
   │
-  └─► TanStack Query Cache (committed state: messages, tool calls)
+  ├─► Imperative Commit (message_end only)
+  │     • streamingStore.commitMessage() → ChatPanel onCommit → Lit commitStreaming()
+  │     • Converts timeline items to AgentMessages, appends only new items to Lit
+  │     • Lit's shouldUpdate() suppresses the redundant React catch-up render
+  │
+  └─► TanStack Query Cache (persistence layer: messages, tool calls)
         • Updated via queryClient.setQueryData() on message_end, tool_execution_*
-        • React components subscribe via useQuery() — re-renders on cache update
-        • Persists across route switches; revalidated from server on mount
+        • Serves navigation, refetch, mergeTimelineItems reconciliation
+        • React components subscribe via useQuery() but Lit's shouldUpdate prevents
+          redundant re-renders when data was already committed imperatively
 ```
 
 The server (SDK in-memory messages / JSONL session file) is the source of truth. The frontend cache is a projection that the server can always reconstruct.
@@ -66,7 +72,7 @@ Lit component renders thinking live via imperative callback. React sees nothing.
 
 ### 5. message_end — The Commit Point
 
-This is the critical event. It's the only point where assistant message content enters the React render cycle.
+This is the critical event. It commits assistant message content to both the Lit component (imperatively) and the Query cache (for persistence).
 
 **Server (`pi-subscribe.ts`):**
 1. `extractMessageBlocks(event.message)` parses the SDK message content array:
@@ -80,9 +86,10 @@ This is the critical event. It's the only point where assistant message content 
 **Frontend (`ws-query-bridge.ts`):**
 1. ONE atomic `queryClient.setQueryData()` call that:
    - Upserts the message by ID (replace if exists, append if new)
-   - Appends tool call start items from `message.toolCalls`
-2. `streamingStore.clearSession()` — Lit component switches from streaming overlay to committed content
-3. Single React re-render from the cache update
+   - Appends tool call start items from `message.toolCalls`, deduped by `toolUseId` (skips items where an active tool with the same `toolUseId` and `phase !== "end"` already exists — prevents duplicates when the cache already has tool starts from a prior server fetch)
+2. Imperative commit: `timelineItemsToAgentMessages(committedItems)` → `streamingStore.commitMessage()` → ChatPanel `onCommit` callback → `messageListRef.commitStreaming()` → Lit appends only new items
+3. `streamingStore.clearSession()` — clears streaming overlay
+4. The `setQueryData` call persists data for navigation/refetch, but Lit's `shouldUpdate()` detects the data was already committed imperatively and returns `false` — net result: **0 React re-renders** for message_end
 
 ### 6. tool_execution_start
 
@@ -118,6 +125,16 @@ This is the critical event. It's the only point where assistant message content 
 - If `aborted`: invalidates timeline query → triggers refetch from server session file → 1 re-render
 - Normal: no cache update, no re-render (message_end already committed)
 
+## Imperative Commit Path
+
+Three-layer architecture for getting data from WS events to the Lit component:
+
+**1. Streaming Store (delta channel)** — High-frequency deltas (`text_delta`, `thinking_delta`) at ~30Hz. `streamingStore.appendTextDelta()` / `appendThinkingDelta()` accumulate text in a plain `Map`. The Lit component reads via `onStreamingDelta` callback and renders a streaming overlay. React sees nothing.
+
+**2. Imperative Commit (message_end)** — `ws-query-bridge` builds `committedItems` from the message_end payload, converts them to `AgentMessage[]` via `timelineItemsToAgentMessages()`, then calls `streamingStore.commitMessage(sessionId, agentMessages)`. The streaming store fires the registered `CommitCallback`, which flows: ChatPanel `onCommit` → `messageListRef.commitStreaming(messages)` → Lit `MessageList.commitStreaming()`. The Lit component hides the streaming overlay, builds render items for only the new messages, appends them to its cached render item list, and sets `_committedTotal` to track how many messages it has imperatively. `shouldUpdate()` then suppresses the subsequent React-driven property update (from `setQueryData` → `useQuery` → `useAgentMessages`) by returning `false` when `messages.length <= _committedTotal`.
+
+**3. Query Cache (persistence)** — `setQueryData` still runs on message_end for persistence: it's the source of truth for navigation (route switches reload from cache), refetch reconciliation (`mergeTimelineItems`), and server revalidation. React components subscribe via `useQuery()`, but the Lit component's `shouldUpdate()` gate prevents the redundant render. The `committedRef` flag in `StreamsMessageList` also skips perf tracking on the React catch-up path.
+
 ## Tool Call Lifecycle & ID Matching
 
 `toolUseId` is the stable server-side ID assigned by the SDK at `content_block_start`. It's the join key across the entire tool lifecycle:
@@ -151,7 +168,7 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 
 1. Build a `serverIds` set from the fetched data: `id`, `serverMessageId`, and `toolUseId` values
 2. Filter the old cache for "extras" — items whose identity isn't in `serverIds`
-3. If no extras: return old reference if IDs match (referential equality → no re-render), otherwise return server data
+3. If no extras: return canonical server data (always prefer fresh content over cached snapshots — the ID-only equality check was removed because same IDs doesn't mean same content, e.g. cached version had incomplete thinking blocks from intermediate WS snapshots)
 4. If extras exist: return `[...serverData, ...extras]` (WS-accumulated items the server doesn't know about yet are preserved)
 
 **When revalidation happens:**
@@ -165,7 +182,7 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 |---|---|---|
 | text_delta | 0 | 0 (streaming store → Lit) |
 | thinking_delta | 0 | 0 (streaming store → Lit) |
-| message_end | 1 (message + tool calls atomic) | 1 |
+| message_end | 1 (message + tool calls atomic) + 1 imperative commit | 0 (Lit `shouldUpdate` suppresses React catch-up) |
 | tool_execution_start | 1 (upsert in-place) | 1 |
 | tool_execution_update | 1 (upsert in-place) | 1 |
 | tool_execution_end | 1 (append) | 1 |
@@ -173,7 +190,7 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 | agent_end (normal) | 0 | 0 |
 | agent_end (aborted) | 0 + 1 invalidation → refetch | 1 |
 
-A typical assistant turn with thinking + text + 1 tool call: 4 React re-renders total. All high-frequency deltas are zero-cost to React.
+A typical assistant turn with thinking + text + 1 tool call: 3 React re-renders total (message_end is now 0). All high-frequency deltas are zero-cost to React.
 
 ## Key Files
 
@@ -182,7 +199,7 @@ A typical assistant turn with thinking + text + 1 tool call: 4 React re-renders 
 | `src/streams/pi-subscribe.ts` | Server: SDK event subscription → WS broadcast. `extractMessageBlocks()` extracts text, thinking, and tool calls. |
 | `src/contracts/websocket.ts` | WS event type contracts (shared between server and frontend types) |
 | `src/streams/history.ts` | Server: parses SDK messages / JSONL session file → `ChatTimelineItem[]` for history API |
-| `web/src/lib/streaming-store.ts` | Frontend: imperative Map-based store for high-frequency text/thinking deltas |
+| `web/src/lib/streaming-store.ts` | Frontend: imperative Map-based store for high-frequency text/thinking deltas + commit channel (`onCommit`/`offCommit`/`commitMessage`) for message_end imperative path |
 | `web/src/lib/ws-query-bridge.ts` | Frontend: routes WS events → streaming store or Query cache. Contains `appendTimelineItem`, `upsertActiveToolItem`, atomic message_end handler. |
 | `web/src/lib/queries.ts` | Frontend: TanStack Query options + `mergeTimelineItems` structuralSharing |
 | `web/src/hooks/use-streams-chat.ts` | Frontend: React hook wiring timeline query to chat components |
