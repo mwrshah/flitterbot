@@ -1,6 +1,6 @@
 import { layout, prepare } from "@chenglou/pretext";
-import { useQuery } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { CopyIcon, SettingsIcon } from "lucide-react";
 import {
   type MouseEvent,
@@ -25,6 +25,7 @@ import type {
   ChatTimelineMessage,
   ImageAttachment,
   MessageSource,
+  StatusResponse,
 } from "~/lib/types";
 
 /* ── Types ── */
@@ -33,10 +34,10 @@ type SurfaceEntry = {
   id: string;
   timestamp: string;
 } & (
-  | { kind: "inbound"; source: MessageSource; content: string; streamName?: string }
+  | { kind: "inbound"; source: MessageSource; content: string; streamId?: string; streamName?: string }
   | { kind: "outbound"; channel: "whatsapp" | "all"; content: string }
   | { kind: "hook"; eventName: string; detail: string }
-  | { kind: "streams-response"; content: string; streamName?: string }
+  | { kind: "streams-response"; content: string; streamId?: string; streamName?: string }
 );
 
 type MeasuredSurfaceEntry = SurfaceEntry & {
@@ -172,6 +173,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         kind: "inbound",
         source: msg.source ?? "web",
         content: msg.content,
+        streamId: item.streamId,
         streamName: item.streamName,
       });
       continue;
@@ -183,6 +185,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         timestamp: item.createdAt,
         kind: "streams-response",
         content: item.content,
+        streamId: item.streamId,
         streamName: item.streamName,
       });
       continue;
@@ -366,6 +369,36 @@ function findVirtualIndex(offsets: number[], target: number): number {
 
 /* ── Entry Renderers ── */
 
+function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?: string }) {
+  const queryClient = useQueryClient();
+
+  if (!streamName) return null;
+
+  // Look up piSessionId from the status cache
+  let piSessionId: string | undefined;
+  if (streamId) {
+    const status = queryClient.getQueryData<StatusResponse>(["status"]);
+    piSessionId = status?.streams?.find((s) => s.id === streamId)?.piSessionId ?? undefined;
+  }
+
+  const badgeClasses =
+    "inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1";
+
+  if (!piSessionId) {
+    return <span className={badgeClasses}>{streamName}</span>;
+  }
+
+  return (
+    <Link
+      to="/streams/$piSessionId"
+      params={{ piSessionId }}
+      className={`${badgeClasses} cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors`}
+    >
+      {streamName}
+    </Link>
+  );
+}
+
 const InboundEntry = memo(function InboundEntry({
   entry,
   onExpandToggle,
@@ -374,7 +407,6 @@ const InboundEntry = memo(function InboundEntry({
   onExpandToggle?: () => void;
 }) {
   const displayContent = entry.content;
-  const badgeName = entry.streamName;
 
   return (
     <div className="flex gap-3 items-start">
@@ -388,11 +420,7 @@ const InboundEntry = memo(function InboundEntry({
         </div>
       </div>
       <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-card px-3 py-2">
-        {badgeName && (
-          <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
-            {badgeName}
-          </span>
-        )}
+        <StreamBadge streamId={entry.streamId} streamName={entry.streamName} />
         <PlainTextBlock
           text={displayContent}
           isOverflowing={entry.metrics.isOverflowing}
@@ -451,11 +479,7 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
         </div>
       </div>
       <div className="group/msg relative flex-1 min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2">
-        {entry.streamName && (
-          <span className="inline-block text-[10px] font-medium text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 rounded px-1.5 py-0.5 mb-1">
-            {entry.streamName}
-          </span>
-        )}
+        <StreamBadge streamId={entry.streamId} streamName={entry.streamName} />
         <PlainTextBlock
           text={entry.content}
           isOverflowing={entry.metrics.isOverflowing}
