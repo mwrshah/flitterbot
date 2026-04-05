@@ -37,53 +37,54 @@ function MobileInfoPanel() {
 }
 
 function AppShellInner() {
-  const { isMobile, activeTab, setActiveTab } = useMobileTab();
+  const { activeTab, setActiveTab } = useMobileTab();
   useWhyDidYouRender("AppShell", {});
 
-  if (isMobile) {
-    return (
-      <div className="flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {/* Sidebar — kept mounted via hidden to preserve scroll state */}
-          <div
-            className={cn("h-full", activeTab !== "sidebar" && "hidden")}
-            onClick={(e) => {
-              // Auto-switch to surface tab when a nav link is clicked
-              if ((e.target as HTMLElement).closest("a")) {
-                setActiveTab("surface");
-              }
-            }}
-          >
-            <Sidebar />
-          </div>
-
-          {/* Info panel */}
-          <div className={cn("h-full", activeTab !== "info" && "hidden")}>
-            <MobileInfoPanel />
-          </div>
-
-          {/* Main content — surface & stream tabs both render the Outlet;
-              the route component decides which panel to show based on activeTab */}
-          <main
-            className={cn(
-              "flex flex-col h-full overflow-hidden",
-              activeTab !== "surface" && activeTab !== "stream" && "hidden",
-            )}
-          >
-            <Outlet />
-          </main>
-        </div>
-        <BottomTabBar />
-      </div>
-    );
-  }
-
+  // Single DOM — Tailwind responsive classes handle mobile vs desktop layout.
+  // Mobile: flex column with tab-switched panels + bottom bar.
+  // Desktop (md:): 2-column grid, sidebar always visible, no bottom bar.
   return (
-    <div className="grid grid-cols-[240px_1fr] grid-rows-1 h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex flex-col min-h-0 overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden md:grid md:grid-cols-[240px_1fr] md:grid-rows-1">
+      {/* Sidebar: always visible on desktop (md:block), tab-controlled on mobile */}
+      <div
+        className={cn(
+          "min-h-0",
+          activeTab === "sidebar" ? "flex-1" : "hidden md:block",
+        )}
+        onClick={(e) => {
+          // Auto-switch to surface tab when a nav link is clicked on mobile
+          if ((e.target as HTMLElement).closest("a")) {
+            setActiveTab("surface");
+          }
+        }}
+      >
+        <Sidebar />
+      </div>
+
+      {/* Info panel: mobile only (md:hidden), shown when info tab active */}
+      <div
+        className={cn(
+          "min-h-0 md:hidden",
+          activeTab === "info" ? "flex-1" : "hidden",
+        )}
+      >
+        <MobileInfoPanel />
+      </div>
+
+      {/* Main content: always visible on desktop (md:flex), tab-controlled on mobile */}
+      <main
+        className={cn(
+          "flex flex-col min-h-0 overflow-hidden",
+          activeTab === "surface" || activeTab === "stream" ? "flex-1" : "hidden md:flex",
+        )}
+      >
         <Outlet />
       </main>
+
+      {/* Bottom tab bar: mobile only */}
+      <div className="shrink-0 md:hidden">
+        <BottomTabBar />
+      </div>
     </div>
   );
 }
