@@ -27,13 +27,6 @@ import type {
 } from "~/lib/types";
 import { createId } from "~/lib/utils";
 import type { AutonomaWsClient } from "~/lib/ws";
-import {
-  pipelineLog,
-  pipelineGroup,
-  pipelineWarn,
-  pipelineDeltaLog,
-  pipelineCheckDedup,
-} from "~/lib/pipeline-logger";
 
 /* ── Send message factory (provided via router context) ── */
 
@@ -295,7 +288,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── message_start → typing indicator ──
     if (message.type === "message_start") {
-      pipelineLog("WS_RECEIVED", "message_start", { piSessionId, messageId: message.messageId });
       addPill(queryClient, piSessionId, {
         id: "assistant-typing",
         label: "Thinking…",
@@ -305,11 +297,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
-      pipelineDeltaLog("WS_RECEIVED", "text_delta", `${piSessionId}:text`, {
-        piSessionId,
-        messageId: message.messageId,
-        deltaLen: message.delta.length,
-      });
       // Remove typing indicator once real content starts flowing
       removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.appendTextDelta(piSessionId, message.messageId, message.delta);
@@ -318,7 +305,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── thinking lifecycle → streaming store ──
     if (message.type === "thinking_start") {
-      pipelineLog("WS_RECEIVED", "thinking_start", { piSessionId, messageId: message.messageId });
       // Remove typing indicator once thinking starts
       removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.setThinkingStreaming(piSessionId, true, message.messageId);
@@ -326,28 +312,17 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "thinking_delta") {
-      pipelineDeltaLog("WS_RECEIVED", "thinking_delta", `${piSessionId}:thinking`, {
-        piSessionId,
-        messageId: message.messageId,
-        deltaLen: message.delta.length,
-      });
       streamingStore.appendThinkingDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     if (message.type === "thinking_end") {
-      pipelineLog("WS_RECEIVED", "thinking_end", { piSessionId, messageId: message.messageId });
       streamingStore.setThinkingStreaming(piSessionId, false);
       return;
     }
 
     // ── toolcall_start → append tool card to streaming overlay ──
     if (message.type === "toolcall_start") {
-      pipelineLog("WS_RECEIVED", "toolcall_start", {
-        piSessionId,
-        toolUseId: message.toolUseId,
-        toolName: message.toolName,
-      });
       if (message.toolUseId && message.toolName) {
         streamingStore.appendToolCall(piSessionId, {
           type: "toolCall",
@@ -370,128 +345,81 @@ export function setupWsQueryBridge(deps: {
       const blocks = (msg as ChatTimelineMessage).blocks;
       const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
 
-      pipelineGroup("WS_RECEIVED", "message_end", `${piSessionId}:${msg.id}`, () => {
-        pipelineLog("WS_RECEIVED", "message_end", {
-          piSessionId,
-          messageId: msg.id,
-          role: msg.role,
-          contentLen: msg.content.length,
-          hasBlocks: !!(blocks && blocks.length > 0),
-          toolCallCount: message.toolCalls?.length ?? 0,
-          hasContent,
-        });
+      if (hasContent || message.toolCalls?.length) {
+        const now = new Date().toISOString();
 
-        if (hasContent || message.toolCalls?.length) {
-          const now = new Date().toISOString();
-
-          // Build the committed timeline items for both Query cache and imperative commit.
-          const committedItems: ChatTimelineItem[] = [];
-          if (hasContent) {
-            committedItems.push(blocks ? { ...msg, blocks } : msg);
-          }
-          if (message.toolCalls?.length) {
-            for (const tc of message.toolCalls) {
-              committedItems.push({
-                id: createId("tool"),
-                kind: "tool",
-                tool: tc.toolName ?? "tool",
-                phase: "start",
-                toolUseId: tc.toolUseId,
-                args: tc.args as JsonValue | undefined,
-                createdAt: now,
-              });
-            }
-          }
-
-          queryClient.setQueryData<ChatTimelineItem[]>(
-            ["streams-history", piSessionId, "agent"],
-            (old) => {
-              const items = old ?? [];
-
-              // Dedup detection for pipeline logger
-              if (hasContent) {
-                const committed = committedItems[0] as ChatTimelineMessage;
-                pipelineCheckDedup(committed.id, committed.content, "message_end:message");
-              }
-
-              // Upsert the message (replace existing by ID, or append).
-              let next = items;
-              if (hasContent) {
-                const committed = committedItems[0] as ChatTimelineMessage;
-                const idx = items.findIndex((existing) => existing.id === committed.id);
-                if (idx >= 0) {
-                  pipelineLog("QUERY_CACHE_UPDATE", "message_end", {
-                    action: "upsert_replace",
-                    messageId: committed.id,
-                    existingIdx: idx,
-                  });
-                  next = [...items];
-                  next[idx] = committed;
-                } else {
-                  pipelineLog("QUERY_CACHE_UPDATE", "message_end", {
-                    action: "upsert_append",
-                    messageId: committed.id,
-                    cacheSize: items.length,
-                  });
-                  next = [...items, committed];
-                }
-              }
-
-              // Append tool call start items from the server (dedup by toolUseId).
-              if (message.toolCalls?.length) {
-                const base = next === items ? [...items] : next;
-                const toolItems = hasContent ? committedItems.slice(1) : committedItems;
-                for (const toolItem of toolItems) {
-                  const tc = toolItem as ChatTimelineTool;
-                  const alreadyExists = base.some(
-                    (existing) =>
-                      existing.kind === "tool" &&
-                      (existing as ChatTimelineTool).toolUseId === tc.toolUseId &&
-                      (existing as ChatTimelineTool).phase !== "end",
-                  );
-                  if (alreadyExists) {
-                    pipelineWarn("QUERY_CACHE_UPDATE", "message_end", "Tool start already in cache (deduped)", {
-                      toolUseId: tc.toolUseId,
-                    });
-                  } else {
-                    pipelineLog("QUERY_CACHE_UPDATE", "message_end", {
-                      action: "append_tool_start",
-                      toolUseId: tc.toolUseId,
-                      tool: tc.tool,
-                    });
-                    base.push(tc);
-                  }
-                }
-                next = base;
-              }
-
-              pipelineLog("QUERY_CACHE_UPDATE", "message_end", {
-                finalCacheSize: next.length,
-                committedItemCount: committedItems.length,
-              });
-
-              return next;
-            },
-          );
-
-          // Imperative commit: convert committed items to AgentMessages and push
-          // directly to the Lit component, bypassing React re-render cycle.
-          const agentMessages = timelineItemsToAgentMessages(committedItems);
-          if (agentMessages.length > 0) {
-            pipelineLog("IMPERATIVE_COMMIT", "message_end", {
-              piSessionId,
-              agentMessageCount: agentMessages.length,
-              committedItemCount: committedItems.length,
+        // Build the committed timeline items for both Query cache and imperative commit.
+        const committedItems: ChatTimelineItem[] = [];
+        if (hasContent) {
+          committedItems.push(blocks ? { ...msg, blocks } : msg);
+        }
+        if (message.toolCalls?.length) {
+          for (const tc of message.toolCalls) {
+            committedItems.push({
+              id: createId("tool"),
+              kind: "tool",
+              tool: tc.toolName ?? "tool",
+              phase: "start",
+              toolUseId: tc.toolUseId,
+              args: tc.args as JsonValue | undefined,
+              createdAt: now,
             });
-            console.log(
-              "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
-              agentMessages.length,
-              piSessionId,
-            );
-            streamingStore.commitMessage(piSessionId, agentMessages);
           }
         }
-      });
+
+        queryClient.setQueryData<ChatTimelineItem[]>(
+          ["streams-history", piSessionId, "agent"],
+          (old) => {
+            const items = old ?? [];
+
+            // Upsert the message (replace existing by ID, or append).
+            let next = items;
+            if (hasContent) {
+              const committed = committedItems[0] as ChatTimelineMessage;
+              const idx = items.findIndex((existing) => existing.id === committed.id);
+              if (idx >= 0) {
+                next = [...items];
+                next[idx] = committed;
+              } else {
+                next = [...items, committed];
+              }
+            }
+
+            // Append tool call start items from the server (dedup by toolUseId).
+            if (message.toolCalls?.length) {
+              const base = next === items ? [...items] : next;
+              const toolItems = hasContent ? committedItems.slice(1) : committedItems;
+              for (const toolItem of toolItems) {
+                const tc = toolItem as ChatTimelineTool;
+                const alreadyExists = base.some(
+                  (existing) =>
+                    existing.kind === "tool" &&
+                    (existing as ChatTimelineTool).toolUseId === tc.toolUseId &&
+                    (existing as ChatTimelineTool).phase !== "end",
+                );
+                if (!alreadyExists) {
+                  base.push(tc);
+                }
+              }
+              next = base;
+            }
+
+            return next;
+          },
+        );
+
+        // Imperative commit: convert committed items to AgentMessages and push
+        // directly to the Lit component, bypassing React re-render cycle.
+        const agentMessages = timelineItemsToAgentMessages(committedItems);
+        if (agentMessages.length > 0) {
+          console.log(
+            "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
+            agentMessages.length,
+            piSessionId,
+          );
+          streamingStore.commitMessage(piSessionId, agentMessages);
+        }
+      }
 
       streamingStore.clearSession(piSessionId);
       return;
@@ -542,11 +470,6 @@ export function setupWsQueryBridge(deps: {
     // ── tool_execution_update → imperative active-tool channel ──
     if (message.type === "tool_execution_update") {
       if (!message.toolUseId) return;
-      pipelineDeltaLog("WS_RECEIVED", "tool_execution_update", `${piSessionId}:tool:${message.toolUseId}`, {
-        piSessionId,
-        toolUseId: message.toolUseId,
-        hasPartialResult: message.partialResult !== undefined,
-      });
       streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
@@ -558,11 +481,6 @@ export function setupWsQueryBridge(deps: {
     // ── tool_execution_start → imperative active-tool channel ──
     if (message.type === "tool_execution_start") {
       if (!message.toolUseId) return;
-      pipelineLog("WS_RECEIVED", "tool_execution_start", {
-        piSessionId,
-        toolUseId: message.toolUseId,
-        tool: message.tool,
-      });
       streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
@@ -577,12 +495,6 @@ export function setupWsQueryBridge(deps: {
           ? (message.event as Record<string, unknown>)
           : undefined;
       if (!message.toolUseId) return;
-      pipelineLog("WS_RECEIVED", "tool_execution_end", {
-        piSessionId,
-        toolUseId: message.toolUseId,
-        isError: message.isError,
-        hasResult: message.result !== undefined,
-      });
       streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: false,
@@ -595,20 +507,10 @@ export function setupWsQueryBridge(deps: {
 
     // ── tool_result → canonical durable tool flush ──
     if (message.type === "tool_result") {
-      pipelineLog("WS_RECEIVED", "tool_result", {
-        piSessionId,
-        toolUseId: message.item.toolUseId,
-        tool: message.item.tool,
-        phase: message.item.phase,
-      });
       appendTimelineItem(queryClient, piSessionId, message.item);
 
       const [toolResultMessage] = timelineItemsToAgentMessages([message.item]);
       if (toolResultMessage) {
-        pipelineLog("IMPERATIVE_COMMIT", "tool_result", {
-          piSessionId,
-          toolUseId: message.item.toolUseId,
-        });
         streamingStore.commitToolResult(piSessionId, toolResultMessage);
       }
       if (message.item.toolUseId) {
@@ -619,7 +521,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── turn_end ──
     if (message.type === "turn_end") {
-      pipelineLog("WS_RECEIVED", "turn_end", { piSessionId });
       console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", piSessionId);
       streamingStore.clearSession(piSessionId);
       return;
@@ -627,15 +528,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── agent_end ──
     if (message.type === "agent_end") {
-      pipelineLog("WS_RECEIVED", "agent_end", {
-        piSessionId,
-        aborted: message.aborted ?? false,
-      });
-      if (message.aborted) {
-        pipelineWarn("WS_RECEIVED", "agent_end", "Aborted — message_end was skipped, invalidating cache", {
-          piSessionId,
-        });
-      }
       removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.clearSession(piSessionId);
       if (message.aborted) {

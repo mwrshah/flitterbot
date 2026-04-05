@@ -15,11 +15,6 @@
 
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { streamingPerf } from "./streaming-perf";
-import {
-  pipelineLog,
-  pipelineDeltaLog,
-  pipelineDeltaReset,
-} from "./pipeline-logger";
 
 /* ── Types ── */
 
@@ -107,19 +102,12 @@ export const streamingStore = {
   appendTextDelta(sessionId: string, messageId: string, delta: string) {
     const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = texts.get(sessionId);
-    const isFirst = !existing;
     if (existing) {
       existing.text += delta;
       existing.messageId = messageId;
     } else {
       texts.set(sessionId, { text: delta, messageId });
     }
-    pipelineDeltaLog("STORE_UPDATE", "text_delta", `${sessionId}:store:text`, {
-      sessionId,
-      messageId,
-      isFirst,
-      accumulatedLen: texts.get(sessionId)!.text.length,
-    });
     fireCallbacks(sessionId);
     streamingPerf.endDeltaToCallback(deltaToken);
   },
@@ -134,19 +122,12 @@ export const streamingStore = {
   appendThinkingDelta(sessionId: string, messageId: string, delta: string) {
     const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = thinking.get(sessionId);
-    const isFirst = !existing;
     if (existing) {
       existing.text += delta;
       existing.messageId = messageId;
     } else {
       thinking.set(sessionId, { text: delta, messageId });
     }
-    pipelineDeltaLog("STORE_UPDATE", "thinking_delta", `${sessionId}:store:thinking`, {
-      sessionId,
-      messageId,
-      isFirst,
-      accumulatedLen: thinking.get(sessionId)!.text.length,
-    });
     fireCallbacks(sessionId);
     streamingPerf.endDeltaToCallback(deltaToken);
   },
@@ -166,11 +147,6 @@ export const streamingStore = {
   /* ── Tool call streaming (from toolcall_start events) ── */
 
   appendToolCall(sessionId: string, toolCall: StreamingToolCall) {
-    pipelineLog("STORE_UPDATE", "toolcall_start", {
-      sessionId,
-      toolUseId: toolCall.id,
-      toolName: toolCall.name,
-    });
     const existing = toolCalls.get(sessionId);
     if (existing) {
       existing.push(toolCall);
@@ -196,12 +172,6 @@ export const streamingStore = {
       return;
     }
 
-    pipelineLog("STORE_UPDATE", "clearSession", {
-      sessionId,
-      hadStreaming,
-      hadActiveTools,
-    });
-    pipelineDeltaReset(sessionId);
     console.log("[debug][streaming-store] clearSession for session=%s", sessionId);
     texts.delete(sessionId);
     thinking.delete(sessionId);
@@ -245,11 +215,6 @@ export const streamingStore = {
    *  Called from ws-query-bridge after message_end setQueryData. */
   commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
     const cb = commitCallbacks.get(sessionId);
-    pipelineLog("IMPERATIVE_COMMIT", "commitMessage", {
-      sessionId,
-      messageCount: agentMessages.length,
-      hasCallback: !!cb,
-    });
     console.log(
       "[debug][streaming-store] commitMessage: session=%s messages=%d hasCallback=%s",
       sessionId,
@@ -269,10 +234,6 @@ export const streamingStore = {
 
   commitToolResult(sessionId: string, agentMessage: AgentMessage) {
     const cb = toolResultCommitCallbacks.get(sessionId);
-    pipelineLog("IMPERATIVE_COMMIT", "commitToolResult", {
-      sessionId,
-      hasCallback: !!cb,
-    });
     console.log(
       "[debug][streaming-store] commitToolResult: session=%s hasCallback=%s",
       sessionId,
