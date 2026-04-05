@@ -3,10 +3,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
+import { useMobileTab } from "~/components/mobile-tab-provider";
 import { useStreamsChat } from "~/hooks/use-streams-chat";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { statusQueryOptions } from "~/lib/queries";
+import { cn } from "~/lib/utils";
 import type { ChatTimelineItem } from "~/lib/types";
 import {
   fetchDownstreamSessions,
@@ -57,6 +59,7 @@ const STREAMS_MAIN_DEFAULT: Record<string, number> = { chat: 50, downstream: 50 
 
 function StreamsDefaultRoute() {
   useWhyDidYouRender("StreamsDefaultRoute", {});
+  const { isMobile, activeTab } = useMobileTab();
   const { history } = Route.useLoaderData();
   const { config, setConfig } = useUserConfig();
   const streamsLayout = parsePanelLayout(config, STREAMS_MAIN_KEY, STREAMS_MAIN_DEFAULT);
@@ -69,6 +72,28 @@ function StreamsDefaultRoute() {
   const defaultStream = status?.streams?.find((ws) => ws.piSessionId === defaultPiSessionId);
   const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
     useStreamsChat(defaultPiSessionId, history);
+
+  if (isMobile) {
+    return (
+      <>
+        <div className={cn("flex flex-col h-full", activeTab === "stream" && "hidden")}>
+          <ChatPanel
+            piSessionId={effectivePiSessionId}
+            timeline={timeline}
+            statusPills={statusPills}
+            isSessionBusy={isSessionBusy}
+            onSendMessage={onSendMessage}
+          />
+        </div>
+        <div className={cn("flex flex-col h-full", activeTab !== "stream" && "hidden")}>
+          <DownstreamSessionsPanel
+            piSessionId={effectivePiSessionId}
+            piSessionStatus={defaultStream?.piSessionStatus}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <PanelGroup

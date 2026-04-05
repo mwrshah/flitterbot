@@ -205,7 +205,7 @@ export function DownstreamSessionsPanel({
 
   if (!piSessionId) {
     return (
-      <div className="flex flex-col h-full border-l border-border bg-background">
+      <div className="flex flex-col h-full md:border-l border-border bg-background">
         <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Active Sessions
         </p>
@@ -217,7 +217,7 @@ export function DownstreamSessionsPanel({
   }
 
   return (
-    <div className="flex flex-col h-full border-l border-border bg-background">
+    <div className="flex flex-col h-full md:border-l border-border bg-background">
       {/* Header row: status banner + diff toggle */}
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
         {(() => {

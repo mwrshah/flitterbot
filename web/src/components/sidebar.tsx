@@ -110,7 +110,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
+    <aside className="flex flex-col h-full bg-sidebar md:border-r border-sidebar-border">
       {/* Brand */}
       <div className="shrink-0 flex items-center justify-between px-6 py-0 border-b border-sidebar-border">
         <span className="text-lg font-semibold text-sidebar-foreground mt-0.5 -mb-1">autonoma</span>
