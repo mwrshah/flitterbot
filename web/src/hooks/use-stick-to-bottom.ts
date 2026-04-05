@@ -44,10 +44,14 @@ export function useStickToBottom({
     el.scrollTop = el.scrollHeight;
   }, []);
 
-  const engageAndScroll = useCallback(() => {
+  const engage = useCallback(() => {
     isAtBottomRef.current = true;
+  }, []);
+
+  const engageAndScroll = useCallback(() => {
+    engage();
     scrollToBottom();
-  }, [scrollToBottom]);
+  }, [engage, scrollToBottom]);
 
   useEffect(() => {
     didInitialScrollRef.current = false;
@@ -121,5 +125,5 @@ export function useStickToBottom({
     };
   }, [observeDOM]);
 
-  return { viewportRef, isAtBottomRef, scrollToBottom, engageAndScroll };
+  return { viewportRef, isAtBottomRef, scrollToBottom, engage, engageAndScroll };
 }

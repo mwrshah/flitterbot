@@ -41,11 +41,30 @@ export const StreamsMessageList = memo(
     const elementRef = useRef<MessageListElement | null>(null);
     const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
     const clearActiveToolsQueuedRef = useRef(false);
+    const renderNotificationSeqRef = useRef(0);
     /** Set to true after commitStreaming — the next React-driven messages update
      *  skips perf tracking since the Lit component already has the data. */
     const committedRef = useRef(false);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
+
+    const notifyMessagesRendered = (renderComplete?: Promise<unknown>) => {
+      const el = elementRef.current;
+      if (!el) return;
+      const seq = ++renderNotificationSeqRef.current;
+      void (renderComplete ?? el.updateComplete).then(() => {
+        if (seq !== renderNotificationSeqRef.current) return;
+        if (elementRef.current !== el) return;
+        flushActiveTools();
+        // Defer scroll until after the browser runs layout — updateComplete
+        // resolves when the parent Lit element finishes, but child components
+        // may still be rendering. rAF ensures scrollHeight reflects final DOM.
+        requestAnimationFrame(() => {
+          if (seq !== renderNotificationSeqRef.current) return;
+          onMessagesRendered?.();
+        });
+      });
+    };
 
     const flushActiveTools = () => {
       const el = elementRef.current;
@@ -113,14 +132,8 @@ export const StreamsMessageList = memo(
       el.tools = EMPTY_TOOLS;
       el.pendingToolCalls = EMPTY_PENDING;
       void el.updateComplete.then(() => {
-        flushActiveTools();
         streamingPerf.endCommittedLitRender(renderToken);
-        // Defer scroll until after the browser runs layout — updateComplete
-        // resolves when the parent Lit element finishes, but child components
-        // may still be rendering.  rAF ensures scrollHeight reflects final DOM.
-        requestAnimationFrame(() => {
-          onMessagesRendered?.();
-        });
+        notifyMessagesRendered();
       });
     }, [ready, messages, onMessagesRendered]);
 
@@ -132,7 +145,8 @@ export const StreamsMessageList = memo(
 
     useImperativeHandle(ref, () => ({
       updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {
-        elementRef.current?.updateStreaming(message, isThinkingStreaming);
+        const renderComplete = elementRef.current?.updateStreaming(message, isThinkingStreaming);
+        notifyMessagesRendered(renderComplete);
       },
       clearStreaming() {
         elementRef.current?.clearStreaming();
@@ -140,11 +154,13 @@ export const StreamsMessageList = memo(
       commitStreaming(messages: AgentMessage[]) {
         elementRef.current?.commitStreaming(messages);
         committedRef.current = true;
+        notifyMessagesRendered();
       },
       commitToolResult(message: AgentMessage) {
         const committed = elementRef.current?.commitToolResult(message) ?? false;
         if (committed) {
           committedRef.current = true;
+          notifyMessagesRendered();
         }
         return committed;
       },
