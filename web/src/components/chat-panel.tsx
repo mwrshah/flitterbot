@@ -86,7 +86,7 @@ export function ChatPanel({
   const [isSending, setIsSending] = useState(false);
   const agentMessages = useAgentMessages(timeline);
 
-  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
+  const { viewportRef, scrollToBottom, isAtBottomRef, engage, engageAndScroll } = useStickToBottom({
     initialScrollWhen: agentMessages.length > 0,
     initialScrollKey: piSessionId,
   });
@@ -205,7 +205,7 @@ export function ChatPanel({
 
       setIsSending(true);
       setPendingImages([]);
-      engageAndScroll();
+      engage();
 
       try {
         await onSendMessage(text || "(image)", images);
@@ -213,7 +213,7 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [engageAndScroll, onSendMessage],
+    [engage, onSendMessage],
   );
 
   return (
