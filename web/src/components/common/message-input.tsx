@@ -439,6 +439,7 @@ export const MessageInput = memo(function MessageInput({
     [closePicker, handleDraftChange],
   );
 
+
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -582,7 +583,12 @@ export const MessageInput = memo(function MessageInput({
           </button>
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            <Button type="submit" size="sm" disabled={isSending || !canSend}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSending || !canSend}
+              className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+            >
               {isSending ? (
                 <Loader2Icon className="w-4 h-4 animate-spin" />
               ) : (
