@@ -812,7 +812,7 @@ export class ControlSurfaceRuntime {
         });
       } catch (error) {
         this.log(
-          `outbound message persist failed: ${error instanceof Error ? error.message : String(error)}`,
+          `outbound message persist failed (len=${finalText.length}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 
@@ -822,15 +822,23 @@ export class ControlSurfaceRuntime {
           ? `[${managed.streamName}] ${finalText}`
           : finalText;
 
+      // WhatsApp has a ~65 536 character practical limit per message.
+      // Truncate to avoid silent send failures on very large AI responses.
+      const MAX_WHATSAPP_LENGTH = 60_000;
+      const waText =
+        surfaceText.length > MAX_WHATSAPP_LENGTH
+          ? `${surfaceText.slice(0, MAX_WHATSAPP_LENGTH)}\n\n[...truncated — full response available in web client]`
+          : surfaceText;
+
       try {
         await this.sendWhatsAppCommand({
           command: "send",
-          text: `*B-bot:*\n---\n${surfaceText}`,
+          text: `*B-bot:*\n---\n${waText}`,
           contextRef: undefined,
         });
       } catch (error) {
         this.log(
-          `auto-surface to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,
+          `auto-surface to WhatsApp failed (len=${surfaceText.length}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -1561,7 +1569,9 @@ export class ControlSurfaceRuntime {
                 command: "send",
                 text: `⚠️ Stuck turn detected: ${label} — stuck for ${Math.round(age / 60_000)}min. Cron paused via circuit breaker (30min TTL).`,
                 contextRef: undefined,
-              }).catch(() => {});
+              }).catch((err) => {
+                this.log(`stuck-turn WhatsApp alert failed: ${err instanceof Error ? err.message : String(err)}`);
+              });
             }
           }
         }
@@ -1666,17 +1676,24 @@ export class ControlSurfaceRuntime {
           serverMessageId,
         });
 
-        // Mirror web user message to WhatsApp for complete conversation record
+        // Mirror web user message to WhatsApp for complete conversation record.
+        // Truncate aggressively — user messages pasted from the web client can be
+        // very large (e.g. full document pastes) and must not exceed WhatsApp limits.
+        const MAX_USER_WA_LENGTH = 30_000;
         try {
           const wsLabel = routerMeta.stream_name ? `[${routerMeta.stream_name}] ` : "";
+          const userText =
+            payload.text.length > MAX_USER_WA_LENGTH
+              ? `${payload.text.slice(0, MAX_USER_WA_LENGTH)}\n\n[...truncated — full message in web client]`
+              : payload.text;
           await this.sendWhatsAppCommand({
             command: "send",
-            text: `${wsLabel}*User (web):*\n---\n${payload.text}`,
+            text: `${wsLabel}*User (web):*\n---\n${userText}`,
             contextRef: undefined,
           });
         } catch (error) {
           this.log(
-            `mirror web message to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,
+            `mirror web message to WhatsApp failed (len=${payload.text.length}): ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       } catch (error) {
