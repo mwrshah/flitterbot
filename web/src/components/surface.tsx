@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
@@ -790,11 +791,14 @@ export function Surface() {
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      setPendingImages([]);
       engageAndScroll();
 
       try {
         await sendMessage(text || "(image)", images);
+        setPendingImages([]);
+      } catch (error) {
+        toast.error("Failed to send message");
+        console.error("handleSubmit send failed:", error);
       } finally {
         setIsSending(false);
       }

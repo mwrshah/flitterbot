@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
@@ -201,11 +202,14 @@ export function ChatPanel({
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      setPendingImages([]);
       engage();
 
       try {
         await onSendMessage(text || "(image)", images);
+        setPendingImages([]);
+      } catch (error) {
+        toast.error("Failed to send message");
+        console.error("handleSubmit send failed:", error);
       } finally {
         setIsSending(false);
       }

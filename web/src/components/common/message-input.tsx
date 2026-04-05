@@ -439,6 +439,24 @@ export const MessageInput = memo(function MessageInput({
     [closePicker, handleDraftChange],
   );
 
+  // Mobile soft keyboards often fire keydown with key='Unidentified' or keyCode=229 (IME),
+  // so the Enter check in handleKeyDown never matches. Listen for beforeinput with
+  // inputType='insertLineBreak' as a fallback — this fires reliably on iOS Safari
+  // and Android Chrome when the user taps the Return/Send key.
+  const handleBeforeInput = useCallback((event: React.FormEvent<HTMLTextAreaElement>) => {
+    const inputEvent = event.nativeEvent as InputEvent;
+    if (inputEvent.inputType !== "insertLineBreak") return;
+    // Shift+Enter should still insert a newline — but beforeinput doesn't carry
+    // shiftKey. On mobile this path only fires from the soft keyboard (no shift),
+    // so it's safe to always treat insertLineBreak as submit here.
+    // When a picker is open, Enter selects the picker item — skip submit.
+    if (slashPositionRef.current >= 0 || atPositionRef.current >= 0) return;
+    event.preventDefault();
+    const text = draftRef.current.trim();
+    onSubmitRef.current(text);
+    setDraft("");
+  }, []);
+
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -548,7 +566,9 @@ export const MessageInput = memo(function MessageInput({
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onBeforeInput={handleBeforeInput}
             onPaste={handlePaste}
+            enterKeyHint="send"
             rows={fillHeight ? undefined : rows}
             placeholder={placeholder}
             className={cn(
@@ -582,7 +602,12 @@ export const MessageInput = memo(function MessageInput({
           </button>
           {/* Toolbar — bottom right */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            <Button type="submit" size="sm" disabled={isSending || !canSend}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSending || !canSend}
+              className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+            >
               {isSending ? (
                 <Loader2Icon className="w-4 h-4 animate-spin" />
               ) : (

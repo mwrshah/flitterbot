@@ -50,6 +50,7 @@ export function createSendMessage(deps: { wsClient: AutonomaWsClient }): SendMes
       await wsClient.sendMessage(text, "followUp", images, targetPiSessionId);
     } catch (error) {
       console.error("WS send failed (socket not open):", error);
+      throw error;
     }
   };
 }
