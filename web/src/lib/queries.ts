@@ -50,10 +50,10 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
   });
 
   if (!extras.length) {
-    // All old items covered by server — check if identical to preserve reference
-    return prev.length === next.length && prev.every((item, i) => item.id === next[i]!.id)
-      ? prev
-      : next;
+    // All old items covered by server — always use canonical server data.
+    // ID-only equality was returning stale cached items whose content differed
+    // (e.g. incomplete thinking blocks from intermediate WS snapshots).
+    return next;
   }
 
   return [...next, ...extras];
