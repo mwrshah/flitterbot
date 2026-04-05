@@ -135,3 +135,22 @@ code,
 .d2h-file-list-header {
   padding-inline: 0.5rem;
 }
+
+/* Sonner toast overrides — use app CSS variables */
+[data-sonner-toast] [data-description] {
+  color: var(--muted-foreground);
+}
+[data-sonner-toast] [data-close-button] {
+  background: var(--muted);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+[data-sonner-toast][data-type="error"] {
+  background: var(--destructive) !important;
+  color: var(--destructive-foreground) !important;
+  border-color: var(--destructive) !important;
+}
+[data-sonner-toast] [data-button] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
