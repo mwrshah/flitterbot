@@ -4,7 +4,7 @@ Canonical reference for how server-side SDK events reach the web UI and how clie
 
 ## Architecture Overview
 
-Three layers, three state paths, zero React re-renders during streaming, active tool progress, and message commit.
+Four layers, four state paths, zero React re-renders during streaming, active tool progress, and message commit.
 
 ```
 PI SDK (Claude)
@@ -18,12 +18,15 @@ WebSocket transport
   ▼
 ws-query-bridge.ts ── routes WS events to the correct state layer
   │
-  ├─► Streaming Store (all ephemeral per-session state — not React state)
-  │     • Text/thinking deltas: Plain Map<sessionId, text/thinking> at ~30Hz
-  │     • Tool call cards: toolcall_start appends to streaming content for early rendering
-  │     • Active tool progress: tool_execution_start/update/end keyed by toolUseId
-  │     • Lit web component reads imperatively via callbacks — zero React re-renders
+  ├─► Streaming Store (high-frequency deltas: text_delta, thinking_delta)
+  │     • Plain Map<sessionId, text/thinking> — not React state
+  │     • Lit web component reads imperatively via callback — zero React re-renders
   │     • Cleared on message_end / turn_end / agent_end
+  │
+  ├─► Active Tool Store (ephemeral tool_execution_start/update/end progress)
+  │     • Plain Map<sessionId, toolUseId, partialResult> — not React state
+  │     • Lit tool cards update imperatively by toolUseId — zero React re-renders
+  │     • Cleared when canonical tool_result arrives or on turn_end/agent_end cleanup
   │
   ├─► Imperative Commit (message_end + tool_result)
   │     • streamingStore.commitMessage() → ChatPanel onCommit → Lit commitStreaming()
@@ -70,7 +73,7 @@ Lit component renders thinking live via imperative callback. React sees nothing.
 
 **Server:** Broadcasts `{type: "toolcall_start", piSessionId, toolName, toolUseId}`.
 
-**Frontend → Streaming Store:** `appendToolCall(sid, {type: "toolCall", id: toolUseId, name: toolName, arguments: {}})`. The streaming callback fires, and the Lit component renders `<tool-message>` cards inside the streaming `<assistant-message>` overlay. This ensures tool-message DOM elements exist **before** `message_end` commits, so `commitToolResult` can find its target without queuing.
+**Frontend:** No-op. Tool calls are committed via `message_end`.
 
 ### 5. message_end — The Commit Point
 
@@ -97,19 +100,19 @@ This is the critical event. It commits assistant message content to both the Lit
 
 **Server:** Broadcasts with `tool`, `toolUseId`, `args`, `timestamp`.
 
-**Frontend → Streaming Store:** `streamingStore.upsertTool()` marks the tool as running in the ephemeral tool state. If the assistant message has already been committed, the matching `<tool-message>` element is updated imperatively in-place. 0 React re-renders.
+**Frontend → Active Tool Store:** marks the tool as running in the ephemeral tool store. If the assistant message has already been committed, the matching `<tool-message>` element is updated imperatively in-place. 0 React re-renders.
 
 ### 7. tool_execution_update
 
 **Server:** Broadcasts with `toolUseId` and `partialResult`.
 
-**Frontend → Streaming Store:** merges `partialResult` into the ephemeral tool state and pushes it directly into the matching Lit tool card by `toolUseId`. 0 React re-renders.
+**Frontend → Active Tool Store:** merges `partialResult` into the ephemeral tool state and pushes it directly into the matching Lit tool card by `toolUseId`. 0 React re-renders.
 
 ### 8. tool_execution_end
 
 **Server:** Broadcasts with `toolUseId`, `result`, `isError`.
 
-**Frontend → Streaming Store:** updates the live tool card with the final streamed result, but does **not** flush durable timeline state from the WS payload. The websocket result is treated as provisional UI progress until the server canonicalizes the turn.
+**Frontend → Active Tool Store:** updates the live tool card with the final streamed result, but does **not** flush durable timeline state from the WS payload. The websocket result is treated as provisional UI progress until the server canonicalizes the turn.
 
 ### 9. tool_result — The Canonical Tool Commit Point
 
@@ -135,13 +138,15 @@ This is the critical event. It commits assistant message content to both the Lit
 
 ## Imperative Commit Path
 
-Three-layer architecture for getting data from WS events to the Lit component:
+Four-layer architecture for getting data from WS events to the Lit component:
 
-**1. Streaming Store (delta + tool progress channel)** — All ephemeral per-session state lives in `streaming-store.ts`. High-frequency deltas (`text_delta`, `thinking_delta`) at ~30Hz accumulate text in a plain `Map`. `toolcall_start` events append tool cards to the streaming content for early rendering. `tool_execution_start` / `tool_execution_update` / `tool_execution_end` events maintain active tool state keyed by `toolUseId`. ChatPanel subscribes to streaming deltas via `onStreamingDelta` and to tool progress via `onActiveToolUpdate`, forwarding updates imperatively to the Lit component. `MessageList` keeps a `toolUseId -> <tool-message>` index and mutates only the matching tool card. React sees nothing.
+**1. Streaming Store (delta channel)** — High-frequency deltas (`text_delta`, `thinking_delta`) at ~30Hz. `streamingStore.appendTextDelta()` / `appendThinkingDelta()` accumulate text in a plain `Map`. The Lit component reads via `onStreamingDelta` callback and renders a streaming overlay. React sees nothing.
 
-**2. Imperative Commit (message_end + tool_result)** — canonical server commits are pushed into the current Lit UI without going through a full React render cycle. For assistant/user `message_end`, `ws-query-bridge` builds `committedItems`, converts them to `AgentMessage[]`, then calls `streamingStore.commitMessage()` → ChatPanel `onCommit` → `messageListRef.commitStreaming()` → Lit `MessageList.commitStreaming()`. For canonical `tool_result`, `ws-query-bridge` converts the single timeline item into a `toolResult` AgentMessage and calls `streamingStore.commitToolResult()` → ChatPanel `onToolResultCommit` → `messageListRef.commitToolResult()` → Lit updates only the matching tool card. Both paths set `_committedTotal` so the subsequent React catch-up render is suppressed.
+**2. Active Tool Store (tool progress channel)** — `tool_execution_start` / `tool_execution_update` / `tool_execution_end` live in a plain `Map<sessionId, toolUseId, ActiveToolState>`. ChatPanel subscribes imperatively and forwards each update to `messageListRef.applyActiveToolState()`. `MessageList` keeps a `toolUseId -> <tool-message>` index and mutates only the matching tool card. React sees nothing.
 
-**3. Query Cache (persistence)** — `setQueryData` runs on canonical WS commits for persistence: `message_end` for assistant/user messages and `tool_result` for tool results. It remains the source of truth for navigation, refetch reconciliation (`mergeTimelineItems`), and server revalidation. React components subscribe via `useQuery()`, but the hot path never depends on React renders.
+**3. Imperative Commit (message_end + tool_result)** — canonical server commits are pushed into the current Lit UI without going through a full React render cycle. For assistant/user `message_end`, `ws-query-bridge` builds `committedItems`, converts them to `AgentMessage[]`, then calls `streamingStore.commitMessage()` → ChatPanel `onCommit` → `messageListRef.commitStreaming()` → Lit `MessageList.commitStreaming()`. For canonical `tool_result`, `ws-query-bridge` converts the single timeline item into a `toolResult` AgentMessage and calls `streamingStore.commitToolResult()` → ChatPanel `onToolResultCommit` → `messageListRef.commitToolResult()` → Lit updates only the matching tool card. Both paths set `_committedTotal` so the subsequent React catch-up render is suppressed.
+
+**4. Query Cache (persistence)** — `setQueryData` runs on canonical WS commits for persistence: `message_end` for assistant/user messages and `tool_result` for tool results. It remains the source of truth for navigation, refetch reconciliation (`mergeTimelineItems`), and server revalidation. React components subscribe via `useQuery()`, but the hot path never depends on React renders.
 
 ## Tool Call Lifecycle & ID Matching
 
@@ -149,13 +154,12 @@ Three-layer architecture for getting data from WS events to the Lit component:
 
 | Event | Source | Action |
 |---|---|---|
-| `toolcall_start` | SDK content_block_start | `streamingStore.appendToolCall()` — renders `<tool-message>` in streaming overlay |
 | `message_end` (toolCalls) | SDK content array | Creates tool item: `{toolUseId, phase: "start"}` |
-| `tool_execution_start` | SDK tool_execution_start | `streamingStore.upsertTool()` — marks matching tool card as running |
-| `tool_execution_update` | SDK tool_execution_update | `streamingStore.upsertTool()` — merges `partialResult` and updates matching tool card imperatively |
-| `tool_execution_end` | SDK tool_execution_end | `streamingStore.upsertTool()` — updates tool card with final streamed result only |
+| `tool_execution_start` | SDK tool_execution_start | Marks matching active tool card as running in the active tool store |
+| `tool_execution_update` | SDK tool_execution_update | Merges `partialResult` into the active tool store and updates the matching tool card imperatively |
+| `tool_execution_end` | SDK tool_execution_end | Updates the active tool card with the final streamed result only |
 | `tool_result` | `message_end(role="toolResult")` | Appends canonical `{toolUseId, phase: "end", result}` and commits it imperatively |
-| `turn_end` | SDK turn_end | `streamingStore.clearSession()` — clears all ephemeral state |
+| `turn_end` | SDK turn_end | Clears any remaining ephemeral state |
 
 ## Thinking Trace Lifecycle
 
@@ -191,11 +195,10 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 |---|---|---|
 | text_delta | 0 | 0 (streaming store → Lit) |
 | thinking_delta | 0 | 0 (streaming store → Lit) |
-| toolcall_start | 0 | 0 (streaming store → Lit streaming overlay) |
 | message_end | 1 (message + tool calls atomic) + 1 imperative commit | 0 (Lit `shouldUpdate` suppresses React catch-up) |
-| tool_execution_start | 0 | 0 (streaming store → targeted Lit tool card) |
-| tool_execution_update | 0 | 0 (streaming store → targeted Lit tool card) |
-| tool_execution_end | 0 | 0 (streaming store → targeted Lit tool card) |
+| tool_execution_start | 0 | 0 (active tool store → targeted Lit tool card) |
+| tool_execution_update | 0 | 0 (active tool store → targeted Lit tool card) |
+| tool_execution_end | 0 | 0 (active tool store → targeted Lit tool card) |
 | tool_result | 1 (append canonical end item) + 1 imperative tool-result commit | 0 |
 | turn_end | 0 | 0 |
 | agent_end (normal) | 0 | 0 |
@@ -210,8 +213,9 @@ A typical assistant turn with thinking + text + 1 tool call: 0 React re-renders 
 | `src/streams/pi-subscribe.ts` | Server: SDK event subscription → WS broadcast. `extractMessageBlocks()` extracts text, thinking, and tool calls. |
 | `src/contracts/websocket.ts` | WS event type contracts (shared between server and frontend types) |
 | `src/streams/history.ts` | Server: parses SDK messages / JSONL session file → `ChatTimelineItem[]` for history API |
-| `web/src/lib/streaming-store.ts` | Frontend: unified imperative store for all ephemeral per-session state — text/thinking deltas, streaming toolCalls, active tool execution progress, and commit channels for message_end and canonical tool_result flushes |
-| `web/src/lib/ws-query-bridge.ts` | Frontend: routes WS events → streaming store or Query cache. Contains atomic message_end handler and canonical tool_result flush. |
+| `web/src/lib/streaming-store.ts` | Frontend: imperative Map-based store for high-frequency text/thinking deltas + commit channels for message_end and canonical tool_result flushes |
+| `web/src/lib/active-tool-store.ts` | Frontend: imperative per-session store for live tool progress keyed by `toolUseId` |
+| `web/src/lib/ws-query-bridge.ts` | Frontend: routes WS events → streaming store, active tool store, or Query cache. Contains atomic message_end handler and canonical tool_result flush. |
 | `web/src/lib/queries.ts` | Frontend: TanStack Query options + `mergeTimelineItems` structuralSharing |
 | `web/src/hooks/use-streams-chat.ts` | Frontend: React hook wiring timeline query to chat components |
 | `web/src/lib/types.ts` | Frontend: `WsMessage` union type, `ChatTimelineItem` types |
