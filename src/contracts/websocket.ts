@@ -74,6 +74,8 @@ export interface MessageEndWebSocketEvent {
   type: "message_end";
   piSessionId?: string;
   message: ChatTimelineMessage;
+  /** Tool calls extracted from the SDK message content array. */
+  toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
@@ -198,6 +200,8 @@ export interface AgentStartWebSocketEvent {
 export interface AgentEndWebSocketEvent {
   type: "agent_end";
   piSessionId?: string;
+  /** True when the agent run was aborted before message_end fired. */
+  aborted?: boolean;
 }
 
 export interface TurnStartWebSocketEvent {
