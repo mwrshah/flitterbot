@@ -23,6 +23,7 @@ type MessageListElement = HTMLElement & MessageList & { updateComplete: Promise<
 export type StreamsMessageListHandle = {
   updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean): void;
   clearStreaming(): void;
+  commitStreaming(messages: AgentMessage[]): void;
 };
 
 export const StreamsMessageList = memo(
@@ -33,6 +34,9 @@ export const StreamsMessageList = memo(
     useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered });
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<MessageListElement | null>(null);
+    /** Set to true after commitStreaming — the next React-driven messages update
+     *  skips perf tracking since the Lit component already has the data. */
+    const committedRef = useRef(false);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
 
@@ -67,6 +71,19 @@ export const StreamsMessageList = memo(
       }
 
       const el = elementRef.current as MessageListElement & Record<string, unknown>;
+
+      // If Lit already committed these messages imperatively (message_end path),
+      // sync the property for internal consistency (e.g. getTurnCopyText) but
+      // skip perf tracking and scroll — the Lit component's shouldUpdate will
+      // suppress the redundant render.
+      if (committedRef.current) {
+        committedRef.current = false;
+        el.messages = messages;
+        el.tools = EMPTY_TOOLS;
+        el.pendingToolCalls = EMPTY_PENDING;
+        return;
+      }
+
       const renderToken = streamingPerf.beginCommittedLitRender();
       el.messages = messages;
       el.tools = EMPTY_TOOLS;
@@ -94,6 +111,10 @@ export const StreamsMessageList = memo(
       },
       clearStreaming() {
         elementRef.current?.clearStreaming();
+      },
+      commitStreaming(messages: AgentMessage[]) {
+        elementRef.current?.commitStreaming(messages);
+        committedRef.current = true;
       },
     }));
 

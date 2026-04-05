@@ -11,6 +11,7 @@
  * subsequent deltas, and cleared on message_end / turn_end.
  */
 
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { streamingPerf } from "./streaming-perf";
 
 /* ── Types ── */
@@ -27,6 +28,9 @@ type StreamingCallback = (
   messageId: string | null,
 ) => void;
 
+/** Fired once at message_end with the converted AgentMessages for imperative Lit commit. */
+type CommitCallback = (messages: AgentMessage[]) => void;
+
 /* ── Store implementation ── */
 
 const texts = new Map<string, StreamingText>();
@@ -34,6 +38,7 @@ const thinking = new Map<string, StreamingThinking>();
 /** True between thinking_start and thinking_end — drives ThinkingBlock open/close. */
 const thinkingActive = new Map<string, boolean>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
+const commitCallbacks = new Map<string, CommitCallback>();
 
 function fireCallbacks(sessionId: string) {
   const cb = streamingCallbacks.get(sessionId);
@@ -133,5 +138,22 @@ export const streamingStore = {
 
   offStreamingDelta(sessionId: string) {
     streamingCallbacks.delete(sessionId);
+  },
+
+  /* ── Imperative commit callbacks (message_end → Lit component) ── */
+
+  onCommit(sessionId: string, callback: CommitCallback) {
+    commitCallbacks.set(sessionId, callback);
+  },
+
+  offCommit(sessionId: string) {
+    commitCallbacks.delete(sessionId);
+  },
+
+  /** Fire the commit callback with already-converted AgentMessages.
+   *  Called from ws-query-bridge after message_end setQueryData. */
+  commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
+    const cb = commitCallbacks.get(sessionId);
+    if (cb) cb(agentMessages);
   },
 };

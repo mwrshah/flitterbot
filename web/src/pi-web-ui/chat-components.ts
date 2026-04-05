@@ -965,6 +965,13 @@ export class MessageList extends LitElement {
 
   private _streamingEl: AssistantMessage | null = null;
 
+  /** Cached render items from the last render or imperative commit. */
+  private _cachedRenderItems: Array<{ key: string; template: TemplateResult }> | null = null;
+  /** When > 0, the Lit component has imperatively committed messages up to this
+   *  total count. The next React-driven `messages` property update that doesn't
+   *  exceed this count will be suppressed (shouldUpdate returns false). */
+  private _committedTotal = 0;
+
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -972,6 +979,28 @@ export class MessageList extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+  }
+
+  override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
+    if (
+      this._committedTotal > 0 &&
+      changedProperties.has("messages") &&
+      changedProperties.size === 1
+    ) {
+      // React catch-up: the messages property was set with the same data we
+      // already rendered imperatively. Accept the new property value (Lit has
+      // already assigned it) but skip the expensive render cycle.
+      if ((this.messages as RenderMessage[]).length <= this._committedTotal) {
+        this._committedTotal = 0;
+        this._cachedRenderItems = null;
+        return false;
+      }
+      // More messages than committed (e.g. tool_execution_end arrived before
+      // React caught up) — allow full render.
+      this._committedTotal = 0;
+      this._cachedRenderItems = null;
+    }
+    return true;
   }
 
   override updated(): void {
@@ -1020,6 +1049,76 @@ export class MessageList extends LitElement {
     requestAnimationFrame(() => {
       el.style.display = "none";
     });
+  }
+
+  /**
+   * Imperatively commit messages from message_end without rebuilding the
+   * entire render item list. Hides the streaming overlay and appends only
+   * the new items, then schedules a Lit update using the cached list.
+   */
+  commitStreaming(messages: AgentMessage[]): void {
+    // Hide streaming overlay immediately (no rAF delay — committed content replaces it)
+    if (this._streamingEl) {
+      this._streamingEl.style.display = "none";
+    }
+
+    const newItems = this.buildRenderItemsForCommit(messages);
+    if (!newItems.length) return;
+
+    // Cache current items if this is the first imperative commit since the last full render
+    if (!this._cachedRenderItems) {
+      this._cachedRenderItems = this.buildRenderItems();
+    }
+
+    this._cachedRenderItems.push(...newItems);
+    this._committedTotal = (this.messages as RenderMessage[]).length + messages.length;
+
+    this.requestUpdate();
+  }
+
+  /**
+   * Build render items for a small set of committed AgentMessages (from message_end).
+   * Uses the same key scheme as buildRenderItems so repeat() recognises them.
+   */
+  private buildRenderItemsForCommit(
+    messages: AgentMessage[],
+  ): Array<{ key: string; template: TemplateResult }> {
+    const items: Array<{ key: string; template: TemplateResult }> = [];
+    let fallbackIndex = this._cachedRenderItems?.length ?? (this.messages as RenderMessage[]).length;
+
+    for (const msg of messages) {
+      const role = (msg as unknown as { role: string }).role;
+      if (role === "artifact" || role === "toolResult") continue;
+
+      const ts = (msg as unknown as { timestamp?: number }).timestamp;
+      const key = ts != null ? `${role}:${ts}` : `msg:${fallbackIndex}`;
+      fallbackIndex++;
+
+      if (role === "user" || role === "user-with-attachments") {
+        items.push({
+          key,
+          template: html`<user-message .message=${msg}></user-message>`,
+        });
+      } else if (role === "assistant") {
+        items.push({
+          key,
+          template: html`
+            <assistant-message
+              .message=${msg as AssistantMessageType}
+              .tools=${this.tools}
+              .isStreaming=${false}
+              .pendingToolCalls=${this.pendingToolCalls}
+              .toolResultsById=${new Map()}
+              .hideToolCalls=${false}
+              .onCostClick=${this.onCostClick}
+              .getCopyText=${() => MessageList.getAssistantPlainText(msg as AssistantMessageType)}
+            ></assistant-message>
+          `,
+        });
+      }
+    }
+
+    return items;
   }
 
   /** Extract plain text from an assistant message's content chunks. */
@@ -1120,7 +1219,16 @@ export class MessageList extends LitElement {
   }
 
   override render() {
-    const items = this.buildRenderItems();
+    let items: Array<{ key: string; template: TemplateResult }>;
+    if (this._cachedRenderItems) {
+      items = this._cachedRenderItems;
+      // Keep cache alive while committed data hasn't been reconciled with React yet
+      if (this._committedTotal === 0) {
+        this._cachedRenderItems = null;
+      }
+    } else {
+      items = this.buildRenderItems();
+    }
     return html`<div class="flex flex-col gap-3">
       ${repeat(
         items,
