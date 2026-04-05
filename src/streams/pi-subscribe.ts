@@ -154,27 +154,55 @@ function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
   return undefined;
 }
 
-function extractMessageText(message: unknown): string | undefined {
-  if (!message || typeof message !== "object") return undefined;
+type MessageBlock = { type: "text"; text: string } | { type: "thinking"; thinking: string };
+type ExtractedToolCall = { toolUseId: string; toolName: string; args?: unknown };
+
+/**
+ * Extract structured blocks (text + thinking) and tool calls from a message's
+ * content array. Returns the display text, blocks array, and any tool calls.
+ * Thinking-only messages return empty text but non-empty blocks.
+ */
+function extractMessageBlocks(message: unknown): {
+  text: string | undefined;
+  blocks: MessageBlock[];
+  toolCalls: ExtractedToolCall[];
+} {
+  if (!message || typeof message !== "object")
+    return { text: undefined, blocks: [], toolCalls: [] };
 
   const record = message as Record<string, unknown>;
-
-  // Check content array first — for aborted messages this contains the actual partial
-  // text, while errorMessage contains a generic SDK string ("Request was aborted.").
-  // Falling back to errorMessage ensures non-content error messages still surface.
   const content = record.content;
+
   if (Array.isArray(content)) {
-    const parts = content
-      .flatMap((block) => {
-        if (!block || typeof block !== "object") return [];
-        const item = block as Record<string, unknown>;
-        if (item.type === "text" && typeof item.text === "string") {
-          return [item.text];
+    const blocks: MessageBlock[] = [];
+    const toolCalls: ExtractedToolCall[] = [];
+    let textBuffer = "";
+
+    for (const block of content) {
+      if (!block || typeof block !== "object") continue;
+      const item = block as Record<string, unknown>;
+      if (item.type === "text" && typeof item.text === "string") {
+        textBuffer += item.text;
+        blocks.push({ type: "text", text: item.text });
+      } else if (item.type === "thinking" && typeof item.thinking === "string") {
+        if (item.thinking.trim()) {
+          blocks.push({ type: "thinking", thinking: item.thinking });
         }
-        return [];
-      })
-      .join("");
-    if (parts.trim().length > 0) return parts;
+      } else if (
+        item.type === "toolCall" &&
+        typeof item.id === "string" &&
+        typeof item.name === "string"
+      ) {
+        toolCalls.push({
+          toolUseId: item.id,
+          toolName: item.name,
+          args: item.arguments as unknown,
+        });
+      }
+    }
+
+    const text = textBuffer.trim().length > 0 ? textBuffer : undefined;
+    return { text, blocks, toolCalls };
   }
 
   // Fall back to scalar text fields for non-content-array message shapes.
@@ -183,7 +211,11 @@ function extractMessageText(message: unknown): string | undefined {
   const directText = [record.text, record.message].find(
     (value): value is string => typeof value === "string" && value.trim().length > 0,
   );
-  return directText;
+  return {
+    text: directText,
+    blocks: directText ? [{ type: "text", text: directText }] : [],
+    toolCalls: [],
+  };
 }
 
 function _extractMessageId(message: unknown): string | undefined {
@@ -227,6 +259,10 @@ export function subscribeToPiSession(
   // Tracks the last assistant message in the current agent run.
   // Reset on agent_start; used on agent_end to re-broadcast as final + stream_surfaced.
   let lastAssistantMessage: ChatTimelineMessage | null = null;
+
+  // True when at least one assistant message_end fired in the current agent run.
+  // Reset on agent_start; checked on agent_end to detect aborted runs.
+  let messageEndFired = false;
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
@@ -324,21 +360,27 @@ export function subscribeToPiSession(
 
         // Only broadcast user/assistant messages — toolResult is not surfaced via WS.
         const role = anyRole === "user" || anyRole === "assistant" ? anyRole : undefined;
-        const content = extractMessageText(event.message);
-        if (!role || !content) break;
+        const { text: content, blocks, toolCalls } = extractMessageBlocks(event.message);
+        // Allow thinking-only messages (content empty but blocks non-empty) through.
+        if (!role || (!content && blocks.length === 0)) break;
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
         const timelineMessage: ChatTimelineMessage = {
           id: messageId,
           kind: "message",
           role,
-          content,
+          content: content ?? "",
           source: currentItem?.source,
           streamId: currentItem?.streamId ?? sessionStreamId ?? undefined,
           streamName: currentItem?.streamName ?? sessionStreamName ?? undefined,
           serverMessageId: currentItem?.serverMessageId,
           createdAt: extractTimestamp(event.message, now),
         };
+        // Include blocks when there are thinking blocks (text-only messages
+        // don't need blocks — content already carries the text).
+        if (blocks.some((b) => b.type === "thinking")) {
+          timelineMessage.blocks = blocks;
+        }
 
         if (role === "assistant") {
           // Broadcast immediately with intermediate flag so the session view gets it live.
@@ -347,9 +389,11 @@ export function subscribeToPiSession(
             type: "message_end",
             piSessionId: session.sessionId,
             message: { ...timelineMessage, intermediate: true },
+            ...(toolCalls.length > 0 ? { toolCalls } : {}),
           };
           broadcast(wsHub, payload);
           lastAssistantMessage = timelineMessage;
+          messageEndFired = true;
         } else {
           const payload: MessageEndWebSocketEvent = {
             type: "message_end",
@@ -423,18 +467,20 @@ export function subscribeToPiSession(
       case "agent_start":
         touchPiEvent(blackboard, session.sessionId, now, "active");
         lastAssistantMessage = null;
+        messageEndFired = false;
         break;
       case "agent_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
         if (lastAssistantMessage) {
-          // Broadcast stream_surfaced for the Surface. The agent timeline already has
-          // the message from the message_end event — no second message_end needed.
           broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
         }
+        broadcast(wsHub, {
+          type: "agent_end",
+          piSessionId: session.sessionId,
+          ...(messageEndFired ? {} : { aborted: true }),
+        });
         lastAssistantMessage = null;
-        // Always broadcast agent_end so the frontend can flush any uncommitted streaming
-        // text (e.g. when abort() causes runAgentLoop to throw, skipping message_end/turn_end).
-        broadcast(wsHub, { type: "agent_end", piSessionId: session.sessionId });
+        messageEndFired = false;
         onAgentEnd?.();
         break;
       }

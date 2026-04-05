@@ -221,6 +221,7 @@ export type WsMessage =
       type: "message_end";
       piSessionId?: string;
       message: ChatTimelineMessage;
+      toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";
@@ -251,7 +252,7 @@ export type WsMessage =
       piSessionId?: string;
     }
   | { type: "turn_end"; piSessionId?: string }
-  | { type: "agent_end"; piSessionId?: string }
+  | { type: "agent_end"; piSessionId?: string; aborted?: boolean }
   | {
       type: "stream_surfaced";
       message: ChatTimelineMessage;
