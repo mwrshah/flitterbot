@@ -241,45 +241,6 @@ function upsertActiveToolItem(queryClient: QueryClient, sessionId: string, item:
   });
 }
 
-/* ── Timeline upsert helper (replace existing by ID, or append) ── */
-/* Used for message_end: intermediate→final correction is the one expected replace. */
-
-function upsertTimelineItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineItem) {
-  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
-    const items = old ?? [];
-    const idx = items.findIndex((existing) => existing.id === item.id);
-    if (idx >= 0) {
-      const prev = items[idx]!;
-      // Expected path: intermediate assistant message replaced by final version on agent_end.
-      // Anything else is a backend bug — log it so it's visible in devtools.
-      const wasIntermediate = "intermediate" in prev && (prev as ChatTimelineMessage).intermediate;
-      if (!wasIntermediate) {
-        console.warn(
-          "[ws-bridge] upsert replaced non-intermediate item id=%s — possible duplicate event",
-          item.id,
-        );
-      }
-      console.log(
-        "[debug][ws-bridge] upsertTimelineItem: replaced existing id=%s wasIntermediate=%s timeline.length=%d session=%s",
-        item.id,
-        wasIntermediate,
-        items.length,
-        sessionId,
-      );
-      const updated = [...items];
-      updated[idx] = item;
-      return updated;
-    }
-    console.log(
-      "[debug][ws-bridge] upsertTimelineItem: appended (no existing id=%s) → timeline.length=%d session=%s",
-      item.id,
-      items.length + 1,
-      sessionId,
-    );
-    return [...items, item];
-  });
-}
-
 /* ── Main setup ── */
 
 export function setupWsQueryBridge(deps: {
@@ -435,64 +396,72 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start → buffer in streaming store ──
+    // ── toolcall_start (no-op — tool calls are committed via message_end) ──
     if (message.type === "toolcall_start") {
-      if (message.toolUseId) {
-        streamingStore.addPendingToolCall(piSessionId, {
-          toolUseId: message.toolUseId,
-          toolName: message.toolName,
-        });
-      }
       return;
     }
 
-    // ── message_end → agent timeline only (upsert) ──
+    // ── message_end → commit message + tool calls atomically ──
     if (message.type === "message_end") {
       const msg = message.message;
 
-      // Remove typing indicator on message commit
       removePill(queryClient, piSessionId, "assistant-typing");
 
-      // Always capture thinking from the streaming store — it must be committed
-      // to the Query cache regardless of whether there's text content.
-      const thinkingText = streamingStore.getThinkingText(piSessionId);
+      // Build all new timeline items from server-provided data, then commit
+      // in a single setQueryData call to avoid intermediate renders.
+      const blocks = (msg as ChatTimelineMessage).blocks;
+      const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
 
-      if (msg.content.trim() || thinkingText) {
-        // Build the committed message with both thinking and text blocks.
-        // Even if content is empty, thinking-only messages are preserved.
-        const blocks: Array<
-          { type: "text"; text: string } | { type: "thinking"; thinking: string }
-        > = [];
-        if (thinkingText) {
-          blocks.push({ type: "thinking" as const, thinking: thinkingText });
-        }
-        if (msg.content.trim()) {
-          blocks.push({ type: "text" as const, text: msg.content });
-        }
+      if (hasContent || message.toolCalls?.length) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<ChatTimelineItem[]>(
+          ["streams-history", piSessionId, "agent"],
+          (old) => {
+            const items = old ?? [];
 
-        const committed = { ...msg, blocks };
-        upsertTimelineItem(queryClient, piSessionId, committed);
+            // Upsert the message (replace existing by ID, or append).
+            let next = items;
+            if (hasContent) {
+              const committed = blocks ? { ...msg, blocks } : msg;
+              const idx = items.findIndex((existing) => existing.id === committed.id);
+              if (idx >= 0) {
+                next = [...items];
+                next[idx] = committed;
+              } else {
+                next = [...items, committed];
+              }
+            }
+
+            // Append tool call start items from the server (dedup by toolUseId).
+            if (message.toolCalls?.length) {
+              const base = next === items ? [...items] : next;
+              for (const tc of message.toolCalls) {
+                const alreadyExists = base.some(
+                  (existing) =>
+                    existing.kind === "tool" &&
+                    (existing as ChatTimelineTool).toolUseId === tc.toolUseId &&
+                    (existing as ChatTimelineTool).phase !== "end",
+                );
+                if (!alreadyExists) {
+                  base.push({
+                    id: createId("tool"),
+                    kind: "tool",
+                    tool: tc.toolName ?? "tool",
+                    phase: "start",
+                    toolUseId: tc.toolUseId,
+                    args: tc.args as JsonValue | undefined,
+                    createdAt: now,
+                  });
+                }
+              }
+              next = base;
+            }
+
+            return next;
+          },
+        );
       }
 
-      // Flush tool calls buffered since toolcall_start.
-      const pendingTools = streamingStore.flushPendingToolCalls(piSessionId);
-      for (const tool of pendingTools) {
-        upsertActiveToolItem(queryClient, piSessionId, {
-          id: createId("tool"),
-          kind: "tool",
-          tool: tool.toolName ?? "tool",
-          phase: "start",
-          toolUseId: tool.toolUseId,
-          createdAt: new Date().toISOString(),
-        });
-      }
-
-      // Clear all streaming state atomically.
-      console.log(
-        "[debug][ws-bridge] message_end: calling clearSession for session=%s msgId=%s",
-        piSessionId,
-        msg.id,
-      );
       streamingStore.clearSession(piSessionId);
       return;
     }
@@ -611,44 +580,12 @@ export function setupWsQueryBridge(deps: {
 
     // ── agent_end ──
     if (message.type === "agent_end") {
-      // Remove typing indicator if still present
       removePill(queryClient, piSessionId, "assistant-typing");
-
-      const uncommitted = streamingStore.getUncommittedText(piSessionId);
-      const thinkingText = streamingStore.getThinkingText(piSessionId);
-      if (uncommitted?.text.trim() || thinkingText) {
-        console.log(
-          "[debug][ws-bridge] agent_end: flushing uncommitted content msgId=%s hasText=%s hasThinking=%s session=%s",
-          uncommitted?.messageId ?? "none",
-          uncommitted?.text.trim() ? "yes" : "no",
-          thinkingText ? "yes" : "no",
-          piSessionId,
-        );
-        const blocks: Array<
-          { type: "text"; text: string } | { type: "thinking"; thinking: string }
-        > = [];
-        if (thinkingText) {
-          blocks.push({ type: "thinking" as const, thinking: thinkingText });
-        }
-        if (uncommitted?.text.trim()) {
-          blocks.push({ type: "text" as const, text: uncommitted.text });
-        }
-        upsertTimelineItem(queryClient, piSessionId, {
-          id: uncommitted?.messageId ?? `msg-agent-end-${Date.now()}`,
-          kind: "message",
-          role: "assistant",
-          content: uncommitted?.text ?? "",
-          blocks,
-          createdAt: new Date().toISOString(),
-        });
-      }
-      console.log(
-        "[debug][ws-bridge] agent_end: calling clearSession hasText=%s hasThinking=%s session=%s",
-        uncommitted?.text.trim() ? "yes" : "no",
-        thinkingText ? "yes" : "no",
-        piSessionId,
-      );
       streamingStore.clearSession(piSessionId);
+      if (message.aborted) {
+        // message_end was skipped (abort) — revalidate from the server session file.
+        queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
+      }
       return;
     }
   });
