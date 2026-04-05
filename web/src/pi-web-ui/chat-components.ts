@@ -991,12 +991,22 @@ export class MessageList extends LitElement {
       // already rendered imperatively. Accept the new property value (Lit has
       // already assigned it) but skip the expensive render cycle.
       if ((this.messages as RenderMessage[]).length <= this._committedTotal) {
+        console.log(
+          "[debug][message-list] shouldUpdate SUPPRESSED: React catch-up render skipped (messages.length=%d, committedTotal=%d)",
+          (this.messages as RenderMessage[]).length,
+          this._committedTotal,
+        );
         this._committedTotal = 0;
         this._cachedRenderItems = null;
         return false;
       }
       // More messages than committed (e.g. tool_execution_end arrived before
       // React caught up) — allow full render.
+      console.log(
+        "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
+        (this.messages as RenderMessage[]).length,
+        this._committedTotal,
+      );
       this._committedTotal = 0;
       this._cachedRenderItems = null;
     }
@@ -1070,8 +1080,16 @@ export class MessageList extends LitElement {
       this._cachedRenderItems = this.buildRenderItems();
     }
 
+    const cachedBefore = this._cachedRenderItems.length;
     this._cachedRenderItems.push(...newItems);
     this._committedTotal = (this.messages as RenderMessage[]).length + messages.length;
+
+    console.log(
+      "[debug][message-list] commitStreaming: appending %d items (cachedTotal=%d → %d)",
+      newItems.length,
+      cachedBefore,
+      this._cachedRenderItems.length,
+    );
 
     this.requestUpdate();
   }
@@ -1148,6 +1166,12 @@ export class MessageList extends LitElement {
   }
 
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
+    if (this._committedTotal > 0) {
+      console.warn(
+        "[message-list] buildRenderItems called while committedTotal=%d — expected imperative path to handle this",
+        this._committedTotal,
+      );
+    }
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
       if ((message as unknown as { role: string }).role === "toolResult") {
@@ -1222,12 +1246,21 @@ export class MessageList extends LitElement {
     let items: Array<{ key: string; template: TemplateResult }>;
     if (this._cachedRenderItems) {
       items = this._cachedRenderItems;
+      console.log(
+        "[debug][message-list] render: using cached render items (count=%d)",
+        items.length,
+      );
       // Keep cache alive while committed data hasn't been reconciled with React yet
       if (this._committedTotal === 0) {
         this._cachedRenderItems = null;
       }
     } else {
       items = this.buildRenderItems();
+      console.log(
+        "[debug][message-list] render: FULL buildRenderItems (count=%d messages=%d)",
+        items.length,
+        (this.messages as RenderMessage[]).length,
+      );
     }
     return html`<div class="flex flex-col gap-3">
       ${repeat(
