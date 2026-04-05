@@ -1,5 +1,10 @@
 import type { DeliveryMode } from "./control-surface-api.ts";
-import type { ChatTimelineMessage, ImageAttachment, MessageSource } from "./timeline.ts";
+import type {
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  ImageAttachment,
+  MessageSource,
+} from "./timeline.ts";
 
 export const CONTROL_SURFACE_WS_PATH = "/ws";
 
@@ -135,6 +140,12 @@ export interface ToolExecutionUpdateWebSocketEvent {
   event?: unknown;
 }
 
+export interface ToolResultWebSocketEvent {
+  type: "tool_result";
+  piSessionId?: string;
+  item: ChatTimelineTool;
+}
+
 export interface TurnEndWebSocketEvent {
   type: "turn_end";
   piSessionId?: string;
@@ -242,6 +253,7 @@ export type ControlSurfaceWebSocketServerEvent =
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionUpdateWebSocketEvent
   | ToolExecutionEndWebSocketEvent
+  | ToolResultWebSocketEvent
   | TurnEndWebSocketEvent
   | TurnStartWebSocketEvent
   | AgentStartWebSocketEvent

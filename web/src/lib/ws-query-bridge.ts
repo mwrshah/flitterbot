@@ -14,6 +14,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { activeToolStore } from "~/lib/active-tool-store";
+import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
@@ -24,8 +26,7 @@ import type {
   JsonValue,
   WsMessage,
 } from "~/lib/types";
-import { createId, extractToolName } from "~/lib/utils";
-import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
+import { createId } from "~/lib/utils";
 import type { AutonomaWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
@@ -36,9 +37,7 @@ export type SendMessageFn = (
   targetPiSessionId?: string,
 ) => Promise<void>;
 
-export function createSendMessage(deps: {
-  wsClient: AutonomaWsClient;
-}): SendMessageFn {
+export function createSendMessage(deps: { wsClient: AutonomaWsClient }): SendMessageFn {
   const { wsClient } = deps;
   return async (text, images, targetPiSessionId) => {
     try {
@@ -165,60 +164,6 @@ function appendTimelineItem(
       sessionId,
     );
     return next;
-  });
-}
-
-function mergeToolItem(prev: ChatTimelineTool, next: ChatTimelineTool): ChatTimelineTool {
-  return {
-    ...prev,
-    ...next,
-    id: prev.id,
-    tool: next.tool === "tool" && prev.tool !== "tool" ? prev.tool : next.tool,
-    toolUseId: next.toolUseId ?? prev.toolUseId,
-    args: next.args ?? prev.args,
-    result: next.result ?? prev.result,
-    isError: next.isError ?? prev.isError,
-    createdAt: next.createdAt ?? prev.createdAt,
-  };
-}
-
-function upsertActiveToolItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineTool) {
-  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
-    const items = old ?? [];
-    if (!item.toolUseId || item.phase === "end") {
-      return [...items, item];
-    }
-
-    const idx = items.findIndex(
-      (existing) =>
-        existing.kind === "tool" &&
-        (existing as ChatTimelineTool).toolUseId === item.toolUseId &&
-        (existing as ChatTimelineTool).phase !== "end",
-    );
-
-    if (idx < 0) {
-      console.log(
-        "[debug][ws-bridge] upsertActiveToolItem: appended toolUseId=%s phase=%s timeline.length=%d session=%s",
-        item.toolUseId,
-        item.phase,
-        items.length + 1,
-        sessionId,
-      );
-      return [...items, item];
-    }
-
-    const prev = items[idx] as ChatTimelineTool;
-    const updated = [...items];
-    updated[idx] = mergeToolItem(prev, item);
-    console.log(
-      "[debug][ws-bridge] upsertActiveToolItem: replaced toolUseId=%s prevPhase=%s nextPhase=%s timeline.length=%d session=%s",
-      item.toolUseId,
-      prev.phase,
-      item.phase,
-      items.length,
-      sessionId,
-    );
-    return updated;
   });
 }
 
@@ -515,41 +460,23 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_execution_update ──
+    // ── tool_execution_update → imperative active-tool channel ──
     if (message.type === "tool_execution_update") {
-      upsertActiveToolItem(queryClient, piSessionId, {
-        id: createId("tool"),
-        kind: "tool",
-        tool: "tool",
-        phase: "update",
+      if (!message.toolUseId) return;
+      activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
-        result: message.partialResult as JsonValue | undefined,
-        createdAt: new Date().toISOString(),
+        pending: true,
+        partialResult: message.partialResult,
       });
       return;
     }
 
-    // ── tool_execution_start → upgrade pending tool card with args ──
+    // ── tool_execution_start → imperative active-tool channel ──
     if (message.type === "tool_execution_start") {
-      const eventRecord =
-        message.event && typeof message.event === "object"
-          ? (message.event as Record<string, unknown>)
-          : undefined;
-      const args = (message.args ??
-        eventRecord?.arguments ??
-        eventRecord?.args ??
-        eventRecord?.toolArguments) as JsonValue | undefined;
-      const tool = message.tool || extractToolName(message.event);
-      const timestamp = message.timestamp ?? new Date().toISOString();
-
-      upsertActiveToolItem(queryClient, piSessionId, {
-        id: message.id ?? createId("tool"),
-        kind: "tool",
-        tool,
-        phase: "start",
+      if (!message.toolUseId) return;
+      activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
-        args,
-        createdAt: timestamp,
+        pending: true,
       });
       return;
     }
@@ -560,21 +487,28 @@ export function setupWsQueryBridge(deps: {
         message.event && typeof message.event === "object"
           ? (message.event as Record<string, unknown>)
           : undefined;
-
-      const toolEvent: ChatTimelineTool = {
-        id: message.id ?? createId("tool"),
-        kind: "tool",
-        tool: message.tool || extractToolName(message.event),
-        phase: "end",
+      if (!message.toolUseId) return;
+      activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
-        result: (message.result ??
-          eventRecord?.result ??
-          eventRecord?.output ??
-          eventRecord?.toolResult) as JsonValue | undefined,
+        pending: false,
+        partialResult:
+          message.result ?? eventRecord?.result ?? eventRecord?.output ?? eventRecord?.toolResult,
         isError: message.isError,
-        createdAt: message.timestamp ?? new Date().toISOString(),
-      };
-      appendTimelineItem(queryClient, piSessionId, toolEvent);
+      });
+      return;
+    }
+
+    // ── tool_result → canonical durable tool flush ──
+    if (message.type === "tool_result") {
+      appendTimelineItem(queryClient, piSessionId, message.item);
+
+      const [toolResultMessage] = timelineItemsToAgentMessages([message.item]);
+      if (toolResultMessage) {
+        streamingStore.commitToolResult(piSessionId, toolResultMessage);
+      }
+      if (message.item.toolUseId) {
+        activeToolStore.dropTool(piSessionId, message.item.toolUseId);
+      }
       return;
     }
 
@@ -582,6 +516,7 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "turn_end") {
       console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", piSessionId);
       streamingStore.clearSession(piSessionId);
+      activeToolStore.clearSession(piSessionId);
       return;
     }
 
@@ -589,6 +524,7 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "agent_end") {
       removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.clearSession(piSessionId);
+      activeToolStore.clearSession(piSessionId);
       if (message.aborted) {
         // message_end was skipped (abort) — revalidate from the server session file.
         queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });

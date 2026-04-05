@@ -3,6 +3,7 @@ import readline from "node:readline";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  ChatTimelineTool,
   JsonValue,
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
@@ -149,25 +150,38 @@ function parseMessageRecord(
   }
 
   if (role === "toolResult") {
-    const resultText = firstText(messageRecord.content);
-    const toolCallId =
-      typeof messageRecord.toolCallId === "string"
-        ? messageRecord.toolCallId
-        : `unknown-${messageId}`;
-    items.push({
-      id: `tool-${toolCallId}-end`,
-      kind: "tool",
-      tool:
-        typeof messageRecord.toolName === "string" && messageRecord.toolName.trim()
-          ? messageRecord.toolName
-          : "unknown_tool",
-      phase: "end",
-      toolUseId: toolCallId,
-      result: (messageRecord.details ?? resultText) as JsonValue | undefined,
-      isError: Boolean(messageRecord.isError),
-      createdAt,
-    });
+    const item = toolResultMessageToTimelineItem(messageRecord, messageId, createdAt);
+    if (item) items.push(item);
   }
+}
+
+export function toolResultMessageToTimelineItem(
+  message: unknown,
+  messageId: string,
+  createdAt: string,
+): ChatTimelineTool | undefined {
+  const messageRecord = asRecord(message);
+  if (messageRecord.role !== "toolResult") return undefined;
+
+  const resultText = firstText(messageRecord.content);
+  const toolCallId =
+    typeof messageRecord.toolCallId === "string"
+      ? messageRecord.toolCallId
+      : `unknown-${messageId}`;
+
+  return {
+    id: `tool-${toolCallId}-end`,
+    kind: "tool",
+    tool:
+      typeof messageRecord.toolName === "string" && messageRecord.toolName.trim()
+        ? messageRecord.toolName
+        : "unknown_tool",
+    phase: "end",
+    toolUseId: toolCallId,
+    result: (messageRecord.details ?? resultText) as JsonValue | undefined,
+    isError: Boolean(messageRecord.isError),
+    createdAt,
+  };
 }
 
 function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[] {

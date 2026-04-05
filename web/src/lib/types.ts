@@ -1,6 +1,10 @@
 /* ── Chat timeline (shared with backend) ── */
 
-import type { ChatTimelineItem, ChatTimelineMessage } from "../../../src/contracts/timeline.ts";
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+} from "../../../src/contracts/timeline.ts";
 
 export type {
   ChatTimelineDivider,
@@ -245,6 +249,11 @@ export type WsMessage =
       type: "tool_execution_update";
       toolUseId?: string;
       partialResult?: unknown;
+      piSessionId?: string;
+    }
+  | {
+      type: "tool_result";
+      item: ChatTimelineTool;
       piSessionId?: string;
     }
   | { type: "turn_end"; piSessionId?: string }
