@@ -14,7 +14,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import type { AutonomaApiClient } from "~/lib/api";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
@@ -38,32 +37,13 @@ export type SendMessageFn = (
 
 export function createSendMessage(deps: {
   wsClient: AutonomaWsClient;
-  apiClient: AutonomaApiClient;
-  queryClient: QueryClient;
 }): SendMessageFn {
-  const { wsClient, apiClient, queryClient } = deps;
+  const { wsClient } = deps;
   return async (text, images, targetPiSessionId) => {
     try {
       await wsClient.sendMessage(text, "followUp", images, targetPiSessionId);
-    } catch (wsError) {
-      console.error("WS send failed, trying HTTP fallback:", wsError);
-      try {
-        await apiClient.sendMessage({
-          text,
-          source: "web",
-          deliveryMode: "followUp",
-          images,
-          targetPiSessionId,
-        });
-      } catch (httpError) {
-        console.error("HTTP fallback also failed:", httpError);
-        const sid = targetPiSessionId ?? "default";
-        addPill(queryClient, sid, {
-          id: createId("send-error"),
-          label: "Failed to send message",
-          variant: "error",
-        });
-      }
+    } catch (error) {
+      console.error("WS send failed (socket not open):", error);
     }
   };
 }

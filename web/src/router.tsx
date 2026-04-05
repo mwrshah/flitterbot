@@ -26,7 +26,7 @@ export function getRouter() {
   const apiClient = createAutonomaApiClient(() => settingsStore.get());
   const wsClient = new AutonomaWsClient(() => settingsStore.get());
   const wsConnectionStore = createWsConnectionStore(wsClient);
-  const sendMessage = createSendMessage({ wsClient, apiClient, queryClient });
+  const sendMessage = createSendMessage({ wsClient });
 
   const router = createRouter({
     routeTree,

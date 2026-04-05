@@ -1,7 +1,6 @@
 import type {
   DirectMessageResponse,
   DirectoryCompletionsResponse,
-  SendMessageResponse,
   SessionDetailResponse,
   SessionListResponse,
   SkillsListResponse,
@@ -48,18 +47,6 @@ export function createAutonomaApiClient(getSettings: () => ControlSurfaceSetting
       if (cursor) params.set("cursor", cursor);
       return request<TranscriptPage>(`/api/sessions/${sessionId}/transcript?${params}`);
     },
-
-    sendMessage: (body: {
-      text: string;
-      source: string;
-      deliveryMode: string;
-      images?: Array<{ data: string; mimeType: string }>;
-      targetPiSessionId?: string;
-    }) =>
-      request<SendMessageResponse>("/message", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
 
     sendDirectSessionMessage: (sessionId: string, text: string) =>
       request<DirectMessageResponse>(`/sessions/${sessionId}/message`, {
