@@ -1070,7 +1070,7 @@ export class MessageList extends LitElement {
    * isThinkingStreaming controls whether the ThinkingBlock renders expanded with
    * the shimmer animation (true = thinking in progress, false = thinking done).
    */
-  updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): void {
+  updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): Promise<unknown> {
     const domWriteToken = streamingPerf.beginStreamingDomWrite();
     if (!this._streamingEl) {
       this._streamingEl = document.createElement(
@@ -1089,7 +1089,7 @@ export class MessageList extends LitElement {
     streamingPerf.endStreamingDomWrite(domWriteToken);
 
     const renderToken = streamingPerf.beginStreamingLitRender();
-    void this._streamingEl.updateComplete.then(() => {
+    return this._streamingEl.updateComplete.then(() => {
       streamingPerf.endStreamingLitRender(renderToken);
     });
   }

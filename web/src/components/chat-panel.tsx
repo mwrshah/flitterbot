@@ -86,7 +86,7 @@ export function ChatPanel({
   const [isSending, setIsSending] = useState(false);
   const agentMessages = useAgentMessages(timeline);
 
-  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
+  const { viewportRef, scrollToBottom, isAtBottomRef, engage } = useStickToBottom({
     initialScrollWhen: agentMessages.length > 0,
     initialScrollKey: piSessionId,
   });
@@ -130,7 +130,6 @@ export function ChatPanel({
             },
             isThinkingStreaming,
           );
-          settleToBottomIfPinned();
         } else {
           console.log(
             "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
@@ -145,11 +144,9 @@ export function ChatPanel({
     // directly to the Lit component, bypassing the React render cycle.
     streamingStore.onCommit(piSessionId, (agentMessages) => {
       messageListRef.current?.commitStreaming(agentMessages);
-      settleToBottomIfPinned();
     });
     streamingStore.onToolResultCommit(piSessionId, (agentMessage) => {
       messageListRef.current?.commitToolResult(agentMessage);
-      settleToBottomIfPinned();
     });
 
     activeToolStore.onUpdate(piSessionId, (event) => {
@@ -205,7 +202,7 @@ export function ChatPanel({
 
       setIsSending(true);
       setPendingImages([]);
-      engageAndScroll();
+      engage();
 
       try {
         await onSendMessage(text || "(image)", images);
@@ -213,7 +210,7 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [engageAndScroll, onSendMessage],
+    [engage, onSendMessage],
   );
 
   return (
