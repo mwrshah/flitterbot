@@ -32,7 +32,7 @@ import MessageSquare from "lucide/dist/esm/icons/message-square.js";
 import Search from "lucide/dist/esm/icons/search.js";
 import SquareTerminal from "lucide/dist/esm/icons/square-terminal.js";
 import { marked } from "marked";
-import type { ActiveToolState } from "~/lib/active-tool-store";
+import type { ActiveToolState } from "~/lib/streaming-store";
 import { streamingPerf } from "~/lib/streaming-perf";
 
 hljs.registerLanguage("javascript", javascript);
@@ -1010,6 +1010,7 @@ export class MessageList extends LitElement {
   private _activeToolStates = new Map<string, ActiveToolState>();
   private _pendingToolResultCommits = new Map<string, ToolResultMessageType>();
   private _toolMessageEls = new Map<string, ToolMessageElement>();
+  private _toolMessageObserver: MutationObserver | null = null;
 
   /** Cached render items from the last render or imperative commit. */
   private _cachedRenderItems: Array<{ key: string; template: TemplateResult }> | null = null;
@@ -1025,6 +1026,31 @@ export class MessageList extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+
+    // Watch for new tool-message elements created by child Lit renders
+    // (e.g. <assistant-message> rendering <tool-message> children after
+    // <message-list>'s own updated() has already fired).
+    this._toolMessageObserver = new MutationObserver(() => {
+      // Sync when: (a) the DOM has tool-message elements we haven't indexed,
+      // or (b) there are pending operations waiting for targets.
+      // The count check is cheap and avoids running syncToolMessageTargets
+      // on every text-streaming DOM mutation (where both counts are 0).
+      const domCount = this.querySelectorAll("tool-message").length;
+      if (
+        domCount !== this._toolMessageEls.size ||
+        this._pendingToolResultCommits.size > 0 ||
+        this._activeToolStates.size > 0
+      ) {
+        this.syncToolMessageTargets();
+      }
+    });
+    this._toolMessageObserver.observe(this, { childList: true, subtree: true });
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._toolMessageObserver?.disconnect();
+    this._toolMessageObserver = null;
   }
 
   override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
@@ -1164,6 +1190,22 @@ export class MessageList extends LitElement {
     );
 
     this.requestUpdate();
+
+    // The committed <assistant-message> elements create <tool-message> children
+    // in their own Lit render cycle (microtask after this message-list render).
+    // Re-sync targets after child renders so _toolMessageEls points at committed
+    // (visible) elements before tool_execution_start / tool_result arrive.
+    this.updateComplete
+      .then(() => {
+        const children = this.querySelectorAll("assistant-message");
+        if (children.length === 0) return;
+        return Promise.all(
+          Array.from(children).map((el) => (el as LitElement).updateComplete),
+        );
+      })
+      .then(() => {
+        this.syncToolMessageTargets();
+      });
   }
 
   commitToolResult(message: AgentMessage): boolean {
@@ -1171,9 +1213,13 @@ export class MessageList extends LitElement {
     const target = this._toolMessageEls.get(toolResult.toolCallId);
     if (!target) {
       this._pendingToolResultCommits.set(toolResult.toolCallId, toolResult);
+      // Pre-count to suppress the React catch-up render even though the
+      // imperative apply is deferred until the target element appears.
+      this.noteToolResultCommit(1);
       console.log(
-        "[debug][message-list] commitToolResult queued: waiting for tool-message target toolCallId=%s",
+        "[debug][message-list] commitToolResult queued: waiting for tool-message target toolCallId=%s committedTotal=%d",
         toolResult.toolCallId,
+        this._committedTotal,
       );
       return false;
     }
@@ -1280,7 +1326,7 @@ export class MessageList extends LitElement {
       appliedCount += 1;
     }
     if (appliedCount > 0) {
-      this.noteToolResultCommit(appliedCount);
+      // Don't call noteToolResultCommit — already pre-counted when queued in commitToolResult.
       console.log(
         "[debug][message-list] applyPendingToolResultCommits: applied=%d committedTotal=%d",
         appliedCount,
@@ -1308,10 +1354,13 @@ export class MessageList extends LitElement {
   private syncToolMessageTargets(): void {
     this.pruneCommittedToolStates();
     const next = new Map<string, ToolMessageElement>();
+    // querySelectorAll returns elements in document order. Committed elements
+    // appear before the streaming overlay in the DOM. Use "first one wins"
+    // so committed (visible) elements take priority over streaming fallbacks.
     for (const node of Array.from(this.querySelectorAll("tool-message"))) {
       const target = node as ToolMessageElement;
       const toolUseId = target.toolCall?.id;
-      if (toolUseId) {
+      if (toolUseId && !next.has(toolUseId)) {
         next.set(toolUseId, target);
       }
     }

@@ -10,7 +10,6 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { activeToolStore } from "~/lib/active-tool-store";
 import type { StatusPill } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -105,7 +104,7 @@ export function ChatPanel({
   useEffect(() => {
     streamingStore.onStreamingDelta(
       piSessionId,
-      (text, thinking, isThinkingStreaming, messageId) => {
+      (text, thinking, isThinkingStreaming, messageId, streamingToolCalls) => {
         if (messageId != null) {
           messageListRef.current?.updateStreaming(
             {
@@ -113,6 +112,7 @@ export function ChatPanel({
               content: [
                 ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
                 ...(text ? [{ type: "text" as const, text }] : []),
+                ...streamingToolCalls,
               ],
               api: "openai-responses",
               provider: "openai",
@@ -149,7 +149,7 @@ export function ChatPanel({
       messageListRef.current?.commitToolResult(agentMessage);
     });
 
-    activeToolStore.onUpdate(piSessionId, (event) => {
+    streamingStore.onActiveToolUpdate(piSessionId, (event) => {
       if (event.type === "clear_all") {
         messageListRef.current?.clearActiveTools();
         return;
@@ -157,13 +157,13 @@ export function ChatPanel({
       messageListRef.current?.applyActiveToolState(event.state);
       settleToBottomIfPinned();
     });
-    messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
+    messageListRef.current?.setActiveTools(streamingStore.getActiveToolSnapshot(piSessionId));
 
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
       streamingStore.offCommit(piSessionId);
       streamingStore.offToolResultCommit(piSessionId);
-      activeToolStore.offUpdate(piSessionId);
+      streamingStore.offActiveToolUpdate(piSessionId);
       messageListRef.current?.clearStreaming();
       messageListRef.current?.clearActiveTools();
     };
