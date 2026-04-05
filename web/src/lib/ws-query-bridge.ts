@@ -460,6 +460,11 @@ export function setupWsQueryBridge(deps: {
         // directly to the Lit component, bypassing React re-render cycle.
         const agentMessages = timelineItemsToAgentMessages(committedItems);
         if (agentMessages.length > 0) {
+          console.log(
+            "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
+            agentMessages.length,
+            piSessionId,
+          );
           streamingStore.commitMessage(piSessionId, agentMessages);
         }
       }

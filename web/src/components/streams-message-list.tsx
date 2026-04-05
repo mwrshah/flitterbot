@@ -78,6 +78,9 @@ export const StreamsMessageList = memo(
       // suppress the redundant render.
       if (committedRef.current) {
         committedRef.current = false;
+        console.log(
+          "[debug][StreamsMessageList] React catch-up: skipping perf tracking (Lit already committed)",
+        );
         el.messages = messages;
         el.tools = EMPTY_TOOLS;
         el.pendingToolCalls = EMPTY_PENDING;

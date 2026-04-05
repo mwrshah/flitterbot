@@ -154,6 +154,12 @@ export const streamingStore = {
    *  Called from ws-query-bridge after message_end setQueryData. */
   commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
     const cb = commitCallbacks.get(sessionId);
+    console.log(
+      "[debug][streaming-store] commitMessage: session=%s messages=%d hasCallback=%s",
+      sessionId,
+      agentMessages.length,
+      String(!!cb),
+    );
     if (cb) cb(agentMessages);
   },
 };
