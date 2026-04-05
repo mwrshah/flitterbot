@@ -25,6 +25,7 @@ import type {
   WsMessage,
 } from "~/lib/types";
 import { createId, extractToolName } from "~/lib/utils";
+import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import type { AutonomaWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
@@ -394,6 +395,26 @@ export function setupWsQueryBridge(deps: {
 
       if (hasContent || message.toolCalls?.length) {
         const now = new Date().toISOString();
+
+        // Build the committed timeline items for both Query cache and imperative commit.
+        const committedItems: ChatTimelineItem[] = [];
+        if (hasContent) {
+          committedItems.push(blocks ? { ...msg, blocks } : msg);
+        }
+        if (message.toolCalls?.length) {
+          for (const tc of message.toolCalls) {
+            committedItems.push({
+              id: createId("tool"),
+              kind: "tool",
+              tool: tc.toolName ?? "tool",
+              phase: "start",
+              toolUseId: tc.toolUseId,
+              args: tc.args as JsonValue | undefined,
+              createdAt: now,
+            });
+          }
+        }
+
         queryClient.setQueryData<ChatTimelineItem[]>(
           ["streams-history", piSessionId, "agent"],
           (old) => {
@@ -402,7 +423,7 @@ export function setupWsQueryBridge(deps: {
             // Upsert the message (replace existing by ID, or append).
             let next = items;
             if (hasContent) {
-              const committed = blocks ? { ...msg, blocks } : msg;
+              const committed = committedItems[0] as ChatTimelineMessage;
               const idx = items.findIndex((existing) => existing.id === committed.id);
               if (idx >= 0) {
                 next = [...items];
@@ -415,7 +436,9 @@ export function setupWsQueryBridge(deps: {
             // Append tool call start items from the server (dedup by toolUseId).
             if (message.toolCalls?.length) {
               const base = next === items ? [...items] : next;
-              for (const tc of message.toolCalls) {
+              const toolItems = hasContent ? committedItems.slice(1) : committedItems;
+              for (const toolItem of toolItems) {
+                const tc = toolItem as ChatTimelineTool;
                 const alreadyExists = base.some(
                   (existing) =>
                     existing.kind === "tool" &&
@@ -423,15 +446,7 @@ export function setupWsQueryBridge(deps: {
                     (existing as ChatTimelineTool).phase !== "end",
                 );
                 if (!alreadyExists) {
-                  base.push({
-                    id: createId("tool"),
-                    kind: "tool",
-                    tool: tc.toolName ?? "tool",
-                    phase: "start",
-                    toolUseId: tc.toolUseId,
-                    args: tc.args as JsonValue | undefined,
-                    createdAt: now,
-                  });
+                  base.push(tc);
                 }
               }
               next = base;
@@ -440,6 +455,13 @@ export function setupWsQueryBridge(deps: {
             return next;
           },
         );
+
+        // Imperative commit: convert committed items to AgentMessages and push
+        // directly to the Lit component, bypassing React re-render cycle.
+        const agentMessages = timelineItemsToAgentMessages(committedItems);
+        if (agentMessages.length > 0) {
+          streamingStore.commitMessage(piSessionId, agentMessages);
+        }
       }
 
       streamingStore.clearSession(piSessionId);

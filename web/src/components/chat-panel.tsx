@@ -139,8 +139,17 @@ export function ChatPanel({
         }
       },
     );
+
+    // Wire imperative commit: message_end pushes converted AgentMessages
+    // directly to the Lit component, bypassing the React render cycle.
+    streamingStore.onCommit(piSessionId, (agentMessages) => {
+      messageListRef.current?.commitStreaming(agentMessages);
+      settleToBottomIfPinned();
+    });
+
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
+      streamingStore.offCommit(piSessionId);
       messageListRef.current?.clearStreaming();
     };
   }, [piSessionId, settleToBottomIfPinned]);

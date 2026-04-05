@@ -158,6 +158,15 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 }
 
 /**
+ * Convert a small set of timeline items (e.g. one message + its tool calls
+ * from message_end) into AgentMessage[] format. Same logic as
+ * timelineToAgentMessages but semantically named for the imperative commit path.
+ */
+export function timelineItemsToAgentMessages(items: ChatTimelineItem[]): AgentMessage[] {
+  return timelineToAgentMessages(items);
+}
+
+/**
  * Derive the set of toolUseIds that have started but not yet ended.
  */
 export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<string> {
