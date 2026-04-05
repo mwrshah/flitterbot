@@ -14,7 +14,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { activeToolStore } from "~/lib/active-tool-store";
 import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
@@ -322,8 +321,16 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start (no-op — tool calls are committed via message_end) ──
+    // ── toolcall_start → append tool card to streaming overlay ──
     if (message.type === "toolcall_start") {
+      if (message.toolUseId && message.toolName) {
+        streamingStore.appendToolCall(piSessionId, {
+          type: "toolCall",
+          id: message.toolUseId,
+          name: message.toolName,
+          arguments: {},
+        });
+      }
       return;
     }
 
@@ -463,7 +470,7 @@ export function setupWsQueryBridge(deps: {
     // ── tool_execution_update → imperative active-tool channel ──
     if (message.type === "tool_execution_update") {
       if (!message.toolUseId) return;
-      activeToolStore.upsertTool(piSessionId, {
+      streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
         partialResult: message.partialResult,
@@ -474,7 +481,7 @@ export function setupWsQueryBridge(deps: {
     // ── tool_execution_start → imperative active-tool channel ──
     if (message.type === "tool_execution_start") {
       if (!message.toolUseId) return;
-      activeToolStore.upsertTool(piSessionId, {
+      streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
       });
@@ -488,7 +495,7 @@ export function setupWsQueryBridge(deps: {
           ? (message.event as Record<string, unknown>)
           : undefined;
       if (!message.toolUseId) return;
-      activeToolStore.upsertTool(piSessionId, {
+      streamingStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: false,
         partialResult:
@@ -507,7 +514,7 @@ export function setupWsQueryBridge(deps: {
         streamingStore.commitToolResult(piSessionId, toolResultMessage);
       }
       if (message.item.toolUseId) {
-        activeToolStore.dropTool(piSessionId, message.item.toolUseId);
+        streamingStore.dropTool(piSessionId, message.item.toolUseId);
       }
       return;
     }
@@ -516,7 +523,6 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "turn_end") {
       console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", piSessionId);
       streamingStore.clearSession(piSessionId);
-      activeToolStore.clearSession(piSessionId);
       return;
     }
 
@@ -524,7 +530,6 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "agent_end") {
       removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.clearSession(piSessionId);
-      activeToolStore.clearSession(piSessionId);
       if (message.aborted) {
         // message_end was skipped (abort) — revalidate from the server session file.
         queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
