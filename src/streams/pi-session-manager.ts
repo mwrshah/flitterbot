@@ -11,6 +11,7 @@ import {
 import { getStreamById } from "../blackboard/query-streams.ts";
 import type { AutonomaConfig } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
+import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createAutonomaAgent } from "./create-agent.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
@@ -34,6 +35,8 @@ export interface ManagedPiSession {
   unsubscribe: () => void;
   /** Set during close_stream tool execution; checked post-turn to destroy after the turn completes. */
   pendingDestroy?: boolean;
+  /** Populated by pi-subscribe on agent_end; consumed by runtime.ts to broadcast stream_surfaced after persist. */
+  lastSurfacedAssistantMessage?: ChatTimelineMessage;
 }
 
 export type ProcessQueueItemCallback = (
@@ -332,7 +335,8 @@ export class PiSessionManager {
       this.wsHub,
       managed.streamId,
       managed.streamName,
-      () => {
+      (lastAssistantMessage) => {
+        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
           this.destroyOrchestrator(managed.streamId, "close_stream");
         }
@@ -519,7 +523,8 @@ export class PiSessionManager {
       this.wsHub,
       streamId,
       streamName,
-      () => {
+      (lastAssistantMessage) => {
+        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
           this.destroyOrchestrator(managed.streamId, "close_stream");
         }
