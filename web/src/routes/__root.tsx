@@ -133,7 +133,19 @@ function RootDocument({
       </head>
       <body>
         {children}
-        <Toaster />
+        <Toaster
+          theme={resolvedTheme}
+          duration={Infinity}
+          closeButton
+          toastOptions={{
+            style: {
+              background: "var(--background)",
+              color: "var(--foreground)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+            },
+          }}
+        />
         <Scripts />
       </body>
     </html>
