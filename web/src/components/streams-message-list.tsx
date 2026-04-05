@@ -12,6 +12,7 @@ import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import type { ActiveToolState } from "~/lib/active-tool-store";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList } from "~/pi-web-ui/chat-components";
@@ -24,6 +25,10 @@ export type StreamsMessageListHandle = {
   updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean): void;
   clearStreaming(): void;
   commitStreaming(messages: AgentMessage[]): void;
+  commitToolResult(message: AgentMessage): boolean;
+  setActiveTools(states: ActiveToolState[]): void;
+  applyActiveToolState(state: ActiveToolState): void;
+  clearActiveTools(): void;
 };
 
 export const StreamsMessageList = memo(
@@ -34,11 +39,25 @@ export const StreamsMessageList = memo(
     useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered });
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<MessageListElement | null>(null);
+    const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
+    const clearActiveToolsQueuedRef = useRef(false);
     /** Set to true after commitStreaming — the next React-driven messages update
      *  skips perf tracking since the Lit component already has the data. */
     const committedRef = useRef(false);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
+
+    const flushActiveTools = () => {
+      const el = elementRef.current;
+      if (!el) return;
+      if (clearActiveToolsQueuedRef.current) {
+        el.clearActiveTools();
+        clearActiveToolsQueuedRef.current = false;
+      }
+      if (pendingActiveToolsRef.current.size > 0) {
+        el.setActiveTools(Array.from(pendingActiveToolsRef.current.values()));
+      }
+    };
 
     useEffect(() => {
       let cancelled = false;
@@ -71,6 +90,7 @@ export const StreamsMessageList = memo(
       }
 
       const el = elementRef.current as MessageListElement & Record<string, unknown>;
+      flushActiveTools();
 
       // If Lit already committed these messages imperatively (message_end path),
       // sync the property for internal consistency (e.g. getTurnCopyText) but
@@ -84,6 +104,7 @@ export const StreamsMessageList = memo(
         el.messages = messages;
         el.tools = EMPTY_TOOLS;
         el.pendingToolCalls = EMPTY_PENDING;
+        flushActiveTools();
         return;
       }
 
@@ -92,6 +113,7 @@ export const StreamsMessageList = memo(
       el.tools = EMPTY_TOOLS;
       el.pendingToolCalls = EMPTY_PENDING;
       void el.updateComplete.then(() => {
+        flushActiveTools();
         streamingPerf.endCommittedLitRender(renderToken);
         // Defer scroll until after the browser runs layout — updateComplete
         // resolves when the parent Lit element finishes, but child components
@@ -119,6 +141,31 @@ export const StreamsMessageList = memo(
         elementRef.current?.commitStreaming(messages);
         committedRef.current = true;
       },
+      commitToolResult(message: AgentMessage) {
+        const committed = elementRef.current?.commitToolResult(message) ?? false;
+        if (committed) {
+          committedRef.current = true;
+        }
+        return committed;
+      },
+      setActiveTools(states: ActiveToolState[]) {
+        pendingActiveToolsRef.current = new Map(states.map((state) => [state.toolUseId, state]));
+        clearActiveToolsQueuedRef.current = false;
+        elementRef.current?.setActiveTools(states);
+      },
+      applyActiveToolState(state: ActiveToolState) {
+        pendingActiveToolsRef.current.set(state.toolUseId, state);
+        clearActiveToolsQueuedRef.current = false;
+        elementRef.current?.applyActiveToolState(state);
+      },
+      clearActiveTools() {
+        pendingActiveToolsRef.current.clear();
+        clearActiveToolsQueuedRef.current = true;
+        if (elementRef.current) {
+          elementRef.current.clearActiveTools();
+          clearActiveToolsQueuedRef.current = false;
+        }
+      },
     }));
 
     if (error) {
@@ -145,7 +192,6 @@ export const StreamsMessageList = memo(
 
     return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
   }),
-  // Custom equality: skip re-render if messages array is the same reference
-  // (useAgentMessages returns a stable reference via fingerprinting)
+  // Custom equality: skip re-render if messages array is the same reference.
   (prev, next) => prev.messages === next.messages,
 );

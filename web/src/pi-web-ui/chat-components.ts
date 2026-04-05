@@ -32,6 +32,7 @@ import MessageSquare from "lucide/dist/esm/icons/message-square.js";
 import Search from "lucide/dist/esm/icons/search.js";
 import SquareTerminal from "lucide/dist/esm/icons/square-terminal.js";
 import { marked } from "marked";
+import type { ActiveToolState } from "~/lib/active-tool-store";
 import { streamingPerf } from "~/lib/streaming-perf";
 
 hljs.registerLanguage("javascript", javascript);
@@ -52,6 +53,7 @@ type UserMessageWithAttachments = {
 };
 
 type RenderMessage = AgentMessage | UserMessageWithAttachments | { role: "artifact" };
+type ToolMessageElement = ToolMessage & { toolCall: ToolCall };
 
 function i18n(text: string): string {
   return text;
@@ -126,6 +128,47 @@ function prettyValue(value: unknown): { content: string; language: string } {
   } catch {
     return { content: String(value), language: "text" };
   }
+}
+
+function stringifyToolOutput(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function normalizeToolExecutionResult(
+  toolCall: ToolCall,
+  partialResult: unknown,
+  isError = false,
+): ToolResultMessageType | undefined {
+  if (partialResult == null) return undefined;
+
+  if (typeof partialResult === "object" && partialResult && "content" in partialResult) {
+    const content = (partialResult as { content?: unknown }).content;
+    if (Array.isArray(content)) {
+      return {
+        role: "toolResult",
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: content as ToolResultMessageType["content"],
+        isError,
+        timestamp: Date.now(),
+      } as ToolResultMessageType;
+    }
+  }
+
+  return {
+    role: "toolResult",
+    toolCallId: toolCall.id,
+    toolName: toolCall.name,
+    content: [{ type: "text", text: stringifyToolOutput(partialResult) }],
+    isError,
+    timestamp: Date.now(),
+  } as ToolResultMessageType;
 }
 
 export class MessageCopyButton extends LitElement {
@@ -654,12 +697,12 @@ function summarizeToolCall(
 ): { title: string; subtitle: string } {
   const state = aborted
     ? i18n("aborted")
-    : result?.isError
-      ? i18n("error")
-      : result
-        ? i18n("done")
-        : pending || isStreaming
-          ? i18n("running")
+    : pending || isStreaming
+      ? i18n("running")
+      : result?.isError
+        ? i18n("error")
+        : result
+          ? i18n("done")
           : i18n("pending");
 
   const p = paramRecord(params);
@@ -964,6 +1007,9 @@ export class MessageList extends LitElement {
   @property({ attribute: false }) onCostClick?: () => void;
 
   private _streamingEl: AssistantMessage | null = null;
+  private _activeToolStates = new Map<string, ActiveToolState>();
+  private _pendingToolResultCommits = new Map<string, ToolResultMessageType>();
+  private _toolMessageEls = new Map<string, ToolMessageElement>();
 
   /** Cached render items from the last render or imperative commit. */
   private _cachedRenderItems: Array<{ key: string; template: TemplateResult }> | null = null;
@@ -1000,8 +1046,8 @@ export class MessageList extends LitElement {
         this._cachedRenderItems = null;
         return false;
       }
-      // More messages than committed (e.g. tool_execution_end arrived before
-      // React caught up) — allow full render.
+      // More messages than committed means a later canonical event landed
+      // before React caught up — allow a full render.
       console.log(
         "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
         (this.messages as RenderMessage[]).length,
@@ -1015,6 +1061,7 @@ export class MessageList extends LitElement {
 
   override updated(): void {
     streamingPerf.markMessageListUpdated();
+    this.syncToolMessageTargets();
   }
 
   /**
@@ -1061,6 +1108,31 @@ export class MessageList extends LitElement {
     });
   }
 
+  setActiveTools(states: ActiveToolState[]): void {
+    this._activeToolStates = new Map(states.map((state) => [state.toolUseId, state]));
+    this.pruneCommittedToolStates();
+    this.applyActiveToolStates();
+  }
+
+  applyActiveToolState(state: ActiveToolState): void {
+    if (this.hasCommittedToolResult(state.toolUseId)) return;
+    this._activeToolStates.set(state.toolUseId, state);
+    const target = this._toolMessageEls.get(state.toolUseId);
+    if (target) {
+      this.applyActiveToolStateToElement(target, state);
+    }
+  }
+
+  clearActiveTools(): void {
+    for (const toolUseId of this._activeToolStates.keys()) {
+      const target = this._toolMessageEls.get(toolUseId);
+      if (!target || this.hasCommittedToolResult(toolUseId)) continue;
+      target.pending = false;
+      target.result = undefined;
+    }
+    this._activeToolStates.clear();
+  }
+
   /**
    * Imperatively commit messages from message_end without rebuilding the
    * entire render item list. Hides the streaming overlay and appends only
@@ -1094,6 +1166,30 @@ export class MessageList extends LitElement {
     this.requestUpdate();
   }
 
+  commitToolResult(message: AgentMessage): boolean {
+    const toolResult = message as ToolResultMessageType;
+    const target = this._toolMessageEls.get(toolResult.toolCallId);
+    if (!target) {
+      this._pendingToolResultCommits.set(toolResult.toolCallId, toolResult);
+      console.log(
+        "[debug][message-list] commitToolResult queued: waiting for tool-message target toolCallId=%s",
+        toolResult.toolCallId,
+      );
+      return false;
+    }
+
+    this.applyToolResultCommitToElement(target, toolResult);
+    this.noteToolResultCommit(1);
+
+    console.log(
+      "[debug][message-list] commitToolResult: toolCallId=%s committedTotal=%d",
+      toolResult.toolCallId,
+      this._committedTotal,
+    );
+
+    return true;
+  }
+
   /**
    * Build render items for a small set of committed AgentMessages (from message_end).
    * Uses the same key scheme as buildRenderItems so repeat() recognises them.
@@ -1102,7 +1198,8 @@ export class MessageList extends LitElement {
     messages: AgentMessage[],
   ): Array<{ key: string; template: TemplateResult }> {
     const items: Array<{ key: string; template: TemplateResult }> = [];
-    let fallbackIndex = this._cachedRenderItems?.length ?? (this.messages as RenderMessage[]).length;
+    let fallbackIndex =
+      this._cachedRenderItems?.length ?? (this.messages as RenderMessage[]).length;
 
     for (const msg of messages) {
       const role = (msg as unknown as { role: string }).role;
@@ -1137,6 +1234,90 @@ export class MessageList extends LitElement {
     }
 
     return items;
+  }
+
+  private applyActiveToolStates(): void {
+    for (const [toolUseId, state] of this._activeToolStates) {
+      const target = this._toolMessageEls.get(toolUseId);
+      if (target) {
+        this.applyActiveToolStateToElement(target, state);
+      }
+    }
+  }
+
+  private applyActiveToolStateToElement(target: ToolMessageElement, state: ActiveToolState): void {
+    target.pending = state.pending;
+    if (state.partialResult !== undefined) {
+      target.result = normalizeToolExecutionResult(
+        target.toolCall,
+        state.partialResult,
+        state.isError,
+      );
+    }
+  }
+
+  private applyToolResultCommitToElement(
+    target: ToolMessageElement,
+    toolResult: ToolResultMessageType,
+  ): void {
+    target.pending = false;
+    target.result = toolResult;
+    this._activeToolStates.delete(toolResult.toolCallId);
+    this._pendingToolResultCommits.delete(toolResult.toolCallId);
+  }
+
+  private noteToolResultCommit(count: number): void {
+    this._committedTotal =
+      Math.max(this._committedTotal, (this.messages as RenderMessage[]).length) + count;
+  }
+
+  private applyPendingToolResultCommits(): void {
+    let appliedCount = 0;
+    for (const [toolUseId, toolResult] of Array.from(this._pendingToolResultCommits.entries())) {
+      const target = this._toolMessageEls.get(toolUseId);
+      if (!target) continue;
+      this.applyToolResultCommitToElement(target, toolResult);
+      appliedCount += 1;
+    }
+    if (appliedCount > 0) {
+      this.noteToolResultCommit(appliedCount);
+      console.log(
+        "[debug][message-list] applyPendingToolResultCommits: applied=%d committedTotal=%d",
+        appliedCount,
+        this._committedTotal,
+      );
+    }
+  }
+
+  private hasCommittedToolResult(toolUseId: string): boolean {
+    return this.messages.some(
+      (message) =>
+        (message as unknown as { role?: string }).role === "toolResult" &&
+        (message as ToolResultMessageType).toolCallId === toolUseId,
+    );
+  }
+
+  private pruneCommittedToolStates(): void {
+    for (const toolUseId of Array.from(this._activeToolStates.keys())) {
+      if (this.hasCommittedToolResult(toolUseId)) {
+        this._activeToolStates.delete(toolUseId);
+      }
+    }
+  }
+
+  private syncToolMessageTargets(): void {
+    this.pruneCommittedToolStates();
+    const next = new Map<string, ToolMessageElement>();
+    for (const node of Array.from(this.querySelectorAll("tool-message"))) {
+      const target = node as ToolMessageElement;
+      const toolUseId = target.toolCall?.id;
+      if (toolUseId) {
+        next.set(toolUseId, target);
+      }
+    }
+    this._toolMessageEls = next;
+    this.applyPendingToolResultCommits();
+    this.applyActiveToolStates();
   }
 
   /** Extract plain text from an assistant message's content chunks. */

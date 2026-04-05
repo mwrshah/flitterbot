@@ -10,6 +10,7 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { activeToolStore } from "~/lib/active-tool-store";
 import type { StatusPill } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -146,11 +147,28 @@ export function ChatPanel({
       messageListRef.current?.commitStreaming(agentMessages);
       settleToBottomIfPinned();
     });
+    streamingStore.onToolResultCommit(piSessionId, (agentMessage) => {
+      messageListRef.current?.commitToolResult(agentMessage);
+      settleToBottomIfPinned();
+    });
+
+    activeToolStore.onUpdate(piSessionId, (event) => {
+      if (event.type === "clear_all") {
+        messageListRef.current?.clearActiveTools();
+        return;
+      }
+      messageListRef.current?.applyActiveToolState(event.state);
+      settleToBottomIfPinned();
+    });
+    messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
 
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
       streamingStore.offCommit(piSessionId);
+      streamingStore.offToolResultCommit(piSessionId);
+      activeToolStore.offUpdate(piSessionId);
       messageListRef.current?.clearStreaming();
+      messageListRef.current?.clearActiveTools();
     };
   }, [piSessionId, settleToBottomIfPinned]);
 

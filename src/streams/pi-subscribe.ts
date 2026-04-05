@@ -11,9 +11,11 @@ import type {
   ToolExecutionEndWebSocketEvent,
   ToolExecutionStartWebSocketEvent,
   ToolExecutionUpdateWebSocketEvent,
+  ToolResultWebSocketEvent,
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
+import { toolResultMessageToTimelineItem } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 
 type PiSessionSubscriptionEvent =
@@ -358,7 +360,23 @@ export function subscribeToPiSession(
         messageOrdinal += 1;
         currentStreamingMessageId = null;
 
-        // Only broadcast user/assistant messages — toolResult is not surfaced via WS.
+        if (anyRole === "toolResult") {
+          const item = toolResultMessageToTimelineItem(
+            event.message,
+            messageId,
+            extractTimestamp(event.message, now),
+          );
+          if (item) {
+            const payload: ToolResultWebSocketEvent = {
+              type: "tool_result",
+              piSessionId: session.sessionId,
+              item,
+            };
+            broadcast(wsHub, payload);
+          }
+          break;
+        }
+
         const role = anyRole === "user" || anyRole === "assistant" ? anyRole : undefined;
         const { text: content, blocks, toolCalls } = extractMessageBlocks(event.message);
         // Allow thinking-only messages (content empty but blocks non-empty) through.

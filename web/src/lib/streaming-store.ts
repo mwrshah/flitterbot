@@ -30,6 +30,8 @@ type StreamingCallback = (
 
 /** Fired once at message_end with the converted AgentMessages for imperative Lit commit. */
 type CommitCallback = (messages: AgentMessage[]) => void;
+/** Fired once at canonical tool_result with the converted toolResult AgentMessage. */
+type ToolResultCommitCallback = (message: AgentMessage) => void;
 
 /* ── Store implementation ── */
 
@@ -39,6 +41,7 @@ const thinking = new Map<string, StreamingThinking>();
 const thinkingActive = new Map<string, boolean>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 const commitCallbacks = new Map<string, CommitCallback>();
+const toolResultCommitCallbacks = new Map<string, ToolResultCommitCallback>();
 
 function fireCallbacks(sessionId: string) {
   const cb = streamingCallbacks.get(sessionId);
@@ -161,5 +164,23 @@ export const streamingStore = {
       String(!!cb),
     );
     if (cb) cb(agentMessages);
+  },
+
+  onToolResultCommit(sessionId: string, callback: ToolResultCommitCallback) {
+    toolResultCommitCallbacks.set(sessionId, callback);
+  },
+
+  offToolResultCommit(sessionId: string) {
+    toolResultCommitCallbacks.delete(sessionId);
+  },
+
+  commitToolResult(sessionId: string, agentMessage: AgentMessage) {
+    const cb = toolResultCommitCallbacks.get(sessionId);
+    console.log(
+      "[debug][streaming-store] commitToolResult: session=%s hasCallback=%s",
+      sessionId,
+      String(!!cb),
+    );
+    if (cb) cb(agentMessage);
   },
 };
