@@ -44,7 +44,9 @@ export class TurnQueue {
 
     // Steer messages bypass the queue and interrupt the current turn immediately
     if (item.deliveryMode === "steer" && this.processing) {
-      void this.processItem(item).catch(() => {});
+      void this.processItem(item).catch((error) => {
+        this.onItemEnd?.(item, error);
+      });
       return;
     }
 
