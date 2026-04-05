@@ -1655,28 +1655,37 @@ export class ControlSurfaceRuntime {
         }
       }
 
-      this.enqueue({
-        text: payload.text,
-        source: "web",
-        metadata: { via: "ws", ...routerMeta },
-        webClientId: client.id,
-        deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
-        images: Array.isArray(payload.images) ? payload.images : undefined,
-        serverMessageId,
-      });
-
-      // Mirror web user message to WhatsApp for complete conversation record
       try {
-        const wsLabel = routerMeta.stream_name ? `[${routerMeta.stream_name}] ` : "";
-        await this.sendWhatsAppCommand({
-          command: "send",
-          text: `${wsLabel}*User (web):*\n---\n${payload.text}`,
-          contextRef: undefined,
+        this.enqueue({
+          text: payload.text,
+          source: "web",
+          metadata: { via: "ws", ...routerMeta },
+          webClientId: client.id,
+          deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
+          images: Array.isArray(payload.images) ? payload.images : undefined,
+          serverMessageId,
         });
+
+        // Mirror web user message to WhatsApp for complete conversation record
+        try {
+          const wsLabel = routerMeta.stream_name ? `[${routerMeta.stream_name}] ` : "";
+          await this.sendWhatsAppCommand({
+            command: "send",
+            text: `${wsLabel}*User (web):*\n---\n${payload.text}`,
+            contextRef: undefined,
+          });
+        } catch (error) {
+          this.log(
+            `mirror web message to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       } catch (error) {
-        this.log(
-          `mirror web message to WhatsApp failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        const reason = error instanceof Error ? error.message : String(error);
+        this.log(`WS message enqueue failed for client ${client.id}: ${reason}`);
+        this.wsHub.send(client.id, {
+          type: "error",
+          message: `Failed to deliver message — ${reason}`,
+        });
       }
     }
   }

@@ -168,10 +168,6 @@ export type SessionDetailResponse = {
   tmux?: TmuxSessionInspection | null;
 };
 
-export type SendMessageResponse = {
-  ok: boolean;
-};
-
 export type DirectMessageResponse = {
   ok: boolean;
   delivery?: string;
