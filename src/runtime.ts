@@ -833,7 +833,7 @@ export class ControlSurfaceRuntime {
       try {
         await this.sendWhatsAppCommand({
           command: "send",
-          text: `*B-bot:*\n---\n${waText}`,
+          text: waText,
           contextRef: undefined,
           remoteJid:
             item.source === "whatsapp"
