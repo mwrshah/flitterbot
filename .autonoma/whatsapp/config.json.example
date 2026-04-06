@@ -1,5 +1,6 @@
 {
   "recipientJid": "",
+  "allowedJids": [],
   "pairingPhoneNumber": "",
   "typingDelayMs": 800
 }
