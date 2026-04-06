@@ -819,7 +819,7 @@ export class ControlSurfaceRuntime {
       // Surface with stream label for orchestrators
       const surfaceText =
         managed.role === "orchestrator" && managed.streamName
-          ? `[${managed.streamName}] ${finalText}`
+          ? `*[${managed.streamName}]* ${finalText}`
           : finalText;
 
       // WhatsApp has a ~65 536 character practical limit per message.
@@ -1685,7 +1685,7 @@ export class ControlSurfaceRuntime {
         // very large (e.g. full document pastes) and must not exceed WhatsApp limits.
         const MAX_USER_WA_LENGTH = 30_000;
         try {
-          const wsLabel = routerMeta.stream_name ? `[${routerMeta.stream_name}] ` : "";
+          const wsLabel = routerMeta.stream_name ? `*[${routerMeta.stream_name}]* ` : "";
           const userText =
             payload.text.length > MAX_USER_WA_LENGTH
               ? `${payload.text.slice(0, MAX_USER_WA_LENGTH)}\n\n[...truncated — full message in web client]`
