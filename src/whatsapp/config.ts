@@ -4,6 +4,7 @@ import { getWhatsAppConfigPath, getWhatsAppHome } from "./paths.ts";
 
 type WhatsAppConfig = {
   recipientJid?: string;
+  allowedJids: string[];
   pairingPhoneNumber?: string;
   typingDelayMs: number;
   daemonStartupTimeoutMs: number;
@@ -11,6 +12,7 @@ type WhatsAppConfig = {
 
 type WhatsAppConfigJson = {
   recipientJid?: string;
+  allowedJids?: string[];
   pairingPhoneNumber?: string;
   typingDelayMs?: number;
   daemonStartupTimeoutMs?: number;
@@ -18,6 +20,7 @@ type WhatsAppConfigJson = {
 
 const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   recipientJid: undefined,
+  allowedJids: [],
   pairingPhoneNumber: undefined,
   typingDelayMs: 800,
   daemonStartupTimeoutMs: 8000,
@@ -82,9 +85,13 @@ export function loadWhatsAppConfig(configPath = getWhatsAppConfigPath()): WhatsA
   const raw = readJsonObject(configPath);
 
   const recipientJid = readString(raw.recipientJid);
+  const allowedJids = Array.isArray(raw.allowedJids)
+    ? raw.allowedJids.filter((v): v is string => typeof v === "string" && v.trim() !== "")
+    : [];
 
   return {
     recipientJid,
+    allowedJids,
     pairingPhoneNumber: readString(raw.pairingPhoneNumber),
     typingDelayMs: readPositiveInt(raw.typingDelayMs, DEFAULT_WHATSAPP_CONFIG.typingDelayMs),
     daemonStartupTimeoutMs: readPositiveInt(
@@ -92,6 +99,10 @@ export function loadWhatsAppConfig(configPath = getWhatsAppConfigPath()): WhatsA
       DEFAULT_WHATSAPP_CONFIG.daemonStartupTimeoutMs,
     ),
   };
+}
+
+export function resolveAllowedJids(config = loadWhatsAppConfig()): string[] {
+  return config.allowedJids.map(toWhatsAppJid);
 }
 
 export function resolveRecipientJid(config = loadWhatsAppConfig()): string {

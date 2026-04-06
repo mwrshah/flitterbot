@@ -22,6 +22,7 @@ export interface WhatsAppDaemonRuntimeStatus {
 export interface SendWhatsAppRequest {
   text: string;
   contextRef?: string;
+  remoteJid?: string;
 }
 
 export interface SendWhatsAppResult {
@@ -47,6 +48,7 @@ export type DaemonCommand =
       command: "send";
       text: string;
       contextRef?: string;
+      remoteJid?: string;
       pendingAction?: PendingActionRequest;
     };
 

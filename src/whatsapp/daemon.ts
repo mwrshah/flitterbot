@@ -36,6 +36,7 @@ import {
 import {
   ensureWhatsAppHome,
   loadWhatsAppConfig,
+  resolveAllowedJids,
   resolvePairingPhoneNumber,
   resolveRecipientJid,
 } from "./config.ts";
@@ -158,6 +159,7 @@ class WhatsAppDaemon {
           command.text,
           command.contextRef,
           command.pendingAction,
+          command.remoteJid,
         );
       default:
         return {
@@ -208,7 +210,7 @@ class WhatsAppDaemon {
     // Includes the configured phone JID and the account's LID (Linked Identity)
     // since Baileys may deliver self-chat messages using either format.
     // Rebuilt on each creds.update so the LID stays current.
-    const allowedJids = new Set<string>([recipientJid]);
+    const allowedJids = new Set<string>([recipientJid, ...resolveAllowedJids(config)]);
     const rebuildAllowedJids = () => {
       const lidRaw = state.creds.me?.lid;
       if (lidRaw) {
@@ -380,6 +382,7 @@ class WhatsAppDaemon {
     text: string,
     contextRef?: string,
     pendingAction?: PendingActionRequest,
+    targetJid?: string,
   ): Promise<DaemonResponse> {
     if (this.status === "auth_required" || this.status === "logged_out") {
       return {
@@ -400,7 +403,7 @@ class WhatsAppDaemon {
     }
 
     const config = loadWhatsAppConfig();
-    const remoteJid = resolveRecipientJid(config);
+    const remoteJid = targetJid ?? resolveRecipientJid(config);
 
     const pending = createOutboundPendingMessage(this.db, {
       waMessageId: null,

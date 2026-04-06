@@ -835,6 +835,10 @@ export class ControlSurfaceRuntime {
           command: "send",
           text: `*B-bot:*\n---\n${waText}`,
           contextRef: undefined,
+          remoteJid:
+            item.source === "whatsapp"
+              ? (item.metadata?.remote_jid as string | undefined)
+              : undefined,
         });
       } catch (error) {
         this.log(
