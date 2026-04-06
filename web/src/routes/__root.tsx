@@ -79,12 +79,22 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
+/** Select only the fields RootComponent reads — excludes volatile `uptime`
+ *  so status polls that only change uptime don't trigger re-renders. */
 function useShortcutStatus(apiClient: AutonomaApiClient) {
-  const { data } = useQuery({ ...statusQueryOptions(apiClient), retry: 1 });
+  const { data } = useQuery({
+    ...statusQueryOptions(apiClient),
+    retry: 1,
+    select: (d) => ({
+      piAgent: d.piAgent,
+      streams: d.streams,
+      shortcuts: d.shortcuts,
+    }),
+  });
   return data;
 }
 
-function useStreamPaths(status: StatusResponse | undefined): string[] {
+function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | undefined): string[] {
   return useMemo(() => {
     const paths: string[] = [];
     if (status?.piAgent?.default?.piSessionId) paths.push("/streams/default");
@@ -92,7 +102,7 @@ function useStreamPaths(status: StatusResponse | undefined): string[] {
       if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
     }
     return paths.slice(0, 9);
-  }, [status]);
+  }, [status?.piAgent, status?.streams]);
 }
 
 function RootComponent() {
@@ -105,12 +115,17 @@ function RootComponent() {
 
   useEffect(() => startRealtime(), [startRealtime]);
 
-  return (
-    <RootDocument resolvedTheme={resolvedTheme}>
-      <AppShell />
-      <TanStackRouterDevtools position="bottom-right" />
-    </RootDocument>
+  const children = useMemo(
+    () => (
+      <>
+        <AppShell />
+        <TanStackRouterDevtools position="bottom-right" />
+      </>
+    ),
+    [],
   );
+
+  return <RootDocument resolvedTheme={resolvedTheme}>{children}</RootDocument>;
 }
 
 function RootDocument({
