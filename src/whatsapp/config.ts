@@ -105,6 +105,10 @@ export function resolveAllowedJids(config = loadWhatsAppConfig()): string[] {
   return config.allowedJids.map(toWhatsAppJid);
 }
 
+/**
+ * Returns the primary JID — the main recipient who receives web-mirrored
+ * messages and serves as the default outbound target.
+ */
 export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
   if (config.recipientJid) {
     return toWhatsAppJid(config.recipientJid);
@@ -114,6 +118,9 @@ export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
     `Missing recipient configuration. Set recipientJid in ${path.join(getWhatsAppHome(), "config.json")}.`,
   );
 }
+
+/** Alias for resolveRecipientJid — the primary JID receives web-mirrored input and is the default reply target. */
+export const resolvePrimaryJid = resolveRecipientJid;
 
 export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string {
   const value = config.pairingPhoneNumber ?? config.recipientJid;
