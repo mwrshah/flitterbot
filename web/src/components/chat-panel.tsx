@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
@@ -10,6 +11,7 @@ import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { activeToolStore } from "~/lib/active-tool-store";
 import type { StatusPill } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -104,7 +106,7 @@ export function ChatPanel({
   useEffect(() => {
     streamingStore.onStreamingDelta(
       piSessionId,
-      (text, thinking, isThinkingStreaming, messageId, streamingToolCalls) => {
+      (text, thinking, isThinkingStreaming, messageId) => {
         if (messageId != null) {
           messageListRef.current?.updateStreaming(
             {
@@ -112,7 +114,6 @@ export function ChatPanel({
               content: [
                 ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
                 ...(text ? [{ type: "text" as const, text }] : []),
-                ...streamingToolCalls,
               ],
               api: "openai-responses",
               provider: "openai",
@@ -149,7 +150,7 @@ export function ChatPanel({
       messageListRef.current?.commitToolResult(agentMessage);
     });
 
-    streamingStore.onActiveToolUpdate(piSessionId, (event) => {
+    activeToolStore.onUpdate(piSessionId, (event) => {
       if (event.type === "clear_all") {
         messageListRef.current?.clearActiveTools();
         return;
@@ -157,13 +158,13 @@ export function ChatPanel({
       messageListRef.current?.applyActiveToolState(event.state);
       settleToBottomIfPinned();
     });
-    messageListRef.current?.setActiveTools(streamingStore.getActiveToolSnapshot(piSessionId));
+    messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
 
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
       streamingStore.offCommit(piSessionId);
       streamingStore.offToolResultCommit(piSessionId);
-      streamingStore.offActiveToolUpdate(piSessionId);
+      activeToolStore.offUpdate(piSessionId);
       messageListRef.current?.clearStreaming();
       messageListRef.current?.clearActiveTools();
     };
@@ -201,11 +202,14 @@ export function ChatPanel({
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      setPendingImages([]);
       engage();
 
       try {
         await onSendMessage(text || "(image)", images);
+        setPendingImages([]);
+      } catch (error) {
+        toast.error("Failed to send message");
+        console.error("handleSubmit send failed:", error);
       } finally {
         setIsSending(false);
       }

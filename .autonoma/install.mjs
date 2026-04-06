@@ -656,6 +656,7 @@ async function bootstrapWhatsappConfig() {
 
   const whatsappAfter = {
     recipientJid,
+    allowedJids: [],
     pairingPhoneNumber: pairingPhone,
     typingDelayMs: 800,
   };

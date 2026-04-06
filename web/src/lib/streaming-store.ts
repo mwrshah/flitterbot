@@ -1,42 +1,23 @@
 /**
- * Unified imperative store for all ephemeral per-session state.
+ * Minimal external store for high-frequency streaming state.
  *
- * Holds two categories of state outside React:
+ * Text deltas and thinking deltas arrive at ~30Hz via WebSocket. Routing
+ * these through TanStack Query would trigger cache notifications on every
+ * chunk — too expensive. Instead, this store holds ephemeral streaming state
+ * and exposes imperative per-session callbacks for the Lit web component to
+ * consume without React re-renders.
  *
- * 1. **Streaming deltas** — text, thinking, and toolCall chunks arrive at
- *    ~30Hz via WebSocket. Lit reads them imperatively via callbacks.
- *
- * 2. **Active tool execution progress** — tool_execution_start/update/end
- *    events live here as ephemeral state keyed by toolUseId. Lit tool cards
- *    are updated imperatively, avoiding React re-renders.
- *
- * Both are cleared on message_end / turn_end / agent_end via `clearSession`.
+ * Lifecycle: streaming state is created on first text_delta, updated on
+ * subsequent deltas, and cleared on message_end / turn_end.
  */
 
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { streamingPerf } from "./streaming-perf";
-import {
-  pipelineLog,
-  pipelineDeltaLog,
-  pipelineDeltaReset,
-} from "./pipeline-logger";
 
 /* ── Types ── */
 
 export type StreamingText = { text: string; messageId: string };
 export type StreamingThinking = { text: string; messageId: string };
-export type StreamingToolCall = { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> };
-
-export type ActiveToolState = {
-  toolUseId: string;
-  pending: boolean;
-  partialResult?: unknown;
-  isError?: boolean;
-};
-
-export type ActiveToolStoreEvent =
-  | { type: "upsert"; state: ActiveToolState }
-  | { type: "clear_all" };
 
 /* ── Per-session streaming callbacks (for imperative Lit component updates) ── */
 
@@ -45,15 +26,12 @@ type StreamingCallback = (
   thinking: string | null,
   isThinkingStreaming: boolean,
   messageId: string | null,
-  toolCalls: StreamingToolCall[],
 ) => void;
 
 /** Fired once at message_end with the converted AgentMessages for imperative Lit commit. */
 type CommitCallback = (messages: AgentMessage[]) => void;
 /** Fired once at canonical tool_result with the converted toolResult AgentMessage. */
 type ToolResultCommitCallback = (message: AgentMessage) => void;
-/** Fired on tool_execution_start/update/end or session clear. */
-type ActiveToolCallback = (event: ActiveToolStoreEvent) => void;
 
 /* ── Store implementation ── */
 
@@ -61,30 +39,9 @@ const texts = new Map<string, StreamingText>();
 const thinking = new Map<string, StreamingThinking>();
 /** True between thinking_start and thinking_end — drives ThinkingBlock open/close. */
 const thinkingActive = new Map<string, boolean>();
-/** Accumulated toolCalls during streaming (from toolcall_start events). */
-const toolCalls = new Map<string, StreamingToolCall[]>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
 const commitCallbacks = new Map<string, CommitCallback>();
 const toolResultCommitCallbacks = new Map<string, ToolResultCommitCallback>();
-
-/* ── Active tool execution state ── */
-
-const activeToolsBySession = new Map<string, Map<string, ActiveToolState>>();
-const activeToolCallbacks = new Map<string, ActiveToolCallback>();
-
-function getSessionTools(sessionId: string): Map<string, ActiveToolState> {
-  let tools = activeToolsBySession.get(sessionId);
-  if (!tools) {
-    tools = new Map<string, ActiveToolState>();
-    activeToolsBySession.set(sessionId, tools);
-  }
-  return tools;
-}
-
-function emitActiveToolEvent(sessionId: string, event: ActiveToolStoreEvent): void {
-  const callback = activeToolCallbacks.get(sessionId);
-  if (callback) callback(event);
-}
 
 function fireCallbacks(sessionId: string) {
   const cb = streamingCallbacks.get(sessionId);
@@ -92,11 +49,10 @@ function fireCallbacks(sessionId: string) {
   const textState = texts.get(sessionId);
   const thinkingState = thinking.get(sessionId);
   const isThinkingStreaming = thinkingActive.get(sessionId) ?? false;
-  const sessionToolCalls = toolCalls.get(sessionId) ?? [];
   const messageId = textState?.messageId ?? thinkingState?.messageId ?? null;
-  const hasContent = textState != null || thinkingState != null || sessionToolCalls.length > 0;
+  const hasContent = textState != null || thinkingState != null;
   const effectiveMessageId = hasContent ? messageId : null;
-  cb(textState?.text ?? null, thinkingState?.text ?? null, isThinkingStreaming, effectiveMessageId, sessionToolCalls);
+  cb(textState?.text ?? null, thinkingState?.text ?? null, isThinkingStreaming, effectiveMessageId);
 }
 
 /* ── Public API (called by ws-query-bridge) ── */
@@ -107,19 +63,12 @@ export const streamingStore = {
   appendTextDelta(sessionId: string, messageId: string, delta: string) {
     const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = texts.get(sessionId);
-    const isFirst = !existing;
     if (existing) {
       existing.text += delta;
       existing.messageId = messageId;
     } else {
       texts.set(sessionId, { text: delta, messageId });
     }
-    pipelineDeltaLog("STORE_UPDATE", "text_delta", `${sessionId}:store:text`, {
-      sessionId,
-      messageId,
-      isFirst,
-      accumulatedLen: texts.get(sessionId)!.text.length,
-    });
     fireCallbacks(sessionId);
     streamingPerf.endDeltaToCallback(deltaToken);
   },
@@ -134,19 +83,12 @@ export const streamingStore = {
   appendThinkingDelta(sessionId: string, messageId: string, delta: string) {
     const deltaToken = streamingPerf.beginDeltaToCallback();
     const existing = thinking.get(sessionId);
-    const isFirst = !existing;
     if (existing) {
       existing.text += delta;
       existing.messageId = messageId;
     } else {
       thinking.set(sessionId, { text: delta, messageId });
     }
-    pipelineDeltaLog("STORE_UPDATE", "thinking_delta", `${sessionId}:store:thinking`, {
-      sessionId,
-      messageId,
-      isFirst,
-      accumulatedLen: thinking.get(sessionId)!.text.length,
-    });
     fireCallbacks(sessionId);
     streamingPerf.endDeltaToCallback(deltaToken);
   },
@@ -163,32 +105,14 @@ export const streamingStore = {
     fireCallbacks(sessionId);
   },
 
-  /* ── Tool call streaming (from toolcall_start events) ── */
-
-  appendToolCall(sessionId: string, toolCall: StreamingToolCall) {
-    pipelineLog("STORE_UPDATE", "toolcall_start", {
-      sessionId,
-      toolUseId: toolCall.id,
-      toolName: toolCall.name,
-    });
-    const existing = toolCalls.get(sessionId);
-    if (existing) {
-      existing.push(toolCall);
-    } else {
-      toolCalls.set(sessionId, [toolCall]);
-    }
-    fireCallbacks(sessionId);
-  },
-
   /* ── Clear all streaming for a session (turn_end / agent_end) ── */
 
-  /** Idempotent: clears all streaming AND active tool state for the session. */
+  /** Idempotent: only fires callback if there was actually streaming state to clear. */
   clearSession(sessionId: string) {
-    const hadStreaming =
-      texts.has(sessionId) || thinking.has(sessionId) || thinkingActive.has(sessionId) || toolCalls.has(sessionId);
-    const hadActiveTools = activeToolsBySession.has(sessionId);
+    const hadState =
+      texts.has(sessionId) || thinking.has(sessionId) || thinkingActive.has(sessionId);
 
-    if (!hadStreaming && !hadActiveTools) {
+    if (!hadState) {
       console.log(
         "[debug][streaming-store] clearSession SKIPPED (already clear) for session=%s",
         sessionId,
@@ -196,23 +120,11 @@ export const streamingStore = {
       return;
     }
 
-    pipelineLog("STORE_UPDATE", "clearSession", {
-      sessionId,
-      hadStreaming,
-      hadActiveTools,
-    });
-    pipelineDeltaReset(sessionId);
     console.log("[debug][streaming-store] clearSession for session=%s", sessionId);
     texts.delete(sessionId);
     thinking.delete(sessionId);
     thinkingActive.delete(sessionId);
-    toolCalls.delete(sessionId);
-    if (hadStreaming) fireCallbacks(sessionId);
-
-    if (hadActiveTools) {
-      activeToolsBySession.delete(sessionId);
-      emitActiveToolEvent(sessionId, { type: "clear_all" });
-    }
+    fireCallbacks(sessionId);
   },
 
   /* ── Imperative callbacks for Lit component integration ── */
@@ -245,11 +157,6 @@ export const streamingStore = {
    *  Called from ws-query-bridge after message_end setQueryData. */
   commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
     const cb = commitCallbacks.get(sessionId);
-    pipelineLog("IMPERATIVE_COMMIT", "commitMessage", {
-      sessionId,
-      messageCount: agentMessages.length,
-      hasCallback: !!cb,
-    });
     console.log(
       "[debug][streaming-store] commitMessage: session=%s messages=%d hasCallback=%s",
       sessionId,
@@ -269,63 +176,11 @@ export const streamingStore = {
 
   commitToolResult(sessionId: string, agentMessage: AgentMessage) {
     const cb = toolResultCommitCallbacks.get(sessionId);
-    pipelineLog("IMPERATIVE_COMMIT", "commitToolResult", {
-      sessionId,
-      hasCallback: !!cb,
-    });
     console.log(
       "[debug][streaming-store] commitToolResult: session=%s hasCallback=%s",
       sessionId,
       String(!!cb),
     );
     if (cb) cb(agentMessage);
-  },
-
-  /* ── Active tool execution progress (tool_execution_start/update/end) ── */
-
-  getActiveToolSnapshot(sessionId: string): ActiveToolState[] {
-    const tools = activeToolsBySession.get(sessionId);
-    return tools ? Array.from(tools.values()).map((state) => ({ ...state })) : [];
-  },
-
-  upsertTool(
-    sessionId: string,
-    next: Pick<ActiveToolState, "toolUseId"> &
-      Partial<Omit<ActiveToolState, "toolUseId">> & { pending?: boolean },
-  ): void {
-    const tools = getSessionTools(sessionId);
-    const prev = tools.get(next.toolUseId);
-    const merged: ActiveToolState = {
-      toolUseId: next.toolUseId,
-      pending: next.pending ?? prev?.pending ?? true,
-      partialResult: next.partialResult !== undefined ? next.partialResult : prev?.partialResult,
-      isError: next.isError ?? prev?.isError,
-    };
-    tools.set(next.toolUseId, merged);
-    emitActiveToolEvent(sessionId, { type: "upsert", state: { ...merged } });
-  },
-
-  /**
-   * Remove a tool from the backing store without emitting a UI clear event.
-   *
-   * The canonical tool_result render path takes over immediately after this
-   * point, so silent removal avoids a transient clear/flicker while also
-   * preventing stale hydration on remount.
-   */
-  dropTool(sessionId: string, toolUseId: string): void {
-    const tools = activeToolsBySession.get(sessionId);
-    if (!tools) return;
-    tools.delete(toolUseId);
-    if (tools.size === 0) {
-      activeToolsBySession.delete(sessionId);
-    }
-  },
-
-  onActiveToolUpdate(sessionId: string, callback: ActiveToolCallback): void {
-    activeToolCallbacks.set(sessionId, callback);
-  },
-
-  offActiveToolUpdate(sessionId: string): void {
-    activeToolCallbacks.delete(sessionId);
   },
 };

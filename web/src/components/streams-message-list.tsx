@@ -12,7 +12,7 @@ import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { ActiveToolState } from "~/lib/streaming-store";
+import type { ActiveToolState } from "~/lib/active-tool-store";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList } from "~/pi-web-ui/chat-components";

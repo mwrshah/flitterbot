@@ -98,6 +98,12 @@ export function getInboundMessageRejectionReason(
   if (!remoteJid) {
     return "missing_remote_jid";
   }
+  // Accept all LID-format JIDs — these are linked identities from contacts
+  // with active WhatsApp sessions. Baileys uses LID format unpredictably
+  // instead of phone-number JIDs, so we can't reliably map them to the allowlist.
+  if (remoteJid.endsWith("@lid")) {
+    return undefined;
+  }
   const accepted = allowedJids ?? new Set([resolveRecipientJid()]);
   if (!accepted.has(remoteJid)) {
     return `unexpected_remote_jid:${remoteJid}`;

@@ -13,6 +13,7 @@ export async function sendWhatsAppViaDaemon(
     command: "send",
     text: request.text,
     contextRef: request.contextRef,
+    remoteJid: request.remoteJid,
   });
 
   return {

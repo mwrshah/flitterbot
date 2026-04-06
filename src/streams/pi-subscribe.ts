@@ -247,7 +247,7 @@ export function subscribeToPiSession(
   wsHub: WebSocketHub,
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
-  onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
+  onAgentEnd?: () => void,
 ): () => void {
   // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
   // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
@@ -489,18 +489,17 @@ export function subscribeToPiSession(
         break;
       case "agent_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
-        // NOTE: assistant messages are NOT surfaced here. runtime.ts broadcasts
-        // stream_surfaced AFTER persistOutboundMessage so the serverMessageId is
-        // set and the Surface timeline can dedup against DB records on refetch.
+        if (lastAssistantMessage) {
+          broadcastSurfaced(wsHub, session.sessionId, lastAssistantMessage);
+        }
         broadcast(wsHub, {
           type: "agent_end",
           piSessionId: session.sessionId,
           ...(messageEndFired ? {} : { aborted: true }),
         });
-        const pendingSurface = lastAssistantMessage;
         lastAssistantMessage = null;
         messageEndFired = false;
-        onAgentEnd?.(pendingSurface);
+        onAgentEnd?.();
         break;
       }
       case "compaction_start":

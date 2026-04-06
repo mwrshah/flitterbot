@@ -48,7 +48,6 @@ import type {
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
-  StreamSurfacedWebSocketEvent,
   StatusResponse,
   StreamRoutingMeta,
 } from "./contracts/index.ts";
@@ -798,51 +797,29 @@ export class ControlSurfaceRuntime {
 
     // Auto-surface final assistant message
     const finalAssistant = extractFinalAssistantMessage(session);
-    // Clear pending surface regardless — avoids stale data on tool-only turns.
-    const pendingSurface = managed.lastSurfacedAssistantMessage;
-    managed.lastSurfacedAssistantMessage = undefined;
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
 
       // Persist outbound with resolved server UUID (when available)
-      let persistedId: string | undefined;
       try {
         const streamId = managed.streamId ?? (item.metadata?.stream_id as string) ?? undefined;
-        const row = persistOutboundMessage(this.blackboard, {
+        persistOutboundMessage(this.blackboard, {
           id: finalMessageId,
           source: "stream_outbound",
           content: finalText,
           streamId,
           piSessionId: managed.piSessionId,
         });
-        persistedId = row.id;
       } catch (error) {
         this.log(
           `outbound message persist failed (len=${finalText.length}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 
-      // Broadcast stream_surfaced with serverMessageId so the Surface timeline
-      // can dedup against the DB record on refetch. The timeline message was
-      // captured by pi-subscribe on agent_end and stored on managed.
-      // Uses the actual DB row id (not responseId) so it works even when
-      // the provider doesn't return a responseId.
-      if (pendingSurface && persistedId) {
-        pendingSurface.serverMessageId = persistedId;
-        const surfacedPayload: StreamSurfacedWebSocketEvent = {
-          type: "stream_surfaced",
-          piSessionId: managed.piSessionId,
-          message: pendingSurface,
-          streamId: pendingSurface.streamId,
-          streamName: pendingSurface.streamName,
-        };
-        this.wsHub.broadcast(surfacedPayload);
-      }
-
       // Surface with stream label for orchestrators
       const surfaceText =
         managed.role === "orchestrator" && managed.streamName
-          ? `[${managed.streamName}] ${finalText}`
+          ? `*[${managed.streamName}]* ${finalText}`
           : finalText;
 
       // WhatsApp has a ~65 536 character practical limit per message.
@@ -856,8 +833,12 @@ export class ControlSurfaceRuntime {
       try {
         await this.sendWhatsAppCommand({
           command: "send",
-          text: `*B-bot:*\n---\n${waText}`,
+          text: waText,
           contextRef: undefined,
+          remoteJid:
+            item.source === "whatsapp"
+              ? (item.metadata?.remote_jid as string | undefined)
+              : undefined,
         });
       } catch (error) {
         this.log(
@@ -1704,7 +1685,7 @@ export class ControlSurfaceRuntime {
         // very large (e.g. full document pastes) and must not exceed WhatsApp limits.
         const MAX_USER_WA_LENGTH = 30_000;
         try {
-          const wsLabel = routerMeta.stream_name ? `[${routerMeta.stream_name}] ` : "";
+          const wsLabel = routerMeta.stream_name ? `*[${routerMeta.stream_name}]* ` : "";
           const userText =
             payload.text.length > MAX_USER_WA_LENGTH
               ? `${payload.text.slice(0, MAX_USER_WA_LENGTH)}\n\n[...truncated — full message in web client]`
