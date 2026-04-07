@@ -45,7 +45,7 @@ function NavItem({
     <Link
       to={to}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
         active
           ? "bg-accent text-accent-foreground font-medium"
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
@@ -112,7 +112,7 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Brand */}
-      <div className="shrink-0 flex items-center justify-between px-6 py-0 border-b border-sidebar-border">
+      <div className="shrink-0 flex items-center justify-between pl-6 pr-2 py-0 border-b border-sidebar-border">
         <span className="text-lg font-semibold text-sidebar-foreground mt-0.5 -mb-1">autonoma</span>
         <img src={logoBlack} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 dark:hidden" />
         <img src={logoWhite} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 hidden dark:block" />
