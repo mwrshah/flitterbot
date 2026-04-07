@@ -13,21 +13,11 @@ type CreateWorktreeResult = {
   worktreePath?: string;
   branchName?: string;
   message: string;
-  usedGtr: boolean;
 };
 
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
-}
-
-async function hasGtr(repoPath: string): Promise<boolean> {
-  try {
-    await execPromise("git gtr version", { cwd: repoPath, timeout: 5_000 });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function getHighestBranchNumber(repoPath: string): Promise<number> {
@@ -59,28 +49,7 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-async function resolveGtrWorktreePath(repoPath: string, branchName: string): Promise<string> {
-  try {
-    const output = await exec(`git gtr go ${branchName}`, repoPath, 5_000);
-    if (output) return output;
-  } catch {
-    // fall through to convention
-  }
-  // gtr convention: <repo>-worktrees/<branch>
-  const repoDir = path.basename(repoPath);
-  return path.resolve(repoPath, "..", `${repoDir}-worktrees`, branchName);
-}
-
-async function createWithGtr(
-  repoPath: string,
-  branchName: string,
-): Promise<{ worktreePath: string }> {
-  await exec(`git gtr new ${branchName} --yes`, repoPath, 60_000);
-  const worktreePath = await resolveGtrWorktreePath(repoPath, branchName);
-  return { worktreePath };
-}
-
-async function createWithRawGit(
+async function createWorktree(
   repoPath: string,
   branchName: string,
   baseRef: string,
@@ -243,7 +212,6 @@ export async function executeCreateWorktree(
       ok: false,
       streamId,
       message: `Stream ${streamId} not found`,
-      usedGtr: false,
     };
   }
   if (stream.status !== "open") {
@@ -251,7 +219,6 @@ export async function executeCreateWorktree(
       ok: false,
       streamId,
       message: `Stream ${streamId} is not open`,
-      usedGtr: false,
     };
   }
 
@@ -265,7 +232,6 @@ export async function executeCreateWorktree(
       streamId,
       worktreePath: newWorktree,
       message: `Updated stream fields (repo_path=${newRepo}, worktree_path=${newWorktree ?? "null"})`,
-      usedGtr: false,
     };
   }
 
@@ -304,8 +270,7 @@ export async function executeCreateWorktree(
         streamId,
         worktreePath: stream.worktree_path,
         message: `${cleanupMessage}Existing worktree reused at ${stream.worktree_path}`,
-        usedGtr: false,
-      };
+        };
     }
   }
 
@@ -338,8 +303,7 @@ export async function executeCreateWorktree(
                 worktreePath: existingPath,
                 branchName: resolvedBranch,
                 message: `${cleanupMessage}Worktree already exists at ${existingPath} on branch ${resolvedBranch}`,
-                usedGtr: false,
-              };
+                        };
             }
           }
         }
@@ -349,20 +313,8 @@ export async function executeCreateWorktree(
     // ignore — proceed to create
   }
 
-  const isMainBase = baseRef === "origin/main" || baseRef === "main";
-  // gtr always branches from main — fall back to raw git for non-main base refs
-  const useGtr = isMainBase && (await hasGtr(repoPath));
   try {
-    const result = useGtr
-      ? await createWithGtr(repoPath, resolvedBranch)
-      : await createWithRawGit(repoPath, resolvedBranch, baseRef);
-
-    // Register Git Town parent if git-town is available
-    try {
-      await exec(`git config "git-town-branch.${resolvedBranch}.parent" main`, repoPath, 5_000);
-    } catch {
-      // Git Town not installed — fine
-    }
+    const result = await createWorktree(repoPath, resolvedBranch, baseRef);
 
     enrichStream(blackboard, streamId, repoPath, result.worktreePath);
 
@@ -393,8 +345,7 @@ export async function executeCreateWorktree(
       streamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}${envSummary}`,
-      usedGtr: useGtr,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${installSummary}${envSummary}`,
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -402,7 +353,6 @@ export async function executeCreateWorktree(
       ok: false,
       streamId,
       message: `${cleanupMessage}Failed to create worktree: ${msg}`,
-      usedGtr: useGtr,
     };
   }
 }
