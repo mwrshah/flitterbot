@@ -51,7 +51,6 @@ import type {
   StreamSurfacedWebSocketEvent,
   StatusResponse,
   StreamRoutingMeta,
-  StreamSurfacedWebSocketEvent,
 } from "./contracts/index.ts";
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
