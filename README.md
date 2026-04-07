@@ -63,3 +63,7 @@ Installed runtime (`~/.autonoma/`): `config.json`, `blackboard.db`, `logs/`, `bi
 **WhatsApp auth errors** — re-run `autonoma-wa auth`.
 **Hooks not firing** — check `~/.claude/settings.json`, `hook-post.mjs`, `hooks-errors.log`; hooks run async with a 15s timeout.
 **Runtime restarts after stop** — scheduler still installed; run `node ~/.autonoma/uninstall.mjs`.
+
+## TODO / Not Yet Implemented
+
+- Cleanup cron for stale worktrees — old worktrees from force-recreated or repo-switched streams are left on disk and need periodic cleanup

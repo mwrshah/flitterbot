@@ -235,43 +235,20 @@ export async function executeCreateWorktree(
     };
   }
 
-  // Enhancement 1: Clean up orphaned worktree when switching repos
+  // Guard against accidental worktree proliferation
   let cleanupMessage = "";
-  if (stream.worktree_path && stream.repo_path && stream.repo_path !== repoPath) {
-    try {
-      await exec(
-        `git worktree remove ${JSON.stringify(stream.worktree_path)} --force`,
-        stream.repo_path,
-        15_000,
-      );
-      cleanupMessage = `Removed orphaned worktree at ${stream.worktree_path} (old repo: ${stream.repo_path}). `;
-    } catch {
-      cleanupMessage = `Warning: could not remove old worktree at ${stream.worktree_path}. `;
-    }
-  }
-
-  // Enhancement 3: Reuse existing worktree if stream already has one on disk
   if (stream.worktree_path && existsSync(stream.worktree_path)) {
-    if (force) {
-      try {
-        await exec(
-          `git worktree remove ${JSON.stringify(stream.worktree_path)} --force`,
-          repoPath,
-          15_000,
-        );
-        cleanupMessage += `Removed existing worktree at ${stream.worktree_path} (force). `;
-      } catch {
-        cleanupMessage += `Warning: could not remove existing worktree at ${stream.worktree_path}. `;
-      }
-    } else {
-      enrichStream(blackboard, streamId, repoPath, stream.worktree_path);
+    if (!force) {
       return {
         ok: true,
         streamId,
         worktreePath: stream.worktree_path,
-        message: `${cleanupMessage}Existing worktree reused at ${stream.worktree_path}`,
-        };
+        message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. Call create_worktree with force=true to delink it and create a new one (old worktree left on disk for cleanup).`,
+      };
     }
+    cleanupMessage = `Old worktree delinked at ${stream.worktree_path} (left on disk). `;
+  } else if (stream.worktree_path && stream.repo_path && stream.repo_path !== repoPath) {
+    cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
   // Determine branch name: NNN-<slug> convention

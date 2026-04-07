@@ -886,6 +886,7 @@ export function Surface() {
 
         <Panel id="input" defaultSize="15%" minSize="9%">
           <MessageInput
+            draftKey="__surface__"
             isSending={isSending}
             onSubmit={handleSubmit}
             pendingImages={pendingImages}
