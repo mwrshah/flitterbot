@@ -35,7 +35,13 @@ type SurfaceEntry = {
   id: string;
   timestamp: string;
 } & (
-  | { kind: "inbound"; source: MessageSource; content: string; streamId?: string; streamName?: string }
+  | {
+      kind: "inbound";
+      source: MessageSource;
+      content: string;
+      streamId?: string;
+      streamName?: string;
+    }
   | { kind: "outbound"; channel: "whatsapp" | "all"; content: string }
   | { kind: "hook"; eventName: string; detail: string }
   | { kind: "streams-response"; content: string; streamId?: string; streamName?: string }

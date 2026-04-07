@@ -1,4 +1,4 @@
-import { keepPreviousData } from "@tanstack/react-query";
+import { keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { AutonomaApiClient } from "~/lib/api";
 import type { ChatTimelineItem, DownstreamSessionItem, StatusResponse } from "~/lib/types";
 import {
@@ -53,10 +53,12 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
     // All old items covered by server — always use canonical server data.
     // ID-only equality was returning stale cached items whose content differed
     // (e.g. incomplete thinking blocks from intermediate WS snapshots).
-    return next;
+    // Use replaceEqualDeep to preserve the old reference when data is
+    // structurally identical, preventing unnecessary downstream re-renders.
+    return replaceEqualDeep(prev, next);
   }
 
-  return [...next, ...extras];
+  return replaceEqualDeep(prev, [...next, ...extras]);
 }
 
 export function statusQueryOptions(apiClient: AutonomaApiClient) {

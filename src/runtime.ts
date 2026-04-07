@@ -48,6 +48,7 @@ import type {
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
+  StreamSurfacedWebSocketEvent,
   StatusResponse,
   StreamRoutingMeta,
 } from "./contracts/index.ts";
@@ -797,23 +798,45 @@ export class ControlSurfaceRuntime {
 
     // Auto-surface final assistant message
     const finalAssistant = extractFinalAssistantMessage(session);
+    // Clear pending surface regardless — avoids stale data on tool-only turns.
+    const pendingSurface = managed.lastSurfacedAssistantMessage;
+    managed.lastSurfacedAssistantMessage = undefined;
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
 
       // Persist outbound with resolved server UUID (when available)
+      let persistedId: string | undefined;
       try {
         const streamId = managed.streamId ?? (item.metadata?.stream_id as string) ?? undefined;
-        persistOutboundMessage(this.blackboard, {
+        const row = persistOutboundMessage(this.blackboard, {
           id: finalMessageId,
           source: "stream_outbound",
           content: finalText,
           streamId,
           piSessionId: managed.piSessionId,
         });
+        persistedId = row.id;
       } catch (error) {
         this.log(
           `outbound message persist failed (len=${finalText.length}): ${error instanceof Error ? error.message : String(error)}`,
         );
+      }
+
+      // Broadcast stream_surfaced with serverMessageId so the Surface timeline
+      // can dedup against the DB record on refetch. The timeline message was
+      // captured by pi-subscribe on agent_end and stored on managed.
+      // Uses the actual DB row id (not responseId) so it works even when
+      // the provider doesn't return a responseId.
+      if (pendingSurface && persistedId) {
+        pendingSurface.serverMessageId = persistedId;
+        const surfacedPayload: StreamSurfacedWebSocketEvent = {
+          type: "stream_surfaced",
+          piSessionId: managed.piSessionId,
+          message: pendingSurface,
+          streamId: pendingSurface.streamId,
+          streamName: pendingSurface.streamName,
+        };
+        this.wsHub.broadcast(surfacedPayload);
       }
 
       // Surface with stream label for orchestrators
@@ -1318,18 +1341,30 @@ export class ControlSurfaceRuntime {
               description:
                 "Update only the worktree_path field without creating a worktree. Skips all git operations.",
             },
+            base_ref: {
+              type: "string",
+              description:
+                "Git ref to branch from (optional, defaults to origin/main)",
+            },
+            force: {
+              type: "boolean",
+              description:
+                "Remove and re-create the worktree even if one already exists for this stream",
+            },
           },
           required: ["stream_id", "repo_path"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, repo_path, branch_name, update_repo_path, update_worktree_path } =
+          const { stream_id, repo_path, branch_name, update_repo_path, update_worktree_path, base_ref, force } =
             params as {
               stream_id: string;
               repo_path: string;
               branch_name?: string;
               update_repo_path?: string;
               update_worktree_path?: string;
+              base_ref?: string;
+              force?: boolean;
             };
           const result = await executeCreateWorktree(
             this.blackboard,
@@ -1338,6 +1373,8 @@ export class ControlSurfaceRuntime {
             branch_name,
             update_repo_path,
             update_worktree_path,
+            base_ref,
+            force,
           );
           if (result.ok) {
             const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;
