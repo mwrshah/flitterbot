@@ -283,6 +283,7 @@ export function ChatPanel({
 
         <Panel id="input" defaultSize="15%" minSize="9%">
           <MessageInput
+            draftKey={streamId ?? piSessionId ?? "__chat__"}
             isSending={isSending}
             onSubmit={handleSubmit}
             pendingImages={pendingImages}
