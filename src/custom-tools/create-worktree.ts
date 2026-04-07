@@ -1,5 +1,5 @@
 import { exec as cpExec } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
@@ -83,12 +83,13 @@ async function createWithGtr(
 async function createWithRawGit(
   repoPath: string,
   branchName: string,
+  baseRef: string,
 ): Promise<{ worktreePath: string }> {
   const repoDir = path.basename(repoPath);
   const worktreePath = path.resolve(repoPath, "..", `${repoDir}-worktrees`, branchName);
   await exec("git fetch origin", repoPath, 30_000);
   await exec(
-    `git worktree add ${JSON.stringify(worktreePath)} -b ${JSON.stringify(branchName)} origin/main`,
+    `git worktree add ${JSON.stringify(worktreePath)} -b ${JSON.stringify(branchName)} ${JSON.stringify(baseRef)}`,
     repoPath,
     30_000,
   );
@@ -151,6 +152,81 @@ async function installDependencies(worktreePath: string): Promise<string[]> {
   return results;
 }
 
+const ENV_NAMES = new Set([".env", ".env.local"]);
+const ALWAYS_SKIP = new Set(["node_modules", ".git", "__pycache__"]);
+
+async function getGitIgnoredDirs(repoPath: string, absPaths: string[]): Promise<Set<string>> {
+  if (absPaths.length === 0) return new Set();
+  try {
+    const args = absPaths.map((p) => JSON.stringify(p)).join(" ");
+    const { stdout } = await execPromise(`git check-ignore ${args}`, {
+      cwd: repoPath,
+      timeout: 5_000,
+    });
+    return new Set(stdout.trim().split("\n").filter(Boolean));
+  } catch {
+    // exit code 1 = nothing ignored, or git unavailable — skip nothing
+    return new Set();
+  }
+}
+
+async function findEnvFiles(repoPath: string, dir: string, maxDepth: number, depth = 0): Promise<string[]> {
+  if (depth > maxDepth) return [];
+  const results: string[] = [];
+  const candidateDirs: string[] = [];
+  try {
+    for (const entry of readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (ENV_NAMES.has(entry)) {
+        try {
+          if (statSync(full).isFile()) results.push(full);
+        } catch {
+          continue;
+        }
+      } else if (depth < maxDepth && !entry.startsWith(".") && !ALWAYS_SKIP.has(entry)) {
+        try {
+          if (statSync(full).isDirectory()) candidateDirs.push(full);
+        } catch {
+          continue;
+        }
+      }
+    }
+  } catch {
+    // readdir failed — skip
+  }
+
+  if (candidateDirs.length > 0) {
+    const ignored = await getGitIgnoredDirs(repoPath, candidateDirs);
+    for (const subdir of candidateDirs) {
+      if (!ignored.has(subdir)) {
+        results.push(...(await findEnvFiles(repoPath, subdir, maxDepth, depth + 1)));
+      }
+    }
+  }
+
+  return results;
+}
+
+async function copyEnvFiles(repoPath: string, worktreePath: string): Promise<string[]> {
+  const envFiles = await findEnvFiles(repoPath, repoPath, 3);
+  if (envFiles.length === 0) return [];
+
+  const results: string[] = [];
+  for (const srcFile of envFiles) {
+    const relPath = path.relative(repoPath, srcFile);
+    const destFile = path.join(worktreePath, relPath);
+    try {
+      mkdirSync(path.dirname(destFile), { recursive: true });
+      copyFileSync(srcFile, destFile);
+      results.push(relPath);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      results.push(`${relPath} (failed: ${msg})`);
+    }
+  }
+  return results;
+}
+
 export async function executeCreateWorktree(
   blackboard: BlackboardDatabase,
   streamId: string,
@@ -158,6 +234,8 @@ export async function executeCreateWorktree(
   branchName?: string,
   updateRepoPath?: string,
   updateWorktreePath?: string,
+  baseRef = "origin/main",
+  force = false,
 ): Promise<CreateWorktreeResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
@@ -208,14 +286,27 @@ export async function executeCreateWorktree(
 
   // Enhancement 3: Reuse existing worktree if stream already has one on disk
   if (stream.worktree_path && existsSync(stream.worktree_path)) {
-    enrichStream(blackboard, streamId, repoPath, stream.worktree_path);
-    return {
-      ok: true,
-      streamId,
-      worktreePath: stream.worktree_path,
-      message: `${cleanupMessage}Existing worktree reused at ${stream.worktree_path}`,
-      usedGtr: false,
-    };
+    if (force) {
+      try {
+        await exec(
+          `git worktree remove ${JSON.stringify(stream.worktree_path)} --force`,
+          repoPath,
+          15_000,
+        );
+        cleanupMessage += `Removed existing worktree at ${stream.worktree_path} (force). `;
+      } catch {
+        cleanupMessage += `Warning: could not remove existing worktree at ${stream.worktree_path}. `;
+      }
+    } else {
+      enrichStream(blackboard, streamId, repoPath, stream.worktree_path);
+      return {
+        ok: true,
+        streamId,
+        worktreePath: stream.worktree_path,
+        message: `${cleanupMessage}Existing worktree reused at ${stream.worktree_path}`,
+        usedGtr: false,
+      };
+    }
   }
 
   // Determine branch name: NNN-<slug> convention
@@ -258,11 +349,13 @@ export async function executeCreateWorktree(
     // ignore — proceed to create
   }
 
-  const useGtr = await hasGtr(repoPath);
+  const isMainBase = baseRef === "origin/main" || baseRef === "main";
+  // gtr always branches from main — fall back to raw git for non-main base refs
+  const useGtr = isMainBase && (await hasGtr(repoPath));
   try {
     const result = useGtr
       ? await createWithGtr(repoPath, resolvedBranch)
-      : await createWithRawGit(repoPath, resolvedBranch);
+      : await createWithRawGit(repoPath, resolvedBranch, baseRef);
 
     // Register Git Town parent if git-town is available
     try {
@@ -284,12 +377,23 @@ export async function executeCreateWorktree(
       // Never let install scanning fail the overall operation
     }
 
+    // Best-effort .env file copy from source repo
+    let envSummary = "";
+    try {
+      const envResults = await copyEnvFiles(repoPath, result.worktreePath);
+      if (envResults.length > 0) {
+        envSummary = `\nEnv: copied ${envResults.join(", ")}`;
+      }
+    } catch (error: unknown) {
+      envSummary = `\nEnv: copy failed — ${error instanceof Error ? error.message : String(error)}`;
+    }
+
     return {
       ok: true,
       streamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}`,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}${envSummary}`,
       usedGtr: useGtr,
     };
   } catch (error: unknown) {
