@@ -22,6 +22,9 @@ import type { DirectoryCompletionsResult } from "~/server/directory-completions"
 
 const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "", query: "" };
 
+/** Module-level store: persists draft text per route across navigations. */
+const draftStore = new Map<string, string>();
+
 type MessageInputProps = {
   isSending: boolean;
   onSubmit: (text: string) => void;
@@ -36,6 +39,8 @@ type MessageInputProps = {
   /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
   streamId?: string;
   fillHeight?: boolean;
+  /** Key into draftStore — when set, persists draft text across route navigations. */
+  draftKey?: string;
 };
 
 export const MessageInput = memo(function MessageInput({
@@ -51,12 +56,14 @@ export const MessageInput = memo(function MessageInput({
   autoFocus = false,
   streamId,
   fillHeight = false,
+  draftKey,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [draft, setDraft] = useState("");
+  const draftKeyRef = useRef(draftKey);
+  const [draft, setDraft] = useState(() => (draftKey ? (draftStore.get(draftKey) ?? "") : ""));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
@@ -179,6 +186,7 @@ export const MessageInput = memo(function MessageInput({
    */
   const handleDraftChange = useCallback(
     (value: string) => {
+      if (draftKeyRef.current) draftStore.set(draftKeyRef.current, value);
       setDraft(value);
       const cursor = textareaRef.current?.selectionStart ?? value.length;
 
@@ -434,6 +442,7 @@ export const MessageInput = memo(function MessageInput({
         const text = draftRef.current.trim();
         onSubmitRef.current(text);
         setDraft("");
+        if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
       }
     },
     [closePicker, handleDraftChange],
@@ -482,6 +491,7 @@ export const MessageInput = memo(function MessageInput({
           e.preventDefault();
           onSubmit(draftRef.current.trim());
           setDraft("");
+          if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
         }}
         className={cn("space-y-2", fillHeight && "flex-1 flex flex-col min-h-0")}
       >
