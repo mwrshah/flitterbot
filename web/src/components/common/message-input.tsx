@@ -439,7 +439,6 @@ export const MessageInput = memo(function MessageInput({
     [closePicker, handleDraftChange],
   );
 
-
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items;
     if (!items) return;

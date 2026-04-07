@@ -48,9 +48,9 @@ import type {
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
-  StreamSurfacedWebSocketEvent,
   StatusResponse,
   StreamRoutingMeta,
+  StreamSurfacedWebSocketEvent,
 } from "./contracts/index.ts";
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
@@ -1597,7 +1597,9 @@ export class ControlSurfaceRuntime {
                 text: `⚠️ Stuck turn detected: ${label} — stuck for ${Math.round(age / 60_000)}min. Cron paused via circuit breaker (30min TTL).`,
                 contextRef: undefined,
               }).catch((err) => {
-                this.log(`stuck-turn WhatsApp alert failed: ${err instanceof Error ? err.message : String(err)}`);
+                this.log(
+                  `stuck-turn WhatsApp alert failed: ${err instanceof Error ? err.message : String(err)}`,
+                );
               });
             }
           }
