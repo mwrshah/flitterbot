@@ -1349,7 +1349,7 @@ export class ControlSurfaceRuntime {
             force: {
               type: "boolean",
               description:
-                "Remove and re-create the worktree even if one already exists for this stream",
+                "Create a new worktree even if stream already has one (existing worktree is delinked but left on disk)",
             },
           },
           required: ["stream_id", "repo_path"],
