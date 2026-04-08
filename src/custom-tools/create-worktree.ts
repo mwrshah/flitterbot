@@ -139,7 +139,12 @@ async function getGitIgnoredDirs(repoPath: string, absPaths: string[]): Promise<
   }
 }
 
-async function findEnvFiles(repoPath: string, dir: string, maxDepth: number, depth = 0): Promise<string[]> {
+async function findEnvFiles(
+  repoPath: string,
+  dir: string,
+  maxDepth: number,
+  depth = 0,
+): Promise<string[]> {
   if (depth > maxDepth) return [];
   const results: string[] = [];
   const candidateDirs: string[] = [];
@@ -149,15 +154,11 @@ async function findEnvFiles(repoPath: string, dir: string, maxDepth: number, dep
       if (ENV_NAMES.has(entry)) {
         try {
           if (statSync(full).isFile()) results.push(full);
-        } catch {
-          continue;
-        }
+        } catch {}
       } else if (depth < maxDepth && !entry.startsWith(".") && !ALWAYS_SKIP.has(entry)) {
         try {
           if (statSync(full).isDirectory()) candidateDirs.push(full);
-        } catch {
-          continue;
-        }
+        } catch {}
       }
     }
   } catch {
@@ -280,7 +281,7 @@ export async function executeCreateWorktree(
                 worktreePath: existingPath,
                 branchName: resolvedBranch,
                 message: `${cleanupMessage}Worktree already exists at ${existingPath} on branch ${resolvedBranch}`,
-                        };
+              };
             }
           }
         }
@@ -290,10 +291,60 @@ export async function executeCreateWorktree(
     // ignore — proceed to create
   }
 
+  // Validate baseRef is a real branch (not a SHA, tag, or nonexistent ref)
+  const SHA_RE = /^[0-9a-f]{7,40}$/i;
+  if (SHA_RE.test(baseRef)) {
+    return {
+      ok: false,
+      streamId,
+      message: `baseRef "${baseRef}" looks like a commit SHA. Please provide a branch name (e.g. "main" or "origin/develop").`,
+    };
+  }
+  try {
+    const isTag = await exec(`git tag -l ${JSON.stringify(baseRef)}`, repoPath, 5_000);
+    if (isTag) {
+      return {
+        ok: false,
+        streamId,
+        message: `baseRef "${baseRef}" is a tag, not a branch. Please provide a branch name.`,
+      };
+    }
+  } catch {
+    // git tag -l failed — skip tag check
+  }
+  try {
+    await exec(`git rev-parse --verify ${JSON.stringify(baseRef)}`, repoPath, 5_000);
+  } catch {
+    return {
+      ok: false,
+      streamId,
+      message: `baseRef "${baseRef}" does not resolve to a known branch. Check the name and try again.`,
+    };
+  }
+
   try {
     const result = await createWorktree(repoPath, resolvedBranch, baseRef);
 
-    enrichStream(blackboard, streamId, repoPath, result.worktreePath);
+    const normalizedBase = baseRef.replace(/^origin\//, "");
+
+    // Ensure local tracking branch exists so close-stream can `git checkout <base>`
+    if (normalizedBase !== "main") {
+      try {
+        await exec(`git rev-parse --verify ${JSON.stringify(normalizedBase)}`, repoPath, 5_000);
+      } catch {
+        // Local branch doesn't exist — create it tracking the remote
+        try {
+          await exec(
+            `git branch ${JSON.stringify(normalizedBase)} ${JSON.stringify(`origin/${normalizedBase}`)}`,
+            repoPath,
+            10_000,
+          );
+        } catch {
+          // Best-effort — don't fail worktree creation over this
+        }
+      }
+    }
+    enrichStream(blackboard, streamId, repoPath, result.worktreePath, normalizedBase);
 
     // Best-effort dependency installation
     let installSummary = "";
