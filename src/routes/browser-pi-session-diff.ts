@@ -47,12 +47,13 @@ export async function handleBrowserPiSessionDiffRoute(
     maxBuffer: 5 * 1024 * 1024,
   };
 
-  // Find the fork point from main
+  // Find the fork point from the stream's base branch
+  const baseBranch = ws.base_branch ?? "main";
   let base: string;
   try {
     const { stdout: mergeBase } = await execFileAsync(
       "git",
-      ["merge-base", "main", "HEAD"],
+      ["merge-base", baseBranch, "HEAD"],
       execOpts,
     );
     base = mergeBase.trim();

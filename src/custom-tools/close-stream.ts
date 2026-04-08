@@ -79,9 +79,10 @@ async function commitUncommittedChanges(worktreePath: string): Promise<CommitRes
 
 type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
 
-async function mergeToMain(
+async function mergeToTarget(
   repoPath: string,
   branch: string,
+  targetBranch: string,
   commitMessage?: string,
 ): Promise<MergeResult> {
   // Fetch latest
@@ -92,27 +93,27 @@ async function mergeToMain(
   }
 
   // Check if already merged
-  if (await isBranchAncestorOf(repoPath, branch, "main")) {
+  if (await isBranchAncestorOf(repoPath, branch, targetBranch)) {
     return { ok: true };
   }
 
-  // Checkout main
+  // Checkout target branch
   try {
-    await exec("git checkout main", repoPath);
+    await exec(`git checkout ${targetBranch}`, repoPath);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       conflicts: [],
-      message: `Failed to checkout main: ${msg}`,
+      message: `Failed to checkout ${targetBranch}: ${msg}`,
     };
   }
 
-  // Pull latest main
+  // Pull latest target
   try {
-    await exec("git pull origin main --ff-only", repoPath);
+    await exec(`git pull origin ${targetBranch} --ff-only`, repoPath);
   } catch {
-    // Non-fatal — continue with local main
+    // Non-fatal — continue with local state
   }
 
   // Attempt merge
@@ -148,9 +149,9 @@ async function mergeToMain(
   }
 }
 
-async function pushMain(repoPath: string): Promise<boolean> {
+async function pushBranch(repoPath: string, targetBranch: string): Promise<boolean> {
   try {
-    await exec("git push origin main", repoPath);
+    await exec(`git push origin ${targetBranch}`, repoPath);
     return true;
   } catch {
     return false;
@@ -203,6 +204,7 @@ export async function executeCloseStream(
       const branch = await inferBranchFromWorktree(worktreePath);
 
       if (branch) {
+        const targetBranch = stream.base_branch ?? "main";
         const commitResult = await commitUncommittedChanges(worktreePath);
         if (commitResult.hasChanges && !commitResult.ok) {
           return {
@@ -211,7 +213,7 @@ export async function executeCloseStream(
             message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
           };
         }
-        const mergeResult = await mergeToMain(repoPath, branch, mergeCommitMessage);
+        const mergeResult = await mergeToTarget(repoPath, branch, targetBranch, mergeCommitMessage);
         if (mergeResult.ok === false) {
           // Return early — resolve conflicts and call again
           return {
@@ -219,14 +221,14 @@ export async function executeCloseStream(
             streamId,
             message:
               mergeResult.message +
-              ". Resolve conflicts in the main repo, then call close_stream again.",
+              `. Resolve conflicts in the main repo, then call close_stream again.`,
             conflicts: mergeResult.conflicts,
           };
         }
         merged = true;
 
-        // Push main after clean merge
-        pushed = await pushMain(repoPath);
+        // Push target branch after clean merge
+        pushed = await pushBranch(repoPath, targetBranch);
       }
     }
   }
@@ -238,7 +240,7 @@ export async function executeCloseStream(
   const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
   if (mode === "noop") parts.push("Git operations skipped (noop mode).");
-  if (merged) parts.push("Branch merged to main.");
+  if (merged) parts.push(`Branch merged to ${stream.base_branch ?? "main"}.`);
   if (pushed) parts.push("Pushed to origin.");
 
   return {
