@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 19;
+export const BLACKBOARD_SCHEMA_VERSION = 20;
 
 // --- Shared types used across multiple files ---
 
@@ -90,6 +90,7 @@ export interface StreamRow {
   status: StreamStatus;
   created_at: string;
   closed_at: string | null;
+  base_branch: string | null;
 }
 
 export interface ClaudeSessionRow {
@@ -203,7 +204,8 @@ CREATE TABLE IF NOT EXISTS streams (
     worktree_path TEXT,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
-    closed_at TEXT
+    closed_at TEXT,
+    base_branch TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

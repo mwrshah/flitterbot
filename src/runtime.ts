@@ -48,9 +48,9 @@ import type {
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
   SessionTranscriptResponse,
-  StreamSurfacedWebSocketEvent,
   StatusResponse,
   StreamRoutingMeta,
+  StreamSurfacedWebSocketEvent,
 } from "./contracts/index.ts";
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
@@ -1343,8 +1343,7 @@ export class ControlSurfaceRuntime {
             },
             base_ref: {
               type: "string",
-              description:
-                "Git ref to branch from (optional, defaults to origin/main)",
+              description: "Git ref to branch from (optional, defaults to origin/main)",
             },
             force: {
               type: "boolean",
@@ -1356,16 +1355,23 @@ export class ControlSurfaceRuntime {
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, repo_path, branch_name, update_repo_path, update_worktree_path, base_ref, force } =
-            params as {
-              stream_id: string;
-              repo_path: string;
-              branch_name?: string;
-              update_repo_path?: string;
-              update_worktree_path?: string;
-              base_ref?: string;
-              force?: boolean;
-            };
+          const {
+            stream_id,
+            repo_path,
+            branch_name,
+            update_repo_path,
+            update_worktree_path,
+            base_ref,
+            force,
+          } = params as {
+            stream_id: string;
+            repo_path: string;
+            branch_name?: string;
+            update_repo_path?: string;
+            update_worktree_path?: string;
+            base_ref?: string;
+            force?: boolean;
+          };
           const result = await executeCreateWorktree(
             this.blackboard,
             stream_id,
