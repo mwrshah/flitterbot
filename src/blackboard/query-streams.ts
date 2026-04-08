@@ -27,12 +27,19 @@ export function enrichStream(
   streamId: string,
   repoPath: string,
   worktreePath?: string,
+  baseBranch?: string,
 ): void {
-  db.prepare(`UPDATE streams SET repo_path = ?, worktree_path = ? WHERE id = ?`).run(
-    repoPath,
-    worktreePath ?? null,
-    streamId,
-  );
+  if (baseBranch !== undefined) {
+    db.prepare(
+      `UPDATE streams SET repo_path = ?, worktree_path = ?, base_branch = ? WHERE id = ?`,
+    ).run(repoPath, worktreePath ?? null, baseBranch, streamId);
+  } else {
+    db.prepare(`UPDATE streams SET repo_path = ?, worktree_path = ? WHERE id = ?`).run(
+      repoPath,
+      worktreePath ?? null,
+      streamId,
+    );
+  }
 }
 
 export function getActivePiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {

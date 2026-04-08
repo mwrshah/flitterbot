@@ -846,6 +846,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 19) {
     applyV19Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 20) {
+    applyV20Migration(db);
   }
 
   return getSchemaVersion(db);
@@ -1218,6 +1223,19 @@ function applyV19Migration(db: DatabaseSync): void {
       INSERT OR IGNORE INTO schema_migrations(version) VALUES (19);
     `);
 
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function applyV20Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec("ALTER TABLE streams ADD COLUMN base_branch TEXT;");
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (20);");
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");
