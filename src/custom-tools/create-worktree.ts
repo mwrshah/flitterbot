@@ -1,5 +1,5 @@
 import { exec as cpExec } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
@@ -151,6 +151,63 @@ async function installDependencies(worktreePath: string): Promise<string[]> {
   return results;
 }
 
+const ENV_NAMES = new Set([".env", ".env.local"]);
+
+function copyEnvFiles(repoPath: string, worktreePath: string): string[] {
+  const copied: string[] = [];
+  try {
+    walkForEnv(repoPath, worktreePath, repoPath, 0, copied);
+  } catch {
+    // best-effort — never fail
+  }
+  return copied;
+}
+
+function walkForEnv(
+  repoPath: string,
+  worktreePath: string,
+  dir: string,
+  depth: number,
+  copied: string[],
+): void {
+  if (depth > 2) return; // depth 0=root, 1=subdir, 2=subdir/subdir → 3 levels
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry);
+    if (ENV_NAMES.has(entry)) {
+      try {
+        if (!statSync(full).isFile()) continue;
+      } catch {
+        continue;
+      }
+      const rel = path.relative(repoPath, full);
+      const dest = path.join(worktreePath, rel);
+      if (existsSync(dest)) continue;
+      try {
+        mkdirSync(path.dirname(dest), { recursive: true });
+        copyFileSync(full, dest);
+        copied.push(rel);
+      } catch {
+        // skip this file
+      }
+    } else {
+      // Recurse into subdirectories (skip hidden dirs and node_modules)
+      if (entry.startsWith(".") || entry === "node_modules") continue;
+      try {
+        if (!statSync(full).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      walkForEnv(repoPath, worktreePath, full, depth + 1, copied);
+    }
+  }
+}
+
 export async function executeCreateWorktree(
   blackboard: BlackboardDatabase,
   streamId: string,
@@ -284,12 +341,17 @@ export async function executeCreateWorktree(
       // Never let install scanning fail the overall operation
     }
 
+    // Best-effort env file copying
+    const copiedEnvs = copyEnvFiles(repoPath, result.worktreePath);
+    const envSummary =
+      copiedEnvs.length > 0 ? `\nEnv: copied ${copiedEnvs.join(", ")}` : "\nEnv: none found";
+
     return {
       ok: true,
       streamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}`,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${useGtr ? "" : " (git gtr not available — used raw git worktree)"}${installSummary}${envSummary}`,
       usedGtr: useGtr,
     };
   } catch (error: unknown) {
