@@ -76,6 +76,8 @@ When the user replies:
 
 When your stream involves code changes, unless instructed otherwise or if it's a very small change: create a worktree in the relevant repository before launching CC sessions. Use \`create_worktree\` with the repo path — it auto-generates a numbered branch (NNN-<stream-slug>) and creates an isolated worktree. Typically one worktree per stream.
 
+If your cwd is a worktree (not the main repo root), resolve the main repo path first: \`git worktree list --porcelain | head -1 | sed 's/^worktree //'\`. Always pass the main repo root as \`repo_path\` to \`create_worktree\`, never a worktree path — it resolves sibling directories via \`path.resolve(repoPath, "..", ...)\`.
+
 ## Stream Closure
 
 You have a \`close_stream\` tool. ONLY call it when the human explicitly signals *finality* — the work is done and they have no further feedback (e.g., "looks good", "ship it", "we're done here"). If the user asks to "merge with main", "rebase", or any git operation, they want you to run the git commands directly so they can test afterward — that is NOT a close signal.
