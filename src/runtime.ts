@@ -1038,6 +1038,11 @@ export class ControlSurfaceRuntime {
               description:
                 "Optional repository name (relative to projects dir, e.g. 'autonoma' or 'KLAIR'). When provided, the stream's orchestrator and agents will use this repo as their working directory.",
             },
+            cwd: {
+              type: "string",
+              description:
+                "Optional absolute path to use as the working directory for this stream's orchestrator and agents. Takes precedence over repo if both provided.",
+            },
           },
           required: ["name"],
           additionalProperties: false,
@@ -1047,15 +1052,30 @@ export class ControlSurfaceRuntime {
             name,
             message: agentMessage,
             repo,
+            cwd: cwdParam,
           } = params as {
             name: string;
             message?: string;
             repo?: string;
+            cwd?: string;
           };
 
-          // Resolve and validate repo path if provided
-          let repoPath: string | undefined;
-          if (repo) {
+          // Resolve effective working directory: cwd takes precedence over repo
+          let effectiveCwd: string | undefined;
+          if (cwdParam) {
+            if (!fs.existsSync(cwdParam)) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Error: cwd path "${cwdParam}" does not exist`,
+                  },
+                ],
+                details: {},
+              };
+            }
+            effectiveCwd = cwdParam;
+          } else if (repo) {
             const resolved = path.join(this.config.projectsDir, repo);
             if (!fs.existsSync(resolved) || !fs.existsSync(path.join(resolved, ".git"))) {
               return {
@@ -1068,25 +1088,25 @@ export class ControlSurfaceRuntime {
                 details: {},
               };
             }
-            repoPath = resolved;
+            effectiveCwd = resolved;
           }
 
           const { insertStream, enrichStream } = await import("./blackboard/query-streams.ts");
           const ws = insertStream(this.blackboard, name);
 
-          if (repoPath) {
-            enrichStream(this.blackboard, ws.id, repoPath);
+          if (effectiveCwd) {
+            enrichStream(this.blackboard, ws.id, effectiveCwd);
           }
 
           this.log(
-            `default agent created stream "${name}" (${ws.id})${repoPath ? ` repo=${repoPath}` : ""}`,
+            `default agent created stream "${name}" (${ws.id})${effectiveCwd ? ` cwd=${effectiveCwd}` : ""}`,
           );
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
               ws.id,
               ws.name,
-              repoPath,
+              effectiveCwd,
               this.createCustomTools("orchestrator", ws.id),
             );
 
