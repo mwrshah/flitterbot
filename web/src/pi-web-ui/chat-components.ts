@@ -383,7 +383,7 @@ if (!customElements.get("console-block")) {
 export class ThinkingBlock extends LitElement {
   @property() content = "";
   @property({ type: Boolean }) isStreaming = false;
-  @state() private isExpanded = true;
+  @state() private isExpanded = false;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -392,6 +392,12 @@ export class ThinkingBlock extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+  }
+
+  protected override willUpdate(changedProperties: Map<string, unknown>): void {
+    if (changedProperties.has("isStreaming") && this.isStreaming) {
+      this.isExpanded = true;
+    }
   }
 
   private toggleExpanded = (): void => {
