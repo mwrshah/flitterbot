@@ -1668,7 +1668,10 @@ export class ControlSurfaceRuntime {
     client: WebSocketClient,
     data: ControlSurfaceWebSocketClientEvent | unknown,
   ): Promise<void> {
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") {
+      console.warn("[ws] Dropping non-object WebSocket message (type=%s)", typeof data);
+      return;
+    }
     const payload = data as ControlSurfaceWebSocketClientEvent;
     if (payload.type === "ping") {
       this.wsHub.send(client.id, { type: "pong" });

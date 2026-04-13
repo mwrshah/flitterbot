@@ -14,6 +14,10 @@ export type WebSocketClient = {
   buffer: Buffer;
   /** piSessionId → event type filter (null = all event types) */
   subscriptions: Map<string, Set<string> | null>;
+  /** Buffered payloads from fragmented WebSocket frames (FIN=0) */
+  fragmentBuffers: Buffer[];
+  /** The opcode of the first fragment in the current fragmented message */
+  fragmentOpcode: number | null;
 };
 
 type WebSocketMessageHandler = (
@@ -67,6 +71,8 @@ export class WebSocketHub {
       socket,
       buffer: head && head.length > 0 ? Buffer.from(head) : Buffer.alloc(0),
       subscriptions: new Map(),
+      fragmentBuffers: [],
+      fragmentOpcode: null,
     };
     this.clients.set(client.id, client);
     socket.on("data", (chunk) => {
@@ -148,6 +154,8 @@ export class WebSocketHub {
       const frame = decodeFrame(client.buffer);
       if (!frame) return;
       client.buffer = client.buffer.subarray(frame.bytesConsumed);
+
+      // Control frames (close, ping) are never fragmented — handle immediately
       if (frame.opcode === 0x8) {
         this.clients.delete(client.id);
         client.socket.end();
@@ -157,8 +165,44 @@ export class WebSocketHub {
         client.socket.write(encodePongFrame(frame.payload));
         continue;
       }
-      if (frame.opcode !== 0x1) continue;
-      const text = frame.payload.toString("utf8");
+
+      // --- Fragment reassembly ---
+      const iscontinuation = frame.opcode === 0x0;
+
+      if (!frame.fin) {
+        // Non-final frame: start or continue a fragmented message
+        if (!iscontinuation) {
+          // First fragment — record the original opcode
+          client.fragmentOpcode = frame.opcode;
+          client.fragmentBuffers = [frame.payload];
+        } else {
+          // Middle continuation fragment
+          client.fragmentBuffers.push(frame.payload);
+        }
+        continue;
+      }
+
+      // FIN=1: either a complete unfragmented frame, or the final fragment
+      let payload: Buffer;
+      let opcode: number;
+
+      if (iscontinuation) {
+        // Final continuation frame — assemble the full message
+        client.fragmentBuffers.push(frame.payload);
+        payload = Buffer.concat(client.fragmentBuffers);
+        opcode = client.fragmentOpcode ?? 0x1;
+        client.fragmentBuffers = [];
+        client.fragmentOpcode = null;
+      } else {
+        // Single unfragmented frame (common path)
+        payload = frame.payload;
+        opcode = frame.opcode;
+      }
+
+      // Only process text frames (opcode 0x1)
+      if (opcode !== 0x1) continue;
+
+      const text = payload.toString("utf8");
       let parsed: ControlSurfaceWebSocketClientEvent | unknown = text;
       try {
         parsed = JSON.parse(text) as ControlSurfaceWebSocketClientEvent;
@@ -212,10 +256,11 @@ function encodeCloseFrame(): Buffer {
 
 function decodeFrame(
   buffer: Buffer,
-): { opcode: number; payload: Buffer; bytesConsumed: number } | undefined {
+): { opcode: number; fin: boolean; payload: Buffer; bytesConsumed: number } | undefined {
   if (buffer.length < 2) return undefined;
   const first = buffer[0]!;
   const second = buffer[1]!;
+  const fin = (first & 0x80) !== 0;
   const opcode = first & 0x0f;
   const masked = (second & 0x80) !== 0;
   let offset = 2;
@@ -241,5 +286,5 @@ function decodeFrame(
     }
     payload = decoded;
   }
-  return { opcode, payload, bytesConsumed: offset + maskBytes + payloadLength };
+  return { opcode, fin, payload, bytesConsumed: offset + maskBytes + payloadLength };
 }
