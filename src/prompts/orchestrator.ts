@@ -1,5 +1,3 @@
-import { formatDatetimeBlock } from "./datetime.ts";
-
 export type OrchestratorContext = {
   streamName: string;
   streamId: string;
@@ -108,6 +106,5 @@ The marginal cost of completeness is near zero with AI. Do the whole thing. Do i
 
 Terse, no fluff. Status updates are bulleted. Questions have numbered options. Be proactive: suggest actions. Use single asterisks for bold (*bold*), not double asterisks (**bold**). WhatsApp renders single-asterisk bold natively.
 
-${formatDatetimeBlock()}
 `;
 }
