@@ -15,7 +15,7 @@ import {
 import { loadConfig } from "../config/load-config.ts";
 import { resolveRecipientJid } from "./config.ts";
 
-const logger = pino({ level: process.env.AUTONOMA_WA_LOG_LEVEL ?? "info" });
+const logger = pino({ level: process.env.FLITTERBOT_WA_LOG_LEVEL ?? "info" });
 const OUTBOUND_ECHO_WINDOW_MS = 5_000;
 
 function previewBody(value: string, max = 160): string {

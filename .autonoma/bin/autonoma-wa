@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
-exec node "$AUTONOMA_HOME/whatsapp/cli.js" "$@"

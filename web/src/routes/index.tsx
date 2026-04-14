@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
   },
   pendingMs: 0,
   head: () => ({
-    meta: [{ title: "Autonoma" }],
+    meta: [{ title: "Flitterbot" }],
   }),
   loader: async ({ context }) => {
     try {

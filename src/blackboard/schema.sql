@@ -1,4 +1,4 @@
--- Autonoma blackboard schema (v19)
+-- Flitterbot blackboard schema (v19)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;

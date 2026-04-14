@@ -1,4 +1,4 @@
-import type { AutonomaConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type {
   ClaudeSessionRow,
   DownstreamSessionItem,
@@ -128,7 +128,7 @@ export function getSessionByTmuxSession(
 
 export function getInjectionEligibility(
   session: SessionListItem,
-  config: Pick<AutonomaConfig, "stallMinutes" | "toolTimeoutMinutes">,
+  config: Pick<FlitterbotConfig, "stallMinutes" | "toolTimeoutMinutes">,
 ): InjectionEligibility {
   if (session.status === "ended") {
     return { ok: false, reason: "ended" };

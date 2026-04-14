@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
-import logoBlack from "~/assets/autonoma_logo_black_small.png";
-import logoWhite from "~/assets/autonoma_logo_white_small.png";
+import logoBlack from "~/assets/flitterbot_logo_black_small.png";
+import logoWhite from "~/assets/flitterbot_logo_white_small.png";
 import { useModifierLabel } from "~/hooks/platform";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -113,9 +113,9 @@ export const Sidebar = memo(function Sidebar() {
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Brand */}
       <div className="shrink-0 flex items-center justify-between pl-6 pr-2 py-0 border-b border-sidebar-border">
-        <span className="text-lg font-semibold text-sidebar-foreground mt-0.5 -mb-1">autonoma</span>
-        <img src={logoBlack} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 dark:hidden" />
-        <img src={logoWhite} alt="Autonoma" className="h-12 w-auto mt-0 -mb-1 hidden dark:block" />
+        <span className="text-lg font-semibold text-sidebar-foreground mt-0.5 -mb-1">flitterbot</span>
+        <img src={logoBlack} alt="Flitterbot" className="h-12 w-auto mt-0 -mb-1 dark:hidden" />
+        <img src={logoWhite} alt="Flitterbot" className="h-12 w-auto mt-0 -mb-1 hidden dark:block" />
       </div>
 
       {/* Navigation */}

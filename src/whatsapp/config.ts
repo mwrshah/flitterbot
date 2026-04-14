@@ -126,7 +126,7 @@ export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string
   const value = config.pairingPhoneNumber ?? config.recipientJid;
   if (!value) {
     throw new Error(
-      "Missing pairing phone number. Set pairingPhoneNumber in ~/.autonoma/whatsapp/config.json.",
+      "Missing pairing phone number. Set pairingPhoneNumber in ~/.flitterbot/whatsapp/config.json.",
     );
   }
 
