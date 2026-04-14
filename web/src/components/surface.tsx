@@ -39,12 +39,19 @@ type SurfaceEntry = {
       kind: "inbound";
       source: MessageSource;
       content: string;
+      images?: ImageAttachment[];
       streamId?: string;
       streamName?: string;
     }
   | { kind: "outbound"; channel: "whatsapp" | "all"; content: string }
   | { kind: "hook"; eventName: string; detail: string }
-  | { kind: "streams-response"; content: string; streamId?: string; streamName?: string }
+  | {
+      kind: "streams-response";
+      content: string;
+      images?: ImageAttachment[];
+      streamId?: string;
+      streamName?: string;
+    }
 );
 
 type MeasuredSurfaceEntry = SurfaceEntry & {
@@ -99,6 +106,8 @@ const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BUBBLE_VERTICAL_PADDING = 16;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
+const SURFACE_IMAGE_HEIGHT = 200;
+const SURFACE_IMAGE_GAP = 8;
 const SURFACE_HOOK_TITLE_HEIGHT = 20;
 const SURFACE_HOOK_DETAIL_GAP = 8;
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
@@ -180,6 +189,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         kind: "inbound",
         source: msg.source ?? "web",
         content: msg.content,
+        images: msg.images,
         streamId: item.streamId,
         streamName: item.streamName,
       });
@@ -192,6 +202,7 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         timestamp: item.createdAt,
         kind: "streams-response",
         content: item.content,
+        images: item.images,
         streamId: item.streamId,
         streamName: item.streamName,
       });
@@ -232,15 +243,19 @@ function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurf
     case "inbound":
     case "streams-response": {
       const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+      const imageCount = entry.images?.length ?? 0;
+      const imageHeight =
+        imageCount > 0 ? imageCount * SURFACE_IMAGE_HEIGHT + imageCount * SURFACE_IMAGE_GAP : 0;
       return {
         ...entry,
         displayTime,
         metrics: {
-          estimatedHeight: estimateMessageRowHeight(
-            metrics.lineCount,
-            !!entry.streamName,
-            metrics.isOverflowing,
-          ),
+          estimatedHeight:
+            estimateMessageRowHeight(
+              metrics.lineCount,
+              !!entry.streamName,
+              metrics.isOverflowing,
+            ) + imageHeight,
           isOverflowing: metrics.isOverflowing,
         },
       };
@@ -318,6 +333,22 @@ function PlainTextBlock({
           {expanded ? "Show less" : "Read more"}
         </button>
       )}
+    </div>
+  );
+}
+
+function ImageStack({ images }: { images: ImageAttachment[] }) {
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      {images.map((img, i) => (
+        <img
+          key={i}
+          src={`data:${img.mimeType};base64,${img.data}`}
+          alt=""
+          className="max-w-full rounded-md object-contain"
+          style={{ maxHeight: `${SURFACE_IMAGE_HEIGHT}px` }}
+        />
+      ))}
     </div>
   );
 }
@@ -433,6 +464,7 @@ const InboundEntry = memo(function InboundEntry({
           isOverflowing={entry.metrics.isOverflowing}
           onExpandToggle={onExpandToggle}
         />
+        {entry.images && entry.images.length > 0 && <ImageStack images={entry.images} />}
         <MessageCopyButton text={displayContent} />
       </div>
     </div>
@@ -493,6 +525,7 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
           fadeClassName="from-muted/30"
           onExpandToggle={onExpandToggle}
         />
+        {entry.images && entry.images.length > 0 && <ImageStack images={entry.images} />}
         <MessageCopyButton text={entry.content} />
       </div>
     </div>
