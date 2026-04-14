@@ -86,7 +86,13 @@ export const MessageInput = memo(function MessageInput({
   }, [autoFocus]);
 
   useEffect(() => {
-    registerComposerFocusTarget(() => textareaRef.current?.focus());
+    registerComposerFocusTarget(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+    });
     return () => registerComposerFocusTarget(null);
   }, []);
 
