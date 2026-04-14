@@ -4,6 +4,7 @@ import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   ChatTimelineTool,
+  ImageAttachment,
   JsonValue,
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
@@ -49,12 +50,13 @@ function pushMessage(
   content: string,
   createdAt: string,
   blocks?: StreamsHistoryMessageBlock[],
+  images?: ImageAttachment[],
 ): void {
   const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );
-  if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0)) return;
+  if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0) && (!images || images.length === 0)) return;
 
   const item: ChatTimelineMessage = {
     id,
@@ -65,6 +67,9 @@ function pushMessage(
   };
   if (normalizedBlocks && normalizedBlocks.length > 0) {
     item.blocks = normalizedBlocks;
+  }
+  if (images && images.length > 0) {
+    item.images = images;
   }
   items.push(item);
 }
@@ -83,6 +88,7 @@ function parseMessageContent(
   }
 
   const messageBlocks: StreamsHistoryMessageBlock[] = [];
+  const imageAttachments: ImageAttachment[] = [];
   let textBuffer = "";
 
   const flushTextBlock = () => {
@@ -93,11 +99,13 @@ function parseMessageContent(
 
   const flushMessage = () => {
     flushTextBlock();
-    if (messageBlocks.length === 0) return;
+    const images = imageAttachments.length > 0 ? [...imageAttachments] : undefined;
+    imageAttachments.length = 0;
+    if (messageBlocks.length === 0 && !images) return;
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks]);
+    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images);
     messageBlocks.length = 0;
   };
 
@@ -107,6 +115,11 @@ function parseMessageContent(
 
     if (type === "text" && typeof record.text === "string") {
       textBuffer += record.text;
+      continue;
+    }
+
+    if (type === "image" && typeof record.data === "string" && typeof record.mimeType === "string") {
+      imageAttachments.push({ data: record.data, mimeType: record.mimeType });
       continue;
     }
 
