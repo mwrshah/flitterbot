@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import { formatStreamPrompt } from "../pi/format-stream-prompt.ts";
+import { formatStreamPrompt } from "../streams/format-stream-prompt.ts";
 import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
 
 // Mock groq-client before importing context-relevance
@@ -38,16 +38,16 @@ describe("buildContextRelevancePrompt", () => {
 // --- formatStreamPrompt tests ---
 
 describe("formatStreamPrompt", () => {
-  test("single message produces simple format", () => {
+  test("single message produces simple format with default footer", () => {
     const result = formatStreamPrompt(["Do the thing"], "my-ws", "ws-123");
 
     expect(result).toContain("Do the thing");
-    expect(result).toContain("/load2-w");
+    expect(result).toContain("/tmux2");
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("[Stream:");
   });
 
-  test("multiple messages produces numbered format", () => {
+  test("multiple messages produces numbered format with default footer", () => {
     const result = formatStreamPrompt(
       ["First context", "Second context", "Create the feature"],
       "my-feature",
@@ -61,13 +61,25 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("First context");
     expect(result).toContain("Second context");
     expect(result).toContain("Create the feature");
-    expect(result).toContain("/load2-w");
+    expect(result).toContain("/tmux2");
   });
 
   test("empty messages array produces footer only", () => {
     const result = formatStreamPrompt([], "empty-ws", "ws-000");
     expect(result).not.toContain("[Stream:");
-    expect(result).toContain("/load2-w");
+    expect(result).toContain("/tmux2");
+  });
+
+  test("custom footer overrides default", () => {
+    const result = formatStreamPrompt(["Hello"], "ws", "ws-1", undefined, "Load /custom-skill first");
+    expect(result).toContain("Load /custom-skill first");
+    expect(result).not.toContain("/tmux2");
+  });
+
+  test("empty footer omits footer section", () => {
+    const result = formatStreamPrompt(["Hello"], "ws", "ws-1", undefined, "");
+    expect(result).not.toContain("IMPORTANT");
+    expect(result).toBe("Hello");
   });
 });
 

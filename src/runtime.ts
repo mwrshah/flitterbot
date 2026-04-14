@@ -211,11 +211,13 @@ export class ControlSurfaceRuntime {
     );
 
     // Bootstrap default pi session with startup skills
-    this.enqueue({
-      text: "/load2-w",
-      source: "init",
-      metadata: { via: "startup" },
-    });
+    if (this.config.defaultAgentBootstrapPrompt) {
+      this.enqueue({
+        text: this.config.defaultAgentBootstrapPrompt,
+        source: "init",
+        metadata: { via: "startup" },
+      });
+    }
   }
 
   async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {
@@ -1149,7 +1151,7 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(originalText)) {
                       relevantTexts.push(originalText);
                     }
-                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
+                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage, this.config.orchestratorBootstrapFooterPrompt);
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
@@ -1159,6 +1161,7 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
+                      this.config.orchestratorBootstrapFooterPrompt,
                     );
                   }
                 } else {
@@ -1167,6 +1170,7 @@ export class ControlSurfaceRuntime {
                     ws.name,
                     ws.id,
                     agentMessage,
+                    this.config.orchestratorBootstrapFooterPrompt,
                   );
                 }
               } catch (error) {
@@ -1183,6 +1187,7 @@ export class ControlSurfaceRuntime {
                   ws.name,
                   ws.id,
                   agentMessage,
+                  this.config.orchestratorBootstrapFooterPrompt,
                 );
               }
 
