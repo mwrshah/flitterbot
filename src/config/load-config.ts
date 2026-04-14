@@ -51,7 +51,6 @@ export type AutonomaConfig = {
   controlSurfaceAgentDir: string;
   controlSurfacePidPath: string;
   controlSurfaceLogPath: string;
-  controlSurfacePromptPath: string;
   projectsDir: string;
   wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
@@ -88,7 +87,6 @@ export function loadConfig(): AutonomaConfig {
   const controlSurfaceDir = path.join(AUTONOMA_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
   const agentDir = path.join(controlSurfaceDir, "agent");
-  const promptPath = path.join(agentDir, "system-prompt.md");
   const pidPath = path.join(controlSurfaceDir, "server.pid");
   const logPath = path.join(AUTONOMA_DIR, "logs", "control-surface.log");
   const blackboardPath = expandHome(raw.blackboardPath ?? "~/.autonoma/blackboard.db");
@@ -137,7 +135,6 @@ export function loadConfig(): AutonomaConfig {
     controlSurfaceAgentDir: agentDir,
     controlSurfacePidPath: pidPath,
     controlSurfaceLogPath: logPath,
-    controlSurfacePromptPath: promptPath,
   };
 
   ensureDir(projectsDir);
