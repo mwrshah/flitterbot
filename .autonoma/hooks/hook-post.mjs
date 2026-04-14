@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Shared hook dispatcher — reads Claude Code hook payload from stdin,
- * enriches it with AUTONOMA_* env vars, POSTs to the control surface.
+ * enriches it with FLITTERBOT_* env vars, POSTs to the control surface.
  *
  * Usage: echo '{"session_id":"..."}' | node hook-post.mjs <event-slug>
  *   e.g. node hook-post.mjs session-start
@@ -11,10 +11,10 @@ import { readFileSync, appendFileSync, mkdirSync, statSync, renameSync } from "n
 import { join } from "node:path";
 import http from "node:http";
 
-const AUTONOMA_HOME = process.env.AUTONOMA_HOME || join(process.env.HOME || "~", ".autonoma");
-const LOG_DIR = process.env.AUTONOMA_LOG_DIR || join(AUTONOMA_HOME, "logs");
+const FLITTERBOT_HOME = process.env.FLITTERBOT_HOME || join(process.env.HOME || "~", ".flitterbot");
+const LOG_DIR = process.env.FLITTERBOT_LOG_DIR || join(FLITTERBOT_HOME, "logs");
 const ERROR_LOG = join(LOG_DIR, "hooks-errors.log");
-const CONFIG_PATH = process.env.AUTONOMA_CONFIG || join(AUTONOMA_HOME, "config.json");
+const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || join(FLITTERBOT_HOME, "config.json");
 const POST_TIMEOUT_MS = 2000;
 const ROTATE_BYTES = 10 * 1024 * 1024;
 
@@ -43,13 +43,13 @@ function loadConfig() {
 
 function enrichPayload(payload) {
   const env = process.env;
-  if (env.AUTONOMA_AGENT_MANAGED === "1") {
+  if (env.FLITTERBOT_AGENT_MANAGED === "1") {
     payload.agent_managed = true;
-    if (env.AUTONOMA_TMUX_SESSION) payload.tmux_session = env.AUTONOMA_TMUX_SESSION;
-    if (env.AUTONOMA_TASK_DESCRIPTION) payload.task_description = env.AUTONOMA_TASK_DESCRIPTION;
-    if (env.AUTONOMA_TODOIST_TASK_ID) payload.todoist_task_id = env.AUTONOMA_TODOIST_TASK_ID;
-    if (env.AUTONOMA_PI_SESSION_ID) payload.pi_session_id = env.AUTONOMA_PI_SESSION_ID;
-    if (env.AUTONOMA_STREAM_ID) payload.stream_id = env.AUTONOMA_STREAM_ID;
+    if (env.FLITTERBOT_TMUX_SESSION) payload.tmux_session = env.FLITTERBOT_TMUX_SESSION;
+    if (env.FLITTERBOT_TASK_DESCRIPTION) payload.task_description = env.FLITTERBOT_TASK_DESCRIPTION;
+    if (env.FLITTERBOT_TODOIST_TASK_ID) payload.todoist_task_id = env.FLITTERBOT_TODOIST_TASK_ID;
+    if (env.FLITTERBOT_PI_SESSION_ID) payload.pi_session_id = env.FLITTERBOT_PI_SESSION_ID;
+    if (env.FLITTERBOT_STREAM_ID) payload.stream_id = env.FLITTERBOT_STREAM_ID;
   }
   return payload;
 }

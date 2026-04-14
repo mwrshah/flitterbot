@@ -70,7 +70,7 @@ async function run(): Promise<void> {
       const contextRef = takeFlag(args, "--context");
       const text = args.join(" ").trim();
       if (!text) {
-        throw new Error('Usage: autonoma-wa send "message" [--context ref]');
+        throw new Error('Usage: flitterbot-wa send "message" [--context ref]');
       }
 
       const result = await sendWhatsAppViaDaemon({ text, contextRef });
@@ -89,7 +89,7 @@ async function run(): Promise<void> {
       return;
     }
     default:
-      console.error("Usage: autonoma-wa <start|stop|status|send|auth>");
+      console.error("Usage: flitterbot-wa <start|stop|status|send|auth>");
       process.exit(1);
   }
 }

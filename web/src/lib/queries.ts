@@ -1,5 +1,5 @@
 import { keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
-import type { AutonomaApiClient } from "~/lib/api";
+import type { FlitterbotApiClient } from "~/lib/api";
 import type { ChatTimelineItem, DownstreamSessionItem, StatusResponse } from "~/lib/types";
 import {
   type DirectoryCompletionsResult,
@@ -61,7 +61,7 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
   return replaceEqualDeep(prev, [...next, ...extras]);
 }
 
-export function statusQueryOptions(apiClient: AutonomaApiClient) {
+export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["status"] as const,
     queryFn: (): Promise<StatusResponse> => apiClient.getStatus(),

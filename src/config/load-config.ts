@@ -33,7 +33,7 @@ type RawConfigJson = {
   orchestratorBootstrapFooterPrompt?: string;
 };
 
-export type AutonomaConfig = {
+export type FlitterbotConfig = {
   controlSurfaceHost: string;
   controlSurfacePort: number;
   controlSurfaceToken: string;
@@ -62,8 +62,8 @@ export type AutonomaConfig = {
 };
 
 const HOME = os.homedir();
-const AUTONOMA_DIR = path.join(HOME, ".autonoma");
-const CONFIG_PATH = path.join(AUTONOMA_DIR, "config.json");
+const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
+const CONFIG_PATH = path.join(FLITTERBOT_DIR, "config.json");
 
 function expandHome(value: string): string {
   if (!value) return value;
@@ -83,26 +83,26 @@ function readJsonFile<T>(filePath: string): T | undefined {
   return JSON.parse(raw) as T;
 }
 
-export function loadConfig(): AutonomaConfig {
-  ensureDir(AUTONOMA_DIR);
-  ensureDir(path.join(AUTONOMA_DIR, "logs"));
+export function loadConfig(): FlitterbotConfig {
+  ensureDir(FLITTERBOT_DIR);
+  ensureDir(path.join(FLITTERBOT_DIR, "logs"));
 
   const raw = readJsonFile<RawConfigJson>(CONFIG_PATH) ?? {};
-  const controlSurfaceDir = path.join(AUTONOMA_DIR, "control-surface");
+  const controlSurfaceDir = path.join(FLITTERBOT_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
   const agentDir = path.join(controlSurfaceDir, "agent");
   const pidPath = path.join(controlSurfaceDir, "server.pid");
-  const logPath = path.join(AUTONOMA_DIR, "logs", "control-surface.log");
-  const blackboardPath = expandHome(raw.blackboardPath ?? "~/.autonoma/blackboard.db");
-  const whatsappAuthDir = expandHome(raw.whatsappAuthDir ?? "~/.autonoma/whatsapp/auth");
+  const logPath = path.join(FLITTERBOT_DIR, "logs", "control-surface.log");
+  const blackboardPath = expandHome(raw.blackboardPath ?? "~/.flitterbot/blackboard.db");
+  const whatsappAuthDir = expandHome(raw.whatsappAuthDir ?? "~/.flitterbot/whatsapp/auth");
   const whatsappSocketPath = expandHome(
-    raw.whatsappSocketPath ?? "~/.autonoma/whatsapp/daemon.sock",
+    raw.whatsappSocketPath ?? "~/.flitterbot/whatsapp/daemon.sock",
   );
-  const whatsappPidPath = expandHome(raw.whatsappPidPath ?? "~/.autonoma/whatsapp/daemon.pid");
-  const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.autonoma/whatsapp/cli.js");
-  const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.autonoma/whatsapp/daemon.js");
+  const whatsappPidPath = expandHome(raw.whatsappPidPath ?? "~/.flitterbot/whatsapp/daemon.pid");
+  const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.flitterbot/whatsapp/cli.js");
+  const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.flitterbot/whatsapp/daemon.js");
   const projectsDir = expandHome(raw.projectsDir ?? "~/development");
-  const wipeStreamsOnStart = raw.wipeStreamsOnStart ?? process.env.AUTONOMA_WIPE_STREAMS === "1";
+  const wipeStreamsOnStart = raw.wipeStreamsOnStart ?? process.env.FLITTERBOT_WIPE_STREAMS === "1";
   const whatsappEnabled =
     process.env.WHATSAPP_ENABLED !== undefined
       ? process.env.WHATSAPP_ENABLED !== "0" &&
@@ -115,7 +115,7 @@ export function loadConfig(): AutonomaConfig {
     raw.orchestratorBootstrapFooterPrompt ?? "IMPORTANT: Before doing anything else, load /tmux2";
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
-  const config: AutonomaConfig = {
+  const config: FlitterbotConfig = {
     controlSurfaceHost: raw.controlSurfaceHost ?? "127.0.0.1",
     controlSurfacePort: raw.controlSurfacePort ?? 18820,
     controlSurfaceToken: raw.controlSurfaceToken ?? crypto.randomUUID(),

@@ -27,7 +27,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
  *   CONNECTED     → DISCONNECTED  (manual disconnect)
  *   *             → DISCONNECTED  (manual disconnect always allowed)
  */
-export class AutonomaWsClient {
+export class FlitterbotWsClient {
   private getSettings: () => ControlSurfaceSettings;
   private socket: WebSocket | null = null;
   private subscribers = new Set<WsSubscriber>();

@@ -39,7 +39,7 @@ const MODES: Record<string, string> = {
 
 // ── Schema description (embedded in tool description for LLM context) ──────
 
-const SCHEMA_DESCRIPTION = `Run read-only SQL against the Autonoma blackboard database (SQLite).
+const SCHEMA_DESCRIPTION = `Run read-only SQL against the Flitterbot blackboard database (SQLite).
 
 SCHEMA — every table, column, type, and key:
 

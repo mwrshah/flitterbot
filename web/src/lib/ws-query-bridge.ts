@@ -27,7 +27,7 @@ import type {
   WsMessage,
 } from "~/lib/types";
 import { createId } from "~/lib/utils";
-import type { AutonomaWsClient } from "~/lib/ws";
+import type { FlitterbotWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
 
@@ -37,7 +37,7 @@ export type SendMessageFn = (
   targetPiSessionId?: string,
 ) => Promise<void>;
 
-export function createSendMessage(deps: { wsClient: AutonomaWsClient }): SendMessageFn {
+export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendMessageFn {
   const { wsClient } = deps;
   return async (text, images, targetPiSessionId) => {
     try {
@@ -172,7 +172,7 @@ function appendTimelineItem(
 
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
-  wsClient: AutonomaWsClient;
+  wsClient: FlitterbotWsClient;
   router: AnyRouter;
   getDefaultPiSessionId: () => string | undefined;
 }): () => void {

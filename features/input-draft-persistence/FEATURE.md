@@ -93,7 +93,7 @@ const handleDraftChange = useCallback((value: string) => {
 
 ```ts
 // At module scope
-let savedDraft = sessionStorage.getItem('autonoma:draft') ?? '';
+let savedDraft = sessionStorage.getItem('flitterbot:draft') ?? '';
 
 // Inside the component
 const [draft, setDraft] = useState(() => savedDraft);
@@ -101,7 +101,7 @@ const [draft, setDraft] = useState(() => savedDraft);
 // In handleDraftChange:
 const handleDraftChange = useCallback((value: string) => {
   savedDraft = value;
-  sessionStorage.setItem('autonoma:draft', value);   // <-- write-through
+  sessionStorage.setItem('flitterbot:draft', value);   // <-- write-through
   setDraft(value);
   // ... picker logic
 }, [skills, computeSlashLeft]);
@@ -211,7 +211,7 @@ const draftStore = new Map<string, string>();
 // Hydrate from sessionStorage on first load (client only)
 if (typeof window !== 'undefined') {
   try {
-    const saved = sessionStorage.getItem('autonoma:drafts');
+    const saved = sessionStorage.getItem('flitterbot:drafts');
     if (saved) {
       const entries: [string, string][] = JSON.parse(saved);
       for (const [k, v] of entries) draftStore.set(k, v);
@@ -220,7 +220,7 @@ if (typeof window !== 'undefined') {
 }
 
 function persistDrafts() {
-  sessionStorage.setItem('autonoma:drafts', JSON.stringify([...draftStore]));
+  sessionStorage.setItem('flitterbot:drafts', JSON.stringify([...draftStore]));
 }
 ```
 
