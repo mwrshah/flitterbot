@@ -389,6 +389,127 @@ export class PiSessionManager {
     this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
   }
 
+  /**
+   * Reset the default session: end the old pi_session, call newSession() on
+   * the SDK AgentSession to clear messages and create a fresh session file,
+   * update all in-memory maps and DB rows, re-subscribe, and broadcast so
+   * the frontend picks up the new piSessionId.
+   */
+  async resetDefault(): Promise<void> {
+    const old = this.defaultSession;
+    if (!old || !old.session) {
+      throw new Error("No active default session to reset");
+    }
+
+    const oldPiSessionId = old.piSessionId;
+
+    // 1. Stop queue and unsubscribe from SDK events
+    old.queue.stop();
+    try {
+      old.unsubscribe();
+    } catch {
+      /* ignore */
+    }
+
+    // 2. End the old pi_session in the DB
+    endPiSession(this.blackboard, oldPiSessionId, "ended", "clear", new Date().toISOString());
+
+    // 3. Call newSession() on the AgentSession — clears messages, creates new session file
+    await old.session.newSession();
+
+    const newPiSessionId = old.session.sessionId;
+    const newSessionFile = old.session.sessionFile;
+
+    // 4. Re-initialize state with the new session
+    old.state.initialize(newPiSessionId, newSessionFile, old.session.messages.length);
+
+    // 5. Update the managed session's piSessionId
+    old.piSessionId = newPiSessionId;
+
+    // 6. Upsert the new pi_sessions row
+    upsertPiSession(this.blackboard, {
+      piSessionId: newPiSessionId,
+      role: "default",
+      status: "waiting_for_user",
+      runtimeInstanceId: this.runtimeInstanceId,
+      pid: process.pid,
+      sessionFile: newSessionFile,
+      cwd: this.config.projectsDir,
+      agentDir: this.config.controlSurfaceAgentDir,
+      modelProvider: old.modelInfo.provider,
+      modelId: old.modelInfo.id,
+      thinkingLevel: this.config.piThinkingLevel,
+      startedAt: new Date(this.startedAt).toISOString(),
+      lastEventAt: new Date().toISOString(),
+    });
+
+    // 7. Update byPiSessionId map
+    this.byPiSessionId.delete(oldPiSessionId);
+    this.byPiSessionId.set(newPiSessionId, old);
+
+    // 8. Create a new TurnQueue (old one is stopped)
+    const processCallback = this.processCallback;
+    old.queue = new TurnQueue({
+      process: (item) => processCallback(old, item),
+      onItemStart: (item) => {
+        old.state.setBusy(true, item);
+        this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
+        this.wsHub.broadcast({
+          type: "queue_item_start",
+          item,
+          piSessionId: old.piSessionId,
+        });
+      },
+      onItemEnd: (item, error) => {
+        old.state.setBusy(false);
+        this.wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi",
+          timestamp: new Date().toISOString(),
+        });
+        if (error) {
+          const apiErr = error instanceof Error ? (error as ApiError) : undefined;
+          const detail = apiErr
+            ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
+            : String(error);
+          this.log(`queue item ${item.id} failed (default): ${detail}`);
+        }
+        this.wsHub.broadcast({
+          type: "queue_item_end",
+          itemId: item.id,
+          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+          piSessionId: old.piSessionId,
+        });
+      },
+    });
+
+    // 9. Re-subscribe to SDK events
+    old.unsubscribe = subscribeToPiSession(
+      old.session,
+      old.state,
+      this.blackboard,
+      this.wsHub,
+      null,
+      null,
+      (lastAssistantMessage) => {
+        old.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
+      },
+    );
+
+    // 10. Broadcast status_changed so frontend picks up the new piSessionId
+    this.wsHub.broadcast({
+      type: "status_changed",
+      subsystem: "pi_session",
+      timestamp: new Date().toISOString(),
+    });
+
+    this.log(`default session reset: ${oldPiSessionId} → ${newPiSessionId}`);
+  }
+
   disposeAll(): void {
     // Dispose orchestrators first
     for (const [streamId] of this.orchestrators) {
