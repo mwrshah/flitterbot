@@ -256,7 +256,22 @@ export class ControlSurfaceRuntime {
   /**
    * Route a message to the correct pi session's queue based on classification metadata.
    */
-  enqueue(input: EnqueueInput): { ok: true; item: QueueItem } {
+  enqueue(input: EnqueueInput): { ok: true; item: QueueItem } | { ok: true; cleared: true } {
+    // /clear command: reset the default session without persisting or enqueuing.
+    // The frontend strips _targetSessionId for /clear, so if neither stream_id nor
+    // _targetSessionId is set, the message is bound for the default session.
+    if (
+      input.text.trim() === "/clear" &&
+      !input.metadata?.stream_id &&
+      !input.metadata?._targetSessionId
+    ) {
+      this.log("/clear: resetting default session");
+      void this.sessionManager.resetDefault().catch((error) => {
+        this.log(`/clear reset failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      return { ok: true, cleared: true };
+    }
+
     const images = input.images?.map((img) => ({
       type: "image" as const,
       data: img.data,
