@@ -3,6 +3,7 @@
 .scratch/
 node_modules/
 throwaway/
+__pycache__/
 
 # Secrets & keys
 *.pem

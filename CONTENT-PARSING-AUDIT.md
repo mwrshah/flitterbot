@@ -63,10 +63,10 @@ const surfaceText =
 
 await this.sendWhatsAppCommand({
   command: "send",
-  text: `*Autonoma:*\n---\n${surfaceText}`,
+  text: `*Flitterbot:*\n---\n${surfaceText}`,
 });
 ```
-- **What:** Prepends `[streamName]` to outbound orchestrator messages when surfacing to WhatsApp. Also wraps in `*Autonoma:*\n---\n` markdown
+- **What:** Prepends `[streamName]` to outbound orchestrator messages when surfacing to WhatsApp. Also wraps in `*Flitterbot:*\n---\n` markdown
 - **Verdict:** HACK — stream name is structured metadata embedded in display text. WhatsApp has no way to parse it back, but it mixes metadata into content.
 
 ### 5. Stream Name Label in Web-to-WhatsApp Mirror
