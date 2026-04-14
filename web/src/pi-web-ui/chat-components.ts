@@ -781,7 +781,7 @@ export class UserMessage extends LitElement {
       <div class="flex justify-start mx-4">
         <div class="relative">
           <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
-            ${textContent?.text ? html`<markdown-block .content=${textContent.text}></markdown-block>` : ""}
+            ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
             ${
               imageBlocks.length > 0
                 ? html`
