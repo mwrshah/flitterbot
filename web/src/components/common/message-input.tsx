@@ -78,21 +78,20 @@ export const MessageInput = memo(function MessageInput({
   const atPositionRef = useRef<number>(-1);
   const tildeExpandedRef = useRef(false);
 
-  // Auto-focus textarea on mount when requested
+  // Auto-focus textarea on mount when requested, cursor to end of any hydrated draft
   useEffect(() => {
     if (autoFocus) {
-      textareaRef.current?.focus();
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        const len = textarea.value.length;
+        if (len > 0) textarea.setSelectionRange(len, len);
+      }
     }
   }, [autoFocus]);
 
   useEffect(() => {
-    registerComposerFocusTarget(() => {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-      }
-    });
+    registerComposerFocusTarget(() => textareaRef.current?.focus());
     return () => registerComposerFocusTarget(null);
   }, []);
 
