@@ -59,8 +59,6 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
   const piSessionId = sessionManager.getSessionId();
 
   const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
-  ensurePromptFile(config.controlSurfacePromptPath, systemPrompt);
-
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
   // concurrent-orchestrator race condition.
@@ -72,20 +70,22 @@ export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
     ? piAuthPath
     : path.join(config.controlSurfaceAgentDir, "auth.json");
   const authStorage = AuthStorage.create(authPath);
-  // Use ~/.pi/agent as the agent dir — same as the Pi CLI. This picks up
-  // AGENTS.md, models.json, and any agent-level config from the canonical location.
-  const piAgentDir = path.join(HOME, ".pi", "agent");
-  const agentDir = fs.existsSync(piAgentDir) ? piAgentDir : config.controlSurfaceAgentDir;
-
-  const modelRegistry = ModelRegistry.create(authStorage, path.join(agentDir, "models.json"));
+  // Use the control-surface agent dir so the resource loader doesn't pick up
+  // ~/.pi/agent skills or AGENTS.md. Auth and models still resolve from
+  // ~/.pi/agent explicitly (same pattern as authStorage above).
+  const agentDir = config.controlSurfaceAgentDir;
+  const piModelsPath = path.join(HOME, ".pi", "agent", "models.json");
+  const modelsPath = fs.existsSync(piModelsPath) ? piModelsPath : path.join(agentDir, "models.json");
+  const modelRegistry = ModelRegistry.create(authStorage, modelsPath);
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
     cwd: workingDir,
     agentDir,
     settingsManager,
-    additionalSkillPaths: [path.join(HOME, ".agents", "skills")].filter((entry) =>
-      fs.existsSync(entry),
-    ),
+    additionalSkillPaths: [
+      path.join(HOME, ".claude", "skills"),
+      path.join(HOME, ".agents", "skills"),
+    ].filter((entry) => fs.existsSync(entry)),
     systemPromptOverride: () => promptRef.value,
   });
   await resourceLoader.reload();
@@ -138,9 +138,4 @@ function resolveSystemPrompt(
     return buildOrchestratorPrompt({ ...ctx, piSessionId });
   }
   return buildDefaultAgentPrompt(piSessionId);
-}
-
-function ensurePromptFile(promptPath: string, content: string): void {
-  fs.mkdirSync(path.dirname(promptPath), { recursive: true });
-  fs.writeFileSync(promptPath, content, "utf8");
 }
