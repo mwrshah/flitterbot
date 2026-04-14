@@ -14,7 +14,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import type { AutonomaConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
 
@@ -29,8 +29,8 @@ type StreamsRole = "default" | "orchestrator";
  * Custom tools use plain JSON Schema objects for `parameters` (not TypeBox TSchema),
  * so we accept a loose array and cast to ToolDefinition[] at the SDK boundary.
  */
-type CreateAutonomaAgentOptions = {
-  config: AutonomaConfig;
+type CreateFlitterbotAgentOptions = {
+  config: FlitterbotConfig;
   customTools: unknown[];
   role?: StreamsRole;
   orchestratorContext?: OrchestratorInput;
@@ -40,7 +40,7 @@ type CreateAutonomaAgentOptions = {
   cwd?: string;
 };
 
-export async function createAutonomaAgent(options: CreateAutonomaAgentOptions) {
+export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
   const {
     config,
     customTools,

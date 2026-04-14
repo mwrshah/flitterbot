@@ -6,7 +6,7 @@
 WebSocket (browser native)
   │
   ▼
-AutonomaWsClient (ws.ts)
+FlitterbotWsClient (ws.ts)
   │  - Manages connection lifecycle, heartbeat, reconnect, visibility
   │  - Parses JSON, fans out to subscriber callbacks
   │

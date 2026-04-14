@@ -3,10 +3,10 @@ import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { DefaultCatchBoundary } from "./components/default-catch-boundary";
 import { NotFound } from "./components/not-found";
-import { createAutonomaApiClient } from "./lib/api";
+import { createFlitterbotApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
 import type { StatusResponse } from "./lib/types";
-import { AutonomaWsClient } from "./lib/ws";
+import { FlitterbotWsClient } from "./lib/ws";
 import { createWsConnectionStore } from "./lib/ws-connection-store";
 import { createSendMessage, setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { setupWsRouteSubscriptions } from "./lib/ws-route-subscriptions";
@@ -23,8 +23,8 @@ export function getRouter() {
     queryClient.invalidateQueries({ queryKey: ["user-config"] });
   });
 
-  const apiClient = createAutonomaApiClient(() => settingsStore.get());
-  const wsClient = new AutonomaWsClient(() => settingsStore.get());
+  const apiClient = createFlitterbotApiClient(() => settingsStore.get());
+  const wsClient = new FlitterbotWsClient(() => settingsStore.get());
   const wsConnectionStore = createWsConnectionStore(wsClient);
   const sendMessage = createSendMessage({ wsClient });
 

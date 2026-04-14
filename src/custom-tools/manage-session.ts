@@ -2,12 +2,12 @@ import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { getInjectionEligibility, getSessionById } from "../blackboard/query-sessions.ts";
 import { sendMessageToClaudeSession } from "../claude-sessions/send-message.ts";
 import { inspectTmuxSession, tmuxSessionExists } from "../claude-sessions/tmux.ts";
-import type { AutonomaConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { DirectSessionMessageResponse } from "../contracts/index.ts";
 
 type SessionControlContext = {
   blackboard: BlackboardDatabase;
-  config: Pick<AutonomaConfig, "stallMinutes" | "toolTimeoutMinutes">;
+  config: Pick<FlitterbotConfig, "stallMinutes" | "toolTimeoutMinutes">;
 };
 
 export async function directSessionMessage(

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { ConnectionState } from "~/lib/types";
-import type { AutonomaWsClient } from "~/lib/ws";
+import type { FlitterbotWsClient } from "~/lib/ws";
 
 type Listener = () => void;
 
@@ -11,7 +11,7 @@ export type WsConnectionStore = {
   start: () => () => void;
 };
 
-export function createWsConnectionStore(wsClient: AutonomaWsClient): WsConnectionStore {
+export function createWsConnectionStore(wsClient: FlitterbotWsClient): WsConnectionStore {
   let state: ConnectionState = "connecting";
   let started = false;
   let unsubscribeConnection: (() => void) | null = null;

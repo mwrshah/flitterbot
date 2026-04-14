@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { ControlSurfaceSettings } from "./api";
 
-const STORAGE_KEY = "autonoma.web.control-surface";
+const STORAGE_KEY = "flitterbot.web.control-surface";
 
 function loadSettings(): ControlSurfaceSettings {
   if (typeof window === "undefined") {
@@ -18,8 +18,8 @@ function loadSettings(): ControlSurfaceSettings {
       const parsed = JSON.parse(raw) as Partial<ControlSurfaceSettings>;
       return {
         baseUrl:
-          parsed.baseUrl || import.meta.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820",
-        token: parsed.token || import.meta.env.VITE_AUTONOMA_TOKEN || "",
+          parsed.baseUrl || import.meta.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820",
+        token: parsed.token || import.meta.env.VITE_FLITTERBOT_TOKEN || "",
         useStubFallback: parsed.useStubFallback ?? true,
       };
     }
@@ -28,8 +28,8 @@ function loadSettings(): ControlSurfaceSettings {
   }
 
   return {
-    baseUrl: import.meta.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820",
-    token: import.meta.env.VITE_AUTONOMA_TOKEN || "",
+    baseUrl: import.meta.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820",
+    token: import.meta.env.VITE_FLITTERBOT_TOKEN || "",
     useStubFallback: true,
   };
 }

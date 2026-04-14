@@ -5,8 +5,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const autonomaHome = process.env.AUTONOMA_HOME || path.join(os.homedir(), '.autonoma');
-const configPath = path.join(autonomaHome, 'config.json');
+const flitterbotHome = process.env.FLITTERBOT_HOME || path.join(os.homedir(), '.flitterbot');
+const configPath = path.join(flitterbotHome, 'config.json');
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 
 function readConfig() {
@@ -37,7 +37,7 @@ function resolveEntry(entryName) {
     return ['--experimental-strip-types', repoRelativeSrc];
   }
 
-  const localSrc = path.join(autonomaHome, 'src', 'whatsapp', `${entryName}.ts`);
+  const localSrc = path.join(flitterbotHome, 'src', 'whatsapp', `${entryName}.ts`);
   if (existsSync(localSrc)) {
     return ['--experimental-strip-types', localSrc];
   }

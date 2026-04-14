@@ -83,7 +83,7 @@ process.on("unhandledRejection", (error) => {
 await runtime.start();
 server.listen(runtime.config.controlSurfacePort, runtime.config.controlSurfaceHost, () => {
   console.log(
-    `Autonoma control surface listening on http://${runtime.config.controlSurfaceHost}:${runtime.config.controlSurfacePort}`,
+    `Flitterbot control surface listening on http://${runtime.config.controlSurfaceHost}:${runtime.config.controlSurfacePort}`,
   );
 });
 

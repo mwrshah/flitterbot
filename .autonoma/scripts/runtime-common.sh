@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
-AUTONOMA_CONFIG="${AUTONOMA_CONFIG:-$AUTONOMA_HOME/config.json}"
-AUTONOMA_LOG_DIR="${AUTONOMA_LOG_DIR:-$AUTONOMA_HOME/logs}"
-AUTONOMA_ROTATE_BYTES=$((10 * 1024 * 1024))
+FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
+FLITTERBOT_CONFIG="${FLITTERBOT_CONFIG:-$FLITTERBOT_HOME/config.json}"
+FLITTERBOT_LOG_DIR="${FLITTERBOT_LOG_DIR:-$FLITTERBOT_HOME/logs}"
+FLITTERBOT_ROTATE_BYTES=$((10 * 1024 * 1024))
 
 ensure_runtime_dirs() {
-  mkdir -p "$AUTONOMA_HOME" "$AUTONOMA_LOG_DIR"
+  mkdir -p "$FLITTERBOT_HOME" "$FLITTERBOT_LOG_DIR"
 }
 
 _file_size_bytes() {
@@ -28,7 +28,7 @@ rotate_log_file() {
   ensure_runtime_dirs
   local size
   size=$(_file_size_bytes "$path")
-  if (( size < AUTONOMA_ROTATE_BYTES )); then
+  if (( size < FLITTERBOT_ROTATE_BYTES )); then
     return 0
   fi
 
@@ -50,7 +50,7 @@ append_log() {
 config_value() {
   local key="${1#.}"
   local fallback="$2"
-  if [[ ! -f "$AUTONOMA_CONFIG" ]]; then
+  if [[ ! -f "$FLITTERBOT_CONFIG" ]]; then
     printf '%s\n' "$fallback"
     return 0
   fi
@@ -60,7 +60,7 @@ config_value() {
     const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
     const v = c[process.argv[2]];
     process.stdout.write(v != null ? String(v) : '');
-  " "$AUTONOMA_CONFIG" "$key" 2>/dev/null || true)
+  " "$FLITTERBOT_CONFIG" "$key" 2>/dev/null || true)
 
   if [[ -n "$value" && "$value" != "null" ]]; then
     printf '%s\n' "$value"
@@ -102,7 +102,7 @@ control_surface_base_url() {
 
 blackboard_path() {
   local configured
-  configured=$(config_string '.blackboardPath' "$AUTONOMA_HOME/blackboard.db")
+  configured=$(config_string '.blackboardPath' "$FLITTERBOT_HOME/blackboard.db")
   expand_home_path "$configured"
 }
 

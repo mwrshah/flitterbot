@@ -11,11 +11,11 @@ import { NotFound } from "~/components/not-found";
 import { useGlobalShortcuts } from "~/hooks/use-global-shortcuts";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { AutonomaApiClient } from "~/lib/api";
+import type { FlitterbotApiClient } from "~/lib/api";
 import { statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { StatusResponse } from "~/lib/types";
-import type { AutonomaWsClient } from "~/lib/ws";
+import type { FlitterbotWsClient } from "~/lib/ws";
 import type { WsConnectionStore } from "~/lib/ws-connection-store";
 import type { SendMessageFn } from "~/lib/ws-query-bridge";
 import piWebUiCss from "~/pi-web-ui.css?url";
@@ -24,8 +24,8 @@ import { seo } from "~/utils/seo";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  apiClient: AutonomaApiClient;
-  wsClient: AutonomaWsClient;
+  apiClient: FlitterbotApiClient;
+  wsClient: FlitterbotWsClient;
   wsConnectionStore: WsConnectionStore;
   settingsStore: SettingsStore;
   sendMessage: SendMessageFn;
@@ -42,7 +42,7 @@ export const Route = createRootRouteWithContext<{
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       ...seo({
-        title: "Autonoma",
+        title: "Flitterbot",
         description: "Orchestration layer for Claude Code.",
       }),
     ],
@@ -81,7 +81,7 @@ export const Route = createRootRouteWithContext<{
 
 /** Select only the fields RootComponent reads — excludes volatile `uptime`
  *  so status polls that only change uptime don't trigger re-renders. */
-function useShortcutStatus(apiClient: AutonomaApiClient) {
+function useShortcutStatus(apiClient: FlitterbotApiClient) {
   const { data } = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,

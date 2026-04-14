@@ -1,6 +1,6 @@
-# Autonoma Web App
+# Flitterbot Web App
 
-TanStack Start thin client for the Autonoma control surface.
+TanStack Start thin client for the Flitterbot control surface.
 
 ## Base starter
 

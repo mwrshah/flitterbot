@@ -15,9 +15,9 @@ export type ControlSurfaceSettings = {
   useStubFallback: boolean;
 };
 
-export type AutonomaApiClient = ReturnType<typeof createAutonomaApiClient>;
+export type FlitterbotApiClient = ReturnType<typeof createFlitterbotApiClient>;
 
-export function createAutonomaApiClient(getSettings: () => ControlSurfaceSettings) {
+export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSettings) {
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const { baseUrl, token } = getSettings();
     const url = `${baseUrl.replace(/\/$/, "")}${path}`;

@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { StatusResponse } from "~/lib/types";
-import type { AutonomaWsClient } from "~/lib/ws";
+import type { FlitterbotWsClient } from "~/lib/ws";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
@@ -61,7 +61,7 @@ function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null):
 
 export function setupWsRouteSubscriptions(
   router: AnyRouter,
-  wsClient: AutonomaWsClient,
+  wsClient: FlitterbotWsClient,
   queryClient: QueryClient,
 ): () => void {
   let activeTarget: SubscriptionTarget | null = null;
