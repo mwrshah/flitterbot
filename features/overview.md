@@ -29,7 +29,7 @@ Hook scripts POST lifecycle events (`session-start`, `stop`, `session-end`) to t
 
 ### Output Surfacing
 
-Pi's final text each turn auto-surfaces to WhatsApp and web — no tool call needed. Web messages mirror to WhatsApp (`*User (web):*` prefix); Pi responses appear as `*Autonoma:*`. Replies from either surface reach both.
+Pi's final text each turn auto-surfaces to WhatsApp and web — no tool call needed. Web messages mirror to WhatsApp (`*User (web):*` prefix); Pi responses appear as `*Flitterbot:*`. Replies from either surface reach both.
 
 ### Proactive Behavior (Cron)
 
