@@ -1,4 +1,4 @@
-# Autonoma — Features Overview
+# Flitterbot — Features Overview
 
 Orchestration layer above Claude Code. A long-running control surface hosts concurrent Pi agent sessions — one default for triage, one orchestrator per active workstream — behind a Groq classifier. State in SQLite; user interaction via WhatsApp and web client (bidirectionally synced); Claude Code sessions report back via hooks; OS-level cron injects periodic health checks.
 
@@ -107,7 +107,7 @@ On startup: creates default agent, rehydrates orchestrators for open workstreams
 
 ### Blackboard (SQLite)
 
-`~/.autonoma/blackboard.db` — WAL, 5s busy timeout, foreign keys. Schema v14 (migrations v0→v14). Schema + row types + enums in `src/contracts/blackboard.ts`.
+`~/.flitterbot/blackboard.db` — WAL, 5s busy timeout, foreign keys. Schema v14 (migrations v0→v14). Schema + row types + enums in `src/contracts/blackboard.ts`.
 
 | Table | Purpose |
 |-------|---------|
@@ -142,9 +142,9 @@ Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), pa
 
 ### Installer
 
-Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (`node:*` only). Deploys `~/.autonoma/`, bootstraps config, installs Claude Code hooks in `~/.claude/settings.json`, optionally installs OS scheduler. Every change manifest-tracked (SHA-256 checksums, drift detection). Each step shows diff, requires confirmation.
+Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (`node:*` only). Deploys `~/.flitterbot/`, bootstraps config, installs Claude Code hooks in `~/.claude/settings.json`, optionally installs OS scheduler. Every change manifest-tracked (SHA-256 checksums, drift detection). Each step shows diff, requires confirmation.
 
-Runtime tree: hook dispatcher (`hook-post.mjs`), process manager (`autonoma-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`autonoma-wa`), cron script, shared shell utilities.
+Runtime tree: hook dispatcher (`hook-post.mjs`), process manager (`flitterbot-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`flitterbot-wa`), cron script, shared shell utilities.
 
 ## Source Organization
 
@@ -155,7 +155,7 @@ src/
 ├── blackboard/      # SQLite wrapper, migrations, query-*/write-*
 ├── classifier/      # Groq LLM routing
 ├── claude-sessions/ # Tmux inspection + injection
-├── config/          # AutonomaConfig loader
+├── config/          # FlitterbotConfig loader
 ├── contracts/       # Shared types, schema DDL, enums (SSOT), message.ts
 ├── custom-tools/    # close-workstream, create-worktree
 ├── pi/              # Session manager, turn queue, state, agent creation
@@ -223,7 +223,7 @@ Installer → Blackboard → WhatsApp Channel ──┐
 - **Prompt-driven waves** — Pi coordinates CC session waves through instructions, not infrastructure
 - **Todoist is human-owned** — Pi reads/annotates, never autonomously completes
 - **Permission-gated** — Pi suggests, doesn't execute without approval
-- **Minimal footprint** — only `~/.claude/settings.json` and scheduler entries touched outside `~/.autonoma/`
+- **Minimal footprint** — only `~/.claude/settings.json` and scheduler entries touched outside `~/.flitterbot/`
 - **Uninstaller-first** — manifest-tracked, drift-detected removal before installation
 
 ## Quick Start
@@ -231,9 +231,9 @@ Installer → Blackboard → WhatsApp Channel ──┐
 ```bash
 pnpm install
 pnpm --dir web install
-node .autonoma/install.mjs
-~/.autonoma/bin/autonoma-up start
+node .flitterbot/install.mjs
+~/.flitterbot/bin/flitterbot-up start
 # optional
 pnpm --dir web dev
-~/.autonoma/bin/autonoma-wa auth
+~/.flitterbot/bin/flitterbot-wa auth
 ```

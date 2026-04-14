@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Autonoma installer — Node.js rewrite of install.sh.
+ * Flitterbot installer — Node.js rewrite of install.sh.
  * Standalone ESM script using only node:* built-in modules.
  *
  * Usage: node install.mjs [--dry-run] [--yes] [--with-scheduler] [--without-scheduler]
@@ -21,20 +21,20 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ---------------------------------------------------------------------------
 const HOME = homedir();
-const AUTONOMA_DIR = join(HOME, ".autonoma");
-const MANIFEST = join(AUTONOMA_DIR, "manifest.json");
+const FLITTERBOT_DIR = join(HOME, ".flitterbot");
+const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
 const SETTINGS = join(HOME, ".claude", "settings.json");
-const PLIST_DEST = join(HOME, "Library", "LaunchAgents", "com.autonoma.scheduler.plist");
-const PLIST_LABEL = "com.autonoma.scheduler";
+const PLIST_DEST = join(HOME, "Library", "LaunchAgents", "com.flitterbot.scheduler.plist");
+const PLIST_LABEL = "com.flitterbot.scheduler";
 const SYSTEMD_USER_DIR = join(HOME, ".config", "systemd", "user");
-const SYSTEMD_SERVICE_NAME = "autonoma-scheduler.service";
-const SYSTEMD_TIMER_NAME = "autonoma-scheduler.timer";
+const SYSTEMD_SERVICE_NAME = "flitterbot-scheduler.service";
+const SYSTEMD_TIMER_NAME = "flitterbot-scheduler.timer";
 const SYSTEMD_SERVICE_DEST = join(SYSTEMD_USER_DIR, SYSTEMD_SERVICE_NAME);
 const SYSTEMD_TIMER_DEST = join(SYSTEMD_USER_DIR, SYSTEMD_TIMER_NAME);
 const LEGACY_CRONTAB_TARGET = "crontab:user";
-const HOOKS_DIR = join(AUTONOMA_DIR, "hooks");
-const LOG_FILE = join(AUTONOMA_DIR, "logs", "install.log");
-const VERSION_FILE = join(AUTONOMA_DIR, "VERSION");
+const HOOKS_DIR = join(FLITTERBOT_DIR, "hooks");
+const LOG_FILE = join(FLITTERBOT_DIR, "logs", "install.log");
+const VERSION_FILE = join(FLITTERBOT_DIR, "VERSION");
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CURRENT_OS = platform() === "darwin" ? "Darwin" : platform() === "linux" ? "Linux" : platform();
 
@@ -75,7 +75,7 @@ const OBSOLETE_RUNTIME_FILES = [
   "scripts/hook_dispatch.py",
   "scripts/bb_write.py",
   "scripts/bb-write.py",
-  "scripts/autonoma_runtime.py",
+  "scripts/flitterbot_runtime.py",
   "scripts/bb-query.py",
 ];
 
@@ -91,8 +91,8 @@ const HOOK_COMMANDS = [
 
 const SCRIPT_FILES = ["init-db.sh", "runtime-common.sh"];
 const SOURCE_FILES = ["blackboard/schema.sql"];
-const CRON_FILES = ["autonoma-checkin.sh", "scheduler.sh", "com.autonoma.scheduler.plist"];
-const BIN_FILES = ["autonoma-up", "autonoma-wa"];
+const CRON_FILES = ["flitterbot-checkin.sh", "scheduler.sh", "com.flitterbot.scheduler.plist"];
+const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
 const WHATSAPP_FILES = ["README.md", "config.json.example"];
 const WHATSAPP_EXEC_FILES = ["run-entry.js", "cli.js", "daemon.js"];
 
@@ -130,7 +130,7 @@ function error(msg) { console.error(`ERROR: ${msg}`); log(`ERROR: ${msg}`); }
 
 function atomicWrite(path, content) {
   mkdirSync(dirname(path), { recursive: true });
-  const tmp = join(dirname(path), `.autonoma.tmp.${randomUUID()}`);
+  const tmp = join(dirname(path), `.flitterbot.tmp.${randomUUID()}`);
   writeFileSync(tmp, content);
   renameSync(tmp, path);
 }
@@ -167,8 +167,8 @@ function sortedPrettyJson(obj) {
 
 function diffText(before, after) {
   try {
-    const tmpA = join("/tmp", `.autonoma-diff-a.${process.pid}`);
-    const tmpB = join("/tmp", `.autonoma-diff-b.${process.pid}`);
+    const tmpA = join("/tmp", `.flitterbot-diff-a.${process.pid}`);
+    const tmpB = join("/tmp", `.flitterbot-diff-b.${process.pid}`);
     writeFileSync(tmpA, before);
     writeFileSync(tmpB, after);
     const result = execSync(`diff -u "${tmpA}" "${tmpB}"`, { encoding: "utf8" });
@@ -177,8 +177,8 @@ function diffText(before, after) {
     return result;
   } catch (e) {
     // diff exits 1 when files differ — output is in stdout
-    try { rmSync(`/tmp/.autonoma-diff-a.${process.pid}`, { force: true }); } catch {}
-    try { rmSync(`/tmp/.autonoma-diff-b.${process.pid}`, { force: true }); } catch {}
+    try { rmSync(`/tmp/.flitterbot-diff-a.${process.pid}`, { force: true }); } catch {}
+    try { rmSync(`/tmp/.flitterbot-diff-b.${process.pid}`, { force: true }); } catch {}
     return e.stdout || "";
   }
 }
@@ -237,7 +237,7 @@ function walkDir(dir, prefix = "") {
 // Manifest operations — all JSON, no jq
 // ---------------------------------------------------------------------------
 function manifestInit() {
-  mkdirSync(AUTONOMA_DIR, { recursive: true });
+  mkdirSync(FLITTERBOT_DIR, { recursive: true });
   if (existsSync(MANIFEST)) {
     try { readJsonFile(MANIFEST); } catch {
       const backup = `${MANIFEST}.bak.${new Date().toISOString().replace(/[-:.]/g, "").replace("T", "T").slice(0, 15)}Z`;
@@ -247,7 +247,7 @@ function manifestInit() {
   }
   if (!existsSync(MANIFEST)) {
     atomicWrite(MANIFEST, JSON.stringify({
-      version: "1", autonoma_version: "0.0.0", installed_at: null, targets: {},
+      version: "1", flitterbot_version: "0.0.0", installed_at: null, targets: {},
     }, null, 2) + "\n");
     chmodSync(MANIFEST, 0o600);
   }
@@ -259,7 +259,7 @@ function manifestWriteTarget(targetKey, targetObj) {
   const version = readFileSync(VERSION_FILE, "utf8").trim();
   const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
   manifest.version = "1";
-  manifest.autonoma_version = version;
+  manifest.flitterbot_version = version;
   manifest.installed_at = now;
   manifest.targets[targetKey] = targetObj;
   writeJsonFile(MANIFEST, manifest, 0o600);
@@ -279,10 +279,10 @@ function manifestDeleteTarget(targetKey) {
 // ---------------------------------------------------------------------------
 function resolvePackagedRuntimeFile(rel) {
   const candidates = [
-    PROJECT_ROOT && join(PROJECT_ROOT, ".autonoma", rel),
+    PROJECT_ROOT && join(PROJECT_ROOT, ".flitterbot", rel),
     join(SCRIPT_DIR, rel),
-    join(AUTONOMA_DIR, rel),
-    join(SCRIPT_DIR, "..", ".autonoma", rel),
+    join(FLITTERBOT_DIR, rel),
+    join(SCRIPT_DIR, "..", ".flitterbot", rel),
   ].filter(Boolean);
   for (const c of candidates) if (existsSync(c)) return c;
   return null;
@@ -291,7 +291,7 @@ function resolvePackagedRuntimeFile(rel) {
 function resolvePackagedSrcFile(rel) {
   const candidates = [
     PROJECT_ROOT && join(PROJECT_ROOT, "src", rel),
-    join(AUTONOMA_DIR, "src", rel),
+    join(FLITTERBOT_DIR, "src", rel),
     join(SCRIPT_DIR, "src", rel),
     join(SCRIPT_DIR, "..", "src", rel),
   ].filter(Boolean);
@@ -343,18 +343,18 @@ function noteTextFile(dest, content) {
 }
 
 function snapshotRuntimeTree() {
-  if (!existsSync(AUTONOMA_DIR)) return [];
-  return walkDir(AUTONOMA_DIR);
+  if (!existsSync(FLITTERBOT_DIR)) return [];
+  return walkDir(FLITTERBOT_DIR);
 }
 
 function recordRuntimeTreeTarget() {
   if (DRY_RUN) return;
   const paths = snapshotRuntimeTree();
   const treeHash = sha256Text(JSON.stringify(paths));
-  manifestWriteTarget("~/.autonoma", {
+  manifestWriteTarget("~/.flitterbot", {
     type: "owned-tree",
     modifications: [{
-      id: "autonoma:home-tree",
+      id: "flitterbot:home-tree",
       action: "sync-tree",
       paths,
       content_sha256: treeHash,
@@ -379,19 +379,19 @@ function systemctlUserAvailable() {
 
 function renderSystemdService() {
   return `[Unit]
-Description=Autonoma scheduler check-in
+Description=Flitterbot scheduler check-in
 After=default.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash ${AUTONOMA_DIR}/cron/autonoma-checkin.sh
+ExecStart=/bin/bash ${FLITTERBOT_DIR}/cron/flitterbot-checkin.sh
 WorkingDirectory=${HOME}
 `;
 }
 
 function renderSystemdTimer() {
   return `[Unit]
-Description=Run Autonoma scheduler every 10 minutes
+Description=Run Flitterbot scheduler every 10 minutes
 
 [Timer]
 OnBootSec=2m
@@ -408,7 +408,7 @@ WantedBy=timers.target
 function computeLegacyCrontabAfterText(beforeText) {
   return beforeText
     .split("\n")
-    .filter((line) => !line.includes("# autonoma-scheduler"))
+    .filter((line) => !line.includes("# flitterbot-scheduler"))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/^\n+/, "")
@@ -418,7 +418,7 @@ function computeLegacyCrontabAfterText(beforeText) {
 function applyLegacyCrontabText(afterText) {
   const trimmed = afterText.replace(/\s/g, "");
   if (trimmed) {
-    const tmp = `/tmp/autonoma-crontab.${process.pid}`;
+    const tmp = `/tmp/flitterbot-crontab.${process.pid}`;
     writeFileSync(tmp, afterText + "\n");
     try { execSync(`crontab "${tmp}"`, { stdio: "pipe" }); } finally { rmSync(tmp, { force: true }); }
   } else {
@@ -434,7 +434,7 @@ function computeProjectRoot() {
     PROJECT_ROOT = resolve(SCRIPT_DIR, "..");
     return;
   }
-  const sourceRootFile = join(AUTONOMA_DIR, "source-root");
+  const sourceRootFile = join(FLITTERBOT_DIR, "source-root");
   if (existsSync(sourceRootFile)) {
     PROJECT_ROOT = readFileSync(sourceRootFile, "utf8").trim();
     return;
@@ -444,20 +444,20 @@ function computeProjectRoot() {
 
 function prepareDirectories() {
   const dirs = [
-    AUTONOMA_DIR,
-    join(AUTONOMA_DIR, "bin"),
-    ...(INSTALL_SCHEDULER ? [join(AUTONOMA_DIR, "cron")] : []),
-    join(AUTONOMA_DIR, "control-surface"),
-    join(AUTONOMA_DIR, "hooks"),
-    join(AUTONOMA_DIR, "logs"),
-    join(AUTONOMA_DIR, "scripts"),
-    join(AUTONOMA_DIR, "src", "blackboard"),
-    join(AUTONOMA_DIR, "whatsapp", "auth"),
-    join(AUTONOMA_DIR, "whatsapp", "logs"),
+    FLITTERBOT_DIR,
+    join(FLITTERBOT_DIR, "bin"),
+    ...(INSTALL_SCHEDULER ? [join(FLITTERBOT_DIR, "cron")] : []),
+    join(FLITTERBOT_DIR, "control-surface"),
+    join(FLITTERBOT_DIR, "hooks"),
+    join(FLITTERBOT_DIR, "logs"),
+    join(FLITTERBOT_DIR, "scripts"),
+    join(FLITTERBOT_DIR, "src", "blackboard"),
+    join(FLITTERBOT_DIR, "whatsapp", "auth"),
+    join(FLITTERBOT_DIR, "whatsapp", "logs"),
   ];
   for (const d of dirs) mkdirSync(d, { recursive: true });
-  try { chmodSync(join(AUTONOMA_DIR, "whatsapp", "auth"), 0o700); } catch {}
-  try { chmodSync(join(AUTONOMA_DIR, "whatsapp", "logs"), 0o700); } catch {}
+  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "auth"), 0o700); } catch {}
+  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "logs"), 0o700); } catch {}
 }
 
 function preflight() {
@@ -480,7 +480,7 @@ function preflight() {
   if (existsSync(versionSrc)) version = readFileSync(versionSrc, "utf8").trim();
   writeFileSync(VERSION_FILE, version + "\n");
 
-  info(`Autonoma Installer v${version}`);
+  info(`Flitterbot Installer v${version}`);
   info("==========================");
   if (DRY_RUN) info("(dry-run mode — no changes will be written)");
   info(INSTALL_SCHEDULER
@@ -493,7 +493,7 @@ function preflight() {
 // Bootstrap config.json
 // ---------------------------------------------------------------------------
 async function bootstrapConfig() {
-  const configPath = join(AUTONOMA_DIR, "config.json");
+  const configPath = join(FLITTERBOT_DIR, "config.json");
   let configBefore = {};
   let beforeHash = "null";
 
@@ -531,12 +531,12 @@ async function bootstrapConfig() {
   configAfter.piThinkingLevel = configAfter.piThinkingLevel || "medium";
   configAfter.stallMinutes = configAfter.stallMinutes || 15;
   configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 4;
-  configAfter.blackboardPath = configAfter.blackboardPath || "~/.autonoma/blackboard.db";
-  configAfter.whatsappAuthDir = configAfter.whatsappAuthDir || "~/.autonoma/whatsapp/auth";
-  configAfter.whatsappSocketPath = configAfter.whatsappSocketPath || "~/.autonoma/whatsapp/daemon.sock";
-  configAfter.whatsappPidPath = configAfter.whatsappPidPath || "~/.autonoma/whatsapp/daemon.pid";
-  configAfter.whatsappCliPath = configAfter.whatsappCliPath || "~/.autonoma/whatsapp/cli.js";
-  configAfter.whatsappDaemonPath = configAfter.whatsappDaemonPath || "~/.autonoma/whatsapp/daemon.js";
+  configAfter.blackboardPath = configAfter.blackboardPath || "~/.flitterbot/blackboard.db";
+  configAfter.whatsappAuthDir = configAfter.whatsappAuthDir || "~/.flitterbot/whatsapp/auth";
+  configAfter.whatsappSocketPath = configAfter.whatsappSocketPath || "~/.flitterbot/whatsapp/daemon.sock";
+  configAfter.whatsappPidPath = configAfter.whatsappPidPath || "~/.flitterbot/whatsapp/daemon.pid";
+  configAfter.whatsappCliPath = configAfter.whatsappCliPath || "~/.flitterbot/whatsapp/cli.js";
+  configAfter.whatsappDaemonPath = configAfter.whatsappDaemonPath || "~/.flitterbot/whatsapp/daemon.js";
   if (configAfter.whatsappEnabled === undefined) configAfter.whatsappEnabled = true;
   if (configAfter.wipeStreamsOnStart === undefined) configAfter.wipeStreamsOnStart = false;
   if (!configAfter.projectsDir) {
@@ -583,7 +583,7 @@ async function syncWebEnv(config) {
   const webEnvPath = join(PROJECT_ROOT, "web", ".env");
   const baseUrl = `http://${config.controlSurfaceHost || "127.0.0.1"}:${config.controlSurfacePort || 18820}`;
   const token = config.controlSurfaceToken || "";
-  const desired = `VITE_AUTONOMA_BASE_URL=${baseUrl}\nVITE_AUTONOMA_TOKEN=${token}\n`;
+  const desired = `VITE_FLITTERBOT_BASE_URL=${baseUrl}\nVITE_FLITTERBOT_TOKEN=${token}\n`;
 
   const beforeHash = existsSync(webEnvPath) ? sha256File(webEnvPath) : "";
 
@@ -647,7 +647,7 @@ async function promptWhatsappPhone(promptText) {
 }
 
 async function bootstrapWhatsappConfig() {
-  const whatsappConfig = join(AUTONOMA_DIR, "whatsapp", "config.json");
+  const whatsappConfig = join(FLITTERBOT_DIR, "whatsapp", "config.json");
   if (existsSync(whatsappConfig)) {
     try { readJsonFile(whatsappConfig); return; } catch {
       error(`WhatsApp config is malformed JSON: ${whatsappConfig}`);
@@ -686,7 +686,7 @@ async function bootstrapWhatsappConfig() {
 // Blackboard initialization
 // ---------------------------------------------------------------------------
 function initBlackboard() {
-  const initScript = join(AUTONOMA_DIR, "scripts", "init-db.sh");
+  const initScript = join(FLITTERBOT_DIR, "scripts", "init-db.sh");
   if (!existsSync(initScript)) {
     warn("init-db.sh not available; skipping blackboard initialization");
     return;
@@ -699,7 +699,7 @@ function initBlackboard() {
 
   // Read blackboardPath from config to pass as env to init-db.sh
   let dbPath = "";
-  const configPath = join(AUTONOMA_DIR, "config.json");
+  const configPath = join(FLITTERBOT_DIR, "config.json");
   if (existsSync(configPath)) {
     try {
       const cfg = readJsonFile(configPath);
@@ -709,8 +709,8 @@ function initBlackboard() {
     } catch {}
   }
 
-  const env = { ...process.env, AUTONOMA_HOME: AUTONOMA_DIR };
-  if (dbPath) env.AUTONOMA_DB_PATH = dbPath;
+  const env = { ...process.env, FLITTERBOT_HOME: FLITTERBOT_DIR };
+  if (dbPath) env.FLITTERBOT_DB_PATH = dbPath;
 
   try {
     execSync(`bash "${initScript}"`, {
@@ -732,7 +732,7 @@ async function deployRuntimeFiles() {
   for (const file of TOP_LEVEL_FILES) {
     const src = resolvePackagedRuntimeFile(file);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, file));
   }
 
   const seenHooks = new Set();
@@ -741,53 +741,53 @@ async function deployRuntimeFiles() {
     seenHooks.add(file);
     const src = resolvePackagedRuntimeFile(`hooks/${file}`);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "hooks", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", file));
   }
 
   for (const file of SCRIPT_FILES) {
     const src = resolvePackagedRuntimeFile(`scripts/${file}`);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "scripts", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "scripts", file));
   }
 
   if (INSTALL_SCHEDULER) {
     for (const file of CRON_FILES) {
       const src = resolvePackagedRuntimeFile(`cron/${file}`);
       if (!src) continue;
-      noteRuntimeFile(src, join(AUTONOMA_DIR, "cron", file));
+      noteRuntimeFile(src, join(FLITTERBOT_DIR, "cron", file));
     }
   }
 
   for (const file of SOURCE_FILES) {
     const src = resolvePackagedSrcFile(file);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "src", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "src", file));
   }
 
   for (const file of BIN_FILES) {
     const src = resolvePackagedRuntimeFile(`bin/${file}`);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "bin", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "bin", file));
   }
 
   for (const file of WHATSAPP_FILES) {
     const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "whatsapp", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file));
   }
 
   for (const file of WHATSAPP_EXEC_FILES) {
     const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
     if (!src) continue;
-    noteRuntimeFile(src, join(AUTONOMA_DIR, "whatsapp", file));
+    noteRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file));
   }
 
   if (PROJECT_ROOT) {
-    noteTextFile(join(AUTONOMA_DIR, "source-root"), PROJECT_ROOT + "\n");
+    noteTextFile(join(FLITTERBOT_DIR, "source-root"), PROJECT_ROOT + "\n");
   }
 
   for (const obsolete of OBSOLETE_RUNTIME_FILES) {
-    noteRemovedRuntimeFile(join(AUTONOMA_DIR, obsolete));
+    noteRemovedRuntimeFile(join(FLITTERBOT_DIR, obsolete));
   }
 
   if (!RUNTIME_CHANGES) {
@@ -802,7 +802,7 @@ async function deployRuntimeFiles() {
         for (const file of TOP_LEVEL_FILES) {
           const src = resolvePackagedRuntimeFile(file);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, file), 0o755);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, file), 0o755);
         }
 
         const seenCopy = new Set();
@@ -811,53 +811,53 @@ async function deployRuntimeFiles() {
           seenCopy.add(file);
           const src = resolvePackagedRuntimeFile(`hooks/${file}`);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "hooks", file), 0o755);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", file), 0o755);
         }
 
         for (const file of SCRIPT_FILES) {
           const src = resolvePackagedRuntimeFile(`scripts/${file}`);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "scripts", file), 0o755);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "scripts", file), 0o755);
         }
 
         if (INSTALL_SCHEDULER) {
           for (const file of CRON_FILES) {
             const src = resolvePackagedRuntimeFile(`cron/${file}`);
             if (!src) continue;
-            copyRuntimeFile(src, join(AUTONOMA_DIR, "cron", file), 0o755);
+            copyRuntimeFile(src, join(FLITTERBOT_DIR, "cron", file), 0o755);
           }
         }
 
         for (const file of SOURCE_FILES) {
           const src = resolvePackagedSrcFile(file);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "src", file), 0o644);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "src", file), 0o644);
         }
 
         for (const file of BIN_FILES) {
           const src = resolvePackagedRuntimeFile(`bin/${file}`);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "bin", file), 0o755);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "bin", file), 0o755);
         }
 
         for (const file of WHATSAPP_FILES) {
           const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "whatsapp", file), 0o644);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file), 0o644);
         }
 
         for (const file of WHATSAPP_EXEC_FILES) {
           const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
           if (!src) continue;
-          copyRuntimeFile(src, join(AUTONOMA_DIR, "whatsapp", file), 0o755);
+          copyRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file), 0o755);
         }
 
         if (PROJECT_ROOT) {
-          writeRuntimeFile(join(AUTONOMA_DIR, "source-root"), PROJECT_ROOT + "\n", 0o644);
+          writeRuntimeFile(join(FLITTERBOT_DIR, "source-root"), PROJECT_ROOT + "\n", 0o644);
         }
 
         for (const obsolete of OBSOLETE_RUNTIME_FILES) {
-          rmSync(join(AUTONOMA_DIR, obsolete), { force: true, recursive: true });
+          rmSync(join(FLITTERBOT_DIR, obsolete), { force: true, recursive: true });
         }
       }
     } else {
@@ -892,19 +892,19 @@ async function installHooks() {
   let current = { ...settingsBefore };
   if (!current.hooks || typeof current.hooks !== "object") current.hooks = {};
 
-  const isAutonomaGroup = (group) => {
+  const isFlitterbotGroup = (group) => {
     return (group.hooks || []).some((h) => {
       const cmd = h.command || "";
       return cmd.startsWith(prefix) || cmd.startsWith(prefixNode);
     });
   };
 
-  // Remove Autonoma hooks from deprecated events
+  // Remove Flitterbot hooks from deprecated events
   let changes = false;
   const deprecatedEvents = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "SubagentStart", "SubagentStop"];
   for (const event of deprecatedEvents) {
     const groups = current.hooks[event] || [];
-    const filtered = groups.filter((g) => !isAutonomaGroup(g));
+    const filtered = groups.filter((g) => !isFlitterbotGroup(g));
     if (filtered.length !== groups.length) {
       if (filtered.length === 0) {
         delete current.hooks[event];
@@ -926,12 +926,12 @@ async function installHooks() {
     };
 
     const groups = current.hooks[event] || [];
-    const autonomaGroups = groups.filter(isAutonomaGroup);
-    const identicalGroups = autonomaGroups.filter((g) => canonicalJson(g) === canonicalJson(desiredGroup));
+    const flitterbotGroups = groups.filter(isFlitterbotGroup);
+    const identicalGroups = flitterbotGroups.filter((g) => canonicalJson(g) === canonicalJson(desiredGroup));
 
-    if (autonomaGroups.length !== 1 || identicalGroups.length !== 1) {
-      const nonAutonoma = groups.filter((g) => !isAutonomaGroup(g));
-      current.hooks[event] = [...nonAutonoma, desiredGroup];
+    if (flitterbotGroups.length !== 1 || identicalGroups.length !== 1) {
+      const nonFlitterbot = groups.filter((g) => !isFlitterbotGroup(g));
+      current.hooks[event] = [...nonFlitterbot, desiredGroup];
       changes = true;
     }
 
@@ -986,18 +986,18 @@ async function installHooks() {
 async function installLaunchd() {
   if (CURRENT_OS !== "Darwin") return;
 
-  const plistSrc = join(SCRIPT_DIR, "cron", "com.autonoma.scheduler.plist");
+  const plistSrc = join(SCRIPT_DIR, "cron", "com.flitterbot.scheduler.plist");
   if (!existsSync(plistSrc)) { warn(`Missing plist template: ${plistSrc}`); return; }
 
   let plistContent = readFileSync(plistSrc, "utf8");
   plistContent = plistContent.replaceAll("__HOME__", HOME);
-  plistContent = plistContent.replaceAll("__AUTONOMA_DIR__", AUTONOMA_DIR);
+  plistContent = plistContent.replaceAll("__FLITTERBOT_DIR__", FLITTERBOT_DIR);
 
   let beforeHash = "null";
   if (existsSync(PLIST_DEST)) beforeHash = sha256File(PLIST_DEST);
 
   // Validate plist
-  const tmpPlist = `/tmp/autonoma-plist.${process.pid}`;
+  const tmpPlist = `/tmp/flitterbot-plist.${process.pid}`;
   writeFileSync(tmpPlist, plistContent);
   try {
     execSync(`plutil -lint "${tmpPlist}"`, { stdio: "pipe" });
@@ -1035,7 +1035,7 @@ async function installLaunchd() {
 
   if (!DRY_RUN) {
     const afterHash = sha256File(PLIST_DEST);
-    manifestWriteTarget("~/Library/LaunchAgents/com.autonoma.scheduler.plist", {
+    manifestWriteTarget("~/Library/LaunchAgents/com.flitterbot.scheduler.plist", {
       type: "file-create",
       modifications: [{ id: "launchd:scheduler", action: "insert", content_sha256: afterHash }],
       checksums: {
@@ -1142,7 +1142,7 @@ async function installLinuxSystemd() {
     const serviceAfterHash = sha256File(SYSTEMD_SERVICE_DEST);
     const timerAfterHash = sha256File(SYSTEMD_TIMER_DEST);
 
-    manifestWriteTarget("~/.config/systemd/user/autonoma-scheduler.service", {
+    manifestWriteTarget("~/.config/systemd/user/flitterbot-scheduler.service", {
       type: "file-create",
       modifications: [{ id: "systemd-user:scheduler-service", action: "upsert", content_sha256: serviceAfterHash }],
       checksums: {
@@ -1152,7 +1152,7 @@ async function installLinuxSystemd() {
       },
     });
 
-    manifestWriteTarget("~/.config/systemd/user/autonoma-scheduler.timer", {
+    manifestWriteTarget("~/.config/systemd/user/flitterbot-scheduler.timer", {
       type: "file-create",
       modifications: [{ id: "systemd-user:scheduler-timer", action: "upsert", content_sha256: timerAfterHash }],
       checksums: {
@@ -1186,7 +1186,7 @@ async function main() {
   if (!INSTALL_SCHEDULER) {
     info("Scheduler not installed. Re-run with --with-scheduler when ready.");
   }
-  info(`To uninstall: ${AUTONOMA_DIR}/uninstall.mjs`);
+  info(`To uninstall: ${FLITTERBOT_DIR}/uninstall.mjs`);
 }
 
 main().catch((e) => {

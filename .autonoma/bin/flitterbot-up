@@ -2,19 +2,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
+FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
 # shellcheck source=/dev/null
-source "$AUTONOMA_HOME/scripts/runtime-common.sh"
+source "$FLITTERBOT_HOME/scripts/runtime-common.sh"
 
 COMMAND="${1:-start}"
-RUNTIME_DIR="$AUTONOMA_HOME/control-surface"
+RUNTIME_DIR="$FLITTERBOT_HOME/control-surface"
 PID_FILE="$RUNTIME_DIR/server.pid"
 LOCK_DIR="$RUNTIME_DIR/start.lock"
-LOG_FILE="$AUTONOMA_LOG_DIR/control-surface.log"
+LOG_FILE="$FLITTERBOT_LOG_DIR/control-surface.log"
 STATE_FILE="$RUNTIME_DIR/last-start.json"
 
 ensure_layout() {
-  mkdir -p "$RUNTIME_DIR" "$AUTONOMA_LOG_DIR" "$AUTONOMA_HOME/bin" "$AUTONOMA_HOME/scripts"
+  mkdir -p "$RUNTIME_DIR" "$FLITTERBOT_LOG_DIR" "$FLITTERBOT_HOME/bin" "$FLITTERBOT_HOME/scripts"
 }
 
 port() {
@@ -43,15 +43,15 @@ project_root() {
     return 0
   fi
 
-  if [[ -f "$AUTONOMA_HOME/source-root" ]]; then
+  if [[ -f "$FLITTERBOT_HOME/source-root" ]]; then
     local file_root=""
-    IFS= read -r file_root < "$AUTONOMA_HOME/source-root" || true
+    IFS= read -r file_root < "$FLITTERBOT_HOME/source-root" || true
     printf '%s\n' "$file_root"
   fi
 }
 
 resolve_control_surface_command() {
-  local configured="${AUTONOMA_CONTROL_SURFACE_COMMAND:-}"
+  local configured="${FLITTERBOT_CONTROL_SURFACE_COMMAND:-}"
   if [[ -n "$configured" ]]; then
     printf '%s\n' "$configured"
     return 0
@@ -363,7 +363,7 @@ start_runtime() {
 
   local command=""
   if ! command=$(resolve_control_surface_command); then
-    append_log "$LOG_FILE" "ERROR" "no control surface command configured; set .controlSurfaceCommand or AUTONOMA_CONTROL_SURFACE_COMMAND"
+    append_log "$LOG_FILE" "ERROR" "no control surface command configured; set .controlSurfaceCommand or FLITTERBOT_CONTROL_SURFACE_COMMAND"
     return 1
   fi
 
@@ -429,7 +429,7 @@ main() {
       print_status
       ;;
     *)
-      echo "Usage: autonoma-up [start|stop|restart|status]" >&2
+      echo "Usage: flitterbot-up [start|stop|restart|status]" >&2
       exit 1
       ;;
   esac

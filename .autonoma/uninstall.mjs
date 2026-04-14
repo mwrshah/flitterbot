@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Autonoma uninstaller — Node.js rewrite of uninstall.sh.
+ * Flitterbot uninstaller — Node.js rewrite of uninstall.sh.
  * Standalone ESM script using only node:* built-in modules.
  *
  * Usage: node uninstall.mjs [--dry-run] [--yes] [--meta] [--external-only]
@@ -20,18 +20,18 @@ import { createInterface } from "node:readline";
 // Constants
 // ---------------------------------------------------------------------------
 const HOME = homedir();
-const AUTONOMA_DIR = join(HOME, ".autonoma");
-const MANIFEST = join(AUTONOMA_DIR, "manifest.json");
+const FLITTERBOT_DIR = join(HOME, ".flitterbot");
+const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
 const SETTINGS = join(HOME, ".claude", "settings.json");
-const PLIST = join(HOME, "Library", "LaunchAgents", "com.autonoma.scheduler.plist");
-const PLIST_LABEL = "com.autonoma.scheduler";
+const PLIST = join(HOME, "Library", "LaunchAgents", "com.flitterbot.scheduler.plist");
+const PLIST_LABEL = "com.flitterbot.scheduler";
 const SYSTEMD_USER_DIR = join(HOME, ".config", "systemd", "user");
-const SYSTEMD_SERVICE_NAME = "autonoma-scheduler.service";
-const SYSTEMD_TIMER_NAME = "autonoma-scheduler.timer";
+const SYSTEMD_SERVICE_NAME = "flitterbot-scheduler.service";
+const SYSTEMD_TIMER_NAME = "flitterbot-scheduler.timer";
 const SYSTEMD_SERVICE_DEST = join(SYSTEMD_USER_DIR, SYSTEMD_SERVICE_NAME);
 const SYSTEMD_TIMER_DEST = join(SYSTEMD_USER_DIR, SYSTEMD_TIMER_NAME);
 const LEGACY_CRONTAB_TARGET = "crontab:user";
-const LOG_FILE = join(AUTONOMA_DIR, "logs", "install.log");
+const LOG_FILE = join(FLITTERBOT_DIR, "logs", "install.log");
 const CURRENT_OS = platform() === "darwin" ? "Darwin" : platform() === "linux" ? "Linux" : platform();
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ function error(msg) { console.error(`ERROR: ${msg}`); log(`ERROR: ${msg}`); }
 
 function atomicWrite(path, content) {
   mkdirSync(dirname(path), { recursive: true });
-  const tmp = join(dirname(path), `.autonoma.tmp.${randomUUID()}`);
+  const tmp = join(dirname(path), `.flitterbot.tmp.${randomUUID()}`);
   writeFileSync(tmp, content);
   renameSync(tmp, path);
 }
@@ -119,8 +119,8 @@ function canonicalJson(obj) {
 
 function diffText(before, after) {
   try {
-    const tmpA = `/tmp/.autonoma-diff-a.${process.pid}`;
-    const tmpB = `/tmp/.autonoma-diff-b.${process.pid}`;
+    const tmpA = `/tmp/.flitterbot-diff-a.${process.pid}`;
+    const tmpB = `/tmp/.flitterbot-diff-b.${process.pid}`;
     writeFileSync(tmpA, before);
     writeFileSync(tmpB, after);
     const result = execSync(`diff -u "${tmpA}" "${tmpB}"`, { encoding: "utf8" });
@@ -128,8 +128,8 @@ function diffText(before, after) {
     rmSync(tmpB, { force: true });
     return result;
   } catch (e) {
-    try { rmSync(`/tmp/.autonoma-diff-a.${process.pid}`, { force: true }); } catch {}
-    try { rmSync(`/tmp/.autonoma-diff-b.${process.pid}`, { force: true }); } catch {}
+    try { rmSync(`/tmp/.flitterbot-diff-a.${process.pid}`, { force: true }); } catch {}
+    try { rmSync(`/tmp/.flitterbot-diff-b.${process.pid}`, { force: true }); } catch {}
     return e.stdout || "";
   }
 }
@@ -185,7 +185,7 @@ function manifestGetTarget(targetKey) {
 // Prereqs
 // ---------------------------------------------------------------------------
 function ensurePrereqs() {
-  mkdirSync(join(AUTONOMA_DIR, "logs"), { recursive: true });
+  mkdirSync(join(FLITTERBOT_DIR, "logs"), { recursive: true });
 
   if (existsSync(MANIFEST)) {
     try {
@@ -221,8 +221,8 @@ async function uninstallHooks() {
     process.exit(1);
   }
 
-  const prefix = `${HOME}/.autonoma/hooks/`;
-  const prefixNode = `node ${HOME}/.autonoma/hooks/`;
+  const prefix = `${HOME}/.flitterbot/hooks/`;
+  const prefixNode = `node ${HOME}/.flitterbot/hooks/`;
 
   // Drift detection
   if (manifestTargetExists("~/.claude/settings.json")) {
@@ -231,7 +231,7 @@ async function uninstallHooks() {
     if (expectedHash) {
       const currentHash = sha256File(SETTINGS);
       if (expectedHash !== currentHash) {
-        warn("settings.json has drifted since installation. Attempting surgical removal of Autonoma hooks only.");
+        warn("settings.json has drifted since installation. Attempting surgical removal of Flitterbot hooks only.");
       }
     }
 
@@ -253,20 +253,20 @@ async function uninstallHooks() {
     }
   }
 
-  const isAutonomaGroup = (group) => {
+  const isFlitterbotGroup = (group) => {
     return (group.hooks || []).some((h) => {
       const cmd = h.command || "";
       return cmd.startsWith(prefix) || cmd.startsWith(prefixNode);
     });
   };
 
-  // Filter out Autonoma hooks
+  // Filter out Flitterbot hooks
   const filtered = { ...settings };
   if (filtered.hooks && typeof filtered.hooks === "object") {
     const newHooks = {};
     for (const [event, groups] of Object.entries(filtered.hooks)) {
       if (!Array.isArray(groups)) continue;
-      const kept = groups.filter((g) => !isAutonomaGroup(g));
+      const kept = groups.filter((g) => !isFlitterbotGroup(g));
       if (kept.length > 0) newHooks[event] = kept;
     }
     if (Object.keys(newHooks).length > 0) {
@@ -278,7 +278,7 @@ async function uninstallHooks() {
 
   // Check if anything changed
   if (canonicalJson(settings) === canonicalJson(filtered)) {
-    info("Autonoma hook entries are already absent.");
+    info("Flitterbot hook entries are already absent.");
     if (!DRY_RUN) manifestDeleteTarget("~/.claude/settings.json");
     return;
   }
@@ -305,7 +305,7 @@ async function uninstallHooks() {
 // Uninstall launchd (macOS)
 // ---------------------------------------------------------------------------
 async function uninstallLaunchd() {
-  if (!existsSync(PLIST) && !manifestTargetExists("~/Library/LaunchAgents/com.autonoma.scheduler.plist")) {
+  if (!existsSync(PLIST) && !manifestTargetExists("~/Library/LaunchAgents/com.flitterbot.scheduler.plist")) {
     return;
   }
 
@@ -318,7 +318,7 @@ async function uninstallLaunchd() {
     if (!DRY_RUN) {
       try { execSync(`launchctl bootout gui/$(id -u) "${PLIST}"`, { stdio: "pipe" }); } catch {}
       rmSync(PLIST, { force: true });
-      manifestDeleteTarget("~/Library/LaunchAgents/com.autonoma.scheduler.plist");
+      manifestDeleteTarget("~/Library/LaunchAgents/com.flitterbot.scheduler.plist");
       info("launchd scheduler removed.");
     }
   } else {
@@ -340,8 +340,8 @@ async function uninstallLinuxSystemd() {
   if (CURRENT_OS !== "Linux") return;
 
   if (!existsSync(SYSTEMD_SERVICE_DEST) && !existsSync(SYSTEMD_TIMER_DEST)
-    && !manifestTargetExists("~/.config/systemd/user/autonoma-scheduler.service")
-    && !manifestTargetExists("~/.config/systemd/user/autonoma-scheduler.timer")) {
+    && !manifestTargetExists("~/.config/systemd/user/flitterbot-scheduler.service")
+    && !manifestTargetExists("~/.config/systemd/user/flitterbot-scheduler.timer")) {
     return;
   }
 
@@ -365,8 +365,8 @@ async function uninstallLinuxSystemd() {
       if (commandExists("systemctl")) {
         try { execSync("systemctl --user daemon-reload", { stdio: "pipe" }); } catch {}
       }
-      manifestDeleteTarget("~/.config/systemd/user/autonoma-scheduler.service");
-      manifestDeleteTarget("~/.config/systemd/user/autonoma-scheduler.timer");
+      manifestDeleteTarget("~/.config/systemd/user/flitterbot-scheduler.service");
+      manifestDeleteTarget("~/.config/systemd/user/flitterbot-scheduler.timer");
       info("Linux systemd scheduler removed.");
     }
   } else {
@@ -380,7 +380,7 @@ async function uninstallLinuxSystemd() {
 function computeLegacyCrontabAfterText(beforeText) {
   return beforeText
     .split("\n")
-    .filter((line) => !line.includes("# autonoma-scheduler"))
+    .filter((line) => !line.includes("# flitterbot-scheduler"))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/^\n+/, "")
@@ -390,7 +390,7 @@ function computeLegacyCrontabAfterText(beforeText) {
 function applyLegacyCrontabText(afterText) {
   const trimmed = afterText.replace(/\s/g, "");
   if (trimmed) {
-    const tmp = `/tmp/autonoma-crontab.${process.pid}`;
+    const tmp = `/tmp/flitterbot-crontab.${process.pid}`;
     writeFileSync(tmp, afterText + "\n");
     try { execSync(`crontab "${tmp}"`, { stdio: "pipe" }); } finally { rmSync(tmp, { force: true }); }
   } else {
@@ -409,7 +409,7 @@ async function uninstallLinuxLegacyCrontab() {
   let beforeText = "";
   try { beforeText = execSync("crontab -l", { encoding: "utf8" }); } catch { beforeText = ""; }
 
-  if (!manifestTargetExists(LEGACY_CRONTAB_TARGET) && !beforeText.includes("# autonoma-scheduler")) {
+  if (!manifestTargetExists(LEGACY_CRONTAB_TARGET) && !beforeText.includes("# flitterbot-scheduler")) {
     return;
   }
 
@@ -443,18 +443,18 @@ async function uninstallLinuxLegacyCrontab() {
 // ---------------------------------------------------------------------------
 // Uninstall web/.env
 // ---------------------------------------------------------------------------
-const AUTONOMA_ENV_KEYS = ["VITE_AUTONOMA_BASE_URL", "VITE_AUTONOMA_TOKEN"];
+const FLITTERBOT_ENV_KEYS = ["VITE_FLITTERBOT_BASE_URL", "VITE_FLITTERBOT_TOKEN"];
 const WEB_ENV_MANIFEST_KEY = "web/.env";
 
 function resolveProjectRoot() {
-  const configPath = join(AUTONOMA_DIR, "config.json");
+  const configPath = join(FLITTERBOT_DIR, "config.json");
   if (existsSync(configPath)) {
     try {
       const config = readJsonFile(configPath);
       if (config.projectRoot) return config.projectRoot;
     } catch {}
   }
-  const sourceRootPath = join(AUTONOMA_DIR, "source-root");
+  const sourceRootPath = join(FLITTERBOT_DIR, "source-root");
   if (existsSync(sourceRootPath)) {
     const root = readFileSync(sourceRootPath, "utf8").trim();
     if (root) return root;
@@ -484,13 +484,13 @@ async function uninstallWebEnv() {
   const before = readFileSync(webEnvPath, "utf8");
   const afterLines = before.split("\n").filter((line) => {
     const key = line.split("=")[0].trim();
-    return !AUTONOMA_ENV_KEYS.includes(key);
+    return !FLITTERBOT_ENV_KEYS.includes(key);
   });
   const after = afterLines.join("\n").replace(/^\n+/, "").replace(/\n{3,}/g, "\n\n");
 
   if (!after.trim()) {
     info("=== web/.env cleanup ===");
-    info(`Will remove ${webEnvPath} (only contained Autonoma vars)`);
+    info(`Will remove ${webEnvPath} (only contained Flitterbot vars)`);
     info("");
 
     if (await confirm()) {
@@ -511,13 +511,13 @@ async function uninstallWebEnv() {
       if (!DRY_RUN) {
         atomicWrite(webEnvPath, after);
         manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
-        info("Cleaned Autonoma vars from web/.env.");
+        info("Cleaned Flitterbot vars from web/.env.");
       }
     } else {
       info("Skipped web/.env cleanup.");
     }
   } else {
-    info("web/.env has no Autonoma vars to clean.");
+    info("web/.env has no Flitterbot vars to clean.");
     if (!DRY_RUN) manifestDeleteTarget(WEB_ENV_MANIFEST_KEY);
   }
 }
@@ -538,10 +538,10 @@ async function uninstallScheduler() {
 // Graceful stop
 // ---------------------------------------------------------------------------
 function gracefulStop() {
-  const upScript = join(AUTONOMA_DIR, "bin", "autonoma-up");
+  const upScript = join(FLITTERBOT_DIR, "bin", "flitterbot-up");
   if (existsSync(upScript)) {
     if (DRY_RUN) {
-      info(`(dry-run) Would stop Autonoma runtime via ${upScript} stop`);
+      info(`(dry-run) Would stop Flitterbot runtime via ${upScript} stop`);
     } else {
       try { execSync(`"${upScript}" stop`, { stdio: "pipe" }); } catch {}
     }
@@ -554,13 +554,13 @@ function gracefulStop() {
 async function uninstallRuntimeTree() {
   if (!REMOVE_RUNTIME) return;
 
-  if (!existsSync(AUTONOMA_DIR)) {
-    info("Autonoma runtime directory already absent.");
+  if (!existsSync(FLITTERBOT_DIR)) {
+    info("Flitterbot runtime directory already absent.");
     return;
   }
 
   info("=== Runtime removal ===");
-  info(`Will remove ${AUTONOMA_DIR} and all install-managed state:`);
+  info(`Will remove ${FLITTERBOT_DIR} and all install-managed state:`);
   info("- runtime scripts and hooks");
   info("- staged src mirror");
   info("- config, manifest, blackboard DB, and logs");
@@ -570,9 +570,9 @@ async function uninstallRuntimeTree() {
   if (await confirm()) {
     gracefulStop();
     if (!DRY_RUN) {
-      rmSync(AUTONOMA_DIR, { recursive: true, force: true });
+      rmSync(FLITTERBOT_DIR, { recursive: true, force: true });
       LOG_ENABLED = false;
-      info(`Removed ${AUTONOMA_DIR}.`);
+      info(`Removed ${FLITTERBOT_DIR}.`);
     }
   } else {
     info("Skipped runtime removal.");
@@ -601,7 +601,7 @@ function cleanupManifestIfEmpty() {
 async function main() {
   ensurePrereqs();
 
-  info("Autonoma Uninstaller");
+  info("Flitterbot Uninstaller");
   info("====================");
   if (DRY_RUN) info("(dry-run mode — no changes will be written)");
   info("");

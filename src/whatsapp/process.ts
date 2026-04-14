@@ -183,7 +183,7 @@ export async function runForegroundDaemonProcess(
   return await new Promise<number>((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       stdio: "inherit",
-      env: { ...process.env, AUTONOMA_WA_EXIT_AFTER_AUTH: "1" },
+      env: { ...process.env, FLITTERBOT_WA_EXIT_AFTER_AUTH: "1" },
     });
 
     child.once("error", reject);

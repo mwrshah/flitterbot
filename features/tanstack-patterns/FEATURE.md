@@ -31,8 +31,8 @@ Pattern:
 ```ts
 // web/src/server/user-config.ts — Server function
 export const fetchUserConfig = createServerFn({ method: 'GET' }).handler(async () => {
-  const url = `${process.env.VITE_AUTONOMA_BASE_URL}/api/user-config/default_user`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.VITE_AUTONOMA_TOKEN}` } });
+  const url = `${process.env.VITE_FLITTERBOT_BASE_URL}/api/user-config/default_user`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.VITE_FLITTERBOT_TOKEN}` } });
   if (!res.ok) throw new Error(`${res.status}`);
   return (await res.json()).config;
 });

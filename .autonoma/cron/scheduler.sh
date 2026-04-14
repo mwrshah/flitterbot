@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backward-compatible wrapper for the Autonoma cron recovery loop.
+# Backward-compatible wrapper for the Flitterbot cron recovery loop.
 set -euo pipefail
 
-exec "$HOME/.autonoma/cron/autonoma-checkin.sh" "$@"
+exec "$HOME/.flitterbot/cron/flitterbot-checkin.sh" "$@"

@@ -9,11 +9,11 @@ import {
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import { getStreamById } from "../blackboard/query-streams.ts";
-import type { AutonomaConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import { createAutonomaAgent } from "./create-agent.ts";
+import { createFlitterbotAgent } from "./create-agent.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
 import { PiSessionState } from "./pi-session-state.ts";
 import { subscribeToPiSession } from "./pi-subscribe.ts";
@@ -48,7 +48,7 @@ export class PiSessionManager {
   private defaultSession?: ManagedPiSession;
   private readonly orchestrators = new Map<string, ManagedPiSession>();
   private readonly byPiSessionId = new Map<string, ManagedPiSession>();
-  private readonly config: AutonomaConfig;
+  private readonly config: FlitterbotConfig;
   private readonly blackboard: BlackboardDatabase;
   private readonly wsHub: WebSocketHub;
   private readonly runtimeInstanceId: string;
@@ -57,7 +57,7 @@ export class PiSessionManager {
   private readonly log: (message: string) => void;
 
   constructor(
-    config: AutonomaConfig,
+    config: FlitterbotConfig,
     blackboard: BlackboardDatabase,
     wsHub: WebSocketHub,
     runtimeInstanceId: string,
@@ -95,7 +95,7 @@ export class PiSessionManager {
     // must survive restarts so their piSessionId (and associated messages) are preserved.
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
 
-    const created = await createAutonomaAgent({
+    const created = await createFlitterbotAgent({
       config: this.config,
       customTools,
       role: "default",
@@ -154,7 +154,7 @@ export class PiSessionManager {
       repoPath,
     };
 
-    const created = await createAutonomaAgent({
+    const created = await createFlitterbotAgent({
       config: this.config,
       customTools: customTools ?? [],
       role: "orchestrator",
@@ -313,7 +313,7 @@ export class PiSessionManager {
     const stream = getStreamById(this.blackboard, managed.streamId);
     const repoPath = stream?.repo_path ?? undefined;
 
-    const created = await createAutonomaAgent({
+    const created = await createFlitterbotAgent({
       config: this.config,
       customTools: customTools ?? [],
       role: "orchestrator",

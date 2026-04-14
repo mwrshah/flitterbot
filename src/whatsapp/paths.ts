@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 export function getWhatsAppHome(): string {
-  return path.join(homedir(), ".autonoma", "whatsapp");
+  return path.join(homedir(), ".flitterbot", "whatsapp");
 }
 
 export function getWhatsAppAuthDir(): string {
@@ -26,7 +26,7 @@ export function getWhatsAppPidPath(): string {
 }
 
 export function getWhatsAppLogPath(): string {
-  return path.join(homedir(), ".autonoma", "logs", "whatsapp-daemon.log");
+  return path.join(homedir(), ".flitterbot", "logs", "whatsapp-daemon.log");
 }
 
 export function getWhatsAppStatusSignalPath(): string {

@@ -33,7 +33,7 @@ import {
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
-import { type AutonomaConfig, loadConfig } from "./config/load-config.ts";
+import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
@@ -99,7 +99,7 @@ type EnqueueInput = {
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
 
 export class ControlSurfaceRuntime {
-  readonly config: AutonomaConfig;
+  readonly config: FlitterbotConfig;
   readonly blackboard: BlackboardDatabase;
   readonly runtimeInstanceId = crypto.randomUUID();
   readonly startedAt = Date.now();
@@ -123,7 +123,7 @@ export class ControlSurfaceRuntime {
     return this.config.whatsappEnabled;
   }
 
-  constructor(config: AutonomaConfig = loadConfig()) {
+  constructor(config: FlitterbotConfig = loadConfig()) {
     this.config = config;
     if (!config.whatsappEnabled) {
       this.whatsappStatusCache = { status: "disabled", managedByControlSurface: true };
@@ -374,9 +374,9 @@ export class ControlSurfaceRuntime {
       let piSessionIdValue = pickString(payload, [
         "pi_session_id",
         "piSessionId",
-        "AUTONOMA_PI_SESSION_ID",
+        "FLITTERBOT_PI_SESSION_ID",
       ]);
-      let streamIdValue = pickString(payload, ["stream_id", "streamId", "AUTONOMA_STREAM_ID"]);
+      let streamIdValue = pickString(payload, ["stream_id", "streamId", "FLITTERBOT_STREAM_ID"]);
       if (cwd && !piSessionIdValue && !streamIdValue) {
         const openStreams = listOpenStreams(this.blackboard);
         const matchingStream = openStreams.find(
@@ -398,16 +398,16 @@ export class ControlSurfaceRuntime {
         source: pickString(payload, ["source"]),
         transcript_path: pickString(payload, ["transcript_path", "transcriptPath"]),
         agent_managed: agentManaged,
-        tmux_session: pickString(payload, ["tmux_session", "tmuxSession", "AUTONOMA_TMUX_SESSION"]),
+        tmux_session: pickString(payload, ["tmux_session", "tmuxSession", "FLITTERBOT_TMUX_SESSION"]),
         task_description: pickString(payload, [
           "task_description",
           "taskDescription",
-          "AUTONOMA_TASK_DESCRIPTION",
+          "FLITTERBOT_TASK_DESCRIPTION",
         ]),
         todoist_task_id: pickString(payload, [
           "todoist_task_id",
           "todoistTaskId",
-          "AUTONOMA_TODOIST_TASK_ID",
+          "FLITTERBOT_TODOIST_TASK_ID",
         ]),
         pi_session_id: piSessionIdValue,
         stream_id: streamIdValue,
@@ -469,7 +469,7 @@ export class ControlSurfaceRuntime {
     const piSessionIdFromPayload = pickString(payload, [
       "pi_session_id",
       "piSessionId",
-      "AUTONOMA_PI_SESSION_ID",
+      "FLITTERBOT_PI_SESSION_ID",
     ]);
     let targetQueue: ManagedPiSession | undefined;
     let resolvedVia = "default";
@@ -1053,7 +1053,7 @@ export class ControlSurfaceRuntime {
             repo: {
               type: "string",
               description:
-                "Optional repository name (relative to projects dir, e.g. 'autonoma' or 'KLAIR'). When provided, the stream's orchestrator and agents will use this repo as their working directory.",
+                "Optional repository name (relative to projects dir, e.g. 'flitterbot' or 'KLAIR'). When provided, the stream's orchestrator and agents will use this repo as their working directory.",
             },
             cwd: {
               type: "string",
@@ -1823,7 +1823,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
   const sessionId = pickString(payload, ["session_id", "sessionId"]);
   const cwd = pickString(payload, ["cwd"]);
   const transcript = pickString(payload, ["transcript_path", "transcriptPath"]);
-  const tmuxSession = pickString(payload, ["tmux_session", "tmuxSession", "AUTONOMA_TMUX_SESSION"]);
+  const tmuxSession = pickString(payload, ["tmux_session", "tmuxSession", "FLITTERBOT_TMUX_SESSION"]);
   const project = pickString(payload, ["project", "project_label", "projectLabel"]);
   const reason = pickString(payload, ["reason", "stop_reason", "session_end_reason"]);
   const agentManaged =

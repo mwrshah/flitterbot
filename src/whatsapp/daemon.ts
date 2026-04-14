@@ -50,7 +50,7 @@ import {
 } from "./paths.ts";
 import { getInboundMessageRejectionReason, persistInboundMessage } from "./receive.ts";
 
-const logger = pino({ level: process.env.AUTONOMA_WA_LOG_LEVEL ?? "info" });
+const logger = pino({ level: process.env.FLITTERBOT_WA_LOG_LEVEL ?? "info" });
 
 function timestamp(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -103,7 +103,7 @@ class WhatsAppDaemon {
 
     if (!hasStoredAuthState() && !this.options.authMode) {
       this.status = "auth_required";
-      this.lastError = "Missing WhatsApp credentials. Run `autonoma-wa auth` in a terminal.";
+      this.lastError = "Missing WhatsApp credentials. Run `flitterbot-wa auth` in a terminal.";
       logger.warn(this.lastError);
       return;
     }
@@ -201,7 +201,7 @@ class WhatsAppDaemon {
       },
       logger,
       printQRInTerminal: false,
-      browser: Browsers.macOS("Autonoma"),
+      browser: Browsers.macOS("Flitterbot"),
       markOnlineOnConnect: false,
       syncFullHistory: false,
     });
@@ -318,7 +318,7 @@ class WhatsAppDaemon {
 
       if (this.options.authMode) {
         console.log("WhatsApp auth succeeded.");
-        if (process.env.AUTONOMA_WA_EXIT_AFTER_AUTH === "1") {
+        if (process.env.FLITTERBOT_WA_EXIT_AFTER_AUTH === "1") {
           setTimeout(() => {
             void this.stop().finally(() => process.exit(0));
           }, 250);
@@ -344,13 +344,13 @@ class WhatsAppDaemon {
 
     if (code === DisconnectReason.loggedOut || code === 401) {
       this.status = "logged_out";
-      this.lastError = this.lastError ?? "WhatsApp auth expired. Run `autonoma-wa auth`.";
+      this.lastError = this.lastError ?? "WhatsApp auth expired. Run `flitterbot-wa auth`.";
       this.signalStatusChange();
       createPendingAction(this.db, {
         channel: "internal",
         kind: "whatsapp_auth_expired",
         promptText:
-          "WhatsApp auth expired. Run `autonoma-wa auth` in a terminal to re-link the session.",
+          "WhatsApp auth expired. Run `flitterbot-wa auth` in a terminal to re-link the session.",
       });
       logger.warn(this.lastError);
       return;
@@ -388,7 +388,7 @@ class WhatsAppDaemon {
       return {
         ok: false,
         status: this.status,
-        error: "WhatsApp is not authenticated. Run `autonoma-wa auth` manually in a terminal.",
+        error: "WhatsApp is not authenticated. Run `flitterbot-wa auth` manually in a terminal.",
         daemon: this.snapshot(),
       };
     }

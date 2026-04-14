@@ -1,4 +1,4 @@
-# Autonoma — Major Phases Plan
+# Flitterbot — Major Phases Plan
 
 Implementation order for the v1 architecture:
 
@@ -80,7 +80,7 @@ Blackboard + runtime config (with workstreams)
 - Hook writer behavior (session insert/update on hook events)
 - Launch metadata handshake
 - Stale-reconciliation and idle-cleanup queries
-- Config loader for `~/.autonoma/config.json`
+- Config loader for `~/.flitterbot/config.json`
 
 **Suggested modules:**
 - `src/config/load-config.ts`
@@ -156,7 +156,7 @@ Blackboard + runtime config (with workstreams)
 - Outbound via `send_to_user` tool (sends to WhatsApp + WS simultaneously)
 - Bidirectional sync: WhatsApp replies appear in web client via WS, web client replies appear in WhatsApp thread
 - Outbound/inbound blackboard flow
-- Manual auth flow (`autonoma-wa auth`)
+- Manual auth flow (`flitterbot-wa auth`)
 - Web client WhatsApp health indicator (notification banner when WhatsApp disconnected)
 
 **Suggested modules:**
@@ -209,7 +209,7 @@ Blackboard + runtime config (with workstreams)
 - Runtime error handling and retries
 - End-to-end install/run/recover/uninstall checks
 
-**Exit criteria:** Install is idempotent; uninstall removes only Autonoma-owned modifications; startup wrapper reliable; hooks, web, and WhatsApp all converge on same control-surface Pi runtime; end-to-end smoke tests pass.
+**Exit criteria:** Install is idempotent; uninstall removes only Flitterbot-owned modifications; startup wrapper reliable; hooks, web, and WhatsApp all converge on same control-surface Pi runtime; end-to-end smoke tests pass.
 
 ---
 
@@ -260,7 +260,7 @@ Freezes: HTTP request/response payloads, WS event/message payloads, auth header/
 Owns: tmux adapter, session launch/inject/list/kill pathways, git worktree create/cleanup, v1 direct-message delivery contract (`tmux_send_keys`).
 
 ### Owner 4 — Runtime packaging
-Owns: `autonoma-up`, installer/uninstaller integration, runtime file layout under `~/.autonoma/`.
+Owns: `flitterbot-up`, installer/uninstaller integration, runtime file layout under `~/.flitterbot/`.
 
 ---
 
@@ -285,7 +285,7 @@ All start after Wave 0.
 | **A — Blackboard** | Phase 1: schema, migrations, query helpers (sessions, pi-sessions, workstreams), hook writer | DB internals |
 | **B — Control-surface core + router** | Phase 2: router, persisted Pi, queue, Pi state tracking, routes, `send_to_user` tool, Pi event subscriptions | HTTP server/runtime/router |
 | **C — Claude/tmux bridge + worktrees** | Phase 3: tmux/session adapter, git worktree management, direct session message pathway, launch/list/inject helpers | tmux adapter + worktree internals |
-| **D — Installer/runtime packaging** | Installer skeleton, runtime file deployment, `autonoma-up` wrapper | Installed file layout, startup scripts |
+| **D — Installer/runtime packaging** | Installer skeleton, runtime file deployment, `flitterbot-up` wrapper | Installed file layout, startup scripts |
 
 Safe in parallel: each track owns distinct implementation surfaces, sharing only frozen interfaces.
 
@@ -360,7 +360,7 @@ Maximum throughput is **not** fully serial phases. It is:
 - **WhatsApp reliability** — pairing, reconnect behavior, auth expiry edge cases
 - **Git worktree management** — stale worktree cleanup, branch conflicts, base branch selection
 - **Transcript normalization** — exact item/event shape, large-file chunking performance
-- **Startup wrappers** — final `autonoma-up` shape, PID ownership, stale PID cleanup
+- **Startup wrappers** — final `flitterbot-up` shape, PID ownership, stale PID cleanup
 - **WebSocket polish** — reconnect strategy, correlation IDs, multi-tab behavior
 - **Bidirectional sync edge cases** — message ordering, deduplication between surfaces
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# init-db.sh — Bootstrap the Autonoma blackboard database.
+# init-db.sh — Bootstrap the Flitterbot blackboard database.
 # Fresh install: applies schema.sql to create all tables at the current version.
 # Existing DB: reports the current schema version. Incremental migrations are
 # handled by the server's TypeScript migrate.ts on startup.
 set -euo pipefail
 
-AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
-AUTONOMA_CONFIG="${AUTONOMA_CONFIG:-$AUTONOMA_HOME/config.json}"
-DB_PATH="${AUTONOMA_DB_PATH:-}"
+FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
+FLITTERBOT_CONFIG="${FLITTERBOT_CONFIG:-$FLITTERBOT_HOME/config.json}"
+DB_PATH="${FLITTERBOT_DB_PATH:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCHEMA_FILE=""
 LATEST_VERSION=11
@@ -23,18 +23,18 @@ expand_home() {
   fi
 }
 
-if [[ -z "$DB_PATH" && -f "$AUTONOMA_CONFIG" ]]; then
+if [[ -z "$DB_PATH" && -f "$FLITTERBOT_CONFIG" ]]; then
   config_db_path="$(node -e "
     const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
     if (c.blackboardPath) process.stdout.write(c.blackboardPath);
-  " "$AUTONOMA_CONFIG" 2>/dev/null || true)"
+  " "$FLITTERBOT_CONFIG" 2>/dev/null || true)"
   if [[ -n "$config_db_path" && "$config_db_path" != "null" ]]; then
     DB_PATH="$(expand_home "$config_db_path")"
   fi
 fi
 
 if [[ -z "$DB_PATH" ]]; then
-  DB_PATH="${AUTONOMA_HOME}/blackboard.db"
+  DB_PATH="${FLITTERBOT_HOME}/blackboard.db"
 fi
 
 DB_DIR="$(dirname "$DB_PATH")"

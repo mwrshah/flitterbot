@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { ChatTimelineItem, DownstreamSessionItem } from "~/lib/types";
 
-const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
-const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
+const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
+const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
 
 async function streamsRequest(path: string): Promise<unknown> {
   const url = `${BASE_URL.replace(/\/$/, "")}${path}`;

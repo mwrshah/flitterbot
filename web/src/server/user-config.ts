@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const BASE_URL = process.env.VITE_AUTONOMA_BASE_URL || "http://127.0.0.1:18820";
-const TOKEN = process.env.VITE_AUTONOMA_TOKEN || "";
+const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
+const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
 
 function headers(): Record<string, string> {
   return {

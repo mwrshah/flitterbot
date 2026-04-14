@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Autonoma cron tick — ping the control surface if it's running.
+# Flitterbot cron tick — ping the control surface if it's running.
 # If the surface is down, curl fails silently and we exit 0.
 # All decision logic lives in the control surface's POST /cron/tick endpoint.
 set -euo pipefail
 
-AUTONOMA_HOME="${AUTONOMA_HOME:-$HOME/.autonoma}"
-CONFIG_FILE="$AUTONOMA_HOME/config.json"
+FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
+CONFIG_FILE="$FLITTERBOT_HOME/config.json"
 
 # Read token and connection details from config
 if [[ ! -f "$CONFIG_FILE" ]]; then
