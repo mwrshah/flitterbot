@@ -29,6 +29,8 @@ type RawConfigJson = {
   wipeStreamsOnStart?: boolean;
   whatsappEnabled?: boolean;
   shortcuts?: ShortcutBindingsConfig;
+  defaultAgentBootstrapPrompt?: string;
+  orchestratorBootstrapFooterPrompt?: string;
 };
 
 export type AutonomaConfig = {
@@ -55,6 +57,8 @@ export type AutonomaConfig = {
   wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
   shortcuts: ShortcutBindingsConfig;
+  defaultAgentBootstrapPrompt: string;
+  orchestratorBootstrapFooterPrompt: string;
 };
 
 const HOME = os.homedir();
@@ -105,6 +109,10 @@ export function loadConfig(): AutonomaConfig {
         process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
       : (raw.whatsappEnabled ?? true);
   const shortcuts = raw.shortcuts ?? {};
+  const defaultAgentBootstrapPrompt =
+    raw.defaultAgentBootstrapPrompt ?? "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
+  const orchestratorBootstrapFooterPrompt =
+    raw.orchestratorBootstrapFooterPrompt ?? "IMPORTANT: Before doing anything else, load /tmux2";
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: AutonomaConfig = {
@@ -129,6 +137,8 @@ export function loadConfig(): AutonomaConfig {
     wipeStreamsOnStart,
     whatsappEnabled,
     shortcuts,
+    defaultAgentBootstrapPrompt,
+    orchestratorBootstrapFooterPrompt,
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
@@ -167,6 +177,8 @@ export function loadConfig(): AutonomaConfig {
     wipeStreamsOnStart: config.wipeStreamsOnStart,
     whatsappEnabled: config.whatsappEnabled,
     shortcuts: config.shortcuts,
+    defaultAgentBootstrapPrompt: config.defaultAgentBootstrapPrompt,
+    orchestratorBootstrapFooterPrompt: config.orchestratorBootstrapFooterPrompt,
   };
 
   fs.writeFileSync(CONFIG_PATH, `${JSON.stringify(nextPersisted, null, 2)}\n`, "utf8");

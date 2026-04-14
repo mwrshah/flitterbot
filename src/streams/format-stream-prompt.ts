@@ -7,12 +7,13 @@ export function formatStreamPrompt(
   _streamName: string,
   _streamId: string,
   agentMessage?: string,
+  bootstrapFooterPrompt: string = "IMPORTANT: Before doing anything else, load /tmux2",
 ): string {
-  const footer = "IMPORTANT: Before doing anything else, run /load2-w to load essential skills.";
   const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
+  const footerSection = bootstrapFooterPrompt ? `\n\n${bootstrapFooterPrompt}` : "";
 
   if (messages.length <= 1) {
-    return `${messages[0] ?? ""}${agentSection}\n\n${footer}`;
+    return `${messages[0] ?? ""}${agentSection}${footerSection}`;
   }
 
   const total = messages.length;
@@ -23,5 +24,5 @@ export function formatStreamPrompt(
     })
     .join("\n\n");
 
-  return `The following user messages provide context for this stream:\n\n${body}${agentSection}\n\n${footer}`;
+  return `The following user messages provide context for this stream:\n\n${body}${agentSection}${footerSection}`;
 }
