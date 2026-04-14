@@ -1,5 +1,3 @@
-import { formatDatetimeBlock } from "./datetime.ts";
-
 export function buildDefaultAgentPrompt(piSessionId: string): string {
   return `You are Autonoma, the default stream agent — the always-on primary interface for the user.
 
@@ -79,6 +77,5 @@ Only ask when genuinely uncertain about scope.
 For actions outside your normal repertoire (destructive ops), suggest and wait. 
 Use single asterisks for bold (*bold*), not double asterisks (**bold**). WhatsApp renders single-asterisk bold natively.
 
-${formatDatetimeBlock()}
 `;
 }
