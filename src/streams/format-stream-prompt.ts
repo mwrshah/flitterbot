@@ -1,6 +1,9 @@
+import { formatDatetimeBlock } from "../prompts/datetime.ts";
+
 /**
  * Format the initial prompt for a new stream orchestrator.
  * Accepts one or more user messages as context, and an optional agent-authored message.
+ * Prepends the current datetime so the orchestrator knows the time from its first message.
  */
 export function formatStreamPrompt(
   messages: string[],
@@ -9,11 +12,12 @@ export function formatStreamPrompt(
   agentMessage?: string,
   bootstrapFooterPrompt: string = "IMPORTANT: Before doing anything else, load /tmux2",
 ): string {
+  const datetime = formatDatetimeBlock();
   const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
   const footerSection = bootstrapFooterPrompt ? `\n\n${bootstrapFooterPrompt}` : "";
 
   if (messages.length <= 1) {
-    return `${messages[0] ?? ""}${agentSection}${footerSection}`;
+    return `${datetime}\n${messages[0] ?? ""}${agentSection}${footerSection}`;
   }
 
   const total = messages.length;
@@ -24,5 +28,5 @@ export function formatStreamPrompt(
     })
     .join("\n\n");
 
-  return `The following user messages provide context for this stream:\n\n${body}${agentSection}${footerSection}`;
+  return `${datetime}\nThe following user messages provide context for this stream:\n\n${body}${agentSection}${footerSection}`;
 }
