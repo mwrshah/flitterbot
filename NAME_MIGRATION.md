@@ -340,3 +340,36 @@ node ~/development/$NEW/.$NEW/install.mjs
 
 # 10. Verify (see §10 block)
 ```
+
+---
+
+## 9a. Align env vars in user-level skills and plugins
+
+Hooks installed in `~/.claude/settings.json` (§9) now expect `FLITTERBOT_*` env vars, but skills and plugins outside the repo may still set `AUTONOMA_*`. These are the env vars that hooks read to identify agent-managed sessions:
+
+| Old env var | New env var |
+|---|---|
+| `AUTONOMA_AGENT_MANAGED` | `FLITTERBOT_AGENT_MANAGED` |
+| `AUTONOMA_TMUX_SESSION` | `FLITTERBOT_TMUX_SESSION` |
+| `AUTONOMA_STREAM_ID` | `FLITTERBOT_STREAM_ID` |
+| `AUTONOMA_PI_SESSION_ID` | `FLITTERBOT_PI_SESSION_ID` |
+
+### Where to check
+
+1. **User-level skills** — `~/.agents/skills/` (e.g. `tmux2/scripts/sessions.sh` sets these when launching Claude via tmux)
+2. **Claude Code plugins** — any plugin installed from a local directory or marketplace that launches Claude sessions
+3. **Custom scripts** — anything in `~/bin/`, dotfiles, or cron jobs that spawns `claude` with env vars
+
+### Fix
+
+```bash
+# Sweep user skills
+grep -rl 'AUTONOMA_' ~/.agents/skills/ | xargs sed -i '' 's/AUTONOMA_/FLITTERBOT_/g'
+
+# Sweep local plugins
+grep -rl 'AUTONOMA_' ~/development/localskills/ 2>/dev/null | xargs sed -i '' 's/AUTONOMA_/FLITTERBOT_/g'
+```
+
+### Why it matters
+
+Without this, sessions launched by these tools set `AUTONOMA_AGENT_MANAGED=1` but hooks check `FLITTERBOT_AGENT_MANAGED`. Result: hooks silently skip enrichment — no `tmux_session`, `stream_id`, or `pi_session_id` gets reported to the control surface. Sessions appear as unmanaged in the blackboard.
