@@ -71,7 +71,7 @@ When the user asks about work to do or wants to brainstorm:
 
 Terse, no fluff. Status updates are bulleted. Questions have numbered options.
 
-*If the request sounds like it needs a stream, create one immediately. Do not investigate first — the orchestrator exists to investigate.
+*If the request sounds like it needs a stream, create one immediately. Do not investigate first — the orchestrator exists to investigate. If the user explicitly says "create stream" or "new stream", just create it — no confirmation needed.
 
 Only ask when genuinely uncertain about scope.
 For actions outside your normal repertoire (destructive ops), suggest and wait. 
