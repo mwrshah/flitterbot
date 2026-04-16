@@ -1060,6 +1060,11 @@ export class ControlSurfaceRuntime {
               description:
                 "Optional absolute path to use as the working directory for this stream's orchestrator and agents. Takes precedence over repo if both provided.",
             },
+            skipUserMessage: {
+              type: "boolean",
+              description:
+                "When true, skip the default user-message passthrough and context resolution. The agent-authored message becomes the sole context for the new stream. Use when creating multiple streams in a batch where each stream receives targeted context via the message parameter.",
+            },
           },
           required: ["name"],
           additionalProperties: false,
@@ -1070,11 +1075,13 @@ export class ControlSurfaceRuntime {
             message: agentMessage,
             repo,
             cwd: cwdParam,
+            skipUserMessage,
           } = params as {
             name: string;
             message?: string;
             repo?: string;
             cwd?: string;
+            skipUserMessage?: boolean;
           };
 
           // Resolve effective working directory: cwd takes precedence over repo
@@ -1138,7 +1145,7 @@ export class ControlSurfaceRuntime {
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
 
-            if (originalText) {
+            if (originalText && !skipUserMessage) {
               let prompt: string;
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
@@ -1217,13 +1224,42 @@ export class ControlSurfaceRuntime {
                 receivedAt: new Date().toISOString(),
               });
               this.log(`enqueued original user message onto stream "${ws.name}" (${ws.id})`);
+            } else if (skipUserMessage && agentMessage) {
+              const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
+              const prompt = formatStreamPrompt(
+                [],
+                ws.name,
+                ws.id,
+                agentMessage,
+                this.config.orchestratorBootstrapFooterPrompt,
+              );
+              orchestrator.queue.enqueue({
+                id: `ws-init-${ws.id}`,
+                text: prompt,
+                source: "web",
+                metadata: {
+                  stream_id: ws.id,
+                  stream_name: ws.name,
+                },
+                receivedAt: new Date().toISOString(),
+              });
+              this.log(
+                `enqueued agent-only message onto stream "${ws.name}" (${ws.id}) [batch mode]`,
+              );
             }
 
+            const passthroughNote = skipUserMessage
+              ? agentMessage
+                ? " with agent-authored context (batch mode)"
+                : ""
+              : originalText
+                ? " and user message passed through"
+                : "";
             return {
               content: [
                 {
                   type: "text",
-                  text: `Stream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${originalText ? " and user message passed through" : ""}.`,
+                  text: `Stream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${passthroughNote}.`,
                 },
               ],
               details: { streamId: ws.id, streamName: ws.name },

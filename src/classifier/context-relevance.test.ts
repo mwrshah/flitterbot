@@ -70,6 +70,21 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("/tmux2");
   });
 
+  test("skipUserMessage batch mode: empty messages + agent context", () => {
+    const result = formatStreamPrompt(
+      [],
+      "batch-ws",
+      "ws-batch-1",
+      "Investigate renewals pipeline failure in klair-api",
+      "Load /tmux2",
+    );
+    expect(result).not.toContain("User message (");
+    expect(result).not.toContain("The following user messages provide context");
+    expect(result).toContain("--- Agent context ---");
+    expect(result).toContain("Investigate renewals pipeline failure in klair-api");
+    expect(result).toContain("Load /tmux2");
+  });
+
   test("custom footer overrides default", () => {
     const result = formatStreamPrompt(["Hello"], "ws", "ws-1", undefined, "Load /custom-skill first");
     expect(result).toContain("Load /custom-skill first");
