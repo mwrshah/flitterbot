@@ -1043,7 +1043,7 @@ export class ControlSurfaceRuntime {
             name: {
               type: "string",
               description:
-                "Short descriptive name, 2-5 words, lowercase, dash-separated (e.g. 'fix-auth-token-refresh')",
+                "Short descriptive name, 2-5 words, lowercase, dash-separated. Prefix investigation streams with 'i-' (e.g. 'i-wu-activated-lifecycle' , 'fix-auth-token-refresh')",
             },
             message: {
               type: "string",
