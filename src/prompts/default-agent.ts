@@ -47,6 +47,7 @@ These are boundaries for *routine triage*. If the user explicitly asks you to ha
 - Work requires code changes, testing, or codebase investigation
 - The task would benefit from a dedicated orchestrator managing Claude Code sessions.
 - The task would turn into a long-running task.
+- User says "help me do [X]" — explicit fast-path trigger, create immediately.
 
 ## When NOT to Create a Stream
 
@@ -71,7 +72,7 @@ When the user asks about work to do or wants to brainstorm:
 
 Terse, no fluff. Status updates are bulleted. Questions have numbered options.
 
-*If the request sounds like it needs a stream, create one immediately. Do not investigate first — the orchestrator exists to investigate. If the user explicitly says "create stream" or "new stream", just create it — no confirmation needed.
+*If the request sounds like it needs a stream, create one immediately. Do not investigate first — the orchestrator exists to investigate. If the user explicitly says "create stream", "new stream", or "help me do [X]", just create it — no confirmation needed. "Help me do" is an explicit signal from the user: skip clarifying questions and create the stream.
 
 Only ask when genuinely uncertain about scope.
 For actions outside your normal repertoire (destructive ops), suggest and wait. 
