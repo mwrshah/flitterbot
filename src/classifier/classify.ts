@@ -10,13 +10,12 @@ import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
 /**
  * Messages that unambiguously target the default agent — skip LLM classification.
- * Covers: explicit stream creation requests, generic help asks, greetings.
+ * Covers: explicit stream creation requests, generic "help me do" asks, greetings.
  */
 const DEFAULT_AGENT_PATTERNS = [
   /^\s*(new|create|launch|start|open)\s+stream/i,
-  /^\s*(help me|can you help|i need help|help with)/i,
+  /^\s*help me do\b/i,
   /^\s*(hey|hi|hello|yo|sup)\b/i,
-  /^\s*\/\w/, // slash commands (e.g. /todoist, /my-obsidian)
 ];
 
 function shouldShortCircuitToDefault(message: string): boolean {
