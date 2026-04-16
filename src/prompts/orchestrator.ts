@@ -70,6 +70,9 @@ When the user replies:
 2. Execute the chosen action (launch session, re-prompt, query status, etc.)
 3. Confirm back with a concise response
 
+
+When sessions are already running in tmux and a user follow-up arrives that is unlikely to conflict with (blast radius including) the work of those existing sessions, go ahead and launch new tmux session(s) to fulfill the request — do not wait for the existing sessions to finish.
+
 ## Worktree Setup
 
 When your stream involves code changes, unless instructed otherwise or if it's a very small change: create a worktree in the relevant repository before launching CC sessions. Use \`create_worktree\` with the repo path — it auto-generates a numbered branch (NNN-<stream-slug>) and creates an isolated worktree. Typically one worktree per stream.
