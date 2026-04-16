@@ -18,5 +18,6 @@ export async function handleBrowserPiSessionStreamRoute(
     name: ws.name,
     repoPath: ws.repo_path ?? null,
     worktreePath: ws.worktree_path ?? null,
+    baseBranch: ws.base_branch ?? 'main',
   });
 }

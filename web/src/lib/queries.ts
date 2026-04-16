@@ -125,7 +125,7 @@ export function streamsWorktreeQueryOptions(piSessionId: string) {
 }
 
 /**
- * Git diff (against main) for a stream's worktree.
+ * Git diff against the stream's base branch for a stream's worktree.
  * Only fetched when the diff panel toggle is active.
  */
 export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
