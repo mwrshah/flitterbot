@@ -274,7 +274,9 @@ export function DownstreamSessionsPanel({
             <p className="px-4 py-3 text-xs text-destructive">Failed to load diff.</p>
           )}
           {diffQuery.isSuccess && !diffQuery.data && (
-            <p className="px-4 py-3 text-xs text-muted-foreground">No changes against main.</p>
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              No changes against {worktree?.baseBranch ?? "main"}.
+            </p>
           )}
           {diffQuery.isSuccess && diffQuery.data?.mode === "summary" && (
             <>
