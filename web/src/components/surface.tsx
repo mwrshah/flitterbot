@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { MarkdownContent } from "~/components/common/markdown-content";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
@@ -314,7 +315,7 @@ function PlainTextBlock({
             : undefined
         }
       >
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{text}</p>
+        <MarkdownContent content={text} />
       </div>
       {isOverflowing && !expanded && (
         <div
@@ -495,7 +496,7 @@ const OutboundEntry = memo(function OutboundEntry({
           isWhatsApp ? "border-emerald-500/25 bg-emerald-500/5" : "border-blue-500/25 bg-blue-500/5"
         }`}
       >
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{entry.content}</p>
+        <MarkdownContent content={entry.content} />
       </div>
     </div>
   );
@@ -549,7 +550,7 @@ const HookEntry = memo(function HookEntry({
       <div className="flex-1 min-w-0 rounded-lg border border-violet-500/25 bg-violet-500/5 px-3 py-2">
         <p className="text-xs font-medium text-muted-foreground mb-1">{entry.eventName}</p>
         {entry.detail && (
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{entry.detail}</p>
+          <MarkdownContent content={entry.detail} />
         )}
       </div>
     </div>
