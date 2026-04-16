@@ -66,11 +66,6 @@ const icons = {
       <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v1A1.5 1.5 0 0 1 13.5 6h-11A1.5 1.5 0 0 1 1 4.5v-1ZM1 8.5A1.5 1.5 0 0 1 2.5 7h11A1.5 1.5 0 0 1 15 8.5v1A1.5 1.5 0 0 1 13.5 11h-11A1.5 1.5 0 0 1 1 9.5v-1ZM2.5 12A1.5 1.5 0 0 0 1 13.5v.5h14v-.5a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
     </svg>
   ),
-  piAgent: (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
-      <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5.5L3 13.5V11H3a1 1 0 0 1-1-1V3Z" />
-    </svg>
-  ),
 };
 
 export const Sidebar = memo(function Sidebar() {
@@ -111,20 +106,18 @@ export const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      {/* Brand */}
-      <div className="shrink-0 flex items-center justify-between pl-6 pr-2 py-0 border-b border-sidebar-border">
-        <span className="text-lg font-semibold text-sidebar-foreground mt-0.5 -mb-1">flitterbot</span>
-        <img src={logoBlack} alt="Flitterbot" className="h-12 w-auto mt-0 -mb-1 dark:hidden" />
-        <img src={logoWhite} alt="Flitterbot" className="h-12 w-auto mt-0 -mb-1 hidden dark:block" />
-      </div>
-
       {/* Navigation */}
       <nav className="shrink-0 px-3 py-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
           to={lastStreamPath}
           label="Streams"
-          icon={icons.piAgent}
+          icon={
+            <>
+              <img src={logoBlack} alt="" className="w-4 h-4 object-contain dark:hidden" />
+              <img src={logoWhite} alt="" className="w-4 h-4 object-contain hidden dark:block" />
+            </>
+          }
           shortcutHint={streamsShortcutHint}
         />
       </nav>
@@ -150,7 +143,7 @@ export const Sidebar = memo(function Sidebar() {
                     )}
                   >
                     <span className="shrink-0 h-2 w-2 rounded-full bg-sidebar-foreground/25" />
-                    <span className="truncate flex-1">default</span>
+                    <span className="truncate flex-1">flitterbot</span>
                     {defaultShortcut && (
                       <span className="text-sidebar-foreground/30 tabular-nums shrink-0 ml-2 text-xs">
                         {defaultShortcut}
