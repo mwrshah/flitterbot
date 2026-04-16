@@ -8,6 +8,21 @@ import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompt } from "../prompts/classifier.ts";
 import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
+/**
+ * Messages that unambiguously target the default agent — skip LLM classification.
+ * Covers: explicit stream creation requests, generic help asks, greetings.
+ */
+const DEFAULT_AGENT_PATTERNS = [
+  /^\s*(new|create|launch|start|open)\s+stream/i,
+  /^\s*(help me|can you help|i need help|help with)/i,
+  /^\s*(hey|hi|hello|yo|sup)\b/i,
+  /^\s*\/\w/, // slash commands (e.g. /todoist, /my-obsidian)
+];
+
+function shouldShortCircuitToDefault(message: string): boolean {
+  return DEFAULT_AGENT_PATTERNS.some((p) => p.test(message));
+}
+
 export type ClassificationResult = {
   stream: StreamRow | null;
   action: "matched" | "none";
@@ -19,6 +34,12 @@ export async function classifyMessage(
   apiKey: string,
   defaultPiSessionId?: string,
 ): Promise<ClassificationResult> {
+  // Fast-path: messages that clearly target the default agent skip LLM
+  if (shouldShortCircuitToDefault(message)) {
+    console.log("[router] short-circuit to default agent: %s", message.slice(0, 120));
+    return { stream: null, action: "none" };
+  }
+
   const streams = listOpenStreams(db);
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
   const defaultConversation = defaultPiSessionId
