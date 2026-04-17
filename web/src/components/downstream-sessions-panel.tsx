@@ -149,6 +149,8 @@ export function DownstreamSessionsPanel({
   const tmuxCopy = useCopyToClipboard(600);
   const worktreeCopy = useCopyToClipboard(600);
   const branchCopy = useCopyToClipboard(600);
+  const baseBranchCopy = useCopyToClipboard(600);
+  const piCwdCopy = useCopyToClipboard(600);
 
   useEffect(() => {
     return registerShortcutHandlers([
@@ -376,6 +378,17 @@ export function DownstreamSessionsPanel({
                   </span>
                 </span>
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                  Merge Target:{" "}
+                  <CopyableCode
+                    text={worktree.baseBranch}
+                    copied={baseBranchCopy.copied}
+                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch)}
+                  />
+                  <span className="text-muted-foreground/50 text-[10px]">
+                    {baseBranchCopy.copied ? "Copied!" : ""}
+                  </span>
+                </span>
+                <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Worktree:{" "}
                   <CopyableCode
                     text={worktree.worktreePath ?? ""}
@@ -391,6 +404,26 @@ export function DownstreamSessionsPanel({
                     {worktreeCopy.copied ? "Copied!" : worktreeShortcutLabel}
                   </span>
                 </span>
+                {worktree.piSessionCwd && (
+                  <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                    Orchestrator CWD:{" "}
+                    <CopyableCode
+                      text={worktree.piSessionCwd}
+                      displayText={(() => {
+                        const parts = worktree.piSessionCwd.split("/");
+                        const leaf = parts[parts.length - 1] ?? "";
+                        return `../${leaf}`;
+                      })()}
+                      copied={piCwdCopy.copied}
+                      onCopy={() =>
+                        worktree.piSessionCwd && piCwdCopy.copy(worktree.piSessionCwd)
+                      }
+                    />
+                    <span className="text-muted-foreground/50 text-[10px]">
+                      {piCwdCopy.copied ? "Copied!" : ""}
+                    </span>
+                  </span>
+                )}
               </div>
             </div>
           )}

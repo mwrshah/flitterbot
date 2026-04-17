@@ -13,11 +13,16 @@ export async function handleBrowserPiSessionStreamRoute(
   if (!ws) {
     return sendJson(response, 404, { ok: false, error: "No stream for this pi session" });
   }
+  const piSession = runtime.blackboard.get<{ cwd: string }>(
+    "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
+    piSessionId,
+  );
   return sendJson(response, 200, {
     streamId: ws.id,
     name: ws.name,
     repoPath: ws.repo_path ?? null,
     worktreePath: ws.worktree_path ?? null,
     baseBranch: ws.base_branch ?? 'main',
+    piSessionCwd: piSession?.cwd ?? null,
   });
 }
