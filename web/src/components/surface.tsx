@@ -21,6 +21,7 @@ import { SettingsDrawer } from "~/components/settings-drawer";
 
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
+import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
@@ -610,6 +611,10 @@ export function Surface() {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+  const pickerItems = useMemo(
+    () => [...INTERNAL_COMMANDS, ...(skillsData?.items ?? [])],
+    [skillsData],
+  );
 
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
@@ -926,7 +931,7 @@ export function Surface() {
             pendingImages={pendingImages}
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
-            skills={skillsData?.items}
+            skills={pickerItems}
             placeholder="Message streams..."
             fillHeight
             autoFocus

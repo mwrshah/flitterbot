@@ -256,7 +256,12 @@ export class ControlSurfaceRuntime {
   /**
    * Route a message to the correct pi session's queue based on classification metadata.
    */
-  enqueue(input: EnqueueInput): { ok: true; item: QueueItem } | { ok: true; cleared: true } {
+  enqueue(
+    input: EnqueueInput,
+  ):
+    | { ok: true; item: QueueItem }
+    | { ok: true; cleared: true }
+    | { ok: true; reloaded: true } {
     // /clear command: reset the default session without persisting or enqueuing.
     // The frontend strips _targetSessionId for /clear, so if neither stream_id nor
     // _targetSessionId is set, the message is bound for the default session.
@@ -270,6 +275,27 @@ export class ControlSurfaceRuntime {
         this.log(`/clear reset failed: ${error instanceof Error ? error.message : String(error)}`);
       });
       return { ok: true, cleared: true };
+    }
+
+    // /reload command: reload skills/prompts/extensions on the default session
+    // without persisting or enqueuing. Frontend strips _targetSessionId for
+    // /reload, so it always lands on the default session.
+    if (
+      input.text.trim() === "/reload" &&
+      !input.metadata?.stream_id &&
+      !input.metadata?._targetSessionId
+    ) {
+      const managed = this.sessionManager.getDefault();
+      this.log(`/reload: reloading session ${managed?.piSessionId ?? "<none>"}`);
+      void (async () => {
+        try {
+          await managed?.session?.reload();
+          this.wsHub.broadcast({ type: "resources_reloaded" });
+        } catch (error) {
+          this.log(`/reload failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      })();
+      return { ok: true, reloaded: true };
     }
 
     const images = input.images?.map((img) => ({
@@ -994,42 +1020,7 @@ export class ControlSurfaceRuntime {
     role: "orchestrator" | "default" = "default",
     streamId?: string,
   ): CustomToolDefinition[] {
-    const tools: CustomToolDefinition[] = [
-      createQueryBlackboardTool(this.blackboard),
-      {
-        name: "reload_resources",
-        label: "Reload Resources",
-        description:
-          "Reload skills, extensions, prompts, context files, and system prompt. Use after skills or AGENTS.md files have been added or changed on disk.",
-        parameters: {
-          type: "object",
-          properties: {},
-          additionalProperties: false,
-        },
-        execute: async () => {
-          // Reload the session that owns this tool — find by role/stream
-          const managed = streamId
-            ? this.sessionManager.getByStream(streamId)
-            : this.sessionManager.getDefault();
-          if (!managed?.session) {
-            return {
-              content: [{ type: "text", text: "Error: pi session not initialized" }],
-              details: {},
-            };
-          }
-          await managed.session.reload();
-          return {
-            content: [
-              {
-                type: "text",
-                text: "Resources reloaded. Skills, extensions, prompts, context files, and system prompt have been refreshed.",
-              },
-            ],
-            details: { reloadedAt: new Date().toISOString() },
-          };
-        },
-      },
-    ];
+    const tools: CustomToolDefinition[] = [createQueryBlackboardTool(this.blackboard)];
 
     if (role === "default") {
       tools.push({
