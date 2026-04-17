@@ -77,7 +77,35 @@ async function commitUncommittedChanges(worktreePath: string): Promise<CommitRes
   }
 }
 
-type MergeResult = { ok: true } | { ok: false; conflicts: string[]; message: string };
+type MergeResult =
+  | { ok: true; mergedAt: string }
+  | { ok: false; conflicts: string[]; message: string };
+
+/**
+ * Parses `git worktree list --porcelain` output and returns the worktree path
+ * that has `branch` checked out, or null if no worktree currently has it.
+ */
+async function findWorktreeForBranch(repoPath: string, branch: string): Promise<string | null> {
+  let output: string;
+  try {
+    output = await exec("git worktree list --porcelain", repoPath, 5_000);
+  } catch {
+    return null;
+  }
+  const target = `refs/heads/${branch}`;
+  let currentPath: string | null = null;
+  for (const line of output.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      currentPath = line.slice("worktree ".length).trim();
+    } else if (line.startsWith("branch ") && currentPath) {
+      const ref = line.slice("branch ".length).trim();
+      if (ref === target) return currentPath;
+    } else if (line === "") {
+      currentPath = null;
+    }
+  }
+  return null;
+}
 
 async function mergeToTarget(
   repoPath: string,
@@ -94,24 +122,34 @@ async function mergeToTarget(
 
   // Check if already merged
   if (await isBranchAncestorOf(repoPath, branch, targetBranch)) {
-    return { ok: true };
+    return { ok: true, mergedAt: repoPath };
   }
 
-  // Checkout target branch
-  try {
-    await exec(`git checkout ${targetBranch}`, repoPath);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return {
-      ok: false,
-      conflicts: [],
-      message: `Failed to checkout ${targetBranch}: ${msg}`,
-    };
+  // Find a worktree that already has the target branch checked out. If none,
+  // fall back to checking it out in repoPath. (Git refuses `git checkout main`
+  // in repoPath when another worktree has main checked out, which is the
+  // common case.)
+  const existingWorktree = await findWorktreeForBranch(repoPath, targetBranch);
+  let mergeCwd: string;
+  if (existingWorktree) {
+    mergeCwd = existingWorktree;
+  } else {
+    try {
+      await exec(`git checkout ${targetBranch}`, repoPath);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        conflicts: [],
+        message: `Failed to checkout ${targetBranch}: ${msg}`,
+      };
+    }
+    mergeCwd = repoPath;
   }
 
   // Pull latest target
   try {
-    await exec(`git pull origin ${targetBranch} --ff-only`, repoPath);
+    await exec(`git pull origin ${targetBranch} --ff-only`, mergeCwd);
   } catch {
     // Non-fatal — continue with local state
   }
@@ -121,27 +159,24 @@ async function mergeToTarget(
     const mergeCmd = commitMessage
       ? `git merge ${branch} -m '${commitMessage.replace(/'/g, "'\\''")}'`
       : `git merge ${branch} --no-edit`;
-    await exec(mergeCmd, repoPath);
-    return { ok: true };
+    await exec(mergeCmd, mergeCwd);
+    return { ok: true, mergedAt: mergeCwd };
   } catch {
-    // Check if it's a conflict or a different error
-    const conflicts = await getConflictedFiles(repoPath);
+    const conflicts = await getConflictedFiles(mergeCwd);
     if (conflicts.length > 0) {
-      // Abort the failed merge so the repo isn't left in a dirty state
       try {
-        await exec("git merge --abort", repoPath);
+        await exec("git merge --abort", mergeCwd);
       } catch {
         /* ignore */
       }
       return {
         ok: false,
         conflicts,
-        message: `Merge conflict: ${conflicts.length} file(s) conflicted: ${conflicts.join(", ")}`,
+        message: `Merge conflict in ${mergeCwd}: ${conflicts.length} file(s) conflicted: ${conflicts.join(", ")}`,
       };
     }
-    // Non-conflict merge failure
     try {
-      await exec("git merge --abort", repoPath);
+      await exec("git merge --abort", mergeCwd);
     } catch {
       /* ignore */
     }
@@ -149,9 +184,9 @@ async function mergeToTarget(
   }
 }
 
-async function pushBranch(repoPath: string, targetBranch: string): Promise<boolean> {
+async function pushBranch(cwd: string, targetBranch: string): Promise<boolean> {
   try {
-    await exec(`git push origin ${targetBranch}`, repoPath);
+    await exec(`git push origin ${targetBranch}`, cwd);
     return true;
   } catch {
     return false;
@@ -221,14 +256,14 @@ export async function executeCloseStream(
             streamId,
             message:
               mergeResult.message +
-              `. Resolve conflicts in the main repo, then call close_stream again.`,
+              `. Resolve conflicts there, then call close_stream again.`,
             conflicts: mergeResult.conflicts,
           };
         }
         merged = true;
 
-        // Push target branch after clean merge
-        pushed = await pushBranch(repoPath, targetBranch);
+        // Push from wherever the merge happened
+        pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
       }
     }
   }
