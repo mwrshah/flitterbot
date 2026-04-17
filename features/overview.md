@@ -99,7 +99,7 @@ Two roles with tailored system prompts and role-gated tools:
 
 **Orchestrators** — ephemeral, one per workstream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_workstream` (merge, push, cleanup, self-destruct). Cannot write code directly.
 
-Shared: `query_blackboard` (read-only SQL), `reload_resources` (hot-reload). SDK-provided: `read`, `bash`, `grep`.
+Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
 
 Delivery: `followUp` (queue append) or `steer` (bypass queue, interrupt via `streamingBehavior: "steer"`; two-layer bypass at runtime and TurnQueue level).
 

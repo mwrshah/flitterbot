@@ -188,6 +188,8 @@ export type SkillListItem = {
   name: string;
   description: string;
   disableModelInvocation: boolean;
+  /** "command" marks built-in slash commands (/clear, /reload); absent or "skill" for regular skills. */
+  kind?: "skill" | "command";
 };
 
 export type SkillsListResponse = {
@@ -289,4 +291,5 @@ export type WsMessage =
       text: string;
       source: "web";
     }
+  | { type: "resources_reloaded" }
   | { type: "error"; message: string };

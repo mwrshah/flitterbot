@@ -203,6 +203,10 @@ export interface MessageAckWebSocketEvent {
   source: "web";
 }
 
+export interface ResourcesReloadedWebSocketEvent {
+  type: "resources_reloaded";
+}
+
 export interface AgentStartWebSocketEvent {
   type: "agent_start";
   piSessionId?: string;
@@ -268,5 +272,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | SessionsChangedWebSocketEvent
   | WorktreeChangedWebSocketEvent
   | MessageAckWebSocketEvent
+  | ResourcesReloadedWebSocketEvent
   | PongWebSocketEvent
   | ErrorWebSocketEvent;

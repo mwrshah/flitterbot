@@ -87,17 +87,31 @@ export const SkillPicker = memo(function SkillPicker({
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">No matching skills</div>
           ) : (
-            filtered.map((skill) => (
-              <CommandItem
-                key={skill.name}
-                value={skill.name}
-                onSelect={() => onSelect(skill.name)}
-                className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
-              >
-                <span className="font-mono text-xs text-foreground shrink-0">/{skill.name}</span>
-                <span className="text-xs text-muted-foreground truncate">{skill.description}</span>
-              </CommandItem>
-            ))
+            filtered.map((skill) => {
+              const isCommand = skill.kind === "command";
+              return (
+                <CommandItem
+                  key={skill.name}
+                  value={skill.name}
+                  onSelect={() => onSelect(skill.name)}
+                  className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
+                >
+                  <span
+                    className={`font-mono text-xs shrink-0 ${isCommand ? "text-primary font-semibold" : "text-foreground"}`}
+                  >
+                    /{skill.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {skill.description}
+                  </span>
+                  <span
+                    className={`ml-auto text-[10px] uppercase tracking-wide shrink-0 ${isCommand ? "text-primary" : "text-muted-foreground/60"}`}
+                  >
+                    {isCommand ? "Command" : "Skill"}
+                  </span>
+                </CommandItem>
+              );
+            })
           )}
         </CommandList>
       </Command>

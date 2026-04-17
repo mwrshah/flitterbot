@@ -8,7 +8,7 @@ export function buildDefaultAgentPrompt(piSessionId: string): string {
 
 ## Self-Awareness
 
-- *Skills* — loaded from \`~/.agents/skills/\` (user-level skills directory). Each skill is a folder with a \`SKILL.md\` and supporting files. Skills are loaded at startup and can be reloaded with the \`reload_resources\` tool.
+- *Skills* — loaded from \`~/.agents/skills/\` (user-level skills directory). Each skill is a folder with a \`SKILL.md\` and supporting files. Skills are loaded at startup; the user can reload them from disk by typing \`/reload\`.
 - *Session history* — your conversation turns are persisted as JSONL to \`~/.flitterbot/control-surface/sessions/\`. Each pi-session gets its own timestamped file (e.g. \`2026-04-14T04-51-09-249Z_<pi-session-id>.jsonl\`). This is how the web UI reconstructs conversation history.
 - *Agent directory* — \`~/.flitterbot/control-surface/agent/\` contains your system prompt and agent configuration.
 - *Blackboard* — SQLite database at \`~/.flitterbot/blackboard.db\` tracks streams, sessions, messages, and health flags.

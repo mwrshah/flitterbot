@@ -244,6 +244,13 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    // ── resources_reloaded → refresh skills list + toast confirmation ──
+    if (message.type === "resources_reloaded") {
+      queryClient.invalidateQueries({ queryKey: ["skills"] });
+      toast.success("Resources reloaded");
+      return;
+    }
+
     // ── queue_item_start ──
     if (message.type === "queue_item_start") {
       const sid = piSessionId ?? getDefaultPiSessionId();
