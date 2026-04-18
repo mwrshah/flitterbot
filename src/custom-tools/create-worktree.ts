@@ -197,14 +197,45 @@ async function copyEnvFiles(repoPath: string, worktreePath: string): Promise<str
   return results;
 }
 
+/**
+ * Resolve the current branch of the orchestrator's working directory. Used as
+ * the default base_ref when the caller omits one — we branch from whatever the
+ * orchestrator itself is sitting on, not a hardcoded origin/main.
+ *
+ * Fails loudly on detached HEAD, non-git dirs, or git errors. Callers must
+ * surface the error to the LLM so it can choose an explicit base_ref rather
+ * than silently falling back.
+ */
+async function resolveOrchestratorHeadBranch(cwd: string): Promise<string> {
+  if (!existsSync(cwd)) {
+    throw new Error(`Orchestrator cwd does not exist: ${cwd}`);
+  }
+  let raw: string;
+  try {
+    raw = await exec("git rev-parse --abbrev-ref HEAD", cwd, 5_000);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to resolve HEAD branch of orchestrator cwd ${cwd}: ${msg}`);
+  }
+  const branch = raw.trim();
+  if (!branch) {
+    throw new Error(`Orchestrator cwd ${cwd} returned empty HEAD branch`);
+  }
+  if (branch === "HEAD") {
+    throw new Error(`Orchestrator cwd ${cwd} is on a detached HEAD — pass an explicit base_ref`);
+  }
+  return branch;
+}
+
 export async function executeCreateWorktree(
   blackboard: BlackboardDatabase,
   streamId: string,
+  orchestratorCwd: string,
   repoPath: string,
   branchName?: string,
   updateRepoPath?: string,
   updateWorktreePath?: string,
-  baseRef = "origin/main",
+  baseRef?: string,
   force = false,
 ): Promise<CreateWorktreeResult> {
   const stream = getStreamById(blackboard, streamId);
@@ -252,6 +283,24 @@ export async function executeCreateWorktree(
     cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
+  // Resolve base_ref. Explicit caller value wins; otherwise derive from the
+  // orchestrator's own current branch. No silent fallback to origin/main —
+  // failures bubble up as tool errors so the orchestrator can decide what to do.
+  let resolvedBaseRef: string;
+  if (baseRef) {
+    resolvedBaseRef = baseRef;
+  } else {
+    try {
+      resolvedBaseRef = await resolveOrchestratorHeadBranch(orchestratorCwd);
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        streamId,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   // Determine branch name: NNN-<slug> convention
   const slug = slugify(stream.name);
   let resolvedBranch: string;
@@ -293,39 +342,39 @@ export async function executeCreateWorktree(
 
   // Validate baseRef is a real branch (not a SHA, tag, or nonexistent ref)
   const SHA_RE = /^[0-9a-f]{7,40}$/i;
-  if (SHA_RE.test(baseRef)) {
+  if (SHA_RE.test(resolvedBaseRef)) {
     return {
       ok: false,
       streamId,
-      message: `baseRef "${baseRef}" looks like a commit SHA. Please provide a branch name (e.g. "main" or "origin/develop").`,
+      message: `baseRef "${resolvedBaseRef}" looks like a commit SHA. Please provide a branch name (e.g. "main" or "origin/develop").`,
     };
   }
   try {
-    const isTag = await exec(`git tag -l ${JSON.stringify(baseRef)}`, repoPath, 5_000);
+    const isTag = await exec(`git tag -l ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
     if (isTag) {
       return {
         ok: false,
         streamId,
-        message: `baseRef "${baseRef}" is a tag, not a branch. Please provide a branch name.`,
+        message: `baseRef "${resolvedBaseRef}" is a tag, not a branch. Please provide a branch name.`,
       };
     }
   } catch {
     // git tag -l failed — skip tag check
   }
   try {
-    await exec(`git rev-parse --verify ${JSON.stringify(baseRef)}`, repoPath, 5_000);
+    await exec(`git rev-parse --verify ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
   } catch {
     return {
       ok: false,
       streamId,
-      message: `baseRef "${baseRef}" does not resolve to a known branch. Check the name and try again.`,
+      message: `baseRef "${resolvedBaseRef}" does not resolve to a known branch. Check the name and try again.`,
     };
   }
 
   try {
-    const result = await createWorktree(repoPath, resolvedBranch, baseRef);
+    const result = await createWorktree(repoPath, resolvedBranch, resolvedBaseRef);
 
-    const normalizedBase = baseRef.replace(/^origin\//, "");
+    const normalizedBase = resolvedBaseRef.replace(/^origin\//, "");
 
     // Ensure local tracking branch exists so close-stream can `git checkout <base>`
     if (normalizedBase !== "main") {
