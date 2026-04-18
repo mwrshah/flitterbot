@@ -16,8 +16,12 @@ import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorSoloPrompt } from "../prompts/index.ts";
 
-/** Orchestrator context as provided by the caller — piSessionId is injected internally. */
-type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
+/**
+ * Orchestrator context as provided by the caller. `piSessionId` and `cwd` are
+ * injected internally by this module — piSessionId from the freshly-created or
+ * resumed SessionManager, cwd from the effective working directory.
+ */
+type OrchestratorInput = Omit<OrchestratorContext, "piSessionId" | "cwd">;
 
 const HOME = os.homedir();
 
@@ -56,7 +60,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(role, piSessionId, orchestratorContext);
+  const systemPrompt = resolveSystemPrompt(role, piSessionId, workingDir, orchestratorContext);
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
   // concurrent-orchestrator race condition.
@@ -131,11 +135,12 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
 function resolveSystemPrompt(
   role: StreamsRole,
   piSessionId: string,
+  cwd: string,
   ctx?: OrchestratorInput,
 ): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorSoloPrompt({ ...ctx, piSessionId });
+    return buildOrchestratorSoloPrompt({ ...ctx, piSessionId, cwd });
   }
   return buildDefaultAgentPrompt(piSessionId);
 }

@@ -1470,7 +1470,8 @@ export class ControlSurfaceRuntime {
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
-          "Create an isolated git worktree for a stream. Sets up a new branch from origin/main and records the paths on the stream.",
+          "Create an isolated git worktree for a stream. Sets up a new branch and records the paths on the stream. By default, base_ref is resolved from the orchestrator's own current branch (git rev-parse --abbrev-ref HEAD in the orchestrator's pi-session cwd) — NOT hardcoded to origin/main. Pass base_ref explicitly to override.",
+
         parameters: {
           type: "object",
           properties: {
@@ -1492,7 +1493,8 @@ export class ControlSurfaceRuntime {
             },
             base_ref: {
               type: "string",
-              description: "Git ref to branch from (optional, defaults to origin/main)",
+              description:
+                "Git ref to branch from. Optional — when omitted, resolves to the orchestrator's own current branch (from its pi-session cwd). Pass explicitly to override (e.g. 'main', 'develop', 'origin/release-2026'). Does NOT accept SHAs or tags.",
             },
             force: {
               type: "boolean",
@@ -1521,9 +1523,32 @@ export class ControlSurfaceRuntime {
             base_ref?: string;
             force?: boolean;
           };
+          // Resolve the orchestrator's cwd at execution time so the default
+          // base_ref tracks pi_sessions.cwd, not the repo_path arg. pi_sessions
+          // is the source of truth — works whether the orchestrator is live,
+          // dormant, or freshly activated.
+          const orchestratorRow = this.blackboard.get<{ cwd: string | null }>(
+            `SELECT cwd FROM pi_sessions
+             WHERE stream_id = ? AND role = 'orchestrator'
+             ORDER BY started_at DESC LIMIT 1`,
+            stream_id,
+          );
+          const orchestratorCwd = orchestratorRow?.cwd;
+          if (!orchestratorCwd) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error: no orchestrator pi_session found for stream ${stream_id} — cannot resolve base_ref default.`,
+                },
+              ],
+              details: { ok: false, streamId: stream_id },
+            };
+          }
           const result = await executeCreateWorktree(
             this.blackboard,
             stream_id,
+            orchestratorCwd,
             repo_path,
             branch_name,
             update_repo_path,

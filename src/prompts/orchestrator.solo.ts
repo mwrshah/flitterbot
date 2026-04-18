@@ -11,6 +11,7 @@ You do the work directly using your own tools. Do NOT launch tmux sessions, do N
 
 ## Runtime Facts
 - Your final text response each turn is automatically sent to both WhatsApp and the web client.
+- Your cwd: \`${ctx.cwd}\`
 - You are the orchestrator assigned to this one stream.
 - Stream: *${ctx.streamName}* (ID: ${ctx.streamId})${repoLine}
 
