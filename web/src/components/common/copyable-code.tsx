@@ -18,7 +18,7 @@ export function CopyableCode({
   return (
     <span
       onClick={() => (isControlled ? onCopy() : internal.copy(text))}
-      className="inline-block text-xxs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
+      className="inline-block text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
       title={`copy \`${text}\``}
     >
       {!isControlled && isCopied ? (
