@@ -140,13 +140,13 @@ describe("isCoalescableUserInput", () => {
 // --- Coalesce builder unit tests ---
 
 describe("coalesceUserItems", () => {
-  test("joins text with \\n\\n and preserves order", () => {
+  test("joins text with \\n and preserves order", () => {
     const merged = coalesceUserItems([
       mk({ id: "a", text: "first", source: "web", sender: "user", serverMessageId: "sm-a" }),
       mk({ id: "b", text: "second", source: "web", sender: "user", serverMessageId: "sm-b" }),
       mk({ id: "c", text: "third", source: "web", sender: "user", serverMessageId: "sm-c" }),
     ]);
-    expect(merged.text).toBe("first\n\nsecond\n\nthird");
+    expect(merged.text).toBe("first\nsecond\nthird");
   });
 
   test("serverMessageId comes from the last item", () => {
@@ -234,7 +234,7 @@ describe("TurnQueue.pump coalescing", () => {
     );
     // [primer, coalesced(u1+u2+u3)]
     expect(delivered).toHaveLength(2);
-    expect(delivered[1]!.text).toBe("a\n\nb\n\nc");
+    expect(delivered[1]!.text).toBe("a\nb\nc");
     expect(delivered[1]!.id).toBe("coalesced:u1+2");
     expect(delivered[1]!.serverMessageId).toBe("sm-3");
     expect(delivered[1]!.metadata?.coalescedFrom).toEqual(["u1", "u2", "u3"]);
@@ -251,7 +251,7 @@ describe("TurnQueue.pump coalescing", () => {
       ],
     );
     // [primer, u1, a1, coalesced(u2+u3)]
-    expect(delivered.map((d) => d.text)).toEqual(["prime", "one", "agent-note", "two\n\nthree"]);
+    expect(delivered.map((d) => d.text)).toEqual(["prime", "one", "agent-note", "two\nthree"]);
     expect(delivered[3]!.id).toBe("coalesced:u2+1");
   });
 
@@ -275,7 +275,7 @@ describe("TurnQueue.pump coalescing", () => {
       "prime",
       "before",
       "with-image",
-      "after1\n\nafter2",
+      "after1\nafter2",
     ]);
   });
 
@@ -322,7 +322,7 @@ describe("TurnQueue.pump coalescing", () => {
       ],
     );
     expect(delivered).toHaveLength(2);
-    expect(delivered[1]!.text).toBe("web-msg\n\nwa-msg");
+    expect(delivered[1]!.text).toBe("web-msg\nwa-msg");
   });
 
   test("ws-init bootstrap (source=web, sender=system) does NOT coalesce with user follow-up", async () => {
@@ -337,7 +337,7 @@ describe("TurnQueue.pump coalescing", () => {
     expect(delivered.map((d) => d.text)).toEqual([
       "prime",
       "[bootstrap]",
-      "user-follow-up-1\n\nuser-follow-up-2",
+      "user-follow-up-1\nuser-follow-up-2",
     ]);
   });
 });

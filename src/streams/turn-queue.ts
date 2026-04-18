@@ -39,7 +39,7 @@ export function isCoalescableUserInput(item: QueueItem): boolean {
 
 /**
  * Merge consecutive user-input items into a single delivery.
- *   - text:              joined with "\n\n"
+ *   - text:              joined with "\n"
  *   - metadata:          last-wins key merge + explicit `coalescedFrom` audit array
  *   - serverMessageId:   last in group (SDK stamps a single user entry; matches the
  *                        most recent optimistic UI bubble)
@@ -61,7 +61,7 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     id: `coalesced:${first.id}+${items.length - 1}`,
     source: first.source,
     sender: "user",
-    text: items.map((it) => it.text).join("\n\n"),
+    text: items.map((it) => it.text).join("\n"),
     metadata,
     receivedAt: first.receivedAt,
     webClientId: last.webClientId,
