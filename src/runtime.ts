@@ -302,9 +302,15 @@ export class ControlSurfaceRuntime {
     }));
     // Use pre-generated serverMessageId if provided (e.g. from WS handler), else generate one
     const messageUuid = input.serverMessageId ?? crypto.randomUUID();
+    // sender = "user" only for real user-input channels (web/whatsapp). cron
+    // scheduled nudges are agent-generated, so they're tagged "system" and do
+    // NOT coalesce with user messages.
+    const sender: "user" | "system" =
+      input.source === "web" || input.source === "whatsapp" ? "user" : "system";
     const item: QueueItem = {
       id: crypto.randomUUID(),
       source: input.source,
+      sender,
       text: input.text,
       metadata: input.metadata,
       receivedAt: new Date().toISOString(),
@@ -536,6 +542,7 @@ export class ControlSurfaceRuntime {
     const hookItem: QueueItem = {
       id: crypto.randomUUID(),
       source: "hook",
+      sender: "system",
       text,
       metadata: { event: normalized, ...payload },
       receivedAt: new Date().toISOString(),
@@ -1297,6 +1304,9 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
+                // Bootstrap prompt is agent-authored — do NOT coalesce with
+                // subsequent real user messages.
+                sender: "system",
                 metadata: {
                   stream_id: ws.id,
                   stream_name: ws.name,
@@ -1317,6 +1327,9 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
+                // Bootstrap prompt is agent-authored — do NOT coalesce with
+                // subsequent real user messages.
+                sender: "system",
                 metadata: {
                   stream_id: ws.id,
                   stream_name: ws.name,
@@ -1414,6 +1427,7 @@ export class ControlSurfaceRuntime {
               id: `enq-msg-${crypto.randomUUID()}`,
               text: message,
               source: "agent",
+              sender: "system",
               metadata: {
                 stream_id: ws.id,
                 stream_name: ws.name,
