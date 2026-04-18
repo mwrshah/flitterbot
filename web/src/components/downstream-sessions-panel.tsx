@@ -393,9 +393,9 @@ export function DownstreamSessionsPanel({
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Merge Target:{" "}
                   <CopyableCode
-                    text={worktree.baseBranch}
+                    text={worktree.baseBranch ?? "main"}
                     copied={baseBranchCopy.copied}
-                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch)}
+                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch ?? "main")}
                   />
                   <span className="text-muted-foreground/50 text-[10px]">
                     {baseBranchCopy.copied ? "Copied!" : ""}
