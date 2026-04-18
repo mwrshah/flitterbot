@@ -4,6 +4,7 @@ import { ColorSchemeType } from "diff2html/lib/types";
 import "diff2html/bundles/css/diff2html.min.css";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { CopyableCode } from "~/components/common/copyable-code";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useTheme } from "~/hooks/use-theme";
@@ -46,37 +47,6 @@ function piStatusBanner(status: PiSessionStatus | undefined) {
     default:
       return null;
   }
-}
-
-function CopyableCode({
-  text,
-  displayText,
-  copied: externalCopied,
-  onCopy,
-}: {
-  text: string;
-  displayText?: string;
-  copied?: boolean;
-  onCopy?: () => void;
-}) {
-  const internal = useCopyToClipboard(600);
-  const isControlled = onCopy !== undefined;
-  const isCopied = isControlled ? (externalCopied ?? false) : internal.copied;
-
-  return (
-    <button
-      type="button"
-      onClick={() => (isControlled ? onCopy() : internal.copy(text))}
-      className="inline-block font-mono text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
-      title={`copy \`${text}\``}
-    >
-      {!isControlled && isCopied ? (
-        <span className="text-muted-foreground">Copied!</span>
-      ) : (
-        <span>{displayText ?? text}</span>
-      )}
-    </button>
-  );
 }
 
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
@@ -150,7 +120,6 @@ export function DownstreamSessionsPanel({
   const worktreeCopy = useCopyToClipboard(600);
   const branchCopy = useCopyToClipboard(600);
   const baseBranchCopy = useCopyToClipboard(600);
-  const cwdCopy = useCopyToClipboard(600);
 
   useEffect(() => {
     return registerShortcutHandlers([
@@ -303,20 +272,6 @@ export function DownstreamSessionsPanel({
       ) : (
         /* Default sessions + worktree panel */
         <div className="flex-1 overflow-y-auto">
-          {worktree?.cwd && worktree.cwdAbsolute && (
-            <div className="px-4 pt-3 pb-2 border-b border-border flex items-center gap-1 min-w-0 text-xs text-muted-foreground">
-              <span className="shrink-0">CWD:</span>
-              <CopyableCode
-                text={worktree.cwdAbsolute}
-                displayText={worktree.cwd}
-                copied={cwdCopy.copied}
-                onCopy={() => worktree.cwdAbsolute && cwdCopy.copy(worktree.cwdAbsolute)}
-              />
-              <span className="text-muted-foreground/50 text-[10px]">
-                {cwdCopy.copied ? "Copied!" : ""}
-              </span>
-            </div>
-          )}
           <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
             Active Sessions
           </p>
