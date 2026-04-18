@@ -139,19 +139,27 @@ code,
 .diff-viewer-panel .d2h-code-line {
   /* Drop the library's width:calc(100%-16em) + padding:0 8em (those reserved
      space for the absolute gutter, which is now in flow). Flex-fill the
-     remaining row width and wrap long lines instead of clipping. */
+     remaining row width and wrap long lines instead of clipping.
+
+     white-space MUST stay collapsing here. The library's template emits a
+     newline + indent between the <span.d2h-code-line-prefix> and
+     <span.d2h-code-line-ctn> siblings; with pre-wrap that whitespace
+     renders and the prefix ends up on its own visual line above the code.
+     Keep 'normal' on the outer so inter-span whitespace collapses; pre-wrap
+     lives on the inner .d2h-code-line-ctn where real code indentation is. */
   position: static;
   flex: 1 1 0;
   min-width: 0;
   width: auto;
   padding: 0 0.5em;
-  white-space: pre-wrap;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .diff-viewer-panel .d2h-code-line-ctn {
   /* Library sets width:100% (needed in its original inline-block layout).
      In our flex layout that forces the ctn to row width and defeats wrap;
-     let it size to content instead. */
+     let it size to content instead. pre-wrap preserves the real code
+     indentation while allowing soft-wrap at the container edge. */
   width: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
