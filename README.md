@@ -24,8 +24,8 @@ The installer (step 3 in quickstart) deploys to `~/.flitterbot/`, writes `web/.e
 **`.env`:** `ANTHROPIC_API_KEY` (optional - otherwise fallbacks to Anthropic Oauth token obtained via Pi TUI — Run `pi` in terminal, then `/login` to populate), `GROQ_API_KEY` (required for message classification).
 
 **`~/.flitterbot/config.json` options:**
-- `piModel` (default `claude-opus-4-6`) — model for all Pi agents
-- `piThinkingLevel` (default `medium`) — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`
+- `piModel` (default `claude-opus-4-7`) — model for all Pi agents
+- `piThinkingLevel` (default `high`) — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`
 - `stallMinutes` (default `15`) — inactivity before a session is stalled
 - `toolTimeoutMinutes` (default `4`) — tool-waiting timeout before stall
 - `claudeCliCommand` (default `claude --dangerously-skip-permissions`) — CLI used to launch sessions
