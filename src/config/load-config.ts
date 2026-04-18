@@ -100,7 +100,9 @@ export function loadConfig(): FlitterbotConfig {
   );
   const whatsappPidPath = expandHome(raw.whatsappPidPath ?? "~/.flitterbot/whatsapp/daemon.pid");
   const whatsappCliPath = expandHome(raw.whatsappCliPath ?? "~/.flitterbot/whatsapp/cli.js");
-  const whatsappDaemonPath = expandHome(raw.whatsappDaemonPath ?? "~/.flitterbot/whatsapp/daemon.js");
+  const whatsappDaemonPath = expandHome(
+    raw.whatsappDaemonPath ?? "~/.flitterbot/whatsapp/daemon.js",
+  );
   const projectsDir = expandHome(raw.projectsDir ?? "~/development");
   const wipeStreamsOnStart = raw.wipeStreamsOnStart ?? process.env.FLITTERBOT_WIPE_STREAMS === "1";
   const whatsappEnabled =
@@ -110,9 +112,9 @@ export function loadConfig(): FlitterbotConfig {
       : (raw.whatsappEnabled ?? true);
   const shortcuts = raw.shortcuts ?? {};
   const defaultAgentBootstrapPrompt =
-    raw.defaultAgentBootstrapPrompt ?? "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
-  const orchestratorBootstrapFooterPrompt =
-    raw.orchestratorBootstrapFooterPrompt ?? "IMPORTANT: Before doing anything else, load /tmux2";
+    raw.defaultAgentBootstrapPrompt ??
+    "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
+  const orchestratorBootstrapFooterPrompt = raw.orchestratorBootstrapFooterPrompt ?? "";
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: FlitterbotConfig = {
