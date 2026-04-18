@@ -9,25 +9,25 @@ export async function handleBrowserPiSessionStreamRoute(
   response: http.ServerResponse,
   piSessionId: string,
 ) {
-  const ws = getStreamForPiSession(runtime.blackboard, piSessionId);
-  if (!ws) {
-    return sendJson(response, 404, { ok: false, error: "No stream for this pi session" });
-  }
+  // cwd is sourced exclusively from pi_sessions.cwd — i.e. where
+  // createAgentSession was invoked for this pi session. No fallback to
+  // stream.worktree_path / repo_path: the agent's actual working directory
+  // is the single source of truth.
   const piSession = runtime.blackboard.get<{ cwd: string }>(
     "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
     piSessionId,
   );
-  const piSessionCwd = piSession?.cwd ?? null;
-  const worktreePath = ws.worktree_path ?? null;
-  const repoPath = ws.repo_path ?? null;
-  const effectiveCwd = piSessionCwd ?? worktreePath ?? repoPath;
+  const ws = getStreamForPiSession(runtime.blackboard, piSessionId);
+  if (!piSession && !ws) {
+    return sendJson(response, 404, { ok: false, error: "Unknown pi session" });
+  }
+  const cwd = piSession?.cwd ?? null;
   return sendJson(response, 200, {
-    streamId: ws.id,
-    name: ws.name,
-    repoPath,
-    worktreePath,
-    baseBranch: ws.base_branch ?? "main",
-    piSessionCwd,
-    effectiveCwd,
+    streamId: ws?.id ?? null,
+    name: ws?.name ?? null,
+    repoPath: ws?.repo_path ?? null,
+    worktreePath: ws?.worktree_path ?? null,
+    baseBranch: ws?.base_branch ?? null,
+    cwd,
   });
 }

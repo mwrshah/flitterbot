@@ -303,13 +303,13 @@ export function DownstreamSessionsPanel({
       ) : (
         /* Default sessions + worktree panel */
         <div className="flex-1 overflow-y-auto">
-          {worktree?.effectiveCwd && (
+          {worktree?.cwd && (
             <div className="px-4 pt-3 pb-2 border-b border-border flex items-center gap-1 min-w-0 text-xs text-muted-foreground">
               <span className="shrink-0">CWD:</span>
               <CopyableCode
-                text={worktree.effectiveCwd}
+                text={worktree.cwd}
                 copied={cwdCopy.copied}
-                onCopy={() => worktree.effectiveCwd && cwdCopy.copy(worktree.effectiveCwd)}
+                onCopy={() => worktree.cwd && cwdCopy.copy(worktree.cwd)}
               />
               <span className="text-muted-foreground/50 text-[10px]">
                 {cwdCopy.copied ? "Copied!" : ""}
@@ -393,9 +393,9 @@ export function DownstreamSessionsPanel({
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Merge Target:{" "}
                   <CopyableCode
-                    text={worktree.baseBranch}
+                    text={worktree.baseBranch ?? "main"}
                     copied={baseBranchCopy.copied}
-                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch)}
+                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch ?? "main")}
                   />
                   <span className="text-muted-foreground/50 text-[10px]">
                     {baseBranchCopy.copied ? "Copied!" : ""}
