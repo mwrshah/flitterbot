@@ -944,20 +944,25 @@ export class ControlSurfaceRuntime {
     const ws = getStreamById(this.blackboard, streamId);
     if (!ws) throw new Error("Stream not found");
 
-    // Allow reopen for closed streams AND for open streams with an ended
-    // pi_session (broken state from legacy detectCloseStream destroying the
-    // orchestrator without closing the stream).
-    const hasEndedPiSession =
+    // Allow reopen for:
+    //   - closed streams (normal reopen flow)
+    //   - open streams with an ended pi_session (legacy detectCloseStream destroyed
+    //     the orchestrator without closing the stream)
+    //   - open streams with a crashed pi_session (queue item error triggered
+    //     destroyOrchestrator with reason='crashed'; stream is intact but the
+    //     orchestrator process is gone and needs to be revived)
+    const hasDeadPiSession =
       ws.status === "open" &&
       !!this.blackboard.get<{ pi_session_id: string }>(
         `SELECT pi_session_id FROM pi_sessions
-         WHERE stream_id = ? AND role = 'orchestrator' AND status = 'ended'
+         WHERE stream_id = ? AND role = 'orchestrator'
+           AND status IN ('ended', 'crashed')
          ORDER BY started_at DESC LIMIT 1`,
         streamId,
       );
 
-    if (ws.status !== "closed" && !hasEndedPiSession) {
-      throw new Error("Stream is not closed");
+    if (ws.status !== "closed" && !hasDeadPiSession) {
+      throw new Error("Stream is not closed and has no recoverable pi-session");
     }
 
     // 1. Reopen the stream (if closed) and clear stale worktree_path
@@ -1013,7 +1018,9 @@ export class ControlSurfaceRuntime {
       streamName: ws.name,
     });
 
-    this.log(`reopened stream "${ws.name}" (${streamId})`);
+    const reopenReason =
+      ws.status === "closed" ? "reopened closed stream" : "recovered dead pi-session for stream";
+    this.log(`${reopenReason} "${ws.name}" (${streamId})`);
     return { ok: true, streamId };
   }
 

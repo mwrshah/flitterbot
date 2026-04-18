@@ -63,9 +63,17 @@ function PiSessionRoute() {
   const { apiClient } = rootApi.useRouteContext();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
-  // Also treat open streams with ended pi_session as "closed" so the Reopen
-  // button appears (handles the broken state from legacy close detection).
-  const isStreamClosed = stream?.status === "closed" || stream?.piSessionStatus === "ended";
+  // Recovery kind drives which button (if any) renders in the chat header:
+  //   - 'closed'  → stream itself was closed; show "Reopen"
+  //   - 'dead'    → stream is open but its orchestrator pi-session ended or
+  //                 crashed; show "Recover"
+  //   - undefined → nothing to recover
+  const recoveryKind: "closed" | "dead" | undefined =
+    stream?.status === "closed"
+      ? "closed"
+      : stream?.piSessionStatus === "ended" || stream?.piSessionStatus === "crashed"
+        ? "dead"
+        : undefined;
 
   const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
     piSessionId,
@@ -87,7 +95,7 @@ function PiSessionRoute() {
           onSendMessage={onSendMessage}
           streamId={stream?.id}
           streamName={stream?.name}
-          isStreamClosed={isStreamClosed}
+          recoveryKind={recoveryKind}
         />
       </Panel>
       <ResizeHandle />

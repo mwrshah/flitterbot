@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { RotateCcw } from "lucide-react";
+import { LifeBuoy, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
@@ -45,7 +45,10 @@ type ChatPanelProps = {
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
   streamId?: string;
   streamName?: string;
-  isStreamClosed?: boolean;
+  /** Recovery action to offer in the header, if any:
+   *  - 'closed' → stream is closed; offer "Reopen"
+   *  - 'dead'   → stream is open but pi-session ended/crashed; offer "Recover" */
+  recoveryKind?: "closed" | "dead";
 };
 
 export function ChatPanel({
@@ -55,14 +58,14 @@ export function ChatPanel({
   onSendMessage,
   streamId,
   streamName,
-  isStreamClosed,
+  recoveryKind,
 }: ChatPanelProps) {
   useWhyDidYouRender("ChatPanel", {
     piSessionId,
     timeline,
     isSessionBusy,
     streamId,
-    isStreamClosed,
+    recoveryKind,
   });
   const isClient = useIsClient();
   const { config, setConfig } = useUserConfig();
@@ -88,9 +91,18 @@ export function ChatPanel({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
-  const reopenMutation = useMutation({
+  // Single endpoint handles both reopen (closed stream) and recover (dead
+  // pi-session). Label and icon differ but the server flow is identical.
+  const recoverMutation = useMutation({
     mutationFn: () => apiClient.reopenStream(streamId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+    onError: (error) => {
+      toast.error(
+        `Failed to ${recoveryKind === "dead" ? "recover" : "reopen"}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
   });
 
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
@@ -285,16 +297,26 @@ export function ChatPanel({
               {interruptMutation.isPending ? "Stopping..." : "Stop"}
             </Button>
           )}
-          {isClient && !isSessionActive && isStreamClosed && streamId && (
+          {isClient && !isSessionActive && recoveryKind && streamId && (
             <Button
               variant="outline"
               size="sm"
               className="h-6 px-2 text-[11px]"
-              disabled={reopenMutation.isPending}
-              onClick={() => reopenMutation.mutate()}
+              disabled={recoverMutation.isPending}
+              onClick={() => recoverMutation.mutate()}
             >
-              <RotateCcw className="size-3" />
-              {reopenMutation.isPending ? "Reopening..." : "Reopen"}
+              {recoveryKind === "dead" ? (
+                <LifeBuoy className="size-3" />
+              ) : (
+                <RotateCcw className="size-3" />
+              )}
+              {recoverMutation.isPending
+                ? recoveryKind === "dead"
+                  ? "Recovering..."
+                  : "Reopening..."
+                : recoveryKind === "dead"
+                  ? "Recover"
+                  : "Reopen"}
             </Button>
           )}
         </div>

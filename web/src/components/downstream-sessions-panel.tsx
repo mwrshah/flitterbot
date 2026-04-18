@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
@@ -14,6 +15,7 @@ import {
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
 import {
+  statusQueryOptions,
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsWorktreeQueryOptions,
@@ -45,6 +47,64 @@ function piStatusBanner(status: PiSessionStatus | undefined) {
     default:
       return null;
   }
+}
+
+/**
+ * Renders the pi-session status pill at the top of the downstream panel.
+ * For "crashed" and "ended" states, the pill becomes a clickable button that
+ * triggers stream recovery (same endpoint as the header "Recover" button).
+ * Hovering shows the action affordance.
+ */
+function PiStatusBanner({
+  piSessionId,
+  piSessionStatus,
+}: {
+  piSessionId: string;
+  piSessionStatus: PiSessionStatus | undefined;
+}) {
+  const rootApi = getRouteApi("__root__");
+  const { apiClient } = rootApi.useRouteContext();
+  const queryClient = useQueryClient();
+  const { data: status } = useQuery(statusQueryOptions(apiClient));
+  const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
+  const streamId = stream?.id;
+
+  const recoverMutation = useMutation({
+    mutationFn: () => apiClient.reopenStream(streamId!),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+    onError: (error) => {
+      toast.error(`Failed to recover: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+
+  const banner = piStatusBanner(piSessionStatus);
+  if (!banner) return <div />;
+
+  const canRecover = !!streamId && (piSessionStatus === "crashed" || piSessionStatus === "ended");
+  if (!canRecover) {
+    return (
+      <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
+        {banner.label}
+      </div>
+    );
+  }
+
+  const label = recoverMutation.isPending ? "Recovering…" : `${banner.label} — click to recover`;
+  return (
+    <button
+      type="button"
+      disabled={recoverMutation.isPending}
+      onClick={() => recoverMutation.mutate()}
+      className={cn(
+        "px-3 py-1.5 rounded-md text-xs font-medium transition-opacity",
+        banner.colorClass,
+        "hover:opacity-80 disabled:opacity-50 cursor-pointer",
+      )}
+      title="Recover this stream's orchestrator"
+    >
+      {label}
+    </button>
+  );
 }
 
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
@@ -196,16 +256,7 @@ export function DownstreamSessionsPanel({
     <div className="flex flex-col h-full border-l border-border bg-background">
       {/* Header row: status banner + diff toggle */}
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
-        {(() => {
-          const banner = piStatusBanner(piSessionStatus);
-          return banner ? (
-            <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
-              {banner.label}
-            </div>
-          ) : (
-            <div />
-          );
-        })()}
+        <PiStatusBanner piSessionId={piSessionId} piSessionStatus={piSessionStatus} />
         <ToggleGroup
           value={[panelView]}
           onValueChange={(newValue) => {
