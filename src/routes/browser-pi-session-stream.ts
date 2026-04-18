@@ -1,4 +1,5 @@
 import type http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
@@ -37,7 +38,14 @@ export async function handleBrowserPiSessionStreamRoute(
 
 function relativizeCwd(cwdAbsolute: string, projectsDir: string): string {
   const rel = path.relative(projectsDir, cwdAbsolute);
-  if (rel === "") return cwdAbsolute;
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return cwdAbsolute;
+  if (rel === "") return homeify(cwdAbsolute);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return homeify(cwdAbsolute);
   return `../${rel}`;
+}
+
+function homeify(absolute: string): string {
+  const home = os.homedir();
+  if (absolute === home) return "~";
+  if (absolute.startsWith(`${home}/`)) return `~/${absolute.slice(home.length + 1)}`;
+  return absolute;
 }
