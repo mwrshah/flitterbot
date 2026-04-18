@@ -67,8 +67,10 @@ function PiSessionRoute() {
   // button appears (handles the broken state from legacy close detection).
   const isStreamClosed = stream?.status === "closed" || stream?.piSessionStatus === "ended";
 
-  const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
-    useStreamsChat(piSessionId, history);
+  const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
+    piSessionId,
+    history,
+  );
 
   return (
     <PanelGroup
@@ -81,7 +83,6 @@ function PiSessionRoute() {
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
-          statusPills={statusPills}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
           streamId={stream?.id}
