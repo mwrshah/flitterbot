@@ -258,10 +258,7 @@ export class ControlSurfaceRuntime {
    */
   enqueue(
     input: EnqueueInput,
-  ):
-    | { ok: true; item: QueueItem }
-    | { ok: true; cleared: true }
-    | { ok: true; reloaded: true } {
+  ): { ok: true; item: QueueItem } | { ok: true; cleared: true } | { ok: true; reloaded: true } {
     // /clear command: reset the default session without persisting or enqueuing.
     // The frontend strips _targetSessionId for /clear, so if neither stream_id nor
     // _targetSessionId is set, the message is bound for the default session.
@@ -424,7 +421,11 @@ export class ControlSurfaceRuntime {
         source: pickString(payload, ["source"]),
         transcript_path: pickString(payload, ["transcript_path", "transcriptPath"]),
         agent_managed: agentManaged,
-        tmux_session: pickString(payload, ["tmux_session", "tmuxSession", "FLITTERBOT_TMUX_SESSION"]),
+        tmux_session: pickString(payload, [
+          "tmux_session",
+          "tmuxSession",
+          "FLITTERBOT_TMUX_SESSION",
+        ]),
         task_description: pickString(payload, [
           "task_description",
           "taskDescription",
@@ -1165,7 +1166,13 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(originalText)) {
                       relevantTexts.push(originalText);
                     }
-                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage, this.config.orchestratorBootstrapFooterPrompt);
+                    prompt = formatStreamPrompt(
+                      relevantTexts,
+                      ws.name,
+                      ws.id,
+                      agentMessage,
+                      this.config.orchestratorBootstrapFooterPrompt,
+                    );
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
@@ -1469,7 +1476,7 @@ export class ControlSurfaceRuntime {
         name: "close_stream",
         label: "Close Stream",
         description:
-          'Close the current stream. Mode is required: "merge" merges branch into main, pushes, and closes. "noop" skips all git operations and just closes the stream record. Only call when the human explicitly confirms the work is done.',
+          'Close the current stream. Mode is required: "merge" merges branch into the stream\'s recorded base branch, pushes, and closes. "noop" skips all git operations and just closes the stream record. Only call when the human explicitly confirms the work is done.',
         parameters: {
           type: "object",
           properties: {
@@ -1478,22 +1485,28 @@ export class ControlSurfaceRuntime {
               type: "string",
               enum: ["merge", "noop"],
               description:
-                '"merge" commits uncommitted changes, merges branch to main, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
+                '"merge" commits uncommitted changes, merges branch to the stream\'s base branch, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
             },
             merge_commit_message: {
               type: "string",
               description:
                 "Optional commit message for the merge commit when mode is merge. Ignored for noop mode. Falls back to git's default merge commit message if omitted.",
             },
+            base_branch: {
+              type: "string",
+              description:
+                "Optional override for the branch to merge into. When provided, supersedes the stream's recorded base_branch. Use this if the stream record is missing base_branch or if you need to merge somewhere different. Ignored in noop mode.",
+            },
           },
           required: ["stream_id", "mode"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, mode, merge_commit_message } = params as {
+          const { stream_id, mode, merge_commit_message, base_branch } = params as {
             stream_id: string;
             mode: "merge" | "noop";
             merge_commit_message?: string;
+            base_branch?: string;
           };
           const managed = closeStreamId
             ? this.sessionManager.getByStream(closeStreamId)
@@ -1511,6 +1524,7 @@ export class ControlSurfaceRuntime {
             stream_id,
             mode,
             merge_commit_message,
+            base_branch,
           );
           if (result.ok) {
             // Flag for post-turn destruction — destroying mid-turn would prevent the
@@ -1851,7 +1865,11 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
   const sessionId = pickString(payload, ["session_id", "sessionId"]);
   const cwd = pickString(payload, ["cwd"]);
   const transcript = pickString(payload, ["transcript_path", "transcriptPath"]);
-  const tmuxSession = pickString(payload, ["tmux_session", "tmuxSession", "FLITTERBOT_TMUX_SESSION"]);
+  const tmuxSession = pickString(payload, [
+    "tmux_session",
+    "tmuxSession",
+    "FLITTERBOT_TMUX_SESSION",
+  ]);
   const project = pickString(payload, ["project", "project_label", "projectLabel"]);
   const reason = pickString(payload, ["reason", "stop_reason", "session_end_reason"]);
   const agentManaged =
