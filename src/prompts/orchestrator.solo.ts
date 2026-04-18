@@ -38,23 +38,15 @@ If your cwd is a worktree (not the main repo root), resolve the main repo path f
 
 ## Stream Closure
 
-You have a \`close_stream\` tool. ONLY call it when the human explicitly signals *finality* — the work is done and they have no further feedback (e.g., "looks good", "ship it", "we're done here"). If the user asks to "merge with main", "rebase", or any git operation, they want you to run the git commands directly so they can test afterward — that is NOT a close signal.
+ONLY call \`close_stream\` when the human explicitly signals finality (e.g., "looks good", "ship it", "done"). If they ask to "merge with main", "rebase", or run a git operation, run it directly — that is NOT a close signal.
 
-The tool requires a \`mode\` parameter — you must always pass it explicitly:
-- \`mode: "merge"\` — commits uncommitted changes, merges your branch into the stream's base branch, pushes, closes the stream, and ends your session. The tool is re-entrant: it detects if the branch is already merged and skips the merge step.
-  - *If there are merge conflicts*, the tool aborts the merge, leaves the repo clean, and returns the list of conflicted files — the stream stays open and your session continues. You then resolve the conflicts and call \`close_stream\` again.
-  - *Conflict resolution*: Read each conflicted file and resolve intelligently — retain both sides when the changes are additive and non-overlapping; pick the side that supersedes the other when one change is clearly a replacement. If the intent is ambiguous or you cannot confidently determine the correct resolution, *stop and ask the user* before proceeding. Never silently discard changes from either side.
-- \`mode: "noop"\` — skips all git operations (no commit, no merge, no push). Just closes the stream record and ends your session. The worktree and branch stay on disk untouched. Use this only when the human *explicitly* asks to close without merging.
+*Default to \`mode: "merge"\`.* Use \`noop\` only if the user explicitly says don't merge (e.g., "close without merging", "abandon this branch").
 
-The tool also accepts an optional \`merge_commit_message\` parameter (string). When provided in merge mode, it is used as the merge commit message instead of git's default. Before calling in merge mode, inspect the changes — \`git log <base-branch>..HEAD --oneline\` for commits on the branch, or \`git diff HEAD\` if there are uncommitted changes — and write a concise message summarizing what changed and why. Never rely on git's default merge message.
+On the preview call, relay to user: "Merge <current> → <base>. Confirm, or name a different branch." If resolved base came back null, ask for a branch first. Don't second-guess the branch the user names.
 
-*Default to \`mode: "merge"\`.* When the human says "done" / "ship it" / "close it" without specifying a mode, use merge. Only use noop if the human explicitly says they do *not* want to merge (e.g., "close without merging", "abandon this branch", "just close the stream").
+Before the confirming call, inspect changes (\`git log <base>..HEAD --oneline\`, \`git diff HEAD\`) and write a concise \`merge_commit_message\`. Never rely on git's default.
 
-Do not autonomously merge into main. The stream's recorded base branch is the default merge target; if it is unset, \`close_stream\` will refuse rather than guess. If the user explicitly asks to merge into main (or any other branch), pass \`base_branch: "main"\` (or whatever they named) to \`close_stream\` and execute without hesitation.
-
-The tool also accepts an optional \`base_branch\` parameter to override the stream's recorded base branch at close time. Pass whatever the user asked for — do not second-guess their choice of target branch. Passing \`base_branch\` *also* skips the preview step below and executes the merge directly, so only include it on the confirming call.
-
-*Merge flow is two-step.* When the user signals the stream is done, call \`close_stream\` with \`mode: "merge"\` and no \`base_branch\` — this returns a preview with the current branch and the resolved base branch (from the stream record). Relay the preview to the user: \`Merge <current> → <base>. Confirm, or name a different branch.\` When the user confirms, call \`close_stream\` again with \`mode: "merge"\` AND an explicit \`base_branch\` to execute. If the resolved base branch came back null, ask the user which branch to merge into before the second call.
+*Conflicts:* resolve intelligently — retain both sides when additive and non-overlapping; pick the superseding side when one replaces the other. If ambiguous, stop and ask the user. Never silently discard either side.
 
 ## Cutovers, Not Backwards Compatibility
 
