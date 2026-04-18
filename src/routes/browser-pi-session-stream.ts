@@ -17,12 +17,17 @@ export async function handleBrowserPiSessionStreamRoute(
     "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
     piSessionId,
   );
+  const piSessionCwd = piSession?.cwd ?? null;
+  const worktreePath = ws.worktree_path ?? null;
+  const repoPath = ws.repo_path ?? null;
+  const effectiveCwd = piSessionCwd ?? worktreePath ?? repoPath;
   return sendJson(response, 200, {
     streamId: ws.id,
     name: ws.name,
-    repoPath: ws.repo_path ?? null,
-    worktreePath: ws.worktree_path ?? null,
-    baseBranch: ws.base_branch ?? 'main',
-    piSessionCwd: piSession?.cwd ?? null,
+    repoPath,
+    worktreePath,
+    baseBranch: ws.base_branch ?? "main",
+    piSessionCwd,
+    effectiveCwd,
   });
 }
