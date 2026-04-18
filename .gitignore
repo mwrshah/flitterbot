@@ -4,6 +4,7 @@
 node_modules/
 throwaway/
 __pycache__/
+*.py[cod]
 
 # Secrets & keys
 *.pem
