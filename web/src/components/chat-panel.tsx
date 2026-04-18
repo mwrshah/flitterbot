@@ -231,7 +231,7 @@ export function ChatPanel({
             <>
               <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
               <span
-                className="inline-block text-xxs text-muted-foreground truncate max-w-full"
+                className="inline-block text-xs text-muted-foreground truncate max-w-full"
                 title={worktree.cwdAbsolute}
               >
                 {worktree.cwd}
