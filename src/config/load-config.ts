@@ -31,6 +31,7 @@ type RawConfigJson = {
   shortcuts?: ShortcutBindingsConfig;
   defaultAgentBootstrapPrompt?: string;
   orchestratorBootstrapFooterPrompt?: string;
+  extraSkillPaths?: string[];
 };
 
 export type FlitterbotConfig = {
@@ -59,6 +60,14 @@ export type FlitterbotConfig = {
   shortcuts: ShortcutBindingsConfig;
   defaultAgentBootstrapPrompt: string;
   orchestratorBootstrapFooterPrompt: string;
+  /**
+   * Extra directories to load skills from, in addition to the built-in
+   * `~/.agents/skills/` and `~/.claude/skills/` locations. Paths are expanded
+   * (`~` → home), resolved to absolute, de-duplicated, and order is preserved.
+   * Missing paths are skipped with a warning. Name collisions with earlier
+   * paths are logged and the earlier skill wins.
+   */
+  extraSkillPaths: string[];
 };
 
 const HOME = os.homedir();
@@ -81,6 +90,30 @@ function readJsonFile<T>(filePath: string): T | undefined {
   const raw = fs.readFileSync(filePath, "utf8").trim();
   if (!raw) return undefined;
   return JSON.parse(raw) as T;
+}
+
+/**
+ * Expand `~`, resolve to absolute, de-duplicate (preserving declared order),
+ * and drop non-string / empty entries. Existence is NOT checked here — the
+ * consumer (resource loader) re-checks and skips missing dirs with a warning,
+ * and we also emit our own warn log at agent-creation time. Validating here
+ * too would either double-log or require coupling config to a logger.
+ */
+function normalizeExtraSkillPaths(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of input) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const expanded = expandHome(trimmed);
+    const absolute = path.resolve(expanded);
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    out.push(absolute);
+  }
+  return out;
 }
 
 export function loadConfig(): FlitterbotConfig {
@@ -115,6 +148,7 @@ export function loadConfig(): FlitterbotConfig {
     raw.defaultAgentBootstrapPrompt ??
     "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
   const orchestratorBootstrapFooterPrompt = raw.orchestratorBootstrapFooterPrompt ?? "";
+  const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
   const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const config: FlitterbotConfig = {
@@ -141,6 +175,7 @@ export function loadConfig(): FlitterbotConfig {
     shortcuts,
     defaultAgentBootstrapPrompt,
     orchestratorBootstrapFooterPrompt,
+    extraSkillPaths,
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
@@ -181,6 +216,7 @@ export function loadConfig(): FlitterbotConfig {
     shortcuts: config.shortcuts,
     defaultAgentBootstrapPrompt: config.defaultAgentBootstrapPrompt,
     orchestratorBootstrapFooterPrompt: config.orchestratorBootstrapFooterPrompt,
+    extraSkillPaths: config.extraSkillPaths,
   };
 
   fs.writeFileSync(CONFIG_PATH, `${JSON.stringify(nextPersisted, null, 2)}\n`, "utf8");

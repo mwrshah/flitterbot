@@ -562,13 +562,16 @@ export class PiSessionManager {
 
   private logResourceInfo(
     role: string,
-    info: { skillNames: string[]; agentsFilePaths: string[] },
+    info: { skillNames: string[]; agentsFilePaths: string[]; skillMessages?: string[] },
   ): void {
-    const { skillNames, agentsFilePaths } = info;
+    const { skillNames, agentsFilePaths, skillMessages } = info;
     if (skillNames.length > 0) {
       this.log(`pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`);
     } else {
       this.log(`pi-agent (${role}): no skills loaded`);
+    }
+    for (const message of skillMessages ?? []) {
+      this.log(`pi-agent (${role}): ${message}`);
     }
     for (const filePath of agentsFilePaths) {
       this.log(`pi-agent (${role}): loaded ${path.basename(filePath)} from ${filePath}`);

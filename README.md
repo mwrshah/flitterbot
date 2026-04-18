@@ -32,6 +32,7 @@ The installer (step 3 in quickstart) deploys to `~/.flitterbot/`, writes `web/.e
 - `projectsDir` (default `~/development`) — working directory for Pi agents and default root for Claude Code sessions (overridden by worktree path once created)
 - `wipeStreamsOnStart` (default `false`) — close all open streams on startup
 - `whatsappEnabled` (default `true`) — enable/disable WhatsApp channel
+- `extraSkillPaths` (default `[]`) — extra directories to load skills from, in addition to the built-in `~/.agents/skills/` and `~/.claude/skills/`. Paths are expanded (`~` → home), resolved to absolute, and loaded in declared order. Missing directories are skipped with a warn log. Built-ins take precedence on name collisions — extras cannot shadow them; collisions are logged. Example: `"extraSkillPaths": ["~/work/team-skills", "/opt/shared/skills"]`
 
 **WhatsApp auth:** `~/.flitterbot/bin/flitterbot-wa auth` (QR) or `--pairing-code`. Auth state at `~/.flitterbot/whatsapp/auth/`.
 
