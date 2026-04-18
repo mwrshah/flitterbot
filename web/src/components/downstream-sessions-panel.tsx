@@ -1,5 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
@@ -15,7 +14,6 @@ import {
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
 import {
-  statusQueryOptions,
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsWorktreeQueryOptions,
@@ -23,92 +21,39 @@ import {
 import type { DownstreamSessionItem, PiSessionStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
-function piStatusBanner(status: PiSessionStatus | undefined) {
+/**
+ * Pi-session status as a plain dot + label. Purely informational — not
+ * interactive. The Recover action lives in the chat header button only.
+ * Matches the dot+label pattern used by downstream session rows below.
+ */
+function piStatusIndicator(status: PiSessionStatus | undefined): {
+  label: string;
+  dotClass: string;
+} | null {
   switch (status) {
     case "active":
-      return {
-        label: "Inferring",
-        colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-      };
+      return { label: "Inferring", dotClass: "bg-emerald-500 animate-pulse" };
     case "waiting_for_sessions":
-      return {
-        label: "Waiting for sessions",
-        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-      };
+      return { label: "Waiting for sessions", dotClass: "bg-amber-500" };
     case "waiting_for_user":
-      return {
-        label: "Waiting for user",
-        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-      };
+      return { label: "Waiting for user", dotClass: "bg-blue-400" };
     case "ended":
-      return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
+      return { label: "Ended", dotClass: "bg-zinc-500" };
     case "crashed":
-      // Mirror "Waiting for user" styling — muted pill, no destructive/red
-      // variant. The click-to-recover affordance carries the action semantics.
-      return {
-        label: "Crashed",
-        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-      };
+      return { label: "Crashed", dotClass: "bg-red-500" };
     default:
       return null;
   }
 }
 
-/**
- * Renders the pi-session status pill at the top of the downstream panel.
- * For "crashed" and "ended" states, the pill becomes a clickable button that
- * triggers stream recovery (same endpoint as the header "Recover" button).
- * Hovering shows the action affordance.
- */
-function PiStatusBanner({
-  piSessionId,
-  piSessionStatus,
-}: {
-  piSessionId: string;
-  piSessionStatus: PiSessionStatus | undefined;
-}) {
-  const rootApi = getRouteApi("__root__");
-  const { apiClient } = rootApi.useRouteContext();
-  const queryClient = useQueryClient();
-  const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
-  const streamId = stream?.id;
-
-  const recoverMutation = useMutation({
-    mutationFn: () => apiClient.reopenStream(streamId!),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
-    onError: (error) => {
-      toast.error(`Failed to recover: ${error instanceof Error ? error.message : String(error)}`);
-    },
-  });
-
-  const banner = piStatusBanner(piSessionStatus);
-  if (!banner) return <div />;
-
-  const canRecover = !!streamId && (piSessionStatus === "crashed" || piSessionStatus === "ended");
-  if (!canRecover) {
-    return (
-      <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
-        {banner.label}
-      </div>
-    );
-  }
-
-  const label = recoverMutation.isPending ? "Recovering…" : `${banner.label} — click to recover`;
+function PiStatusIndicator({ piSessionStatus }: { piSessionStatus: PiSessionStatus | undefined }) {
+  const indicator = piStatusIndicator(piSessionStatus);
+  if (!indicator) return <div />;
   return (
-    <button
-      type="button"
-      disabled={recoverMutation.isPending}
-      onClick={() => recoverMutation.mutate()}
-      className={cn(
-        "px-3 py-1.5 rounded-md text-xs font-medium transition-opacity",
-        banner.colorClass,
-        "hover:opacity-80 disabled:opacity-50 cursor-pointer",
-      )}
-      title="Recover this stream's orchestrator"
-    >
-      {label}
-    </button>
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span className={cn("h-2 w-2 rounded-full shrink-0", indicator.dotClass)} />
+      <span>{indicator.label}</span>
+    </div>
   );
 }
 
@@ -261,7 +206,7 @@ export function DownstreamSessionsPanel({
     <div className="flex flex-col h-full border-l border-border bg-background">
       {/* Header row: status banner + diff toggle */}
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
-        <PiStatusBanner piSessionId={piSessionId} piSessionStatus={piSessionStatus} />
+        <PiStatusIndicator piSessionStatus={piSessionStatus} />
         <ToggleGroup
           value={[panelView]}
           onValueChange={(newValue) => {

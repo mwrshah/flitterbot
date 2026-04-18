@@ -19,8 +19,8 @@ function piStatusDotClass(status: PiSessionStatus | undefined): string {
       return "bg-amber-500";
     case "waiting_for_user":
       return "bg-blue-400";
-    // Crashed and ended fall through to the default muted dot — the Recover
-    // affordance lives in the chat header / downstream status pill, not here.
+    case "crashed":
+      return "bg-red-500";
     default:
       return "bg-zinc-500";
   }
