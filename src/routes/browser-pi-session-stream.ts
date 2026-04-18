@@ -1,4 +1,5 @@
 import type http from "node:http";
+import path from "node:path";
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
@@ -21,7 +22,8 @@ export async function handleBrowserPiSessionStreamRoute(
   if (!piSession && !ws) {
     return sendJson(response, 404, { ok: false, error: "Unknown pi session" });
   }
-  const cwd = piSession?.cwd ?? null;
+  const cwdAbsolute = piSession?.cwd ?? null;
+  const cwd = cwdAbsolute ? relativizeCwd(cwdAbsolute, runtime.config.projectsDir) : null;
   return sendJson(response, 200, {
     streamId: ws?.id ?? null,
     name: ws?.name ?? null,
@@ -29,5 +31,13 @@ export async function handleBrowserPiSessionStreamRoute(
     worktreePath: ws?.worktree_path ?? null,
     baseBranch: ws?.base_branch ?? null,
     cwd,
+    cwdAbsolute,
   });
+}
+
+function relativizeCwd(cwdAbsolute: string, projectsDir: string): string {
+  const rel = path.relative(projectsDir, cwdAbsolute);
+  if (rel === "") return ".";
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return cwdAbsolute;
+  return rel;
 }
