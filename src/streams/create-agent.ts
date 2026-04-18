@@ -7,8 +7,10 @@ import {
   AuthStorage,
   createAgentSession,
   createBashTool,
+  createEditTool,
   createGrepTool,
   createReadTool,
+  createWriteTool,
   DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
@@ -16,7 +18,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
-import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
+import { buildDefaultAgentPrompt, buildOrchestratorSoloPrompt } from "../prompts/index.ts";
 
 /** Orchestrator context as provided by the caller — piSessionId is injected internally. */
 type OrchestratorInput = Omit<OrchestratorContext, "piSessionId">;
@@ -75,7 +77,9 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   // ~/.pi/agent explicitly (same pattern as authStorage above).
   const agentDir = config.controlSurfaceAgentDir;
   const piModelsPath = path.join(HOME, ".pi", "agent", "models.json");
-  const modelsPath = fs.existsSync(piModelsPath) ? piModelsPath : path.join(agentDir, "models.json");
+  const modelsPath = fs.existsSync(piModelsPath)
+    ? piModelsPath
+    : path.join(agentDir, "models.json");
   const modelRegistry = ModelRegistry.create(authStorage, modelsPath);
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
@@ -106,7 +110,13 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     agentDir,
     model,
     thinkingLevel: config.piThinkingLevel,
-    tools: [createReadTool(workingDir), createBashTool(workingDir), createGrepTool(workingDir)],
+    tools: [
+      createReadTool(workingDir),
+      createBashTool(workingDir),
+      createGrepTool(workingDir),
+      createEditTool(workingDir),
+      createWriteTool(workingDir),
+    ],
     customTools: customTools as ToolDefinition[],
     resourceLoader,
     sessionManager,
@@ -135,7 +145,7 @@ function resolveSystemPrompt(
 ): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorPrompt({ ...ctx, piSessionId });
+    return buildOrchestratorSoloPrompt({ ...ctx, piSessionId });
   }
   return buildDefaultAgentPrompt(piSessionId);
 }
