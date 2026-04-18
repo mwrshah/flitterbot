@@ -1,16 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
@@ -20,7 +12,6 @@ import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
-import type { StatusPill } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
@@ -40,7 +31,6 @@ const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
 type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
-  statusPills: StatusPill[];
   isSessionBusy: boolean;
   onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
   streamId?: string;
@@ -51,7 +41,6 @@ type ChatPanelProps = {
 export function ChatPanel({
   piSessionId,
   timeline,
-  statusPills,
   isSessionBusy,
   onSendMessage,
   streamId,
@@ -61,7 +50,6 @@ export function ChatPanel({
   useWhyDidYouRender("ChatPanel", {
     piSessionId,
     timeline,
-    statusPills,
     isSessionBusy,
     streamId,
     isStreamClosed,
@@ -235,15 +223,6 @@ export function ChatPanel({
       <div className="flex items-center justify-between px-6 py-2 border-b border-border shrink-0 min-h-11">
         <h1 className="text-sm font-semibold text-foreground">Streams</h1>
         <div className="flex items-center gap-2">
-          {isClient && statusPills.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {statusPills.map((pill) => (
-                <Badge key={pill.id} variant={pill.variant === "error" ? "error" : "muted"}>
-                  {pill.label}
-                </Badge>
-              ))}
-            </div>
-          )}
           {isClient && isSessionActive && (
             <Button
               variant="destructive"

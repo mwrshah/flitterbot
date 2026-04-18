@@ -16,7 +16,6 @@ import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
-import type { StatusPill } from "~/lib/queries";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
@@ -47,20 +46,6 @@ export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendM
       throw error;
     }
   };
-}
-
-/* ── Pill management helpers ── */
-
-function addPill(queryClient: QueryClient, sessionId: string, pill: StatusPill) {
-  queryClient.setQueryData<StatusPill[]>(["streams-status-pills", sessionId], (old) =>
-    [...(old ?? []).filter((p) => p.id !== pill.id), pill].slice(-6),
-  );
-}
-
-function removePill(queryClient: QueryClient, sessionId: string, pillId: string) {
-  queryClient.setQueryData<StatusPill[]>(["streams-status-pills", sessionId], (old) =>
-    (old ?? []).filter((p) => p.id !== pillId),
-  );
 }
 
 /* ── Timeline append helper with dedup ── */
@@ -174,27 +159,14 @@ export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;
   router: AnyRouter;
-  getDefaultPiSessionId: () => string | undefined;
 }): () => void {
-  const { queryClient, wsClient, router, getDefaultPiSessionId } = deps;
+  const { queryClient, wsClient, router } = deps;
 
   /* ── WS message handler ── */
 
   const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
     const piSessionId =
       "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
-
-    // ── connected ──
-    if (message.type === "connected") {
-      const defaultSid = getDefaultPiSessionId();
-      if (defaultSid) {
-        addPill(queryClient, defaultSid, {
-          id: "ws-connected",
-          label: `WS ${message.clientId.slice(0, 8)}`,
-        });
-      }
-      return;
-    }
 
     // ── streams_changed / status_changed ──
     if (message.type === "streams_changed" || message.type === "status_changed") {
@@ -251,71 +223,16 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── queue_item_start ──
-    if (message.type === "queue_item_start") {
-      const sid = piSessionId ?? getDefaultPiSessionId();
-      if (!sid) return;
-      const sourceLabel =
-        message.item.source === "whatsapp"
-          ? "WhatsApp"
-          : message.item.source === "hook"
-            ? "Hook"
-            : message.item.source === "cron"
-              ? "Cron"
-              : message.item.source === "agent"
-                ? "Agent"
-                : message.item.source === "init"
-                  ? "System"
-                  : message.item.source === "stream_outbound"
-                    ? "Streams"
-                    : "Web";
-      addPill(queryClient, sid, {
-        id: `processing-${message.item.id}`,
-        label: `Processing ${sourceLabel} message`,
-        variant: message.item.source !== "web" ? "info" : undefined,
-      });
-      return;
-    }
-
-    // ── queue_item_end ──
-    if (message.type === "queue_item_end") {
-      const sid = piSessionId ?? getDefaultPiSessionId();
-      if (!sid) return;
-      removePill(queryClient, sid, `processing-${message.itemId}`);
-
-      if (message.error) {
-        addPill(queryClient, sid, {
-          id: `error-${message.itemId}`,
-          label: message.error,
-          variant: "error",
-        });
-      }
-      return;
-    }
-
     if (!piSessionId) return;
-
-    // ── message_start → typing indicator ──
-    if (message.type === "message_start") {
-      addPill(queryClient, piSessionId, {
-        id: "assistant-typing",
-        label: "Thinking…",
-      });
-      return;
-    }
 
     // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
-      // Remove typing indicator once real content starts flowing
-      removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.appendTextDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     // ── thinking lifecycle → streaming store ──
     if (message.type === "thinking_start") {
-      // Remove typing indicator once thinking starts
-      removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.setThinkingStreaming(piSessionId, true, message.messageId);
       return;
     }
@@ -338,8 +255,6 @@ export function setupWsQueryBridge(deps: {
     // ── message_end → commit message + tool calls atomically ──
     if (message.type === "message_end") {
       const msg = message.message;
-
-      removePill(queryClient, piSessionId, "assistant-typing");
 
       // Build all new timeline items from server-provided data, then commit
       // in a single setQueryData call to avoid intermediate renders.
@@ -530,7 +445,6 @@ export function setupWsQueryBridge(deps: {
 
     // ── agent_end ──
     if (message.type === "agent_end") {
-      removePill(queryClient, piSessionId, "assistant-typing");
       streamingStore.clearSession(piSessionId);
       activeToolStore.clearSession(piSessionId);
       if (message.aborted) {
