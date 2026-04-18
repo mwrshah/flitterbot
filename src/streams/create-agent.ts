@@ -82,23 +82,57 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     : path.join(agentDir, "models.json");
   const modelRegistry = ModelRegistry.create(authStorage, modelsPath);
   const settingsManager = SettingsManager.inMemory();
+  // Skill paths, in precedence order:
+  //   1. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
+  //   2. `extraSkillPaths` from ~/.flitterbot/config.json, in declared order
+  // The loader de-duplicates by skill name — first occurrence wins — so
+  // built-ins cannot be shadowed by extras. Collisions surface via
+  // resourceLoader.getSkills().diagnostics and are logged below.
+  const builtInSkillPaths = [
+    path.join(HOME, ".claude", "skills"),
+    path.join(HOME, ".agents", "skills"),
+  ];
+  const skillPathWarnings: string[] = [];
+  const extraSkillPaths: string[] = [];
+  for (const entry of config.extraSkillPaths) {
+    if (!fs.existsSync(entry)) {
+      skillPathWarnings.push(`extraSkillPaths: missing directory skipped: ${entry}`);
+      continue;
+    }
+    extraSkillPaths.push(entry);
+  }
+  const additionalSkillPaths = [
+    ...builtInSkillPaths.filter((entry) => fs.existsSync(entry)),
+    ...extraSkillPaths,
+  ];
+
   const resourceLoader = new DefaultResourceLoader({
     cwd: workingDir,
     agentDir,
     settingsManager,
-    additionalSkillPaths: [
-      path.join(HOME, ".claude", "skills"),
-      path.join(HOME, ".agents", "skills"),
-    ].filter((entry) => fs.existsSync(entry)),
+    additionalSkillPaths,
     systemPromptOverride: () => promptRef.value,
   });
   await resourceLoader.reload();
 
   // Collect resource info for startup logging
-  const { skills } = resourceLoader.getSkills();
+  const { skills, diagnostics: skillDiagnostics } = resourceLoader.getSkills();
   const { agentsFiles } = resourceLoader.getAgentsFiles();
   const skillNames = skills.map((s) => s.name);
   const agentsFilePaths = agentsFiles.map((f) => f.path);
+  // Surface collision / missing-path diagnostics from the loader so the
+  // orchestrator log clearly shows which skills were shadowed and which
+  // extra paths were silently dropped.
+  const skillMessages: string[] = [...skillPathWarnings];
+  for (const d of skillDiagnostics) {
+    if (d.type === "collision" && d.collision) {
+      skillMessages.push(
+        `skill name collision: "${d.collision.name}" — keeping ${d.collision.winnerPath}, ignoring ${d.collision.loserPath}`,
+      );
+    } else if (d.type === "warning" || d.type === "error") {
+      skillMessages.push(`skill ${d.type}: ${d.message}${d.path ? ` (${d.path})` : ""}`);
+    }
+  }
 
   const model = getModel("anthropic", config.piModel as Parameters<typeof getModel>[1]);
   if (!model) {
@@ -128,6 +162,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     resourceInfo: {
       skillNames,
       agentsFilePaths,
+      skillMessages,
     },
   };
 }
