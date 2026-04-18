@@ -1,6 +1,6 @@
 export { createFlitterbotAgent } from "./create-agent.ts";
 export { formatPromptWithContext } from "./format-prompt.ts";
-export { readStreamsHistory, readStreamsHistoryFromMessages } from "./history.ts";
+export { readStreamsHistory, readStreamsHistoryFromSession } from "./history.ts";
 export {
   type ManagedPiSession,
   PiSessionManager,

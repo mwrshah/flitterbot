@@ -76,6 +76,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
+    pruneStreamHistory: (piSessionId: string, entryId: string) =>
+      request<{ ok: true; piSessionId: string; messageCount: number }>("/api/streams/prune", {
+        method: "POST",
+        body: JSON.stringify({ piSessionId, entryId }),
+      }),
+
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
     getDirectoryCompletions: (path: string, piSessionId?: string) => {

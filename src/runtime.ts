@@ -1017,6 +1017,80 @@ export class ControlSurfaceRuntime {
     return { ok: true, streamId };
   }
 
+  /**
+   * Prune conversation history at a specific session entry. The entry and all
+   * of its descendants (on the current leaf branch) become invisible to both
+   * the live agent and disk-based readers.
+   *
+   * Flow:
+   *  1. Resolve the managed pi session; activate if dormant.
+   *  2. Validate: entry must exist and be a user message.
+   *  3. `AgentSession.navigateTree(entryId)` moves the SessionManager leaf to
+   *     the target's parent and rebuilds `agent.state.messages`.
+   *  4. `SessionManager.appendCustomEntry("flitterbot:prune_anchor", ...)`
+   *     persists the new leaf position to the JSONL file. Custom entries are
+   *     ignored by `buildSessionContext()`, so they don't pollute LLM context,
+   *     but on process restart they become the leaf, keeping the prune
+   *     durable across restarts.
+   *  5. Broadcast `history_rewritten` so the UI invalidates cached history.
+   */
+  async pruneStreamHistory(
+    piSessionId: string,
+    entryId: string,
+  ): Promise<{ ok: true; piSessionId: string; messageCount: number }> {
+    const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (!managed) throw new Error("Pi session not found");
+
+    if (!managed.session) {
+      if (managed.role === "orchestrator" && managed.streamId) {
+        this.log(`activating dormant orchestrator for prune stream=${managed.streamId}`);
+        await this.sessionManager.activateOrchestrator(
+          managed,
+          this.createCustomTools("orchestrator", managed.streamId),
+        );
+      } else {
+        throw new Error("Pi session is not active and cannot be activated for prune");
+      }
+    }
+
+    const session = managed.session;
+    if (!session) throw new Error("Pi session failed to activate");
+
+    const sessionManager = session.sessionManager;
+    const target = sessionManager.getEntry(entryId);
+    if (!target) throw new Error(`Session entry ${entryId} not found`);
+    if (target.type !== "message" || target.message.role !== "user") {
+      throw new Error(`Entry ${entryId} is not a user message (type=${target.type})`);
+    }
+
+    // Move leaf to parent of user message; rebuilds agent.state.messages.
+    const navResult = await session.navigateTree(entryId);
+    if (navResult.cancelled) {
+      throw new Error("navigateTree cancelled (extension veto)");
+    }
+
+    // Persist new leaf position. Custom entries don't appear in LLM context but
+    // do become the leaf on reload.
+    sessionManager.appendCustomEntry("flitterbot:prune_anchor", {
+      prunedEntryId: entryId,
+      prunedAt: new Date().toISOString(),
+    });
+
+    const newCount = session.messages.length;
+    managed.state.noteEvent(newCount);
+
+    this.wsHub.broadcast({
+      type: "history_rewritten",
+      piSessionId,
+      reason: "prune",
+    });
+
+    this.log(
+      `pruned history for pi session ${piSessionId} at entry ${entryId} (messages now ${newCount})`,
+    );
+    return { ok: true, piSessionId, messageCount: newCount };
+  }
+
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     streamId?: string,

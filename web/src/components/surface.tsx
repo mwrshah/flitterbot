@@ -253,11 +253,8 @@ function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurf
         displayTime,
         metrics: {
           estimatedHeight:
-            estimateMessageRowHeight(
-              metrics.lineCount,
-              !!entry.streamName,
-              metrics.isOverflowing,
-            ) + imageHeight,
+            estimateMessageRowHeight(metrics.lineCount, !!entry.streamName, metrics.isOverflowing) +
+            imageHeight,
           isOverflowing: metrics.isOverflowing,
         },
       };
@@ -550,9 +547,7 @@ const HookEntry = memo(function HookEntry({
       </div>
       <div className="flex-1 min-w-0 rounded-lg border border-violet-500/25 bg-violet-500/5 px-3 py-2">
         <p className="text-xs font-medium text-muted-foreground mb-1">{entry.eventName}</p>
-        {entry.detail && (
-          <MarkdownContent content={entry.detail} />
-        )}
+        {entry.detail && <MarkdownContent content={entry.detail} />}
       </div>
     </div>
   );

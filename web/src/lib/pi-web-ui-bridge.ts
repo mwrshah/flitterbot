@@ -82,7 +82,10 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         content,
         timestamp: new Date(item.createdAt).getTime(),
         source,
-      } as AgentMessage & { source: MessageSource });
+        // Non-standard passthrough: pi-sdk SessionManager entry id. Consumed by
+        // the <user-message> Lit component to expose a "delete from here" menu.
+        _entryId: item.entryId,
+      } as AgentMessage & { source: MessageSource; _entryId?: string });
       continue;
     }
 

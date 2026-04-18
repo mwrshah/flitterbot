@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
-import { formatStreamPrompt } from "../streams/format-stream-prompt.ts";
 import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
+import { formatStreamPrompt } from "../streams/format-stream-prompt.ts";
 
 // Mock groq-client before importing context-relevance
 const mockCallGroqJson = mock<(apiKey: string, prompt: string) => Promise<unknown>>();
@@ -86,7 +86,13 @@ describe("formatStreamPrompt", () => {
   });
 
   test("custom footer overrides default", () => {
-    const result = formatStreamPrompt(["Hello"], "ws", "ws-1", undefined, "Load /custom-skill first");
+    const result = formatStreamPrompt(
+      ["Hello"],
+      "ws",
+      "ws-1",
+      undefined,
+      "Load /custom-skill first",
+    );
     expect(result).toContain("Load /custom-skill first");
     expect(result).not.toContain("/tmux2");
   });

@@ -244,6 +244,18 @@ export interface AutoRetryEndWebSocketEvent {
   piSessionId?: string;
 }
 
+/**
+ * Emitted when server-side history is mutated non-append-only (e.g. a prune
+ * operation that moves the session leaf backwards). Clients should invalidate
+ * any cached history for the referenced piSessionId.
+ */
+export interface HistoryRewrittenWebSocketEvent {
+  type: "history_rewritten";
+  piSessionId: string;
+  /** Reason for the rewrite. Currently only "prune" is emitted. */
+  reason: "prune";
+}
+
 export type ControlSurfaceWebSocketServerEvent =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
@@ -266,6 +278,7 @@ export type ControlSurfaceWebSocketServerEvent =
   | CompactionEndWebSocketEvent
   | AutoRetryStartWebSocketEvent
   | AutoRetryEndWebSocketEvent
+  | HistoryRewrittenWebSocketEvent
   | StreamSurfacedWebSocketEvent
   | StreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent

@@ -242,7 +242,8 @@ export async function createDetachedTmuxSession(
 }
 
 export async function ensureUniqueTmuxSessionName(baseName: string): Promise<string> {
-  const cleanBase = baseName.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "flitterbot";
+  const cleanBase =
+    baseName.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "flitterbot";
   let candidate = cleanBase;
   let suffix = 2;
 

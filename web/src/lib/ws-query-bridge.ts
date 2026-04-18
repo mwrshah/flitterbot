@@ -188,6 +188,14 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    // ── history_rewritten ──
+    if (message.type === "history_rewritten") {
+      queryClient.invalidateQueries({
+        queryKey: ["streams-history", message.piSessionId],
+      });
+      return;
+    }
+
     // ── message_ack → optimistic user message on surface timeline ──
     if (message.type === "message_ack") {
       console.log(

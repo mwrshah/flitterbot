@@ -1,11 +1,11 @@
-import { marked } from 'marked';
-import { memo, useMemo } from 'react';
+import { marked } from "marked";
+import { memo, useMemo } from "react";
 
 const renderer = new marked.Renderer();
 const originalLink = renderer.link;
 renderer.link = function (...args: Parameters<typeof originalLink>) {
   const link = originalLink.apply(this, args);
-  return link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+  return link.replace("<a ", '<a target="_blank" rel="noopener noreferrer" ');
 };
 
 const parseCache = new Map<string, string>();

@@ -7,7 +7,7 @@ import type {
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
-import { readStreamsHistory, readStreamsHistoryFromMessages } from "../streams/history.ts";
+import { readStreamsHistory, readStreamsHistoryFromSession } from "../streams/history.ts";
 import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
 import { sendJson } from "./_shared.ts";
 
@@ -20,30 +20,25 @@ async function readSessionHistory(
 
   let items: ChatTimelineItem[];
 
-  if (
-    managed.session?.sessionId === snapshot.piSessionId &&
-    Array.isArray(managed.session.messages)
-  ) {
-    const body = readStreamsHistoryFromMessages(
+  // Prefer the live SessionManager when the session is active — getBranch()
+  // returns entries on the current leaf's path, so pruned branches are
+  // correctly excluded.
+  if (managed.session && managed.session.sessionId === snapshot.piSessionId) {
+    const body = readStreamsHistoryFromSession(
       snapshot.piSessionId,
-      snapshot.sessionFile ?? null,
-      managed.session.messages,
+      managed.session.sessionManager,
       historyMode,
     );
     if (body.items.length > 0 || !snapshot.sessionFile) {
       items = body.items;
     } else if (snapshot.sessionFile) {
-      const fileBody = await readStreamsHistory(
-        snapshot.piSessionId,
-        snapshot.sessionFile,
-        historyMode,
-      );
+      const fileBody = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
       items = fileBody.items;
     } else {
       return [];
     }
   } else if (snapshot.sessionFile) {
-    const body = await readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
+    const body = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
     items = body.items;
   } else {
     return [];
@@ -135,7 +130,7 @@ async function handleBrowserStreamsHistoryRouteInner(
         .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
-        const diskBody = await readStreamsHistory(piSessionId, row.session_file, historyMode);
+        const diskBody = readStreamsHistory(piSessionId, row.session_file, historyMode);
         if (diskBody.items.length > 0) {
           const body: StreamsHistoryResponse = {
             piSessionId: piSessionId,
