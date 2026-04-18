@@ -64,8 +64,7 @@ export type StreamInfo = {
   repoPath: string | null;
   worktreePath: string | null;
   baseBranch: string | null;
-  piSessionCwd: string | null;
-  effectiveCwd: string | null;
+  cwd: string | null;
 };
 
 export const fetchStreamsWorktree = createServerFn({ method: "GET" })

@@ -9,10 +9,10 @@ export async function handleBrowserPiSessionStreamRoute(
   response: http.ServerResponse,
   piSessionId: string,
 ) {
-  // Two cases: (1) pi_session bound to a stream (stream_id set) — return full
-  // stream metadata; (2) default agent with no stream (stream_id NULL) — return
-  // nulls for stream fields but still surface piSessionCwd as effectiveCwd.
-  // 404 only when the pi_session itself is unknown.
+  // cwd is sourced exclusively from pi_sessions.cwd — i.e. where
+  // createAgentSession was invoked for this pi session. No fallback to
+  // stream.worktree_path / repo_path: the agent's actual working directory
+  // is the single source of truth.
   const piSession = runtime.blackboard.get<{ cwd: string }>(
     "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
     piSessionId,
@@ -21,17 +21,13 @@ export async function handleBrowserPiSessionStreamRoute(
   if (!piSession && !ws) {
     return sendJson(response, 404, { ok: false, error: "Unknown pi session" });
   }
-  const piSessionCwd = piSession?.cwd ?? null;
-  const worktreePath = ws?.worktree_path ?? null;
-  const repoPath = ws?.repo_path ?? null;
-  const effectiveCwd = piSessionCwd ?? worktreePath ?? repoPath;
+  const cwd = piSession?.cwd ?? null;
   return sendJson(response, 200, {
     streamId: ws?.id ?? null,
     name: ws?.name ?? null,
-    repoPath,
-    worktreePath,
+    repoPath: ws?.repo_path ?? null,
+    worktreePath: ws?.worktree_path ?? null,
     baseBranch: ws?.base_branch ?? null,
-    piSessionCwd,
-    effectiveCwd,
+    cwd,
   });
 }
