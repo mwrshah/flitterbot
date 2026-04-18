@@ -137,24 +137,12 @@ export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
   };
 }
 
-/** Status pills per session — populated by WS bridge, never fetched from server. */
-export type StatusPill = { id: string; label: string; variant?: "info" | "error" };
-
 /** User config (panel layouts, theme, etc.) — prefetched in root loader. */
 export function userConfigQueryOptions() {
   return {
     queryKey: ["user-config"] as const,
     queryFn: () => fetchUserConfig(),
     staleTime: 30_000,
-  };
-}
-
-export function statusPillsQueryOptions(piSessionId: string) {
-  return {
-    queryKey: ["streams-status-pills", piSessionId] as const,
-    queryFn: (): StatusPill[] => [],
-    staleTime: Infinity,
-    // Initialized as empty; WS bridge uses setQueryData to manage pills
   };
 }
 

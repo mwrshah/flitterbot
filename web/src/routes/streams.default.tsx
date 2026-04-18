@@ -67,8 +67,10 @@ function StreamsDefaultRoute() {
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
   const defaultStream = status?.streams?.find((ws) => ws.piSessionId === defaultPiSessionId);
-  const { timeline, statusPills, onSendMessage, effectivePiSessionId, isSessionBusy } =
-    useStreamsChat(defaultPiSessionId, history);
+  const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
+    defaultPiSessionId,
+    history,
+  );
 
   return (
     <PanelGroup
@@ -81,7 +83,6 @@ function StreamsDefaultRoute() {
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
-          statusPills={statusPills}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
         />
