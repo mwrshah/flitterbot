@@ -6,6 +6,15 @@ import { toast } from "sonner";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
@@ -87,7 +96,32 @@ export function ChatPanel({
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
+  const [pruneTarget, setPruneTarget] = useState<string | null>(null);
   const agentMessages = useAgentMessages(timeline);
+
+  const pruneMutation = useMutation({
+    mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId] });
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to delete messages: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  });
+
+  const handlePruneRequested = useCallback((entryId: string) => {
+    setPruneTarget(entryId);
+  }, []);
+
+  const confirmPrune = useCallback(() => {
+    const entryId = pruneTarget;
+    if (!entryId) return;
+    pruneMutation.mutate(entryId, {
+      onSettled: () => setPruneTarget(null),
+    });
+  }, [pruneTarget, pruneMutation]);
 
   const { viewportRef, scrollToBottom, isAtBottomRef, engage } = useStickToBottom({
     initialScrollWhen: agentMessages.length > 0,
@@ -283,6 +317,7 @@ export function ChatPanel({
               ref={messageListRef}
               messages={agentMessages}
               onMessagesRendered={settleToBottomIfPinned}
+              onPruneRequested={handlePruneRequested}
             />
           </div>
         </Panel>
@@ -290,6 +325,35 @@ export function ChatPanel({
         <HorizontalResizeHandle />
 
         <Panel id="input" defaultSize="15%" minSize="9%">
+          <Dialog
+            open={pruneTarget !== null}
+            onOpenChange={(open) => !open && setPruneTarget(null)}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete from here?</DialogTitle>
+                <DialogDescription>
+                  This removes this user message and every turn after it from both the live agent
+                  context and the on-disk transcript. The agent will not remember the pruned turns.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose
+                  render={<Button variant="outline" />}
+                  disabled={pruneMutation.isPending}
+                >
+                  Cancel
+                </DialogClose>
+                <Button
+                  variant="destructive"
+                  onClick={confirmPrune}
+                  disabled={pruneMutation.isPending}
+                >
+                  {pruneMutation.isPending ? "Deleting…" : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <MessageInput
             key={streamId ?? piSessionId ?? "__chat__"}
             draftKey={streamId ?? piSessionId ?? "__chat__"}

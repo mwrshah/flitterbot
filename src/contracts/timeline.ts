@@ -44,6 +44,12 @@ export type ChatTimelineMessage = {
   intermediate?: boolean;
   /** Server-generated UUID for optimistic UI correlation. */
   serverMessageId?: string;
+  /**
+   * Underlying pi-sdk SessionManager entry id. Present when the message was
+   * loaded from a live or on-disk pi session (not for surface-table messages).
+   * Required to prune history from a specific point via navigateTree().
+   */
+  entryId?: string;
   createdAt: string;
 };
 

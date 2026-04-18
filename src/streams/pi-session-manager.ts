@@ -551,7 +551,13 @@ export class PiSessionManager {
     agentMessage?: string,
     bootstrapFooterPrompt?: string,
   ): string {
-    return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage, bootstrapFooterPrompt);
+    return formatStreamPrompt(
+      [currentMessage],
+      streamName,
+      streamId,
+      agentMessage,
+      bootstrapFooterPrompt,
+    );
   }
 
   private logResourceInfo(

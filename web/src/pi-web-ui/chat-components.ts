@@ -25,6 +25,7 @@ import createElement from "lucide/dist/esm/createElement.js";
 import ChevronRight from "lucide/dist/esm/icons/chevron-right.js";
 import Code from "lucide/dist/esm/icons/code.js";
 import Copy from "lucide/dist/esm/icons/copy.js";
+import EllipsisVertical from "lucide/dist/esm/icons/ellipsis-vertical.js";
 import FilePen from "lucide/dist/esm/icons/file-pen.js";
 import FileText from "lucide/dist/esm/icons/file-text.js";
 import FolderOpen from "lucide/dist/esm/icons/folder-open.js";
@@ -753,6 +754,14 @@ function summarizeToolCall(
 
 export class UserMessage extends LitElement {
   @property({ type: Object }) message!: UserMessageWithAttachments | UserMessageType;
+  /**
+   * pi-sdk SessionManager entry id. When set, the message renders an ellipsis
+   * menu with a "Delete (including me)" action that dispatches a bubbling
+   * `prune-message` CustomEvent for React handlers higher up to consume.
+   */
+  @property({ attribute: false }) entryId?: string;
+
+  @state() private menuOpen = false;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -761,7 +770,38 @@ export class UserMessage extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
+    document.addEventListener("click", this._onDocClick);
   }
+
+  override disconnectedCallback(): void {
+    document.removeEventListener("click", this._onDocClick);
+    super.disconnectedCallback();
+  }
+
+  private _onDocClick = (ev: MouseEvent): void => {
+    if (!this.menuOpen) return;
+    const target = ev.target as Node | null;
+    if (target && this.contains(target)) return;
+    this.menuOpen = false;
+  };
+
+  private _toggleMenu = (ev: MouseEvent): void => {
+    ev.stopPropagation();
+    this.menuOpen = !this.menuOpen;
+  };
+
+  private _requestPrune = (ev: MouseEvent): void => {
+    ev.stopPropagation();
+    this.menuOpen = false;
+    if (!this.entryId) return;
+    this.dispatchEvent(
+      new CustomEvent("prune-message", {
+        detail: { entryId: this.entryId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
 
   override render() {
     if (!this.message?.content) return nothing;
@@ -776,9 +816,10 @@ export class UserMessage extends LitElement {
     const imageBlocks = contentArr.filter((chunk) => chunk.type === "image") as ImageContent[];
 
     const plainText = textContent?.text || "";
+    const canPrune = Boolean(this.entryId);
 
     return html`
-      <div class="flex justify-start mx-4">
+      <div class="flex justify-start mx-4 group/user-message">
         <div class="relative">
           <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
@@ -801,6 +842,40 @@ export class UserMessage extends LitElement {
             }
           </div>
           <message-copy-button .getText=${() => plainText}></message-copy-button>
+          ${
+            canPrune
+              ? html`
+            <button
+              @click=${this._toggleMenu}
+              data-open=${this.menuOpen ? "true" : "false"}
+              aria-haspopup="menu"
+              aria-expanded=${this.menuOpen ? "true" : "false"}
+              class="absolute top-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/user-message:opacity-100 data-[open=true]:opacity-100 transition-opacity cursor-pointer"
+              title="${i18n("Message actions")}"
+            >
+              ${unsafeHTML(iconSvg(EllipsisVertical, "sm"))}
+            </button>
+            ${
+              this.menuOpen
+                ? html`
+              <div
+                role="menu"
+                class="absolute top-7 right-1 z-20 min-w-[13rem] rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1 text-xs"
+              >
+                <button
+                  role="menuitem"
+                  @click=${this._requestPrune}
+                  class="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive cursor-pointer"
+                >
+                  ${i18n("Delete (including me)")}
+                </button>
+              </div>
+            `
+                : ""
+            }
+          `
+              : ""
+          }
         </div>
       </div>
     `;
@@ -1039,13 +1114,27 @@ export class MessageList extends LitElement {
       changedProperties.has("messages") &&
       changedProperties.size === 1
     ) {
+      const newLength = (this.messages as RenderMessage[]).length;
+      // History shrank — only possible after a server-side rewrite (e.g. prune).
+      // Drop committed state and allow a full render so the old DOM is thrown
+      // away and the new (shorter) list renders correctly.
+      if (newLength < this._committedTotal) {
+        console.log(
+          "[debug][message-list] shouldUpdate FALLTHROUGH: history shrank (messages.length=%d, committedTotal=%d) — full render",
+          newLength,
+          this._committedTotal,
+        );
+        this._committedTotal = 0;
+        this._cachedRenderItems = null;
+        return true;
+      }
       // React catch-up: the messages property was set with the same data we
       // already rendered imperatively. Accept the new property value (Lit has
       // already assigned it) but skip the expensive render cycle.
-      if ((this.messages as RenderMessage[]).length <= this._committedTotal) {
+      if (newLength === this._committedTotal) {
         console.log(
           "[debug][message-list] shouldUpdate SUPPRESSED: React catch-up render skipped (messages.length=%d, committedTotal=%d)",
-          (this.messages as RenderMessage[]).length,
+          newLength,
           this._committedTotal,
         );
         this._committedTotal = 0;
@@ -1056,7 +1145,7 @@ export class MessageList extends LitElement {
       // before React caught up — allow a full render.
       console.log(
         "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
-        (this.messages as RenderMessage[]).length,
+        newLength,
         this._committedTotal,
       );
       this._committedTotal = 0;
@@ -1216,9 +1305,10 @@ export class MessageList extends LitElement {
       fallbackIndex++;
 
       if (role === "user" || role === "user-with-attachments") {
+        const entryId = (msg as unknown as { _entryId?: string })._entryId;
         items.push({
           key,
-          template: html`<user-message .message=${msg}></user-message>`,
+          template: html`<user-message .message=${msg} .entryId=${entryId}></user-message>`,
         });
       } else if (role === "assistant") {
         items.push({
@@ -1398,9 +1488,10 @@ export class MessageList extends LitElement {
       fallbackIndex++;
 
       if (role === "user" || role === "user-with-attachments") {
+        const entryId = (msg as unknown as { _entryId?: string })._entryId;
         items.push({
           key,
-          template: html`<user-message .message=${msg}></user-message>`,
+          template: html`<user-message .message=${msg} .entryId=${entryId}></user-message>`,
         });
         continue;
       }

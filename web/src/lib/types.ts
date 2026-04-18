@@ -292,4 +292,5 @@ export type WsMessage =
       source: "web";
     }
   | { type: "resources_reloaded" }
+  | { type: "history_rewritten"; piSessionId: string; reason: "prune" }
   | { type: "error"; message: string };

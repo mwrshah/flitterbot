@@ -34,8 +34,13 @@ export type StreamsMessageListHandle = {
 export const StreamsMessageList = memo(
   forwardRef<
     StreamsMessageListHandle,
-    { messages: AgentMessage[]; onMessagesRendered?: () => void }
-  >(function StreamsMessageList({ messages, onMessagesRendered }, ref) {
+    {
+      messages: AgentMessage[];
+      onMessagesRendered?: () => void;
+      /** Called when a user message's “Delete (including me)” menu item is clicked. */
+      onPruneRequested?: (entryId: string) => void;
+    }
+  >(function StreamsMessageList({ messages, onMessagesRendered, onPruneRequested }, ref) {
     useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered });
     const containerRef = useRef<HTMLDivElement>(null);
     const elementRef = useRef<MessageListElement | null>(null);
@@ -142,6 +147,24 @@ export const StreamsMessageList = memo(
         elementRef.current = null;
       };
     }, []);
+
+    // Listen for `prune-message` CustomEvents bubbled by <user-message> in the
+    // Lit subtree. Keep the listener on the React container so it survives even
+    // if the Lit element is rebuilt.
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const handler = (ev: Event) => {
+        const detail = (ev as CustomEvent<{ entryId?: string }>).detail;
+        const entryId = detail?.entryId;
+        if (!entryId) return;
+        onPruneRequested?.(entryId);
+      };
+      container.addEventListener("prune-message", handler);
+      return () => {
+        container.removeEventListener("prune-message", handler);
+      };
+    }, [onPruneRequested]);
 
     useImperativeHandle(ref, () => ({
       updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {

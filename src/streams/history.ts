@@ -1,5 +1,9 @@
-import fs, { createReadStream } from "node:fs";
-import readline from "node:readline";
+import fs from "node:fs";
+import {
+  parseSessionEntries,
+  type SessionEntry,
+  type SessionManager,
+} from "@mariozechner/pi-coding-agent";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -51,12 +55,18 @@ function pushMessage(
   createdAt: string,
   blocks?: StreamsHistoryMessageBlock[],
   images?: ImageAttachment[],
+  entryId?: string,
 ): void {
   const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
     block.type === "text" ? block.text.trim() : block.thinking.trim(),
   );
-  if (!normalized && (!normalizedBlocks || normalizedBlocks.length === 0) && (!images || images.length === 0)) return;
+  if (
+    !normalized &&
+    (!normalizedBlocks || normalizedBlocks.length === 0) &&
+    (!images || images.length === 0)
+  )
+    return;
 
   const item: ChatTimelineMessage = {
     id,
@@ -71,6 +81,9 @@ function pushMessage(
   if (images && images.length > 0) {
     item.images = images;
   }
+  if (entryId) {
+    item.entryId = entryId;
+  }
   items.push(item);
 }
 
@@ -80,10 +93,11 @@ function parseMessageContent(
   role: "user" | "assistant" | "system",
   createdAt: string,
   content: unknown,
+  entryId?: string,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, messageId, role, text, createdAt);
+    if (text) pushMessage(items, messageId, role, text, createdAt, undefined, undefined, entryId);
     return;
   }
 
@@ -105,7 +119,16 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images);
+    pushMessage(
+      items,
+      messageId,
+      role,
+      contentText,
+      createdAt,
+      [...messageBlocks],
+      images,
+      entryId,
+    );
     messageBlocks.length = 0;
   };
 
@@ -118,7 +141,11 @@ function parseMessageContent(
       continue;
     }
 
-    if (type === "image" && typeof record.data === "string" && typeof record.mimeType === "string") {
+    if (
+      type === "image" &&
+      typeof record.data === "string" &&
+      typeof record.mimeType === "string"
+    ) {
       imageAttachments.push({ data: record.data, mimeType: record.mimeType });
       continue;
     }
@@ -154,11 +181,12 @@ function parseMessageRecord(
   createdAt: string,
   messageId: string,
   items: ChatTimelineItem[],
+  entryId?: string,
 ): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content);
+    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, entryId);
     return;
   }
 
@@ -256,51 +284,60 @@ function shapeHistoryItems(
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
-function parseHistoryLine(
-  line: string,
-  _lineNumber: number,
-  items: ChatTimelineItem[],
-  ordinal: { value: number },
-): void {
-  const parsed = JSON.parse(line) as Record<string, unknown>;
-  if (parsed.type !== "message") return;
-
-  const messageRecord = asRecord(parsed.message);
-  const createdAt = isoTimestamp(messageRecord.timestamp, parsed.timestamp);
-  const messageId = `msg-${ordinal.value}`;
-  ordinal.value += 1;
-  parseMessageRecord(messageRecord, createdAt, messageId, items);
-}
-
-export function readStreamsHistoryFromMessages(
-  piSessionId: string,
-  sessionFile: string | null,
-  messages: Array<unknown>,
-  mode: StreamsHistoryMode = "agent",
-): StreamsHistoryResponse {
+/**
+ * Walk a list of SessionEntry objects (already ordered root→leaf) and build a
+ * ChatTimelineItem[]. Each entry's id is stamped onto emitted message items as
+ * `entryId` so the UI can address them for prune/edit operations.
+ *
+ * Non-message entries (thinking_level_change, model_change, compaction,
+ * custom, label, session_info, branch_summary) are skipped here — the chat
+ * timeline only renders conversational content.
+ */
+function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const items: ChatTimelineItem[] = [];
   let ordinal = 0;
-
-  for (const message of messages) {
-    const record = asRecord(message);
-    const createdAt = isoTimestamp(record.timestamp);
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const messageRecord = asRecord(entry.message);
+    const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);
     const messageId = `msg-${ordinal}`;
     ordinal += 1;
-    parseMessageRecord(record, createdAt, messageId, items);
+    parseMessageRecord(messageRecord, createdAt, messageId, items, entry.id);
   }
+  return items;
+}
 
+/**
+ * Build history from a live AgentSession's SessionManager, walking the current
+ * leaf's branch path (root → leaf). Entries not on the current branch (e.g.
+ * pruned siblings) are excluded.
+ */
+export function readStreamsHistoryFromSession(
+  piSessionId: string,
+  sessionManager: SessionManager,
+  mode: StreamsHistoryMode = "agent",
+): StreamsHistoryResponse {
+  const sessionFile = sessionManager.getSessionFile() ?? null;
+  const branch = sessionManager.getBranch();
+  const items = entriesToTimeline(branch);
   return {
-    piSessionId: piSessionId,
+    piSessionId,
     sessionFile,
     items: shapeHistoryItems(items, mode),
   };
 }
 
-export async function readStreamsHistory(
+/**
+ * Build history from an on-disk session JSONL file. Resolves the leaf (last
+ * entry in the file) and walks back to root via parentId pointers, emitting
+ * only entries on the active branch. This mirrors SessionManager's leaf
+ * resolution and ensures pruned branches are invisible to dormant readers.
+ */
+export function readStreamsHistory(
   piSessionId: string,
   sessionFile: string,
   mode: StreamsHistoryMode = "agent",
-): Promise<StreamsHistoryResponse> {
+): StreamsHistoryResponse {
   if (!fs.existsSync(sessionFile)) {
     console.warn(
       "readStreamsHistory: session file missing on disk (sessionId=%s, file=%s)",
@@ -308,36 +345,52 @@ export async function readStreamsHistory(
       sessionFile,
     );
     return {
-      piSessionId: piSessionId,
+      piSessionId,
       sessionFile,
       items: [],
     };
   }
 
-  const stream = createReadStream(sessionFile, { encoding: "utf8" });
-  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
-  const items: ChatTimelineItem[] = [];
-  let lineNumber = 0;
-  const ordinal = { value: 0 };
-
+  let raw: string;
   try {
-    for await (const rawLine of lines) {
-      lineNumber += 1;
-      const line = rawLine.trim();
-      if (!line) continue;
-      try {
-        parseHistoryLine(line, lineNumber, items, ordinal);
-      } catch {
-        // Ignore malformed lines and continue reading the session.
-      }
-    }
-  } finally {
-    lines.close();
-    stream.close();
+    raw = fs.readFileSync(sessionFile, "utf8");
+  } catch (err) {
+    console.warn(
+      "readStreamsHistory: failed to read session file (sessionId=%s, file=%s): %s",
+      piSessionId,
+      sessionFile,
+      err instanceof Error ? err.message : String(err),
+    );
+    return { piSessionId, sessionFile, items: [] };
   }
 
+  const fileEntries = parseSessionEntries(raw);
+  // Strip header; keep only SessionEntry (non-"session" types).
+  const entries: SessionEntry[] = [];
+  const byId = new Map<string, SessionEntry>();
+  for (const fe of fileEntries) {
+    if (fe.type === "session") continue;
+    entries.push(fe);
+    byId.set(fe.id, fe);
+  }
+
+  if (entries.length === 0) {
+    return { piSessionId, sessionFile, items: [] };
+  }
+
+  // Leaf = last entry in file (matches SessionManager._buildIndex behaviour).
+  // Walk leaf → root collecting the active branch path.
+  const leaf = entries[entries.length - 1]!;
+  const path: SessionEntry[] = [];
+  let current: SessionEntry | undefined = leaf;
+  while (current) {
+    path.unshift(current);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+
+  const items = entriesToTimeline(path);
   return {
-    piSessionId: piSessionId,
+    piSessionId,
     sessionFile,
     items: shapeHistoryItems(items, mode),
   };
