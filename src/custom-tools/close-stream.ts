@@ -16,6 +16,9 @@ type CloseStreamResult = {
   conflicts?: string[];
   merged?: boolean;
   pushed?: boolean;
+  needsConfirmation?: boolean;
+  currentBranch?: string | null;
+  resolvedBaseBranch?: string | null;
 };
 
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
@@ -207,6 +210,24 @@ export async function executeCloseStream(
   }
   if (stream.status !== "open") {
     return { ok: false, streamId, message: `Stream ${streamId} is already closed` };
+  }
+
+  // Preview step: when merging without an explicit base_branch override, return
+  // a non-destructive preview for user confirmation. No sessions killed, no
+  // commits, no merges, no push, no stream closure.
+  if (mode === "merge" && baseBranchOverride === undefined) {
+    const currentBranch = stream.worktree_path
+      ? await inferBranchFromWorktree(stream.worktree_path)
+      : null;
+    const resolvedBaseBranch = stream.base_branch ?? null;
+    return {
+      ok: false,
+      streamId,
+      needsConfirmation: true,
+      currentBranch,
+      resolvedBaseBranch,
+      message: `Preview: would merge ${currentBranch ?? "(unknown)"} → ${resolvedBaseBranch ?? "(none recorded)"}. Confirm by calling close_stream again with explicit base_branch.`,
+    };
   }
 
   // Step 0: Kill active CC sessions belonging to this stream
