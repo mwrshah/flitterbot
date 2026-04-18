@@ -128,6 +128,22 @@ code,
 .diff-viewer-panel .d2h-file-wrapper {
   overflow: visible;
 }
+/* Anchor the absolutely-positioned line-number gutter to the diff table so
+   it scrolls with the rows. Without a positioned ancestor, the library's
+   `.d2h-code-linenumber { position: absolute }` resolves against the viewport
+   and stays pinned while the code scrolls past. */
+.diff-viewer-panel .d2h-diff-table {
+  position: relative;
+}
+/* Include the +/- prefix sign in text selection so copy-paste of a diff row
+   contains the marker. The library sets user-select:none on the code line
+   and its prefix span; flip both back to text. Line numbers stay unselectable
+   (library default, intentional). */
+.diff-viewer-panel .d2h-code-line,
+.diff-viewer-panel .d2h-code-line-prefix {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 /* Hide scrollbars while keeping scroll functionality */
 .no-scrollbar {
