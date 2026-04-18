@@ -48,11 +48,12 @@ function piStatusBanner(
     case "ended":
       return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
-      // Match "Waiting for user" styling exactly — same muted blue pill, only
-      // the label differs. The recovery action lives in the header button.
+      // Same /15 tinted-pill template as the other states, red hue for the
+      // semantic. Not the shadcn destructive variant — just the muted red
+      // tint that matches the pattern (emerald / amber / blue / zinc / red).
       return {
         label: "Crashed",
-        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+        colorClass: "bg-red-500/15 text-red-600 dark:text-red-400",
       };
     default:
       return null;
