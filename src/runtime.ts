@@ -1476,7 +1476,7 @@ export class ControlSurfaceRuntime {
         name: "close_stream",
         label: "Close Stream",
         description:
-          'Close the current stream. Mode is required: "merge" merges branch into the stream\'s recorded base branch, pushes, and closes. "noop" skips all git operations and just closes the stream record. Only call when the human explicitly confirms the work is done.',
+          'Close the current stream. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record. Merge uses a two-step flow: call once without base_branch to get a non-destructive preview (current branch + resolved base branch), then call again with explicit base_branch to execute. Only call when the human explicitly confirms the work is done.',
         parameters: {
           type: "object",
           properties: {
@@ -1485,7 +1485,7 @@ export class ControlSurfaceRuntime {
               type: "string",
               enum: ["merge", "noop"],
               description:
-                '"merge" commits uncommitted changes, merges branch to the stream\'s base branch, and pushes. "noop" skips all git operations — just closes the stream and ends the session.',
+                '"merge" commits uncommitted changes, merges branch to the stream\'s base branch, and pushes. On the first merge call without base_branch, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the stream and ends the session.',
             },
             merge_commit_message: {
               type: "string",
@@ -1495,7 +1495,7 @@ export class ControlSurfaceRuntime {
             base_branch: {
               type: "string",
               description:
-                "Optional override for the branch to merge into. When provided, supersedes the stream's recorded base_branch. Use this if the stream record is missing base_branch or if you need to merge somewhere different. Ignored in noop mode.",
+                "Target branch to merge into. Supersedes the stream's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
             },
           },
           required: ["stream_id", "mode"],

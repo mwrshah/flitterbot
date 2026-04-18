@@ -52,7 +52,9 @@ The tool also accepts an optional \`merge_commit_message\` parameter (string). W
 
 Do not autonomously merge into main. The stream's recorded base branch is the default merge target; if it is unset, \`close_stream\` will refuse rather than guess. If the user explicitly asks to merge into main (or any other branch), pass \`base_branch: "main"\` (or whatever they named) to \`close_stream\` and execute without hesitation.
 
-The tool also accepts an optional \`base_branch\` parameter to override the stream's recorded base branch at close time. Pass whatever the user asked for — do not second-guess their choice of target branch.
+The tool also accepts an optional \`base_branch\` parameter to override the stream's recorded base branch at close time. Pass whatever the user asked for — do not second-guess their choice of target branch. Passing \`base_branch\` *also* skips the preview step below and executes the merge directly, so only include it on the confirming call.
+
+*Merge flow is two-step.* When the user signals the stream is done, call \`close_stream\` with \`mode: "merge"\` and no \`base_branch\` — this returns a preview with the current branch and the resolved base branch (from the stream record). Relay the preview to the user: \`Merge <current> → <base>. Confirm, or name a different branch.\` When the user confirms, call \`close_stream\` again with \`mode: "merge"\` AND an explicit \`base_branch\` to execute. If the resolved base branch came back null, ask the user which branch to merge into before the second call.
 
 ## Cutovers, Not Backwards Compatibility
 
