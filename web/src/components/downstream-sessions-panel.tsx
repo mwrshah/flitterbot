@@ -26,35 +26,37 @@ import { cn } from "~/lib/utils";
  * interactive. The Recover action lives in the chat header button only.
  * Matches the dot+label pattern used by downstream session rows below.
  */
-function piStatusIndicator(status: PiSessionStatus | undefined): {
-  label: string;
-  dotClass: string;
-} | null {
+function piStatusBanner(
+  status: PiSessionStatus | undefined,
+): { label: string; colorClass: string } | null {
   switch (status) {
     case "active":
-      return { label: "Inferring", dotClass: "bg-emerald-500 animate-pulse" };
+      return {
+        label: "Inferring",
+        colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+      };
     case "waiting_for_sessions":
-      return { label: "Waiting for sessions", dotClass: "bg-amber-500" };
+      return {
+        label: "Waiting for sessions",
+        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+      };
     case "waiting_for_user":
-      return { label: "Waiting for user", dotClass: "bg-blue-400" };
+      return {
+        label: "Waiting for user",
+        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+      };
     case "ended":
-      return { label: "Ended", dotClass: "bg-zinc-500" };
+      return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
-      return { label: "Crashed", dotClass: "bg-red-500" };
+      // Match "Waiting for user" styling exactly — same muted blue pill, only
+      // the label differs. The recovery action lives in the header button.
+      return {
+        label: "Crashed",
+        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+      };
     default:
       return null;
   }
-}
-
-function PiStatusIndicator({ piSessionStatus }: { piSessionStatus: PiSessionStatus | undefined }) {
-  const indicator = piStatusIndicator(piSessionStatus);
-  if (!indicator) return <div />;
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span className={cn("h-2 w-2 rounded-full shrink-0", indicator.dotClass)} />
-      <span>{indicator.label}</span>
-    </div>
-  );
 }
 
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
@@ -206,7 +208,16 @@ export function DownstreamSessionsPanel({
     <div className="flex flex-col h-full border-l border-border bg-background">
       {/* Header row: status banner + diff toggle */}
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
-        <PiStatusIndicator piSessionStatus={piSessionStatus} />
+        {(() => {
+          const banner = piStatusBanner(piSessionStatus);
+          return banner ? (
+            <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
+              {banner.label}
+            </div>
+          ) : (
+            <div />
+          );
+        })()}
         <ToggleGroup
           value={[panelView]}
           onValueChange={(newValue) => {
