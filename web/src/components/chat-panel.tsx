@@ -4,11 +4,9 @@ import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
-import { CopyableCode } from "~/components/common/copyable-code";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -70,7 +68,6 @@ export function ChatPanel({
     staleTime: 5 * 60 * 1000,
   });
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
-  const cwdCopy = useCopyToClipboard(600);
   const pickerItems = useMemo(
     () => [...INTERNAL_COMMANDS, ...(skillsData?.items ?? [])],
     [skillsData],
@@ -233,12 +230,12 @@ export function ChatPanel({
           {worktree?.cwd && worktree.cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
-              <CopyableCode
-                text={worktree.cwdAbsolute}
-                displayText={worktree.cwd}
-                copied={cwdCopy.copied}
-                onCopy={() => worktree.cwdAbsolute && cwdCopy.copy(worktree.cwdAbsolute)}
-              />
+              <span
+                className="inline-block text-xxs text-muted-foreground truncate max-w-full"
+                title={worktree.cwdAbsolute}
+              >
+                {worktree.cwd}
+              </span>
             </>
           )}
         </div>
