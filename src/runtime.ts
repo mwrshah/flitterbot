@@ -1491,7 +1491,7 @@ export class ControlSurfaceRuntime {
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
-          "Create an isolated git worktree for a stream. Sets up a new branch and records the paths on the stream. By default, base_ref is resolved from the orchestrator's own current branch (git rev-parse --abbrev-ref HEAD in the orchestrator's pi-session cwd) — NOT hardcoded to origin/main. Pass base_ref explicitly to override.",
+          "Create an isolated git worktree for a stream. Sets up a new branch and records repo_path + worktree_path on the stream. base_ref defaults to the orchestrator's own current branch (resolved from pi_sessions.cwd via `git rev-parse --abbrev-ref HEAD`) — NOT hardcoded to origin/main. Pass base_ref explicitly to override (e.g. 'main', 'develop'). SHAs/tags not accepted. Branch name auto-generates as NNN-<stream-slug> when omitted. Typically one worktree per stream. ALWAYS pass the main repo root as `repo_path` — never a worktree path (the tool resolves sibling directories via path.resolve(repoPath, '..', ...)). If your own cwd is itself a worktree, resolve the main repo first with `git worktree list --porcelain | head -1 | sed 's/^worktree //'`.",
 
         parameters: {
           type: "object",
@@ -1596,7 +1596,7 @@ export class ControlSurfaceRuntime {
         name: "close_stream",
         label: "Close Stream",
         description:
-          'Close the current stream. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record. Merge uses a two-step flow: call once without base_branch to get a non-destructive preview (current branch + resolved base branch), then call again with explicit base_branch to execute. Only call when the human explicitly confirms the work is done.',
+          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. Before the confirming call, inspect `git log <base>..HEAD --oneline` and `git diff HEAD` and author a concise merge_commit_message — never rely on git\'s default. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_stream again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
         parameters: {
           type: "object",
           properties: {
