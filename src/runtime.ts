@@ -188,12 +188,12 @@ export class ControlSurfaceRuntime {
           streamsRow.model_id,
         );
       } else {
-        // No surviving pi session row — create a fresh orchestrator
-        await this.sessionManager.createOrchestrator(
-          ws.id,
-          ws.name,
-          ws.repo_path ?? undefined,
-          this.createCustomTools("orchestrator", ws.id),
+        // Latest pi_session is crashed/ended (or missing). Do NOT auto-spawn
+        // a fresh orchestrator — that orphans prior messages bound to the old
+        // pi_session_id and masks the crash in the UI. Recovery is explicit:
+        // user clicks "Recover" → POST /api/streams/:id/reopen → reopenStream().
+        this.log(
+          `skipping orchestrator spawn for open stream "${ws.name}" (${ws.id}) — no alive pi_session; awaiting explicit Recover`,
         );
       }
     }
