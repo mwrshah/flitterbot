@@ -1,13 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { html as diff2html } from "diff2html";
-import { ColorSchemeType } from "diff2html/lib/types";
-import "diff2html/bundles/css/diff2html.min.css";
 import { useEffect, useMemo, useState } from "react";
+import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
+import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
-import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
@@ -87,7 +85,6 @@ export function DownstreamSessionsPanel({
   piSessionStatus?: PiSessionStatus;
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
-  const { resolvedTheme } = useTheme();
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   useEffect(() => {
     setPanelView("info");
@@ -164,15 +161,23 @@ export function DownstreamSessionsPanel({
     ]);
   }, [firstTmuxSession, currentWorktreePath, tmuxCopy.copy, worktreeCopy.copy, hasWorktree]);
 
-  const renderedDiff = useMemo(() => {
-    if (diffQuery.data?.mode !== "diff") return "";
-    return diff2html(diffQuery.data.diff, {
-      outputFormat: "line-by-line",
-      drawFileList: true,
-      matching: "lines",
-      colorScheme: resolvedTheme === "dark" ? ColorSchemeType.DARK : ColorSchemeType.LIGHT,
-    });
-  }, [diffQuery.data, resolvedTheme]);
+  // Parse the unified diff into react-diff-view's file/hunk/change model.
+  // Inject the +/-/space prefix into each change's content so the sign is
+  // part of the selectable text (the library renders content as-is in the
+  // code cell and omits the prefix by design — it signals type via color).
+  const diffFiles = useMemo<FileData[]>(() => {
+    if (diffQuery.data?.mode !== "diff") return [];
+    const files = parseDiff(diffQuery.data.diff);
+    for (const file of files) {
+      for (const hunk of file.hunks) {
+        for (const change of hunk.changes) {
+          const sign = change.type === "insert" ? "+" : change.type === "delete" ? "-" : " ";
+          change.content = sign + change.content;
+        }
+      }
+    }
+    return files;
+  }, [diffQuery.data]);
 
   if (!piSessionId) {
     return (
@@ -262,11 +267,29 @@ export function DownstreamSessionsPanel({
             </>
           )}
           {diffQuery.isSuccess && diffQuery.data?.mode === "diff" && (
-            <div
-              className="diff-viewer-panel text-xs"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: diff HTML is generated server-side by diff2html, not from user input
-              dangerouslySetInnerHTML={{ __html: renderedDiff }}
-            />
+            <div className="diff-viewer-panel text-xs">
+              {diffFiles.map((file) => {
+                const path = file.newPath || file.oldPath || "(unknown)";
+                const key = `${file.oldRevision}-${file.newRevision}-${path}`;
+                return (
+                  <div key={key} className="mb-3 last:mb-0">
+                    <div className="sticky top-0 z-10 px-3 py-1 text-[11px] font-mono text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm truncate">
+                      {path}
+                    </div>
+                    <Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
+                      {(hunks) =>
+                        hunks.map((hunk) => (
+                          <Hunk
+                            key={`${hunk.oldStart},${hunk.oldLines} ${hunk.newStart},${hunk.newLines}`}
+                            hunk={hunk}
+                          />
+                        ))
+                      }
+                    </Diff>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       ) : (

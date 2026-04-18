@@ -91,93 +91,58 @@ code,
   color: var(--color-muted-foreground);
 }
 
-/* diff2html overrides — rebuild each diff row as an in-flow flex row.
+/* react-diff-view overrides — theme with app tokens + size for narrow panel.
 
-   The library's default layout (absolute-positioned gutter overlaying
-   left padding reserved on an inline-block code <td> with
-   white-space:nowrap) doesn't work in a narrow side panel:
-     - absolute gutter has no positioned ancestor → detaches from scroll
-     - fixed-width code cell with nowrap → long lines clip off the right
-     - shrinking the gutter to fit → line numbers truncate to ellipsis
-   Trade those architecture constraints away: linearize <table>/<tbody>
-   to block, make each <tr> a flex row with gutter (intrinsic width) +
-   code (flex-1), and let the code cell wrap. Everything scrolls together
-   because nothing is out of flow. Library HTML (from diff2html-templates):
-     <tr>
-       <td.d2h-code-linenumber.{type}>
-         <div.line-num1>old</div><div.line-num2>new</div>
-       </td>
-       <td.{type}>
-         <div.d2h-code-line>
-           <span.d2h-code-line-prefix>+|-| </span>
-           <span.d2h-code-line-ctn>content</span>
-         </div>
-       </td>
-     </tr>
-*/
-.diff-viewer-panel .d2h-diff-table,
-.diff-viewer-panel .d2h-diff-table > tbody {
-  display: block;
-  width: 100%;
+   Library renders a <table class="diff"> per file with:
+     <colgroup><col.diff-gutter-col/><col.diff-gutter-col/><col/></colgroup>
+     <tbody class="diff-hunk">
+       <tr class="diff-line diff-line-{type}">
+         <td.diff-gutter.diff-gutter-{type}>oldLine</td>
+         <td.diff-gutter.diff-gutter-{type}>newLine</td>
+         <td.diff-code.diff-code-{type}>content</td>
+       </tr>
+       …
+     </tbody>
+   Everything is a real table — no absolute positioning, no tricks. Gutter
+   cells scroll with rows by construction. Content is plain text in a <td>
+   with white-space:pre-wrap + word-break:break-all from library default,
+   which handles wrapping cleanly. We just narrow the gutter, drop the
+   break-all aggression, and theme the colors. */
+.diff-viewer-panel .diff {
+  font-size: inherit;
 }
-.diff-viewer-panel .d2h-diff-table tr {
-  display: flex;
-  width: 100%;
+.diff-viewer-panel .diff-gutter-col {
+  /* Two gutter cols in unified view. 3.5ch each = 7ch total; fits 3-digit
+     line numbers comfortably and holds the layout stable for larger files. */
+  width: 3.5ch;
 }
-.diff-viewer-panel .d2h-code-linenumber {
-  /* Drop the library's position:absolute + width:7.5em. Become an in-flow
-     flex item sized to fit 4-digit line numbers per side. */
-  position: static;
-  flex: 0 0 auto;
-  width: 5em;
+.diff-viewer-panel .diff-gutter {
+  padding: 0 0.25ch;
+  font-size: 0.85em;
+  border-right: 1px solid var(--border);
 }
-.diff-viewer-panel .line-num1,
-.diff-viewer-panel .line-num2 {
-  width: 2.25em;
-  padding: 0 0.25em;
-}
-.diff-viewer-panel .d2h-code-line {
-  /* Drop the library's width:calc(100%-16em) + padding:0 8em (those reserved
-     space for the absolute gutter, which is now in flow). Flex-fill the
-     remaining row width and wrap long lines instead of clipping.
-
-     white-space MUST stay collapsing here. The library's template emits a
-     newline + indent between the <span.d2h-code-line-prefix> and
-     <span.d2h-code-line-ctn> siblings; with pre-wrap that whitespace
-     renders and the prefix ends up on its own visual line above the code.
-     Keep 'normal' on the outer so inter-span whitespace collapses; pre-wrap
-     lives on the inner .d2h-code-line-ctn where real code indentation is. */
-  position: static;
-  flex: 1 1 0;
-  min-width: 0;
-  width: auto;
+.diff-viewer-panel .diff-code {
   padding: 0 0.5em;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.diff-viewer-panel .d2h-code-line-ctn {
-  /* Library sets width:100% (needed in its original inline-block layout).
-     In our flex layout that forces the ctn to row width and defeats wrap;
-     let it size to content instead. pre-wrap preserves the real code
-     indentation while allowing soft-wrap at the container edge. */
-  width: auto;
+  /* Library ships word-break:break-all which chops mid-word aggressively.
+     word-break:normal + overflow-wrap:anywhere wraps at whitespace first
+     and only breaks inside tokens when a single token overflows. */
   white-space: pre-wrap;
+  word-break: normal;
   overflow-wrap: anywhere;
 }
-.diff-viewer-panel .d2h-file-diff {
-  overflow-y: auto;
-}
-.diff-viewer-panel .d2h-file-wrapper {
-  overflow: visible;
-}
-/* Include the +/- prefix sign in text selection so copy-paste of a diff row
-   contains the marker. The library sets user-select:none on the code line
-   and its prefix span; flip both back to text. Line numbers stay unselectable
-   (library default, intentional). */
-.diff-viewer-panel .d2h-code-line,
-.diff-viewer-panel .d2h-code-line-prefix {
-  -webkit-user-select: text;
-  user-select: text;
+/* Theme mapping: library CSS variables → app color tokens. One block for
+   both light and dark; values are alpha-composited against the app bg so
+   they read well in either theme. */
+.diff-viewer-panel {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--foreground);
+  --diff-font-family: var(--font-mono);
+  --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
+  --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
+  --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
+  --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
+  --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
+  --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
 }
 
 /* Hide scrollbars while keeping scroll functionality */
@@ -186,11 +151,6 @@ code,
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
-}
-
-/* diff2html override — align file list header padding */
-.d2h-file-list-header {
-  padding-inline: 0.5rem;
 }
 
 /* Sonner toast overrides — use app CSS variables */
