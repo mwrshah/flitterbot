@@ -41,9 +41,16 @@ export const SkillPicker = memo(function SkillPicker({
   });
 
   const filtered = useMemo(() => {
-    if (!filter) return skills;
     const lower = filter.toLowerCase();
-    return skills.filter((s) => s.name.toLowerCase().includes(lower));
+    const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
+    // Pin command-kind items (e.g. /clear, /reload) to the bottom, preserving
+    // relative order within each group.
+    const nonCommands: SkillListItem[] = [];
+    const commands: SkillListItem[] = [];
+    for (const item of matched) {
+      (item.kind === "command" ? commands : nonCommands).push(item);
+    }
+    return [...nonCommands, ...commands];
   }, [skills, filter]);
 
   // Manual selection management (cmdk won't auto-select with shouldFilter={false})
@@ -101,11 +108,11 @@ export const SkillPicker = memo(function SkillPicker({
                   >
                     /{skill.name}
                   </span>
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
                     {skill.description}
                   </span>
                   <span
-                    className={`ml-auto text-[10px] uppercase tracking-wide shrink-0 ${isCommand ? "text-primary" : "text-muted-foreground/60"}`}
+                    className={`text-[10px] uppercase tracking-wide shrink-0 ${isCommand ? "text-primary" : "text-muted-foreground/60"}`}
                   >
                     {isCommand ? "Command" : "Skill"}
                   </span>
