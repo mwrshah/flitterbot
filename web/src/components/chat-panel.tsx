@@ -4,14 +4,17 @@ import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
+import { CopyableCode } from "~/components/common/copyable-code";
 import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
+import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
+import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
@@ -66,6 +69,8 @@ export function ChatPanel({
     queryFn: () => apiClient.listSkills(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
+  const cwdCopy = useCopyToClipboard(600);
   const pickerItems = useMemo(
     () => [...INTERNAL_COMMANDS, ...(skillsData?.items ?? [])],
     [skillsData],
@@ -220,9 +225,25 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-border shrink-0 min-h-11">
-        <h1 className="text-sm font-semibold text-foreground">Streams</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-sm font-semibold text-foreground truncate">
+            {streamName ?? "flitterbot"}
+          </h1>
+          {worktree?.cwd && worktree.cwdAbsolute && (
+            <>
+              <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
+              <span className="text-xs text-muted-foreground shrink-0">CWD:</span>
+              <CopyableCode
+                text={worktree.cwdAbsolute}
+                displayText={worktree.cwd}
+                copied={cwdCopy.copied}
+                onCopy={() => worktree.cwdAbsolute && cwdCopy.copy(worktree.cwdAbsolute)}
+              />
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           {isClient && isSessionActive && (
             <Button
               variant="destructive"

@@ -85,6 +85,7 @@ function StreamsDefaultRoute() {
           timeline={timeline}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
+          streamName={defaultStream?.name}
         />
       </Panel>
       <ResizeHandle />
