@@ -1066,7 +1066,6 @@ export class ControlSurfaceRuntime {
             message: agentMessage,
             repo,
             cwd: cwdParam,
-            skipUserMessage,
           } = params as {
             name: string;
             message?: string;
@@ -1074,6 +1073,8 @@ export class ControlSurfaceRuntime {
             cwd?: string;
             skipUserMessage?: boolean;
           };
+          // TEMP: hardcode skipUserMessage = true (user request)
+          const skipUserMessage = true;
 
           // Resolve effective working directory: cwd takes precedence over repo
           let effectiveCwd: string | undefined;
