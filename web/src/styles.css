@@ -91,24 +91,36 @@ code,
   color: var(--color-muted-foreground);
 }
 
-/* diff2html base overrides — must use !important to beat library specificity */
-.line-num1, .line-num2 {
-  width: unset !important;
-}
-.line-num2 {
-  margin-left: 2rem;
-}
-
-/* diff2html overrides — table-cell layout for narrow panel context */
+/* diff2html overrides — shrink the line-number gutter to fit a narrow
+   side panel. The library lays out each diff row as:
+     <tr>
+       <td.d2h-code-linenumber>  (inline-block, position:absolute, width:7.5em)
+         <div.line-num1 float:left width:3.5em>old</div>
+         <div.line-num2 float:right width:3.5em>new</div>
+       </td>
+       <td.d2h-code-line>         (inline-block, width:calc(100% - 16em), padding:0 8em)
+         ...content...
+       </td>
+     </tr>
+   The gutter <td> is position:absolute at its natural flow position and
+   visually overlays the 8em left padding reserved on the code <td>. We
+   keep that architecture intact — only tighten the widths so the gutter
+   fits in a <=360px panel. Do NOT change display/float/position here: any
+   mismatch between the two <td>s breaks the row and stacks the gutter
+   above the code. */
 .diff-viewer-panel .d2h-code-linenumber {
-  position: static;
-  display: table-cell;
-  white-space: nowrap;
-  width: max-content;
+  width: 5em;
 }
 .diff-viewer-panel .line-num1,
 .diff-viewer-panel .line-num2 {
-  display: inline-block !important;
+  width: 2.25em;
+  padding: 0 0.25em;
+}
+.diff-viewer-panel .d2h-code-line {
+  /* Left padding = gutter width; trim the library's matching right padding
+     down to a small gutter-edge gap so content gets back horizontal room. */
+  width: calc(100% - 5.5em);
+  padding: 0 0.5em 0 5em;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
@@ -123,12 +135,6 @@ code,
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
-}
-
-/* diff2html override — remove excessive padding on code lines */
-.diff-viewer-panel .d2h-code-line {
-  padding: 0;
-  width: 100%;
 }
 
 /* diff2html override — align file list header padding */
