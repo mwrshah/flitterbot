@@ -43,6 +43,8 @@ ONLY call \`close_stream\` when the human explicitly signals finality (e.g., "lo
 
 *Default to \`mode: "merge"\`.* Use \`noop\` only if the user explicitly says don't merge (e.g., "close without merging", "abandon this branch").
 
+*Two-call flow — required.* The first \`close_stream\` call is always a dry-run preview: it returns the resolved base and the planned merge without executing. To actually close and merge, you must call \`close_stream\` a second time with an explicit \`base_branch\`. One call alone does nothing destructive — don't assume it closed.
+
 On the preview call, relay to user: "Merge <current> → <base>. Confirm, or name a different branch." If resolved base came back null, ask for a branch first. Don't second-guess the branch the user names.
 
 Before the confirming call, inspect changes (\`git log <base>..HEAD --oneline\`, \`git diff HEAD\`) and write a concise \`merge_commit_message\`. Never rely on git's default.
