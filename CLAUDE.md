@@ -1,1 +1,1 @@
-/home/mas/development/dotfiles/CLAUDE.arch.md
+/Users/munawarshah/.claude/CLAUDE.macos.md
