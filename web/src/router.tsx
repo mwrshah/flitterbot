@@ -5,7 +5,6 @@ import { DefaultCatchBoundary } from "./components/default-catch-boundary";
 import { NotFound } from "./components/not-found";
 import { createFlitterbotApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
-import type { StatusResponse } from "./lib/types";
 import { FlitterbotWsClient } from "./lib/ws";
 import { createWsConnectionStore } from "./lib/ws-connection-store";
 import { createSendMessage, setupWsQueryBridge } from "./lib/ws-query-bridge";
@@ -61,10 +60,6 @@ export function getRouter() {
       queryClient,
       wsClient,
       router,
-      getDefaultPiSessionId: () => {
-        const status = queryClient.getQueryData<StatusResponse>(["status"]);
-        return status?.piAgent?.default?.piSessionId;
-      },
     });
 
     const stopWsRouteSubscriptions = setupWsRouteSubscriptions(router, wsClient, queryClient);
