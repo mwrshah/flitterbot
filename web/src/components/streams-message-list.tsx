@@ -151,7 +151,14 @@ export const StreamsMessageList = memo(
     // Listen for `prune-message` CustomEvents bubbled by <user-message> in the
     // Lit subtree. Keep the listener on the React container so it survives even
     // if the Lit element is rebuilt.
+    //
+    // `ready` is a dep because the container div is only rendered once the Lit
+    // runtime has loaded — before that the component returns a loading
+    // placeholder and containerRef.current is null. Without `ready` here, the
+    // effect runs at mount, bails out, and never re-runs after the container
+    // actually mounts, silently dropping every prune-message event.
     useEffect(() => {
+      if (!ready) return;
       const container = containerRef.current;
       if (!container) return;
       const handler = (ev: Event) => {
@@ -164,7 +171,7 @@ export const StreamsMessageList = memo(
       return () => {
         container.removeEventListener("prune-message", handler);
       };
-    }, [onPruneRequested]);
+    }, [ready, onPruneRequested]);
 
     useImperativeHandle(ref, () => ({
       updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {
