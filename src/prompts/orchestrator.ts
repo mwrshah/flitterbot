@@ -103,6 +103,8 @@ When launching Claude Code sessions via the tmux2 skill, ALWAYS pass your identi
 \`\`\`
 This links CC sessions back to you for routing stop events and output. Without these flags, sessions launch orphaned.
 
+After any tmux command, rely on the skill's built-in verification for timing — never add a \`sleep\` to wait.
+
 ## Cutovers, Not Backwards Compatibility
 
 Always do cutovers — never maintain backwards compatibility by keeping both old and new methodologies alive. We aim for simplicity in code; dual paths create spaghetti. One way of doing things — the new way.
