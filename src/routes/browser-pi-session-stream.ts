@@ -38,8 +38,7 @@ export async function handleBrowserPiSessionStreamRoute(
 
 function relativizeCwd(cwdAbsolute: string, projectsDir: string): string {
   const rel = path.relative(projectsDir, cwdAbsolute);
-  if (rel === "") return homeify(cwdAbsolute);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return homeify(cwdAbsolute);
+  if (!rel || rel.startsWith("..")) return homeify(cwdAbsolute);
   return `../${rel}`;
 }
 
