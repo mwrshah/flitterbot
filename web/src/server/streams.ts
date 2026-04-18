@@ -59,11 +59,11 @@ export const fetchDownstreamSessions = createServerFn({ method: "GET" })
   });
 
 export type StreamInfo = {
-  streamId: string;
-  name: string;
+  streamId: string | null;
+  name: string | null;
   repoPath: string | null;
   worktreePath: string | null;
-  baseBranch: string;
+  baseBranch: string | null;
   piSessionCwd: string | null;
   effectiveCwd: string | null;
 };
