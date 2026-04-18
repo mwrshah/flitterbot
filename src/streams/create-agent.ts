@@ -60,7 +60,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(role, piSessionId, workingDir, orchestratorContext);
+  const systemPrompt = resolveSystemPrompt(role, piSessionId, workingDir, orchestratorContext, config.projectsDir);
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
   // concurrent-orchestrator race condition.
@@ -172,10 +172,11 @@ function resolveSystemPrompt(
   piSessionId: string,
   cwd: string,
   ctx?: OrchestratorInput,
+  projectsDir?: string,
 ): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
     return buildOrchestratorSoloPrompt({ ...ctx, piSessionId, cwd });
   }
-  return buildDefaultAgentPrompt(piSessionId);
+  return buildDefaultAgentPrompt(piSessionId, projectsDir ?? cwd);
 }

@@ -97,6 +97,8 @@ The tool also accepts an optional \`merge_commit_message\` parameter (string). W
 
 *Default to \`mode: "merge"\`.* When the human says "done" / "ship it" / "close it" without specifying a mode, use merge. Only use noop if the human explicitly says they do *not* want to merge (e.g., "close without merging", "abandon this branch", "just close the stream").
 
+Follow user instructions, but don't autonomously open PRs.
+
 Do not autonomously merge into main. The stream's recorded base branch is the default merge target; if it is unset, \`close_stream\` will refuse rather than guess. If the user explicitly asks to merge into main (or any other branch), pass \`base_branch: "main"\` (or whatever they named) to \`close_stream\` and execute without hesitation.
 
 The tool also accepts an optional \`base_branch\` parameter to override the stream's recorded base branch at close time. Pass whatever the user asked for — do not second-guess their choice of target branch.

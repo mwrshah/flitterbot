@@ -51,6 +51,8 @@ Before the confirming call, inspect changes (\`git log <base>..HEAD --oneline\`,
 
 *Conflicts:* resolve intelligently — retain both sides when additive and non-overlapping; pick the superseding side when one replaces the other. If ambiguous, stop and ask the user. Never silently discard either side.
 
+Follow user instructions, but don't autonomously open PRs.
+
 ## Cutovers, Not Backwards Compatibility
 
 Always do cutovers — never maintain backwards compatibility by keeping both old and new methodologies alive. We aim for simplicity in code; dual paths create spaghetti. One way of doing things — the new way.
