@@ -45,7 +45,7 @@ SCHEMA — every table, column, type, and key:
 
 streams
   id TEXT PK, name TEXT, repo_path TEXT, worktree_path TEXT,
-  base_branch TEXT (branch this stream was forked from; NULL defaults to 'main'),
+  base_branch TEXT (branch this stream was forked from; required for close_stream merge mode),
   status TEXT ('open'|'closed'), created_at DATETIME, closed_at TEXT
 
 sessions

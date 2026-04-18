@@ -199,6 +199,7 @@ export async function executeCloseStream(
   streamId: string,
   mode: "merge" | "noop",
   mergeCommitMessage?: string,
+  baseBranchOverride?: string,
 ): Promise<CloseStreamResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
@@ -229,8 +230,9 @@ export async function executeCloseStream(
 
   let merged = false;
   let pushed = false;
+  let resolvedTargetBranch: string | undefined;
 
-  // Step 1: Merge branch to main (only in merge mode)
+  // Step 1: Merge branch to target (only in merge mode)
   if (mode === "merge") {
     const worktreePath = stream.worktree_path;
     const repoPath = stream.repo_path;
@@ -239,7 +241,16 @@ export async function executeCloseStream(
       const branch = await inferBranchFromWorktree(worktreePath);
 
       if (branch) {
-        const targetBranch = stream.base_branch ?? "main";
+        const targetBranch = baseBranchOverride ?? stream.base_branch ?? null;
+        if (!targetBranch) {
+          return {
+            ok: false,
+            streamId,
+            message:
+              "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_stream, or call close_stream with mode:noop.",
+          };
+        }
+        resolvedTargetBranch = targetBranch;
         const commitResult = await commitUncommittedChanges(worktreePath);
         if (commitResult.hasChanges && !commitResult.ok) {
           return {
@@ -255,8 +266,7 @@ export async function executeCloseStream(
             ok: false,
             streamId,
             message:
-              mergeResult.message +
-              `. Resolve conflicts there, then call close_stream again.`,
+              mergeResult.message + `. Resolve conflicts there, then call close_stream again.`,
             conflicts: mergeResult.conflicts,
           };
         }
@@ -275,7 +285,7 @@ export async function executeCloseStream(
   const parts = [`Stream "${stream.name}" closed.`];
   if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
   if (mode === "noop") parts.push("Git operations skipped (noop mode).");
-  if (merged) parts.push(`Branch merged to ${stream.base_branch ?? "main"}.`);
+  if (merged && resolvedTargetBranch) parts.push(`Branch merged to ${resolvedTargetBranch}.`);
   if (pushed) parts.push("Pushed to origin.");
 
   return {
