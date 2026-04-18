@@ -91,24 +91,44 @@ code,
   color: var(--color-muted-foreground);
 }
 
-/* diff2html overrides — shrink the line-number gutter to fit a narrow
-   side panel. The library lays out each diff row as:
+/* diff2html overrides — rebuild each diff row as an in-flow flex row.
+
+   The library's default layout (absolute-positioned gutter overlaying
+   left padding reserved on an inline-block code <td> with
+   white-space:nowrap) doesn't work in a narrow side panel:
+     - absolute gutter has no positioned ancestor → detaches from scroll
+     - fixed-width code cell with nowrap → long lines clip off the right
+     - shrinking the gutter to fit → line numbers truncate to ellipsis
+   Trade those architecture constraints away: linearize <table>/<tbody>
+   to block, make each <tr> a flex row with gutter (intrinsic width) +
+   code (flex-1), and let the code cell wrap. Everything scrolls together
+   because nothing is out of flow. Library HTML (from diff2html-templates):
      <tr>
-       <td.d2h-code-linenumber>  (inline-block, position:absolute, width:7.5em)
-         <div.line-num1 float:left width:3.5em>old</div>
-         <div.line-num2 float:right width:3.5em>new</div>
+       <td.d2h-code-linenumber.{type}>
+         <div.line-num1>old</div><div.line-num2>new</div>
        </td>
-       <td.d2h-code-line>         (inline-block, width:calc(100% - 16em), padding:0 8em)
-         ...content...
+       <td.{type}>
+         <div.d2h-code-line>
+           <span.d2h-code-line-prefix>+|-| </span>
+           <span.d2h-code-line-ctn>content</span>
+         </div>
        </td>
      </tr>
-   The gutter <td> is position:absolute at its natural flow position and
-   visually overlays the 8em left padding reserved on the code <td>. We
-   keep that architecture intact — only tighten the widths so the gutter
-   fits in a <=360px panel. Do NOT change display/float/position here: any
-   mismatch between the two <td>s breaks the row and stacks the gutter
-   above the code. */
+*/
+.diff-viewer-panel .d2h-diff-table,
+.diff-viewer-panel .d2h-diff-table > tbody {
+  display: block;
+  width: 100%;
+}
+.diff-viewer-panel .d2h-diff-table tr {
+  display: flex;
+  width: 100%;
+}
 .diff-viewer-panel .d2h-code-linenumber {
+  /* Drop the library's position:absolute + width:7.5em. Become an in-flow
+     flex item sized to fit 4-digit line numbers per side. */
+  position: static;
+  flex: 0 0 auto;
   width: 5em;
 }
 .diff-viewer-panel .line-num1,
@@ -117,23 +137,30 @@ code,
   padding: 0 0.25em;
 }
 .diff-viewer-panel .d2h-code-line {
-  /* Left padding = gutter width; trim the library's matching right padding
-     down to a small gutter-edge gap so content gets back horizontal room. */
-  width: calc(100% - 5.5em);
-  padding: 0 0.5em 0 5em;
+  /* Drop the library's width:calc(100%-16em) + padding:0 8em (those reserved
+     space for the absolute gutter, which is now in flow). Flex-fill the
+     remaining row width and wrap long lines instead of clipping. */
+  position: static;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  padding: 0 0.5em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff-viewer-panel .d2h-code-line-ctn {
+  /* Library sets width:100% (needed in its original inline-block layout).
+     In our flex layout that forces the ctn to row width and defeats wrap;
+     let it size to content instead. */
+  width: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .diff-viewer-panel .d2h-file-diff {
   overflow-y: auto;
 }
 .diff-viewer-panel .d2h-file-wrapper {
   overflow: visible;
-}
-/* Anchor the absolutely-positioned line-number gutter to the diff table so
-   it scrolls with the rows. Without a positioned ancestor, the library's
-   `.d2h-code-linenumber { position: absolute }` resolves against the viewport
-   and stays pinned while the code scrolls past. */
-.diff-viewer-panel .d2h-diff-table {
-  position: relative;
 }
 /* Include the +/- prefix sign in text selection so copy-paste of a diff row
    contains the marker. The library sets user-select:none on the code line
