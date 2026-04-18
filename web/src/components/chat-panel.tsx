@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { LifeBuoy, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
@@ -305,11 +305,7 @@ export function ChatPanel({
               disabled={recoverMutation.isPending}
               onClick={() => recoverMutation.mutate()}
             >
-              {recoveryKind === "dead" ? (
-                <LifeBuoy className="size-3" />
-              ) : (
-                <RotateCcw className="size-3" />
-              )}
+              <RotateCcw className="size-3" />
               {recoverMutation.isPending
                 ? recoveryKind === "dead"
                   ? "Recovering..."

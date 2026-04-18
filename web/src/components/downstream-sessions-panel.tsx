@@ -43,7 +43,12 @@ function piStatusBanner(status: PiSessionStatus | undefined) {
     case "ended":
       return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
-      return { label: "Crashed", colorClass: "bg-red-500/15 text-red-600 dark:text-red-400" };
+      // Mirror "Waiting for user" styling — muted pill, no destructive/red
+      // variant. The click-to-recover affordance carries the action semantics.
+      return {
+        label: "Crashed",
+        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+      };
     default:
       return null;
   }
