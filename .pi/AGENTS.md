@@ -1,1 +1,1 @@
-../CLAUDE.md
+/Users/munawarshah/.claude/CLAUDE.macos.md

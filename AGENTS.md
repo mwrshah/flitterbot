@@ -1,1 +1,1 @@
-.pi/AGENTS.md
+/Users/munawarshah/.claude/CLAUDE.macos.md
