@@ -1,4 +1,4 @@
-// HUMAN REVIEW
+// === HUMAN REVIEW LINE === ABOVE: FINAL === BELOW: EDITABLE ===
 import type { OrchestratorContext } from "./orchestrator.ts";
 import {
   CLOSE_STREAM_RULE,
