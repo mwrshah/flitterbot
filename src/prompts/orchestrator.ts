@@ -23,16 +23,16 @@ export function buildOrchestratorPrompt(
 
 ## Runtime
 - cwd: \`${ctx.cwd}\`
-- Stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}
+- Work stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}
 
 ## Tools
 - *read* — read files.
 - *bash* — shell (\`ls\`, \`find\`, \`rg\`).
 - *edit* — targeted string replacement.
 - *write* — create or overwrite files.
-- *query_blackboard* — stream and session state.
+- *query_blackboard* — work stream and session state.
 - *create_worktree* — isolated worktree.
-- *close_stream* — finalize stream.
+- *close_stream* — finalize the work stream.
 
 ## RULES
 
@@ -64,7 +64,7 @@ Load the \`tmux2\` skill once before spawning sub-agents — it supplies the ses
 
 Spawn Claude Code sub-agents through tmux2 when work is parallelizable. Define work to delegate and make investigation across different aspects parallelizable. Prompt them by stating the problem, not the solution. Pass instructions through; make them positive, positioned as if you are the user passing through a message to investigate or do. Tone should be positive, tight, succinct, clear, and not overly prescriptive. You may include your interpretation, spec paths, and constraints, but soften the language a little bit, avoid hard gating with negatives. Describe what's broken or what the user wants, name files or areas when already known, and state the constraints that matter ("might be good to use existing Groq client", "classifier interface shouldn't get modified as part of this, but if you need to tell me").
 
-Launch sub-agents with \`--pi-session-id ${ctx.piSessionId}${wsFlag}\` so stop events route back to this stream and your pi-session.
+Launch sub-agents with \`--pi-session-id ${ctx.piSessionId}${wsFlag}\` so stop events route back to this work stream and your pi-session.
 
 Sub-agents auto-notify on completion via stop events — so fire and forget instead of waiting. No polling or sleeping. On a stop event, if needed you may query the blackboard for session details, and read the transcript or tmux pane, then decide: notify the user, follow up on the same session through tmux2 \`message\`, or launch a fresh session when a new exploration is required — re-prompting isn't the goal when the direction has shifted. Reserve \`send\` for raw keystrokes: a bare Enter for permission prompts, or an Escape to cancel an inferring session and stop it in its tracks. Stop events from sessions you didn't prompt mean the user is interacting directly — read to stay in the loop, but don't act.
 `;
