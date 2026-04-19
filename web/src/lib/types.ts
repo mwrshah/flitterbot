@@ -206,10 +206,14 @@ export type ModelListItem = {
   provider: string;
   modelId: string;
   thinkingLevel?: ThinkingLevel;
+  name?: string;
+  contextWindow?: number;
+  available?: boolean;
 };
 
 export type ModelsListResponse = {
-  models: ModelListItem[];
+  pinned: ModelListItem[];
+  all: ModelListItem[];
   defaultModel: string;
 };
 

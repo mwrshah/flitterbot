@@ -117,17 +117,32 @@ export interface MessageRequest {
   modelId?: string;
 }
 
-/** Entry in `GET /api/models` response. Mirrors server-side `ModelConfigEntry`. */
+/**
+ * Entry in `GET /api/models` response. Used for both curated `pinned` entries
+ * (from `config.models[]`) and enumerated `all` entries (from the pi SDK
+ * catalog). `id` is the stable value the UI persists — either the user's
+ * chosen curated id, or the composite `provider/modelId` for catalog entries.
+ */
 export interface ModelListItem {
   id: string;
   label: string;
   provider: string;
   modelId: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  /** Pi SDK's display name for the model (e.g. "Claude Opus 4.7"). Omitted for curated entries where `label` is already user-authored. */
+  name?: string;
+  /** Context window in tokens, when known from the pi SDK catalog. */
+  contextWindow?: number;
+  /** Whether the provider's auth (env var / OAuth) is present in the server's environment. False entries are surfaced with a visual badge so the user can see why a selection might fail before sending. */
+  available?: boolean;
 }
 
 export interface ModelsListResponse {
-  models: ModelListItem[];
+  /** Curated favorites from `config.models[]`. Rendered at the top of the selector. */
+  pinned: ModelListItem[];
+  /** Full pi SDK catalog, grouped by provider on the client. */
+  all: ModelListItem[];
+  /** Id of the default model — matches either a `pinned.id` or an `all.id`. */
   defaultModel: string;
 }
 

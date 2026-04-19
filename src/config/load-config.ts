@@ -202,13 +202,21 @@ function normalizeModels(input: unknown): ModelConfigEntry[] {
 }
 
 /**
- * Resolve the effective `defaultModel` id. Prefers the configured value when
- * it matches an entry in `models`; otherwise falls back to the first model id.
+ * Resolve the effective `defaultModel` id. Accepts either a curated `models[]`
+ * entry id OR a composite `provider/modelId` string (which the full pi SDK
+ * catalog uses). Actual catalog resolution happens at request time via
+ * `resolveModelEntry` — here we just keep the configured value when it looks
+ * structurally plausible, and fall back to the first curated model id when it
+ * doesn't.
  */
 function resolveDefaultModel(configured: unknown, models: ModelConfigEntry[]): string {
   const fallback = models[0]?.id ?? SEED_MODELS[0]!.id;
   if (typeof configured !== "string" || !configured) return fallback;
-  return models.some((m) => m.id === configured) ? configured : fallback;
+  if (models.some((m) => m.id === configured)) return configured;
+  // Composite form `provider/modelId` — keep as-is; real validation happens
+  // when a session actually instantiates the model.
+  if (configured.includes("/")) return configured;
+  return fallback;
 }
 
 export function loadConfig(): FlitterbotConfig {

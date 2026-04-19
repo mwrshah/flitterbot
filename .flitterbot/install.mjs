@@ -527,7 +527,9 @@ async function bootstrapConfig() {
   configAfter.controlSurfaceHost = configAfter.controlSurfaceHost || "127.0.0.1";
   configAfter.controlSurfacePort = configAfter.controlSurfacePort || 18820;
   if (!configAfter.controlSurfaceToken) configAfter.controlSurfaceToken = token;
-  configAfter.piModel = configAfter.piModel || "claude-opus-4-7";
+  // Note: `piModel` has been removed (clean cutover to `models[]` + `defaultModel`
+  // managed by src/config/load-config.ts). The server seeds the new fields on
+  // first boot if missing, so the installer no longer touches them here.
   configAfter.piThinkingLevel = configAfter.piThinkingLevel || "high";
   configAfter.stallMinutes = configAfter.stallMinutes || 15;
   configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 4;
