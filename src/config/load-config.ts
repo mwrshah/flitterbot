@@ -74,6 +74,7 @@ type RawConfigJson = {
   defaultAgentBootstrapPrompt?: string;
   orchestratorBootstrapFooterPrompt?: string;
   extraSkillPaths?: string[];
+  tmux2Enabled?: boolean;
 };
 
 export type FlitterbotConfig = {
@@ -105,6 +106,12 @@ export type FlitterbotConfig = {
   shortcuts: ShortcutBindingsConfig;
   defaultAgentBootstrapPrompt: string;
   orchestratorBootstrapFooterPrompt: string;
+  /**
+   * When true, orchestrator prompts include the tmux2 sub-agent section and
+   * surface the pi-session ID for launching Claude Code sub-agents via tmux2.
+   * Defaults to false (solo-style orchestrator that does the work directly).
+   */
+  tmux2Enabled: boolean;
   /**
    * Extra directories to load skills from, in addition to the built-in
    * `~/.agents/skills/` and `~/.claude/skills/` locations. Paths are expanded
@@ -256,6 +263,7 @@ export function loadConfig(): FlitterbotConfig {
     raw.defaultAgentBootstrapPrompt ??
     "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
   const orchestratorBootstrapFooterPrompt = raw.orchestratorBootstrapFooterPrompt ?? "";
+  const tmux2Enabled = raw.tmux2Enabled === true;
   const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const models = normalizeModels(raw.models);
@@ -285,6 +293,7 @@ export function loadConfig(): FlitterbotConfig {
     shortcuts,
     defaultAgentBootstrapPrompt,
     orchestratorBootstrapFooterPrompt,
+    tmux2Enabled,
     extraSkillPaths,
 
     controlSurfaceDir,
@@ -332,6 +341,7 @@ export function loadConfig(): FlitterbotConfig {
     shortcuts: config.shortcuts,
     defaultAgentBootstrapPrompt: config.defaultAgentBootstrapPrompt,
     orchestratorBootstrapFooterPrompt: config.orchestratorBootstrapFooterPrompt,
+    tmux2Enabled: config.tmux2Enabled,
     extraSkillPaths: config.extraSkillPaths,
   };
 
