@@ -146,6 +146,25 @@ export interface ModelsListResponse {
   defaultModel: string;
 }
 
+export interface ModelsPinRequest {
+  /** Id to pin/unpin — either a curated id or a composite `provider/modelId`. */
+  id: string;
+  /** `true` adds to `config.models[]`; `false` removes. Idempotent. */
+  pin: boolean;
+  /** Optional user-authored label when pinning a catalog entry. Defaults to the pi SDK model's `name`. */
+  label?: string;
+}
+
+export interface ModelsDefaultRequest {
+  id: string;
+}
+
+export interface ModelsMutationResponse {
+  ok: true;
+  pinned: ModelListItem[];
+  defaultModel: string;
+}
+
 export interface MessageResponse {
   ok: boolean;
 }
@@ -354,6 +373,16 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     method: "GET",
     path: "/api/models",
     auth: "none",
+  },
+  modelsPin: {
+    method: "POST",
+    path: "/api/models/pin",
+    auth: "bearer",
+  },
+  modelsDefault: {
+    method: "PUT",
+    path: "/api/models/default",
+    auth: "bearer",
   },
   stop: {
     method: "POST",

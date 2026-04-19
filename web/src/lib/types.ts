@@ -217,6 +217,12 @@ export type ModelsListResponse = {
   defaultModel: string;
 };
 
+export type ModelsMutationResponse = {
+  ok: true;
+  pinned: ModelListItem[];
+  defaultModel: string;
+};
+
 /* ── Directory Completions ── */
 
 export type DirectoryCompletionItem = {

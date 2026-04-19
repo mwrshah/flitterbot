@@ -2,6 +2,7 @@ import type {
   DirectMessageResponse,
   DirectoryCompletionsResponse,
   ModelsListResponse,
+  ModelsMutationResponse,
   SessionDetailResponse,
   SessionListResponse,
   SkillsListResponse,
@@ -86,6 +87,18 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
     listModels: () => request<ModelsListResponse>("/api/models"),
+
+    pinModel: (id: string, pin: boolean, label?: string) =>
+      request<ModelsMutationResponse>("/api/models/pin", {
+        method: "POST",
+        body: JSON.stringify({ id, pin, ...(label ? { label } : {}) }),
+      }),
+
+    setDefaultModel: (id: string) =>
+      request<ModelsMutationResponse>("/api/models/default", {
+        method: "PUT",
+        body: JSON.stringify({ id }),
+      }),
 
     getDirectoryCompletions: (path: string, piSessionId?: string) => {
       const params = new URLSearchParams({ path });

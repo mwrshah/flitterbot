@@ -119,6 +119,11 @@ const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
 const CONFIG_PATH = path.join(FLITTERBOT_DIR, "config.json");
 
+/** Absolute path to the user's ~/.flitterbot/config.json. Exported so helpers
+ *  that mutate specific fields (e.g. the pin/unpin endpoint) can write back
+ *  without duplicating the path-resolution logic. */
+export const FLITTERBOT_CONFIG_PATH = CONFIG_PATH;
+
 function expandHome(value: string): string {
   if (!value) return value;
   if (value === "~") return HOME;

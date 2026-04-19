@@ -1,9 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, SearchIcon, StarIcon, StarOffIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { ModelListItem } from "~/lib/types";
+import { toast } from "sonner";
+import type { ModelListItem, ModelsListResponse } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
@@ -49,6 +50,36 @@ export const ModelSelector = memo(function ModelSelector({
   const pinned = data?.pinned ?? [];
   const all = data?.all ?? [];
   const defaultModelId = data?.defaultModel ?? null;
+  const pinnedIds = useMemo(() => new Set(pinned.map((m) => m.id)), [pinned]);
+
+  const queryClient = useQueryClient();
+  const pinMutation = useMutation({
+    mutationFn: ({ id, pin, label }: { id: string; pin: boolean; label?: string }) =>
+      apiClient.pinModel(id, pin, label),
+    onSuccess: (result, vars) => {
+      // Optimistic-write: drop the fresh payload straight into the cache so
+      // the popup rerenders with the new pinned state without a round-trip GET.
+      queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
+        old ? { ...old, pinned: result.pinned, defaultModel: result.defaultModel } : old,
+      );
+      toast.success(vars.pin ? "Pinned to config" : "Unpinned");
+    },
+    onError: (error) => {
+      toast.error(`Pin failed: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+  const defaultMutation = useMutation({
+    mutationFn: (id: string) => apiClient.setDefaultModel(id),
+    onSuccess: (result) => {
+      queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
+        old ? { ...old, pinned: result.pinned, defaultModel: result.defaultModel } : old,
+      );
+      toast.success("Default model updated in config");
+    },
+    onError: (error) => {
+      toast.error(`Set default failed: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
 
   // The effective selected id — localStorage overrides server default.
   const effectiveId = value ?? defaultModelId;
@@ -114,10 +145,16 @@ export const ModelSelector = memo(function ModelSelector({
                       key={`pinned:${model.id}`}
                       model={model}
                       selected={model.id === effectiveId}
+                      isPinned
+                      isDefault={model.id === defaultModelId}
+                      canUnpin={pinned.length > 1}
                       onSelect={() => {
                         onChange(model.id);
                         setOpen(false);
                       }}
+                      onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
+                      onSetDefault={() => defaultMutation.mutate(model.id)}
+                      busy={pinMutation.isPending || defaultMutation.isPending}
                     />
                   ))}
                 </ModelSection>
@@ -126,17 +163,32 @@ export const ModelSelector = memo(function ModelSelector({
               {groupedAll.length > 0 &&
                 groupedAll.map(([provider, models]) => (
                   <ModelSection key={provider} label={provider}>
-                    {models.map((model) => (
-                      <ModelMenuItem
-                        key={`all:${model.id}`}
-                        model={model}
-                        selected={model.id === effectiveId}
-                        onSelect={() => {
-                          onChange(model.id);
-                          setOpen(false);
-                        }}
-                      />
-                    ))}
+                    {models.map((model) => {
+                      const isPinned = pinnedIds.has(model.id);
+                      return (
+                        <ModelMenuItem
+                          key={`all:${model.id}`}
+                          model={model}
+                          selected={model.id === effectiveId}
+                          isPinned={isPinned}
+                          isDefault={model.id === defaultModelId}
+                          canUnpin={pinned.length > 1}
+                          onSelect={() => {
+                            onChange(model.id);
+                            setOpen(false);
+                          }}
+                          onTogglePin={() =>
+                            pinMutation.mutate({
+                              id: model.id,
+                              pin: !isPinned,
+                              ...(isPinned ? {} : { label: model.name ?? model.label }),
+                            })
+                          }
+                          onSetDefault={() => defaultMutation.mutate(model.id)}
+                          busy={pinMutation.isPending || defaultMutation.isPending}
+                        />
+                      );
+                    })}
                   </ModelSection>
                 ))}
 
@@ -198,42 +250,108 @@ function ModelSection({ label, children }: { label: string; children: React.Reac
 function ModelMenuItem({
   model,
   selected,
+  isPinned,
+  isDefault,
+  canUnpin,
   onSelect,
+  onTogglePin,
+  onSetDefault,
+  busy,
 }: {
   model: ModelListItem;
   selected: boolean;
+  isPinned: boolean;
+  isDefault: boolean;
+  canUnpin: boolean;
   onSelect: () => void;
+  onTogglePin: () => void;
+  onSetDefault: () => void;
+  busy: boolean;
 }) {
   const available = model.available !== false;
+  // When pinned, the star turns into an unpin action; when not pinned, it's a
+  // pin action. Disabled for the last pinned entry (server enforces the same).
+  const pinDisabled = busy || (isPinned && !canUnpin);
+  const pinTitle = isPinned
+    ? canUnpin
+      ? "Unpin from config"
+      : "Keep at least one pinned model"
+    : "Pin to config";
+
   return (
-    <Menu.Item
-      onClick={onSelect}
+    <div
       className={cn(
-        "flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm outline-none",
-        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
+        "group/row flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-sm",
+        "hover:bg-accent/50",
         !available && "opacity-60",
       )}
     >
-      <CheckIcon
-        className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")}
-      />
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate font-medium leading-tight">{model.label}</span>
-        <span className="text-[11px] text-muted-foreground/70 leading-tight truncate">
-          {model.provider} · {model.modelId}
-          {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
-          {model.thinkingLevel ? ` · thinking=${model.thinkingLevel}` : ""}
-        </span>
-      </div>
+      <Menu.Item
+        onClick={onSelect}
+        className={cn(
+          "flex min-w-0 flex-1 cursor-pointer items-start gap-2 outline-none",
+          "data-[highlighted]:text-accent-foreground",
+        )}
+      >
+        <CheckIcon
+          className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")}
+        />
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium leading-tight">
+            {model.label}
+            {isDefault && (
+              <span className="ml-1.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground/70">
+                default
+              </span>
+            )}
+          </span>
+          <span className="text-[11px] text-muted-foreground/70 leading-tight truncate">
+            {model.provider} · {model.modelId}
+            {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
+            {model.thinkingLevel ? ` · thinking=${model.thinkingLevel}` : ""}
+          </span>
+        </div>
+      </Menu.Item>
       {!available && (
         <span
-          className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+          className="shrink-0 self-center rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
           title={`No auth configured for provider "${model.provider}"`}
         >
           no auth
         </span>
       )}
-    </Menu.Item>
+      {isPinned && !isDefault && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetDefault();
+          }}
+          className="shrink-0 self-center rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/70 opacity-0 transition hover:bg-accent hover:text-foreground group-hover/row:opacity-100 disabled:cursor-not-allowed"
+          title="Set as default model in config"
+        >
+          set default
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={pinDisabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePin();
+        }}
+        className={cn(
+          "shrink-0 self-center rounded p-1 transition-colors",
+          "text-muted-foreground/50 hover:text-foreground hover:bg-accent",
+          "disabled:cursor-not-allowed disabled:opacity-40",
+          isPinned && "text-amber-500/80 hover:text-amber-500",
+        )}
+        title={pinTitle}
+      >
+        {isPinned ? <StarOffIcon className="h-3.5 w-3.5" /> : <StarIcon className="h-3.5 w-3.5" />}
+      </button>
+    </div>
   );
 }
 
