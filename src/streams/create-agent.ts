@@ -12,7 +12,8 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
+import { resolveModelEntry } from "../config/models.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorSoloPrompt } from "../prompts/index.ts";
 
@@ -40,6 +41,8 @@ type CreateFlitterbotAgentOptions = {
   resumeSessionFile?: string;
   /** Override the working directory (e.g. a specific repo root). Defaults to config.projectsDir. */
   cwd?: string;
+  /** Override the model for this session. When omitted, falls back to `config.defaultModel`. */
+  modelId?: string;
 };
 
 export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
@@ -60,7 +63,13 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
   const piSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(role, piSessionId, workingDir, orchestratorContext, config.projectsDir);
+  const systemPrompt = resolveSystemPrompt(
+    role,
+    piSessionId,
+    workingDir,
+    orchestratorContext,
+    config.projectsDir,
+  );
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
   // concurrent-orchestrator race condition.
@@ -134,16 +143,23 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     }
   }
 
-  const model = getModel("anthropic", config.piModel as Parameters<typeof getModel>[1]);
+  const modelEntry = resolveModelEntry(config, options.modelId);
+  const model = getModel(
+    modelEntry.provider as Parameters<typeof getModel>[0],
+    modelEntry.modelId as Parameters<typeof getModel>[1],
+  );
   if (!model) {
-    throw new Error(`Unable to resolve Pi model: ${config.piModel}`);
+    throw new Error(
+      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
+    );
   }
+  const effectiveThinkingLevel: ThinkingLevel = modelEntry.thinkingLevel ?? config.piThinkingLevel;
 
   const created = await createAgentSession({
     cwd: workingDir,
     agentDir,
     model,
-    thinkingLevel: config.piThinkingLevel,
+    thinkingLevel: effectiveThinkingLevel,
     tools: createCodingTools(workingDir),
     customTools: customTools as ToolDefinition[],
     resourceLoader,
@@ -158,6 +174,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     modelInfo: {
       provider: model.provider,
       id: model.id,
+      entryId: modelEntry.id,
+      thinkingLevel: effectiveThinkingLevel,
     },
     resourceInfo: {
       skillNames,

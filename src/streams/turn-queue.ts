@@ -21,6 +21,12 @@ export type QueueItem = {
   streamId?: string;
   streamName?: string;
   serverMessageId?: string;
+  /**
+   * Per-message model override (id from `config.models[]`). When set,
+   * `processQueueItem` swaps the session model via `session.setModel()`
+   * before calling `session.prompt()`. Omit to use the session's current model.
+   */
+  modelId?: string;
 };
 
 /**
@@ -34,6 +40,10 @@ export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.source !== "web" && item.source !== "whatsapp") return false;
   if (item.deliveryMode === "steer") return false;
   if (item.images && item.images.length > 0) return false;
+  // A mid-conversation model switch has to break the batch: the new modelId
+  // applies only to the turn the user attached it to, and setModel() cannot
+  // be called silently for a group of peers that chose different providers.
+  if (item.modelId) return false;
   return true;
 }
 

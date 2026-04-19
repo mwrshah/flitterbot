@@ -14,6 +14,8 @@ export interface WebSocketClientMessageEvent {
   deliveryMode?: DeliveryMode;
   images?: ImageAttachment[];
   targetPiSessionId?: string;
+  /** Per-message model override (id from `config.models[]`). */
+  modelId?: string;
 }
 
 export interface WebSocketClientSubscribeEvent {

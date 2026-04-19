@@ -196,6 +196,23 @@ export type SkillsListResponse = {
   items: SkillListItem[];
 };
 
+/* ── Models ── */
+
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
+export type ModelListItem = {
+  id: string;
+  label: string;
+  provider: string;
+  modelId: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
+export type ModelsListResponse = {
+  models: ModelListItem[];
+  defaultModel: string;
+};
+
 /* ── Directory Completions ── */
 
 export type DirectoryCompletionItem = {

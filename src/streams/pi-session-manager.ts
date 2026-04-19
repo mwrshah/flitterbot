@@ -9,7 +9,7 @@ import {
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import { getStreamById } from "../blackboard/query-streams.ts";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
 import type { ApiError } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -31,7 +31,18 @@ export interface ManagedPiSession {
   streamName: string | null;
   piSessionId: string;
   createdAt: string;
-  modelInfo: { provider: string; id: string };
+  /**
+   * Current effective model for this session. `entryId` is the `config.models[].id`
+   * that produced this model (used to skip redundant `setModel()` calls when the
+   * same override arrives). `provider`+`id` are the pi SDK identifiers persisted
+   * to `pi_sessions.model_provider` / `pi_sessions.model_id`.
+   */
+  modelInfo: {
+    provider: string;
+    id: string;
+    entryId: string;
+    thinkingLevel: ThinkingLevel;
+  };
   unsubscribe: () => void;
   /** Set during close_stream tool execution; checked post-turn to destroy after the turn completes. */
   pendingDestroy?: boolean;
@@ -121,7 +132,7 @@ export class PiSessionManager {
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: created.modelInfo.provider,
       modelId: created.modelInfo.id,
-      thinkingLevel: this.config.piThinkingLevel,
+      thinkingLevel: created.modelInfo.thinkingLevel,
       startedAt: new Date(this.startedAt).toISOString(),
       lastEventAt: new Date().toISOString(),
     });
@@ -182,7 +193,7 @@ export class PiSessionManager {
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: created.modelInfo.provider,
       modelId: created.modelInfo.id,
-      thinkingLevel: this.config.piThinkingLevel,
+      thinkingLevel: created.modelInfo.thinkingLevel,
       startedAt: new Date().toISOString(),
       lastEventAt: new Date().toISOString(),
       streamId: streamId,
@@ -231,7 +242,15 @@ export class PiSessionManager {
       streamName,
       piSessionId,
       createdAt,
-      modelInfo: { provider: modelProvider ?? "unknown", id: modelId ?? "unknown" },
+      // Dormant sessions have no live SDK to query — record whatever the DB
+      // last knew. entryId is unknown until activation, so leave it blank;
+      // the first model override call will do a full setModel().
+      modelInfo: {
+        provider: modelProvider ?? "unknown",
+        id: modelId ?? "unknown",
+        entryId: "",
+        thinkingLevel: this.config.piThinkingLevel,
+      },
       unsubscribe: () => {},
     };
 
@@ -438,7 +457,7 @@ export class PiSessionManager {
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: old.modelInfo.provider,
       modelId: old.modelInfo.id,
-      thinkingLevel: this.config.piThinkingLevel,
+      thinkingLevel: old.modelInfo.thinkingLevel,
       startedAt: new Date(this.startedAt).toISOString(),
       lastEventAt: new Date().toISOString(),
     });
@@ -579,7 +598,15 @@ export class PiSessionManager {
   }
 
   private buildManagedSession(
-    created: { session: AgentSession; modelInfo: { provider: string; id: string } },
+    created: {
+      session: AgentSession;
+      modelInfo: {
+        provider: string;
+        id: string;
+        entryId: string;
+        thinkingLevel: ThinkingLevel;
+      };
+    },
     state: PiSessionState,
     role: "default" | "orchestrator",
     streamId: string | null,

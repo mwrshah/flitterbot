@@ -48,6 +48,7 @@ export async function handleMessageRoute(
     metadata: { ...body.metadata, ...streamMeta },
     deliveryMode,
     images: Array.isArray(body.images) ? body.images : undefined,
+    modelId: typeof body.modelId === "string" ? body.modelId : undefined,
   });
 
   const response: MessageResponse = { ok: true };

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
-import type { AssistantMessage, TextContent } from "@mariozechner/pi-ai";
+import { type AssistantMessage, getModel, type TextContent } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {
@@ -34,6 +34,7 @@ import {
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
+import { resolveModelEntry } from "./config/models.ts";
 import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
@@ -94,6 +95,8 @@ type EnqueueInput = {
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   serverMessageId?: string;
+  /** Per-message model override (id from `config.models[]`). */
+  modelId?: string;
 };
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
@@ -318,6 +321,7 @@ export class ControlSurfaceRuntime {
       deliveryMode: input.deliveryMode ?? "followUp",
       images: images?.length ? images : undefined,
       serverMessageId: messageUuid,
+      modelId: input.modelId,
     };
 
     try {
@@ -778,6 +782,42 @@ export class ControlSurfaceRuntime {
   /**
    * Per-session queue processing callback.
    */
+  /**
+   * Apply a per-message model override to the given managed session. Resolves
+   * the configured `ModelConfigEntry` by id, looks up the pi SDK `Model`, and
+   * invokes `session.setModel()` when the target differs from the session's
+   * current model. Also propagates the entry's optional `thinkingLevel`
+   * override. No-op when the session already holds the requested model.
+   */
+  private async applyModelOverride(managed: ManagedPiSession, modelId: string): Promise<void> {
+    const session = managed.session;
+    if (!session) return;
+    const entry = resolveModelEntry(this.config, modelId);
+    if (managed.modelInfo.entryId === entry.id) return;
+    const model = getModel(
+      entry.provider as Parameters<typeof getModel>[0],
+      entry.modelId as Parameters<typeof getModel>[1],
+    );
+    if (!model) {
+      throw new Error(
+        `Unable to resolve Pi model: provider=${entry.provider} modelId=${entry.modelId} (entry id=${entry.id})`,
+      );
+    }
+    await session.setModel(model);
+    if (entry.thinkingLevel) {
+      session.setThinkingLevel(entry.thinkingLevel);
+    }
+    managed.modelInfo = {
+      provider: model.provider,
+      id: model.id,
+      entryId: entry.id,
+      thinkingLevel: entry.thinkingLevel ?? this.config.piThinkingLevel,
+    };
+    this.log(
+      `model switched for ${managed.role} session ${managed.piSessionId}: → ${entry.provider}/${entry.modelId} (entry=${entry.id})`,
+    );
+  }
+
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
     // Lazily activate dormant orchestrators on first message after restart
     if (!managed.session && managed.role === "orchestrator" && managed.streamId) {
@@ -801,6 +841,19 @@ export class ControlSurfaceRuntime {
     const promptAt = managed.state.notePrompt(session.messages.length);
     touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
     this.broadcastStatusChanged("pi_session");
+
+    // Per-message model override: swap the session's model before prompting
+    // so the selected provider/modelId handles this turn. No-op when the
+    // session already holds the requested model.
+    if (item.modelId) {
+      try {
+        await this.applyModelOverride(managed, item.modelId);
+      } catch (error) {
+        this.log(
+          `model override failed (item=${item.id} modelId=${item.modelId}): ${error instanceof Error ? error.message : String(error)} — proceeding with current model`,
+        );
+      }
+    }
 
     const promptText = formatPromptWithContext(item);
 
@@ -1928,6 +1981,7 @@ export class ControlSurfaceRuntime {
           deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
           images: Array.isArray(payload.images) ? payload.images : undefined,
           serverMessageId,
+          modelId: typeof payload.modelId === "string" ? payload.modelId : undefined,
         });
 
         // Mirror web user message to WhatsApp for complete conversation record.

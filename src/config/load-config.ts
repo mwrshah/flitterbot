@@ -7,12 +7,54 @@ import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
+/**
+ * A selectable model entry shown in the web UI model selector. `id` is the
+ * stable UI/persistence identifier; `provider`+`modelId` are what the pi SDK
+ * consumes under the hood. `thinkingLevel` optionally overrides the global
+ * `piThinkingLevel` default for this model.
+ */
+export type ModelConfigEntry = {
+  id: string;
+  label: string;
+  provider: string;
+  modelId: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
+/**
+ * Seed models written to config.json on first boot. Ordered by default-ness:
+ * the first entry becomes `defaultModel` when unset. Covers the three models
+ * the user explicitly called out (current Anthropic default, Sonnet fallback,
+ * and GLM-4.7 on Cerebras for the fast-cheap path).
+ */
+const SEED_MODELS: ModelConfigEntry[] = [
+  {
+    id: "claude-opus-4-7",
+    label: "Claude Opus 4.7",
+    provider: "anthropic",
+    modelId: "claude-opus-4-7",
+  },
+  {
+    id: "claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    provider: "anthropic",
+    modelId: "claude-sonnet-4-5",
+  },
+  {
+    id: "zai-glm-4.7",
+    label: "Z.AI GLM-4.7 (Cerebras)",
+    provider: "cerebras",
+    modelId: "zai-glm-4.7",
+  },
+];
+
 type RawConfigJson = {
   controlSurfaceHost?: string;
   controlSurfacePort?: number;
   controlSurfaceToken?: string;
   controlSurfaceCommand?: string;
-  piModel?: string;
+  models?: ModelConfigEntry[];
+  defaultModel?: string;
   piThinkingLevel?: ThinkingLevel;
   stallMinutes?: number;
   toolTimeoutMinutes?: number;
@@ -38,7 +80,10 @@ export type FlitterbotConfig = {
   controlSurfaceHost: string;
   controlSurfacePort: number;
   controlSurfaceToken: string;
-  piModel: string;
+  /** Selectable models exposed to the web UI. Always non-empty — seeded on first boot. */
+  models: ModelConfigEntry[];
+  /** Id of the default model (must match one of `models[].id`). */
+  defaultModel: string;
   piThinkingLevel: ThinkingLevel;
   stallMinutes: number;
   toolTimeoutMinutes: number;
@@ -116,6 +161,56 @@ function normalizeExtraSkillPaths(input: unknown): string[] {
   return out;
 }
 
+/**
+ * Normalize and validate the `models` array from raw config. Drops entries
+ * missing required fields, de-duplicates by `id` (first wins), and falls back
+ * to the seeded defaults when the result is empty.
+ */
+function normalizeModels(input: unknown): ModelConfigEntry[] {
+  if (!Array.isArray(input)) return [...SEED_MODELS];
+  const seen = new Set<string>();
+  const out: ModelConfigEntry[] = [];
+  for (const entry of input) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Partial<ModelConfigEntry>;
+    if (
+      typeof e.id !== "string" ||
+      !e.id.trim() ||
+      typeof e.label !== "string" ||
+      !e.label.trim() ||
+      typeof e.provider !== "string" ||
+      !e.provider.trim() ||
+      typeof e.modelId !== "string" ||
+      !e.modelId.trim()
+    ) {
+      continue;
+    }
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    const normalized: ModelConfigEntry = {
+      id: e.id,
+      label: e.label,
+      provider: e.provider,
+      modelId: e.modelId,
+    };
+    if (typeof e.thinkingLevel === "string") {
+      normalized.thinkingLevel = e.thinkingLevel as ThinkingLevel;
+    }
+    out.push(normalized);
+  }
+  return out.length > 0 ? out : [...SEED_MODELS];
+}
+
+/**
+ * Resolve the effective `defaultModel` id. Prefers the configured value when
+ * it matches an entry in `models`; otherwise falls back to the first model id.
+ */
+function resolveDefaultModel(configured: unknown, models: ModelConfigEntry[]): string {
+  const fallback = models[0]?.id ?? SEED_MODELS[0]!.id;
+  if (typeof configured !== "string" || !configured) return fallback;
+  return models.some((m) => m.id === configured) ? configured : fallback;
+}
+
 export function loadConfig(): FlitterbotConfig {
   ensureDir(FLITTERBOT_DIR);
   ensureDir(path.join(FLITTERBOT_DIR, "logs"));
@@ -149,13 +244,15 @@ export function loadConfig(): FlitterbotConfig {
     "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
   const orchestratorBootstrapFooterPrompt = raw.orchestratorBootstrapFooterPrompt ?? "";
   const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
-  const configuredPiModel = raw.piModel ?? "";
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
+  const models = normalizeModels(raw.models);
+  const defaultModel = resolveDefaultModel(raw.defaultModel, models);
   const config: FlitterbotConfig = {
     controlSurfaceHost: raw.controlSurfaceHost ?? "127.0.0.1",
     controlSurfacePort: raw.controlSurfacePort ?? 18820,
     controlSurfaceToken: raw.controlSurfaceToken ?? crypto.randomUUID(),
-    piModel: configuredPiModel || "claude-opus-4-7",
+    models,
+    defaultModel,
     piThinkingLevel: raw.piThinkingLevel ?? "high",
     stallMinutes: raw.stallMinutes ?? 15,
     toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 4,
@@ -194,12 +291,18 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(path.dirname(whatsappPidPath));
   ensureDir(whatsappAuthDir);
 
+  // Clean cutover: drop any legacy `piModel` field so config.json reflects the
+  // new single source of truth (`models` + `defaultModel`).
+  const { piModel: _legacyPiModel, ...rawWithoutLegacy } = raw as RawConfigJson & {
+    piModel?: string;
+  };
   const nextPersisted = {
-    ...raw,
+    ...rawWithoutLegacy,
     controlSurfaceHost: config.controlSurfaceHost,
     controlSurfacePort: config.controlSurfacePort,
     controlSurfaceToken: config.controlSurfaceToken,
-    piModel: config.piModel,
+    models: config.models,
+    defaultModel: config.defaultModel,
     piThinkingLevel: config.piThinkingLevel,
     stallMinutes: config.stallMinutes,
     toolTimeoutMinutes: config.toolTimeoutMinutes,

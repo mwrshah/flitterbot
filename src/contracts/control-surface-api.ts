@@ -113,6 +113,22 @@ export interface MessageRequest {
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
   targetPiSessionId?: string;
+  /** Per-message model override (id from `config.models[]`). */
+  modelId?: string;
+}
+
+/** Entry in `GET /api/models` response. Mirrors server-side `ModelConfigEntry`. */
+export interface ModelListItem {
+  id: string;
+  label: string;
+  provider: string;
+  modelId: string;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
+export interface ModelsListResponse {
+  models: ModelListItem[];
+  defaultModel: string;
 }
 
 export interface MessageResponse {
@@ -317,6 +333,11 @@ export const CONTROL_SURFACE_ENDPOINTS = {
   skills: {
     method: "GET",
     path: "/api/skills",
+    auth: "none",
+  },
+  models: {
+    method: "GET",
+    path: "/api/models",
     auth: "none",
   },
   stop: {

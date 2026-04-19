@@ -1,6 +1,7 @@
 import type {
   DirectMessageResponse,
   DirectoryCompletionsResponse,
+  ModelsListResponse,
   SessionDetailResponse,
   SessionListResponse,
   SkillsListResponse,
@@ -83,6 +84,8 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       }),
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
+
+    listModels: () => request<ModelsListResponse>("/api/models"),
 
     getDirectoryCompletions: (path: string, piSessionId?: string) => {
       const params = new URLSearchParams({ path });
