@@ -1,13 +1,4 @@
 // === HUMAN REVIEW LINE === ABOVE: FINAL === BELOW: EDITABLE ===
-import {
-  CLOSE_STREAM_RULE,
-  CUTOVER_RULE,
-  SHADCN_RULE,
-  SKILL_PATH_RULE,
-  STYLE_RULE,
-  WORKTREE_RULE,
-} from "./shared.ts";
-
 export type OrchestratorContext = {
   streamName: string;
   streamId: string;
@@ -50,20 +41,20 @@ export function buildOrchestratorPrompt(
 
 ## RULES
 
-Fan reads out in parallel and parallelize downstream work. ${WORKTREE_RULE}
+Fan reads out in parallel and parallelize downstream work. Create a worktree before non-trivial code changes. See the \`create_worktree\` tool description.
 
-${CLOSE_STREAM_RULE}
+Call \`close_stream\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. "Merge with main" / "rebase" are git requests — run them directly, do not close.
 ${tmuxSection}
 ## Boundaries
 
-${SHADCN_RULE}
-${SKILL_PATH_RULE}
+Never modify \`web/src/components/ui/\` (shadcn-managed). Wrap outside \`ui/\`.
+When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 
-${CUTOVER_RULE}
+Ship complete solutions. No workarounds when a real fix exists. Cutovers, not backwards compat.
 
 ## Style
 
-${STYLE_RULE}
+Terse. Bulleted updates. Numbered options. Proactive. Single asterisks for bold (WhatsApp renders).
 `;
 }
 
