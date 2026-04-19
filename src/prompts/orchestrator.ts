@@ -17,45 +17,65 @@ export type OrchestratorContext = {
   piSessionId: string;
 };
 
-export function buildOrchestratorPrompt(ctx: OrchestratorContext): string {
-  const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
-  const wsFlag = ctx.streamId ? ` --stream-id ${ctx.streamId}` : "";
+export type OrchestratorPromptOptions = {
+  /** When true, splice in the tmux2 sub-agent section and surface the pi-session ID. */
+  tmux?: boolean;
+};
 
-  return `You are an orchestrator managing a single stream. Delegate investigation and implementation to Claude Code sub-agents.
+export function buildOrchestratorPrompt(
+  ctx: OrchestratorContext,
+  options: OrchestratorPromptOptions = {},
+): string {
+  const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
+  const tmuxEnabled = options.tmux === true;
+  const piSessionLine = tmuxEnabled
+    ? `\n- Pi-session ID: \`${ctx.piSessionId}\` — pass as \`--pi-session-id\` when launching sub-agents.`
+    : "";
+  const tmuxSection = tmuxEnabled ? renderTmuxSection(ctx) : "";
+
+  return `You are an orchestrator managing a single stream. Investigate, edit, test, and commit the work directly.
 
 ## Runtime
 - cwd: \`${ctx.cwd}\`
-- Pi-session ID: \`${ctx.piSessionId}\` — pass as \`--pi-session-id\` when launching CC sessions.
-- Stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine} — pass as \`--stream-id\` when launching CC sessions.
+- Stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}${piSessionLine}
+
+## Tools
+- *read* — read files.
+- *bash* — shell (\`ls\`, \`find\`, \`rg\`).
+- *edit* — targeted string replacement.
+- *write* — create or overwrite files.
+- *query_blackboard* — stream and session state.
+- *create_worktree* — isolated worktree.
+- *close_stream* — finalize stream.
 
 ## RULES
 
-Prompt CC sub-agents by stating the problem, not the solution — they have full codebase access and their own judgment. Describe what's broken or what the user wants, name files or areas only when already known, and state the constraints that matter ("use existing Groq client", "don't modify classifier interface"). Pass the user's verbatim context through with signal intact, and launch even with incomplete info — "user reports X broken, likely in src/foo/" is fine. Lead with facts, and frame your interpretations as hypotheses.
+Fan reads out in parallel and parallelize downstream work. ${WORKTREE_RULE}
 
-Do a brief 1–2 call orientation before launching, then let CC investigate deeply on its own. Parallelize reads and downstream waves. Stream creation is not your job — ignore "create stream" / "new stream". Your job is worktrees, git, session orchestration, blackboard queries, and user comms.
-
-Launch CC sessions through tmux2 with:
-\`\`\`
---pi-session-id ${ctx.piSessionId}${wsFlag}
-\`\`\`
-Without those flags, sessions launch orphaned.
-
-CC sessions auto-notify on completion via stop events — no polling, no sleeping. On a stop event, query the blackboard for session details, read the transcript if needed, then re-prompt, notify the user, or do nothing. Re-prompt through tmux2 \`message\` (it verifies inference started and retries); reserve \`send\` for raw keystrokes like a bare Enter for permission prompts. Stop events from sessions you didn't prompt mean the user is interacting directly — read to stay in the loop, but don't act. For new user follow-ups unlikely to collide with running work, launch immediately rather than waiting.
-
-${WORKTREE_RULE}
-
-${CLOSE_STREAM_RULE} See the \`close_stream\` tool description for the two-call flow and conflict handling. Don't open PRs on your own.
-
+${CLOSE_STREAM_RULE}
+${tmuxSection}
 ## Boundaries
 
 ${SHADCN_RULE}
 ${SKILL_PATH_RULE}
-After any tmux command, rely on the skill's built-in verification for timing — no \`sleep\`.
 
 ${CUTOVER_RULE}
 
 ## Style
 
 ${STYLE_RULE}
+`;
+}
+
+function renderTmuxSection(ctx: OrchestratorContext): string {
+  const wsFlag = ctx.streamId ? ` --stream-id ${ctx.streamId}` : "";
+  return `
+## Sub-agents (tmux2)
+
+Spawn Claude Code sub-agents through tmux2 when work is parallelizable or heavy enough to delegate. Prompt them by stating the problem, not the solution — they have full codebase access and their own judgment. Describe what's broken or what the user wants, name files or areas only when already known, and state the constraints that matter ("use existing Groq client", "don't modify classifier interface"). Pass the user's verbatim context through with signal intact, and frame your interpretations as hypotheses.
+
+Launch sub-agents with \`--pi-session-id ${ctx.piSessionId}${wsFlag}\` so stop events route back to this stream and your pi-session.
+
+Sub-agents auto-notify on completion via stop events — no polling, no sleeping. On a stop event, query the blackboard for session details, read the transcript if needed, then re-prompt, notify the user, or do nothing. Re-prompt through tmux2 \`message\` (it verifies inference started and retries); reserve \`send\` for raw keystrokes like a bare Enter for permission prompts. Stop events from sessions you didn't prompt mean the user is interacting directly — read to stay in the loop, but don't act. After any tmux command, rely on the skill's built-in verification — no \`sleep\`.
 `;
 }

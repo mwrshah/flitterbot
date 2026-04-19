@@ -15,7 +15,7 @@ import {
 import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
 import { resolveModelEntry } from "../config/models.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
-import { buildDefaultAgentPrompt, buildOrchestratorSoloPrompt } from "../prompts/index.ts";
+import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
 
 /**
  * Orchestrator context as provided by the caller. `piSessionId` and `cwd` are
@@ -43,6 +43,8 @@ type CreateFlitterbotAgentOptions = {
   cwd?: string;
   /** Override the model for this session. When omitted, falls back to `config.defaultModel`. */
   modelId?: string;
+  /** Enable the tmux2 sub-agent section in the orchestrator prompt. Defaults to false. */
+  tmux2Enabled?: boolean;
 };
 
 export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
@@ -69,6 +71,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     workingDir,
     orchestratorContext,
     config.projectsDir,
+    options.tmux2Enabled ?? false,
   );
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
@@ -191,10 +194,11 @@ function resolveSystemPrompt(
   cwd: string,
   ctx?: OrchestratorInput,
   projectsDir?: string,
+  tmux2Enabled = false,
 ): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorSoloPrompt({ ...ctx, piSessionId, cwd });
+    return buildOrchestratorPrompt({ ...ctx, piSessionId, cwd }, { tmux: tmux2Enabled });
   }
   return buildDefaultAgentPrompt(piSessionId, projectsDir ?? cwd);
 }
