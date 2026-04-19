@@ -101,7 +101,7 @@ export const SkillPicker = memo(function SkillPicker({
                   key={skill.name}
                   value={skill.name}
                   onSelect={() => onSelect(skill.name)}
-                  className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted"
+                  className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
                 >
                   <span
                     className={`font-mono text-xs shrink-0 ${isCommand ? "text-primary font-semibold" : "text-foreground"}`}
