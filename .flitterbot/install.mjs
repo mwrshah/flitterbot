@@ -556,9 +556,6 @@ async function bootstrapConfig() {
   if (!configAfter.defaultAgentBootstrapPrompt) {
     configAfter.defaultAgentBootstrapPrompt = "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
   }
-  if (!configAfter.orchestratorBootstrapFooterPrompt) {
-    configAfter.orchestratorBootstrapFooterPrompt = "IMPORTANT: Before doing anything else, load /tmux2";
-  }
 
   if (canonicalJson(configBefore) !== canonicalJson(configAfter)) {
     info("=== Runtime config changes ===");
