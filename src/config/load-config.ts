@@ -72,7 +72,6 @@ type RawConfigJson = {
   whatsappEnabled?: boolean;
   shortcuts?: ShortcutBindingsConfig;
   defaultAgentBootstrapPrompt?: string;
-  orchestratorBootstrapFooterPrompt?: string;
   extraSkillPaths?: string[];
   tmux2Enabled?: boolean;
 };
@@ -105,7 +104,6 @@ export type FlitterbotConfig = {
   whatsappEnabled: boolean;
   shortcuts: ShortcutBindingsConfig;
   defaultAgentBootstrapPrompt: string;
-  orchestratorBootstrapFooterPrompt: string;
   /**
    * When true, orchestrator prompts include the tmux2 sub-agent section and
    * surface the pi-session ID for launching Claude Code sub-agents via tmux2.
@@ -262,7 +260,6 @@ export function loadConfig(): FlitterbotConfig {
   const defaultAgentBootstrapPrompt =
     raw.defaultAgentBootstrapPrompt ??
     "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
-  const orchestratorBootstrapFooterPrompt = raw.orchestratorBootstrapFooterPrompt ?? "";
   const tmux2Enabled = raw.tmux2Enabled === true;
   const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
@@ -292,7 +289,6 @@ export function loadConfig(): FlitterbotConfig {
     whatsappEnabled,
     shortcuts,
     defaultAgentBootstrapPrompt,
-    orchestratorBootstrapFooterPrompt,
     tmux2Enabled,
     extraSkillPaths,
 
@@ -340,7 +336,6 @@ export function loadConfig(): FlitterbotConfig {
     whatsappEnabled: config.whatsappEnabled,
     shortcuts: config.shortcuts,
     defaultAgentBootstrapPrompt: config.defaultAgentBootstrapPrompt,
-    orchestratorBootstrapFooterPrompt: config.orchestratorBootstrapFooterPrompt,
     tmux2Enabled: config.tmux2Enabled,
     extraSkillPaths: config.extraSkillPaths,
   };

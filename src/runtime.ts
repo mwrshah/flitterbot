@@ -1312,7 +1312,6 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
-                      this.config.orchestratorBootstrapFooterPrompt,
                     );
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
@@ -1323,7 +1322,6 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
-                      this.config.orchestratorBootstrapFooterPrompt,
                     );
                   }
                 } else {
@@ -1332,7 +1330,6 @@ export class ControlSurfaceRuntime {
                     ws.name,
                     ws.id,
                     agentMessage,
-                    this.config.orchestratorBootstrapFooterPrompt,
                   );
                 }
               } catch (error) {
@@ -1349,7 +1346,6 @@ export class ControlSurfaceRuntime {
                   ws.name,
                   ws.id,
                   agentMessage,
-                  this.config.orchestratorBootstrapFooterPrompt,
                 );
               }
 
@@ -1369,13 +1365,7 @@ export class ControlSurfaceRuntime {
               this.log(`enqueued original user message onto stream "${ws.name}" (${ws.id})`);
             } else if (skipUserMessage && agentMessage) {
               const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
-              const prompt = formatStreamPrompt(
-                [],
-                ws.name,
-                ws.id,
-                agentMessage,
-                this.config.orchestratorBootstrapFooterPrompt,
-              );
+              const prompt = formatStreamPrompt([], ws.name, ws.id, agentMessage);
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,

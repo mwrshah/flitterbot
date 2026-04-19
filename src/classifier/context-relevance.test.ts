@@ -38,16 +38,16 @@ describe("buildContextRelevancePrompt", () => {
 // --- formatStreamPrompt tests ---
 
 describe("formatStreamPrompt", () => {
-  test("single message produces simple format with default footer", () => {
+  test("single message produces simple format", () => {
     const result = formatStreamPrompt(["Do the thing"], "my-ws", "ws-123");
 
     expect(result).toContain("Do the thing");
-    expect(result).toContain("/tmux2");
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("[Stream:");
+    expect(result).not.toContain("/tmux2");
   });
 
-  test("multiple messages produces numbered format with default footer", () => {
+  test("multiple messages produces numbered format", () => {
     const result = formatStreamPrompt(
       ["First context", "Second context", "Create the feature"],
       "my-feature",
@@ -61,13 +61,15 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("First context");
     expect(result).toContain("Second context");
     expect(result).toContain("Create the feature");
-    expect(result).toContain("/tmux2");
+    expect(result).not.toContain("/tmux2");
   });
 
-  test("empty messages array produces footer only", () => {
+  test("empty messages array produces just datetime", () => {
     const result = formatStreamPrompt([], "empty-ws", "ws-000");
     expect(result).not.toContain("[Stream:");
-    expect(result).toContain("/tmux2");
+    expect(result).not.toContain("User message (");
+    expect(result).not.toContain("/tmux2");
+    expect(result).toMatch(/^\[Now: .+\]\n$/);
   });
 
   test("skipUserMessage batch mode: empty messages + agent context", () => {
@@ -76,31 +78,12 @@ describe("formatStreamPrompt", () => {
       "batch-ws",
       "ws-batch-1",
       "Investigate renewals pipeline failure in klair-api",
-      "Load /tmux2",
     );
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("The following user messages provide context");
     expect(result).toContain("--- Agent context ---");
     expect(result).toContain("Investigate renewals pipeline failure in klair-api");
-    expect(result).toContain("Load /tmux2");
-  });
-
-  test("custom footer overrides default", () => {
-    const result = formatStreamPrompt(
-      ["Hello"],
-      "ws",
-      "ws-1",
-      undefined,
-      "Load /custom-skill first",
-    );
-    expect(result).toContain("Load /custom-skill first");
     expect(result).not.toContain("/tmux2");
-  });
-
-  test("empty footer omits footer section", () => {
-    const result = formatStreamPrompt(["Hello"], "ws", "ws-1", undefined, "");
-    expect(result).not.toContain("IMPORTANT");
-    expect(result).toBe("Hello");
   });
 });
 

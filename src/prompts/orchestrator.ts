@@ -17,17 +17,13 @@ export function buildOrchestratorPrompt(
   options: OrchestratorPromptOptions = {},
 ): string {
   const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
-  const tmuxEnabled = options.tmux === true;
-  const piSessionLine = tmuxEnabled
-    ? `\n- Pi-session ID: \`${ctx.piSessionId}\` — pass as \`--pi-session-id\` when launching sub-agents.`
-    : "";
-  const tmuxSection = tmuxEnabled ? renderTmuxSection(ctx) : "";
+  const tmuxSection = options.tmux === true ? renderTmuxSection(ctx) : "";
 
   return `You are managing a single stream of work. 
 
 ## Runtime
 - cwd: \`${ctx.cwd}\`
-- Stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}${piSessionLine}
+- Stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}
 
 ## Tools
 - *read* — read files.
@@ -61,6 +57,8 @@ function renderTmuxSection(ctx: OrchestratorContext): string {
   const wsFlag = ctx.streamId ? ` --stream-id ${ctx.streamId}` : "";
   return `
 ## Sub-agents (tmux2)
+
+Load the \`/tmux2\` skill once per conversation before spawning sub-agents — it supplies the session-launch and message/send helpers you'll need. Skip reloading if it's already in context this turn.
 
 Spawn Claude Code sub-agents through tmux2 when work is parallelizable. Define work to delegate and make investigation across different aspects parallelizable. Prompt them by stating the problem, not the solution. Pass instructions through; make them positive, positioned as if you are the user passing through a message to investigate or do. Tone should be positive, tight, succinct, clear, and not overly prescriptive. You may include your interpretation, spec paths, and constraints, but soften the language a little bit, avoid hard gating with negatives. Describe what's broken or what the user wants, name files or areas when already known, and state the constraints that matter ("might be good to use existing Groq client", "classifier interface shouldn't get modified as part of this, but if you need to tell me").
 
