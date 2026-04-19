@@ -50,7 +50,17 @@ export const ModelSelector = memo(function ModelSelector({
   const pinned = data?.pinned ?? [];
   const all = data?.all ?? [];
   const defaultModelId = data?.defaultModel ?? null;
-  const pinnedIds = useMemo(() => new Set(pinned.map((m) => m.id)), [pinned]);
+  // Include both the curated id AND the composite `provider/modelId` so an
+  // "All" entry shows its star whether it was pinned under its curated alias
+  // or its composite form.
+  const pinnedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of pinned) {
+      set.add(m.id);
+      set.add(`${m.provider}/${m.modelId}`);
+    }
+    return set;
+  }, [pinned]);
 
   const queryClient = useQueryClient();
   const pinMutation = useMutation({
@@ -86,7 +96,9 @@ export const ModelSelector = memo(function ModelSelector({
   const currentModel = useMemo(() => {
     if (!effectiveId) return undefined;
     return (
-      pinned.find((m) => m.id === effectiveId) ?? all.find((m) => m.id === effectiveId) ?? undefined
+      pinned.find((m) => matchesModelId(m, effectiveId)) ??
+      all.find((m) => matchesModelId(m, effectiveId)) ??
+      undefined
     );
   }, [effectiveId, pinned, all]);
 
@@ -144,7 +156,7 @@ export const ModelSelector = memo(function ModelSelector({
                     <ModelMenuItem
                       key={`pinned:${model.id}`}
                       model={model}
-                      selected={model.id === effectiveId}
+                      selected={effectiveId ? matchesModelId(model, effectiveId) : false}
                       isPinned
                       isDefault={model.id === defaultModelId}
                       canUnpin={pinned.length > 1}
@@ -169,7 +181,7 @@ export const ModelSelector = memo(function ModelSelector({
                         <ModelMenuItem
                           key={`all:${model.id}`}
                           model={model}
-                          selected={model.id === effectiveId}
+                          selected={effectiveId ? matchesModelId(model, effectiveId) : false}
                           isPinned={isPinned}
                           isDefault={model.id === defaultModelId}
                           canUnpin={pinned.length > 1}
@@ -359,6 +371,18 @@ function ModelMenuItem({
   );
 }
 
+/** True when `stored` matches this catalog entry by either curated id or the
+ *  composite `provider/modelId` form. Curated ids (e.g. `claude-opus-4-7`)
+ *  and composite ids (e.g. `anthropic/claude-opus-4-7`) refer to the same
+ *  underlying model; treating them as equivalent keeps localStorage stable
+ *  across pin/unpin changes. */
+function matchesModelId(
+  m: Pick<ModelListItem, "id" | "provider" | "modelId">,
+  stored: string,
+): boolean {
+  return m.id === stored || `${m.provider}/${m.modelId}` === stored;
+}
+
 /** Filter across `label`, `modelId`, and `provider` — whitespace-separated
  *  tokens all have to match (AND semantics) so `opus anthropic` narrows
  *  properly. Case-insensitive. */
@@ -411,11 +435,16 @@ export function useSelectedModel(): [
 
   const effective = selected ?? defaultModelId;
 
-  // Prune invalid stored selections once the catalog loads.
+  // Prune invalid stored selections once the catalog loads. Match by either
+  // curated id or `provider/modelId` composite so a stored curated id isn't
+  // wiped just because the user unpinned / renamed its entry (the same model
+  // still lives in `data.all` under its composite form). localStorage must
+  // keep winning over `defaultModel` whenever the model is still resolvable.
   useEffect(() => {
     if (!selected || !data) return;
     const exists =
-      data.pinned.some((m) => m.id === selected) || data.all.some((m) => m.id === selected);
+      data.pinned.some((m) => matchesModelId(m, selected)) ||
+      data.all.some((m) => matchesModelId(m, selected));
     if (!exists) setSelectedState(null);
   }, [selected, data, setSelectedState]);
 
