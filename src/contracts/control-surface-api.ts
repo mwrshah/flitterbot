@@ -113,8 +113,6 @@ export interface MessageRequest {
   deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
   targetPiSessionId?: string;
-  /** Per-message model override (id from `config.models[]`). */
-  modelId?: string;
 }
 
 /**

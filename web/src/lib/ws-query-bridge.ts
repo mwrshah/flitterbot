@@ -30,23 +30,17 @@ import type { FlitterbotWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
 
-export type SendMessageOptions = {
-  /** Per-message model override (id from `config.models[]`). */
-  modelId?: string;
-};
-
 export type SendMessageFn = (
   text: string,
   images?: ImageAttachment[],
   targetPiSessionId?: string,
-  options?: SendMessageOptions,
 ) => Promise<void>;
 
 export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendMessageFn {
   const { wsClient } = deps;
-  return async (text, images, targetPiSessionId, options) => {
+  return async (text, images, targetPiSessionId) => {
     try {
-      await wsClient.sendMessage(text, "followUp", images, targetPiSessionId, options?.modelId);
+      await wsClient.sendMessage(text, "followUp", images, targetPiSessionId);
     } catch (error) {
       console.error("WS send failed (socket not open):", error);
       throw error;

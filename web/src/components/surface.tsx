@@ -826,7 +826,7 @@ export function Surface() {
   });
 
   const handleSubmit = useCallback(
-    async (text: string, modelId?: string) => {
+    async (text: string) => {
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
@@ -834,7 +834,7 @@ export function Surface() {
       engageAndScroll();
 
       try {
-        await sendMessage(text || "(image)", images, undefined, modelId ? { modelId } : undefined);
+        await sendMessage(text || "(image)", images);
         setPendingImages([]);
       } catch (error) {
         toast.error("Failed to send message");

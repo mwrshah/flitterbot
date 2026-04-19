@@ -273,7 +273,6 @@ export class FlitterbotWsClient {
     deliveryMode: string,
     images?: Array<{ data: string; mimeType: string }>,
     targetPiSessionId?: string,
-    modelId?: string,
   ): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
@@ -281,7 +280,6 @@ export class FlitterbotWsClient {
     const payload: Record<string, unknown> = { type: "message", text, deliveryMode };
     if (images?.length) payload.images = images;
     if (targetPiSessionId) payload.targetPiSessionId = targetPiSessionId;
-    if (modelId) payload.modelId = modelId;
     this.socket.send(JSON.stringify(payload));
   }
 

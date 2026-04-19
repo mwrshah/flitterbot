@@ -9,14 +9,9 @@ import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
-const LOCAL_STORAGE_KEY = "flitterbot:selected-model-id";
 const MODELS_QUERY_KEY = ["models"] as const;
 
 export type ModelSelectorProps = {
-  /** Currently selected model id. Parent owns state; selector just renders it. */
-  value: string | null;
-  /** Called when the user picks a different model. */
-  onChange: (modelId: string) => void;
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
   compact?: boolean;
   disabled?: boolean;
@@ -30,16 +25,10 @@ export type ModelSelectorProps = {
  *      type-to-filter search. Entries whose provider has no auth configured
  *      are rendered dimmed with a small badge.
  *
- * The user's selection is the composite `provider/modelId` for catalog entries
- * (or a curated id) and is persisted to localStorage by `useSelectedModel()`.
- * localStorage always overrides the server's `defaultModel`.
+ * Selecting a model sets it as the server-side default; `defaultModel` from
+ * the models query is the single source of truth.
  */
-export const ModelSelector = memo(function ModelSelector({
-  value,
-  onChange,
-  compact,
-  disabled,
-}: ModelSelectorProps) {
+export const ModelSelector = memo(function ModelSelector({ compact, disabled }: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
   const { data } = useQuery({
     queryKey: MODELS_QUERY_KEY,
@@ -91,16 +80,14 @@ export const ModelSelector = memo(function ModelSelector({
     },
   });
 
-  // The effective selected id — localStorage overrides server default.
-  const effectiveId = value ?? defaultModelId;
   const currentModel = useMemo(() => {
-    if (!effectiveId) return undefined;
+    if (!defaultModelId) return undefined;
     return (
-      pinned.find((m) => matchesModelId(m, effectiveId)) ??
-      all.find((m) => matchesModelId(m, effectiveId)) ??
+      pinned.find((m) => matchesModelId(m, defaultModelId)) ??
+      all.find((m) => matchesModelId(m, defaultModelId)) ??
       undefined
     );
-  }, [effectiveId, pinned, all]);
+  }, [defaultModelId, pinned, all]);
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -156,16 +143,14 @@ export const ModelSelector = memo(function ModelSelector({
                     <ModelMenuItem
                       key={`pinned:${model.id}`}
                       model={model}
-                      selected={effectiveId ? matchesModelId(model, effectiveId) : false}
+                      selected={defaultModelId ? matchesModelId(model, defaultModelId) : false}
                       isPinned
-                      isDefault={model.id === defaultModelId}
                       canUnpin={pinned.length > 1}
                       onSelect={() => {
-                        onChange(model.id);
+                        defaultMutation.mutate(model.id);
                         setOpen(false);
                       }}
                       onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
-                      onSetDefault={() => defaultMutation.mutate(model.id)}
                       busy={pinMutation.isPending || defaultMutation.isPending}
                     />
                   ))}
@@ -181,12 +166,11 @@ export const ModelSelector = memo(function ModelSelector({
                         <ModelMenuItem
                           key={`all:${model.id}`}
                           model={model}
-                          selected={effectiveId ? matchesModelId(model, effectiveId) : false}
+                          selected={defaultModelId ? matchesModelId(model, defaultModelId) : false}
                           isPinned={isPinned}
-                          isDefault={model.id === defaultModelId}
                           canUnpin={pinned.length > 1}
                           onSelect={() => {
-                            onChange(model.id);
+                            defaultMutation.mutate(model.id);
                             setOpen(false);
                           }}
                           onTogglePin={() =>
@@ -196,7 +180,6 @@ export const ModelSelector = memo(function ModelSelector({
                               ...(isPinned ? {} : { label: model.name ?? model.label }),
                             })
                           }
-                          onSetDefault={() => defaultMutation.mutate(model.id)}
                           busy={pinMutation.isPending || defaultMutation.isPending}
                         />
                       );
@@ -267,21 +250,17 @@ function ModelMenuItem({
   model,
   selected,
   isPinned,
-  isDefault,
   canUnpin,
   onSelect,
   onTogglePin,
-  onSetDefault,
   busy,
 }: {
   model: ModelListItem;
   selected: boolean;
   isPinned: boolean;
-  isDefault: boolean;
   canUnpin: boolean;
   onSelect: () => void;
   onTogglePin: () => void;
-  onSetDefault: () => void;
   busy: boolean;
 }) {
   const available = model.available !== false;
@@ -313,14 +292,7 @@ function ModelMenuItem({
           className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")}
         />
         <div className="flex min-w-0 flex-col">
-          <span className="truncate font-medium leading-tight">
-            {model.label}
-            {isDefault && (
-              <span className="ml-1.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground/70">
-                default
-              </span>
-            )}
-          </span>
+          <span className="truncate font-medium leading-tight">{model.label}</span>
           <span className="text-[11px] text-muted-foreground/70 leading-tight truncate">
             {model.provider} · {model.modelId}
             {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
@@ -335,20 +307,6 @@ function ModelMenuItem({
         >
           no auth
         </span>
-      )}
-      {isPinned && !isDefault && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSetDefault();
-          }}
-          className="shrink-0 self-center rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/70 opacity-0 transition hover:bg-accent hover:text-foreground group-hover/row:opacity-100 disabled:cursor-not-allowed"
-          title="Set as default model in config"
-        >
-          set default
-        </button>
       )}
       <button
         type="button"
@@ -374,8 +332,8 @@ function ModelMenuItem({
 /** True when `stored` matches this catalog entry by either curated id or the
  *  composite `provider/modelId` form. Curated ids (e.g. `claude-opus-4-7`)
  *  and composite ids (e.g. `anthropic/claude-opus-4-7`) refer to the same
- *  underlying model; treating them as equivalent keeps localStorage stable
- *  across pin/unpin changes. */
+ *  underlying model; treating them as equivalent avoids mismatches when the
+ *  user pins/unpins entries. */
 function matchesModelId(
   m: Pick<ModelListItem, "id" | "provider" | "modelId">,
   stored: string,
@@ -410,74 +368,4 @@ function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M ctx`;
   if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k ctx`;
   return `${tokens} ctx`;
-}
-
-/**
- * Hook: owns the selected-model state for a composer. Rehydrates from
- * localStorage on mount, falls back to the server's `defaultModel`, and
- * persists user changes across reloads. Selections are validated against
- * the combined pinned+all catalog; stale ids (e.g. model removed from
- * pi-mono) are pruned silently.
- */
-export function useSelectedModel(): [
-  selectedModelId: string | null,
-  setSelected: (modelId: string) => void,
-] {
-  const { apiClient } = rootApi.useRouteContext();
-  const { data } = useQuery({
-    queryKey: MODELS_QUERY_KEY,
-    queryFn: () => apiClient.listModels(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const defaultModelId = data?.defaultModel ?? null;
-
-  const [selected, setSelectedState] = useLocalStorageModel();
-
-  const effective = selected ?? defaultModelId;
-
-  // Prune invalid stored selections once the catalog loads. Match by either
-  // curated id or `provider/modelId` composite so a stored curated id isn't
-  // wiped just because the user unpinned / renamed its entry (the same model
-  // still lives in `data.all` under its composite form). localStorage must
-  // keep winning over `defaultModel` whenever the model is still resolvable.
-  useEffect(() => {
-    if (!selected || !data) return;
-    const exists =
-      data.pinned.some((m) => matchesModelId(m, selected)) ||
-      data.all.some((m) => matchesModelId(m, selected));
-    if (!exists) setSelectedState(null);
-  }, [selected, data, setSelectedState]);
-
-  const setSelected = (modelId: string) => setSelectedState(modelId);
-  return [effective, setSelected];
-}
-
-/**
- * Lightweight localStorage-backed state. Intentionally not cross-tab reactive —
- * no `storage` event listener — because a model change in another tab shouldn't
- * silently hijack the active composer's selection.
- */
-function useLocalStorageModel(): [string | null, (v: string | null) => void] {
-  const [value, setValue] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage.getItem(LOCAL_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
-
-  const set = (next: string | null) => {
-    setValue(next);
-    if (typeof window !== "undefined") {
-      try {
-        if (next) window.localStorage.setItem(LOCAL_STORAGE_KEY, next);
-        else window.localStorage.removeItem(LOCAL_STORAGE_KEY);
-      } catch {
-        /* ignore quota/denied */
-      }
-    }
-  };
-
-  return [value, set];
 }

@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { Button } from "~/components/common/button";
-import { ModelSelector, useSelectedModel } from "~/components/model-selector";
+import { ModelSelector } from "~/components/model-selector";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -28,11 +28,8 @@ const draftStore = new Map<string, string>();
 
 type MessageInputProps = {
   isSending: boolean;
-  /**
-   * Submit handler. `modelId` is the currently-selected model id from the
-   * inline selector (null when no models are configured or selector is off).
-   */
-  onSubmit: (text: string, modelId?: string) => void;
+  /** Submit handler — selected model is set server-side via the inline selector. */
+  onSubmit: (text: string) => void;
   pendingImages: ImageAttachment[];
   onAddImages: (files: FileList | File[]) => void;
   onRemoveImage: (index: number) => void;
@@ -67,7 +64,6 @@ export const MessageInput = memo(function MessageInput({
   showModelSelector = true,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
-  const [selectedModelId, setSelectedModelId] = useSelectedModel();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -140,12 +136,10 @@ export const MessageInput = memo(function MessageInput({
   const draftRef = useRef(draft);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
-  const selectedModelIdRef = useRef(selectedModelId);
   useEffect(() => {
     draftRef.current = draft;
     onSubmitRef.current = onSubmit;
     onAddImagesRef.current = onAddImages;
-    selectedModelIdRef.current = selectedModelId;
   });
 
   /** Close a picker on Escape: remove trigger text, reset position ref, refocus. */
@@ -456,7 +450,7 @@ export const MessageInput = memo(function MessageInput({
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         const text = draftRef.current.trim();
-        onSubmitRef.current(text, selectedModelIdRef.current ?? undefined);
+        onSubmitRef.current(text);
         setDraft("");
         if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
       }
@@ -505,7 +499,7 @@ export const MessageInput = memo(function MessageInput({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onSubmit(draftRef.current.trim(), selectedModelIdRef.current ?? undefined);
+          onSubmit(draftRef.current.trim());
           setDraft("");
           if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
         }}
@@ -610,13 +604,7 @@ export const MessageInput = memo(function MessageInput({
               the send button so "which model am I about to invoke" is always
               visible without stealing focus from the composer. */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            {showModelSelector && (
-              <ModelSelector
-                value={selectedModelId}
-                onChange={setSelectedModelId}
-                disabled={isSending}
-              />
-            )}
+            {showModelSelector && <ModelSelector disabled={isSending} />}
             <Button
               type="submit"
               size="sm"

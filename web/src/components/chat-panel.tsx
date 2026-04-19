@@ -42,7 +42,7 @@ type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
   isSessionBusy: boolean;
-  onSendMessage: (text: string, images?: ImageAttachment[], modelId?: string) => Promise<void>;
+  onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
   streamId?: string;
   streamName?: string;
   /** Recovery action to offer in the header, if any:
@@ -245,7 +245,7 @@ export function ChatPanel({
   });
 
   const handleSubmit = useCallback(
-    async (text: string, modelId?: string) => {
+    async (text: string) => {
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
@@ -253,7 +253,7 @@ export function ChatPanel({
       engage();
 
       try {
-        await onSendMessage(text || "(image)", images, modelId);
+        await onSendMessage(text || "(image)", images);
         setPendingImages([]);
       } catch (error) {
         toast.error("Failed to send message");
