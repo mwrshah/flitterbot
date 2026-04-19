@@ -223,10 +223,14 @@ function SearchBox({ value, onChange }: { value: string; onChange: (v: string) =
         placeholder="Search models…"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        // Base UI's Menu treats arrow keys as item navigation; swallow them
-        // here so typing in the filter doesn't jump focus to the list.
+        // Base UI's Menu wires floating-ui's useTypeahead + useListNavigation
+        // to the popup's keydown. Any character that bubbles out of this
+        // input triggers typeahead, which sets activeIndex and steals DOM
+        // focus onto the matching MenuItem — after which no further keys
+        // reach the input. Stop all keys here except Escape (so the menu
+        // still dismisses) and Tab (so focus can leave the popup normally).
         onKeyDown={(e) => {
-          if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+          if (e.key !== "Escape" && e.key !== "Tab") {
             e.stopPropagation();
           }
         }}
