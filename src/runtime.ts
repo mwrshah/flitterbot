@@ -1116,96 +1116,67 @@ export class ControlSurfaceRuntime {
         name: "create_stream",
         label: "Create Stream",
         description:
-          "Create a new stream and spawn a dedicated orchestrator for it. Use when the user requests engineering work (features, bugs, investigations) that needs a dedicated session. The user's original message is automatically passed through to the new stream.",
+          "Create a new stream and spawn a dedicated orchestrator for it. Use when the user requests any work (features, bugs, investigations, even web research) that might benefit from a dedicated session.",
         parameters: {
           type: "object",
           properties: {
             name: {
               type: "string",
               description:
-                "Short descriptive name, 2-5 words, lowercase, dash-separated. Prefix investigation streams with 'i-' (e.g. 'i-wu-activated-lifecycle' , 'fix-auth-token-refresh')",
+                "Short descriptive name, 2-4 words, lowercase, dash-separated. Prefix investigation streams with 'i-' (e.g. 'i-wu-lifecycle', 'fix-auth-token-refresh')",
             },
             message: {
               type: "string",
               description:
-                "Optional agent-authored context appended to the stream prompt. Use for supplementary information the orchestrator wouldn't otherwise have: spec paths, constraints, relevant background gathered during triage. Omit if there's nothing to add.",
-            },
-            repo: {
-              type: "string",
-              description:
-                "Optional repository name (relative to projects dir, e.g. 'flitterbot' or 'KLAIR'). When provided, the stream's orchestrator and agents will use this repo as their working directory.",
+                "Pass the user's intent through to the orchestrator — verbatim where possible, carrying the task itself. Skip the meta around stream creation; that framing is yours to handle. Write it as a message from the user to the orchestrator, and optionally append a short section with your interpretation of what to investigate, build, or decide. Include spec paths, constraints, and triage context the orchestrator won't otherwise have. Keep it tight and not overly prescriptive.",
             },
             cwd: {
               type: "string",
               description:
-                "Optional absolute path to use as the working directory for this stream's orchestrator and agents. Takes precedence over repo if both provided.",
+                "Absolute path to use as the working directory for new stream's orchestrator and agents.",
             },
             skipUserMessage: {
               type: "boolean",
               description:
-                "When true, skip the default user-message passthrough and context resolution. The agent-authored message becomes the sole context for the new stream. Use when creating multiple streams in a batch where each stream receives targeted context via the message parameter.",
+                "Always true. Skip the programmatic user-message passthrough, since we write it out in message.",
             },
           },
-          required: ["name"],
+          required: ["name", "cwd", "message", "skipUserMessage"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
           const {
             name,
             message: agentMessage,
-            repo,
             cwd: cwdParam,
           } = params as {
             name: string;
-            message?: string;
-            repo?: string;
-            cwd?: string;
-            skipUserMessage?: boolean;
+            message: string;
+            cwd: string;
+            skipUserMessage: boolean;
           };
           // TEMP: hardcode skipUserMessage = true (user request)
           const skipUserMessage = true;
 
-          // Resolve effective working directory: cwd takes precedence over repo
-          let effectiveCwd: string | undefined;
-          if (cwdParam) {
-            if (!fs.existsSync(cwdParam)) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `Error: cwd path "${cwdParam}" does not exist`,
-                  },
-                ],
-                details: {},
-              };
-            }
-            effectiveCwd = cwdParam;
-          } else if (repo) {
-            const resolved = path.join(this.config.projectsDir, repo);
-            if (!fs.existsSync(resolved) || !fs.existsSync(path.join(resolved, ".git"))) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `Error: "${repo}" is not a valid git repository in ${this.config.projectsDir}`,
-                  },
-                ],
-                details: {},
-              };
-            }
-            effectiveCwd = resolved;
+          // cwd is required by the schema; validate it exists.
+          if (!fs.existsSync(cwdParam)) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error: cwd path "${cwdParam}" does not exist`,
+                },
+              ],
+              details: {},
+            };
           }
+          const effectiveCwd = cwdParam;
 
           const { insertStream, enrichStream } = await import("./blackboard/query-streams.ts");
           const ws = insertStream(this.blackboard, name);
+          enrichStream(this.blackboard, ws.id, effectiveCwd);
 
-          if (effectiveCwd) {
-            enrichStream(this.blackboard, ws.id, effectiveCwd);
-          }
-
-          this.log(
-            `default agent created stream "${name}" (${ws.id})${effectiveCwd ? ` cwd=${effectiveCwd}` : ""}`,
-          );
+          this.log(`default agent created stream "${name}" (${ws.id}) cwd=${effectiveCwd}`);
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
