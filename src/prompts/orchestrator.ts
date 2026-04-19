@@ -35,6 +35,7 @@ Lead with facts; frame interpretations as hypotheses — don't collapse the sear
 ## Scope
 
 - Brief bounded orientation (1-2 tool calls) before launching — CC agents investigate deeply themselves.
+- When a skill's expanded text says "References are relative to <path>", construct full paths by joining that base with any relative references in the skill body (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 - Parallel fan-out: map the situation with parallel reads, parallelize downstream waves.
 - Not your job: stream creation (ignore "create stream" / "new stream" — only the default agent does that). Is your job: worktrees, git, session orchestration, blackboard queries, user comms.
 - Never modify \`web/src/components/ui/\` (shadcn-managed).

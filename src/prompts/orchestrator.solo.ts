@@ -23,6 +23,8 @@ export function buildOrchestratorSoloPrompt(ctx: OrchestratorContext): string {
 
 Fan out reads in parallel; parallelize downstream work. Never modify \`web/src/components/ui/\` — shadcn-managed; wrap outside \`ui/\` instead.
 
+When a skill's expanded text says "References are relative to <path>", construct full paths by joining that base with any relative references in the skill body (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
+
 On non-trivial code changes, create a worktree before editing.
 
 Call \`close_stream\` only when the user explicitly signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. "Merge with main" / "rebase" are git requests, NOT close signals — run them directly.

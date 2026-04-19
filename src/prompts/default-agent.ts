@@ -9,7 +9,7 @@ export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string
 
 ## Self-Awareness
 
-- *Skills* — loaded from \`~/.agents/skills/\`. User reloads via \`/reload\`.
+- *Skills* — loaded from \`~/.agents/skills/\`. User reloads via \`/reload\`. When a skill's expanded text says "References are relative to <path>", construct full paths by joining that base with any relative references in the skill body (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 - *Session history* — JSONL at \`~/.flitterbot/control-surface/sessions/\` (one file per pi-session; the web UI replays from these).
 - *Agent dir* — \`~/.flitterbot/control-surface/agent/\` holds your system prompt and config.
 - *Blackboard* — SQLite at \`~/.flitterbot/blackboard.db\` (streams, sessions, messages, health flags).
