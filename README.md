@@ -9,7 +9,7 @@ pnpm install && pnpm --dir web install
     # 2. configure (see below)
 cp .env.example .env
     # 3. deploy runtime
-node .flitterbot/install.mjs
+node installer/install.mjs
     # 4. start control surface
 ~/.flitterbot/bin/flitterbot-up start
     # 5. optional: WhatsApp

@@ -231,7 +231,7 @@ Installer → Blackboard → WhatsApp Channel ──┐
 ```bash
 pnpm install
 pnpm --dir web install
-node .flitterbot/install.mjs
+node installer/install.mjs
 ~/.flitterbot/bin/flitterbot-up start
 # optional
 pnpm --dir web dev

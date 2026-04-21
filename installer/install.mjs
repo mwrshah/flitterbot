@@ -253,10 +253,9 @@ function manifestDeleteTarget(targetKey) {
 // ---------------------------------------------------------------------------
 function resolvePackagedRuntimeFile(rel) {
   const candidates = [
-    PROJECT_ROOT && join(PROJECT_ROOT, ".flitterbot", rel),
+    PROJECT_ROOT && join(PROJECT_ROOT, "installer", rel),
     join(SCRIPT_DIR, rel),
     join(FLITTERBOT_DIR, rel),
-    join(SCRIPT_DIR, "..", ".flitterbot", rel),
   ].filter(Boolean);
   for (const c of candidates) if (existsSync(c)) return c;
   return null;
