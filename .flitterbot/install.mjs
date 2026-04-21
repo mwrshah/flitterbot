@@ -57,39 +57,17 @@ for (const arg of process.argv.slice(2)) {
 // ---------------------------------------------------------------------------
 // File lists
 // ---------------------------------------------------------------------------
-const TOP_LEVEL_FILES = ["install.mjs", "uninstall.mjs", "VERSION"];
+const TOP_LEVEL_FILES = ["uninstall.mjs", "VERSION"];
 
-const OBSOLETE_RUNTIME_FILES = [
-  "install.sh",
-  "uninstall.sh",
-  "init.sh",
-  "hooks/session-start.sh",
-  "hooks/session-end.sh",
-  "hooks/stop.sh",
-  "hooks/pre-tool-use.sh",
-  "hooks/post-tool-use.sh",
-  "hooks/post-tool-use-failure.sh",
-  "hooks/subagent-start.sh",
-  "hooks/subagent-stop.sh",
-  "scripts/hook-dispatch.sh",
-  "scripts/hook_dispatch.py",
-  "scripts/bb_write.py",
-  "scripts/bb-write.py",
-  "scripts/flitterbot_runtime.py",
-  "scripts/bb-query.py",
+const HOOK_SCRIPT = "hook-post.mjs";
+
+const HOOKS = [
+  { event: "SessionStart", arg: "session-start" },
+  { event: "Stop", arg: "stop" },
+  { event: "SessionEnd", arg: "session-end" },
 ];
 
-const HOOK_EVENTS = ["SessionStart", "Stop", "SessionEnd"];
-
-const HOOK_SCRIPTS = ["hook-post.mjs", "hook-post.mjs", "hook-post.mjs"];
-
-const HOOK_COMMANDS = [
-  `node ${HOOKS_DIR}/hook-post.mjs session-start`,
-  `node ${HOOKS_DIR}/hook-post.mjs stop`,
-  `node ${HOOKS_DIR}/hook-post.mjs session-end`,
-];
-
-const SCRIPT_FILES = ["init-db.sh", "runtime-common.sh"];
+const SCRIPT_FILES = ["runtime-common.sh"];
 const SOURCE_FILES = ["blackboard/schema.sql"];
 const CRON_FILES = ["flitterbot-checkin.sh", "scheduler.sh", "com.flitterbot.scheduler.plist"];
 const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
@@ -155,10 +133,6 @@ function sortKeys(obj) {
   const sorted = {};
   for (const key of Object.keys(obj).sort()) sorted[key] = sortKeys(obj[key]);
   return sorted;
-}
-
-function prettyJson(obj) {
-  return JSON.stringify(obj, null, 2);
 }
 
 function sortedPrettyJson(obj) {
@@ -319,10 +293,6 @@ let RUNTIME_CHANGES = "";
 
 function appendRuntimeChange(action, path) {
   RUNTIME_CHANGES += `${action} ${path}\n`;
-}
-
-function noteRemovedRuntimeFile(path) {
-  if (existsSync(path)) appendRuntimeChange("remove", path);
 }
 
 function noteRuntimeFile(src, dest) {
@@ -523,38 +493,47 @@ async function bootstrapConfig() {
     }
   }
 
-  const configAfter = { ...configBefore };
-  configAfter.controlSurfaceHost = configAfter.controlSurfaceHost || "127.0.0.1";
-  configAfter.controlSurfacePort = configAfter.controlSurfacePort || 18820;
-  if (!configAfter.controlSurfaceToken) configAfter.controlSurfaceToken = token;
   // Note: `piModel` has been removed (clean cutover to `models[]` + `defaultModel`
   // managed by src/config/load-config.ts). The server seeds the new fields on
   // first boot if missing, so the installer no longer touches them here.
-  configAfter.piThinkingLevel = configAfter.piThinkingLevel || "high";
-  configAfter.stallMinutes = configAfter.stallMinutes || 15;
-  configAfter.toolTimeoutMinutes = configAfter.toolTimeoutMinutes || 4;
-  configAfter.blackboardPath = configAfter.blackboardPath || "~/.flitterbot/blackboard.db";
-  configAfter.whatsappAuthDir = configAfter.whatsappAuthDir || "~/.flitterbot/whatsapp/auth";
-  configAfter.whatsappSocketPath = configAfter.whatsappSocketPath || "~/.flitterbot/whatsapp/daemon.sock";
-  configAfter.whatsappPidPath = configAfter.whatsappPidPath || "~/.flitterbot/whatsapp/daemon.pid";
-  configAfter.whatsappCliPath = configAfter.whatsappCliPath || "~/.flitterbot/whatsapp/cli.js";
-  configAfter.whatsappDaemonPath = configAfter.whatsappDaemonPath || "~/.flitterbot/whatsapp/daemon.js";
-  if (configAfter.whatsappEnabled === undefined) configAfter.whatsappEnabled = true;
-  if (configAfter.wipeStreamsOnStart === undefined) configAfter.wipeStreamsOnStart = false;
-  if (!configAfter.projectsDir) {
+  const STATIC_DEFAULTS = {
+    controlSurfaceHost: "127.0.0.1",
+    controlSurfacePort: 18820,
+    piThinkingLevel: "high",
+    stallMinutes: 15,
+    toolTimeoutMinutes: 4,
+    blackboardPath: "~/.flitterbot/blackboard.db",
+    whatsappAuthDir: "~/.flitterbot/whatsapp/auth",
+    whatsappSocketPath: "~/.flitterbot/whatsapp/daemon.sock",
+    whatsappPidPath: "~/.flitterbot/whatsapp/daemon.pid",
+    whatsappCliPath: "~/.flitterbot/whatsapp/cli.js",
+    whatsappDaemonPath: "~/.flitterbot/whatsapp/daemon.js",
+    whatsappEnabled: true,
+    wipeStreamsOnStart: false,
+    claudeCliCommand: "claude --dangerously-skip-permissions",
+    defaultAgentBootstrapPrompt: "/todoist /my-obsidian\n\nRun ls on the project repositories directory.",
+  };
+
+  // Defaults only fill when a key is strictly `undefined` (truly absent).
+  // Explicit null / "" / 0 / false are preserved as user intent.
+  const configAfter = { ...configBefore };
+  const setDefault = (key, value) => {
+    if (configAfter[key] === undefined) configAfter[key] = value;
+  };
+
+  for (const [key, value] of Object.entries(STATIC_DEFAULTS)) setDefault(key, value);
+
+  // Dynamic defaults (depend on install context — not meaningful to diff):
+  setDefault("controlSurfaceToken", token);
+  setDefault("projectRoot", projectRoot);
+  setDefault("sourceRoot", configAfter.projectRoot ?? projectRoot);
+  setDefault("controlSurfaceCommand", commandHint);
+
+  if (configAfter.projectsDir === undefined) {
     const entered = await promptString(
       "Projects directory (absolute path where your repos live, e.g. ~/Documents/coded-programs): ",
     );
     if (entered) configAfter.projectsDir = entered;
-  }
-  if (!configAfter.claudeCliCommand || configAfter.claudeCliCommand === "claude") {
-    configAfter.claudeCliCommand = "claude --dangerously-skip-permissions";
-  }
-  if (!configAfter.projectRoot) configAfter.projectRoot = projectRoot;
-  if (!configAfter.sourceRoot) configAfter.sourceRoot = configAfter.projectRoot || projectRoot;
-  if (!configAfter.controlSurfaceCommand) configAfter.controlSurfaceCommand = commandHint;
-  if (!configAfter.defaultAgentBootstrapPrompt) {
-    configAfter.defaultAgentBootstrapPrompt = "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
   }
 
   if (canonicalJson(configBefore) !== canonicalJson(configAfter)) {
@@ -573,8 +552,42 @@ async function bootstrapConfig() {
     }
   }
 
+  reportConfigOverrides(configAfter, STATIC_DEFAULTS);
+
   // Always sync token to web/.env so the frontend can authenticate
   await syncWebEnv(configAfter);
+}
+
+function formatConfigValue(v) {
+  const s = JSON.stringify(v);
+  if (s == null) return String(v);
+  const flat = s.replace(/\\n/g, " ⏎ ");
+  return flat.length > 60 ? flat.slice(0, 57) + "..." : flat;
+}
+
+function normalizeHomePath(v) {
+  if (typeof v !== "string") return v;
+  if (v.startsWith(HOME + "/")) return "~" + v.slice(HOME.length);
+  return v;
+}
+
+function reportConfigOverrides(config, defaults) {
+  const overrides = [];
+  for (const [key, def] of Object.entries(defaults)) {
+    const a = canonicalJson(normalizeHomePath(config[key]));
+    const b = canonicalJson(normalizeHomePath(def));
+    if (a !== b) {
+      overrides.push({ key, value: config[key], default: def });
+    }
+  }
+  if (overrides.length === 0) return;
+
+  const keyWidth = Math.max(...overrides.map((o) => o.key.length));
+  info("=== Config overrides (non-default values preserved) ===");
+  for (const { key, value, default: def } of overrides) {
+    info(`  ${key.padEnd(keyWidth)} = ${formatConfigValue(value)}  (default: ${formatConfigValue(def)})`);
+  }
+  info("");
 }
 
 async function syncWebEnv(config) {
@@ -647,75 +660,96 @@ async function promptWhatsappPhone(promptText) {
 
 async function bootstrapWhatsappConfig() {
   const whatsappConfig = join(FLITTERBOT_DIR, "whatsapp", "config.json");
+  let before = {};
   if (existsSync(whatsappConfig)) {
-    try { readJsonFile(whatsappConfig); return; } catch {
+    try { before = readJsonFile(whatsappConfig); } catch {
       error(`WhatsApp config is malformed JSON: ${whatsappConfig}`);
       process.exit(1);
     }
   }
 
-  const pairingPhone = await promptWhatsappPhone(
-    "WhatsApp phone number for pairing (digits with country code, blank to skip for now): ",
-  );
-  const recipientJid = pairingPhone || "";
-
-  const whatsappAfter = {
-    recipientJid,
-    allowedJids: [],
-    pairingPhoneNumber: pairingPhone,
-    typingDelayMs: 800,
-  };
-
-  info("=== WhatsApp config bootstrap ===");
-  console.log(`--- /dev/null\n+++ proposed\n${sortedPrettyJson(whatsappAfter)}`);
-  if (pairingPhone) {
-    info("");
-    info(`Using ${pairingPhone} for both pairingPhoneNumber and recipientJid.`);
+  const after = { ...before };
+  if (after.pairingPhoneNumber === undefined) {
+    const entered = await promptWhatsappPhone(
+      "WhatsApp phone number for pairing (digits with country code, blank to skip for now): ",
+    );
+    if (entered) after.pairingPhoneNumber = entered;
   }
+  if (after.recipientJid === undefined && after.pairingPhoneNumber) {
+    after.recipientJid = after.pairingPhoneNumber;
+  }
+  if (after.allowedJids === undefined) after.allowedJids = [];
+  if (after.typingDelayMs === undefined) after.typingDelayMs = 800;
+
+  if (canonicalJson(before) === canonicalJson(after)) return;
+
+  info("=== WhatsApp config changes ===");
+  console.log(showJsonDiff(whatsappConfig, after));
   info("");
 
   if (await confirm()) {
-    if (!DRY_RUN) writeJsonFile(whatsappConfig, whatsappAfter, 0o600);
+    if (!DRY_RUN) writeJsonFile(whatsappConfig, after, 0o600);
   } else {
-    info("Skipped WhatsApp config bootstrap.");
+    info("Skipped WhatsApp config update.");
   }
 }
 
 // ---------------------------------------------------------------------------
 // Blackboard initialization
 // ---------------------------------------------------------------------------
-function initBlackboard() {
-  const initScript = join(FLITTERBOT_DIR, "scripts", "init-db.sh");
-  if (!existsSync(initScript)) {
-    warn("init-db.sh not available; skipping blackboard initialization");
-    return;
-  }
+const BLACKBOARD_SCHEMA_VERSION = 11;
 
+function initBlackboard() {
   if (DRY_RUN) {
     info("(dry-run) Would initialize blackboard.db");
     return;
   }
 
-  // Read blackboardPath from config to pass as env to init-db.sh
-  let dbPath = "";
+  const schemaFile = resolvePackagedSrcFile("blackboard/schema.sql")
+    || join(FLITTERBOT_DIR, "src", "blackboard", "schema.sql");
+  if (!existsSync(schemaFile)) {
+    warn(`Schema file not found at ${schemaFile}; skipping blackboard initialization`);
+    return;
+  }
+
+  let dbPath = join(FLITTERBOT_DIR, "blackboard.db");
   const configPath = join(FLITTERBOT_DIR, "config.json");
   if (existsSync(configPath)) {
     try {
       const cfg = readJsonFile(configPath);
-      if (cfg.blackboardPath) {
-        dbPath = cfg.blackboardPath.replace(/^~/, HOME);
-      }
+      if (cfg.blackboardPath) dbPath = cfg.blackboardPath.replace(/^~/, HOME);
     } catch {}
   }
 
-  const env = { ...process.env, FLITTERBOT_HOME: FLITTERBOT_DIR };
-  if (dbPath) env.FLITTERBOT_DB_PATH = dbPath;
+  mkdirSync(dirname(dbPath), { recursive: true });
+
+  const sqlite = (sql) => execSync(
+    `sqlite3 "${dbPath}" "${sql.replace(/"/g, '\\"')}"`,
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+  ).trim();
 
   try {
-    execSync(`bash "${initScript}"`, {
-      env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    let hasSessions = false;
+    if (existsSync(dbPath)) {
+      try {
+        hasSessions = sqlite(
+          "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions';",
+        ) !== "0";
+      } catch {}
+    }
+
+    if (!hasSessions) {
+      execSync(`sqlite3 "${dbPath}" < "${schemaFile}"`, { stdio: "pipe" });
+      sqlite(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (${BLACKBOARD_SCHEMA_VERSION});`);
+      info(`blackboard.db created at ${dbPath} (schema v${BLACKBOARD_SCHEMA_VERSION})`);
+    } else {
+      let current = "0";
+      try { current = sqlite("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;"); } catch {}
+      info(`blackboard.db exists at ${dbPath} (schema v${current})`);
+      if (parseInt(current, 10) < BLACKBOARD_SCHEMA_VERSION) {
+        info(`  note: server will migrate v${current} → v${BLACKBOARD_SCHEMA_VERSION} on next startup`);
+      }
+    }
   } catch (e) {
     warn(`Blackboard initialization reported an error: ${e.message}`);
   }
@@ -734,13 +768,9 @@ async function deployRuntimeFiles() {
     noteRuntimeFile(src, join(FLITTERBOT_DIR, file));
   }
 
-  const seenHooks = new Set();
-  for (const file of HOOK_SCRIPTS) {
-    if (seenHooks.has(file)) continue;
-    seenHooks.add(file);
-    const src = resolvePackagedRuntimeFile(`hooks/${file}`);
-    if (!src) continue;
-    noteRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", file));
+  {
+    const src = resolvePackagedRuntimeFile(`hooks/${HOOK_SCRIPT}`);
+    if (src) noteRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", HOOK_SCRIPT));
   }
 
   for (const file of SCRIPT_FILES) {
@@ -785,10 +815,6 @@ async function deployRuntimeFiles() {
     noteTextFile(join(FLITTERBOT_DIR, "source-root"), PROJECT_ROOT + "\n");
   }
 
-  for (const obsolete of OBSOLETE_RUNTIME_FILES) {
-    noteRemovedRuntimeFile(join(FLITTERBOT_DIR, obsolete));
-  }
-
   if (!RUNTIME_CHANGES) {
     info("Runtime files already up to date.");
   } else {
@@ -804,13 +830,9 @@ async function deployRuntimeFiles() {
           copyRuntimeFile(src, join(FLITTERBOT_DIR, file), 0o755);
         }
 
-        const seenCopy = new Set();
-        for (const file of HOOK_SCRIPTS) {
-          if (seenCopy.has(file)) continue;
-          seenCopy.add(file);
-          const src = resolvePackagedRuntimeFile(`hooks/${file}`);
-          if (!src) continue;
-          copyRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", file), 0o755);
+        {
+          const src = resolvePackagedRuntimeFile(`hooks/${HOOK_SCRIPT}`);
+          if (src) copyRuntimeFile(src, join(FLITTERBOT_DIR, "hooks", HOOK_SCRIPT), 0o755);
         }
 
         for (const file of SCRIPT_FILES) {
@@ -853,10 +875,6 @@ async function deployRuntimeFiles() {
 
         if (PROJECT_ROOT) {
           writeRuntimeFile(join(FLITTERBOT_DIR, "source-root"), PROJECT_ROOT + "\n", 0o644);
-        }
-
-        for (const obsolete of OBSOLETE_RUNTIME_FILES) {
-          rmSync(join(FLITTERBOT_DIR, obsolete), { force: true, recursive: true });
         }
       }
     } else {
@@ -916,9 +934,8 @@ async function installHooks() {
 
   // Install/update current hook events
   const modifications = [];
-  for (let idx = 0; idx < HOOK_EVENTS.length; idx++) {
-    const event = HOOK_EVENTS[idx];
-    const hookCmd = HOOK_COMMANDS[idx];
+  for (const { event, arg } of HOOKS) {
+    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg}`;
     const desiredGroup = {
       matcher: "",
       hooks: [{ type: "command", command: hookCmd, async: true, timeout: 15 }],

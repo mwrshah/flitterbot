@@ -3,14 +3,19 @@
 Long-running orchestration runtime for Claude Code. Architecture and design in [`features/overview.md`](features/overview.md).
 
 ## Quick start
-
 ```bash
-pnpm install && pnpm --dir web install       # 1. dependencies
-cp .env.example .env                          # 2. configure (see below)
-node .flitterbot/install.mjs                    # 3. deploy runtime
-~/.flitterbot/bin/flitterbot-up start             # 4. start control surface
-~/.flitterbot/bin/flitterbot-wa auth              # 5. optional: WhatsApp
-pnpm --dir web dev                            # 6. optional: web UI
+    # 1. dependencies
+pnpm install && pnpm --dir web install
+    # 2. configure (see below)
+cp .env.example .env
+    # 3. deploy runtime
+node .flitterbot/install.mjs
+    # 4. start control surface
+~/.flitterbot/bin/flitterbot-up start
+    # 5. optional: WhatsApp
+~/.flitterbot/bin/flitterbot-wa auth
+    # 6. optional: web UI
+pnpm --dir web dev
 ```
 
 Stop: `~/.flitterbot/bin/flitterbot-up stop` — Disable permanently: `node ~/.flitterbot/uninstall.mjs`
@@ -41,10 +46,19 @@ The installer (step 3 in quickstart) deploys to `~/.flitterbot/`, writes `web/.e
 ```bash
 ~/.flitterbot/bin/flitterbot-up start | status | stop | restart
 ~/.flitterbot/bin/flitterbot-wa start | status | stop | auth
-pnpm --dir web dev                            # http://127.0.0.1:3188
-node ~/.flitterbot/uninstall.mjs                # remove hooks + scheduler
-node ~/.flitterbot/uninstall.mjs --meta         # also remove ~/.flitterbot/
-pnpm run control-surface                      # run from source
+
+# http://127.0.0.1:3188
+pnpm --dir web dev
+
+# remove hooks + scheduler
+node ~/.flitterbot/uninstall.mjs
+
+# also remove ~/.flitterbot/
+node ~/.flitterbot/uninstall.mjs --meta
+
+# run from source
+pnpm run control-surface
+
 pnpm run audit | audit:ts | audit:shell
 ```
 
