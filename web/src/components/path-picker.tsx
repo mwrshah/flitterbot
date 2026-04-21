@@ -15,7 +15,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
 
 function dirFromPath(path: string, name: string): string {
-  // Strip trailing slash for directory entries (e.g. "features/" -> "features")
+  // Strip trailing slash for directory entries (e.g. "docs/" -> "docs")
   const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
   if (cleanPath.endsWith(`/${name}`)) return cleanPath.slice(0, -(name.length + 1));
   if (cleanPath === name) return "";
