@@ -1,5 +1,6 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import {
   type ClipboardEvent,
@@ -16,8 +17,8 @@ import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
-import { directoryCompletionsQueryOptions } from "~/lib/queries";
-import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
+import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
+import type { DirectoryCompletionItem, ImageAttachment } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 /** Module-level store: persists draft text per route across navigations. */
@@ -30,7 +31,6 @@ type MessageInputProps = {
   pendingImages: ImageAttachment[];
   onAddImages: (files: FileList | File[]) => void;
   onRemoveImage: (index: number) => void;
-  skills?: SkillListItem[];
   placeholder?: string;
   rows?: number;
   helpText?: string;
@@ -44,13 +44,14 @@ type MessageInputProps = {
   showModelSelector?: boolean;
 };
 
+const rootRouteApi = getRouteApi("__root__");
+
 export const MessageInput = memo(function MessageInput({
   isSending,
   onSubmit,
   pendingImages,
   onAddImages,
   onRemoveImage,
-  skills,
   placeholder = "Message streams...",
   rows = 2,
   helpText = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
@@ -60,7 +61,12 @@ export const MessageInput = memo(function MessageInput({
   draftKey,
   showModelSelector = true,
 }: MessageInputProps) {
-  useWhyDidYouRender("MessageInput", { isSending, pendingImages, skills, placeholder });
+  useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
+  // Skills list (built-in commands + server skills) comes pre-merged from
+  // skillsQueryOptions and is prefetched in the root loader, so this read is
+  // synchronous on first render after app boot.
+  const { apiClient } = rootRouteApi.useRouteContext();
+  const { data: skills } = useQuery(skillsQueryOptions(apiClient));
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
@@ -20,7 +20,6 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
-import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -74,16 +73,7 @@ export function ChatPanel({
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
-  const { data: skillsData } = useQuery({
-    queryKey: ["skills"],
-    queryFn: () => apiClient.listSkills(),
-    staleTime: 5 * 60 * 1000,
-  });
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
-  const pickerItems = useMemo(
-    () => [...INTERNAL_COMMANDS, ...(skillsData?.items ?? [])],
-    [skillsData],
-  );
   const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
@@ -380,7 +370,6 @@ export function ChatPanel({
             pendingImages={pendingImages}
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
-            skills={pickerItems}
             placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
             fillHeight
             autoFocus

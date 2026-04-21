@@ -12,7 +12,7 @@ import { useGlobalShortcuts } from "~/hooks/use-global-shortcuts";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { FlitterbotApiClient } from "~/lib/api";
-import { statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
+import { skillsQueryOptions, statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
 import type { StatusResponse } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
@@ -35,6 +35,9 @@ export const Route = createRootRouteWithContext<{
     await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient.ensureQueryData(userConfigQueryOptions()).catch(() => ({})),
+      // Warm the `/`-picker skills list once at app boot. Cwd-independent, 5min
+      // staleTime — every MessageInput reads from this cache instantly.
+      context.queryClient.ensureQueryData(skillsQueryOptions(context.apiClient)).catch(() => []),
     ]);
   },
   head: () => ({

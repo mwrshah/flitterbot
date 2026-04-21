@@ -21,7 +21,6 @@ import { SettingsDrawer } from "~/components/settings-drawer";
 
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
   ChatTimelineItem,
@@ -585,7 +584,7 @@ const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
 
 export function Surface() {
-  const { apiClient, sendMessage } = rootApi.useRouteContext();
+  const { sendMessage } = rootApi.useRouteContext();
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -600,16 +599,6 @@ export function Surface() {
   const invalidateMeasurement = useCallback(() => setMeasurementToken((t) => t + 1), []);
 
   const [isSending, setIsSending] = useState(false);
-  const { data: skillsData } = useQuery({
-    queryKey: ["skills"],
-    queryFn: () => apiClient.listSkills(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-  const pickerItems = useMemo(
-    () => [...INTERNAL_COMMANDS, ...(skillsData?.items ?? [])],
-    [skillsData],
-  );
 
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
@@ -926,7 +915,6 @@ export function Surface() {
             pendingImages={pendingImages}
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
-            skills={pickerItems}
             placeholder="Message streams..."
             fillHeight
             autoFocus

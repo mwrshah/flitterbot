@@ -1,6 +1,12 @@
 import { keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
-import type { ChatTimelineItem, DownstreamSessionItem, StatusResponse } from "~/lib/types";
+import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
+import type {
+  ChatTimelineItem,
+  DownstreamSessionItem,
+  SkillListItem,
+  StatusResponse,
+} from "~/lib/types";
 import {
   type DirectoryCompletionsResult,
   fetchDirectoryCompletions,
@@ -154,6 +160,26 @@ export function surfaceTimelineQueryOptions() {
       (await fetchStreamsInputHistory()) as ChatTimelineItem[],
     staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
     structuralSharing: mergeTimelineItems,
+  };
+}
+
+/**
+ * Skills list for the `/`-trigger picker. Merges built-in slash commands
+ * (INTERNAL_COMMANDS: /clear, /reload) with server-provided skills so callers
+ * receive the final picker list straight from cache.
+ *
+ * Prefetched in the root loader — cwd-independent, so one app-boot fetch warms
+ * every downstream MessageInput.
+ */
+export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
+  return {
+    queryKey: ["skills"] as const,
+    queryFn: async (): Promise<SkillListItem[]> => {
+      const res = await apiClient.listSkills();
+      return [...INTERNAL_COMMANDS, ...res.items];
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   };
 }
 
