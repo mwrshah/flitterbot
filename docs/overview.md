@@ -146,6 +146,8 @@ Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (
 
 Runtime tree: hook dispatcher (`hook-post.mjs`), process manager (`flitterbot-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`flitterbot-wa`), cron script, shared shell utilities.
 
+Frozen vs live: the runtime tree under `~/.flitterbot/` is a *copy* of the repo files (`bin/`, `scripts/`, `hooks/`, `whatsapp/` non-server code, scheduler plist) — edits to these in the repo require re-running `installer/install.mjs` to propagate. The control surface server itself runs *live* from the repo via `.controlSurfaceCommand` in `~/.flitterbot/config.json` (seeded at install to `node --experimental-strip-types <repo>/src/server.ts`), so edits under `src/**` take effect on the next `flitterbot-up restart` without reinstalling.
+
 ## Source Organization
 
 Domain-organized, max 2-level nesting (`src/domain/file.ts`):
