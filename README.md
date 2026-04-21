@@ -68,7 +68,7 @@ If `--with-scheduler` was used, `flitterbot-up stop` is still permanent — the 
 
 `src/server.ts`, `src/runtime.ts` — HTTP server and runtime orchestrator. `src/pi/**` — Pi agent lifecycle, turn queue, session state. `src/routes/**` — one file per HTTP endpoint. `src/classifier/**` — Groq-based message routing. `src/blackboard/**` — SQLite layer. `src/claude-sessions/**` — tmux / Claude integration. `src/whatsapp/**` — WhatsApp daemon / CLI / IPC. `src/contracts/**` — shared API and runtime contracts. `src/custom-tools/**` — worktree, session, workstream tools. `web/**` — browser client. `features/**` — architecture and spec docs.
 
-Installed runtime (`~/.flitterbot/`): `config.json`, `blackboard.db`, `logs/`, `bin/`, `hooks/`, `scripts/`, `cron/`, `whatsapp/`.
+Installed runtime (`~/.flitterbot/`): `config.json`, `blackboard.db`, `logs/`, `bin/`, `hooks/`, `scripts/`, `scheduler/`, `whatsapp/`.
 
 `projectRoot` / `sourceRoot` = this checkout, not the working directory for Claude sessions. Only sessions with `FLITTERBOT_AGENT_MANAGED=1` are tracked — set automatically by `launch_claude_code`, or manually with `FLITTERBOT_AGENT_MANAGED=1 claude`. Hook errors log to `~/.flitterbot/logs/hooks-errors.log`; silently skip when control surface is down.
 

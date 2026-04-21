@@ -177,7 +177,7 @@ src/
 | 3 | [Control Surface](control-surface/FEATURE.md) | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
 | 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
 | 5 | [Web App](web-app/FEATURE.md) | Browser client: Input Surface (activity feed), Pi chat with downstream sessions panel, runtime controls |
-| 6 | [Cron Scheduler](cron-scheduler/FEATURE.md) | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
+| 6 | [Cron Scheduler](scheduler/FEATURE.md) | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
 | 7 | [Pi Agent](pi-agent/FEATURE.md) | Multi-agent Pi layer: default triage + per-workstream orchestrators with role-gated custom tools |
 | 8 | [WebSocket Filtering](ws-subscription-filtering/FEATURE.md) | Per-client session subscriptions with server-side broadcast filtering |
 | 9 | [Restructure src/](restructure-src/FEATURE.md) | Domain-organized codebase with max 2-level nesting, prefix conventions, barrel exports |

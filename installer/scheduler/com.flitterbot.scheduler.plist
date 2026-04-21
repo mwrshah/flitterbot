@@ -7,14 +7,14 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>__FLITTERBOT_DIR__/cron/flitterbot-checkin.sh</string>
+    <string>__FLITTERBOT_DIR__/scheduler/flitterbot-checkin.sh</string>
   </array>
   <key>StartInterval</key>
   <integer>600</integer>
   <key>StandardOutPath</key>
-  <string>__FLITTERBOT_DIR__/logs/cron.log</string>
+  <string>__FLITTERBOT_DIR__/logs/scheduler.log</string>
   <key>StandardErrorPath</key>
-  <string>__FLITTERBOT_DIR__/logs/cron.log</string>
+  <string>__FLITTERBOT_DIR__/logs/scheduler.log</string>
   <key>WorkingDirectory</key>
   <string>__HOME__</string>
   <key>RunAtLoad</key>

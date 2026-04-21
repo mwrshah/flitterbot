@@ -69,7 +69,7 @@ const HOOKS = [
 
 const SCRIPT_FILES = ["runtime-common.sh"];
 const SOURCE_FILES = ["blackboard/schema.sql"];
-const CRON_FILES = ["flitterbot-checkin.sh", "scheduler.sh", "com.flitterbot.scheduler.plist"];
+const SCHEDULER_FILES = ["flitterbot-checkin.sh", "com.flitterbot.scheduler.plist"];
 const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
 const WHATSAPP_FILES = ["README.md", "config.json.example"];
 const WHATSAPP_EXEC_FILES = ["run-entry.js", "cli.js", "daemon.js"];
@@ -353,7 +353,7 @@ After=default.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash ${FLITTERBOT_DIR}/cron/flitterbot-checkin.sh
+ExecStart=/bin/bash ${FLITTERBOT_DIR}/scheduler/flitterbot-checkin.sh
 WorkingDirectory=${HOME}
 `;
 }
@@ -415,7 +415,7 @@ function prepareDirectories() {
   const dirs = [
     FLITTERBOT_DIR,
     join(FLITTERBOT_DIR, "bin"),
-    ...(INSTALL_SCHEDULER ? [join(FLITTERBOT_DIR, "cron")] : []),
+    ...(INSTALL_SCHEDULER ? [join(FLITTERBOT_DIR, "scheduler")] : []),
     join(FLITTERBOT_DIR, "control-surface"),
     join(FLITTERBOT_DIR, "hooks"),
     join(FLITTERBOT_DIR, "logs"),
@@ -779,10 +779,10 @@ async function deployRuntimeFiles() {
   }
 
   if (INSTALL_SCHEDULER) {
-    for (const file of CRON_FILES) {
-      const src = resolvePackagedRuntimeFile(`cron/${file}`);
+    for (const file of SCHEDULER_FILES) {
+      const src = resolvePackagedRuntimeFile(`scheduler/${file}`);
       if (!src) continue;
-      noteRuntimeFile(src, join(FLITTERBOT_DIR, "cron", file));
+      noteRuntimeFile(src, join(FLITTERBOT_DIR, "scheduler", file));
     }
   }
 
@@ -841,10 +841,10 @@ async function deployRuntimeFiles() {
         }
 
         if (INSTALL_SCHEDULER) {
-          for (const file of CRON_FILES) {
-            const src = resolvePackagedRuntimeFile(`cron/${file}`);
+          for (const file of SCHEDULER_FILES) {
+            const src = resolvePackagedRuntimeFile(`scheduler/${file}`);
             if (!src) continue;
-            copyRuntimeFile(src, join(FLITTERBOT_DIR, "cron", file), 0o755);
+            copyRuntimeFile(src, join(FLITTERBOT_DIR, "scheduler", file), 0o755);
           }
         }
 
@@ -1001,7 +1001,7 @@ async function installHooks() {
 async function installLaunchd() {
   if (CURRENT_OS !== "Darwin") return;
 
-  const plistSrc = join(SCRIPT_DIR, "cron", "com.flitterbot.scheduler.plist");
+  const plistSrc = join(SCRIPT_DIR, "scheduler", "com.flitterbot.scheduler.plist");
   if (!existsSync(plistSrc)) { warn(`Missing plist template: ${plistSrc}`); return; }
 
   let plistContent = readFileSync(plistSrc, "utf8");

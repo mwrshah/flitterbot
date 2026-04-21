@@ -35,7 +35,7 @@ Goal: minimize rework, maximize safe parallel execution, reach usable state fast
 
 ### Deferred
 
-- **Cron Scheduler** — `features/cron-scheduler/FEATURE.md`  Deferred to post-v1. Will be implemented once Pi has orchestration prompts worth running on a schedule.
+- **Cron Scheduler** — `features/scheduler/FEATURE.md`  Deferred to post-v1. Will be implemented once Pi has orchestration prompts worth running on a schedule.
 
 ---
 
