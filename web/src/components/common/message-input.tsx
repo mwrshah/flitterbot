@@ -1,5 +1,5 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import {
   type ClipboardEvent,
@@ -19,9 +19,6 @@ import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions } from "~/lib/queries";
 import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import type { DirectoryCompletionsResult } from "~/server/directory-completions";
-
-const EMPTY_RESULT: DirectoryCompletionsResult = { items: [], cwd: "", query: "" };
 
 /** Module-level store: persists draft text per route across navigations. */
 const draftStore = new Map<string, string>();
@@ -107,30 +104,19 @@ export const MessageInput = memo(function MessageInput({
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
-  const [activeSearchQuery, setActiveSearchQuery] = useState("");
-  const { data: pathResult, isFetching: isPathFetching } = useQuery(
-    directoryCompletionsQueryOptions(activeSearchQuery, atPickerOpen, { streamId }),
+  // Query directory completions for the @-picker. `keepPreviousData` in the
+  // query options preserves the last list across refetches, so typing doesn't
+  // flicker to empty. Cache is keyed per (query, streamId).
+  const { data: pathResult } = useQuery(
+    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen, { streamId }),
   );
+
+  // Warm the cache for the empty query on mount so the first `@` has items
+  // ready without a loading flash. Re-runs when streamId changes.
+  const queryClient = useQueryClient();
   useEffect(() => {
-    if (!atPickerOpen) {
-      setActiveSearchQuery("");
-      return;
-    }
-    if (!isPathFetching && debouncedAtFilter !== activeSearchQuery) {
-      setActiveSearchQuery(debouncedAtFilter);
-    }
-  }, [activeSearchQuery, atPickerOpen, debouncedAtFilter, isPathFetching]);
-  const [settledPathData, setSettledPathData] = useState<DirectoryCompletionsResult>(EMPTY_RESULT);
-  useEffect(() => {
-    if (!atPickerOpen) {
-      setSettledPathData(EMPTY_RESULT);
-      return;
-    }
-    if (!isPathFetching && pathResult && pathResult.query === activeSearchQuery) {
-      setSettledPathData(pathResult);
-    }
-  }, [activeSearchQuery, atPickerOpen, isPathFetching, pathResult]);
-  const pathData = settledPathData;
+    queryClient.prefetchQuery(directoryCompletionsQueryOptions("", true, { streamId }));
+  }, [queryClient, streamId]);
 
   // Refs for stable useCallback closures
   const draftRef = useRef(draft);
@@ -554,8 +540,7 @@ export const MessageInput = memo(function MessageInput({
           />
           <PathPicker
             open={atPickerOpen}
-            items={pathData.items}
-            isFetching={isPathFetching}
+            items={pathResult?.items ?? []}
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}

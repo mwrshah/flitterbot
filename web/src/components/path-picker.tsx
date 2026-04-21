@@ -63,7 +63,6 @@ function smartMiddleTruncate(dir: string, availableWidth: number, font: string):
 type PathPickerProps = {
   open: boolean;
   items: DirectoryCompletionItem[];
-  isFetching: boolean;
   onSelect: (item: DirectoryCompletionItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
@@ -75,14 +74,13 @@ type PathPickerProps = {
 export const PathPicker = memo(function PathPicker({
   open,
   items,
-  isFetching,
   onSelect,
   caretLeft,
   commandRef,
   anchorRef,
   fuzzy,
 }: PathPickerProps) {
-  useWhyDidYouRender("PathPicker", { open, items, isFetching, caretLeft, fuzzy });
+  useWhyDidYouRender("PathPicker", { open, items, caretLeft, fuzzy });
   // shouldFilter={false} means cmdk won't auto-select on children change.
   // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
@@ -133,10 +131,7 @@ export const PathPicker = memo(function PathPicker({
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
-          {isFetching && items.length === 0 && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Loading...</div>
-          )}
-          {!isFetching && items.length === 0 && (
+          {items.length === 0 && (
             <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
               No matching paths
             </CommandEmpty>
