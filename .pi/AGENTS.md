@@ -1,1 +1,0 @@
-/Users/munawarshah/.claude/CLAUDE.macos.md
