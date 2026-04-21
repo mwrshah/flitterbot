@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionRuntime } from "@mariozechner/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,
@@ -22,8 +22,8 @@ import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 export { formatStreamPrompt };
 
 export interface ManagedPiSession {
-  /** Live SDK session. Null for dormant sessions rehydrated from DB on restart. */
-  session: AgentSession | null;
+  /** Live SDK runtime. Null for dormant sessions rehydrated from DB on restart. */
+  runtime: AgentSessionRuntime | null;
   queue: TurnQueue;
   state: PiSessionState;
   role: "default" | "orchestrator";
@@ -112,22 +112,19 @@ export class PiSessionManager {
       role: "default",
     });
 
+    const session = created.runtime.session;
     const state = new PiSessionState();
-    state.initialize(
-      created.session.sessionId,
-      created.session.sessionFile,
-      created.session.messages.length,
-    );
+    state.initialize(session.sessionId, session.sessionFile, session.messages.length);
 
     const managed = this.buildManagedSession(created, state, "default", null, null);
 
     upsertPiSession(this.blackboard, {
-      piSessionId: created.session.sessionId,
+      piSessionId: session.sessionId,
       role: "default",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
       pid: process.pid,
-      sessionFile: created.session.sessionFile,
+      sessionFile: session.sessionFile,
       cwd: this.config.projectsDir,
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: created.modelInfo.provider,
@@ -174,22 +171,19 @@ export class PiSessionManager {
       tmux2Enabled: this.config.tmux2Enabled,
     });
 
+    const session = created.runtime.session;
     const state = new PiSessionState();
-    state.initialize(
-      created.session.sessionId,
-      created.session.sessionFile,
-      created.session.messages.length,
-    );
+    state.initialize(session.sessionId, session.sessionFile, session.messages.length);
 
     const managed = this.buildManagedSession(created, state, "orchestrator", streamId, streamName);
 
     upsertPiSession(this.blackboard, {
-      piSessionId: created.session.sessionId,
+      piSessionId: session.sessionId,
       role: "orchestrator",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
       pid: process.pid,
-      sessionFile: created.session.sessionFile,
+      sessionFile: session.sessionFile,
       cwd: repoPath ?? this.config.projectsDir,
       agentDir: this.config.controlSurfaceAgentDir,
       modelProvider: created.modelInfo.provider,
@@ -235,7 +229,7 @@ export class PiSessionManager {
     const repoPath = stream?.repo_path ?? undefined;
 
     const managed: ManagedPiSession = {
-      session: null,
+      runtime: null,
       queue: null!,
       state,
       role: "orchestrator",
@@ -325,7 +319,7 @@ export class PiSessionManager {
    * message arrives for a rehydrated stream.
    */
   async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
-    if (managed.session) return; // already active
+    if (managed.runtime) return; // already active
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
 
     const snapshot = managed.state.getSnapshot();
@@ -347,10 +341,11 @@ export class PiSessionManager {
       tmux2Enabled: this.config.tmux2Enabled,
     });
 
-    managed.session = created.session;
+    const session = created.runtime.session;
+    managed.runtime = created.runtime;
     managed.modelInfo = created.modelInfo;
     managed.unsubscribe = subscribeToPiSession(
-      created.session,
+      session,
       managed.state,
       this.blackboard,
       this.wsHub,
@@ -365,11 +360,7 @@ export class PiSessionManager {
     );
 
     // Re-initialize state with actual message count from the resumed session
-    managed.state.initialize(
-      created.session.sessionId,
-      created.session.sessionFile,
-      created.session.messages.length,
-    );
+    managed.state.initialize(session.sessionId, session.sessionFile, session.messages.length);
 
     this.log(
       `activated dormant orchestrator for stream "${managed.streamName}" (${managed.streamId})`,
@@ -388,7 +379,8 @@ export class PiSessionManager {
       /* ignore */
     }
     try {
-      managed.session?.dispose?.();
+      // dispose() is async on AgentSessionRuntime — fire and forget in sync context
+      void managed.runtime?.dispose();
     } catch {
       /* ignore */
     }
@@ -412,13 +404,13 @@ export class PiSessionManager {
 
   /**
    * Reset the default session: end the old pi_session, call newSession() on
-   * the SDK AgentSession to clear messages and create a fresh session file,
-   * update all in-memory maps and DB rows, re-subscribe, and broadcast so
-   * the frontend picks up the new piSessionId.
+   * the SDK AgentSessionRuntime to tear down and recreate the session, update
+   * all in-memory maps and DB rows, re-subscribe, and broadcast so the frontend
+   * picks up the new piSessionId.
    */
   async resetDefault(): Promise<void> {
     const old = this.defaultSession;
-    if (!old || !old.session) {
+    if (!old || !old.runtime) {
       throw new Error("No active default session to reset");
     }
 
@@ -435,14 +427,16 @@ export class PiSessionManager {
     // 2. End the old pi_session in the DB
     endPiSession(this.blackboard, oldPiSessionId, "ended", "clear", new Date().toISOString());
 
-    // 3. Call newSession() on the AgentSession — clears messages, creates new session file
-    await old.session.newSession();
+    // 3. Call newSession() on the AgentSessionRuntime — tears down old session,
+    //    creates a new one via the stored factory
+    await old.runtime.newSession();
 
-    const newPiSessionId = old.session.sessionId;
-    const newSessionFile = old.session.sessionFile;
+    const newSession = old.runtime.session;
+    const newPiSessionId = newSession.sessionId;
+    const newSessionFile = newSession.sessionFile;
 
     // 4. Re-initialize state with the new session
-    old.state.initialize(newPiSessionId, newSessionFile, old.session.messages.length);
+    old.state.initialize(newPiSessionId, newSessionFile, newSession.messages.length);
 
     // 5. Update the managed session's piSessionId
     old.piSessionId = newPiSessionId;
@@ -508,9 +502,9 @@ export class PiSessionManager {
       },
     });
 
-    // 9. Re-subscribe to SDK events
+    // 9. Re-subscribe to SDK events on the new session
     old.unsubscribe = subscribeToPiSession(
-      old.session,
+      newSession,
       old.state,
       this.blackboard,
       this.wsHub,
@@ -553,7 +547,7 @@ export class PiSessionManager {
         new Date().toISOString(),
       );
       try {
-        this.defaultSession.session?.dispose?.();
+        void this.defaultSession.runtime?.dispose();
       } catch {
         /* ignore */
       }
@@ -594,7 +588,7 @@ export class PiSessionManager {
 
   private buildManagedSession(
     created: {
-      session: AgentSession;
+      runtime: AgentSessionRuntime;
       modelInfo: {
         provider: string;
         id: string;
@@ -607,16 +601,17 @@ export class PiSessionManager {
     streamId: string | null,
     streamName: string | null,
   ): ManagedPiSession {
+    const session = created.runtime.session;
     // Circular init: queue callback closes over `managed`, so the object must exist first.
     // null! signals deferred initialization — both fields are set immediately below.
     const managed: ManagedPiSession = {
-      session: created.session,
+      runtime: created.runtime,
       queue: null!,
       state,
       role,
       streamId,
       streamName,
-      piSessionId: created.session.sessionId,
+      piSessionId: session.sessionId,
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
       unsubscribe: null!,
@@ -670,7 +665,7 @@ export class PiSessionManager {
     });
 
     managed.unsubscribe = subscribeToPiSession(
-      created.session,
+      session,
       state,
       this.blackboard,
       this.wsHub,

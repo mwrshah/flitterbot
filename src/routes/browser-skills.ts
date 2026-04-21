@@ -9,10 +9,11 @@ export function handleBrowserSkillsRoute(
   res: http.ServerResponse,
 ) {
   const defaultPi = runtime.sessionManager.getDefault();
-  if (!defaultPi?.session) {
+  const session = defaultPi?.runtime?.session;
+  if (!session) {
     return sendJson(res, 503, { ok: false, error: "Pi session not ready" });
   }
-  const { skills } = defaultPi.session.resourceLoader.getSkills();
+  const { skills } = session.resourceLoader.getSkills();
   const items = skills.map((s: Skill) => ({
     name: s.name,
     description: s.description,

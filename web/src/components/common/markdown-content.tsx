@@ -23,6 +23,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
   return (
     <div
       className="markdown-body text-sm text-foreground break-words"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: rendering marked-parsed markdown
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

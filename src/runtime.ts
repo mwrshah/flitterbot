@@ -286,7 +286,7 @@ export class ControlSurfaceRuntime {
       this.log(`/reload: reloading session ${managed?.piSessionId ?? "<none>"}`);
       void (async () => {
         try {
-          await managed?.session?.reload();
+          await managed?.runtime?.session?.reload();
           this.wsHub.broadcast({ type: "resources_reloaded" });
         } catch (error) {
           this.log(`/reload failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -359,9 +359,9 @@ export class ControlSurfaceRuntime {
     // streamingBehavior: "steer". The SDK handles both streaming and non-streaming states.
     // Skip for dormant sessions (no live SDK agent) — the message will go through the queue
     // and trigger lazy activation instead.
-    if (item.deliveryMode === "steer" && target.queue.isBusy() && target.session) {
+    if (item.deliveryMode === "steer" && target.queue.isBusy() && target.runtime?.session) {
       this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`);
-      void target.session.prompt(formatPromptWithContext(item), {
+      void target.runtime.session.prompt(formatPromptWithContext(item), {
         streamingBehavior: "steer",
         images: item.images,
       });
@@ -584,7 +584,7 @@ export class ControlSurfaceRuntime {
         piSessionId: o.piSessionId,
         streamId: o.streamId!,
         streamName: o.streamName,
-        messageCount: o.session?.messages?.length ?? snap.messageCount,
+        messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
         busy: snap.busy,
       };
     });
@@ -610,7 +610,7 @@ export class ControlSurfaceRuntime {
           ? {
               piSessionId: defSnapshot.piSessionId!,
               sessionFile: defSnapshot.sessionFile ?? null,
-              messageCount: def!.session?.messages?.length ?? defSnapshot.messageCount,
+              messageCount: def!.runtime?.session?.messages?.length ?? defSnapshot.messageCount,
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
               busy: defSnapshot.busy,
             }
@@ -780,7 +780,7 @@ export class ControlSurfaceRuntime {
    */
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
     // Lazily activate dormant orchestrators on first message after restart
-    if (!managed.session && managed.role === "orchestrator" && managed.streamId) {
+    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
       this.log(`activating dormant orchestrator for stream ${managed.streamId}`);
       await this.sessionManager.activateOrchestrator(
         managed,
@@ -788,7 +788,7 @@ export class ControlSurfaceRuntime {
       );
     }
 
-    const session = managed.session;
+    const session = managed.runtime?.session;
     if (!session) throw new Error("pi session not initialized");
 
     const piSessionId = session.sessionId;
@@ -1055,7 +1055,7 @@ export class ControlSurfaceRuntime {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) throw new Error("Pi session not found");
 
-    if (!managed.session) {
+    if (!managed.runtime) {
       if (managed.role === "orchestrator" && managed.streamId) {
         this.log(`activating dormant orchestrator for prune stream=${managed.streamId}`);
         await this.sessionManager.activateOrchestrator(
@@ -1067,7 +1067,7 @@ export class ControlSurfaceRuntime {
       }
     }
 
-    const session = managed.session;
+    const session = managed.runtime?.session;
     if (!session) throw new Error("Pi session failed to activate");
 
     const sessionManager = session.sessionManager;
@@ -1225,12 +1225,7 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(originalText)) {
                       relevantTexts.push(originalText);
                     }
-                    prompt = formatStreamPrompt(
-                      relevantTexts,
-                      ws.name,
-                      ws.id,
-                      agentMessage,
-                    );
+                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );

@@ -1,4 +1,4 @@
-export { createFlitterbotAgent } from "./create-agent.ts";
+export { type CreateFlitterbotAgentResult, createFlitterbotAgent } from "./create-agent.ts";
 export { formatPromptWithContext } from "./format-prompt.ts";
 export { readStreamsHistory, readStreamsHistoryFromSession } from "./history.ts";
 export {

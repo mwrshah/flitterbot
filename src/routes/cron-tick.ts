@@ -47,7 +47,7 @@ export function handleCronTickRoute(
   }
 
   // Gate 3: Pi not ended/crashed
-  if (!defaultPi.session) {
+  if (!defaultPi.runtime?.session) {
     return skip(res, "pi_ended");
   }
 

@@ -23,10 +23,11 @@ async function readSessionHistory(
   // Prefer the live SessionManager when the session is active — getBranch()
   // returns entries on the current leaf's path, so pruned branches are
   // correctly excluded.
-  if (managed.session && managed.session.sessionId === snapshot.piSessionId) {
+  const session = managed.runtime?.session;
+  if (session && session.sessionId === snapshot.piSessionId) {
     const body = readStreamsHistoryFromSession(
       snapshot.piSessionId,
-      managed.session.sessionManager,
+      session.sessionManager,
       historyMode,
     );
     if (body.items.length > 0 || !snapshot.sessionFile) {

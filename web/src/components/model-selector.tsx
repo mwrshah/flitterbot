@@ -28,7 +28,10 @@ export type ModelSelectorProps = {
  * Selecting a model sets it as the server-side default; `defaultModel` from
  * the models query is the single source of truth.
  */
-export const ModelSelector = memo(function ModelSelector({ compact, disabled }: ModelSelectorProps) {
+export const ModelSelector = memo(function ModelSelector({
+  compact,
+  disabled,
+}: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
   const { data } = useQuery({
     queryKey: MODELS_QUERY_KEY,

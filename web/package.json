@@ -46,5 +46,10 @@
     "typescript": "^5.7.2",
     "vite": "^7.3.2",
     "vite-tsconfig-paths": "^5.1.4"
+  },
+  "knip": {
+    "ignoreDependencies": ["tailwindcss", "@fontsource-variable/geist", "shadcn", "tw-animate-css"],
+    "entry": ["src/router.tsx", "src/routes/__root.tsx"],
+    "project": ["src/**/*.{ts,tsx}"]
   }
 }

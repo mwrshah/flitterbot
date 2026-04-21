@@ -4,10 +4,12 @@ import path from "node:path";
 import { getModel } from "@mariozechner/pi-ai";
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import {
+  type AgentSessionRuntime,
   AuthStorage,
-  createAgentSession,
-  createCodingTools,
-  DefaultResourceLoader,
+  type CreateAgentSessionRuntimeFactory,
+  createAgentSessionFromServices,
+  createAgentSessionRuntime,
+  createAgentSessionServices,
   ModelRegistry,
   SessionManager,
   SettingsManager,
@@ -47,7 +49,24 @@ type CreateFlitterbotAgentOptions = {
   tmux2Enabled?: boolean;
 };
 
-export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
+export type CreateFlitterbotAgentResult = {
+  runtime: AgentSessionRuntime;
+  modelInfo: {
+    provider: string;
+    id: string;
+    entryId: string;
+    thinkingLevel: ThinkingLevel;
+  };
+  resourceInfo: {
+    skillNames: string[];
+    agentsFilePaths: string[];
+    skillMessages: string[];
+  };
+};
+
+export async function createFlitterbotAgent(
+  options: CreateFlitterbotAgentOptions,
+): Promise<CreateFlitterbotAgentResult> {
   const {
     config,
     customTools,
@@ -63,20 +82,12 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   const sessionManager = resumeSessionFile
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
-  const piSessionId = sessionManager.getSessionId();
 
-  const systemPrompt = resolveSystemPrompt(
-    role,
-    piSessionId,
-    workingDir,
-    orchestratorContext,
-    config.projectsDir,
-    options.tmux2Enabled ?? false,
-  );
   // Mutable ref so the systemPromptOverride closure always reads the final prompt.
   // Each agent gets its own ref — no shared file read — which fixes the
   // concurrent-orchestrator race condition.
-  const promptRef = { value: systemPrompt };
+  // Updated inside the factory on each session creation to keep the piSessionId in sync.
+  const promptRef = { value: "" };
 
   // Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
   const piAuthPath = path.join(HOME, ".pi", "agent", "auth.json");
@@ -118,16 +129,65 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     ...extraSkillPaths,
   ];
 
-  const resourceLoader = new DefaultResourceLoader({
+  const modelEntry = resolveModelEntry(config, options.modelId);
+  const model = getModel(
+    modelEntry.provider as Parameters<typeof getModel>[0],
+    modelEntry.modelId as Parameters<typeof getModel>[1],
+  );
+  if (!model) {
+    throw new Error(
+      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
+    );
+  }
+  const effectiveThinkingLevel: ThinkingLevel = modelEntry.thinkingLevel ?? config.piThinkingLevel;
+
+  // Build the factory that createAgentSessionRuntime stores and reuses for newSession().
+  // Closes over config-derived values (auth, model, tools, prompts); receives per-session
+  // cwd/agentDir/sessionManager from the runtime.
+  const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
+    // Update the system prompt with the current session's piSessionId
+    const factoryPiSessionId = factoryOpts.sessionManager.getSessionId();
+    promptRef.value = resolveSystemPrompt(
+      role,
+      factoryPiSessionId,
+      factoryOpts.cwd,
+      orchestratorContext,
+      config.projectsDir,
+      options.tmux2Enabled ?? false,
+    );
+
+    const services = await createAgentSessionServices({
+      cwd: factoryOpts.cwd,
+      agentDir: factoryOpts.agentDir,
+      authStorage,
+      settingsManager,
+      modelRegistry,
+      resourceLoaderOptions: {
+        additionalSkillPaths,
+        systemPromptOverride: () => promptRef.value,
+      },
+    });
+
+    const result = await createAgentSessionFromServices({
+      services,
+      sessionManager: factoryOpts.sessionManager,
+      sessionStartEvent: factoryOpts.sessionStartEvent,
+      model,
+      thinkingLevel: effectiveThinkingLevel,
+      customTools: customTools as ToolDefinition[],
+    });
+
+    return { ...result, services, diagnostics: services.diagnostics };
+  };
+
+  const runtime = await createAgentSessionRuntime(runtimeFactory, {
     cwd: workingDir,
     agentDir,
-    settingsManager,
-    additionalSkillPaths,
-    systemPromptOverride: () => promptRef.value,
+    sessionManager,
   });
-  await resourceLoader.reload();
 
-  // Collect resource info for startup logging
+  // Collect resource info for startup logging from the runtime's resource loader
+  const resourceLoader = runtime.services.resourceLoader;
   const { skills, diagnostics: skillDiagnostics } = resourceLoader.getSkills();
   const { agentsFiles } = resourceLoader.getAgentsFiles();
   const skillNames = skills.map((s) => s.name);
@@ -146,34 +206,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     }
   }
 
-  const modelEntry = resolveModelEntry(config, options.modelId);
-  const model = getModel(
-    modelEntry.provider as Parameters<typeof getModel>[0],
-    modelEntry.modelId as Parameters<typeof getModel>[1],
-  );
-  if (!model) {
-    throw new Error(
-      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
-    );
-  }
-  const effectiveThinkingLevel: ThinkingLevel = modelEntry.thinkingLevel ?? config.piThinkingLevel;
-
-  const created = await createAgentSession({
-    cwd: workingDir,
-    agentDir,
-    model,
-    thinkingLevel: effectiveThinkingLevel,
-    tools: createCodingTools(workingDir),
-    customTools: customTools as ToolDefinition[],
-    resourceLoader,
-    sessionManager,
-    settingsManager,
-    authStorage,
-    modelRegistry,
-  });
-
   return {
-    ...created,
+    runtime,
     modelInfo: {
       provider: model.provider,
       id: model.id,

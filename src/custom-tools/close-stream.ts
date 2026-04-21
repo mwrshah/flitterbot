@@ -286,8 +286,7 @@ export async function executeCloseStream(
           return {
             ok: false,
             streamId,
-            message:
-              mergeResult.message + `. Resolve conflicts there, then call close_stream again.`,
+            message: `${mergeResult.message}. Resolve conflicts there, then call close_stream again.`,
             conflicts: mergeResult.conflicts,
           };
         }

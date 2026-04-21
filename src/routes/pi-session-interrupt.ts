@@ -23,15 +23,16 @@ export async function handlePiSessionInterruptRoute(
 
   // Abort the current in-flight streams turn; the queue pump will pick up the next item naturally
   let bashAborted = false;
-  if (managed.session) {
+  const session = managed.runtime?.session;
+  if (session) {
     try {
-      managed.session.abort?.();
+      session.abort?.();
     } catch {
       // Non-fatal — continue to bash abort and CC signals
     }
     try {
-      if (managed.session.isBashRunning) {
-        managed.session.abortBash?.();
+      if (session.isBashRunning) {
+        session.abortBash?.();
         bashAborted = true;
       }
     } catch {
