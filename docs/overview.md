@@ -19,13 +19,15 @@ Each Pi session has its own FIFO turn queue; all agents process concurrently.
 
 ### Workstream Lifecycle
 
-Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator, and automatically passes through the original user message. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, closes the row. The worktree is left on disk. The runtime detects the `close_workstream` result and destroys the orchestrator.
+Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator, and automatically passes through the original user message. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, closes the row. The worktree is left on disk — cleanup cron for stale worktrees (e.g. from force-recreated or repo-switched streams) is not yet implemented. The runtime detects the `close_workstream` result and destroys the orchestrator.
 
 Soft-deleted: `status` flips to `closed` with `closed_at`. Recently closed workstreams (24h) stored for status reporting and reopening via API.
 
 ### Claude Code Feedback Loop
 
 Hook scripts POST lifecycle events (`session-start`, `stop`, `session-end`) to the control surface. `session-start` registers the session in SQLite with Pi/workstream linkage. `stop` uses Claude Code's native `last_assistant_message` from the stop payload and enqueues it back to the owning Pi — closing the Pi → CC → Pi loop. `stop` also transitions the session to `idle`. `session-end` marks the session `ended`.
+
+Only sessions with `FLITTERBOT_AGENT_MANAGED=1` are tracked — set automatically by `launch_claude_code`, or manually via `FLITTERBOT_AGENT_MANAGED=1 claude`. Hook errors log to `~/.flitterbot/logs/hooks-errors.log`; hooks silently skip when the control surface is down. `projectRoot` / `sourceRoot` in the runtime refer to this checkout, not the working directory of a managed Claude Code session.
 
 ### Output Surfacing
 
@@ -142,9 +144,13 @@ Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), pa
 
 ### Installer
 
-Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (`node:*` only). Deploys `~/.flitterbot/`, bootstraps config, installs Claude Code hooks in `~/.claude/settings.json`, optionally installs OS scheduler. Every change manifest-tracked (SHA-256 checksums, drift detection). Each step shows diff, requires confirmation.
+Two standalone ESM scripts (`install.mjs`, `uninstall.mjs`), zero dependencies (`node:*` only). Deploys `~/.flitterbot/`, bootstraps config, installs Claude Code hooks in `~/.claude/settings.json`, optionally installs OS scheduler (`--with-scheduler`). Every change manifest-tracked (SHA-256 checksums, drift detection). Each step shows diff, requires confirmation.
 
-Runtime tree: hook dispatcher (`hook-post.mjs`), process manager (`flitterbot-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`flitterbot-wa`), cron script, shared shell utilities.
+Installed tree under `~/.flitterbot/`: `config.json`, `blackboard.db`, `logs/`, `bin/`, `hooks/`, `scripts/`, `scheduler/`, `whatsapp/`.
+
+Runtime scripts: hook dispatcher (`hook-post.mjs`), process manager (`flitterbot-up` — PID tracking, health checks, graceful shutdown cascade), WhatsApp CLI (`flitterbot-wa`), cron script, shared shell utilities.
+
+`flitterbot-up stop` is permanent even when `--with-scheduler` is installed — the scheduler only POSTs a tick to an already-running runtime and cannot start a stopped one. To remove the scheduler, run the uninstaller.
 
 ## Source Organization
 
