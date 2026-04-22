@@ -86,12 +86,17 @@ export const PathPicker = memo(function PathPicker({
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // When items change, reset selection to first item and scroll list to top
+  // Reset selection to first item and scroll list to top whenever the picker
+  // opens or the items set changes. The `open` dep is required: on reopen with
+  // an unchanged items reference (TanStack keepPreviousData), without it this
+  // effect wouldn't fire, leaving stale selectedValue pointing at an item that
+  // the fresh DOM scrolls out of view.
   useEffect(() => {
+    if (!open) return;
     setSelectedValue(items[0]?.path ?? "");
     const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
     if (list) list.scrollTop = 0;
-  }, [items]);
+  }, [open, items]);
 
   // On keyboard navigation, keep the selected item visible
   useEffect(() => {

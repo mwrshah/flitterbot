@@ -58,10 +58,25 @@ export const SkillPicker = memo(function SkillPicker({
   const pickerRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  // Reset selection to first item when filter changes
+  // Reset selection to first item and scroll list to top whenever the picker
+  // opens or the filtered set changes. Including `open` is required so that
+  // reopening the picker (which leaves this component mounted but rebuilds the
+  // DOM) re-syncs selection to the top of the fresh list.
   useEffect(() => {
+    if (!open) return;
     setSelectedValue(filtered[0]?.name ?? "");
-  }, [filter]);
+    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
+    if (list) list.scrollTop = 0;
+  }, [open, filtered]);
+
+  // Keep the selected item in view as the user keyboard-navigates.
+  useEffect(() => {
+    if (!selectedValue) return;
+    requestAnimationFrame(() => {
+      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
+      el?.scrollIntoView({ block: "nearest" });
+    });
+  }, [selectedValue]);
 
   const updatePosition = useCallback(() => {
     const anchor = anchorRef.current;
