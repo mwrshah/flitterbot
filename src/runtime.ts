@@ -94,6 +94,9 @@ type EnqueueInput = {
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   serverMessageId?: string;
+  /** Client-generated UUID threaded through to pi-subscribe so the user-role
+   *  `message_end` WS envelope can echo it back for optimistic UI reconcile. */
+  clientMessageId?: string;
 };
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
@@ -318,6 +321,7 @@ export class ControlSurfaceRuntime {
       deliveryMode: input.deliveryMode ?? "followUp",
       images: images?.length ? images : undefined,
       serverMessageId: messageUuid,
+      clientMessageId: input.clientMessageId,
     };
 
     try {
@@ -1884,6 +1888,8 @@ export class ControlSurfaceRuntime {
           deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
           images: Array.isArray(payload.images) ? payload.images : undefined,
           serverMessageId,
+          clientMessageId:
+            typeof payload.clientMessageId === "string" ? payload.clientMessageId : undefined,
         });
 
         // Mirror web user message to WhatsApp for complete conversation record.

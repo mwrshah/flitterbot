@@ -158,6 +158,14 @@ describe("coalesceUserItems", () => {
     expect(merged.metadata?.serverMessageId).toBe("sm-b");
   });
 
+  test("clientMessageId comes from the last item (matches most recent optimistic bubble)", () => {
+    const merged = coalesceUserItems([
+      mk({ id: "a", text: "1", source: "web", sender: "user", clientMessageId: "cm-a" }),
+      mk({ id: "b", text: "2", source: "web", sender: "user", clientMessageId: "cm-b" }),
+    ]);
+    expect(merged.clientMessageId).toBe("cm-b");
+  });
+
   test("metadata is last-wins merged with coalescedFrom audit array", () => {
     const merged = coalesceUserItems([
       mk({

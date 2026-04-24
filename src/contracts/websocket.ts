@@ -16,6 +16,12 @@ export interface WebSocketClientMessageEvent {
   targetPiSessionId?: string;
   /** Per-message model override (id from `config.models[]`). */
   modelId?: string;
+  /**
+   * Client-generated UUID for the optimistic user message bubble.
+   * The server echoes this back on the corresponding user-role `message_end`
+   * so the client can reconcile the optimistic entry with the canonical one.
+   */
+  clientMessageId?: string;
 }
 
 export interface WebSocketClientSubscribeEvent {
@@ -83,6 +89,12 @@ export interface MessageEndWebSocketEvent {
   message: ChatTimelineMessage;
   /** Tool calls extracted from the SDK message content array. */
   toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
+  /**
+   * Present on user-role `message_end` when the originating WS `message` event
+   * carried a `clientMessageId`. Clients use this to reconcile their optimistic
+   * user message bubble with the canonical server-side entry.
+   */
+  clientMessageId?: string;
 }
 
 export interface ToolExecutionStartWebSocketEvent {

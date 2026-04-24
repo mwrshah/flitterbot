@@ -30,17 +30,26 @@ import type { FlitterbotWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
 
-export type SendMessageFn = (
-  text: string,
-  images?: ImageAttachment[],
-  targetPiSessionId?: string,
-) => Promise<void>;
+export type SendMessageOptions = {
+  images?: ImageAttachment[];
+  targetPiSessionId?: string;
+  /** Client-generated UUID matching the optimistic user-message bubble in
+   *  cache. The server echoes this on user-role `message_end` so the bridge
+   *  can swap the optimistic entry for the canonical server-side one. */
+  clientMessageId?: string;
+};
+
+export type SendMessageFn = (text: string, options?: SendMessageOptions) => Promise<void>;
 
 export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendMessageFn {
   const { wsClient } = deps;
-  return async (text, images, targetPiSessionId) => {
+  return async (text, options) => {
     try {
-      await wsClient.sendMessage(text, "followUp", images, targetPiSessionId);
+      await wsClient.sendMessage(text, "followUp", {
+        images: options?.images,
+        targetPiSessionId: options?.targetPiSessionId,
+        clientMessageId: options?.clientMessageId,
+      });
     } catch (error) {
       console.error("WS send failed (socket not open):", error);
       throw error;
@@ -268,6 +277,8 @@ export function setupWsQueryBridge(deps: {
       // in a single setQueryData call to avoid intermediate renders.
       const blocks = (msg as ChatTimelineMessage).blocks;
       const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
+      const isUser = msg.role === "user";
+      const clientMessageId = message.clientMessageId;
 
       if (hasContent || message.toolCalls?.length) {
         const now = new Date().toISOString();
@@ -296,11 +307,22 @@ export function setupWsQueryBridge(deps: {
           (old) => {
             const items = old ?? [];
 
-            // Upsert the message (replace existing by ID, or append).
+            // Upsert the message. For user-role events we first try to
+            // reconcile by the echoed clientMessageId (swap the optimistic
+            // bubble in-place for the canonical entry). Falls back to id
+            // match, then append.
             let next = items;
             if (hasContent) {
               const committed = committedItems[0] as ChatTimelineMessage;
-              const idx = items.findIndex((existing) => existing.id === committed.id);
+              let idx = -1;
+              if (isUser && clientMessageId) {
+                idx = items.findIndex(
+                  (existing) => existing.kind === "message" && existing.id === clientMessageId,
+                );
+              }
+              if (idx < 0) {
+                idx = items.findIndex((existing) => existing.id === committed.id);
+              }
               if (idx >= 0) {
                 next = [...items];
                 next[idx] = committed;
@@ -332,16 +354,20 @@ export function setupWsQueryBridge(deps: {
           },
         );
 
-        // Imperative commit: convert committed items to AgentMessages and push
-        // directly to the Lit component, bypassing React re-render cycle.
-        const agentMessages = timelineItemsToAgentMessages(committedItems);
-        if (agentMessages.length > 0) {
-          console.log(
-            "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
-            agentMessages.length,
-            piSessionId,
-          );
-          streamingStore.commitMessage(piSessionId, agentMessages);
+        // Imperative commit bypasses React for assistant messages (streaming
+        // perf). User messages always render through the React path — the
+        // optimistic entry is already in cache and on-screen by the time this
+        // echo arrives, so a duplicate imperative append would double-render.
+        if (!isUser) {
+          const agentMessages = timelineItemsToAgentMessages(committedItems);
+          if (agentMessages.length > 0) {
+            console.log(
+              "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
+              agentMessages.length,
+              piSessionId,
+            );
+            streamingStore.commitMessage(piSessionId, agentMessages);
+          }
         }
       }
 

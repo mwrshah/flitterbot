@@ -251,6 +251,9 @@ export type WsMessage =
       piSessionId?: string;
       message: ChatTimelineMessage;
       toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
+      /** Set on user-role message_end when the originating WS `message` event
+       *  carried a `clientMessageId`. Reconciles the optimistic UI bubble. */
+      clientMessageId?: string;
     }
   | {
       type: "tool_execution_start" | "tool_execution_end";

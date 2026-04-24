@@ -271,15 +271,21 @@ export class FlitterbotWsClient {
   async sendMessage(
     text: string,
     deliveryMode: string,
-    images?: Array<{ data: string; mimeType: string }>,
-    targetPiSessionId?: string,
+    options?: {
+      images?: Array<{ data: string; mimeType: string }>;
+      targetPiSessionId?: string;
+      /** Client-generated UUID for the optimistic user message bubble. Echoed
+       *  back by the server on user-role `message_end` for cache reconcile. */
+      clientMessageId?: string;
+    },
   ): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
     const payload: Record<string, unknown> = { type: "message", text, deliveryMode };
-    if (images?.length) payload.images = images;
-    if (targetPiSessionId) payload.targetPiSessionId = targetPiSessionId;
+    if (options?.images?.length) payload.images = options.images;
+    if (options?.targetPiSessionId) payload.targetPiSessionId = options.targetPiSessionId;
+    if (options?.clientMessageId) payload.clientMessageId = options.clientMessageId;
     this.socket.send(JSON.stringify(payload));
   }
 

@@ -5,6 +5,12 @@ import { statusQueryOptions, streamsHistoryQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
+export type SendUserMessageOptions = {
+  images?: ImageAttachment[];
+  /** Client-generated UUID matching an optimistic bubble in cache. */
+  clientMessageId?: string;
+};
+
 const rootApi = getRouteApi("__root__");
 
 /**
@@ -34,13 +40,17 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
   const effectivePiSessionId = piSessionId ?? "default";
 
   const onSendMessage = useCallback(
-    (text: string, images?: ImageAttachment[]) => {
+    (text: string, options?: SendUserMessageOptions) => {
       // /clear and /reload always target the current default session, regardless
       // of what the UI thinks the piSessionId is. Strip the target so backend
       // routes via getDefault() — avoids stale ID after the reset/reload.
       const trimmed = text.trim();
       const target = trimmed === "/clear" || trimmed === "/reload" ? undefined : piSessionId;
-      return sendMessage(text, images, target);
+      return sendMessage(text, {
+        images: options?.images,
+        targetPiSessionId: target,
+        clientMessageId: options?.clientMessageId,
+      });
     },
     [sendMessage, piSessionId],
   );

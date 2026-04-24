@@ -823,7 +823,7 @@ export function Surface() {
       engageAndScroll();
 
       try {
-        await sendMessage(text || "(image)", images);
+        await sendMessage(text || "(image)", { images });
         setPendingImages([]);
       } catch (error) {
         toast.error("Failed to send message");

@@ -417,6 +417,13 @@ export function subscribeToPiSession(
             type: "message_end",
             piSessionId: session.sessionId,
             message: timelineMessage,
+            // Echo the originating client's optimistic-bubble id so the web
+            // client can swap its optimistic entry for this canonical one.
+            // Only present on user-role message_end; absent for WhatsApp/cron
+            // origins that don't carry one.
+            ...(currentItem?.clientMessageId
+              ? { clientMessageId: currentItem.clientMessageId }
+              : {}),
           };
           broadcast(wsHub, payload);
           broadcastSurfaced(wsHub, session.sessionId, timelineMessage);

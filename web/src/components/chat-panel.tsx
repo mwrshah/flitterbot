@@ -23,7 +23,7 @@ import { activeToolStore } from "~/lib/active-tool-store";
 import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
-import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
+import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment } from "~/lib/types";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const emptySubscribe = () => () => {};
@@ -41,7 +41,10 @@ type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
   isSessionBusy: boolean;
-  onSendMessage: (text: string, images?: ImageAttachment[]) => Promise<void>;
+  onSendMessage: (
+    text: string,
+    options?: { images?: ImageAttachment[]; clientMessageId?: string },
+  ) => Promise<void>;
   streamId?: string;
   streamName?: string;
   /** Recovery action to offer in the header, if any:
@@ -239,20 +242,48 @@ export function ChatPanel({
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
+      // Optimistic insert: append a user-message entry to the agent timeline
+      // *before* the WS round-trip, so the feed grows immediately and the
+      // scroll-to-bottom driven by the messages-changed React path lands on
+      // the real new bottom. The server echoes this id back on user-role
+      // `message_end`; the ws-query-bridge swaps the optimistic entry for
+      // the canonical one in-place (no duplicate, no ordering flip).
+      const clientMessageId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const displayText = text || "(image)";
+      const optimistic: ChatTimelineMessage = {
+        id: clientMessageId,
+        kind: "message",
+        role: "user",
+        content: displayText,
+        source: "web",
+        createdAt: now,
+        ...(images?.length ? { images } : {}),
+      };
+      const cacheKey = ["streams-history", piSessionId, "agent"] as const;
+      queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [...(old ?? []), optimistic]);
+
       setIsSending(true);
+      // Pin so the messages-changed effect in StreamsMessageList scrolls to
+      // the new bottom after Lit commits the optimistic entry.
       engage();
 
       try {
-        await onSendMessage(text || "(image)", images);
+        await onSendMessage(displayText, { images, clientMessageId });
         setPendingImages([]);
       } catch (error) {
+        // Rollback the optimistic entry — the send failed, so the message
+        // will never be echoed back. Leaving it in cache would ghost-commit.
+        queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) =>
+          (old ?? []).filter((item) => item.id !== clientMessageId),
+        );
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);
       } finally {
         setIsSending(false);
       }
     },
-    [engage, onSendMessage],
+    [engage, onSendMessage, piSessionId, queryClient],
   );
 
   return (

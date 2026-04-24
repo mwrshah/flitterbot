@@ -21,6 +21,12 @@ export type QueueItem = {
   streamId?: string;
   streamName?: string;
   serverMessageId?: string;
+  /**
+   * Client-generated UUID for the optimistic UI bubble. Echoed back to the
+   * originating web client on the user-role `message_end` WS envelope so
+   * optimistic entries can be reconciled with their canonical server copy.
+   */
+  clientMessageId?: string;
 };
 
 /**
@@ -70,6 +76,10 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     streamId: first.streamId,
     streamName: first.streamName,
     serverMessageId: last.serverMessageId,
+    // Last in group (same rationale as serverMessageId — the SDK stamps a
+    // single user entry on delivery, which matches the most recent optimistic
+    // UI bubble).
+    clientMessageId: last.clientMessageId,
   };
 }
 
