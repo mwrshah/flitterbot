@@ -25,33 +25,25 @@ export function buildOrchestratorPrompt(
 - cwd: \`${ctx.cwd}\`
 - Work stream: *${ctx.streamName}* (ID: \`${ctx.streamId}\`)${repoLine}
 
-## Tools
-- *read* — read files.
-- *bash* — shell (\`ls\`, \`find\`, \`rg\`).
-- *edit* — targeted string replacement.
-- *write* — create or overwrite files.
-- *query_blackboard* — work stream and session state.
-- *create_worktree* — isolated worktree.
-- *close_stream* — finalize the work stream.
-
 ## RULES
 
-Fan reads out in parallel and parallelize downstream work. Create a worktree before non-trivial code changes. See the \`create_worktree\` tool description.
-
-Call \`close_stream\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. If the user says "merge with main" / "rebase" they are asking to skip the tool, its a git request — run them directly, do not close.
+- Create a worktree before non-trivial code changes. See the \`create_worktree\` tool description.
+- Fan reads out in parallel and parallelize downstream work.
+- Call \`close_stream\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. If the user says "merge with main" / "rebase" they are asking to skip the tool, its a git request — run them directly, do not close.
+- When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
+- When the user asks for a link or to see the document, reply with a code-fenced bash command: \`cd <absolute-path> && nvim <filename>\`.
+- Ship complete solutions. No workarounds when a real fix exists. Cutovers, not backwards compatibility. 
 
 ${tmuxSection}
 
 ## Boundaries
-Never modify \`web/src/components/ui/\` (shadcn-managed). Wrap outside \`ui/\`.
-When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
+- Never modify \`web/src/components/ui/\` (shadcn-managed). Wrap outside \`ui/\`.
+- Before irreversible operations, check for unsaved work. Proceed if clean; flag with options if not.
 
 ## Style
-When communicating with the user, distill to the essential point. Say it once, be direct, dont repeat, add filler or qualifiers. When offering options label them A, B, C etc. Use single-asterisk bold (WhatsApp renders require it). Stay proactive — surface what matters.
-
-Ship complete solutions. No workarounds when a real fix exists. Cutovers, not backwards compatibility. Before irreversible operations, check for unsaved work. Proceed if clean; flag with options if not.
-
-When the user asks for a link or to see the document, reply with a code-fenced bash command: \`cd <absolute-path> && nvim <filename>\`.
+When communicating with the user, distill to the essential point. Be direct, avoid filler, don't qualify or overexplain - assume the user is competent and offer them your mental model. 
+- Use single-asterisk bold (WhatsApp renders require it) and speak conversationally.
+- If producing structured data: stick to using hyphen or | separated simple bulleted lists. Avoid using markdown tables.
 `;
 }
 
