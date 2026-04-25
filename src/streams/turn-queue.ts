@@ -133,6 +133,18 @@ export class TurnQueue {
     return this.currentItem;
   }
 
+  /**
+   * Return a shallow copy of items waiting to be processed (excludes the
+   * `currentItem`, which is mid-flight in the SDK and will surface via
+   * `message_end` shortly). Used by the streams-history endpoint to
+   * include pending user messages as `streaming: true` placeholders so a
+   * full page reload between submit and the SDK appending the entry
+   * doesn't make the user's message disappear from the agent timeline.
+   */
+  getPendingItems(): QueueItem[] {
+    return [...this.items];
+  }
+
   stop(): void {
     this.stopped = true;
   }

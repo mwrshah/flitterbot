@@ -319,17 +319,31 @@ export function setupWsQueryBridge(deps: {
           (old) => {
             const items = old ?? [];
 
-            // Upsert the message. For user-role events we first try to
-            // reconcile by the echoed clientMessageId (swap the optimistic
-            // bubble in-place for the canonical entry). Falls back to id
-            // match, then append.
+            // Upsert the message. Try reconciling against existing entries
+            // (optimistic bubble OR a server-emitted pending placeholder
+            // hydrated on a fresh fetch) in this priority order:
+            //   1. clientMessageId (web optimistic bubbles)
+            //   2. serverMessageId (whatsapp/cron pending placeholders —
+            //      keyed by the runtime's pre-allocated DB row id)
+            //   3. canonical id (entry.id) match for direct re-broadcasts
+            // Falls through to append when nothing matches.
             let next = items;
             if (hasContent) {
               const committed = committedItems[0] as ChatTimelineMessage;
+              const committedServerMessageId = committed.serverMessageId;
               let idx = -1;
               if (isUser && clientMessageId) {
                 idx = items.findIndex(
                   (existing) => existing.kind === "message" && existing.id === clientMessageId,
+                );
+              }
+              if (idx < 0 && committedServerMessageId) {
+                idx = items.findIndex(
+                  (existing) =>
+                    existing.kind === "message" &&
+                    (existing.id === committedServerMessageId ||
+                      (existing as ChatTimelineMessage).serverMessageId ===
+                        committedServerMessageId),
                 );
               }
               if (idx < 0) {
