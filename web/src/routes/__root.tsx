@@ -1,8 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
-// Temporarily hidden — re-enable by restoring the import and the component below.
-// import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
@@ -123,7 +121,6 @@ function RootComponent() {
     () => (
       <>
         <AppShell />
-        {/* <TanStackRouterDevtools position="bottom-right" /> */}
       </>
     ),
     [],
