@@ -35,15 +35,19 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
 
   if (!prev?.length) return next;
 
-  // Build a set of all identifiers from the server response: both `id` and any
-  // `serverMessageId` values.  WS-accumulated items use ordinal IDs ("msg-N")
-  // while the server returns the DB UUID as `id`.  The WS item's
-  // `serverMessageId` matches the server's `id`, so we need to check both.
+  // Build a set of all identifiers from the server response: `id`,
+  // `serverMessageId`, and `clientMessageId`. WS-accumulated items use ordinal
+  // IDs ("msg-N") while the server returns the DB UUID as `id`. Optimistic UI
+  // bubbles use a client-generated UUID as `id` until reconciled — the bridge
+  // stamps that UUID onto the canonical message as `clientMessageId` so this
+  // pass recognises the optimistic entry as covered and doesn't re-append it.
   const serverIds = new Set<string>();
   for (const item of next) {
     serverIds.add(item.id);
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string") serverIds.add(smId);
+    const cmId = (item as Record<string, unknown>).clientMessageId;
+    if (typeof cmId === "string") serverIds.add(cmId);
     if (item.kind === "tool" && item.toolUseId) serverIds.add(item.toolUseId);
   }
 
@@ -51,6 +55,8 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
     if (serverIds.has(item.id)) return false;
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string" && serverIds.has(smId)) return false;
+    const cmId = (item as Record<string, unknown>).clientMessageId;
+    if (typeof cmId === "string" && serverIds.has(cmId)) return false;
     if (item.kind === "tool" && item.toolUseId && serverIds.has(item.toolUseId)) return false;
     return true;
   });
