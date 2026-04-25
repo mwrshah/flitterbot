@@ -58,6 +58,7 @@ import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
+import { stripStreamNamePrefix } from "./streams/strip-name-prefix.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
@@ -1124,10 +1125,10 @@ export class ControlSurfaceRuntime {
         parameters: {
           type: "object",
           properties: {
-            name: {
+            suggested_name: {
               type: "string",
               description:
-                "Short descriptive name, 2-4 words, lowercase, dash-separated. Prefix investigation streams with 'i-' (e.g. 'i-wu-lifecycle', 'fix-auth-token-refresh')",
+                "Your suggested name for the stream — 2-4 words, lowercase, dash-separated. Prefix it with intent: 'i-' for investigations, 'wr-' for web research, 'bug-' or 'fix-' for bug fixes, 'bs-' for repo brainstorms (e.g. 'i-wu-lifecycle', 'fix-auth-token-refresh'). The tool normalizes this into a canonical name by stripping the leading intent prefix, so the stored stream name, worktree dir, and branch stay tight. The canonical name is returned in the response — use it for any subsequent references.",
             },
             message: {
               type: "string",
@@ -1145,20 +1146,25 @@ export class ControlSurfaceRuntime {
                 "Always true. Skip the programmatic user-message passthrough, since we write it out in message.",
             },
           },
-          required: ["name", "cwd", "message", "skipUserMessage"],
+          required: ["suggested_name", "cwd", "message", "skipUserMessage"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
           const {
-            name,
+            suggested_name: suggestedName,
             message: agentMessage,
             cwd: cwdParam,
           } = params as {
-            name: string;
+            suggested_name: string;
             message: string;
             cwd: string;
             skipUserMessage: boolean;
           };
+          // Normalize: strip intent-signal prefixes (`i-`, `wr-`, `bug-`,
+          // `bs-`, `fix-`) once at the start. They communicate intent at the
+          // call site but shouldn't bloat downstream names (worktree dirs,
+          // branches, streams.name). Strip only when followed by more content.
+          const name = stripStreamNamePrefix(suggestedName);
           // TEMP: hardcode skipUserMessage = true (user request)
           const skipUserMessage = true;
 
@@ -1180,7 +1186,9 @@ export class ControlSurfaceRuntime {
           const ws = insertStream(this.blackboard, name);
           enrichStream(this.blackboard, ws.id, effectiveCwd);
 
-          this.log(`default agent created stream "${name}" (${ws.id}) cwd=${effectiveCwd}`);
+          const nameTrace =
+            suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
+          this.log(`default agent created stream ${nameTrace} (${ws.id}) cwd=${effectiveCwd}`);
 
           try {
             const orchestrator = await this.sessionManager.createOrchestrator(
@@ -1308,24 +1316,39 @@ export class ControlSurfaceRuntime {
               : originalText
                 ? " and user message passed through"
                 : "";
+            const normalizationNote =
+              suggestedName !== name
+                ? ` Suggested name "${suggestedName}" normalized to canonical "${name}".`
+                : "";
             return {
               content: [
                 {
                   type: "text",
-                  text: `Stream "${ws.name}" created (ID: ${ws.id}). Orchestrator spawned${passthroughNote}.`,
+                  text: `Stream created (ID: ${ws.id}, canonical name: "${ws.name}"). Orchestrator spawned${passthroughNote}.${normalizationNote} Use the canonical name for any subsequent references.`,
                 },
               ],
-              details: { streamId: ws.id, streamName: ws.name },
+              details: {
+                streamId: ws.id,
+                canonicalName: ws.name,
+                suggestedName,
+                namePrefixStripped: suggestedName !== name,
+              },
             };
           } catch (error) {
             return {
               content: [
                 {
                   type: "text",
-                  text: `Stream "${ws.name}" created (ID: ${ws.id}) but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
+                  text: `Stream "${ws.name}" created (ID: ${ws.id}, canonical name: "${ws.name}") but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
-              details: { streamId: ws.id, error: true },
+              details: {
+                streamId: ws.id,
+                canonicalName: ws.name,
+                suggestedName,
+                namePrefixStripped: suggestedName !== name,
+                error: true,
+              },
             };
           }
         },
