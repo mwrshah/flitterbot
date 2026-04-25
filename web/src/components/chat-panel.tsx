@@ -128,17 +128,26 @@ export function ChatPanel({
     });
   }, [pruneTarget, pruneMutation]);
 
-  const { viewportRef, scrollToBottom, isAtBottomRef, engage } = useStickToBottom({
+  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
     initialScrollWhen: agentMessages.length > 0,
     initialScrollKey: piSessionId,
   });
 
-  const settleToBottomIfPinned = useCallback(() => {
-    if (!isAtBottomRef.current) return;
+  // One-shot intent set by handleSubmit: the next render-complete callback
+  // unconditionally scrolls to bottom and re-pins, regardless of the current
+  // pinned state. Optimistic insert must always reveal the user's own message.
+  const forceScrollOnNextRenderRef = useRef(false);
+
+  const handleMessagesRendered = useCallback(() => {
     const scrollToken = streamingPerf.beginScroll();
-    scrollToBottom();
+    if (forceScrollOnNextRenderRef.current) {
+      forceScrollOnNextRenderRef.current = false;
+      engageAndScroll();
+    } else if (isAtBottomRef.current) {
+      scrollToBottom();
+    }
     streamingPerf.endScroll(scrollToken);
-  }, [isAtBottomRef, scrollToBottom]);
+  }, [engageAndScroll, isAtBottomRef, scrollToBottom]);
 
   // Wire streaming deltas from the streaming store to the Lit web component.
   // We drive scroll explicitly here instead of using MutationObserver /
@@ -197,7 +206,7 @@ export function ChatPanel({
         return;
       }
       messageListRef.current?.applyActiveToolState(event.state);
-      settleToBottomIfPinned();
+      handleMessagesRendered();
     });
     messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
 
@@ -209,7 +218,7 @@ export function ChatPanel({
       messageListRef.current?.clearStreaming();
       messageListRef.current?.clearActiveTools();
     };
-  }, [piSessionId, settleToBottomIfPinned]);
+  }, [piSessionId, handleMessagesRendered]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -261,12 +270,15 @@ export function ChatPanel({
         ...(images?.length ? { images } : {}),
       };
       const cacheKey = ["streams-history", piSessionId, "agent"] as const;
+      // Force-scroll on the next render-complete callback. Set BEFORE the
+      // cache write so the React render it triggers (and the Lit commit that
+      // follows) lands with the intent already armed. This always reveals the
+      // optimistic message — independent of whether the user was already
+      // pinned to the bottom.
+      forceScrollOnNextRenderRef.current = true;
       queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [...(old ?? []), optimistic]);
 
       setIsSending(true);
-      // Pin so the messages-changed effect in StreamsMessageList scrolls to
-      // the new bottom after Lit commits the optimistic entry.
-      engage();
 
       try {
         await onSendMessage(displayText, { images, clientMessageId });
@@ -283,7 +295,7 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [engage, onSendMessage, piSessionId, queryClient],
+    [onSendMessage, piSessionId, queryClient],
   );
 
   return (
@@ -355,7 +367,7 @@ export function ChatPanel({
             <StreamsMessageList
               ref={messageListRef}
               messages={agentMessages}
-              onMessagesRendered={settleToBottomIfPinned}
+              onMessagesRendered={handleMessagesRendered}
               onPruneRequested={handlePruneRequested}
             />
           </div>
