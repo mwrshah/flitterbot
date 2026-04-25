@@ -45,13 +45,6 @@ export type ChatTimelineMessage = {
   /** Server-generated UUID for optimistic UI correlation. */
   serverMessageId?: string;
   /**
-   * Client-generated UUID echoed back from the server on the user-role
-   * `message_end` envelope. Stamped onto the canonical message by the WS
-   * bridge when reconciling an optimistic bubble, so structural-sharing
-   * dedup (mergeTimelineItems) recognises the optimistic entry as covered.
-   */
-  clientMessageId?: string;
-  /**
    * Underlying pi-sdk SessionManager entry id. Present when the message was
    * loaded from a live or on-disk pi session (not for surface-table messages).
    * Required to prune history from a specific point via navigateTree().

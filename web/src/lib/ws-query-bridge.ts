@@ -286,18 +286,7 @@ export function setupWsQueryBridge(deps: {
         // Build the committed timeline items for both Query cache and imperative commit.
         const committedItems: ChatTimelineItem[] = [];
         if (hasContent) {
-          // Stamp the echoed clientMessageId onto the canonical user message
-          // so the structural-sharing comparator (mergeTimelineItems) can
-          // recognise the optimistic bubble (id === clientMessageId) as
-          // covered. Without this, structuralSharing re-appends the optimistic
-          // entry as an "extra" and the user message renders twice.
-          const stamped: ChatTimelineMessage =
-            isUser && clientMessageId
-              ? { ...msg, ...(blocks ? { blocks } : {}), clientMessageId }
-              : blocks
-                ? { ...msg, blocks }
-                : msg;
-          committedItems.push(stamped);
+          committedItems.push(blocks ? { ...msg, blocks } : msg);
         }
         if (message.toolCalls?.length) {
           for (const tc of message.toolCalls) {
