@@ -153,7 +153,7 @@ export function ChatPanel({
             {
               role: "assistant",
               content: [
-                ...(thinking ? [{ type: "thinking" as const, thinking }] : []),
+                ...(thinking != null ? [{ type: "thinking" as const, thinking }] : []),
                 ...(text ? [{ type: "text" as const, text }] : []),
               ],
               api: "openai-responses",

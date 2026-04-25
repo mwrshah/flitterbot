@@ -1025,7 +1025,7 @@ export class AssistantMessage extends LitElement {
     for (const chunk of this.message.content) {
       if (chunk.type === "text" && chunk.text.trim() !== "") {
         orderedParts.push(html`<markdown-block .content=${chunk.text}></markdown-block>`);
-      } else if (chunk.type === "thinking" && chunk.thinking.trim() !== "") {
+      } else if (chunk.type === "thinking" && (chunk.thinking.trim() !== "" || this.isStreaming)) {
         orderedParts.push(
           html`<thinking-block .content=${chunk.thinking} .isStreaming=${this.isStreaming}></thinking-block>`,
         );
