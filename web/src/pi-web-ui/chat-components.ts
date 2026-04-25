@@ -429,7 +429,7 @@ export class ThinkingBlock extends LitElement {
         </button>
         ${
           isOpen
-            ? html`<div class="pl-4 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
+            ? html`<div class="pl-8 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
             : ""
         }
       </div>
