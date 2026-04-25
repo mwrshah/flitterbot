@@ -402,7 +402,8 @@ export function subscribeToPiSession(
           break;
         }
 
-        const role = capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
+        const role =
+          capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
         const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
         // Allow thinking-only messages (content empty but blocks non-empty) through.
         if (!role || (!content && blocks.length === 0)) break;
