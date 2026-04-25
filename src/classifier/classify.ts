@@ -39,6 +39,12 @@ export async function classifyMessage(
   }
 
   const streams = listOpenStreams(db);
+  // Nothing to classify against — skip the Groq call entirely.
+  if (streams.length === 0) {
+    console.log("[router] short-circuit: no open streams, routing to default");
+    return { stream: null, action: "none" };
+  }
+
   const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
   const defaultConversation = defaultPiSessionId
     ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
