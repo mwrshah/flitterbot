@@ -35,15 +35,24 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
 
   if (!prev?.length) return next;
 
-  // Build a set of all identifiers from the server response: both `id` and any
-  // `serverMessageId` values.  WS-accumulated items use ordinal IDs ("msg-N")
-  // while the server returns the DB UUID as `id`.  The WS item's
-  // `serverMessageId` matches the server's `id`, so we need to check both.
+  // Build a set of "covered" identifiers from the new array: `id`,
+  // `serverMessageId`, and `clientMessageId`. Live and reload-from-disk
+  // both key timeline items by the SDK's persistent entry.id, so a refetch
+  // matches the cache by `id` directly. The other two keys cover edge
+  // cases:
+  //   - `serverMessageId`: surface-timeline correlation against DB rows
+  //     pre-allocated at runtime.enqueue (predates the SDK entry).
+  //   - `clientMessageId`: optimistic user-bubble swap. Bridge stamps the
+  //     client UUID onto the canonical at message_end, so the optimistic
+  //     entry (id === clientMessageId) is recognised as covered by the
+  //     canonical (id === entry.id) and isn't re-appended as an extra.
   const serverIds = new Set<string>();
   for (const item of next) {
     serverIds.add(item.id);
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string") serverIds.add(smId);
+    const cmId = (item as Record<string, unknown>).clientMessageId;
+    if (typeof cmId === "string") serverIds.add(cmId);
     if (item.kind === "tool" && item.toolUseId) serverIds.add(item.toolUseId);
   }
 
@@ -51,6 +60,8 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
     if (serverIds.has(item.id)) return false;
     const smId = (item as Record<string, unknown>).serverMessageId;
     if (typeof smId === "string" && serverIds.has(smId)) return false;
+    const cmId = (item as Record<string, unknown>).clientMessageId;
+    if (typeof cmId === "string" && serverIds.has(cmId)) return false;
     if (item.kind === "tool" && item.toolUseId && serverIds.has(item.toolUseId)) return false;
     return true;
   });

@@ -55,7 +55,6 @@ function pushMessage(
   createdAt: string,
   blocks?: StreamsHistoryMessageBlock[],
   images?: ImageAttachment[],
-  entryId?: string,
 ): void {
   const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
@@ -81,9 +80,6 @@ function pushMessage(
   if (images && images.length > 0) {
     item.images = images;
   }
-  if (entryId) {
-    item.entryId = entryId;
-  }
   items.push(item);
 }
 
@@ -93,11 +89,10 @@ function parseMessageContent(
   role: "user" | "assistant" | "system",
   createdAt: string,
   content: unknown,
-  entryId?: string,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, messageId, role, text, createdAt, undefined, undefined, entryId);
+    if (text) pushMessage(items, messageId, role, text, createdAt);
     return;
   }
 
@@ -119,16 +114,7 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(
-      items,
-      messageId,
-      role,
-      contentText,
-      createdAt,
-      [...messageBlocks],
-      images,
-      entryId,
-    );
+    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images);
     messageBlocks.length = 0;
   };
 
@@ -181,12 +167,11 @@ function parseMessageRecord(
   createdAt: string,
   messageId: string,
   items: ChatTimelineItem[],
-  entryId?: string,
 ): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, entryId);
+    parseMessageContent(items, messageId, role, createdAt, messageRecord.content);
     return;
   }
 
@@ -285,9 +270,13 @@ function shapeHistoryItems(
 }
 
 /**
- * Walk a list of SessionEntry objects (already ordered root→leaf) and build a
- * ChatTimelineItem[]. Each entry's id is stamped onto emitted message items as
- * `entryId` so the UI can address them for prune/edit operations.
+ * Walk a list of SessionEntry objects (already ordered root→leaf) and build
+ * timeline items keyed by the SDK's persistent entry.id. The same id is
+ * what pi-subscribe broadcasts on live `message_end` (read back via
+ * sessionManager.getLeafId() once the SDK has appended the entry), so the
+ * cache identity is stable across live streaming and disk reload — no
+ * parallel ordinal counter to keep in sync. The id also doubles as the
+ * prune target since `navigateTree(entryId)` accepts it directly.
  *
  * Non-message entries (thinking_level_change, model_change, compaction,
  * custom, label, session_info, branch_summary) are skipped here — the chat
@@ -295,14 +284,11 @@ function shapeHistoryItems(
  */
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const items: ChatTimelineItem[] = [];
-  let ordinal = 0;
   for (const entry of entries) {
     if (entry.type !== "message") continue;
     const messageRecord = asRecord(entry.message);
     const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);
-    const messageId = `msg-${ordinal}`;
-    ordinal += 1;
-    parseMessageRecord(messageRecord, createdAt, messageId, items, entry.id);
+    parseMessageRecord(messageRecord, createdAt, entry.id, items);
   }
   return items;
 }

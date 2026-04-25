@@ -102,6 +102,14 @@ type SubscribablePiSession = {
   sessionId: string;
   messages: Array<unknown>;
   subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
+  /**
+   * SDK's SessionManager. Used to read the just-appended entry id at
+   * `message_end` time (the SDK calls `appendMessage(event.message)`
+   * synchronously *after* notifying our listener, so we defer the WS
+   * broadcast via queueMicrotask and then read `getLeafId()` to obtain
+   * the canonical, persistent id for the message).
+   */
+  sessionManager: { getLeafId: () => string | null };
 };
 
 /**
@@ -249,13 +257,16 @@ export function subscribeToPiSession(
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
 ): () => void {
-  // Ordinal counter: starts at session.messages.length to account for pre-existing messages.
-  // Incremented on every message_end (user, assistant, toolResult) to produce deterministic
-  // msg-N IDs that match the history path in history.ts.
-  let messageOrdinal = session.messages.length;
-
-  // Tracks the ordinal ID for the currently-streaming assistant message.
-  // Set on message_start (assistant only), cleared on message_end / turn_end.
+  // Transient streaming-correlation key (T1). Lives only between an
+  // assistant `message_start` and its `message_end`, used to tag the
+  // `text_delta`/`thinking_delta` WS events so the streaming-store can
+  // attribute them to the in-flight bubble. The SDK doesn't expose a
+  // persistent id at message_start time — entry.id is only assigned later
+  // when `appendMessage` runs (after `message_end`) — so we mint a local
+  // counter-based key here. It never leaks into the canonical timeline
+  // `id` field; that's the SDK's `entry.id` (T2 key), read via
+  // `sessionManager.getLeafId()` after the entry has been appended.
+  let streamingKeyCounter = session.messages.length;
   let currentStreamingMessageId: string | null = null;
 
   // Tracks the last assistant message in the current agent run.
@@ -276,9 +287,13 @@ export function subscribeToPiSession(
       case "message_start": {
         const role = extractMessageRole(event.message);
         if (role === "assistant") {
-          // Pre-assign the ordinal ID for this message so text_delta events can carry it.
-          // The counter is incremented now; message_end will use this same ID.
-          currentStreamingMessageId = `msg-${messageOrdinal}`;
+          // Mint a transient streaming key for text_delta/thinking_delta
+          // attribution. This is NOT the canonical message id — that's the
+          // SDK's entry.id, only known once `appendMessage` has run after
+          // `message_end`. Counter-based to keep WS payloads small; clients
+          // treat it as opaque.
+          currentStreamingMessageId = `streaming-${streamingKeyCounter}`;
+          streamingKeyCounter += 1;
         }
         break;
       }
@@ -354,80 +369,100 @@ export function subscribeToPiSession(
         const anyRole = extractAnyMessageRole(event.message);
         if (!anyRole) break;
 
-        // Always increment ordinal for every message role (user, assistant, toolResult)
-        // to stay in sync with history.ts which counts all type: "message" entries.
-        const messageId = currentStreamingMessageId ?? `msg-${messageOrdinal}`;
-        messageOrdinal += 1;
+        // Capture stable references inside the case body — the broadcast
+        // is deferred to a microtask so the SDK has a chance to call
+        // `sessionManager.appendMessage(event.message)` (which it does
+        // synchronously *after* notifying our listener). Once that runs,
+        // `sessionManager.getLeafId()` returns the canonical entry.id, the
+        // same id that's serialised to the JSONL session file and read back
+        // on history reload — single persistent identity across live + disk.
+        const capturedMessage = event.message;
+        const capturedTimestamp = extractTimestamp(event.message, now);
+        const capturedRole = anyRole;
         currentStreamingMessageId = null;
 
-        if (anyRole === "toolResult") {
-          const item = toolResultMessageToTimelineItem(
-            event.message,
-            messageId,
-            extractTimestamp(event.message, now),
-          );
-          if (item) {
-            const payload: ToolResultWebSocketEvent = {
-              type: "tool_result",
-              piSessionId: session.sessionId,
-              item,
-            };
-            broadcast(wsHub, payload);
-          }
+        if (capturedRole === "toolResult") {
+          queueMicrotask(() => {
+            const entryId = session.sessionManager.getLeafId();
+            if (!entryId) return;
+            const item = toolResultMessageToTimelineItem(
+              capturedMessage,
+              entryId,
+              capturedTimestamp,
+            );
+            if (item) {
+              const payload: ToolResultWebSocketEvent = {
+                type: "tool_result",
+                piSessionId: session.sessionId,
+                item,
+              };
+              broadcast(wsHub, payload);
+            }
+          });
           break;
         }
 
-        const role = anyRole === "user" || anyRole === "assistant" ? anyRole : undefined;
-        const { text: content, blocks, toolCalls } = extractMessageBlocks(event.message);
+        const role = capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
+        const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
         // Allow thinking-only messages (content empty but blocks non-empty) through.
         if (!role || (!content && blocks.length === 0)) break;
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
-        const timelineMessage: ChatTimelineMessage = {
-          id: messageId,
-          kind: "message",
-          role,
-          content: content ?? "",
-          source: currentItem?.source,
-          streamId: currentItem?.streamId ?? sessionStreamId ?? undefined,
-          streamName: currentItem?.streamName ?? sessionStreamName ?? undefined,
-          serverMessageId: currentItem?.serverMessageId,
-          createdAt: extractTimestamp(event.message, now),
-        };
-        // Include blocks when there are thinking blocks (text-only messages
-        // don't need blocks — content already carries the text).
-        if (blocks.some((b) => b.type === "thinking")) {
-          timelineMessage.blocks = blocks;
-        }
+        const capturedSource = currentItem?.source;
+        const capturedStreamId = currentItem?.streamId ?? sessionStreamId ?? undefined;
+        const capturedStreamName = currentItem?.streamName ?? sessionStreamName ?? undefined;
+        const capturedServerMessageId = currentItem?.serverMessageId;
+        const capturedClientMessageId = currentItem?.clientMessageId;
+        const capturedHasThinking = blocks.some((b) => b.type === "thinking");
+        const capturedBlocks = capturedHasThinking ? blocks : undefined;
+        const capturedToolCalls = toolCalls.length > 0 ? toolCalls : undefined;
 
-        if (role === "assistant") {
-          // Broadcast immediately with intermediate flag so the session view gets it live.
-          // The final correction (without intermediate) happens on agent_end.
-          const payload: MessageEndWebSocketEvent = {
-            type: "message_end",
-            piSessionId: session.sessionId,
-            message: { ...timelineMessage, intermediate: true },
-            ...(toolCalls.length > 0 ? { toolCalls } : {}),
+        queueMicrotask(() => {
+          const entryId = session.sessionManager.getLeafId();
+          if (!entryId) return;
+
+          const timelineMessage: ChatTimelineMessage = {
+            id: entryId,
+            kind: "message",
+            role,
+            content: content ?? "",
+            source: capturedSource,
+            streamId: capturedStreamId,
+            streamName: capturedStreamName,
+            serverMessageId: capturedServerMessageId,
+            createdAt: capturedTimestamp,
           };
-          broadcast(wsHub, payload);
-          lastAssistantMessage = timelineMessage;
-          messageEndFired = true;
-        } else {
-          const payload: MessageEndWebSocketEvent = {
-            type: "message_end",
-            piSessionId: session.sessionId,
-            message: timelineMessage,
-            // Echo the originating client's optimistic-bubble id so the web
-            // client can swap its optimistic entry for this canonical one.
-            // Only present on user-role message_end; absent for WhatsApp/cron
-            // origins that don't carry one.
-            ...(currentItem?.clientMessageId
-              ? { clientMessageId: currentItem.clientMessageId }
-              : {}),
-          };
-          broadcast(wsHub, payload);
-          broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
-        }
+          if (capturedBlocks) {
+            timelineMessage.blocks = capturedBlocks;
+          }
+
+          if (role === "assistant") {
+            // Broadcast immediately with intermediate flag so the session view gets it live.
+            // The final correction (without intermediate) happens on agent_end.
+            const payload: MessageEndWebSocketEvent = {
+              type: "message_end",
+              piSessionId: session.sessionId,
+              message: { ...timelineMessage, intermediate: true },
+              ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
+            };
+            broadcast(wsHub, payload);
+            lastAssistantMessage = timelineMessage;
+            messageEndFired = true;
+          } else {
+            const payload: MessageEndWebSocketEvent = {
+              type: "message_end",
+              piSessionId: session.sessionId,
+              message: timelineMessage,
+              // Echo the originating client's optimistic-bubble id so the web
+              // client can swap its optimistic entry for this canonical one.
+              // Only present on user-role message_end; absent for WhatsApp/cron
+              // origins that don't carry one.
+              ...(capturedClientMessageId ? { clientMessageId: capturedClientMessageId } : {}),
+            };
+            broadcast(wsHub, payload);
+            broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
+          }
+        });
         break;
       }
       case "tool_execution_start": {

@@ -29,6 +29,20 @@ export type ImageAttachment = {
 };
 
 export type ChatTimelineMessage = {
+  /**
+   * Persistent canonical id. For messages that have been appended to the
+   * pi-sdk SessionManager this IS the SDK entry id (8-char hex), which is
+   * also what's serialised to the JSONL session file. Same id on live
+   * (post-message_end) and on history reload from disk — no parallel
+   * synthetic ordinal scheme. Used for cache dedup AND for prune navigation
+   * (`navigateTree(entryId)` accepts this directly).
+   *
+   * For optimistic user bubbles inserted before the WS round-trip this is
+   * the client-generated `clientMessageId` UUID; on the user-role
+   * `message_end` echo the bridge swaps the optimistic entry for the
+   * canonical one (whose `id` is the SDK entry id) keyed via the
+   * `clientMessageId` field below.
+   */
   id: string;
   kind: "message";
   role: "user" | "assistant" | "system";
@@ -42,14 +56,23 @@ export type ChatTimelineMessage = {
   streaming?: boolean;
   /** True for non-final assistant messages in a multi-message turn. */
   intermediate?: boolean;
-  /** Server-generated UUID for optimistic UI correlation. */
+  /**
+   * Surface-timeline correlation key — the DB messages-table row id that
+   * the runtime pre-allocates at enqueue time so the surface (input) view
+   * can show the message before the SDK has appended an entry. Independent
+   * of `id` (the SDK entry id) because the runtime needs an id at enqueue,
+   * before the SDK has assigned its own.
+   */
   serverMessageId?: string;
   /**
-   * Underlying pi-sdk SessionManager entry id. Present when the message was
-   * loaded from a live or on-disk pi session (not for surface-table messages).
-   * Required to prune history from a specific point via navigateTree().
+   * Optimistic-bubble correlation key for user-originated messages.
+   * Echoed back from the server on the user-role `message_end` envelope
+   * AND stamped onto the canonical message by the WS bridge so the
+   * structural-sharing comparator (mergeTimelineItems) recognises the
+   * optimistic entry (id === clientMessageId) as covered by the canonical
+   * (id === entry.id) and doesn't re-append it as an extra.
    */
-  entryId?: string;
+  clientMessageId?: string;
   createdAt: string;
 };
 
