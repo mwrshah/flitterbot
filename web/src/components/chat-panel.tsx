@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -20,7 +20,6 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
-import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment } from "~/lib/types";
@@ -76,7 +75,6 @@ export function ChatPanel({
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
-  const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
@@ -301,23 +299,7 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-foreground truncate">
-            {streamName ?? "flitterbot"}
-          </h1>
-          {worktree?.cwd && worktree.cwdAbsolute && (
-            <>
-              <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
-              <span
-                className="inline-block text-xs text-muted-foreground truncate max-w-full"
-                title={worktree.cwdAbsolute}
-              >
-                {worktree.cwd}
-              </span>
-            </>
-          )}
-        </div>
+      <div className="flex items-center justify-end px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
         <div className="flex items-center gap-2 shrink-0">
           {isClient && isSessionActive && (
             <Button

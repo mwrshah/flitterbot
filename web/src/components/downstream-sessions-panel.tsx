@@ -93,11 +93,13 @@ function sessionDescription(session: DownstreamSessionItem): string {
 export function DownstreamSessionsPanel({
   piSessionId,
   piSessionStatus,
+  streamName,
 }: {
   piSessionId: string | undefined;
   piSessionStatus?: PiSessionStatus;
+  streamName?: string;
 }) {
-  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
+  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, streamName });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   useEffect(() => {
     setPanelView("info");
@@ -308,6 +310,22 @@ export function DownstreamSessionsPanel({
       ) : (
         /* Default sessions + worktree panel */
         <div className="flex-1 overflow-y-auto">
+          <div className="flex items-center gap-2 px-4 pt-3 pb-3 border-b border-border min-w-0">
+            <h2 className="text-sm font-semibold text-foreground truncate">
+              {streamName ?? "flitterbot"}
+            </h2>
+            {worktree?.cwd && worktree.cwdAbsolute && (
+              <>
+                <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
+                <span
+                  className="inline-block text-xs text-muted-foreground truncate"
+                  title={worktree.cwdAbsolute}
+                >
+                  {worktree.cwd}
+                </span>
+              </>
+            )}
+          </div>
           <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
             Active Sessions
           </p>

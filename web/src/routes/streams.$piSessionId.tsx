@@ -103,6 +103,7 @@ function PiSessionRoute() {
         <DownstreamSessionsPanel
           piSessionId={piSessionId}
           piSessionStatus={stream?.piSessionStatus}
+          streamName={stream?.name}
         />
       </Panel>
     </PanelGroup>
