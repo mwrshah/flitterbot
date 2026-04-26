@@ -65,7 +65,7 @@ export const MessageInput = memo(function MessageInput({
   pendingImages,
   onAddImages,
   onRemoveImage,
-  placeholder = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
+  placeholder = "Press i to jump here · / for skills · @ for paths",
   rows = 2,
   autoFocus = false,
   streamId,
