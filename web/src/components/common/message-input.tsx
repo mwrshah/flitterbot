@@ -549,7 +549,7 @@ export const MessageInput = memo(function MessageInput({
         <div
           ref={containerRef}
           className={cn(
-            "relative bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-inset",
+            "relative bg-background focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring",
             fillHeight ? "flex-1 flex flex-col min-h-0" : "h-full",
           )}
         >
