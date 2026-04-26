@@ -352,7 +352,6 @@ export function ChatPanel({
             pendingImages={pendingImages}
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
-            placeholder={streamName ? `Message ${streamName}...` : "Message streams..."}
             fillHeight
             autoFocus
             streamId={streamId}

@@ -33,7 +33,6 @@ type MessageInputProps = {
   onRemoveImage: (index: number) => void;
   placeholder?: string;
   rows?: number;
-  helpText?: string;
   autoFocus?: boolean;
   /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
   streamId?: string;
@@ -66,9 +65,8 @@ export const MessageInput = memo(function MessageInput({
   pendingImages,
   onAddImages,
   onRemoveImage,
-  placeholder = "Message streams...",
+  placeholder = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
   rows = 2,
-  helpText = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
   autoFocus = false,
   streamId,
   fillHeight = false,
@@ -502,7 +500,7 @@ export const MessageInput = memo(function MessageInput({
   return (
     <div
       className={cn(
-        "border-t border-border px-6 py-3",
+        "border-t border-border",
         fillHeight ? "h-full flex flex-col min-h-0" : "shrink-0",
       )}
       onDrop={handleDrop}
@@ -515,7 +513,7 @@ export const MessageInput = memo(function MessageInput({
           setDraft("");
           if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
         }}
-        className={cn("space-y-2", fillHeight && "flex-1 flex flex-col min-h-0")}
+        className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}
       >
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -551,8 +549,8 @@ export const MessageInput = memo(function MessageInput({
         <div
           ref={containerRef}
           className={cn(
-            "relative rounded-lg border border-border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent",
-            fillHeight && "flex-1 flex flex-col min-h-0",
+            "relative bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-inset",
+            fillHeight ? "flex-1 flex flex-col min-h-0" : "h-full",
           )}
         >
           <SkillPicker
@@ -664,7 +662,6 @@ export const MessageInput = memo(function MessageInput({
             )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground/40">{helpText}</p>
       </form>
     </div>
   );

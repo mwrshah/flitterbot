@@ -915,7 +915,6 @@ export function Surface() {
             pendingImages={pendingImages}
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
-            placeholder="Message streams..."
             fillHeight
             autoFocus
           />
