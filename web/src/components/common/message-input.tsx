@@ -65,7 +65,7 @@ export const MessageInput = memo(function MessageInput({
   pendingImages,
   onAddImages,
   onRemoveImage,
-  placeholder = "Press i to jump here · Shift+Enter for newline · / for skills · @ for paths",
+  placeholder = "Press i to jump here · / for skills · @ for paths",
   rows = 2,
   autoFocus = false,
   streamId,
@@ -549,7 +549,7 @@ export const MessageInput = memo(function MessageInput({
         <div
           ref={containerRef}
           className={cn(
-            "relative bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-inset",
+            "relative bg-background focus-within:ring-2 focus-within:ring-ring",
             fillHeight ? "flex-1 flex flex-col min-h-0" : "h-full",
           )}
         >
