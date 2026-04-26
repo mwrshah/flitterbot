@@ -1,9 +1,32 @@
+import { exec as cpExec } from "node:child_process";
 import type http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
+
+const execPromise = promisify(cpExec);
+
+/**
+ * Resolve the actual git branch checked out in a worktree. Returns null on
+ * detached HEAD, missing path, or any git failure — callers render "unknown"
+ * rather than blocking the stream info response on a flaky git read.
+ */
+async function resolveWorktreeBranch(worktreePath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execPromise("git rev-parse --abbrev-ref HEAD", {
+      cwd: worktreePath,
+      timeout: 5_000,
+    });
+    const branch = stdout.trim();
+    if (!branch || branch === "HEAD") return null;
+    return branch;
+  } catch {
+    return null;
+  }
+}
 
 export async function handleBrowserPiSessionStreamRoute(
   runtime: ControlSurfaceRuntime,
@@ -25,11 +48,13 @@ export async function handleBrowserPiSessionStreamRoute(
   }
   const cwdAbsolute = piSession?.cwd ?? null;
   const cwd = cwdAbsolute ? relativizeCwd(cwdAbsolute, runtime.config.projectsDir) : null;
+  const branch = ws?.worktree_path ? await resolveWorktreeBranch(ws.worktree_path) : null;
   return sendJson(response, 200, {
     streamId: ws?.id ?? null,
     name: ws?.name ?? null,
     repoPath: ws?.repo_path ?? null,
     worktreePath: ws?.worktree_path ?? null,
+    branch,
     baseBranch: ws?.base_branch ?? null,
     cwd,
     cwdAbsolute,

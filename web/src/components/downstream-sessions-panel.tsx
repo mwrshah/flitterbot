@@ -392,9 +392,9 @@ export function DownstreamSessionsPanel({
                 <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Branch:{" "}
                   <CopyableCode
-                    text={worktree.name ?? ""}
+                    text={worktree.branch ?? ""}
                     copied={branchCopy.copied}
-                    onCopy={() => branchCopy.copy(worktree.name ?? "")}
+                    onCopy={() => branchCopy.copy(worktree.branch ?? "")}
                   />
                   <span className="text-muted-foreground/50 text-[10px]">
                     {branchCopy.copied ? "Copied!" : ""}
