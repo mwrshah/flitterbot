@@ -1,7 +1,7 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { ArrowRightIcon, Loader2Icon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon } from "lucide-react";
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -42,6 +42,20 @@ type MessageInputProps = {
   draftKey?: string;
   /** Show the model-selector popover-trigger left of the send button. Default: true. */
   showModelSelector?: boolean;
+  /** Agent is generating — send button swaps to a stop-sign icon. */
+  isSessionBusy?: boolean;
+  /** Triggered when the user clicks the stop-sign while session is busy. */
+  onInterrupt?: () => void;
+  /** Interrupt request in flight — disables the stop button. */
+  isInterruptPending?: boolean;
+  /** When set, send button is replaced with a Reopen/Recover action.
+   *  - 'closed' → stream itself was closed; label is "Reopen"
+   *  - 'dead'   → stream is open but its pi-session ended/crashed; label is "Recover" */
+  recoveryKind?: "closed" | "dead";
+  /** Triggered when the user clicks the recovery action. */
+  onRecover?: () => void;
+  /** Recovery request in flight — disables the recovery button. */
+  isRecoverPending?: boolean;
 };
 
 const rootRouteApi = getRouteApi("__root__");
@@ -60,6 +74,12 @@ export const MessageInput = memo(function MessageInput({
   fillHeight = false,
   draftKey,
   showModelSelector = true,
+  isSessionBusy = false,
+  onInterrupt,
+  isInterruptPending = false,
+  recoveryKind,
+  onRecover,
+  isRecoverPending = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
   // Skills list (built-in commands + server skills) comes pre-merged from
@@ -596,18 +616,52 @@ export const MessageInput = memo(function MessageInput({
               visible without stealing focus from the composer. */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
             {showModelSelector && <ModelSelector disabled={isSending} />}
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSending || !canSend}
-              className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
-            >
-              {isSending ? (
-                <Loader2Icon className="w-4 h-4 animate-spin" />
-              ) : (
-                <ArrowRightIcon className="w-4 h-4" />
-              )}
-            </Button>
+            {recoveryKind ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isRecoverPending || !onRecover}
+                onClick={() => onRecover?.()}
+                className="h-10 sm:h-7 px-3"
+              >
+                <RotateCcwIcon className="w-4 h-4" />
+                <span>
+                  {isRecoverPending
+                    ? recoveryKind === "dead"
+                      ? "Recovering…"
+                      : "Reopening…"
+                    : recoveryKind === "dead"
+                      ? "Recover"
+                      : "Reopen"}
+                </span>
+              </Button>
+            ) : isSessionBusy ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={isInterruptPending || !onInterrupt}
+                onClick={() => onInterrupt?.()}
+                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+                title="Stop"
+              >
+                <OctagonIcon className="w-4 h-4 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSending || !canSend}
+                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+              >
+                {isSending ? (
+                  <Loader2Icon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ArrowRightIcon className="w-4 h-4" />
+                )}
+              </Button>
+            )}
           </div>
         </div>
         <p className="text-xs text-muted-foreground/40">{helpText}</p>

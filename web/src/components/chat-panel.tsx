@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
 import { MessageInput } from "~/components/common/message-input";
@@ -24,14 +23,6 @@ import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment } from "~/lib/types";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
-
-const emptySubscribe = () => () => {};
-const useIsClient = () =>
-  useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
@@ -68,14 +59,12 @@ export function ChatPanel({
     streamId,
     recoveryKind,
   });
-  const isClient = useIsClient();
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
-  const isSessionActive = isSessionBusy;
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
@@ -296,43 +285,11 @@ export function ChatPanel({
     [onSendMessage, piSessionId, queryClient],
   );
 
+  // Recover/Reopen is only meaningful when we have a streamId to act on.
+  const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header bar */}
-      <div className="flex items-center justify-end px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
-        <div className="flex items-center gap-2 shrink-0">
-          {isClient && isSessionActive && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-6 px-2 text-[11px]"
-              disabled={interruptMutation.isPending}
-              onClick={() => interruptMutation.mutate()}
-            >
-              {interruptMutation.isPending ? "Stopping..." : "Stop"}
-            </Button>
-          )}
-          {isClient && !isSessionActive && recoveryKind && streamId && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 px-2 text-[11px]"
-              disabled={recoverMutation.isPending}
-              onClick={() => recoverMutation.mutate()}
-            >
-              <RotateCcw className="size-3" />
-              {recoverMutation.isPending
-                ? recoveryKind === "dead"
-                  ? "Recovering..."
-                  : "Reopening..."
-                : recoveryKind === "dead"
-                  ? "Recover"
-                  : "Reopen"}
-            </Button>
-          )}
-        </div>
-      </div>
-
       <PanelGroup
         orientation="vertical"
         className="flex-1 min-h-0"
@@ -399,6 +356,12 @@ export function ChatPanel({
             fillHeight
             autoFocus
             streamId={streamId}
+            isSessionBusy={isSessionBusy}
+            onInterrupt={() => interruptMutation.mutate()}
+            isInterruptPending={interruptMutation.isPending}
+            recoveryKind={effectiveRecoveryKind}
+            onRecover={() => recoverMutation.mutate()}
+            isRecoverPending={recoverMutation.isPending}
           />
         </Panel>
       </PanelGroup>
