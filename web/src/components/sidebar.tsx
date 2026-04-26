@@ -194,7 +194,7 @@ export const Sidebar = memo(function Sidebar() {
           )}
 
           {closedStreams.length > 0 && (
-            <div className={openStreams.length > 0 ? "mt-3" : ""}>
+            <div className={defaultPiSessionId || openStreams.length > 0 ? "mt-6" : ""}>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/30 font-medium mb-2">
                 Recently closed
               </p>
