@@ -103,6 +103,10 @@ export const MessageInput = memo(function MessageInput({
   const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
   const tildeExpandedRef = useRef(false);
+  // One-shot: tracks whether we've already auto-appended "/" after a trailing
+  // bare `..` segment. Resets when the trailing segment is no longer `..`,
+  // so chained `..` `..` `..` keystrokes produce `../../../`.
+  const dotDotExpandedRef = useRef(false);
 
   // Auto-focus textarea on mount when requested, cursor to end of any hydrated draft
   useEffect(() => {
@@ -265,6 +269,31 @@ export const MessageInput = memo(function MessageInput({
           tildeExpandedRef.current = false;
         }
 
+        // Auto-append "/" when the trailing segment of the filter is a bare `..`,
+        // so the picker drills into the parent directory. One-shot per segment:
+        // resets below when the trailing segment is no longer `..`, which lets
+        // chained `..` keystrokes produce `../../../`.
+        const trailingDotDot = filter === ".." || filter.endsWith("/..");
+        if (trailingDotDot && !dotDotExpandedRef.current) {
+          dotDotExpandedRef.current = true;
+          const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
+          const newCursor = cursor + 1;
+          setDraft(newValue);
+          atPositionRef.current = atIdx;
+          computeSlashLeft(newValue, atIdx);
+          setAtPickerOpen(true);
+          setAtPickerFilter(`${filter}/`);
+          slashPositionRef.current = -1;
+          setPickerOpen(false);
+          requestAnimationFrame(() => {
+            textareaRef.current?.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+        if (!trailingDotDot) {
+          dotDotExpandedRef.current = false;
+        }
+
         // Collapse ~// → ~/ when user's own "/" keystroke doubles the auto-inserted one
         if (filter.startsWith("~//")) {
           const extra = atIdx + 1 + 2; // position of the second slash
@@ -305,6 +334,7 @@ export const MessageInput = memo(function MessageInput({
         atPositionRef.current = -1;
         setAtPickerOpen(false);
         tildeExpandedRef.current = false;
+        dotDotExpandedRef.current = false;
       }
     },
     [skills, computeSlashLeft],

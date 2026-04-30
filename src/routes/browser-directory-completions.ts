@@ -111,6 +111,16 @@ export async function handleBrowserDirectoryCompletionsRoute(
   }
 }
 
+/**
+ * True when `child` is `parent` itself or a descendant of it. Uses
+ * `path.relative` rather than `startsWith` so prefix collisions like
+ * `/Users/foo` vs `/Users/foo2` don't yield false positives.
+ */
+function isUnder(child: string, parent: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
 async function listDirectoryCompletionItems(
   cwd: string,
   pathParam: string,
@@ -131,9 +141,16 @@ async function listDirectoryCompletionItems(
   const targetDir = path.resolve(cwd, dirPrefix);
 
   // Security: allow explicit absolute paths and tilde-expanded paths.
-  // For relative paths, ensure they don't escape the project directory via traversal.
-  if (!isAbsolute && !isTilde && !targetDir.startsWith(cwd)) {
-    return [];
+  // For relative paths, ensure they don't escape the project directory —
+  // EXCEPT when the user explicitly types `..` traversal, in which case the
+  // climb is allowed up to (but not above) the user's home directory.
+  if (!isAbsolute && !isTilde) {
+    const isParentTraversal = pathParam === ".." || pathParam.startsWith("../");
+    if (isParentTraversal) {
+      if (!isUnder(targetDir, os.homedir())) return [];
+    } else if (!isUnder(targetDir, cwd)) {
+      return [];
+    }
   }
 
   let entries: import("node:fs").Dirent[];
