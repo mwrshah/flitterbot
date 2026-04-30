@@ -409,9 +409,32 @@ function authSectionLabel(
 }
 
 function compareModelsForDisplay(a: ModelListItem, b: ModelListItem): number {
+  const version = compareModelVersionDesc(a, b);
+  if (version !== 0) return version;
   const provider = a.provider.localeCompare(b.provider);
   if (provider !== 0) return provider;
   return a.label.localeCompare(b.label);
+}
+
+function compareModelVersionDesc(a: ModelListItem, b: ModelListItem): number {
+  const aVersion = extractVersionParts(a);
+  const bVersion = extractVersionParts(b);
+  if (aVersion.length === 0 || bVersion.length === 0) return 0;
+  const length = Math.max(aVersion.length, bVersion.length);
+  for (let i = 0; i < length; i++) {
+    const diff = (bVersion[i] ?? 0) - (aVersion[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function extractVersionParts(model: ModelListItem): number[] {
+  const text = `${model.modelId} ${model.label}`;
+  const match = /(?:gpt|claude|gemini|glm|llama|qwen|mistral)[-\s]?([0-9]+(?:[.-][0-9]+)*)/i.exec(
+    text,
+  );
+  if (!match?.[1]) return [];
+  return match[1].split(/[.-]/).map((part) => Number(part));
 }
 
 function formatContext(tokens: number): string {
