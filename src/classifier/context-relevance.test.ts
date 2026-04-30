@@ -20,7 +20,8 @@ describe("buildContextRelevancePrompt", () => {
 
     expect(prompt).toContain('"fix-login-bug"');
     expect(prompt).toContain("[Message 1]");
-    expect(prompt).toContain("[Message 2]");
+    // The last message is tagged "CURRENT" so rule #3 in the prompt can reference it.
+    expect(prompt).toContain("[Message 2 \u2014 CURRENT]");
     expect(prompt).toContain("Fix the login bug");
     expect(prompt).toContain("It happens on Chrome");
   });
@@ -69,7 +70,7 @@ describe("formatStreamPrompt", () => {
     expect(result).not.toContain("[Stream:");
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("/tmux2");
-    expect(result).toMatch(/^\[Now: .+\]\n$/);
+    expect(result).toMatch(/^\[Now: .+\]$/);
   });
 
   test("skipUserMessage batch mode: empty messages + agent context", () => {

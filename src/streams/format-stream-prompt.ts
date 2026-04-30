@@ -3,7 +3,9 @@ import { formatDatetimeBlock } from "../prompts/datetime.ts";
 /**
  * Format the initial prompt for a new stream orchestrator.
  * Accepts one or more user messages as context, and an optional agent-authored message.
- * Prepends the current datetime so the orchestrator knows the time from its first message.
+ * Appends the current datetime as a tail block so the prompt's leading content is
+ * the user's own message — preserving any leading `/skill:<name>` token that the
+ * pi-sdk expands when the user message is at the head of the prompt.
  */
 export function formatStreamPrompt(
   messages: string[],
@@ -15,7 +17,8 @@ export function formatStreamPrompt(
   const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
 
   if (messages.length <= 1) {
-    return `${datetime}\n${messages[0] ?? ""}${agentSection}`;
+    const head = `${messages[0] ?? ""}${agentSection}`;
+    return head ? `${head}\n\n${datetime}` : datetime;
   }
 
   const total = messages.length;
@@ -26,5 +29,5 @@ export function formatStreamPrompt(
     })
     .join("\n\n");
 
-  return `${datetime}\nThe following user messages provide context for this stream:\n\n${body}${agentSection}`;
+  return `The following user messages provide context for this stream:\n\n${body}${agentSection}\n\n${datetime}`;
 }

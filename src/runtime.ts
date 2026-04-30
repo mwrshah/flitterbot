@@ -263,11 +263,17 @@ export class ControlSurfaceRuntime {
   enqueue(
     input: EnqueueInput,
   ): { ok: true; item: QueueItem } | { ok: true; cleared: true } | { ok: true; reloaded: true } {
+    // Normalize ingress text: trim head/tail whitespace so leading `/skill:<name>` or
+    // `/<command>` tokens land at the literal start of the prompt (the pi-sdk's
+    // expansion guards are strict `startsWith(...)` checks). All downstream
+    // callers see the trimmed value via the same `input.text` field.
+    input.text = input.text.trim();
+
     // /clear command: reset the default session without persisting or enqueuing.
     // The frontend strips _targetSessionId for /clear, so if neither stream_id nor
     // _targetSessionId is set, the message is bound for the default session.
     if (
-      input.text.trim() === "/clear" &&
+      input.text === "/clear" &&
       !input.metadata?.stream_id &&
       !input.metadata?._targetSessionId
     ) {
@@ -282,7 +288,7 @@ export class ControlSurfaceRuntime {
     // without persisting or enqueuing. Frontend strips _targetSessionId for
     // /reload, so it always lands on the default session.
     if (
-      input.text.trim() === "/reload" &&
+      input.text === "/reload" &&
       !input.metadata?.stream_id &&
       !input.metadata?._targetSessionId
     ) {

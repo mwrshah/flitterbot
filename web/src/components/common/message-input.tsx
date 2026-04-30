@@ -346,10 +346,12 @@ export const MessageInput = memo(function MessageInput({
     // Find end of the trigger token (non-whitespace run from trigger position)
     let tokenEnd = slashIdx + 1;
     while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-    // Replace from the "/" through the full token with "/<name> "
+    // Replace from the "/" through the full token with "/skill:<name> " so the
+    // pi-sdk's `_expandSkillCommand` guard (`startsWith("/skill:")`) fires and
+    // inlines the SKILL.md body at send time. Bare `/<name>` is inert.
     const before = value.slice(0, slashIdx);
     const after = value.slice(tokenEnd);
-    const inserted = `/${name} `;
+    const inserted = `/skill:${name} `;
     const newValue = before + inserted + after;
     setDraft(newValue);
     setPickerOpen(false);

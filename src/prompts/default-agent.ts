@@ -9,6 +9,7 @@ export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string
 - *Agent dir* — \`~/.flitterbot/control-surface/agent/\` (system prompt + config). Agent skills can be reloaded via \`/reload\`.
 - *Blackboard* — SQLite at \`~/.flitterbot/blackboard.db\`.
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
+- When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
 
 ## RULES
 Answer directly: quick questions, all todoist ops, light obsidian reads, non-repo brainstorm, conversation.

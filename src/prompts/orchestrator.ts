@@ -31,6 +31,7 @@ export function buildOrchestratorPrompt(
 - Fan reads out in parallel and parallelize downstream work.
 - Call \`close_stream\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. If the user says "merge with main" / "rebase" they are asking to skip the tool, its a git request — run them directly, do not close.
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
+- When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
 - When the user asks for a link or to see the document, reply with a code-fenced bash command: \`cd <absolute-path> && nvim <filename>\`.
 - Ship complete solutions. No workarounds when a real fix exists. Cutovers, not backwards compatibility. 
 
@@ -52,7 +53,7 @@ function renderTmuxSection(ctx: OrchestratorContext): string {
   return `
 ## Sub-agents (tmux2)
 
-Load the \`tmux2\` skill once before spawning sub-agents — it supplies the session-launch and message/send helpers you'll need. Skip reloading if you have context for it it already.
+Load the \`/skill:tmux2\` skill once before spawning sub-agents — it supplies the session-launch and message/send helpers you'll need. Skip reloading if you have context for it it already.
 
 Spawn Claude Code sub-agents through tmux2 when work is parallelizable. Define work to delegate and make investigation across different aspects parallelizable. Prompt them by stating the problem, not the solution. Pass instructions through; make them positive, positioned as if you are the user passing through a message to investigate or do. Tone should be positive, tight, succinct, clear, and not overly prescriptive. You may include your interpretation, spec paths, and constraints, but soften the language a little bit, avoid hard gating with negatives. Describe what's broken or what the user wants, name files or areas when already known, and state the constraints that matter ("might be good to use existing Groq client", "classifier interface shouldn't get modified as part of this, but if you need to tell me").
 
