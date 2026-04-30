@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon, SearchIcon, StarIcon, StarOffIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, SearchIcon, StarIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ModelListItem, ModelsListResponse } from "~/lib/types";
@@ -321,7 +321,7 @@ function ModelMenuItem({
         )}
         title={pinTitle}
       >
-        {isPinned ? <StarOffIcon className="h-3.5 w-3.5" /> : <StarIcon className="h-3.5 w-3.5" />}
+        <StarIcon className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
       </button>
     </div>
   );

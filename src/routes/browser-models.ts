@@ -40,10 +40,12 @@ export async function handleBrowserModelsRoute(
     authKind: availabilityByProvider.get(entry.provider) ?? "none",
   }));
 
+  const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
   for (const provider of getProviders()) {
     const authKind = availabilityByProvider.get(provider) ?? "none";
     for (const model of getModels(provider)) {
+      if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
       all.push({
         id: `${provider}/${model.id}`,
         label: model.name,
