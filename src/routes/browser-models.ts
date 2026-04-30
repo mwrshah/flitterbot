@@ -2,7 +2,11 @@ import type http from "node:http";
 import { getModel, getModels, getProviders } from "@mariozechner/pi-ai";
 import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
-import type { ModelListItem, ModelsListResponse } from "../contracts/index.ts";
+import type {
+  ModelListItem,
+  ModelsListResponse,
+  ModelsMutationResponse,
+} from "../contracts/index.ts";
 import { createPiAuthStorage } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
@@ -106,7 +110,7 @@ export async function handleBrowserModelsPinRoute(
   if (body.pin) {
     if (current.some((m) => m.id === id)) {
       // Already pinned — idempotent success.
-      return sendJson(res, 200, await okResponse(runtime));
+      return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
     const entry = buildEntryFromId(id, userLabel, current);
     if (!entry) {
@@ -120,7 +124,7 @@ export async function handleBrowserModelsPinRoute(
     nextList = current.filter((m) => m.id !== id);
     if (nextList.length === current.length) {
       // Nothing to remove — idempotent success.
-      return sendJson(res, 200, await okResponse(runtime));
+      return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
     if (nextList.length === 0) {
       return sendJson(res, 400, {
@@ -145,7 +149,7 @@ export async function handleBrowserModelsPinRoute(
     `models: ${body.pin ? "pinned" : "unpinned"} id=${id}; total=${nextList.length}; default=${nextDefault}`,
   );
 
-  return sendJson(res, 200, await okResponse(runtime));
+  return sendJson(res, 200, await buildModelsMutationResponse(runtime));
 }
 
 /**
@@ -176,6 +180,15 @@ export async function handleBrowserModelsDefaultRoute(
     });
   }
 
+  try {
+    await runtime.setDefaultModel(id);
+  } catch (error) {
+    return sendJson(res, 400, {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   runtime.config.defaultModel = id;
   persistModelsToConfigFile({
     models: runtime.config.models,
@@ -183,10 +196,12 @@ export async function handleBrowserModelsDefaultRoute(
   });
   runtime.log(`models: defaultModel set to ${id}`);
 
-  return sendJson(res, 200, await okResponse(runtime));
+  return sendJson(res, 200, await buildModelsMutationResponse(runtime));
 }
 
-async function okResponse(runtime: ControlSurfaceRuntime) {
+export async function buildModelsMutationResponse(
+  runtime: ControlSurfaceRuntime,
+): Promise<ModelsMutationResponse> {
   const availabilityByProvider = await resolveProviderAvailability(runtime);
   return {
     ok: true,

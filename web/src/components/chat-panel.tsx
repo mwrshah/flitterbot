@@ -38,6 +38,8 @@ type ChatPanelProps = {
   ) => Promise<void>;
   streamId?: string;
   streamName?: string;
+  modelSelectorMode?: "default" | "pi-session";
+  selectedModelId?: string;
   /** Recovery action to offer in the header, if any:
    *  - 'closed' → stream is closed; offer "Reopen"
    *  - 'dead'   → stream is open but pi-session ended/crashed; offer "Recover" */
@@ -51,6 +53,8 @@ export function ChatPanel({
   onSendMessage,
   streamId,
   streamName,
+  modelSelectorMode = "default",
+  selectedModelId,
   recoveryKind,
 }: ChatPanelProps) {
   useWhyDidYouRender("ChatPanel", {
@@ -377,6 +381,9 @@ export function ChatPanel({
             fillHeight
             autoFocus
             streamId={streamId}
+            modelSelectorMode={modelSelectorMode}
+            modelSelectorPiSessionId={piSessionId}
+            selectedModelId={selectedModelId}
             isSessionBusy={isSessionBusy}
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}

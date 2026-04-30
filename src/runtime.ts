@@ -3,13 +3,14 @@ import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
 import path from "node:path";
-import type { AssistantMessage, TextContent } from "@mariozechner/pi-ai";
+import { type AssistantMessage, getModel, type TextContent } from "@mariozechner/pi-ai";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {
   getLastDatetimeReportedAt,
   touchDatetimeReportedAt,
   touchPiPrompt,
+  updatePiSessionModelMirror,
   updatePiSessionStatus,
 } from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
@@ -34,6 +35,7 @@ import {
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
+import { resolveModelEntry } from "./config/models.ts";
 import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
@@ -44,6 +46,7 @@ import type {
   DirectSessionMessageResponse,
   HookResponse,
   MessageMetadata,
+  PiSessionModelInfo,
   RuntimeWhatsAppStartResponse,
   RuntimeWhatsAppStopResponse,
   ClaudeSessionListItem as SessionListItem,
@@ -583,6 +586,133 @@ export class ControlSurfaceRuntime {
     return { ok: true };
   }
 
+  private resolveModelEntryId(provider: string, modelId: string): string {
+    return (
+      this.config.models.find((entry) => entry.provider === provider && entry.modelId === modelId)
+        ?.id ?? `${provider}/${modelId}`
+    );
+  }
+
+  private toPiSessionModelInfo(modelInfo: {
+    provider: string;
+    id: string;
+    thinkingLevel?: PiSessionModelInfo["thinkingLevel"];
+  }): PiSessionModelInfo {
+    return {
+      id: this.resolveModelEntryId(modelInfo.provider, modelInfo.id),
+      provider: modelInfo.provider,
+      modelId: modelInfo.id,
+      thinkingLevel: modelInfo.thinkingLevel,
+    };
+  }
+
+  private getPersistedPiSessionModels(
+    piSessionIds: Array<string | undefined>,
+  ): Map<string, PiSessionModelInfo> {
+    const ids = Array.from(new Set(piSessionIds.filter((id): id is string => Boolean(id))));
+    const models = new Map<string, PiSessionModelInfo>();
+    if (ids.length === 0) return models;
+
+    const rows = this.blackboard.all<{
+      pi_session_id: string;
+      model_provider: string | null;
+      model_id: string | null;
+      thinking_level: PiSessionModelInfo["thinkingLevel"] | null;
+    }>(
+      `SELECT pi_session_id, model_provider, model_id, thinking_level
+       FROM pi_sessions
+       WHERE pi_session_id IN (${ids.map(() => "?").join(", ")})`,
+      ...ids,
+    );
+
+    for (const row of rows) {
+      if (!row.model_provider || !row.model_id) continue;
+      models.set(row.pi_session_id, {
+        id: this.resolveModelEntryId(row.model_provider, row.model_id),
+        provider: row.model_provider,
+        modelId: row.model_id,
+        thinkingLevel: row.thinking_level ?? undefined,
+      });
+    }
+    return models;
+  }
+
+  async setPiSessionModel(piSessionId: string, modelId: string): Promise<PiSessionModelInfo> {
+    const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (!managed) {
+      throw new Error(`Pi session not found: ${piSessionId}`);
+    }
+
+    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
+      await this.sessionManager.activateOrchestrator(
+        managed,
+        this.createCustomTools("orchestrator", managed.streamId),
+      );
+    }
+
+    const session = managed.runtime?.session;
+    if (!session) {
+      throw new Error(`Pi session is not active: ${piSessionId}`);
+    }
+
+    const modelEntry = resolveModelEntry(this.config, modelId);
+    if (
+      managed.modelInfo.provider === modelEntry.provider &&
+      managed.modelInfo.id === modelEntry.modelId
+    ) {
+      managed.modelInfo.entryId = modelEntry.id;
+      updatePiSessionModelMirror(
+        this.blackboard,
+        managed.piSessionId,
+        managed.modelInfo.provider,
+        managed.modelInfo.id,
+        managed.modelInfo.thinkingLevel,
+      );
+      return this.toPiSessionModelInfo(managed.modelInfo);
+    }
+
+    const model = getModel(
+      modelEntry.provider as Parameters<typeof getModel>[0],
+      modelEntry.modelId as Parameters<typeof getModel>[1],
+    );
+    if (!model) {
+      throw new Error(
+        `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId}`,
+      );
+    }
+
+    await session.setModel(model);
+    const currentModel = session.model;
+    if (!currentModel) {
+      throw new Error(`Pi session has no current model after switch: ${piSessionId}`);
+    }
+
+    managed.modelInfo = {
+      provider: currentModel.provider,
+      id: currentModel.id,
+      entryId: this.resolveModelEntryId(currentModel.provider, currentModel.id),
+      thinkingLevel: session.thinkingLevel,
+    };
+    updatePiSessionModelMirror(
+      this.blackboard,
+      managed.piSessionId,
+      managed.modelInfo.provider,
+      managed.modelInfo.id,
+      managed.modelInfo.thinkingLevel,
+    );
+    this.broadcastStatusChanged("pi_session");
+    this.log(
+      `pi-session model switched: ${managed.piSessionId} → ${managed.modelInfo.provider}/${managed.modelInfo.id}`,
+    );
+    return this.toPiSessionModelInfo(managed.modelInfo);
+  }
+
+  async setDefaultModel(modelId: string): Promise<PiSessionModelInfo | undefined> {
+    const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
+    if (!defaultPiSessionId) return undefined;
+    return this.setPiSessionModel(defaultPiSessionId, modelId);
+  }
+
   getStatus(): StatusResponse {
     const def = this.sessionManager.getDefault();
     const defSnapshot = def?.state.getSnapshot();
@@ -600,8 +730,18 @@ export class ControlSurfaceRuntime {
       };
     });
 
-    const openStreams = listOpenStreams(this.blackboard);
-    const closedStreams = listRecentlyClosedStreams(this.blackboard, 24);
+    const openStreams = listOpenStreams(this.blackboard).map((stream) => ({
+      stream,
+      piSessionId: getActivePiSessionId(this.blackboard, stream.id),
+    }));
+    const closedStreams = listRecentlyClosedStreams(this.blackboard, 24).map((stream) => ({
+      stream,
+      piSessionId: getLatestPiSessionId(this.blackboard, stream.id),
+    }));
+    const persistedModelByPiSession = this.getPersistedPiSessionModels([
+      ...openStreams.map(({ piSessionId }) => piSessionId),
+      ...closedStreams.map(({ piSessionId }) => piSessionId),
+    ]);
     const sessionCountByStream = new Map<string, number>();
     for (const session of this.getSessionList()) {
       if (session.streamId) {
@@ -624,6 +764,7 @@ export class ControlSurfaceRuntime {
               messageCount: def!.runtime?.session?.messages?.length ?? defSnapshot.messageCount,
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
               busy: defSnapshot.busy,
+              model: this.toPiSessionModelInfo(def!.modelInfo),
             }
           : null,
         orchestrators: orchestratorStatuses,
@@ -636,8 +777,8 @@ export class ControlSurfaceRuntime {
       },
       blackboard: blackboardStatus,
       streams: [
-        ...openStreams.map((ws) => {
-          const piSessionId = getActivePiSessionId(this.blackboard, ws.id);
+        ...openStreams.map(({ stream: ws, piSessionId }) => {
+          const managed = this.sessionManager.getByStream(ws.id);
           return {
             id: ws.id,
             name: ws.name,
@@ -648,27 +789,28 @@ export class ControlSurfaceRuntime {
             piSessionStatus: piSessionId
               ? getPiSessionStatus(this.blackboard, piSessionId)
               : undefined,
+            model: managed
+              ? this.toPiSessionModelInfo(managed.modelInfo)
+              : persistedModelByPiSession.get(piSessionId ?? ""),
             sessionCount: sessionCountByStream.get(ws.id) ?? 0,
             createdAt: ws.created_at,
           };
         }),
-        ...closedStreams.map((ws) => {
-          const piSessionId = getLatestPiSessionId(this.blackboard, ws.id);
-          return {
-            id: ws.id,
-            name: ws.name,
-            status: "closed" as const,
-            closedAt: ws.closed_at ?? undefined,
-            repoPath: ws.repo_path ?? undefined,
-            worktreePath: ws.worktree_path ?? undefined,
-            piSessionId,
-            piSessionStatus: piSessionId
-              ? getPiSessionStatus(this.blackboard, piSessionId)
-              : undefined,
-            sessionCount: sessionCountByStream.get(ws.id) ?? 0,
-            createdAt: ws.created_at,
-          };
-        }),
+        ...closedStreams.map(({ stream: ws, piSessionId }) => ({
+          id: ws.id,
+          name: ws.name,
+          status: "closed" as const,
+          closedAt: ws.closed_at ?? undefined,
+          repoPath: ws.repo_path ?? undefined,
+          worktreePath: ws.worktree_path ?? undefined,
+          piSessionId,
+          piSessionStatus: piSessionId
+            ? getPiSessionStatus(this.blackboard, piSessionId)
+            : undefined,
+          model: persistedModelByPiSession.get(piSessionId ?? ""),
+          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
+          createdAt: ws.created_at,
+        })),
       ],
       shortcuts: this.config.shortcuts,
     };

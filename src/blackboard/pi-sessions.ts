@@ -7,6 +7,7 @@ import {
   touchPiSessionEvent,
   touchPiSessionPrompt,
   upsertPiSession as writePiSession,
+  updatePiSessionModel as writePiSessionModel,
 } from "./write-pi-sessions.ts";
 
 type UpsertPiSessionInput = {
@@ -99,6 +100,23 @@ export function updatePiSessionStatus(
          last_event_at = MAX(last_event_at, ?)
      WHERE pi_session_id = ?`,
   ).run(status, now, piSessionId);
+}
+
+export function updatePiSessionModelMirror(
+  db: BlackboardDatabase,
+  piSessionId: string,
+  modelProvider: string,
+  modelId: string,
+  thinkingLevel: string,
+): void {
+  writePiSessionModel(
+    db,
+    piSessionId,
+    modelProvider,
+    modelId,
+    thinkingLevel,
+    new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+  );
 }
 
 export function getLastDatetimeReportedAt(

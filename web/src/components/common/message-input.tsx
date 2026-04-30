@@ -41,6 +41,9 @@ type MessageInputProps = {
   draftKey?: string;
   /** Show the model-selector popover-trigger left of the send button. Default: true. */
   showModelSelector?: boolean;
+  modelSelectorMode?: "default" | "pi-session";
+  modelSelectorPiSessionId?: string;
+  selectedModelId?: string;
   /** Agent is generating — send button swaps to a stop-sign icon. */
   isSessionBusy?: boolean;
   /** Triggered when the user clicks the stop-sign while session is busy. */
@@ -72,6 +75,9 @@ export const MessageInput = memo(function MessageInput({
   fillHeight = false,
   draftKey,
   showModelSelector = true,
+  modelSelectorMode = "default",
+  modelSelectorPiSessionId,
+  selectedModelId,
   isSessionBusy = false,
   onInterrupt,
   isInterruptPending = false,
@@ -645,7 +651,14 @@ export const MessageInput = memo(function MessageInput({
               the send button so "which model am I about to invoke" is always
               visible without stealing focus from the composer. */}
           <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            {showModelSelector && <ModelSelector disabled={isSending} />}
+            {showModelSelector && (
+              <ModelSelector
+                disabled={isSending}
+                mode={modelSelectorMode}
+                piSessionId={modelSelectorPiSessionId}
+                selectedModelId={selectedModelId}
+              />
+            )}
             {recoveryKind ? (
               <Button
                 type="button"

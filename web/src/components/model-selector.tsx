@@ -15,6 +15,10 @@ export type ModelSelectorProps = {
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
   compact?: boolean;
   disabled?: boolean;
+  /** Default mode updates config and the live default Pi session. Pi-session mode only changes that session. */
+  mode?: "default" | "pi-session";
+  piSessionId?: string;
+  selectedModelId?: string;
 };
 
 /**
@@ -25,12 +29,15 @@ export type ModelSelectorProps = {
  *      type-to-filter search. Entries whose provider has no auth configured
  *      are rendered dimmed with a small badge.
  *
- * Selecting a model sets it as the server-side default; `defaultModel` from
- * the models query is the single source of truth.
+ * Selecting a model either updates the default model (default route) or switches
+ * the currently viewed Pi session (stream route).
  */
 export const ModelSelector = memo(function ModelSelector({
   compact,
   disabled,
+  mode = "default",
+  piSessionId,
+  selectedModelId,
 }: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
   const { data } = useQuery({
@@ -44,6 +51,7 @@ export const ModelSelector = memo(function ModelSelector({
   const pinned = data?.pinned ?? [];
   const all = data?.all ?? [];
   const defaultModelId = data?.defaultModel ?? null;
+  const activeModelId = selectedModelId ?? defaultModelId;
   // Include both the curated id AND the composite `provider/modelId` so an
   // "All" entry shows its star whether it was pinned under its curated alias
   // or its composite form.
@@ -72,27 +80,34 @@ export const ModelSelector = memo(function ModelSelector({
       toast.error(`Pin failed: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
-  const defaultMutation = useMutation({
-    mutationFn: (id: string) => apiClient.setDefaultModel(id),
+  const modelMutation = useMutation({
+    mutationFn: (id: string) => {
+      if (mode === "pi-session") {
+        if (!piSessionId) throw new Error("No Pi session selected");
+        return apiClient.setPiSessionModel(piSessionId, id);
+      }
+      return apiClient.setDefaultModel(id);
+    },
     onSuccess: (result) => {
       queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
         old ? { ...old, pinned: result.pinned, defaultModel: result.defaultModel } : old,
       );
-      toast.success("Default model updated in config");
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+      toast.success(mode === "pi-session" ? "Stream model switched" : "Default model updated");
     },
     onError: (error) => {
-      toast.error(`Set default failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`Set model failed: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
 
   const currentModel = useMemo(() => {
-    if (!defaultModelId) return undefined;
+    if (!activeModelId) return undefined;
     return (
-      pinned.find((m) => matchesModelId(m, defaultModelId)) ??
-      all.find((m) => matchesModelId(m, defaultModelId)) ??
+      pinned.find((m) => matchesModelId(m, activeModelId)) ??
+      all.find((m) => matchesModelId(m, activeModelId)) ??
       undefined
     );
-  }, [defaultModelId, pinned, all]);
+  }, [activeModelId, pinned, all]);
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -115,7 +130,7 @@ export const ModelSelector = memo(function ModelSelector({
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
       <Menu.Trigger
-        disabled={disabled}
+        disabled={disabled || (mode === "pi-session" && !piSessionId)}
         className={cn(
           "inline-flex items-center gap-1 h-7 rounded-md border border-border/60 bg-background/40 text-xs text-muted-foreground",
           "hover:text-foreground hover:bg-accent/50 hover:border-border transition-colors",
@@ -148,15 +163,15 @@ export const ModelSelector = memo(function ModelSelector({
                     <ModelMenuItem
                       key={`pinned:${model.id}`}
                       model={model}
-                      selected={defaultModelId ? matchesModelId(model, defaultModelId) : false}
+                      selected={activeModelId ? matchesModelId(model, activeModelId) : false}
                       isPinned
                       canUnpin={pinned.length > 1}
                       onSelect={() => {
-                        defaultMutation.mutate(model.id);
+                        modelMutation.mutate(model.id);
                         setOpen(false);
                       }}
                       onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
-                      busy={pinMutation.isPending || defaultMutation.isPending}
+                      busy={pinMutation.isPending || modelMutation.isPending}
                     />
                   ))}
                 </ModelSection>
@@ -171,11 +186,11 @@ export const ModelSelector = memo(function ModelSelector({
                         <ModelMenuItem
                           key={`all:${model.id}`}
                           model={model}
-                          selected={defaultModelId ? matchesModelId(model, defaultModelId) : false}
+                          selected={activeModelId ? matchesModelId(model, activeModelId) : false}
                           isPinned={isPinned}
                           canUnpin={pinned.length > 1}
                           onSelect={() => {
-                            defaultMutation.mutate(model.id);
+                            modelMutation.mutate(model.id);
                             setOpen(false);
                           }}
                           onTogglePin={() =>
@@ -185,7 +200,7 @@ export const ModelSelector = memo(function ModelSelector({
                               ...(isPinned ? {} : { label: model.name ?? model.label }),
                             })
                           }
-                          busy={pinMutation.isPending || defaultMutation.isPending}
+                          busy={pinMutation.isPending || modelMutation.isPending}
                         />
                       );
                     })}

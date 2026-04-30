@@ -119,21 +119,29 @@ export async function createFlitterbotAgent(
     ...extraSkillPaths,
   ];
 
-  const modelEntry = resolveModelEntry(config, options.modelId);
-  const model = getModel(
-    modelEntry.provider as Parameters<typeof getModel>[0],
-    modelEntry.modelId as Parameters<typeof getModel>[1],
-  );
-  if (!model) {
+  const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
+  const modelEntry = shouldLetSessionRestoreModel
+    ? undefined
+    : resolveModelEntry(config, options.modelId);
+  const model = modelEntry
+    ? getModel(
+        modelEntry.provider as Parameters<typeof getModel>[0],
+        modelEntry.modelId as Parameters<typeof getModel>[1],
+      )
+    : undefined;
+  if (modelEntry && !model) {
     throw new Error(
       `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
     );
   }
-  const effectiveThinkingLevel: ThinkingLevel = modelEntry.thinkingLevel ?? config.piThinkingLevel;
+  const effectiveThinkingLevel: ThinkingLevel | undefined = modelEntry
+    ? (modelEntry.thinkingLevel ?? config.piThinkingLevel)
+    : undefined;
 
   // Build the factory that createAgentSessionRuntime stores and reuses for newSession().
   // Closes over config-derived values (auth, model, tools, prompts); receives per-session
-  // cwd/agentDir/sessionManager from the runtime.
+  // cwd/agentDir/sessionManager from the runtime. Resume without an explicit model lets
+  // the SDK restore the current model from the session JSONL model_change history.
   const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
     // Update the system prompt with the current session's piSessionId
     const factoryPiSessionId = factoryOpts.sessionManager.getSessionId();
@@ -162,8 +170,8 @@ export async function createFlitterbotAgent(
       services,
       sessionManager: factoryOpts.sessionManager,
       sessionStartEvent: factoryOpts.sessionStartEvent,
-      model,
-      thinkingLevel: effectiveThinkingLevel,
+      ...(model ? { model } : {}),
+      ...(effectiveThinkingLevel ? { thinkingLevel: effectiveThinkingLevel } : {}),
       customTools: customTools as ToolDefinition[],
     });
 
@@ -196,13 +204,19 @@ export async function createFlitterbotAgent(
     }
   }
 
+  const currentModel = runtime.session.model;
+  if (!currentModel) {
+    throw new Error("Pi session started without a resolved model");
+  }
+  const currentThinkingLevel = runtime.session.thinkingLevel;
+
   return {
     runtime,
     modelInfo: {
-      provider: model.provider,
-      id: model.id,
-      entryId: modelEntry.id,
-      thinkingLevel: effectiveThinkingLevel,
+      provider: currentModel.provider,
+      id: currentModel.id,
+      entryId: resolveModelEntryId(config, currentModel.provider, currentModel.id),
+      thinkingLevel: currentThinkingLevel,
     },
     resourceInfo: {
       skillNames,
@@ -210,6 +224,13 @@ export async function createFlitterbotAgent(
       skillMessages,
     },
   };
+}
+
+function resolveModelEntryId(config: FlitterbotConfig, provider: string, modelId: string): string {
+  return (
+    config.models.find((entry) => entry.provider === provider && entry.modelId === modelId)?.id ??
+    `${provider}/${modelId}`
+  );
 }
 
 function resolveSystemPrompt(

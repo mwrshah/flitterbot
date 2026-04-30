@@ -38,6 +38,7 @@ import { handleDirectSessionMessageRoute } from "./routes/direct-session-message
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
 import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
+import { handlePiSessionModelRoute } from "./routes/pi-session-model.ts";
 import { handlePruneStreamHistoryRoute } from "./routes/prune-stream-history.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
@@ -228,6 +229,15 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "interrupt"
   ) {
     return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "PUT" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "model"
+  ) {
+    return handlePiSessionModelRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "POST" &&

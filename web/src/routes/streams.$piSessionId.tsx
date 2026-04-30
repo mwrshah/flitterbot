@@ -95,6 +95,8 @@ function PiSessionRoute() {
           onSendMessage={onSendMessage}
           streamId={stream?.id}
           streamName={stream?.name}
+          modelSelectorMode="pi-session"
+          selectedModelId={stream?.model?.id}
           recoveryKind={recoveryKind}
         />
       </Panel>

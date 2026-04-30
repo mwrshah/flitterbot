@@ -35,12 +35,20 @@ export interface WhatsAppRuntimeStatus {
   requiresManualAuth?: boolean;
 }
 
+export interface PiSessionModelInfo {
+  id: string;
+  provider: string;
+  modelId: string;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
 export interface PiSessionRuntimeStatus {
   piSessionId: string;
   sessionFile: string | null;
   messageCount: number;
   lastPromptAt: string | null;
   busy: boolean;
+  model?: PiSessionModelInfo;
 }
 
 export interface ClaudeSessionListItem {
@@ -89,6 +97,8 @@ export interface StreamSummary {
   repoPath?: string;
   worktreePath?: string;
   piSessionId?: string;
+  piSessionStatus?: "active" | "waiting_for_user" | "waiting_for_sessions" | "ended" | "crashed";
+  model?: PiSessionModelInfo;
   sessionCount: number;
   createdAt: string;
 }
@@ -402,6 +412,11 @@ export const CONTROL_SURFACE_ENDPOINTS = {
   piSessionInterrupt: {
     method: "POST",
     path: "/api/pi-sessions/:piSessionId/interrupt",
+    auth: "bearer",
+  },
+  piSessionModel: {
+    method: "PUT",
+    path: "/api/pi-sessions/:piSessionId/model",
     auth: "bearer",
   },
   directoryCompletions: {

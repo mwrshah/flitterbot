@@ -100,6 +100,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ id }),
       }),
 
+    setPiSessionModel: (piSessionId: string, id: string) =>
+      request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/model`, {
+        method: "PUT",
+        body: JSON.stringify({ id }),
+      }),
+
     getDirectoryCompletions: (path: string, piSessionId?: string) => {
       const params = new URLSearchParams({ path });
       if (piSessionId) params.set("piSessionId", piSessionId);

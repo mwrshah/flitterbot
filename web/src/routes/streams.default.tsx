@@ -86,6 +86,8 @@ function StreamsDefaultRoute() {
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
           streamName={defaultStream?.name}
+          modelSelectorMode="default"
+          selectedModelId={status?.piAgent?.default?.model?.id}
         />
       </Panel>
       <ResizeHandle />

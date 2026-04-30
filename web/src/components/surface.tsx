@@ -917,6 +917,7 @@ export function Surface() {
             onRemoveImage={removeImage}
             fillHeight
             autoFocus
+            showModelSelector={false}
           />
         </Panel>
       </PanelGroup>

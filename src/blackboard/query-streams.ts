@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { StreamRow } from "../contracts/index.ts";
+import type { PiSessionStatus, StreamRow } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
 export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
@@ -53,8 +53,8 @@ export function getActivePiSessionId(db: BlackboardDatabase, streamId: string): 
 export function getPiSessionStatus(
   db: BlackboardDatabase,
   piSessionId: string,
-): string | undefined {
-  const row = db.get<{ status: string }>(
+): PiSessionStatus | undefined {
+  const row = db.get<{ status: PiSessionStatus }>(
     `SELECT status FROM pi_sessions WHERE pi_session_id = ?`,
     piSessionId,
   );

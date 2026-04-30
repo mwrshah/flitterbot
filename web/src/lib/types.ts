@@ -95,6 +95,13 @@ export type TranscriptPage = {
 
 export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 
+export type PiSessionModelInfo = {
+  id: string;
+  provider: string;
+  modelId: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
 export type StatusResponse = {
   source?: string;
   pid?: number;
@@ -111,6 +118,7 @@ export type StatusResponse = {
       busy?: boolean;
       messageCount?: number;
       state?: string;
+      model?: PiSessionModelInfo;
     };
     orchestrators?: Array<{
       piSessionId: string;
@@ -142,6 +150,7 @@ export type StreamSummary = {
   worktreePath?: string;
   piSessionId?: string;
   piSessionStatus?: PiSessionStatus;
+  model?: PiSessionModelInfo;
   sessionCount: number;
   createdAt: string;
 };

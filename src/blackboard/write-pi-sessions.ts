@@ -156,6 +156,24 @@ export function touchPiSessionEvent(
   ).run(timestamp, status, piSessionId);
 }
 
+export function updatePiSessionModel(
+  db: BlackboardDatabase,
+  piSessionId: string,
+  modelProvider: string,
+  modelId: string,
+  thinkingLevel: string,
+  timestamp: string,
+): void {
+  db.prepare(
+    `UPDATE pi_sessions
+     SET model_provider = ?,
+         model_id = ?,
+         thinking_level = ?,
+         last_event_at = MAX(last_event_at, ?)
+     WHERE pi_session_id = ?`,
+  ).run(modelProvider, modelId, thinkingLevel, timestamp, piSessionId);
+}
+
 /**
  * Re-associate orphaned sessions whose pi_session_id points to an ended pi session.
  * Moves them to the given new (active) pi session.
