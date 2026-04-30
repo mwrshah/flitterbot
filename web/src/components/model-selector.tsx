@@ -9,7 +9,7 @@ import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
-const MODELS_QUERY_KEY = ["models"] as const;
+const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
 
 export type ModelSelectorProps = {
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
@@ -36,7 +36,9 @@ export const ModelSelector = memo(function ModelSelector({
   const { data } = useQuery({
     queryKey: MODELS_QUERY_KEY,
     queryFn: () => apiClient.listModels(),
-    staleTime: 5 * 60 * 1000,
+    // Auth can change outside the web app (`pi /login`, env updates, token refresh).
+    // Keep the selector's badges/order tied to the control surface's current auth state.
+    staleTime: 0,
   });
 
   const pinned = data?.pinned ?? [];
@@ -102,7 +104,7 @@ export const ModelSelector = memo(function ModelSelector({
 
   const filteredAll = useMemo(() => filterModels(all, search), [all, search]);
   const filteredPinned = useMemo(() => filterModels(pinned, search), [pinned, search]);
-  const groupedAll = useMemo(() => groupByProvider(filteredAll), [filteredAll]);
+  const groupedAll = useMemo(() => groupByAuthKind(filteredAll), [filteredAll]);
 
   if (pinned.length === 0 && all.length === 0) {
     return null;
@@ -161,8 +163,8 @@ export const ModelSelector = memo(function ModelSelector({
               )}
 
               {groupedAll.length > 0 &&
-                groupedAll.map(([provider, models]) => (
-                  <ModelSection key={provider} label={provider}>
+                groupedAll.map(([section, models]) => (
+                  <ModelSection key={section} label={section}>
                     {models.map((model) => {
                       const isPinned = pinnedIds.has(model.id);
                       return (
@@ -303,14 +305,7 @@ function ModelMenuItem({
           </span>
         </div>
       </Menu.Item>
-      {!available && (
-        <span
-          className="shrink-0 self-center rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-          title={`No auth configured for provider "${model.provider}"`}
-        >
-          no auth
-        </span>
-      )}
+      <AuthBadge model={model} />
       <button
         type="button"
         disabled={pinDisabled}
@@ -357,14 +352,66 @@ function filterModels(models: ModelListItem[], query: string): ModelListItem[] {
   });
 }
 
-function groupByProvider(models: ModelListItem[]): Array<[string, ModelListItem[]]> {
+function AuthBadge({ model }: { model: ModelListItem }) {
+  if (model.authKind === "subscription") {
+    return (
+      <span
+        className="shrink-0 self-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400"
+        title={`Using subscription/OAuth token auth for provider "${model.provider}"`}
+      >
+        subscription
+      </span>
+    );
+  }
+  if (model.authKind === "api_key") {
+    return (
+      <span
+        className="shrink-0 self-center rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-600 dark:text-sky-400"
+        title={`Using API key auth for provider "${model.provider}"`}
+      >
+        api key
+      </span>
+    );
+  }
+  return (
+    <span
+      className="shrink-0 self-center rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+      title={`No auth configured for provider "${model.provider}"`}
+    >
+      no auth
+    </span>
+  );
+}
+
+function groupByAuthKind(models: ModelListItem[]): Array<[string, ModelListItem[]]> {
   const groups = new Map<string, ModelListItem[]>();
   for (const m of models) {
-    const bucket = groups.get(m.provider);
+    const label = authSectionLabel(m.authKind);
+    const bucket = groups.get(label);
     if (bucket) bucket.push(m);
-    else groups.set(m.provider, [m]);
+    else groups.set(label, [m]);
   }
-  return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  return AUTH_SECTION_ORDER.flatMap((label) => {
+    const modelsForSection = groups.get(label);
+    if (!modelsForSection?.length) return [];
+    return [[label, modelsForSection.sort(compareModelsForDisplay)] as [string, ModelListItem[]]];
+  });
+}
+
+const AUTH_SECTION_ORDER = ["Subscription/token auth", "API key auth", "No auth"] as const;
+
+function authSectionLabel(
+  authKind: ModelListItem["authKind"],
+): (typeof AUTH_SECTION_ORDER)[number] {
+  if (authKind === "subscription") return "Subscription/token auth";
+  if (authKind === "api_key") return "API key auth";
+  return "No auth";
+}
+
+function compareModelsForDisplay(a: ModelListItem, b: ModelListItem): number {
+  const provider = a.provider.localeCompare(b.provider);
+  if (provider !== 0) return provider;
+  return a.label.localeCompare(b.label);
 }
 
 function formatContext(tokens: number): string {

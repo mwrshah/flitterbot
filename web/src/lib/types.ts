@@ -209,6 +209,7 @@ export type ModelListItem = {
   name?: string;
   contextWindow?: number;
   available?: boolean;
+  authKind?: "subscription" | "api_key" | "none";
 };
 
 export type ModelsListResponse = {

@@ -1,8 +1,9 @@
 import type http from "node:http";
-import { getEnvApiKey, getModel, getModels, getProviders } from "@mariozechner/pi-ai";
+import { getModel, getModels, getProviders } from "@mariozechner/pi-ai";
 import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type { ModelListItem, ModelsListResponse } from "../contracts/index.ts";
+import { createPiAuthStorage } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -13,9 +14,9 @@ import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
  * Response shape:
  *   - `pinned`:        curated favorites from `config.models[]`
  *   - `all`:           every provider/model in the pi SDK catalog, each
- *                      annotated with an `available` flag derived from
- *                      `getEnvApiKey(provider)` so the UI can badge entries
- *                      whose provider has no auth configured.
+ *                      annotated with an `available` flag derived from Pi's
+ *                      canonical auth (API keys, OAuth subscription tokens,
+ *                      or environment variables).
  *   - `defaultModel`:  id used when the web client sends no explicit override
  *
  * IDs in `all` use the composite `provider/modelId` format because pi-mono has
@@ -23,30 +24,25 @@ import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
  * `anthropic` and `opencode`). `resolveModelEntry` on the server accepts
  * either form.
  */
-export function handleBrowserModelsRoute(
+export async function handleBrowserModelsRoute(
   runtime: ControlSurfaceRuntime,
   _req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
+  const availabilityByProvider = await resolveProviderAvailability(runtime);
   const pinned: ModelListItem[] = runtime.config.models.map((entry) => ({
     id: entry.id,
     label: entry.label,
     provider: entry.provider,
     modelId: entry.modelId,
     ...(entry.thinkingLevel ? { thinkingLevel: entry.thinkingLevel } : {}),
-    available: Boolean(getEnvApiKey(entry.provider)),
+    available: (availabilityByProvider.get(entry.provider) ?? "none") !== "none",
+    authKind: availabilityByProvider.get(entry.provider) ?? "none",
   }));
 
-  // Cache auth availability per provider — getEnvApiKey() touches disk for some
-  // providers (Vertex ADC) so we only want to call it once per provider.
-  const availabilityByProvider = new Map<string, boolean>();
   const all: ModelListItem[] = [];
   for (const provider of getProviders()) {
-    let available = availabilityByProvider.get(provider);
-    if (available === undefined) {
-      available = Boolean(getEnvApiKey(provider));
-      availabilityByProvider.set(provider, available);
-    }
+    const authKind = availabilityByProvider.get(provider) ?? "none";
     for (const model of getModels(provider)) {
       all.push({
         id: `${provider}/${model.id}`,
@@ -55,7 +51,8 @@ export function handleBrowserModelsRoute(
         modelId: model.id,
         name: model.name,
         contextWindow: model.contextWindow,
-        available,
+        available: authKind !== "none",
+        authKind,
       });
     }
   }
@@ -107,7 +104,7 @@ export async function handleBrowserModelsPinRoute(
   if (body.pin) {
     if (current.some((m) => m.id === id)) {
       // Already pinned — idempotent success.
-      return sendJson(res, 200, okResponse(runtime));
+      return sendJson(res, 200, await okResponse(runtime));
     }
     const entry = buildEntryFromId(id, userLabel, current);
     if (!entry) {
@@ -121,7 +118,7 @@ export async function handleBrowserModelsPinRoute(
     nextList = current.filter((m) => m.id !== id);
     if (nextList.length === current.length) {
       // Nothing to remove — idempotent success.
-      return sendJson(res, 200, okResponse(runtime));
+      return sendJson(res, 200, await okResponse(runtime));
     }
     if (nextList.length === 0) {
       return sendJson(res, 400, {
@@ -146,7 +143,7 @@ export async function handleBrowserModelsPinRoute(
     `models: ${body.pin ? "pinned" : "unpinned"} id=${id}; total=${nextList.length}; default=${nextDefault}`,
   );
 
-  return sendJson(res, 200, okResponse(runtime));
+  return sendJson(res, 200, await okResponse(runtime));
 }
 
 /**
@@ -184,10 +181,11 @@ export async function handleBrowserModelsDefaultRoute(
   });
   runtime.log(`models: defaultModel set to ${id}`);
 
-  return sendJson(res, 200, okResponse(runtime));
+  return sendJson(res, 200, await okResponse(runtime));
 }
 
-function okResponse(runtime: ControlSurfaceRuntime) {
+async function okResponse(runtime: ControlSurfaceRuntime) {
+  const availabilityByProvider = await resolveProviderAvailability(runtime);
   return {
     ok: true,
     pinned: runtime.config.models.map((m) => ({
@@ -196,10 +194,34 @@ function okResponse(runtime: ControlSurfaceRuntime) {
       provider: m.provider,
       modelId: m.modelId,
       ...(m.thinkingLevel ? { thinkingLevel: m.thinkingLevel } : {}),
-      available: Boolean(getEnvApiKey(m.provider)),
+      available: (availabilityByProvider.get(m.provider) ?? "none") !== "none",
+      authKind: availabilityByProvider.get(m.provider) ?? "none",
     })),
     defaultModel: runtime.config.defaultModel,
   };
+}
+
+async function resolveProviderAvailability(
+  runtime: ControlSurfaceRuntime,
+): Promise<Map<string, ModelListItem["authKind"]>> {
+  const authStorage = createPiAuthStorage(runtime.config.controlSurfaceAgentDir);
+  const providers = new Set([
+    ...getProviders(),
+    ...runtime.config.models.map((model) => model.provider),
+  ]);
+  const entries = await Promise.all(
+    [...providers].map(async (provider) => {
+      const apiKey = await authStorage.getApiKey(provider);
+      const credential = authStorage.get(provider);
+      const authKind: ModelListItem["authKind"] = apiKey
+        ? credential?.type === "oauth"
+          ? "subscription"
+          : "api_key"
+        : "none";
+      return [provider, authKind] as const;
+    }),
+  );
+  return new Map(entries);
 }
 
 /**

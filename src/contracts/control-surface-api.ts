@@ -131,8 +131,10 @@ export interface ModelListItem {
   name?: string;
   /** Context window in tokens, when known from the pi SDK catalog. */
   contextWindow?: number;
-  /** Whether the provider's auth (env var / OAuth) is present in the server's environment. False entries are surfaced with a visual badge so the user can see why a selection might fail before sending. */
+  /** Whether the provider's auth (API key / OAuth subscription token / env var) is present. False entries are surfaced with a visual badge so the user can see why a selection might fail before sending. */
   available?: boolean;
+  /** Auth class used by the model selector for ordering and badges. */
+  authKind?: "subscription" | "api_key" | "none";
 }
 
 export interface ModelsListResponse {

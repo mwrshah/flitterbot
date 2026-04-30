@@ -5,17 +5,16 @@ import { getModel } from "@mariozechner/pi-ai";
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import {
   type AgentSessionRuntime,
-  AuthStorage,
   type CreateAgentSessionRuntimeFactory,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
-  ModelRegistry,
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
 import { resolveModelEntry } from "../config/models.ts";
+import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
 
@@ -89,21 +88,12 @@ export async function createFlitterbotAgent(
   // Updated inside the factory on each session creation to keep the piSessionId in sync.
   const promptRef = { value: "" };
 
-  // Use the canonical Pi auth — same OAuth tokens the Pi CLI uses after `pi auth login`.
-  const piAuthPath = path.join(HOME, ".pi", "agent", "auth.json");
-  const authPath = fs.existsSync(piAuthPath)
-    ? piAuthPath
-    : path.join(config.controlSurfaceAgentDir, "auth.json");
-  const authStorage = AuthStorage.create(authPath);
+  const authStorage = createPiAuthStorage(config.controlSurfaceAgentDir);
   // Use the control-surface agent dir so the resource loader doesn't pick up
   // ~/.pi/agent skills or AGENTS.md. Auth and models still resolve from
-  // ~/.pi/agent explicitly (same pattern as authStorage above).
+  // ~/.pi/agent explicitly.
   const agentDir = config.controlSurfaceAgentDir;
-  const piModelsPath = path.join(HOME, ".pi", "agent", "models.json");
-  const modelsPath = fs.existsSync(piModelsPath)
-    ? piModelsPath
-    : path.join(agentDir, "models.json");
-  const modelRegistry = ModelRegistry.create(authStorage, modelsPath);
+  const modelRegistry = createPiModelRegistry(authStorage, agentDir);
   const settingsManager = SettingsManager.inMemory();
   // Skill paths, in precedence order:
   //   1. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
