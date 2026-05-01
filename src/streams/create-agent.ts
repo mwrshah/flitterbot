@@ -95,6 +95,7 @@ export async function createFlitterbotAgent(
   const agentDir = config.controlSurfaceAgentDir;
   const modelRegistry = createPiModelRegistry(authStorage, agentDir);
   const settingsManager = SettingsManager.inMemory();
+  settingsManager.setTransport(config.piTransport);
   // Skill paths, in precedence order:
   //   1. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
   //   2. `extraSkillPaths` from ~/.flitterbot/config.json, in declared order

@@ -6,6 +6,7 @@ import path from "node:path";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type PiTransport = "sse" | "websocket" | "websocket-cached" | "auto";
 
 /**
  * A selectable model entry shown in the web UI model selector. `id` is the
@@ -56,6 +57,7 @@ type RawConfigJson = {
   models?: ModelConfigEntry[];
   defaultModel?: string;
   piThinkingLevel?: ThinkingLevel;
+  piTransport?: PiTransport;
   stallMinutes?: number;
   toolTimeoutMinutes?: number;
   blackboardPath?: string;
@@ -85,6 +87,7 @@ export type FlitterbotConfig = {
   /** Id of the default model (must match one of `models[].id`). */
   defaultModel: string;
   piThinkingLevel: ThinkingLevel;
+  piTransport: PiTransport;
   stallMinutes: number;
   toolTimeoutMinutes: number;
   blackboardPath: string;
@@ -229,6 +232,15 @@ function resolveDefaultModel(configured: unknown, models: ModelConfigEntry[]): s
   return fallback;
 }
 
+function normalizePiTransport(input: unknown): PiTransport {
+  return input === "sse" ||
+    input === "websocket" ||
+    input === "websocket-cached" ||
+    input === "auto"
+    ? input
+    : "websocket-cached";
+}
+
 export function loadConfig(): FlitterbotConfig {
   ensureDir(FLITTERBOT_DIR);
   ensureDir(path.join(FLITTERBOT_DIR, "logs"));
@@ -265,6 +277,7 @@ export function loadConfig(): FlitterbotConfig {
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const models = normalizeModels(raw.models);
   const defaultModel = resolveDefaultModel(raw.defaultModel, models);
+  const piTransport = normalizePiTransport(raw.piTransport);
   const config: FlitterbotConfig = {
     controlSurfaceHost: raw.controlSurfaceHost ?? "127.0.0.1",
     controlSurfacePort: raw.controlSurfacePort ?? 18820,
@@ -272,6 +285,7 @@ export function loadConfig(): FlitterbotConfig {
     models,
     defaultModel,
     piThinkingLevel: raw.piThinkingLevel ?? "high",
+    piTransport,
     stallMinutes: raw.stallMinutes ?? 15,
     toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 4,
     blackboardPath,
@@ -322,6 +336,7 @@ export function loadConfig(): FlitterbotConfig {
     models: config.models,
     defaultModel: config.defaultModel,
     piThinkingLevel: config.piThinkingLevel,
+    piTransport: config.piTransport,
     stallMinutes: config.stallMinutes,
     toolTimeoutMinutes: config.toolTimeoutMinutes,
     blackboardPath: config.blackboardPath,
