@@ -26,7 +26,6 @@ import ChevronRight from "lucide/dist/esm/icons/chevron-right.js";
 import Code from "lucide/dist/esm/icons/code.js";
 import Copy from "lucide/dist/esm/icons/copy.js";
 import EllipsisVertical from "lucide/dist/esm/icons/ellipsis-vertical.js";
-import FilePen from "lucide/dist/esm/icons/file-pen.js";
 import FileText from "lucide/dist/esm/icons/file-text.js";
 import FolderOpen from "lucide/dist/esm/icons/folder-open.js";
 import MessageSquare from "lucide/dist/esm/icons/message-square.js";
@@ -547,35 +546,133 @@ function truncateLines(text: string, max: number): { lines: string; truncated: b
   return { lines: all.slice(0, max).join("\n"), truncated: true };
 }
 
+type EditDiffRow =
+  | { type: "context"; oldLine: number; newLine: number; content: string }
+  | { type: "delete"; oldLine: number; content: string }
+  | { type: "insert"; newLine: number; content: string }
+  | { type: "omitted"; content: string };
+
+const MAX_EDIT_DIFF_ROWS = 160;
+
+function splitEditLines(text: string): string[] {
+  if (!text) return [];
+  const lines = text.split("\n");
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
+}
+
+function buildEditDiffRows(
+  oldText: string,
+  newText: string,
+): { rows: EditDiffRow[]; truncated: boolean } {
+  const oldLines = splitEditLines(oldText);
+  const newLines = splitEditLines(newText);
+
+  let prefixLength = 0;
+  while (
+    prefixLength < oldLines.length &&
+    prefixLength < newLines.length &&
+    oldLines[prefixLength] === newLines[prefixLength]
+  ) {
+    prefixLength += 1;
+  }
+
+  let suffixLength = 0;
+  while (
+    suffixLength < oldLines.length - prefixLength &&
+    suffixLength < newLines.length - prefixLength &&
+    oldLines[oldLines.length - 1 - suffixLength] === newLines[newLines.length - 1 - suffixLength]
+  ) {
+    suffixLength += 1;
+  }
+
+  const rows: EditDiffRow[] = [];
+
+  for (let i = 0; i < prefixLength; i += 1) {
+    rows.push({ type: "context", oldLine: i + 1, newLine: i + 1, content: oldLines[i] ?? "" });
+  }
+
+  const oldChangedEnd = oldLines.length - suffixLength;
+  const newChangedEnd = newLines.length - suffixLength;
+
+  for (let i = prefixLength; i < oldChangedEnd; i += 1) {
+    rows.push({ type: "delete", oldLine: i + 1, content: oldLines[i] ?? "" });
+  }
+
+  for (let i = prefixLength; i < newChangedEnd; i += 1) {
+    rows.push({ type: "insert", newLine: i + 1, content: newLines[i] ?? "" });
+  }
+
+  for (let i = 0; i < suffixLength; i += 1) {
+    const oldIndex = oldChangedEnd + i;
+    const newIndex = newChangedEnd + i;
+    rows.push({
+      type: "context",
+      oldLine: oldIndex + 1,
+      newLine: newIndex + 1,
+      content: oldLines[oldIndex] ?? "",
+    });
+  }
+
+  if (rows.length <= MAX_EDIT_DIFF_ROWS) return { rows, truncated: false };
+  return {
+    rows: [
+      ...rows.slice(0, MAX_EDIT_DIFF_ROWS),
+      { type: "omitted", content: `… ${rows.length - MAX_EDIT_DIFF_ROWS} more diff lines` },
+    ],
+    truncated: true,
+  };
+}
+
+function renderEditDiffRows(rows: EditDiffRow[]): TemplateResult {
+  return html`
+    <div class="diff-viewer-panel text-xs rounded-md border border-border overflow-auto max-h-64">
+      <table class="diff">
+        <colgroup>
+          <col class="diff-gutter-col" />
+          <col class="diff-gutter-col" />
+          <col />
+        </colgroup>
+        <tbody class="diff-hunk">
+          ${rows.map((row, index) => {
+            if (row.type === "omitted") {
+              return html`
+                <tr class="diff-line diff-line-normal" data-row=${index}>
+                  <td class="diff-gutter diff-gutter-normal" colspan="2"></td>
+                  <td class="diff-code diff-code-normal text-muted-foreground">${row.content}</td>
+                </tr>
+              `;
+            }
+            const diffType = row.type === "context" ? "normal" : row.type;
+            const sign = row.type === "insert" ? "+" : row.type === "delete" ? "-" : " ";
+            const oldLine = row.type === "insert" ? "" : row.oldLine;
+            const newLine = row.type === "delete" ? "" : row.newLine;
+            return html`
+              <tr class=${`diff-line diff-line-${diffType}`} data-row=${index}>
+                <td class=${`diff-gutter diff-gutter-${diffType}`}>${oldLine}</td>
+                <td class=${`diff-gutter diff-gutter-${diffType}`}>${newLine}</td>
+                <td class=${`diff-code diff-code-${diffType}`}>${sign}${row.content}</td>
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderEditTool(
   params: unknown,
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const filePath = toolPathParam(p);
-
   const oldStr = String(p.old_string ?? p.oldString ?? "");
   const newStr = String(p.new_string ?? p.newString ?? "");
-
-  const diffLines: string[] = [];
-  if (oldStr) for (const l of oldStr.split("\n")) diffLines.push(`- ${l}`);
-  if (newStr) for (const l of newStr.split("\n")) diffLines.push(`+ ${l}`);
+  const { rows } = buildEditDiffRows(oldStr, newStr);
 
   return html`
     <div class="space-y-2">
-      ${renderToolHeader(FilePen, `Editing ${filePath}`)}
-      ${
-        diffLines.length
-          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${diffLines.map(
-              (l) =>
-                l.startsWith("- ")
-                  ? html`<span class="text-red-400">${l}\n</span>`
-                  : l.startsWith("+ ")
-                    ? html`<span class="text-green-400">${l}\n</span>`
-                    : html`${l}\n`,
-            )}</pre>`
-          : ""
-      }
+      ${rows.length ? renderEditDiffRows(rows) : ""}
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
@@ -600,17 +697,14 @@ function renderWriteTool(
 }
 
 function renderReadTool(
-  params: unknown,
+  _params: unknown,
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
-  const p = paramRecord(params);
-  const filePath = toolPathParam(p);
   const output = resultText(result);
   const { lines, truncated } = truncateLines(output, 10);
 
   return html`
-    <div class="space-y-2">
-      ${renderToolHeader(FileText, `Reading ${filePath}`)}
+    <div>
       ${
         output
           ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`

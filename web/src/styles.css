@@ -109,7 +109,12 @@ code,
    which handles wrapping cleanly. We just narrow the gutter, drop the
    break-all aggression, and theme the colors. */
 .diff-viewer-panel .diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--diff-font-family);
   font-size: inherit;
+  color: var(--diff-text-color);
+  background: var(--diff-background-color);
 }
 .diff-viewer-panel .diff-gutter-col {
   /* Two gutter cols in unified view. 3.5ch each = 7ch total; fits 3-digit
@@ -129,6 +134,18 @@ code,
   white-space: pre-wrap;
   word-break: normal;
   overflow-wrap: anywhere;
+}
+.diff-viewer-panel .diff-gutter-insert {
+  background: var(--diff-gutter-insert-background-color);
+}
+.diff-viewer-panel .diff-gutter-delete {
+  background: var(--diff-gutter-delete-background-color);
+}
+.diff-viewer-panel .diff-code-insert {
+  background: var(--diff-code-insert-background-color);
+}
+.diff-viewer-panel .diff-code-delete {
+  background: var(--diff-code-delete-background-color);
 }
 /* Theme mapping: library CSS variables → app color tokens. One block for
    both light and dark; values are alpha-composited against the app bg so
