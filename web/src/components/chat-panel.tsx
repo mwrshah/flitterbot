@@ -460,7 +460,8 @@ export function ChatPanel({
             {
               id: "clear-session",
               label: "clear session",
-              insertText: "/clear",
+              insertText: "/clear ",
+              showSendAction: false,
             },
           ]
         : [];
