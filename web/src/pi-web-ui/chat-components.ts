@@ -536,6 +536,11 @@ function resultText(result: ToolResultMessageType | undefined): string {
   );
 }
 
+function toolPathParam(params: Record<string, unknown>): string {
+  const value = params.path ?? params.file_path ?? params.filePath;
+  return value == null ? "" : String(value);
+}
+
 function truncateLines(text: string, max: number): { lines: string; truncated: boolean } {
   const all = text.split("\n");
   if (all.length <= max) return { lines: text, truncated: false };
@@ -547,7 +552,7 @@ function renderEditTool(
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const filePath = String(p.file_path ?? p.filePath ?? "");
+  const filePath = toolPathParam(p);
 
   const oldStr = String(p.old_string ?? p.oldString ?? "");
   const newStr = String(p.new_string ?? p.newString ?? "");
@@ -581,7 +586,7 @@ function renderWriteTool(
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const filePath = String(p.file_path ?? p.filePath ?? "");
+  const filePath = toolPathParam(p);
   const content = String(p.content ?? "");
   const { lines, truncated } = truncateLines(content, 10);
 
@@ -599,7 +604,7 @@ function renderReadTool(
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const filePath = String(p.file_path ?? p.filePath ?? "");
+  const filePath = toolPathParam(p);
   const output = resultText(result);
   const { lines, truncated } = truncateLines(output, 10);
 
@@ -724,9 +729,8 @@ function summarizeToolCall(
   }
 
   if (name === "edit" || name === "write" || name === "read") {
-    const filePath = String(p.file_path ?? p.filePath ?? "");
-    const short = filePath.split("/").slice(-2).join("/");
-    return { title: toolName, subtitle: short ? `${state} • ${short}` : state };
+    const filePath = toolPathParam(p);
+    return { title: toolName, subtitle: filePath ? `${state} • ${filePath}` : state };
   }
 
   if (name === "grep") {
