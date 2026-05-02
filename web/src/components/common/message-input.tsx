@@ -65,6 +65,15 @@ function isBlankDraft(value: string) {
   return value.length === 0 || !/\S/.test(value);
 }
 
+function autoExpandedDuplicateSlashIndex(filter: string) {
+  if (filter.startsWith("~//")) return 2;
+  if (filter.startsWith("..//")) return 3;
+
+  const nestedDotDot = "/..//";
+  const nestedIndex = filter.lastIndexOf(nestedDotDot);
+  return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
+}
+
 function MessageInputHoverButtons({
   buttons,
   composerRef,
@@ -518,16 +527,17 @@ export const MessageInput = memo(function MessageInput({
           dotDotExpandedRef.current = false;
         }
 
-        // Collapse ~// → ~/ when user's own "/" keystroke doubles the auto-inserted one
-        if (filter.startsWith("~//")) {
-          const extra = atIdx + 1 + 2; // position of the second slash
+        // Collapse the user's own "/" keystroke when it doubles an auto-inserted slash.
+        const extraSlash = autoExpandedDuplicateSlashIndex(filter);
+        if (extraSlash >= 0) {
+          const extra = atIdx + 1 + extraSlash;
           const newValue = value.slice(0, extra) + value.slice(extra + 1);
           const newCursor = cursor - 1;
           setDraftAndStore(newValue);
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
-          setAtPickerFilter(filter.slice(0, 2) + filter.slice(3));
+          setAtPickerFilter(filter.slice(0, extraSlash) + filter.slice(extraSlash + 1));
           slashPositionRef.current = -1;
           setPickerOpen(false);
           requestAnimationFrame(() => {
