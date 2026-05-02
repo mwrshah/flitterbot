@@ -17,7 +17,12 @@ import { ModelSelector } from "~/components/model-selector";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
+import {
+  getMessageInputButtonShortcutActionId,
+  MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS,
+  registerComposerFocusTarget,
+  registerShortcutHandlers,
+} from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
 import type {
   DirectoryCompletionItem,
@@ -83,6 +88,10 @@ function autoExpandedDuplicateSlashIndex(filter: string) {
   return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
 }
 
+function messageInputButtonShortcutLabel(index: number) {
+  return MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS[index] ?? null;
+}
+
 function MessageInputHoverButtons({
   buttons,
   composerRef,
@@ -97,9 +106,13 @@ function MessageInputHoverButtons({
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleBlockWidthRef = useRef(0);
+  const [visibleShortcutCount, setVisibleShortcutCount] = useState(0);
 
   useLayoutEffect(() => {
-    if (buttons.length === 0) return;
+    if (buttons.length === 0) {
+      setVisibleShortcutCount(0);
+      return;
+    }
 
     let frame = 0;
     let observer: ResizeObserver | null = null;
@@ -138,12 +151,16 @@ function MessageInputHoverButtons({
       const prefixStyle = firstButton.firstElementChild
         ? window.getComputedStyle(firstButton.firstElementChild)
         : null;
+      const shortcutStyle = firstButton.lastElementChild
+        ? window.getComputedStyle(firstButton.lastElementChild)
+        : null;
       const buttonRowStyle = window.getComputedStyle(buttonRow);
       const toolbarStyle = window.getComputedStyle(toolbar);
       const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
       const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
       const buttonChrome = horizontalBox(buttonStyle);
       const prefixMargin = prefixStyle ? horizontalMargin(prefixStyle) : 0;
+      const shortcutMargin = shortcutStyle ? horizontalMargin(shortcutStyle) : 0;
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
       const availableWidth = Math.max(
@@ -153,9 +170,14 @@ function MessageInputHoverButtons({
 
       let usedWidth = 0;
       let visibleCount = 0;
-      for (const button of buttons) {
+      for (const [index, button] of buttons.entries()) {
         const prefixWidth = pretextTextWidth(button.prefix ?? "+", font, lineHeight) + prefixMargin;
-        const textWidth = prefixWidth + pretextTextWidth(button.label, font, lineHeight);
+        const shortcutLabel = messageInputButtonShortcutLabel(index);
+        const shortcutWidth = shortcutLabel
+          ? pretextTextWidth(shortcutLabel, font, lineHeight) + shortcutMargin
+          : 0;
+        const textWidth =
+          prefixWidth + pretextTextWidth(button.label, font, lineHeight) + shortcutWidth;
         const nextWidth =
           usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
         if (nextWidth > availableWidth) break;
@@ -167,6 +189,7 @@ function MessageInputHoverButtons({
       renderedButtons.forEach((button, index) => {
         if (button) button.hidden = index >= visibleCount;
       });
+      setVisibleShortcutCount((current) => (current === visibleCount ? current : visibleCount));
       return true;
     };
 
@@ -196,8 +219,6 @@ function MessageInputHoverButtons({
     };
   }, [buttons, composerRef, toolbarRef]);
 
-  if (buttons.length === 0) return null;
-
   const currentVisibleBlockWidth = () => {
     const buttonRow = buttonRowRef.current;
     if (!buttonRow) return visibleBlockWidthRef.current;
@@ -212,6 +233,26 @@ function MessageInputHoverButtons({
     }
     return width || visibleBlockWidthRef.current;
   };
+
+  useEffect(() => {
+    const cleanup = registerShortcutHandlers(
+      buttons
+        .slice(0, Math.min(visibleShortcutCount, MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.length))
+        .map((button, index) => ({
+          actionId: getMessageInputButtonShortcutActionId(index + 1),
+          priority: 10,
+          handler: () => {
+            const node = buttonRefs.current[index];
+            if (!node || node.hidden || node.disabled) return false;
+            onInsert(button, currentVisibleBlockWidth());
+            return true;
+          },
+        })),
+    );
+    return cleanup;
+  }, [buttons, onInsert, visibleShortcutCount]);
+
+  if (buttons.length === 0) return null;
 
   return (
     <div
@@ -234,6 +275,11 @@ function MessageInputHoverButtons({
             {button.prefix ?? "+"}
           </span>
           <span className="truncate">{button.label}</span>
+          {messageInputButtonShortcutLabel(index) && (
+            <span aria-hidden="true" className="ml-1.5 shrink-0 text-muted-foreground/35">
+              {messageInputButtonShortcutLabel(index)}
+            </span>
+          )}
         </button>
       ))}
     </div>
