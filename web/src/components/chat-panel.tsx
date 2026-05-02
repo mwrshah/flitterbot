@@ -376,7 +376,14 @@ export function ChatPanel({
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
     if (!streamId) {
       return modelSelectorMode === "default"
-        ? [{ id: "clear-session", label: "/clear", insertText: "/clear", showSendAction: false }]
+        ? [
+            {
+              id: "clear-session",
+              label: "clear session",
+              insertText: "/clear ",
+              showSendAction: false,
+            },
+          ]
         : [];
     }
     if (streamHasWorktree) {

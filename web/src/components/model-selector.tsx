@@ -16,6 +16,14 @@ const rootApi = getRouteApi("__root__");
 
 const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
+  off: "off",
+  minimal: "min",
+  low: "low",
+  medium: "med",
+  high: "high",
+  xhigh: "xhigh",
+};
 
 export type ModelSelectorProps = {
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
@@ -342,7 +350,7 @@ function ThinkingLevelSection({
                   : "Current model does not support this level"
               }
             >
-              {level}
+              {THINKING_LEVEL_LABELS[level]}
             </button>
           );
         })}
