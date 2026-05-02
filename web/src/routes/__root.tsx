@@ -151,7 +151,7 @@ function RootDocument({
         {children}
         <Toaster
           theme={resolvedTheme}
-          duration={Infinity}
+          duration={4000}
           closeButton
           toastOptions={{
             style: {
