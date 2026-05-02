@@ -717,10 +717,9 @@ function summarizeToolCall(
 
   if (name === "bash") {
     const command = String(p.command ?? "");
-    const preview = command.length > 80 ? `${command.slice(0, 80)}…` : command;
     return {
       title: toolName,
-      subtitle: preview ? `${state} • ${preview}` : state,
+      subtitle: command ? `${state} • ${command}` : state,
     };
   }
 
@@ -742,8 +741,7 @@ function summarizeToolCall(
 
   if (name === "send_to_user") {
     const text = String(p.text ?? p.message ?? "");
-    const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-    return { title: "Notify User", subtitle: preview ? `${state} • ${preview}` : state };
+    return { title: "Notify User", subtitle: text ? `${state} • ${text}` : state };
   }
 
   return {
