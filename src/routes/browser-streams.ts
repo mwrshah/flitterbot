@@ -9,48 +9,7 @@ import type {
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readStreamsHistory, readStreamsHistoryFromSession } from "../streams/history.ts";
 import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
-import type { QueueItem } from "../streams/turn-queue.ts";
 import { sendJson } from "./_shared.ts";
-
-/**
- * Build placeholder ChatTimelineMessages for user-originated turn-queue
- * items that haven't yet been appended to the SDK SessionManager. Lets the
- * agent timeline survive a full page reload between submit and `message_end`
- * — without these, a fresh fetch would return the SDK's branch (which
- * doesn't know about in-flight messages yet) and the user's just-submitted
- * bubble would vanish until the WS echo arrives.
- *
- * Id strategy: prefer `clientMessageId` so an existing optimistic bubble
- * in the React-Query cache (id === clientMessageId) is recognised as the
- * same item by the structural-sharing comparator. Fall back to
- * `serverMessageId` for non-web sources (whatsapp/cron) that never had an
- * optimistic but should still appear as pending. The eventual user-role
- * `message_end` carries both, and the WS bridge swap matches whichever
- * key the placeholder used.
- */
-function pendingItemsToPlaceholders(items: QueueItem[]): ChatTimelineMessage[] {
-  const placeholders: ChatTimelineMessage[] = [];
-  for (const item of items) {
-    if (item.sender !== "user") continue;
-    const id = item.clientMessageId ?? item.serverMessageId;
-    if (!id) continue;
-    const placeholder: ChatTimelineMessage = {
-      id,
-      kind: "message",
-      role: "user",
-      content: item.text,
-      source: item.source,
-      streamId: item.streamId,
-      streamName: item.streamName,
-      streaming: true,
-      createdAt: item.receivedAt,
-    };
-    if (item.clientMessageId) placeholder.clientMessageId = item.clientMessageId;
-    if (item.serverMessageId) placeholder.serverMessageId = item.serverMessageId;
-    placeholders.push(placeholder);
-  }
-  return placeholders;
-}
 
 async function readSessionHistory(
   managed: ManagedPiSession,
@@ -92,18 +51,6 @@ async function readSessionHistory(
     const last = items[items.length - 1]!;
     if (last.kind === "message" && last.role === "assistant") {
       items = items.slice(0, -1);
-    }
-  }
-
-  // Append pending user-input placeholders so a full page reload between
-  // submit and SDK appendMessage doesn't drop the user's message from the
-  // agent timeline. Skipped for `input` mode — the input surface reads
-  // from the messages table (which already records inbound rows at
-  // runtime.enqueueMessage time), so it has its own durability path.
-  if (historyMode === "agent") {
-    const placeholders = pendingItemsToPlaceholders(managed.queue.getPendingItems());
-    if (placeholders.length > 0) {
-      items = [...items, ...placeholders];
     }
   }
 
