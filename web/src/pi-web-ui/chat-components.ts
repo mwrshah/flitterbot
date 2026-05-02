@@ -920,11 +920,7 @@ export class UserMessage extends LitElement {
           <div class="user-message-container py-2 px-4 rounded-xl">
             ${
               textContent?.text
-                ? html`<span
-                    class="after:inline-block after:h-px after:w-7 after:content-['']"
-                    style="white-space: pre-wrap;"
-                    >${textContent.text}</span
-                  >`
+                ? html`<span class="copy-safe-text" style="white-space: pre-wrap;">${textContent.text}</span>`
                 : ""
             }
             ${

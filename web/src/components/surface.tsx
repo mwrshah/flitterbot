@@ -301,7 +301,7 @@ function PlainTextBlock({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="relative [&_.markdown-body>:last-child::after]:inline-block [&_.markdown-body>:last-child::after]:h-px [&_.markdown-body>:last-child::after]:w-7 [&_.markdown-body>:last-child::after]:content-['']">
+    <div className="copy-safe-markdown relative">
       <div
         style={
           !expanded
