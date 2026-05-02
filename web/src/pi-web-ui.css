@@ -487,6 +487,15 @@ body {
 	max-width: 100%;
 }
 
+/* Reserve inline space for the absolute copy affordance on the final text line only. */
+.copy-safe-text::after,
+.copy-safe-markdown .markdown-body > :last-child::after {
+	content: "";
+	display: inline-block;
+	width: 1.75rem;
+	height: 1px;
+}
+
 /* Source badges for multi-channel messages */
 .source-badge-whatsapp {
 	color: #25d366;
