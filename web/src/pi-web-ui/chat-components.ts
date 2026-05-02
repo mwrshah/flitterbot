@@ -561,10 +561,18 @@ function splitEditLines(text: string): string[] {
   return lines;
 }
 
-function buildEditDiffRows(
-  oldText: string,
-  newText: string,
-): { rows: EditDiffRow[]; truncated: boolean } {
+function truncateEditDiffRows(rows: EditDiffRow[]): { rows: EditDiffRow[]; truncated: boolean } {
+  if (rows.length <= MAX_EDIT_DIFF_ROWS) return { rows, truncated: false };
+  return {
+    rows: [
+      ...rows.slice(0, MAX_EDIT_DIFF_ROWS),
+      { type: "omitted", content: `… ${rows.length - MAX_EDIT_DIFF_ROWS} more diff lines` },
+    ],
+    truncated: true,
+  };
+}
+
+function buildEditDiffRows(oldText: string, newText: string): EditDiffRow[] {
   const oldLines = splitEditLines(oldText);
   const newLines = splitEditLines(newText);
 
@@ -614,14 +622,44 @@ function buildEditDiffRows(
     });
   }
 
-  if (rows.length <= MAX_EDIT_DIFF_ROWS) return { rows, truncated: false };
-  return {
-    rows: [
-      ...rows.slice(0, MAX_EDIT_DIFF_ROWS),
-      { type: "omitted", content: `… ${rows.length - MAX_EDIT_DIFF_ROWS} more diff lines` },
-    ],
-    truncated: true,
-  };
+  return rows;
+}
+
+function editPairRowsFromParams(params: Record<string, unknown>): EditDiffRow[] {
+  const oldStr = params.old_string ?? params.oldString;
+  const newStr = params.new_string ?? params.newString;
+  if (oldStr != null || newStr != null) {
+    return buildEditDiffRows(String(oldStr ?? ""), String(newStr ?? ""));
+  }
+
+  const edits = params.edits;
+  if (!Array.isArray(edits)) return [];
+
+  return edits.flatMap((edit, index) => {
+    const editParams = paramRecord(edit);
+    const oldText = editParams.oldText ?? editParams.old_string ?? editParams.oldString;
+    const newText = editParams.newText ?? editParams.new_string ?? editParams.newString;
+    if (oldText == null && newText == null) return [];
+    const rows = buildEditDiffRows(String(oldText ?? ""), String(newText ?? ""));
+    if (index === 0) return rows;
+    return [{ type: "omitted" as const, content: "" }, ...rows];
+  });
+}
+
+function editResultDiffText(result: ToolResultMessageType | undefined): string {
+  const text = resultText(result).trim();
+  if (!text) return "";
+
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    const record = paramRecord(parsed);
+    const diff = record.diff;
+    if (typeof diff === "string" && diff.trim()) return diff;
+  } catch {
+    // Non-JSON tool output is the ordinary success/error text, not a structured diff.
+  }
+
+  return "";
 }
 
 function renderEditDiffRows(rows: EditDiffRow[]): TemplateResult {
@@ -666,13 +704,13 @@ function renderEditTool(
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const oldStr = String(p.old_string ?? p.oldString ?? "");
-  const newStr = String(p.new_string ?? p.newString ?? "");
-  const { rows } = buildEditDiffRows(oldStr, newStr);
+  const { rows } = truncateEditDiffRows(editPairRowsFromParams(p));
+  const resultDiff = rows.length ? "" : editResultDiffText(result);
 
   return html`
     <div class="space-y-2">
       ${rows.length ? renderEditDiffRows(rows) : ""}
+      ${resultDiff ? html`<console-block .content=${resultDiff}></console-block>` : ""}
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
