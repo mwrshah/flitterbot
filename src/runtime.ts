@@ -63,6 +63,10 @@ import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
 import { stripStreamNamePrefix } from "./streams/strip-name-prefix.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
+import {
+  clearWorktreePathIfStale,
+  shouldReconcileWorktreeOnRecovery,
+} from "./streams/worktree-link.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -1125,11 +1129,19 @@ export class ControlSurfaceRuntime {
       throw new Error("Stream is not closed and has no recoverable pi-session");
     }
 
-    // 1. Reopen the stream (if closed) and clear stale worktree_path
+    // 1. Reopen closed streams. Recovery for already-open streams only revives
+    // the pi_session; it must not mutate repo_path/worktree_path ownership.
     if (ws.status === "closed") {
       reopenStream(this.blackboard, streamId);
     }
-    this.blackboard.prepare(`UPDATE streams SET worktree_path = NULL WHERE id = ?`).run(streamId);
+    if (shouldReconcileWorktreeOnRecovery(ws.status)) {
+      const reconciled = clearWorktreePathIfStale(this.blackboard, ws);
+      if (reconciled.cleared) {
+        this.log(
+          `cleared stale worktree_path for reopened stream "${ws.name}" (${streamId}): ${reconciled.previousPath} (${reconciled.reason})`,
+        );
+      }
+    }
 
     // 2. Revive the pi session: clear ended_at/end_reason, set status back to waiting_for_user
     const streamsRow = this.blackboard.get<{
