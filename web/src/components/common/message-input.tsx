@@ -221,7 +221,7 @@ function MessageInputHoverButtons({
           }}
           type="button"
           onClick={() => onInsert(button, currentVisibleBlockWidth())}
-          className="pointer-events-auto inline-flex h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          className="pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring"
           aria-label={`Insert ${button.label}`}
           title={`Insert ${button.insertText}`}
         >
