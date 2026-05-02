@@ -8,6 +8,7 @@ import type {
   SkillsListResponse,
   StatusResponse,
   StreamsHistoryResponse,
+  ThinkingLevel,
   TranscriptPage,
 } from "./types";
 
@@ -100,10 +101,22 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ id }),
       }),
 
+    setDefaultThinkingLevel: (level: ThinkingLevel) =>
+      request<ModelsMutationResponse>("/api/models/default-thinking-level", {
+        method: "PUT",
+        body: JSON.stringify({ level }),
+      }),
+
     setPiSessionModel: (piSessionId: string, id: string) =>
       request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/model`, {
         method: "PUT",
         body: JSON.stringify({ id }),
+      }),
+
+    setPiSessionThinkingLevel: (piSessionId: string, level: ThinkingLevel) =>
+      request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/thinking-level`, {
+        method: "PUT",
+        body: JSON.stringify({ level }),
       }),
 
     getDirectoryCompletions: (path: string, piSessionId?: string) => {

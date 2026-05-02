@@ -1,15 +1,21 @@
 import { Menu } from "@base-ui/react/menu";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { CheckIcon, ChevronDownIcon, SearchIcon, StarIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ModelListItem, ModelsListResponse } from "~/lib/types";
+import type {
+  ModelListItem,
+  ModelsListResponse,
+  ModelsMutationResponse,
+  ThinkingLevel,
+} from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
 const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
+const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
 export type ModelSelectorProps = {
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
@@ -19,6 +25,7 @@ export type ModelSelectorProps = {
   mode?: "default" | "pi-session";
   piSessionId?: string;
   selectedModelId?: string;
+  selectedThinkingLevel?: ThinkingLevel;
 };
 
 /**
@@ -38,6 +45,7 @@ export const ModelSelector = memo(function ModelSelector({
   mode = "default",
   piSessionId,
   selectedModelId,
+  selectedThinkingLevel,
 }: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
   const { data } = useQuery({
@@ -51,7 +59,9 @@ export const ModelSelector = memo(function ModelSelector({
   const pinned = data?.pinned ?? [];
   const all = data?.all ?? [];
   const defaultModelId = data?.defaultModel ?? null;
+  const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
   const activeModelId = selectedModelId ?? defaultModelId;
+  const activeThinkingLevel = selectedThinkingLevel ?? defaultThinkingLevel;
   // Include both the curated id AND the composite `provider/modelId` so an
   // "All" entry shows its star whether it was pinned under its curated alias
   // or its composite form.
@@ -71,9 +81,7 @@ export const ModelSelector = memo(function ModelSelector({
     onSuccess: (result, vars) => {
       // Optimistic-write: drop the fresh payload straight into the cache so
       // the popup rerenders with the new pinned state without a round-trip GET.
-      queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
-        old ? { ...old, pinned: result.pinned, defaultModel: result.defaultModel } : old,
-      );
+      updateModelsCache(queryClient, result);
       toast.success(vars.pin ? "Pinned to config" : "Unpinned");
     },
     onError: (error) => {
@@ -89,14 +97,29 @@ export const ModelSelector = memo(function ModelSelector({
       return apiClient.setDefaultModel(id);
     },
     onSuccess: (result) => {
-      queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
-        old ? { ...old, pinned: result.pinned, defaultModel: result.defaultModel } : old,
-      );
+      updateModelsCache(queryClient, result);
       queryClient.invalidateQueries({ queryKey: ["status"] });
       toast.success(mode === "pi-session" ? "Stream model switched" : "Default model updated");
     },
     onError: (error) => {
       toast.error(`Set model failed: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+  const thinkingMutation = useMutation({
+    mutationFn: (level: ThinkingLevel) => {
+      if (mode === "pi-session") {
+        if (!piSessionId) throw new Error("No Pi session selected");
+        return apiClient.setPiSessionThinkingLevel(piSessionId, level);
+      }
+      return apiClient.setDefaultThinkingLevel(level);
+    },
+    onSuccess: (result, level) => {
+      updateModelsCache(queryClient, result);
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+      toast.success(`Thinking level set to ${level}`);
+    },
+    onError: (error) => {
+      toast.error(`Set thinking failed: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
 
@@ -108,6 +131,10 @@ export const ModelSelector = memo(function ModelSelector({
       undefined
     );
   }, [activeModelId, pinned, all]);
+  const availableThinkingLevels = useMemo(
+    () => getAvailableThinkingLevels(currentModel),
+    [currentModel],
+  );
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -157,6 +184,12 @@ export const ModelSelector = memo(function ModelSelector({
           >
             <SearchBox value={search} onChange={setSearch} />
             <div className="flex-1 overflow-y-auto p-1">
+              <ThinkingLevelSection
+                activeLevel={activeThinkingLevel}
+                availableLevels={availableThinkingLevels}
+                disabled={thinkingMutation.isPending || (mode === "pi-session" && !piSessionId)}
+                onSelect={(level) => thinkingMutation.mutate(level)}
+              />
               {filteredPinned.length > 0 && (
                 <ModelSection label="Pinned">
                   {filteredPinned.map((model) => (
@@ -262,6 +295,58 @@ function ModelSection({ label, children }: { label: string; children: React.Reac
         {label}
       </div>
       <div className="flex flex-col">{children}</div>
+    </div>
+  );
+}
+
+function ThinkingLevelSection({
+  activeLevel,
+  availableLevels,
+  disabled,
+  onSelect,
+}: {
+  activeLevel: ThinkingLevel;
+  availableLevels: ThinkingLevel[];
+  disabled: boolean;
+  onSelect: (level: ThinkingLevel) => void;
+}) {
+  const available = new Set(availableLevels);
+  return (
+    <div className="mb-1 border-b border-border/70 pb-2">
+      <div className="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+        Thinking level
+      </div>
+      <div className="flex flex-wrap gap-1 px-2">
+        {THINKING_LEVELS.map((level) => {
+          const levelAvailable = available.has(level);
+          const selected = level === activeLevel;
+          return (
+            <button
+              key={level}
+              type="button"
+              disabled={disabled || !levelAvailable || selected}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect(level);
+              }}
+              className={cn(
+                "rounded-md border px-2 py-1 text-[11px] leading-none transition-colors",
+                selected
+                  ? "border-primary/70 bg-primary/10 text-primary"
+                  : "border-border/60 text-muted-foreground hover:border-border hover:bg-accent/50 hover:text-foreground",
+                (!levelAvailable || disabled) && "cursor-not-allowed opacity-45",
+              )}
+              title={
+                levelAvailable
+                  ? `Set thinking level to ${level}`
+                  : "Current model does not support this level"
+              }
+            >
+              {level}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -450,6 +535,27 @@ function extractVersionParts(model: ModelListItem): number[] {
   );
   if (!match?.[1]) return [];
   return match[1].split(/[.-]/).map((part) => Number(part));
+}
+
+function getAvailableThinkingLevels(model: ModelListItem | undefined): ThinkingLevel[] {
+  if (!model) return THINKING_LEVELS;
+  if (!model.reasoning) return ["off"];
+  return model.supportsXhigh
+    ? THINKING_LEVELS
+    : THINKING_LEVELS.filter((level) => level !== "xhigh");
+}
+
+function updateModelsCache(queryClient: QueryClient, result: ModelsMutationResponse): void {
+  queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
+    old
+      ? {
+          ...old,
+          pinned: result.pinned,
+          defaultModel: result.defaultModel,
+          defaultThinkingLevel: result.defaultThinkingLevel,
+        }
+      : old,
+  );
 }
 
 function formatContext(tokens: number): string {

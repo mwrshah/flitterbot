@@ -493,12 +493,12 @@ async function bootstrapConfig() {
   }
 
   // Note: `piModel` has been removed (clean cutover to `models[]` + `defaultModel`
-  // managed by src/config/load-config.ts). The server seeds the new fields on
-  // first boot if missing, so the installer no longer touches them here.
+  // managed by src/config/load-config.ts). The installer only seeds scalar
+  // runtime defaults here; the server owns model-list defaults on first boot.
   const STATIC_DEFAULTS = {
     controlSurfaceHost: "127.0.0.1",
     controlSurfacePort: 18820,
-    piThinkingLevel: "high",
+    defaultThinkingLevel: "high",
     stallMinutes: 15,
     toolTimeoutMinutes: 4,
     blackboardPath: "~/.flitterbot/blackboard.db",
@@ -516,6 +516,7 @@ async function bootstrapConfig() {
   // Defaults only fill when a key is strictly `undefined` (truly absent).
   // Explicit null / "" / 0 / false are preserved as user intent.
   const configAfter = { ...configBefore };
+  delete configAfter.piThinkingLevel;
   const setDefault = (key, value) => {
     if (configAfter[key] === undefined) configAfter[key] = value;
   };

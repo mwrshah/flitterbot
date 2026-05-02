@@ -5,14 +5,19 @@ import os from "node:os";
 import path from "node:path";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 export type PiTransport = "sse" | "websocket" | "websocket-cached" | "auto";
+
+export function isThinkingLevel(value: unknown): value is ThinkingLevel {
+  return typeof value === "string" && (THINKING_LEVELS as readonly string[]).includes(value);
+}
 
 /**
  * A selectable model entry shown in the web UI model selector. `id` is the
  * stable UI/persistence identifier; `provider`+`modelId` are what the pi SDK
  * consumes under the hood. `thinkingLevel` optionally overrides the global
- * `piThinkingLevel` default for this model.
+ * `defaultThinkingLevel` for this model.
  */
 export type ModelConfigEntry = {
   id: string;
@@ -56,7 +61,7 @@ type RawConfigJson = {
   controlSurfaceCommand?: string;
   models?: ModelConfigEntry[];
   defaultModel?: string;
-  piThinkingLevel?: ThinkingLevel;
+  defaultThinkingLevel?: ThinkingLevel;
   piTransport?: PiTransport;
   stallMinutes?: number;
   toolTimeoutMinutes?: number;
@@ -86,7 +91,8 @@ export type FlitterbotConfig = {
   models: ModelConfigEntry[];
   /** Id of the default model (must match one of `models[].id`). */
   defaultModel: string;
-  piThinkingLevel: ThinkingLevel;
+  /** Global thinking level used for newly-created Pi sessions, unless a model overrides it. */
+  defaultThinkingLevel: ThinkingLevel;
   piTransport: PiTransport;
   stallMinutes: number;
   toolTimeoutMinutes: number;
@@ -284,7 +290,7 @@ export function loadConfig(): FlitterbotConfig {
     controlSurfaceToken: raw.controlSurfaceToken ?? crypto.randomUUID(),
     models,
     defaultModel,
-    piThinkingLevel: raw.piThinkingLevel ?? "high",
+    defaultThinkingLevel: raw.defaultThinkingLevel ?? "high",
     piTransport,
     stallMinutes: raw.stallMinutes ?? 15,
     toolTimeoutMinutes: raw.toolTimeoutMinutes ?? 4,
@@ -323,10 +329,15 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(path.dirname(whatsappPidPath));
   ensureDir(whatsappAuthDir);
 
-  // Clean cutover: drop any legacy `piModel` field so config.json reflects the
-  // new single source of truth (`models` + `defaultModel`).
-  const { piModel: _legacyPiModel, ...rawWithoutLegacy } = raw as RawConfigJson & {
+  // Clean cutover: drop legacy model/thinking keys so config.json reflects the
+  // current single source of truth (`models` + `defaultModel` + `defaultThinkingLevel`).
+  const {
+    piModel: _legacyPiModel,
+    piThinkingLevel: _legacyPiThinkingLevel,
+    ...rawWithoutLegacy
+  } = raw as RawConfigJson & {
     piModel?: string;
+    piThinkingLevel?: unknown;
   };
   const nextPersisted = {
     ...rawWithoutLegacy,
@@ -335,7 +346,7 @@ export function loadConfig(): FlitterbotConfig {
     controlSurfaceToken: config.controlSurfaceToken,
     models: config.models,
     defaultModel: config.defaultModel,
-    piThinkingLevel: config.piThinkingLevel,
+    defaultThinkingLevel: config.defaultThinkingLevel,
     piTransport: config.piTransport,
     stallMinutes: config.stallMinutes,
     toolTimeoutMinutes: config.toolTimeoutMinutes,

@@ -137,6 +137,10 @@ export interface ModelListItem {
   provider: string;
   modelId: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  /** Whether the model exposes provider-side reasoning/thinking controls. */
+  reasoning?: boolean;
+  /** Whether the model accepts the xhigh thinking level. */
+  supportsXhigh?: boolean;
   /** Pi SDK's display name for the model (e.g. "Claude Opus 4.7"). Omitted for curated entries where `label` is already user-authored. */
   name?: string;
   /** Context window in tokens, when known from the pi SDK catalog. */
@@ -154,6 +158,8 @@ export interface ModelsListResponse {
   all: ModelListItem[];
   /** Id of the default model — matches either a `pinned.id` or an `all.id`. */
   defaultModel: string;
+  /** Global thinking level used when new Pi sessions are created. */
+  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
 export interface ModelsPinRequest {
@@ -169,10 +175,15 @@ export interface ModelsDefaultRequest {
   id: string;
 }
 
+export interface ModelsThinkingLevelRequest {
+  level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
 export interface ModelsMutationResponse {
   ok: true;
   pinned: ModelListItem[];
   defaultModel: string;
+  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
 export interface MessageResponse {

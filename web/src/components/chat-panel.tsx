@@ -22,7 +22,12 @@ import { activeToolStore } from "~/lib/active-tool-store";
 import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
-import type { ChatTimelineItem, ChatTimelineMessage, ImageAttachment } from "~/lib/types";
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ImageAttachment,
+  ThinkingLevel,
+} from "~/lib/types";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
@@ -41,6 +46,7 @@ type ChatPanelProps = {
   streamHasWorktree?: boolean;
   modelSelectorMode?: "default" | "pi-session";
   selectedModelId?: string;
+  selectedThinkingLevel?: ThinkingLevel;
   /** Recovery action to offer in the header, if any:
    *  - 'closed' → stream is closed; offer "Reopen"
    *  - 'dead'   → stream is open but pi-session ended/crashed; offer "Recover" */
@@ -57,6 +63,7 @@ export function ChatPanel({
   streamHasWorktree = false,
   modelSelectorMode = "default",
   selectedModelId,
+  selectedThinkingLevel,
   recoveryKind,
 }: ChatPanelProps) {
   useWhyDidYouRender("ChatPanel", {
@@ -415,6 +422,7 @@ export function ChatPanel({
             modelSelectorMode={modelSelectorMode}
             modelSelectorPiSessionId={piSessionId}
             selectedModelId={selectedModelId}
+            selectedThinkingLevel={selectedThinkingLevel}
             isSessionBusy={isSessionBusy}
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}

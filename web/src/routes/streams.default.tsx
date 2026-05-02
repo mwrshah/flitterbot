@@ -88,6 +88,7 @@ function StreamsDefaultRoute() {
           streamName={defaultStream?.name}
           modelSelectorMode="default"
           selectedModelId={status?.piAgent?.default?.model?.id}
+          selectedThinkingLevel={status?.piAgent?.default?.model?.thinkingLevel}
         />
       </Panel>
       <ResizeHandle />

@@ -244,7 +244,7 @@ export class PiSessionManager {
         provider: modelProvider ?? "unknown",
         id: modelId ?? "unknown",
         entryId: "",
-        thinkingLevel: this.config.piThinkingLevel,
+        thinkingLevel: this.config.defaultThinkingLevel,
       },
       unsubscribe: () => {},
     };

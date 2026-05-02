@@ -136,7 +136,7 @@ export async function createFlitterbotAgent(
     );
   }
   const effectiveThinkingLevel: ThinkingLevel | undefined = modelEntry
-    ? (modelEntry.thinkingLevel ?? config.piThinkingLevel)
+    ? (modelEntry.thinkingLevel ?? config.defaultThinkingLevel)
     : undefined;
 
   // Build the factory that createAgentSessionRuntime stores and reuses for newSession().

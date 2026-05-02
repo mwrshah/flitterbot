@@ -1,12 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
-import { FLITTERBOT_CONFIG_PATH, type ModelConfigEntry } from "./load-config.ts";
+import {
+  FLITTERBOT_CONFIG_PATH,
+  type ModelConfigEntry,
+  type ThinkingLevel,
+} from "./load-config.ts";
 
 /**
- * Rewrite the `models` (and optionally `defaultModel`) fields of the user's
- * `~/.flitterbot/config.json` without disturbing any other keys. Uses an
- * atomic temp-file + rename so a crash mid-write can never produce a
- * half-written config.
+ * Rewrite model-selector config fields in the user's `~/.flitterbot/config.json`
+ * without disturbing any other keys. Uses an atomic temp-file + rename so a
+ * crash mid-write can never produce a half-written config.
  *
  * All other fields of `config.json` are preserved verbatim (including any
  * unknown keys the user added by hand) — we read → patch → write, nothing
@@ -16,11 +19,16 @@ import { FLITTERBOT_CONFIG_PATH, type ModelConfigEntry } from "./load-config.ts"
 export function persistModelsToConfigFile(update: {
   models: ModelConfigEntry[];
   defaultModel?: string;
+  defaultThinkingLevel?: ThinkingLevel;
 }): void {
   const existing = readConfigFileOrEmpty();
-  const next: Record<string, unknown> = { ...existing, models: update.models };
+  const { piThinkingLevel: _legacyPiThinkingLevel, ...existingWithoutLegacy } = existing;
+  const next: Record<string, unknown> = { ...existingWithoutLegacy, models: update.models };
   if (update.defaultModel !== undefined) {
     next.defaultModel = update.defaultModel;
+  }
+  if (update.defaultThinkingLevel !== undefined) {
+    next.defaultThinkingLevel = update.defaultThinkingLevel;
   }
   atomicWriteJson(FLITTERBOT_CONFIG_PATH, next);
 }

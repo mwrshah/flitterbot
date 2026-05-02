@@ -16,6 +16,7 @@ import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
 import {
   handleBrowserModelsDefaultRoute,
+  handleBrowserModelsDefaultThinkingLevelRoute,
   handleBrowserModelsPinRoute,
   handleBrowserModelsRoute,
 } from "./routes/browser-models.ts";
@@ -38,7 +39,10 @@ import { handleDirectSessionMessageRoute } from "./routes/direct-session-message
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
 import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
-import { handlePiSessionModelRoute } from "./routes/pi-session-model.ts";
+import {
+  handlePiSessionModelRoute,
+  handlePiSessionThinkingLevelRoute,
+} from "./routes/pi-session-model.ts";
 import { handlePruneStreamHistoryRoute } from "./routes/prune-stream-history.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
@@ -171,6 +175,9 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
   if (method === "PUT" && pathname === "/api/models/default") {
     return handleBrowserModelsDefaultRoute(runtime, req, res);
   }
+  if (method === "PUT" && pathname === "/api/models/default-thinking-level") {
+    return handleBrowserModelsDefaultThinkingLevelRoute(runtime, req, res);
+  }
   if (
     method === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.method &&
     pathname === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.path
@@ -238,6 +245,15 @@ async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse)
     segments[3] === "model"
   ) {
     return handlePiSessionModelRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "PUT" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "thinking-level"
+  ) {
+    return handlePiSessionThinkingLevelRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "POST" &&

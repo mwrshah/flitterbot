@@ -98,6 +98,7 @@ function PiSessionRoute() {
           streamHasWorktree={!!stream?.worktreePath}
           modelSelectorMode="pi-session"
           selectedModelId={stream?.model?.id}
+          selectedThinkingLevel={stream?.model?.thinkingLevel}
           recoveryKind={recoveryKind}
         />
       </Panel>

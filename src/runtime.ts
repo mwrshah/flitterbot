@@ -34,7 +34,7 @@ import {
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
-import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
+import { type FlitterbotConfig, loadConfig, type ThinkingLevel } from "./config/load-config.ts";
 import { resolveModelEntry } from "./config/models.ts";
 import type {
   ClaudeHookPayload,
@@ -714,7 +714,70 @@ export class ControlSurfaceRuntime {
   async setDefaultModel(modelId: string): Promise<PiSessionModelInfo | undefined> {
     const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
     if (!defaultPiSessionId) return undefined;
-    return this.setPiSessionModel(defaultPiSessionId, modelId);
+    await this.setPiSessionModel(defaultPiSessionId, modelId);
+    const modelEntry = resolveModelEntry(this.config, modelId);
+    return this.setPiSessionThinkingLevel(
+      defaultPiSessionId,
+      modelEntry.thinkingLevel ?? this.config.defaultThinkingLevel,
+    );
+  }
+
+  async setPiSessionThinkingLevel(
+    piSessionId: string,
+    thinkingLevel: ThinkingLevel,
+  ): Promise<PiSessionModelInfo> {
+    const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (!managed) {
+      throw new Error(`Pi session not found: ${piSessionId}`);
+    }
+
+    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
+      await this.sessionManager.activateOrchestrator(
+        managed,
+        this.createCustomTools("orchestrator", managed.streamId),
+      );
+    }
+
+    const session = managed.runtime?.session;
+    if (!session) {
+      throw new Error(`Pi session is not active: ${piSessionId}`);
+    }
+
+    session.setThinkingLevel(thinkingLevel);
+    const currentThinkingLevel = session.thinkingLevel;
+    const currentModel = session.model;
+    if (!currentModel) {
+      throw new Error(
+        `Pi session has no current model after thinking-level switch: ${piSessionId}`,
+      );
+    }
+
+    managed.modelInfo = {
+      provider: currentModel.provider,
+      id: currentModel.id,
+      entryId: this.resolveModelEntryId(currentModel.provider, currentModel.id),
+      thinkingLevel: currentThinkingLevel,
+    };
+    updatePiSessionModelMirror(
+      this.blackboard,
+      managed.piSessionId,
+      managed.modelInfo.provider,
+      managed.modelInfo.id,
+      managed.modelInfo.thinkingLevel,
+    );
+    this.broadcastStatusChanged("pi_session");
+    this.log(
+      `pi-session thinking level switched: ${managed.piSessionId} → ${managed.modelInfo.thinkingLevel}`,
+    );
+    return this.toPiSessionModelInfo(managed.modelInfo);
+  }
+
+  async setDefaultThinkingLevel(
+    thinkingLevel: ThinkingLevel,
+  ): Promise<PiSessionModelInfo | undefined> {
+    const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
+    if (!defaultPiSessionId) return undefined;
+    return this.setPiSessionThinkingLevel(defaultPiSessionId, thinkingLevel);
   }
 
   getStatus(): StatusResponse {

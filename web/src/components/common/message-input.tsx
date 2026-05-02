@@ -19,7 +19,12 @@ import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
-import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
+import type {
+  DirectoryCompletionItem,
+  ImageAttachment,
+  SkillListItem,
+  ThinkingLevel,
+} from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 /** Module-level store: persists draft text per route across navigations. */
@@ -242,6 +247,7 @@ type MessageInputProps = {
   modelSelectorMode?: "default" | "pi-session";
   modelSelectorPiSessionId?: string;
   selectedModelId?: string;
+  selectedThinkingLevel?: ThinkingLevel;
   /** Agent is generating — send button swaps to a stop-sign icon. */
   isSessionBusy?: boolean;
   /** Triggered when the user clicks the stop-sign while session is busy. */
@@ -278,6 +284,7 @@ export const MessageInput = memo(function MessageInput({
   modelSelectorMode = "default",
   modelSelectorPiSessionId,
   selectedModelId,
+  selectedThinkingLevel,
   isSessionBusy = false,
   onInterrupt,
   isInterruptPending = false,
@@ -923,6 +930,7 @@ export const MessageInput = memo(function MessageInput({
                 mode={modelSelectorMode}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
+                selectedThinkingLevel={selectedThinkingLevel}
               />
             )}
             {recoveryKind ? (

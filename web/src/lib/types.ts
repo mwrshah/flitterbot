@@ -215,6 +215,8 @@ export type ModelListItem = {
   provider: string;
   modelId: string;
   thinkingLevel?: ThinkingLevel;
+  reasoning?: boolean;
+  supportsXhigh?: boolean;
   name?: string;
   contextWindow?: number;
   available?: boolean;
@@ -225,12 +227,14 @@ export type ModelsListResponse = {
   pinned: ModelListItem[];
   all: ModelListItem[];
   defaultModel: string;
+  defaultThinkingLevel: ThinkingLevel;
 };
 
 export type ModelsMutationResponse = {
   ok: true;
   pinned: ModelListItem[];
   defaultModel: string;
+  defaultThinkingLevel: ThinkingLevel;
 };
 
 /* ── Directory Completions ── */
