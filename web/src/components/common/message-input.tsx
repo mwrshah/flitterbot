@@ -33,7 +33,6 @@ export type MessageInputHoverButton = {
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
-const FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX = 160;
 /** Sub-pixel safety margin so a button that "just fits" in pretext pixels
  *  doesn't get clipped by browser rounding or fractional widths. */
 const MEASUREMENT_BUFFER_PX = 16;
@@ -71,13 +70,11 @@ function MessageInputHoverButtons({
   buttons,
   composerRef,
   toolbarRef,
-  sendAction,
   onInsert,
 }: {
   buttons: MessageInputHoverButton[];
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
-  sendAction?: { width: number; disabled: boolean; onSend: () => void };
   onInsert: (insertText: string, visibleBlockWidth: number) => void;
 }) {
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
@@ -85,7 +82,7 @@ function MessageInputHoverButtons({
   const visibleBlockWidthRef = useRef(0);
 
   useLayoutEffect(() => {
-    if (buttons.length === 0 || sendAction) return;
+    if (buttons.length === 0) return;
 
     let frame = 0;
     let observer: ResizeObserver | null = null;
@@ -184,7 +181,7 @@ function MessageInputHoverButtons({
       observer?.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [buttons, composerRef, sendAction, toolbarRef]);
+  }, [buttons, composerRef, toolbarRef]);
 
   if (buttons.length === 0) return null;
 
@@ -202,28 +199,6 @@ function MessageInputHoverButtons({
     }
     return width || visibleBlockWidthRef.current;
   };
-
-  if (sendAction) {
-    const width = sendAction.width > 0 ? sendAction.width : FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX;
-    return (
-      <div
-        ref={buttonRowRef}
-        className="pointer-events-none absolute left-2.5 bottom-2 flex items-center overflow-hidden"
-      >
-        <button
-          type="button"
-          disabled={sendAction.disabled}
-          onClick={sendAction.onSend}
-          style={{ width }}
-          className="pointer-events-auto inline-flex h-7 min-w-0 shrink-0 items-center justify-center rounded-md border border-border/70 bg-primary/90 px-2.5 text-xs text-primary-foreground transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Send message"
-          title="Send message"
-        >
-          <span className="truncate">click to send message</span>
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -331,10 +306,7 @@ export const MessageInput = memo(function MessageInput({
   const [isDraftBlank, setIsDraftBlank] = useState(() =>
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
-  const [hoverSendAction, setHoverSendAction] = useState<{
-    text: string;
-    width: number;
-  } | null>(null);
+  const [hoverSendAction, setHoverSendAction] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
@@ -801,19 +773,17 @@ export const MessageInput = memo(function MessageInput({
     !recoveryKind;
   const shouldShowHoverButtons = hoverControlsEnabled && isDraftBlank;
   const shouldShowHoverSendAction =
-    hoverControlsEnabled && hoverSendAction !== null && draft === hoverSendAction.text;
+    hoverControlsEnabled && hoverSendAction !== null && draft === hoverSendAction;
 
   const handleHoverButtonClick = useCallback(
-    (insertText: string, visibleBlockWidth: number) => {
+    (insertText: string, _visibleBlockWidth: number) => {
+      if (insertText === "") {
+        submitCurrentDraft();
+        return;
+      }
       const current = draftRef.current;
       const newValue = isBlankDraft(current) ? insertText : `${current}\n${insertText}`;
-      setHoverSendAction({
-        text: newValue,
-        width:
-          visibleBlockWidth > 0
-            ? Math.ceil(visibleBlockWidth)
-            : FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX,
-      });
+      setHoverSendAction(newValue);
       setDraftAndStore(newValue);
       setPickerOpen(false);
       setAtPickerOpen(false);
@@ -824,7 +794,7 @@ export const MessageInput = memo(function MessageInput({
         textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
       });
     },
-    [setDraftAndStore],
+    [setDraftAndStore, submitCurrentDraft],
   );
 
   const canSend = !isDraftBlank || pendingImages.length > 0;
@@ -941,18 +911,13 @@ export const MessageInput = memo(function MessageInput({
           {/* Hover buttons fit against the whole right toolbar, including model selector and send/recovery. */}
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
-              buttons={hoverButtons}
+              buttons={
+                shouldShowHoverSendAction
+                  ? [{ id: "hover-send", label: "click to send message", insertText: "" }]
+                  : hoverButtons
+              }
               composerRef={containerRef}
               toolbarRef={toolbarRef}
-              sendAction={
-                shouldShowHoverSendAction
-                  ? {
-                      width: hoverSendAction.width,
-                      disabled: !canSend,
-                      onSend: submitCurrentDraft,
-                    }
-                  : undefined
-              }
               onInsert={handleHoverButtonClick}
             />
           )}
