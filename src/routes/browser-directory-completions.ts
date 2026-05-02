@@ -12,8 +12,7 @@ import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
 const MAX_ITEMS = 15;
-const HIDDEN_PREFIXES = ["."];
-const EXCLUDED_NAMES = new Set(["node_modules"]);
+const ENV_FILE_PREFIX = ".env";
 
 export async function handleBrowserDirectoryCompletionsRoute(
   runtime: ControlSurfaceRuntime,
@@ -57,9 +56,12 @@ export async function handleBrowserDirectoryCompletionsRoute(
       spaceIdx >= 0 ? resolution.searchTerm.slice(spaceIdx + 1) : resolution.searchTerm;
     const prefixDepth = pathPrefix ? pathPrefix.split("/").filter(Boolean).length : 0;
     const termLower = pureTerm.toLowerCase();
+    const searchableItems = result.value.items.filter(
+      (item) => !hasEnvLikePathSegment(item.relativePath),
+    );
     const seenDirs = new Set<string>();
     const matchingDirItems: DirectoryCompletionItem[] = [];
-    for (const item of result.value.items) {
+    for (const item of searchableItems) {
       // Walk only downstream directories (skip upstream prefix segments)
       const parts = item.relativePath.split("/");
       for (let i = prefixDepth; i < parts.length - 1; i++) {
@@ -80,7 +82,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
       }
     }
 
-    const fuzzyFileItems = result.value.items.map((item) =>
+    const fuzzyFileItems = searchableItems.map((item) =>
       toCompletionItem(
         path.join(resolution.repoRoot, item.relativePath),
         "file",
@@ -137,6 +139,8 @@ async function listDirectoryCompletionItems(
   const dirPrefix = lastSlash >= 0 ? expandedParam.slice(0, lastSlash + 1) : "";
   const filter = lastSlash >= 0 ? expandedParam.slice(lastSlash + 1) : expandedParam;
 
+  if (hasEnvLikePathSegment(dirPrefix)) return [];
+
   // Resolve and validate the target directory
   const targetDir = path.resolve(cwd, dirPrefix);
 
@@ -163,8 +167,7 @@ async function listDirectoryCompletionItems(
   const filterLower = filter.toLowerCase();
 
   const filtered = entries.filter((entry) => {
-    if (HIDDEN_PREFIXES.some((p) => entry.name.startsWith(p))) return false;
-    if (EXCLUDED_NAMES.has(entry.name)) return false;
+    if (isEnvLikeCompletionName(entry.name)) return false;
     if (filterLower && !entry.name.toLowerCase().includes(filterLower)) return false;
     return true;
   });
@@ -187,6 +190,17 @@ async function listDirectoryCompletionItems(
       rawPathForDisplay(pathParam, displayPrefix + entry.name + (entry.isDirectory() ? "/" : "")),
     ),
   );
+}
+
+function isEnvLikeCompletionName(name: string): boolean {
+  return name.startsWith(ENV_FILE_PREFIX);
+}
+
+function hasEnvLikePathSegment(candidatePath: string): boolean {
+  return candidatePath
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .some((segment) => isEnvLikeCompletionName(segment));
 }
 
 function mergeCompletionItems(
