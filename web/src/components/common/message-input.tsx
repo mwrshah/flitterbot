@@ -276,7 +276,10 @@ function MessageInputHoverButtons({
           </span>
           <span className="truncate">{button.label}</span>
           {messageInputButtonShortcutLabel(index) && (
-            <span aria-hidden="true" className="ml-1.5 shrink-0 text-muted-foreground/35">
+            <span
+              aria-hidden="true"
+              className="ml-2 shrink-0 text-xs tabular-nums text-sidebar-foreground/30"
+            >
               {messageInputButtonShortcutLabel(index)}
             </span>
           )}
