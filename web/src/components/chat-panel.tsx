@@ -60,7 +60,7 @@ function QueuedBusyOverlay({ text }: { text: string }) {
   return (
     <div className="pointer-events-none absolute inset-x-6 bottom-3 z-20 flex justify-end">
       <div className="max-w-[min(44rem,100%)] rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="font-medium text-muted-foreground">Queued for next turn</div>
+        <div className="font-medium text-muted-foreground">Queued:</div>
         <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-foreground/90">
           {text}
         </div>
