@@ -33,6 +33,7 @@ export type MessageInputHoverButton = {
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
+const FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX = 160;
 /** Sub-pixel safety margin so a button that "just fits" in pretext pixels
  *  doesn't get clipped by browser rounding or fractional widths. */
 const MEASUREMENT_BUFFER_PX = 16;
@@ -70,26 +71,52 @@ function MessageInputHoverButtons({
   buttons,
   composerRef,
   toolbarRef,
+  sendAction,
   onInsert,
 }: {
   buttons: MessageInputHoverButton[];
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
-  onInsert: (insertText: string) => void;
+  sendAction?: { width: number; disabled: boolean; onSend: () => void };
+  onInsert: (insertText: string, visibleBlockWidth: number) => void;
 }) {
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const visibleBlockWidthRef = useRef(0);
 
   useLayoutEffect(() => {
-    const composer = composerRef.current;
-    const toolbar = toolbarRef.current;
-    const buttonRow = buttonRowRef.current;
-    if (!composer || !toolbar || !buttonRow || buttons.length === 0) return;
+    if (buttons.length === 0 || sendAction) return;
+
+    let frame = 0;
+    let observer: ResizeObserver | null = null;
+    let retryCount = 0;
+
+    const getElements = () => {
+      const composer = composerRef.current;
+      const toolbar = toolbarRef.current;
+      const buttonRow = buttonRowRef.current;
+      if (!composer || !toolbar || !buttonRow) return null;
+      return { composer, toolbar, buttonRow };
+    };
+
+    const attachObserver = () => {
+      if (observer) return true;
+      const elements = getElements();
+      if (!elements) return false;
+      observer = new ResizeObserver(scheduleMeasure);
+      observer.observe(elements.composer);
+      observer.observe(elements.toolbar);
+      return true;
+    };
 
     const measureAndApply = () => {
+      const elements = getElements();
+      if (!elements) return false;
+
+      const { toolbar, buttonRow } = elements;
       const renderedButtons = buttonRefs.current.slice(0, buttons.length);
       const firstButton = renderedButtons[0];
-      if (!firstButton) return;
+      if (!firstButton) return false;
 
       const buttonRowRect = buttonRow.getBoundingClientRect();
       const toolbarRect = toolbar.getBoundingClientRect();
@@ -105,7 +132,7 @@ function MessageInputHoverButtons({
       const prefixWidth =
         pretextTextWidth("+", font, lineHeight) + (prefixStyle ? horizontalMargin(prefixStyle) : 0);
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
-      const toolbarGap = numericStyleValue(buttonRowStyle.columnGap) || buttonGap;
+      const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
       const availableWidth = Math.max(
         0,
         toolbarRect.left -
@@ -126,34 +153,77 @@ function MessageInputHoverButtons({
         visibleCount += 1;
       }
 
+      visibleBlockWidthRef.current = usedWidth;
       renderedButtons.forEach((button, index) => {
         if (button) button.hidden = index >= visibleCount;
       });
+      return true;
     };
 
-    let frame = 0;
-    const scheduleMeasure = () => {
+    function scheduleMeasure() {
       if (frame !== 0) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
         // pretext returns CSS pixels; everything here is measured in CSS pixels.
-        measureAndApply();
+        const measured = measureAndApply();
+        attachObserver();
+        if (!measured && retryCount < 10) {
+          retryCount += 1;
+          scheduleMeasure();
+        }
       });
-    };
+    }
 
-    const observer = new ResizeObserver(scheduleMeasure);
-    observer.observe(composer);
-    observer.observe(toolbar);
-
+    // Measure synchronously before first paint so hidden buttons never flash over
+    // the model selector. The rAF pass catches late ref/font/layout settlement.
+    measureAndApply();
+    attachObserver();
     scheduleMeasure();
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [buttons, composerRef, toolbarRef]);
+  }, [buttons, composerRef, sendAction, toolbarRef]);
 
   if (buttons.length === 0) return null;
+
+  const currentVisibleBlockWidth = () => {
+    const buttonRow = buttonRowRef.current;
+    if (!buttonRow) return visibleBlockWidthRef.current;
+
+    const buttonGap = numericStyleValue(window.getComputedStyle(buttonRow).columnGap);
+    let width = 0;
+    let visibleCount = 0;
+    for (const button of buttonRefs.current.slice(0, buttons.length)) {
+      if (!button || button.hidden) continue;
+      width += button.getBoundingClientRect().width + (visibleCount > 0 ? buttonGap : 0);
+      visibleCount += 1;
+    }
+    return width || visibleBlockWidthRef.current;
+  };
+
+  if (sendAction) {
+    const width = sendAction.width > 0 ? sendAction.width : FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX;
+    return (
+      <div
+        ref={buttonRowRef}
+        className="pointer-events-none absolute left-2.5 bottom-2 flex items-center overflow-hidden"
+      >
+        <button
+          type="button"
+          disabled={sendAction.disabled}
+          onClick={sendAction.onSend}
+          style={{ width }}
+          className="pointer-events-auto inline-flex h-7 min-w-0 shrink-0 items-center justify-center rounded-md border border-border/70 bg-primary/90 px-2.5 text-xs text-primary-foreground transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Send message"
+          title="Send message"
+        >
+          <span className="truncate">click to send message</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -167,7 +237,7 @@ function MessageInputHoverButtons({
             buttonRefs.current[index] = node;
           }}
           type="button"
-          onClick={() => onInsert(button.insertText)}
+          onClick={() => onInsert(button.insertText, currentVisibleBlockWidth())}
           className="pointer-events-auto inline-flex h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-label={`Insert ${button.label}`}
           title={`Insert ${button.insertText}`}
@@ -261,7 +331,10 @@ export const MessageInput = memo(function MessageInput({
   const [isDraftBlank, setIsDraftBlank] = useState(() =>
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
-  const isDraftBlankRef = useRef(isDraftBlank);
+  const [hoverSendAction, setHoverSendAction] = useState<{
+    text: string;
+    width: number;
+  } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
@@ -336,7 +409,6 @@ export const MessageInput = memo(function MessageInput({
       else draftStore.delete(draftKeyRef.current);
     }
     draftRef.current = value;
-    isDraftBlankRef.current = nextIsDraftBlank;
     setDraft(value);
     setIsDraftBlank((current) => (current === nextIsDraftBlank ? current : nextIsDraftBlank));
   }, []);
@@ -395,6 +467,7 @@ export const MessageInput = memo(function MessageInput({
    */
   const handleDraftChange = useCallback(
     (value: string) => {
+      setHoverSendAction(null);
       setDraftAndStore(value);
       const cursor = textareaRef.current?.selectionStart ?? value.length;
 
@@ -583,6 +656,15 @@ export const MessageInput = memo(function MessageInput({
     [handleDraftChange, setDraftAndStore],
   );
 
+  const submitCurrentDraft = useCallback(() => {
+    if (isSending || isSessionBusy || recoveryKind) return;
+    const text = draftRef.current.trim();
+    if (!text && pendingImages.length === 0) return;
+    onSubmitRef.current(text);
+    setHoverSendAction(null);
+    setDraftAndStore("");
+  }, [isSending, isSessionBusy, pendingImages.length, recoveryKind, setDraftAndStore]);
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Escape") {
@@ -678,12 +760,10 @@ export const MessageInput = memo(function MessageInput({
 
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        const text = draftRef.current.trim();
-        onSubmitRef.current(text);
-        setDraftAndStore("");
+        submitCurrentDraft();
       }
     },
-    [closePicker, handleDraftChange, setDraftAndStore],
+    [closePicker, handleDraftChange, submitCurrentDraft],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -713,18 +793,27 @@ export const MessageInput = memo(function MessageInput({
     event.preventDefault();
   }, []);
 
-  const shouldShowHoverButtons =
+  const hoverControlsEnabled =
     hoverButtons.length > 0 &&
-    isDraftBlank &&
     pendingImages.length === 0 &&
     !isSending &&
     !isSessionBusy &&
     !recoveryKind;
+  const shouldShowHoverButtons = hoverControlsEnabled && isDraftBlank;
+  const shouldShowHoverSendAction =
+    hoverControlsEnabled && hoverSendAction !== null && draft === hoverSendAction.text;
 
   const handleHoverButtonClick = useCallback(
-    (insertText: string) => {
+    (insertText: string, visibleBlockWidth: number) => {
       const current = draftRef.current;
       const newValue = isBlankDraft(current) ? insertText : `${current}\n${insertText}`;
+      setHoverSendAction({
+        text: newValue,
+        width:
+          visibleBlockWidth > 0
+            ? Math.ceil(visibleBlockWidth)
+            : FALLBACK_HOVER_SEND_BUTTON_WIDTH_PX,
+      });
       setDraftAndStore(newValue);
       setPickerOpen(false);
       setAtPickerOpen(false);
@@ -752,8 +841,7 @@ export const MessageInput = memo(function MessageInput({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onSubmit(draftRef.current.trim());
-          setDraftAndStore("");
+          submitCurrentDraft();
         }}
         className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}
       >
@@ -851,11 +939,20 @@ export const MessageInput = memo(function MessageInput({
             </svg>
           </button>
           {/* Hover buttons fit against the whole right toolbar, including model selector and send/recovery. */}
-          {shouldShowHoverButtons && (
+          {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               buttons={hoverButtons}
               composerRef={containerRef}
               toolbarRef={toolbarRef}
+              sendAction={
+                shouldShowHoverSendAction
+                  ? {
+                      width: hoverSendAction.width,
+                      disabled: !canSend,
+                      onSend: submitCurrentDraft,
+                    }
+                  : undefined
+              }
               onInsert={handleHoverButtonClick}
             />
           )}

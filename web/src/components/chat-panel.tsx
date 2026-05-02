@@ -300,12 +300,12 @@ export function ChatPanel({
     if (!streamId) return [];
     if (streamHasWorktree) {
       const buttons: MessageInputHoverButton[] = [
+        { id: "close-merge", label: "close (merge)", insertText: "ship it" },
         {
           id: "close-no-git-ops",
           label: "close (no git ops)",
           insertText: "close stream with the no-op option",
         },
-        { id: "close-merge", label: "close (merge)", insertText: "ship it" },
       ];
       if (worktree?.worktreePath && worktree.branch && worktree.baseBranch) {
         buttons.push({
