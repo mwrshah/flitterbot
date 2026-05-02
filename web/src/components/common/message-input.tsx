@@ -18,7 +18,7 @@ import { SkillPicker } from "~/components/skill-picker";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { registerComposerFocusTarget } from "~/lib/global-shortcuts";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
-import type { DirectoryCompletionItem, ImageAttachment } from "~/lib/types";
+import type { DirectoryCompletionItem, ImageAttachment, SkillListItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 /** Module-level store: persists draft text per route across navigations. */
@@ -346,18 +346,18 @@ export const MessageInput = memo(function MessageInput({
     [skills, computeSlashLeft],
   );
 
-  const handleSkillSelect = useCallback((name: string) => {
+  const handleSkillSelect = useCallback((skill: SkillListItem) => {
     const value = draftRef.current;
     const slashIdx = slashPositionRef.current;
     // Find end of the trigger token (non-whitespace run from trigger position)
     let tokenEnd = slashIdx + 1;
     while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-    // Replace from the "/" through the full token with "/skill:<name> " so the
-    // pi-sdk's `_expandSkillCommand` guard (`startsWith("/skill:")`) fires and
-    // inlines the SKILL.md body at send time. Bare `/<name>` is inert.
+    // Regular skills need "/skill:<name> " so the pi-sdk's `_expandSkillCommand`
+    // guard fires and inlines SKILL.md at send time. Built-in commands are not
+    // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
     const before = value.slice(0, slashIdx);
     const after = value.slice(tokenEnd);
-    const inserted = `/skill:${name} `;
+    const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
     const newValue = before + inserted + after;
     setDraft(newValue);
     setPickerOpen(false);

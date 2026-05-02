@@ -18,7 +18,7 @@ type SkillPickerProps = {
   open: boolean;
   filter: string;
   skills: SkillListItem[];
-  onSelect: (skillName: string) => void;
+  onSelect: (skill: SkillListItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
   anchorRef: RefObject<HTMLDivElement | null>;
@@ -115,7 +115,7 @@ export const SkillPicker = memo(function SkillPicker({
                 <CommandItem
                   key={skill.name}
                   value={skill.name}
-                  onSelect={() => onSelect(skill.name)}
+                  onSelect={() => onSelect(skill)}
                   className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
                 >
                   <span
