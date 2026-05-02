@@ -927,23 +927,12 @@ export class UserMessage extends LitElement {
       return;
     }
 
-    bubble.classList.remove("pr-12");
-    bubble.classList.add("pr-4");
-
-    const bubbleStyle = window.getComputedStyle(bubble);
-    const textStyle = window.getComputedStyle(text);
-    const verticalChrome =
-      Number.parseFloat(bubbleStyle.paddingTop) +
-      Number.parseFloat(bubbleStyle.paddingBottom) +
-      Number.parseFloat(bubbleStyle.borderTopWidth) +
-      Number.parseFloat(bubbleStyle.borderBottomWidth);
-    const lineHeight =
-      Number.parseFloat(textStyle.lineHeight) || text.getBoundingClientRect().height;
-    const singleLineHeight = verticalChrome + lineHeight;
-    const shouldReserve = bubble.getBoundingClientRect().height <= singleLineHeight + 2;
-
-    bubble.classList.toggle("pr-12", shouldReserve);
-    bubble.classList.toggle("pr-4", !shouldReserve);
+    bubble.classList.remove("pr-8");
+    const visibleLineCount = Array.from(text.getClientRects()).filter(
+      (rect) => rect.width > 0 && rect.height > 0,
+    ).length;
+    const shouldReserve = visibleLineCount <= 1;
+    bubble.classList.toggle("pr-8", shouldReserve);
     if (this.reserveCopySpace !== shouldReserve) this.reserveCopySpace = shouldReserve;
   }
 
@@ -967,7 +956,7 @@ export class UserMessage extends LitElement {
         <div class="relative">
           <div
             data-user-message-bubble
-            class="user-message-container py-2 pl-4 ${this.reserveCopySpace ? "pr-12" : "pr-4"} rounded-xl"
+            class="user-message-container py-2 px-4 ${this.reserveCopySpace ? "pr-8" : ""} rounded-xl"
           >
             ${
               textContent?.text
