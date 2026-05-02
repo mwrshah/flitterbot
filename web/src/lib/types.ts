@@ -230,11 +230,8 @@ export type ModelsListResponse = {
   defaultThinkingLevel: ThinkingLevel;
 };
 
-export type ModelsMutationResponse = {
+export type ModelsMutationResponse = ModelsListResponse & {
   ok: true;
-  pinned: ModelListItem[];
-  defaultModel: string;
-  defaultThinkingLevel: ThinkingLevel;
 };
 
 /* ── Directory Completions ── */

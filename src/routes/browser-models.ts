@@ -1,5 +1,5 @@
 import type http from "node:http";
-import { getModel, getModels, getProviders, supportsXhigh } from "@mariozechner/pi-ai";
+import { getModel, getModels, getProviders, getSupportedThinkingLevels } from "@mariozechner/pi-ai";
 import { isThinkingLevel, type ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
@@ -13,11 +13,12 @@ import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
 /**
  * GET /api/models — return the configured model selector entries plus the
- * full pi-mono model catalog so the web client can offer the complete list.
+ * unpinned pi-mono catalog entries so the web client can offer the complete
+ * list without render-path deduping.
  *
  * Response shape:
  *   - `pinned`:        curated favorites from `config.models[]`
- *   - `all`:           every provider/model in the pi SDK catalog, each
+ *   - `all`:           every unpinned provider/model in the pi SDK catalog,
  *                      annotated with an `available` flag derived from Pi's
  *                      canonical auth (API keys, OAuth subscription tokens,
  *                      or environment variables).
@@ -33,51 +34,7 @@ export async function handleBrowserModelsRoute(
   _req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
-  const availabilityByProvider = await resolveProviderAvailability(runtime);
-  const pinned: ModelListItem[] = runtime.config.models.map((entry) => {
-    const catalogModel = getModel(
-      entry.provider as Parameters<typeof getModel>[0],
-      entry.modelId as Parameters<typeof getModel>[1],
-    );
-    return {
-      id: entry.id,
-      label: entry.label,
-      provider: entry.provider,
-      modelId: entry.modelId,
-      ...(entry.thinkingLevel ? { thinkingLevel: entry.thinkingLevel } : {}),
-      ...(catalogModel ? modelThinkingCapabilities(catalogModel) : {}),
-      available: (availabilityByProvider.get(entry.provider) ?? "none") !== "none",
-      authKind: availabilityByProvider.get(entry.provider) ?? "none",
-    };
-  });
-
-  const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
-  const all: ModelListItem[] = [];
-  for (const provider of getProviders()) {
-    const authKind = availabilityByProvider.get(provider) ?? "none";
-    for (const model of getModels(provider)) {
-      if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
-      all.push({
-        id: `${provider}/${model.id}`,
-        label: model.name,
-        provider,
-        modelId: model.id,
-        name: model.name,
-        contextWindow: model.contextWindow,
-        ...modelThinkingCapabilities(model),
-        available: authKind !== "none",
-        authKind,
-      });
-    }
-  }
-
-  const body: ModelsListResponse = {
-    pinned,
-    all,
-    defaultModel: runtime.config.defaultModel,
-    defaultThinkingLevel: runtime.config.defaultThinkingLevel,
-  };
-  return sendJson(res, 200, body);
+  return sendJson(res, 200, await buildModelsListResponse(runtime));
 }
 
 /**
@@ -248,37 +205,76 @@ export async function handleBrowserModelsDefaultThinkingLevelRoute(
   return sendJson(res, 200, await buildModelsMutationResponse(runtime));
 }
 
+export async function buildModelsListResponse(
+  runtime: ControlSurfaceRuntime,
+): Promise<ModelsListResponse> {
+  const availabilityByProvider = await resolveProviderAvailability(runtime);
+  const pinned = runtime.config.models.map((entry) =>
+    buildPinnedModelItem(entry, availabilityByProvider),
+  );
+  const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
+  const all: ModelListItem[] = [];
+
+  for (const provider of getProviders()) {
+    const authKind = availabilityByProvider.get(provider) ?? "none";
+    for (const model of getModels(provider)) {
+      if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
+      all.push({
+        id: `${provider}/${model.id}`,
+        label: model.name,
+        provider,
+        modelId: model.id,
+        name: model.name,
+        contextWindow: model.contextWindow,
+        ...modelThinkingCapabilities(model),
+        available: authKind !== "none",
+        authKind,
+      });
+    }
+  }
+
+  return {
+    pinned,
+    all,
+    defaultModel: runtime.config.defaultModel,
+    defaultThinkingLevel: runtime.config.defaultThinkingLevel,
+  };
+}
+
 export async function buildModelsMutationResponse(
   runtime: ControlSurfaceRuntime,
 ): Promise<ModelsMutationResponse> {
-  const availabilityByProvider = await resolveProviderAvailability(runtime);
   return {
     ok: true,
-    pinned: runtime.config.models.map((m) => {
-      const catalogModel = getModel(
-        m.provider as Parameters<typeof getModel>[0],
-        m.modelId as Parameters<typeof getModel>[1],
-      );
-      return {
-        id: m.id,
-        label: m.label,
-        provider: m.provider,
-        modelId: m.modelId,
-        ...(m.thinkingLevel ? { thinkingLevel: m.thinkingLevel } : {}),
-        ...(catalogModel ? modelThinkingCapabilities(catalogModel) : {}),
-        available: (availabilityByProvider.get(m.provider) ?? "none") !== "none",
-        authKind: availabilityByProvider.get(m.provider) ?? "none",
-      };
-    }),
-    defaultModel: runtime.config.defaultModel,
-    defaultThinkingLevel: runtime.config.defaultThinkingLevel,
+    ...(await buildModelsListResponse(runtime)),
+  };
+}
+
+function buildPinnedModelItem(
+  entry: ModelConfigEntry,
+  availabilityByProvider: Map<string, ModelListItem["authKind"]>,
+): ModelListItem {
+  const catalogModel = getModel(
+    entry.provider as Parameters<typeof getModel>[0],
+    entry.modelId as Parameters<typeof getModel>[1],
+  );
+  const authKind = availabilityByProvider.get(entry.provider) ?? "none";
+  return {
+    id: entry.id,
+    label: entry.label,
+    provider: entry.provider,
+    modelId: entry.modelId,
+    ...(entry.thinkingLevel ? { thinkingLevel: entry.thinkingLevel } : {}),
+    ...(catalogModel ? modelThinkingCapabilities(catalogModel) : {}),
+    available: authKind !== "none",
+    authKind,
   };
 }
 
 function modelThinkingCapabilities(model: NonNullable<ReturnType<typeof getModel>>) {
   return {
     reasoning: Boolean(model.reasoning),
-    supportsXhigh: supportsXhigh(model),
+    supportsXhigh: getSupportedThinkingLevels(model).includes("xhigh"),
   };
 }
 

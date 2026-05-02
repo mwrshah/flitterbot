@@ -127,8 +127,8 @@ export interface MessageRequest {
 
 /**
  * Entry in `GET /api/models` response. Used for both curated `pinned` entries
- * (from `config.models[]`) and enumerated `all` entries (from the pi SDK
- * catalog). `id` is the stable value the UI persists — either the user's
+ * (from `config.models[]`) and enumerated `all` entries (unpinned entries from
+ * the pi SDK catalog). `id` is the stable value the UI persists — either the user's
  * chosen curated id, or the composite `provider/modelId` for catalog entries.
  */
 export interface ModelListItem {
@@ -154,7 +154,7 @@ export interface ModelListItem {
 export interface ModelsListResponse {
   /** Curated favorites from `config.models[]`. Rendered at the top of the selector. */
   pinned: ModelListItem[];
-  /** Full pi SDK catalog, grouped by provider on the client. */
+  /** Unpinned pi SDK catalog entries, grouped by provider on the client. */
   all: ModelListItem[];
   /** Id of the default model — matches either a `pinned.id` or an `all.id`. */
   defaultModel: string;
@@ -179,11 +179,8 @@ export interface ModelsThinkingLevelRequest {
   level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
-export interface ModelsMutationResponse {
+export interface ModelsMutationResponse extends ModelsListResponse {
   ok: true;
-  pinned: ModelListItem[];
-  defaultModel: string;
-  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
 export interface MessageResponse {

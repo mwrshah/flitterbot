@@ -87,8 +87,9 @@ export const ModelSelector = memo(function ModelSelector({
     mutationFn: ({ id, pin, label }: { id: string; pin: boolean; label?: string }) =>
       apiClient.pinModel(id, pin, label),
     onSuccess: (result, vars) => {
-      // Optimistic-write: drop the fresh payload straight into the cache so
-      // the popup rerenders with the new pinned state without a round-trip GET.
+      // The mutation response is the same derived model-list shape as GET, so
+      // the cache keeps the server invariant: pinned catalog entries are absent
+      // from `all` instead of being deduped again in the render path.
       updateModelsCache(queryClient, result);
       toast.success(vars.pin ? "Pinned to config" : "Unpinned");
     },
@@ -554,16 +555,12 @@ function getAvailableThinkingLevels(model: ModelListItem | undefined): ThinkingL
 }
 
 function updateModelsCache(queryClient: QueryClient, result: ModelsMutationResponse): void {
-  queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, (old) =>
-    old
-      ? {
-          ...old,
-          pinned: result.pinned,
-          defaultModel: result.defaultModel,
-          defaultThinkingLevel: result.defaultThinkingLevel,
-        }
-      : old,
-  );
+  queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, {
+    pinned: result.pinned,
+    all: result.all,
+    defaultModel: result.defaultModel,
+    defaultThinkingLevel: result.defaultThinkingLevel,
+  });
 }
 
 function formatContext(tokens: number): string {
