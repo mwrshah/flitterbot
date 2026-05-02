@@ -319,12 +319,11 @@ export function setupWsQueryBridge(deps: {
           (old) => {
             const items = old ?? [];
 
-            // Upsert the message. Try reconciling against existing entries
-            // (optimistic bubble OR a server-emitted pending placeholder
-            // hydrated on a fresh fetch) in this priority order:
+            // Upsert the message. Try reconciling against existing entries in
+            // this priority order:
             //   1. clientMessageId (web optimistic bubbles)
-            //   2. serverMessageId (whatsapp/cron pending placeholders —
-            //      keyed by the runtime's pre-allocated DB row id)
+            //   2. serverMessageId (surface/input DB rows keyed by the
+            //      runtime's pre-allocated DB row id)
             //   3. canonical id (entry.id) match for direct re-broadcasts
             // Falls through to append when nothing matches.
             let next = items;

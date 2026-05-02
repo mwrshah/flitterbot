@@ -53,6 +53,21 @@ type ChatPanelProps = {
   recoveryKind?: "closed" | "dead";
 };
 
+function QueuedBusyOverlay({ text }: { text: string }) {
+  if (!text) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-x-6 bottom-3 z-20 flex justify-end">
+      <div className="max-w-[min(44rem,100%)] rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div className="font-medium text-muted-foreground">Queued for next turn</div>
+        <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-foreground/90">
+          {text}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ChatPanel({
   piSessionId,
   timeline,
@@ -103,6 +118,9 @@ export function ChatPanel({
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
+  const [busyQueuedText, setBusyQueuedText] = useState("");
+  const busyQueuedTextRef = useRef("");
+  const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
   const agentMessages = useAgentMessages(timeline);
 
@@ -117,6 +135,38 @@ export function ChatPanel({
       );
     },
   });
+
+  const clearBusyQueuedText = useCallback(() => {
+    busyQueuedTextRef.current = "";
+    busyQueuedClearClientMessageIdRef.current = null;
+    setBusyQueuedText("");
+  }, []);
+
+  const appendBusyQueuedText = useCallback((text: string) => {
+    setBusyQueuedText((previous) => {
+      const next = previous ? `${previous}\n${text}` : text;
+      busyQueuedTextRef.current = next;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    clearBusyQueuedText();
+  }, [clearBusyQueuedText, piSessionId]);
+
+  useEffect(() => {
+    const clientMessageId = busyQueuedClearClientMessageIdRef.current;
+    if (!busyQueuedText || !clientMessageId) return;
+
+    for (const item of timeline) {
+      if (item.kind !== "message") continue;
+      const message = item as ChatTimelineMessage;
+      if (message.role === "user" && message.clientMessageId === clientMessageId) {
+        clearBusyQueuedText();
+        return;
+      }
+    }
+  }, [busyQueuedText, clearBusyQueuedText, timeline]);
 
   const handlePruneRequested = useCallback((entryId: string) => {
     setPruneTarget(entryId);
@@ -253,15 +303,35 @@ export function ChatPanel({
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
+      const clientMessageId = crypto.randomUUID();
+      const displayText = text || "(image)";
+      const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
+
+      if (queueBehindBusy) {
+        if (images?.length) return;
+
+        setIsSending(true);
+        try {
+          await onSendMessage(displayText, { clientMessageId });
+          busyQueuedClearClientMessageIdRef.current = clientMessageId;
+          appendBusyQueuedText(displayText);
+          setPendingImages([]);
+        } catch (error) {
+          toast.error("Failed to queue message");
+          console.error("handleSubmit queue failed:", error);
+        } finally {
+          setIsSending(false);
+        }
+        return;
+      }
+
       // Optimistic insert: append a user-message entry to the agent timeline
       // *before* the WS round-trip, so the feed grows immediately and the
       // scroll-to-bottom driven by the messages-changed React path lands on
       // the real new bottom. The server echoes this id back on user-role
       // `message_end`; the ws-query-bridge swaps the optimistic entry for
       // the canonical one in-place (no duplicate, no ordering flip).
-      const clientMessageId = crypto.randomUUID();
       const now = new Date().toISOString();
-      const displayText = text || "(image)";
       const optimistic: ChatTimelineMessage = {
         id: clientMessageId,
         kind: "message",
@@ -297,7 +367,7 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [onSendMessage, piSessionId, queryClient],
+    [appendBusyQueuedText, isSessionBusy, onSendMessage, piSessionId, queryClient],
   );
 
   // Recover/Reopen is only meaningful when we have a streamId to act on.
@@ -373,17 +443,20 @@ export function ChatPanel({
       >
         {/* Message area */}
         <Panel id="feed" defaultSize="85%" minSize="20%">
-          <div
-            ref={viewportRef}
-            data-scroll-container="main"
-            className="h-full overflow-auto px-6 py-4 space-y-3"
-          >
-            <StreamsMessageList
-              ref={messageListRef}
-              messages={agentMessages}
-              onMessagesRendered={handleMessagesRendered}
-              onPruneRequested={handlePruneRequested}
-            />
+          <div className="relative h-full">
+            <div
+              ref={viewportRef}
+              data-scroll-container="main"
+              className="h-full overflow-auto px-6 py-4 space-y-3"
+            >
+              <StreamsMessageList
+                ref={messageListRef}
+                messages={agentMessages}
+                onMessagesRendered={handleMessagesRendered}
+                onPruneRequested={handlePruneRequested}
+              />
+            </div>
+            <QueuedBusyOverlay text={busyQueuedText} />
           </div>
         </Panel>
 
@@ -435,6 +508,7 @@ export function ChatPanel({
             selectedModelId={selectedModelId}
             selectedThinkingLevel={selectedThinkingLevel}
             isSessionBusy={isSessionBusy}
+            attachmentsDisabled={busyQueuedText.length > 0}
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}
             recoveryKind={effectiveRecoveryKind}

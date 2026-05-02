@@ -263,6 +263,8 @@ type MessageInputProps = {
   selectedThinkingLevel?: ThinkingLevel;
   /** Agent is generating — send button swaps to a stop-sign icon. */
   isSessionBusy?: boolean;
+  /** Disable image attach/paste/drop without changing the session action button. */
+  attachmentsDisabled?: boolean;
   /** Triggered when the user clicks the stop-sign while session is busy. */
   onInterrupt?: () => void;
   /** Interrupt request in flight — disables the stop button. */
@@ -299,6 +301,7 @@ export const MessageInput = memo(function MessageInput({
   selectedModelId,
   selectedThinkingLevel,
   isSessionBusy = false,
+  attachmentsDisabled = false,
   onInterrupt,
   isInterruptPending = false,
   recoveryKind,
@@ -321,6 +324,7 @@ export const MessageInput = memo(function MessageInput({
   const [isDraftBlank, setIsDraftBlank] = useState(() =>
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
+  const imagesDisabled = isSessionBusy || attachmentsDisabled;
   const [hoverSendAction, setHoverSendAction] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
@@ -645,13 +649,13 @@ export const MessageInput = memo(function MessageInput({
   );
 
   const submitCurrentDraft = useCallback(() => {
-    if (isSending || isSessionBusy || recoveryKind) return;
+    if (isSending || recoveryKind || (imagesDisabled && pendingImages.length > 0)) return;
     const text = draftRef.current.trim();
     if (!text && pendingImages.length === 0) return;
     onSubmitRef.current(text);
     setHoverSendAction(null);
     setDraftAndStore("");
-  }, [isSending, isSessionBusy, pendingImages.length, recoveryKind, setDraftAndStore]);
+  }, [imagesDisabled, isSending, pendingImages.length, recoveryKind, setDraftAndStore]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -754,28 +758,39 @@ export const MessageInput = memo(function MessageInput({
     [closePicker, handleDraftChange, submitCurrentDraft],
   );
 
-  const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    const imageFiles: File[] = [];
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) imageFiles.push(file);
+  const handlePaste = useCallback(
+    (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      const imageFiles: File[] = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          if (imagesDisabled) {
+            event.preventDefault();
+            return;
+          }
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
       }
-    }
-    if (imageFiles.length) {
-      event.preventDefault();
-      onAddImagesRef.current(imageFiles);
-    }
-  }, []);
+      if (imageFiles.length) {
+        event.preventDefault();
+        onAddImagesRef.current(imageFiles);
+      }
+    },
+    [imagesDisabled],
+  );
 
-  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (event.dataTransfer?.files?.length) {
-      onAddImagesRef.current(Array.from(event.dataTransfer.files));
-    }
-  }, []);
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (imagesDisabled) return;
+      if (event.dataTransfer?.files?.length) {
+        onAddImagesRef.current(Array.from(event.dataTransfer.files));
+      }
+    },
+    [imagesDisabled],
+  );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -815,7 +830,8 @@ export const MessageInput = memo(function MessageInput({
     [setDraftAndStore, submitCurrentDraft],
   );
 
-  const canSend = !isDraftBlank || pendingImages.length > 0;
+  const canSend =
+    (!isDraftBlank || pendingImages.length > 0) && !(imagesDisabled && pendingImages.length > 0);
 
   return (
     <div
@@ -858,9 +874,10 @@ export const MessageInput = memo(function MessageInput({
           type="file"
           accept="image/*"
           multiple
+          disabled={imagesDisabled}
           className="hidden"
           onChange={(e) => {
-            if (e.target.files?.length) onAddImages(Array.from(e.target.files));
+            if (!imagesDisabled && e.target.files?.length) onAddImages(Array.from(e.target.files));
             e.target.value = "";
           }}
         />
@@ -906,9 +923,12 @@ export const MessageInput = memo(function MessageInput({
           <button
             type="button"
             tabIndex={-1}
+            disabled={imagesDisabled}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded p-0.5"
-            title="Attach image"
+            className="absolute left-2.5 top-3.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded p-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground/60"
+            title={
+              imagesDisabled ? "Images can't be queued while the session is busy" : "Attach image"
+            }
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
