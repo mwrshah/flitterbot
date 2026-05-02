@@ -664,7 +664,7 @@ function editResultDiffText(result: ToolResultMessageType | undefined): string {
 
 function renderEditDiffRows(rows: EditDiffRow[]): TemplateResult {
   return html`
-    <div class="diff-viewer-panel text-xs rounded-md border border-border overflow-auto max-h-64">
+    <div class="diff-viewer-panel text-xs rounded-md border border-border overflow-auto max-h-[70vh]">
       <table class="diff">
         <colgroup>
           <col class="diff-gutter-col" />
@@ -710,7 +710,11 @@ function renderEditTool(
   return html`
     <div class="space-y-2">
       ${rows.length ? renderEditDiffRows(rows) : ""}
-      ${resultDiff ? html`<console-block .content=${resultDiff}></console-block>` : ""}
+      ${
+        resultDiff
+          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-[70vh] whitespace-pre-wrap">${resultDiff}</pre>`
+          : ""
+      }
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
