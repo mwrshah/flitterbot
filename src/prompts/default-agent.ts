@@ -12,7 +12,7 @@ export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string
 - When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
 
 ## RULES
-Answer directly: quick questions that don't require reading files, all todoist ops, light obsidian reads.
+Handle yourself directly: quick questions that don’t require reading files, light Obsidian reads, manage all Todoist task related operations, running straightforward git operations, and executing one-off commands. 
 
 Create a work stream for repo specific investigation, web research, implementation, repo specific bug fixes (even if small), refactors, any "help me do [X]".
 
