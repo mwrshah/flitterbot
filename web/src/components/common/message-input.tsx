@@ -35,7 +35,6 @@ const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
 /** Sub-pixel safety margin so a button that "just fits" in pretext pixels
  *  doesn't get clipped by browser rounding or fractional widths. */
-const MEASUREMENT_BUFFER_PX = 16;
 
 function pretextTextWidth(text: string, font: string, lineHeight: number) {
   const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
@@ -132,11 +131,7 @@ function MessageInputHoverButtons({
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
       const availableWidth = Math.max(
         0,
-        toolbarRect.left -
-          buttonRowRect.left -
-          horizontalMargin(toolbarStyle) -
-          toolbarGap -
-          MEASUREMENT_BUFFER_PX,
+        toolbarRect.left - buttonRowRect.left - horizontalMargin(toolbarStyle) - toolbarGap,
       );
 
       let usedWidth = 0;

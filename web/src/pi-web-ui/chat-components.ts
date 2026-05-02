@@ -852,7 +852,7 @@ export class UserMessage extends LitElement {
               data-open=${this.menuOpen ? "true" : "false"}
               aria-haspopup="menu"
               aria-expanded=${this.menuOpen ? "true" : "false"}
-              class="absolute top-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/user-message:opacity-100 data-[open=true]:opacity-100 transition-opacity cursor-pointer"
+              class="absolute top-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-100 cursor-pointer"
               title="${i18n("Message actions")}"
             >
               ${unsafeHTML(iconSvg(EllipsisVertical, "sm"))}
