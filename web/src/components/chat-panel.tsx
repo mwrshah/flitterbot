@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
-import { MessageInput } from "~/components/common/message-input";
+import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import {
   Dialog,
@@ -38,6 +38,7 @@ type ChatPanelProps = {
   ) => Promise<void>;
   streamId?: string;
   streamName?: string;
+  streamHasWorktree?: boolean;
   modelSelectorMode?: "default" | "pi-session";
   selectedModelId?: string;
   /** Recovery action to offer in the header, if any:
@@ -53,6 +54,7 @@ export function ChatPanel({
   onSendMessage,
   streamId,
   streamName,
+  streamHasWorktree = false,
   modelSelectorMode = "default",
   selectedModelId,
   recoveryKind,
@@ -294,6 +296,35 @@ export function ChatPanel({
   // Recover/Reopen is only meaningful when we have a streamId to act on.
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
 
+  const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
+    if (!streamId) return [];
+    if (streamHasWorktree) {
+      const buttons: MessageInputHoverButton[] = [
+        {
+          id: "close-no-git-ops",
+          label: "close (no git ops)",
+          insertText: "close stream with the no-op option",
+        },
+        { id: "close-merge", label: "close (merge)", insertText: "ship it" },
+      ];
+      if (worktree?.worktreePath && worktree.branch && worktree.baseBranch) {
+        buttons.push({
+          id: "merge-base-branch",
+          label: "merge into base",
+          insertText: `Pls commit all changes in ${worktree.worktreePath}, then merge the current worktree branch ${worktree.branch} into the base branch: ${worktree.baseBranch}.`,
+        });
+      }
+      return buttons;
+    }
+    return [
+      {
+        id: "close-stream",
+        label: "close stream",
+        insertText: "close stream with the no-op option",
+      },
+    ];
+  }, [streamHasWorktree, streamId, worktree?.baseBranch, worktree?.branch, worktree?.worktreePath]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
@@ -389,6 +420,7 @@ export function ChatPanel({
             isInterruptPending={interruptMutation.isPending}
             recoveryKind={effectiveRecoveryKind}
             onRecover={() => recoverMutation.mutate()}
+            hoverButtons={inputHoverButtons}
             isRecoverPending={recoverMutation.isPending}
           />
         </Panel>

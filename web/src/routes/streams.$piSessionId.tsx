@@ -95,6 +95,7 @@ function PiSessionRoute() {
           onSendMessage={onSendMessage}
           streamId={stream?.id}
           streamName={stream?.name}
+          streamHasWorktree={!!stream?.worktreePath}
           modelSelectorMode="pi-session"
           selectedModelId={stream?.model?.id}
           recoveryKind={recoveryKind}

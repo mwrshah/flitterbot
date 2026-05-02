@@ -8,6 +8,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -23,6 +24,163 @@ import { cn } from "~/lib/utils";
 
 /** Module-level store: persists draft text per route across navigations. */
 const draftStore = new Map<string, string>();
+
+export type MessageInputHoverButton = {
+  id: string;
+  label: string;
+  insertText: string;
+};
+
+const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
+const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
+/** Sub-pixel safety margin so a button that "just fits" in pretext pixels
+ *  doesn't get clipped by browser rounding or fractional widths. */
+const MEASUREMENT_BUFFER_PX = 16;
+
+function pretextTextWidth(text: string, font: string, lineHeight: number) {
+  const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
+  const result = layoutWithLines(prepared, HOVER_BUTTON_MEASURE_WIDTH_PX, lineHeight);
+  return result.lines[0]?.width ?? 0;
+}
+
+function numericStyleValue(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function horizontalMargin(style: CSSStyleDeclaration) {
+  return numericStyleValue(style.marginLeft) + numericStyleValue(style.marginRight);
+}
+
+function horizontalBox(style: CSSStyleDeclaration) {
+  return (
+    numericStyleValue(style.paddingLeft) +
+    numericStyleValue(style.paddingRight) +
+    numericStyleValue(style.borderLeftWidth) +
+    numericStyleValue(style.borderRightWidth) +
+    horizontalMargin(style)
+  );
+}
+
+function isBlankDraft(value: string) {
+  return value.length === 0 || !/\S/.test(value);
+}
+
+function MessageInputHoverButtons({
+  buttons,
+  composerRef,
+  toolbarRef,
+  onInsert,
+}: {
+  buttons: MessageInputHoverButton[];
+  composerRef: React.RefObject<HTMLDivElement | null>;
+  toolbarRef: React.RefObject<HTMLDivElement | null>;
+  onInsert: (insertText: string) => void;
+}) {
+  const buttonRowRef = useRef<HTMLDivElement | null>(null);
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useLayoutEffect(() => {
+    const composer = composerRef.current;
+    const toolbar = toolbarRef.current;
+    const buttonRow = buttonRowRef.current;
+    if (!composer || !toolbar || !buttonRow || buttons.length === 0) return;
+
+    const measureAndApply = () => {
+      const renderedButtons = buttonRefs.current.slice(0, buttons.length);
+      const firstButton = renderedButtons[0];
+      if (!firstButton) return;
+
+      const buttonRowRect = buttonRow.getBoundingClientRect();
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const buttonStyle = window.getComputedStyle(firstButton);
+      const prefixStyle = firstButton.firstElementChild
+        ? window.getComputedStyle(firstButton.firstElementChild)
+        : null;
+      const buttonRowStyle = window.getComputedStyle(buttonRow);
+      const toolbarStyle = window.getComputedStyle(toolbar);
+      const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
+      const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
+      const buttonChrome = horizontalBox(buttonStyle);
+      const prefixWidth =
+        pretextTextWidth("+", font, lineHeight) + (prefixStyle ? horizontalMargin(prefixStyle) : 0);
+      const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
+      const toolbarGap = numericStyleValue(buttonRowStyle.columnGap) || buttonGap;
+      const availableWidth = Math.max(
+        0,
+        toolbarRect.left -
+          buttonRowRect.left -
+          horizontalMargin(toolbarStyle) -
+          toolbarGap -
+          MEASUREMENT_BUFFER_PX,
+      );
+
+      let usedWidth = 0;
+      let visibleCount = 0;
+      for (const button of buttons) {
+        const textWidth = prefixWidth + pretextTextWidth(button.label, font, lineHeight);
+        const nextWidth =
+          usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
+        if (nextWidth > availableWidth) break;
+        usedWidth = nextWidth;
+        visibleCount += 1;
+      }
+
+      renderedButtons.forEach((button, index) => {
+        if (button) button.hidden = index >= visibleCount;
+      });
+    };
+
+    let frame = 0;
+    const scheduleMeasure = () => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        // pretext returns CSS pixels; everything here is measured in CSS pixels.
+        measureAndApply();
+      });
+    };
+
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(composer);
+    observer.observe(toolbar);
+
+    scheduleMeasure();
+
+    return () => {
+      observer.disconnect();
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
+  }, [buttons, composerRef, toolbarRef]);
+
+  if (buttons.length === 0) return null;
+
+  return (
+    <div
+      ref={buttonRowRef}
+      className="pointer-events-none absolute left-2.5 bottom-2 flex items-center gap-1.5 overflow-hidden"
+    >
+      {buttons.map((button, index) => (
+        <button
+          key={button.id}
+          ref={(node) => {
+            buttonRefs.current[index] = node;
+          }}
+          type="button"
+          onClick={() => onInsert(button.insertText)}
+          className="pointer-events-auto inline-flex h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label={`Insert ${button.label}`}
+          title={`Insert ${button.insertText}`}
+        >
+          <span aria-hidden="true" className="mr-1 shrink-0 text-muted-foreground/70">
+            +
+          </span>
+          <span className="truncate">{button.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type MessageInputProps = {
   isSending: boolean;
@@ -56,6 +214,8 @@ type MessageInputProps = {
   recoveryKind?: "closed" | "dead";
   /** Triggered when the user clicks the recovery action. */
   onRecover?: () => void;
+  /** Optional plain-text snippet buttons shown inside an empty composer. */
+  hoverButtons?: MessageInputHoverButton[];
   /** Recovery request in flight — disables the recovery button. */
   isRecoverPending?: boolean;
 };
@@ -83,6 +243,7 @@ export const MessageInput = memo(function MessageInput({
   isInterruptPending = false,
   recoveryKind,
   onRecover,
+  hoverButtons = EMPTY_HOVER_BUTTONS,
   isRecoverPending = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
@@ -94,8 +255,13 @@ export const MessageInput = memo(function MessageInput({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const draftKeyRef = useRef(draftKey);
   const [draft, setDraft] = useState(() => (draftKey ? (draftStore.get(draftKey) ?? "") : ""));
+  const [isDraftBlank, setIsDraftBlank] = useState(() =>
+    isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
+  );
+  const isDraftBlankRef = useRef(isDraftBlank);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
@@ -162,6 +328,19 @@ export const MessageInput = memo(function MessageInput({
     onAddImagesRef.current = onAddImages;
   });
 
+  const setDraftAndStore = useCallback((value: string) => {
+    const nextIsDraftBlank = isBlankDraft(value);
+
+    if (draftKeyRef.current) {
+      if (value) draftStore.set(draftKeyRef.current, value);
+      else draftStore.delete(draftKeyRef.current);
+    }
+    draftRef.current = value;
+    isDraftBlankRef.current = nextIsDraftBlank;
+    setDraft(value);
+    setIsDraftBlank((current) => (current === nextIsDraftBlank ? current : nextIsDraftBlank));
+  }, []);
+
   /** Close a picker on Escape: remove trigger text, reset position ref, refocus. */
   const closePicker = useCallback(
     (triggerPos: number, setOpen: (v: boolean) => void, posRef: React.MutableRefObject<number>) => {
@@ -171,14 +350,14 @@ export const MessageInput = memo(function MessageInput({
       const value = draftRef.current;
       const cursor = textarea.selectionStart ?? value.length;
       const newValue = value.slice(0, triggerPos) + value.slice(cursor);
-      setDraft(newValue);
+      setDraftAndStore(newValue);
       posRef.current = -1;
       requestAnimationFrame(() => {
         textarea.setSelectionRange(triggerPos, triggerPos);
         textarea.focus();
       });
     },
-    [],
+    [setDraftAndStore],
   );
 
   /**
@@ -216,8 +395,7 @@ export const MessageInput = memo(function MessageInput({
    */
   const handleDraftChange = useCallback(
     (value: string) => {
-      if (draftKeyRef.current) draftStore.set(draftKeyRef.current, value);
-      setDraft(value);
+      setDraftAndStore(value);
       const cursor = textareaRef.current?.selectionStart ?? value.length;
 
       // Scan backwards from cursor to find a "/" trigger
@@ -257,7 +435,7 @@ export const MessageInput = memo(function MessageInput({
           tildeExpandedRef.current = true;
           const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
           const newCursor = cursor + 1;
-          setDraft(newValue);
+          setDraftAndStore(newValue);
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
@@ -284,7 +462,7 @@ export const MessageInput = memo(function MessageInput({
           dotDotExpandedRef.current = true;
           const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
           const newCursor = cursor + 1;
-          setDraft(newValue);
+          setDraftAndStore(newValue);
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
@@ -305,7 +483,7 @@ export const MessageInput = memo(function MessageInput({
           const extra = atIdx + 1 + 2; // position of the second slash
           const newValue = value.slice(0, extra) + value.slice(extra + 1);
           const newCursor = cursor - 1;
-          setDraft(newValue);
+          setDraftAndStore(newValue);
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
@@ -343,32 +521,35 @@ export const MessageInput = memo(function MessageInput({
         dotDotExpandedRef.current = false;
       }
     },
-    [skills, computeSlashLeft],
+    [skills, computeSlashLeft, setDraftAndStore],
   );
 
-  const handleSkillSelect = useCallback((skill: SkillListItem) => {
-    const value = draftRef.current;
-    const slashIdx = slashPositionRef.current;
-    // Find end of the trigger token (non-whitespace run from trigger position)
-    let tokenEnd = slashIdx + 1;
-    while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-    // Regular skills need "/skill:<name> " so the pi-sdk's `_expandSkillCommand`
-    // guard fires and inlines SKILL.md at send time. Built-in commands are not
-    // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
-    const before = value.slice(0, slashIdx);
-    const after = value.slice(tokenEnd);
-    const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
-    const newValue = before + inserted + after;
-    setDraft(newValue);
-    setPickerOpen(false);
-    slashPositionRef.current = -1;
-    // Restore cursor position after the inserted command
-    const newCursor = before.length + inserted.length;
-    requestAnimationFrame(() => {
-      textareaRef.current?.setSelectionRange(newCursor, newCursor);
-      textareaRef.current?.focus();
-    });
-  }, []);
+  const handleSkillSelect = useCallback(
+    (skill: SkillListItem) => {
+      const value = draftRef.current;
+      const slashIdx = slashPositionRef.current;
+      // Find end of the trigger token (non-whitespace run from trigger position)
+      let tokenEnd = slashIdx + 1;
+      while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
+      // Regular skills need "/skill:<name> " so the pi-sdk's `_expandSkillCommand`
+      // guard fires and inlines SKILL.md at send time. Built-in commands are not
+      // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
+      const before = value.slice(0, slashIdx);
+      const after = value.slice(tokenEnd);
+      const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
+      const newValue = before + inserted + after;
+      setDraftAndStore(newValue);
+      setPickerOpen(false);
+      slashPositionRef.current = -1;
+      // Restore cursor position after the inserted command
+      const newCursor = before.length + inserted.length;
+      requestAnimationFrame(() => {
+        textareaRef.current?.setSelectionRange(newCursor, newCursor);
+        textareaRef.current?.focus();
+      });
+    },
+    [setDraftAndStore],
+  );
 
   const handlePathSelect = useCallback(
     (item: DirectoryCompletionItem) => {
@@ -384,7 +565,7 @@ export const MessageInput = memo(function MessageInput({
       const isDir = item.kind === "directory";
       const inserted = `@${item.insertText}${isDir ? "" : " "}`;
       const newValue = before + inserted + after;
-      setDraft(newValue);
+      setDraftAndStore(newValue);
       if (!isDir) {
         setAtPickerOpen(false);
         atPositionRef.current = -1;
@@ -399,7 +580,7 @@ export const MessageInput = memo(function MessageInput({
         }
       });
     },
-    [handleDraftChange],
+    [handleDraftChange, setDraftAndStore],
   );
 
   const handleKeyDown = useCallback(
@@ -499,11 +680,10 @@ export const MessageInput = memo(function MessageInput({
         event.preventDefault();
         const text = draftRef.current.trim();
         onSubmitRef.current(text);
-        setDraft("");
-        if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
+        setDraftAndStore("");
       }
     },
-    [closePicker, handleDraftChange],
+    [closePicker, handleDraftChange, setDraftAndStore],
   );
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -533,7 +713,32 @@ export const MessageInput = memo(function MessageInput({
     event.preventDefault();
   }, []);
 
-  const canSend = draft.trim() || pendingImages.length > 0;
+  const shouldShowHoverButtons =
+    hoverButtons.length > 0 &&
+    isDraftBlank &&
+    pendingImages.length === 0 &&
+    !isSending &&
+    !isSessionBusy &&
+    !recoveryKind;
+
+  const handleHoverButtonClick = useCallback(
+    (insertText: string) => {
+      const current = draftRef.current;
+      const newValue = isBlankDraft(current) ? insertText : `${current}\n${insertText}`;
+      setDraftAndStore(newValue);
+      setPickerOpen(false);
+      setAtPickerOpen(false);
+      slashPositionRef.current = -1;
+      atPositionRef.current = -1;
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
+      });
+    },
+    [setDraftAndStore],
+  );
+
+  const canSend = !isDraftBlank || pendingImages.length > 0;
 
   return (
     <div
@@ -548,8 +753,7 @@ export const MessageInput = memo(function MessageInput({
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit(draftRef.current.trim());
-          setDraft("");
-          if (draftKeyRef.current) draftStore.delete(draftKeyRef.current);
+          setDraftAndStore("");
         }}
         className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}
       >
@@ -611,7 +815,6 @@ export const MessageInput = memo(function MessageInput({
           />
           <textarea
             ref={textareaRef}
-            tabIndex={-1}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -647,10 +850,16 @@ export const MessageInput = memo(function MessageInput({
               <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
             </svg>
           </button>
-          {/* Toolbar — bottom right. Model selector sits immediately left of
-              the send button so "which model am I about to invoke" is always
-              visible without stealing focus from the composer. */}
-          <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
+          {/* Hover buttons fit against the whole right toolbar, including model selector and send/recovery. */}
+          {shouldShowHoverButtons && (
+            <MessageInputHoverButtons
+              buttons={hoverButtons}
+              composerRef={containerRef}
+              toolbarRef={toolbarRef}
+              onInsert={handleHoverButtonClick}
+            />
+          )}
+          <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
             {showModelSelector && (
               <ModelSelector
                 disabled={isSending}
