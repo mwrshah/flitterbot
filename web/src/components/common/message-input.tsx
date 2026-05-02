@@ -34,6 +34,10 @@ export type MessageInputHoverButton = {
   id: string;
   label: string;
   insertText: string;
+  /** Prefix rendered before the label. Defaults to '+'. */
+  prefix?: string;
+  /** When false, clicking the button only inserts text instead of showing the follow-up send action. */
+  showSendAction?: boolean;
 };
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
@@ -70,6 +74,15 @@ function isBlankDraft(value: string) {
   return value.length === 0 || !/\S/.test(value);
 }
 
+function autoExpandedDuplicateSlashIndex(filter: string) {
+  if (filter.startsWith("~//")) return 2;
+  if (filter.startsWith("..//")) return 3;
+
+  const nestedDotDot = "/..//";
+  const nestedIndex = filter.lastIndexOf(nestedDotDot);
+  return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
+}
+
 function MessageInputHoverButtons({
   buttons,
   composerRef,
@@ -79,7 +92,7 @@ function MessageInputHoverButtons({
   buttons: MessageInputHoverButton[];
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
-  onInsert: (insertText: string, visibleBlockWidth: number) => void;
+  onInsert: (button: MessageInputHoverButton, visibleBlockWidth: number) => void;
 }) {
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -130,8 +143,7 @@ function MessageInputHoverButtons({
       const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
       const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
       const buttonChrome = horizontalBox(buttonStyle);
-      const prefixWidth =
-        pretextTextWidth("+", font, lineHeight) + (prefixStyle ? horizontalMargin(prefixStyle) : 0);
+      const prefixMargin = prefixStyle ? horizontalMargin(prefixStyle) : 0;
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
       const availableWidth = Math.max(
@@ -142,6 +154,7 @@ function MessageInputHoverButtons({
       let usedWidth = 0;
       let visibleCount = 0;
       for (const button of buttons) {
+        const prefixWidth = pretextTextWidth(button.prefix ?? "+", font, lineHeight) + prefixMargin;
         const textWidth = prefixWidth + pretextTextWidth(button.label, font, lineHeight);
         const nextWidth =
           usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
@@ -212,13 +225,13 @@ function MessageInputHoverButtons({
             buttonRefs.current[index] = node;
           }}
           type="button"
-          onClick={() => onInsert(button.insertText, currentVisibleBlockWidth())}
-          className="pointer-events-auto inline-flex h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={() => onInsert(button, currentVisibleBlockWidth())}
+          className="pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring"
           aria-label={`Insert ${button.label}`}
           title={`Insert ${button.insertText}`}
         >
           <span aria-hidden="true" className="mr-1 shrink-0 text-muted-foreground/70">
-            +
+            {button.prefix ?? "+"}
           </span>
           <span className="truncate">{button.label}</span>
         </button>
@@ -525,16 +538,17 @@ export const MessageInput = memo(function MessageInput({
           dotDotExpandedRef.current = false;
         }
 
-        // Collapse ~// → ~/ when user's own "/" keystroke doubles the auto-inserted one
-        if (filter.startsWith("~//")) {
-          const extra = atIdx + 1 + 2; // position of the second slash
+        // Collapse the user's own "/" keystroke when it doubles an auto-inserted slash.
+        const extraSlash = autoExpandedDuplicateSlashIndex(filter);
+        if (extraSlash >= 0) {
+          const extra = atIdx + 1 + extraSlash;
           const newValue = value.slice(0, extra) + value.slice(extra + 1);
           const newCursor = cursor - 1;
           setDraftAndStore(newValue);
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
-          setAtPickerFilter(filter.slice(0, 2) + filter.slice(3));
+          setAtPickerFilter(filter.slice(0, extraSlash) + filter.slice(extraSlash + 1));
           slashPositionRef.current = -1;
           setPickerOpen(false);
           requestAnimationFrame(() => {
@@ -778,14 +792,16 @@ export const MessageInput = memo(function MessageInput({
     hoverControlsEnabled && hoverSendAction !== null && draft === hoverSendAction;
 
   const handleHoverButtonClick = useCallback(
-    (insertText: string, _visibleBlockWidth: number) => {
-      if (insertText === "") {
+    (button: MessageInputHoverButton, _visibleBlockWidth: number) => {
+      if (button.insertText === "") {
         submitCurrentDraft();
         return;
       }
       const current = draftRef.current;
-      const newValue = isBlankDraft(current) ? insertText : `${current}\n${insertText}`;
-      setHoverSendAction(newValue);
+      const newValue = isBlankDraft(current)
+        ? button.insertText
+        : `${current}\n${button.insertText}`;
+      setHoverSendAction(button.showSendAction === false ? null : newValue);
       setDraftAndStore(newValue);
       setPickerOpen(false);
       setAtPickerOpen(false);
@@ -915,7 +931,7 @@ export const MessageInput = memo(function MessageInput({
             <MessageInputHoverButtons
               buttons={
                 shouldShowHoverSendAction
-                  ? [{ id: "hover-send", label: "click to send message", insertText: "" }]
+                  ? [{ id: "hover-send", label: "click to send", insertText: "", prefix: ">" }]
                   : hoverButtons
               }
               composerRef={containerRef}

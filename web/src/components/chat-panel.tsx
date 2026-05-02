@@ -304,7 +304,11 @@ export function ChatPanel({
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
 
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
-    if (!streamId) return [];
+    if (!streamId) {
+      return modelSelectorMode === "default"
+        ? [{ id: "clear-session", label: "/clear", insertText: "/clear", showSendAction: false }]
+        : [];
+    }
     if (streamHasWorktree) {
       const buttons: MessageInputHoverButton[] = [
         { id: "close-merge", label: "close (merge)", insertText: "ship it" },
@@ -330,7 +334,14 @@ export function ChatPanel({
         insertText: "close stream with the no-op option",
       },
     ];
-  }, [streamHasWorktree, streamId, worktree?.baseBranch, worktree?.branch, worktree?.worktreePath]);
+  }, [
+    modelSelectorMode,
+    streamHasWorktree,
+    streamId,
+    worktree?.baseBranch,
+    worktree?.branch,
+    worktree?.worktreePath,
+  ]);
 
   return (
     <div className="flex flex-col h-full">

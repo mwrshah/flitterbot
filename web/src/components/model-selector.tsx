@@ -159,9 +159,9 @@ export const ModelSelector = memo(function ModelSelector({
       <Menu.Trigger
         disabled={disabled || (mode === "pi-session" && !piSessionId)}
         className={cn(
-          "inline-flex items-center gap-1 h-7 rounded-md border border-border/60 bg-background/40 text-xs text-muted-foreground",
+          "inline-flex items-center gap-1 h-10 sm:h-7 rounded-md border border-border/60 bg-background/40 text-xs text-muted-foreground",
           "hover:text-foreground hover:bg-accent/50 hover:border-border transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring",
           "disabled:cursor-not-allowed disabled:opacity-50",
           compact ? "px-1.5" : "px-2",
         )}
