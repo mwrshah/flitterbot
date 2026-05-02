@@ -173,6 +173,7 @@ function normalizeToolExecutionResult(
 
 export class MessageCopyButton extends LitElement {
   @property({ attribute: false }) getText: (() => string) | undefined;
+  @property({ type: Boolean }) inline = false;
   @state() private copied = false;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -195,11 +196,15 @@ export class MessageCopyButton extends LitElement {
 
   override render() {
     if (!this.getText) return nothing;
+    const positionClass = this.inline
+      ? "inline-flex ml-2 align-text-bottom"
+      : "absolute bottom-1.5 right-1.5";
+
     return html`
       <button
         @click=${this.copy}
         data-copied=${this.copied ? "true" : "false"}
-        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
+        class="${positionClass} p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
         title="${i18n("Copy message")}"
       >
         ${unsafeHTML(iconSvg(Copy, "sm"))}
@@ -918,15 +923,8 @@ export class UserMessage extends LitElement {
       <div class="flex justify-start mx-4 group/user-message">
         <div class="relative">
           <div class="user-message-container py-2 px-4 rounded-xl">
-            ${
-              textContent?.text
-                ? html`<span
-                    class="after:inline-block after:h-px after:w-7 after:content-['']"
-                    style="white-space: pre-wrap;"
-                    >${textContent.text}</span
-                  >`
-                : ""
-            }
+            ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
+            <message-copy-button inline .getText=${() => plainText}></message-copy-button>
             ${
               imageBlocks.length > 0
                 ? html`
@@ -945,7 +943,6 @@ export class UserMessage extends LitElement {
                 : ""
             }
           </div>
-          <message-copy-button .getText=${() => plainText}></message-copy-button>
           ${
             canPrune
               ? html`
