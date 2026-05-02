@@ -917,8 +917,12 @@ export class UserMessage extends LitElement {
     return html`
       <div class="flex justify-start mx-4 group/user-message">
         <div class="relative">
-          <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
-            ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
+          <div class="user-message-container py-2 px-4 rounded-xl">
+            ${
+              textContent?.text
+                ? html`<span class="copy-safe-text" style="white-space: pre-wrap;">${textContent.text}</span>`
+                : ""
+            }
             ${
               imageBlocks.length > 0
                 ? html`
