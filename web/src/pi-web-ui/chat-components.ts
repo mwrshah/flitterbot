@@ -173,7 +173,6 @@ function normalizeToolExecutionResult(
 
 export class MessageCopyButton extends LitElement {
   @property({ attribute: false }) getText: (() => string) | undefined;
-  @property() rightClass = "right-1.5";
   @state() private copied = false;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -200,7 +199,7 @@ export class MessageCopyButton extends LitElement {
       <button
         @click=${this.copy}
         data-copied=${this.copied ? "true" : "false"}
-        class="absolute bottom-1.5 ${this.rightClass} p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
+        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
         title="${i18n("Copy message")}"
       >
         ${unsafeHTML(iconSvg(Copy, "sm"))}
@@ -928,7 +927,7 @@ export class UserMessage extends LitElement {
       return;
     }
 
-    bubble.classList.remove("pr-12", "pr-16");
+    bubble.classList.remove("pr-12");
     bubble.classList.add("pr-4");
 
     const bubbleStyle = window.getComputedStyle(bubble);
@@ -943,7 +942,7 @@ export class UserMessage extends LitElement {
     const singleLineHeight = verticalChrome + lineHeight;
     const shouldReserve = bubble.getBoundingClientRect().height <= singleLineHeight + 2;
 
-    bubble.classList.toggle(this.entryId ? "pr-16" : "pr-12", shouldReserve);
+    bubble.classList.toggle("pr-12", shouldReserve);
     bubble.classList.toggle("pr-4", !shouldReserve);
     if (this.reserveCopySpace !== shouldReserve) this.reserveCopySpace = shouldReserve;
   }
@@ -968,9 +967,7 @@ export class UserMessage extends LitElement {
         <div class="relative">
           <div
             data-user-message-bubble
-            class="user-message-container py-2 pl-4 ${
-              this.reserveCopySpace ? (canPrune ? "pr-16" : "pr-12") : "pr-4"
-            } rounded-xl"
+            class="user-message-container py-2 pl-4 ${this.reserveCopySpace ? "pr-12" : "pr-4"} rounded-xl"
           >
             ${
               textContent?.text
@@ -995,10 +992,7 @@ export class UserMessage extends LitElement {
                 : ""
             }
           </div>
-          <message-copy-button
-            .getText=${() => plainText}
-            .rightClass=${canPrune ? "right-8" : "right-1.5"}
-          ></message-copy-button>
+          <message-copy-button .getText=${() => plainText}></message-copy-button>
           ${
             canPrune
               ? html`
