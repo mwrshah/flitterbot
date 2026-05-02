@@ -75,6 +75,22 @@ const STREAM_SLOT_HOME_ROW_CODES = [
   "KeyI",
   "KeyO",
 ] as const;
+export const MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS = [
+  "a",
+  "s",
+  "f",
+  "g",
+  "w",
+  "r",
+  "t",
+  "z",
+  "x",
+  "v",
+  "b",
+] as const;
+const MESSAGE_INPUT_BUTTON_SHORTCUT_CODES = MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.map(
+  (key) => `Key${key.toUpperCase()}`,
+);
 const KEY_TOKEN_ALIASES: Record<string, string> = {
   space: " ",
   enter: "Enter",
@@ -165,6 +181,10 @@ export function defineShortcutAction(actionId: string, definition: ShortcutDefin
 
 export function getStreamSlotShortcutActionId(slot: number) {
   return `nav.stream.slot.${slot}`;
+}
+
+export function getMessageInputButtonShortcutActionId(slot: number) {
+  return `message-input.button.slot.${slot}`;
 }
 
 export function setShortcutBindingOverrides(next: ShortcutBindingsConfig | null | undefined) {
@@ -686,6 +706,14 @@ function registerBuiltInShortcutDefinitions() {
       defaultBindings: [
         { spec: `Alt+${STREAM_SLOT_DIGIT_CODES[slot]}`, when: "always" },
         { spec: `Alt+${STREAM_SLOT_HOME_ROW_CODES[slot]}`, when: "always" },
+      ],
+    });
+  }
+
+  for (let slot = 0; slot < MESSAGE_INPUT_BUTTON_SHORTCUT_CODES.length; slot++) {
+    defineShortcutAction(getMessageInputButtonShortcutActionId(slot + 1), {
+      defaultBindings: [
+        { spec: `Alt+${MESSAGE_INPUT_BUTTON_SHORTCUT_CODES[slot]}`, when: "always" },
       ],
     });
   }
