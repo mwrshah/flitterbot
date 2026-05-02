@@ -19,13 +19,14 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
-import { streamsWorktreeQueryOptions } from "~/lib/queries";
+import { statusQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   ImageAttachment,
+  StatusResponse,
   ThinkingLevel,
 } from "~/lib/types";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -68,6 +69,39 @@ function QueuedBusyOverlay({ text }: { text: string }) {
   );
 }
 
+function markPiSessionBusy(
+  status: StatusResponse | undefined,
+  piSessionId: string,
+): StatusResponse | undefined {
+  if (!status?.piAgent) return status;
+
+  const defaultSession = status.piAgent.default;
+  if (defaultSession?.piSessionId === piSessionId) {
+    if (defaultSession.busy) return status;
+    return {
+      ...status,
+      piAgent: {
+        ...status.piAgent,
+        default: { ...defaultSession, busy: true },
+      },
+    } satisfies StatusResponse;
+  }
+
+  const orchestrators = status.piAgent.orchestrators;
+  const index = orchestrators?.findIndex((session) => session.piSessionId === piSessionId) ?? -1;
+  if (!orchestrators || index < 0 || orchestrators[index]?.busy) return status;
+
+  return {
+    ...status,
+    piAgent: {
+      ...status.piAgent,
+      orchestrators: orchestrators.map((session, sessionIndex) =>
+        sessionIndex === index ? { ...session, busy: true } : session,
+      ),
+    },
+  } satisfies StatusResponse;
+}
+
 export function ChatPanel({
   piSessionId,
   timeline,
@@ -94,6 +128,7 @@ export function ChatPanel({
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
+  const { dataUpdatedAt: statusDataUpdatedAt } = useQuery(statusQueryOptions(apiClient));
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
 
   const interruptMutation = useMutation({
@@ -121,6 +156,8 @@ export function ChatPanel({
   const [busyQueuedText, setBusyQueuedText] = useState("");
   const busyQueuedTextRef = useRef("");
   const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
+  const optimisticBusyRevalidateTimerRef = useRef<number | null>(null);
+  const optimisticBusyStatusUpdatedAtRef = useRef(0);
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
   const agentMessages = useAgentMessages(timeline);
 
@@ -153,6 +190,25 @@ export function ChatPanel({
   useEffect(() => {
     clearBusyQueuedText();
   }, [clearBusyQueuedText, piSessionId]);
+
+  useEffect(() => {
+    if (
+      optimisticBusyRevalidateTimerRef.current !== null &&
+      statusDataUpdatedAt > optimisticBusyStatusUpdatedAtRef.current
+    ) {
+      window.clearTimeout(optimisticBusyRevalidateTimerRef.current);
+      optimisticBusyRevalidateTimerRef.current = null;
+    }
+  }, [statusDataUpdatedAt]);
+
+  useEffect(() => {
+    return () => {
+      if (optimisticBusyRevalidateTimerRef.current !== null) {
+        window.clearTimeout(optimisticBusyRevalidateTimerRef.current);
+        optimisticBusyRevalidateTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
@@ -325,6 +381,25 @@ export function ChatPanel({
         return;
       }
 
+      // The submit intent makes this session busy immediately from the UI's
+      // point of view. Waiting for the websocket status echo leaves one render
+      // where the draft is blank but the session is still "idle", so the empty
+      // composer hover actions briefly reappear. The websocket/server status
+      // remains authoritative; the delayed invalidation below is only a safety
+      // refresh if the status_changed echo is dropped or backend enqueue fails.
+      queryClient.setQueryData<StatusResponse>(["status"], (status) =>
+        markPiSessionBusy(status, piSessionId),
+      );
+      optimisticBusyStatusUpdatedAtRef.current =
+        queryClient.getQueryState(["status"])?.dataUpdatedAt ?? Date.now();
+      if (optimisticBusyRevalidateTimerRef.current !== null) {
+        window.clearTimeout(optimisticBusyRevalidateTimerRef.current);
+      }
+      optimisticBusyRevalidateTimerRef.current = window.setTimeout(() => {
+        optimisticBusyRevalidateTimerRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ["status"] });
+      }, 2_000);
+
       // Optimistic insert: append a user-message entry to the agent timeline
       // *before* the WS round-trip, so the feed grows immediately and the
       // scroll-to-bottom driven by the messages-changed React path lands on
@@ -361,6 +436,11 @@ export function ChatPanel({
         queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) =>
           (old ?? []).filter((item) => item.id !== clientMessageId),
         );
+        if (optimisticBusyRevalidateTimerRef.current !== null) {
+          window.clearTimeout(optimisticBusyRevalidateTimerRef.current);
+          optimisticBusyRevalidateTimerRef.current = null;
+        }
+        queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);
       } finally {
