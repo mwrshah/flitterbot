@@ -3,9 +3,9 @@ import {
   getRecentConversationByWorkstream,
   getRecentDefaultConversation,
 } from "../blackboard/query-messages.ts";
-import { listOpenStreams } from "../blackboard/query-streams.ts";
+import { getLatestStreamCreatedAt, listOpenStreams } from "../blackboard/query-streams.ts";
 import type { StreamRow } from "../contracts/index.ts";
-import { buildClassificationPrompt } from "../prompts/classifier.ts";
+import { buildClassificationPrompts } from "../prompts/classifier.ts";
 import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
 /**
@@ -31,6 +31,7 @@ export async function classifyMessage(
   db: BlackboardDatabase,
   apiKey: string,
   defaultPiSessionId?: string,
+  logClassifierPrompt?: (message: string) => void,
 ): Promise<ClassificationResult> {
   // Fast-path: messages that clearly target the default agent skip LLM
   if (shouldShortCircuitToDefault(message)) {
@@ -45,11 +46,12 @@ export async function classifyMessage(
     return { stream: null, action: "none" };
   }
 
-  const recentConversation = getRecentConversationByWorkstream(db, 12, 4);
+  const recentConversation = getRecentConversationByWorkstream(db, 4);
+  const defaultBoundary = getLatestStreamCreatedAt(db);
   const defaultConversation = defaultPiSessionId
-    ? getRecentDefaultConversation(db, defaultPiSessionId, 10)
+    ? getRecentDefaultConversation(db, defaultPiSessionId, 4, defaultBoundary)
     : [];
-  const prompt = buildClassificationPrompt(
+  const prompts = buildClassificationPrompts(
     message,
     streams,
     recentConversation,
@@ -60,10 +62,12 @@ export async function classifyMessage(
     streams.length,
     message.slice(0, 120),
   );
+  logClassifierPrompt?.(`[router classifier] system prompt\n${prompts.systemPrompt}`);
+  logClassifierPrompt?.(`[router classifier] user prompt\n${prompts.userPrompt}`);
 
   let result: ClassifyResult;
   try {
-    result = await callGroqClassify(apiKey, prompt);
+    result = await callGroqClassify(apiKey, prompts);
   } catch (error) {
     console.error(
       `[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,

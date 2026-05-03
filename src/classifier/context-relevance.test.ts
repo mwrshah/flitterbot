@@ -1,38 +1,50 @@
 import { describe, expect, mock, test } from "bun:test";
-import { buildContextRelevancePrompt } from "../prompts/context-relevance.ts";
+import { buildContextRelevancePrompts } from "../prompts/context-relevance.ts";
 import { formatStreamPrompt } from "../streams/format-stream-prompt.ts";
 
 // Mock groq-client before importing context-relevance
-const mockCallGroqJson = mock<(apiKey: string, prompt: string) => Promise<unknown>>();
+const mockCallGroqJson = mock<(apiKey: string, prompts: unknown) => Promise<unknown>>();
 mock.module("./groq-client.ts", () => ({
-  callGroqJson: (...args: unknown[]) => mockCallGroqJson(...(args as [string, string])),
+  callGroqJson: (...args: unknown[]) => mockCallGroqJson(...(args as [string, unknown])),
 }));
 
 // --- Prompt builder tests ---
 
-describe("buildContextRelevancePrompt", () => {
+describe("buildContextRelevancePrompts", () => {
   test("includes stream name and all messages", () => {
     const messages = [
       { content: "Fix the login bug", created_at: "2026-03-26T10:00:00Z" },
       { content: "It happens on Chrome", created_at: "2026-03-26T10:01:00Z" },
     ];
-    const prompt = buildContextRelevancePrompt(messages, "fix-login-bug");
+    const prompts = buildContextRelevancePrompts(messages, "fix-login-bug");
 
-    expect(prompt).toContain('"fix-login-bug"');
-    expect(prompt).toContain("[Message 1]");
+    expect(prompts.userPrompt).toContain('"fix-login-bug"');
+    expect(prompts.userPrompt).toContain("[Message 1]");
     // The last message is tagged "CURRENT" so rule #3 in the prompt can reference it.
-    expect(prompt).toContain("[Message 2 \u2014 CURRENT]");
-    expect(prompt).toContain("Fix the login bug");
-    expect(prompt).toContain("It happens on Chrome");
+    expect(prompts.userPrompt).toContain("[Message 2 \u2014 CURRENT]");
+    expect(prompts.userPrompt).toContain("Fix the login bug");
+    expect(prompts.userPrompt).toContain("It happens on Chrome");
   });
 
-  test("instructs JSON response with relevant array", () => {
-    const prompt = buildContextRelevancePrompt(
+  test("includes optional agent context as stream purpose", () => {
+    const prompts = buildContextRelevancePrompts(
+      [{ content: "please do this", created_at: "2026-03-26T10:00:00Z" }],
+      "fix-auth",
+      "Fix the token refresh bug in the auth service",
+    );
+
+    expect(prompts.userPrompt).toContain("## Stream purpose / agent context");
+    expect(prompts.userPrompt).toContain("Fix the token refresh bug in the auth service");
+  });
+
+  test("instructs JSON response with relevant array and vague orchestration filtering", () => {
+    const prompts = buildContextRelevancePrompts(
       [{ content: "test", created_at: "2026-03-26T10:00:00Z" }],
       "test-ws",
     );
-    expect(prompt).toContain('"relevant"');
-    expect(prompt).toContain("array of booleans");
+    expect(prompts.systemPrompt).toContain('"relevant"');
+    expect(prompts.systemPrompt).toContain("array of booleans");
+    expect(prompts.systemPrompt).toContain("Omit vague user messages");
   });
 });
 
@@ -103,7 +115,12 @@ describe("classifyContextRelevance", () => {
       { content: "Create stream for auth fix", created_at: "2026-03-26T10:02:00Z" },
     ];
 
-    const result = await classifyContextRelevance(messages, "fix-auth", "fake-key");
+    const result = await classifyContextRelevance(
+      messages,
+      "fix-auth",
+      "fake-key",
+      "Fix auth token refresh",
+    );
     expect(result).toEqual([false, true, true]);
     expect(mockCallGroqJson).toHaveBeenCalledTimes(1);
   });
