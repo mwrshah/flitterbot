@@ -241,20 +241,6 @@ export function ChatPanel({
     initialScrollKey: piSessionId,
   });
 
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-
-    const setFeedHeight = () => {
-      el.style.setProperty("--chat-panel-feed-height", `${el.clientHeight}px`);
-    };
-
-    setFeedHeight();
-    const observer = new ResizeObserver(setFeedHeight);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [viewportRef]);
-
   // One-shot intent set by handleSubmit: the next render-complete callback
   // unconditionally scrolls to bottom and re-pins, regardless of the current
   // pinned state. Optimistic insert must always reveal the user's own message.
