@@ -238,11 +238,7 @@ export function DownstreamSessionsPanel({
           >
             Info
             {infoShortcutLabel && (
-              <ShortcutHint
-                label={infoShortcutLabel}
-                className="ml-1"
-                kbdClassName="h-4 min-w-4 px-1 text-[9px]"
-              />
+              <ShortcutHint label={infoShortcutLabel} className="ml-1" kbdSize="compact" />
             )}
           </ToggleGroupItem>
           <ToggleGroupItem
@@ -252,11 +248,7 @@ export function DownstreamSessionsPanel({
           >
             Diff
             {diffShortcutLabel && (
-              <ShortcutHint
-                label={diffShortcutLabel}
-                className="ml-1"
-                kbdClassName="h-4 min-w-4 px-1 text-[9px]"
-              />
+              <ShortcutHint label={diffShortcutLabel} className="ml-1" kbdSize="compact" />
             )}
           </ToggleGroupItem>
         </ToggleGroup>

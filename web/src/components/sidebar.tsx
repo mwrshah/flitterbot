@@ -60,7 +60,8 @@ function NavItem({
         <ShortcutHint
           label={shortcutHint}
           className="ml-auto text-sidebar-foreground/30"
-          kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+          kbdSize="compact"
+          kbdTone="sidebar"
         />
       )}
     </Link>
@@ -155,7 +156,8 @@ export const Sidebar = memo(function Sidebar() {
                       <ShortcutHint
                         label={String(defaultShortcut)}
                         className="shrink-0 ml-2 text-sidebar-foreground/30"
-                        kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+                        kbdSize="compact"
+                        kbdTone="sidebar"
                       />
                     )}
                   </Link>
@@ -184,7 +186,8 @@ export const Sidebar = memo(function Sidebar() {
                         <ShortcutHint
                           label={String(streamShortcuts.get(ws.id))}
                           className="shrink-0 ml-2 text-sidebar-foreground/30"
-                          kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+                          kbdSize="compact"
+                          kbdTone="sidebar"
                         />
                       )}
                     </Link>
