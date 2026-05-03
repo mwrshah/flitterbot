@@ -178,24 +178,31 @@ src/
 
 ## Features
 
+This overview is the source of truth for feature inventory. Linked feature docs are retained only when they contain substantial design, implementation, or spec detail; overview-only entries intentionally have no separate stub doc.
+
 | # | Feature | Purpose |
 |---|---------|---------|
-| 1 | [Installer / Uninstaller](installer/FEATURE.md) | Permission-gated, manifest-tracked deployment of runtime tree and external config modifications |
-| 2 | [Blackboard](blackboard/FEATURE.md) | SQLite state layer (v14). Workstreams, Claude Code sessions, Pi sessions, unified messages, message ID mapping, WhatsApp tracking, pending actions, health flags |
-| 3 | [Control Surface](control-surface/FEATURE.md) | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
-| 4 | [WhatsApp Channel](whatsapp-channel/FEATURE.md) | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
-| 5 | [Web App](web-app/FEATURE.md) | Browser client: Input Surface (activity feed), Pi chat with downstream sessions panel, runtime controls |
-| 6 | [Cron Scheduler](scheduler/FEATURE.md) | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
-| 7 | [Pi Agent](pi-agent/FEATURE.md) | Multi-agent Pi layer: default triage + per-workstream orchestrators with role-gated custom tools |
-| 8 | [WebSocket Filtering](ws-subscription-filtering/FEATURE.md) | Per-client session subscriptions with server-side broadcast filtering |
-| 9 | [Restructure src/](restructure-src/FEATURE.md) | Domain-organized codebase with max 2-level nesting, prefix conventions, barrel exports |
-| 10 | [At-Mention Directory Autocomplete](at-mention-directory-autocomplete/FEATURE.md) | `@`-triggered path picker with server-side directory completions |
-| 11 | [Bento Board](bento-board/FEATURE.md) | Bento board layout |
-| 12 | [Chat Panel Streaming Order](chat-panel-streaming-order/FEATURE.md) | Correct message ordering during streaming |
-| 13 | [Message Struct Unification](message-struct-unification/FEATURE.md) | Unified message structures across surfaces |
-| 14 | [Performance Audit](performance-audit/FEATURE.md) | Performance profiling and optimization |
-| 15 | [TanStack Patterns](tanstack-patterns/FEATURE.md) | TanStack Query/Router patterns replacing imperative state |
-| 16 | [WS Streaming Perf](ws-streaming-perf/FEATURE.md) | WebSocket streaming performance optimization |
+| 1 | Installer / Uninstaller | Permission-gated, manifest-tracked deployment of runtime tree and external config modifications |
+| 2 | Blackboard | SQLite state layer (v14). Streams, Claude Code sessions, Pi sessions, unified messages, message ID mapping, WhatsApp tracking, pending actions, health flags |
+| 3 | Control Surface | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
+| 4 | WhatsApp Channel | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
+| 5 | Web App | Browser client: Input Surface (activity feed), Pi chat with downstream sessions panel, runtime controls |
+| 6 | Cron Scheduler | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
+| 7 | Pi Agent | Multi-agent Pi layer: default triage + per-stream orchestrators with role-gated custom tools |
+| 8 | WebSocket Filtering | Per-client session subscriptions with server-side broadcast filtering |
+| 9 | Restructure src/ | Domain-organized codebase with max 2-level nesting, prefix conventions, barrel exports |
+| 10 | Bento Board | Bento-style variable-size stream/session grid for at-scale navigation |
+| 11 | Chat Panel Streaming Order | Correct message ordering during streaming |
+| 12 | Message Struct Unification | Unified message structures across surfaces |
+| 13 | Performance Audit | Performance profiling and optimization |
+| 14 | [At-Mention Directory Autocomplete](at-mention-directory-autocomplete/FEATURE.md) | `@`-triggered path picker with server-side directory completions and repo-aware fuzzy search |
+| 15 | [Diff Viewer](diff-viewer/FEATURE.md) | Worktree diff panel rendered from server-side `git diff` output |
+| 16 | [Input Draft Persistence](input-draft-persistence/FEATURE.md) | Preserve composer drafts across route navigation without React sync overhead |
+| 17 | [Keyboard Shortcuts](shortcuts/FEATURE.md) | Action-based global shortcut system with configurable combo and sequential bindings |
+| 18 | [WebSocket Client Sync](ws-client-sync/FEATURE.md) | Canonical server-event → WS → client-cache/streaming-store synchronization model |
+| 19 | [TanStack Patterns](tanstack-patterns/FEATURE.md) | TanStack Query/Router patterns replacing imperative state; SSR-safe data loading guidance |
+| 20 | [Pretext Text Rendering](pretext-text-rendering/FEATURE.md) | Text measurement, virtualization height prediction, cursor positioning, and path truncation |
+| 21 | [Streaming Markdown Performance](streaming-markdown-perf/FEATURE.md) | Planned incremental markdown parsing, chunking, direct-DOM streaming block, and highlight caching |
 
 ## Dependency Order
 
