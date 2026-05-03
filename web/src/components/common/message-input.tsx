@@ -39,8 +39,6 @@ export type MessageInputHoverButton = {
   id: string;
   label: string;
   insertText: string;
-  /** Prefix rendered before the label. Defaults to '+'. */
-  prefix?: string;
   /** When false, clicking the button only inserts text instead of showing the follow-up send action. */
   showSendAction?: boolean;
 };
@@ -148,9 +146,6 @@ function MessageInputHoverButtons({
       const buttonRowRect = buttonRow.getBoundingClientRect();
       const toolbarRect = toolbar.getBoundingClientRect();
       const buttonStyle = window.getComputedStyle(firstButton);
-      const prefixStyle = firstButton.firstElementChild
-        ? window.getComputedStyle(firstButton.firstElementChild)
-        : null;
       const shortcutStyle = firstButton.lastElementChild
         ? window.getComputedStyle(firstButton.lastElementChild)
         : null;
@@ -159,7 +154,6 @@ function MessageInputHoverButtons({
       const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
       const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
       const buttonChrome = horizontalBox(buttonStyle);
-      const prefixMargin = prefixStyle ? horizontalMargin(prefixStyle) : 0;
       const shortcutMargin = shortcutStyle ? horizontalMargin(shortcutStyle) : 0;
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
@@ -171,13 +165,11 @@ function MessageInputHoverButtons({
       let usedWidth = 0;
       let visibleCount = 0;
       for (const [index, button] of buttons.entries()) {
-        const prefixWidth = pretextTextWidth(button.prefix ?? "+", font, lineHeight) + prefixMargin;
         const shortcutLabel = messageInputButtonShortcutLabel(index);
         const shortcutWidth = shortcutLabel
           ? pretextTextWidth(shortcutLabel, font, lineHeight) + shortcutMargin
           : 0;
-        const textWidth =
-          prefixWidth + pretextTextWidth(button.label, font, lineHeight) + shortcutWidth;
+        const textWidth = pretextTextWidth(button.label, font, lineHeight) + shortcutWidth;
         const nextWidth =
           usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
         if (nextWidth > availableWidth) break;
@@ -271,9 +263,6 @@ function MessageInputHoverButtons({
           aria-label={`Insert ${button.label}`}
           title={`Insert ${button.insertText}`}
         >
-          <span aria-hidden="true" className="mr-1 shrink-0 text-muted-foreground/70">
-            {button.prefix ?? "+"}
-          </span>
           <span className="truncate">{button.label}</span>
           {messageInputButtonShortcutLabel(index) && (
             <span
@@ -1000,7 +989,7 @@ export const MessageInput = memo(function MessageInput({
             <MessageInputHoverButtons
               buttons={
                 shouldShowHoverSendAction
-                  ? [{ id: "hover-send", label: "click to send", insertText: "", prefix: ">" }]
+                  ? [{ id: "hover-send", label: "click to send", insertText: "" }]
                   : hoverButtons
               }
               composerRef={containerRef}
