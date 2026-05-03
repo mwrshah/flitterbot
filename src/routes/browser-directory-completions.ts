@@ -7,12 +7,15 @@ import type {
   DirectoryCompletionItem,
   DirectoryCompletionsResponse,
 } from "../contracts/control-surface-api.ts";
-import { getOrCreate } from "../file-finder/manager.ts";
+import {
+  getOrCreate,
+  isFileFinderExcludedName,
+  isFileFinderExcludedPath,
+} from "../file-finder/manager.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
 const MAX_ITEMS = 15;
-const ENV_FILE_PREFIX = ".env";
 
 export async function handleBrowserDirectoryCompletionsRoute(
   runtime: ControlSurfaceRuntime,
@@ -57,7 +60,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
     const prefixDepth = pathPrefix ? pathPrefix.split("/").filter(Boolean).length : 0;
     const termLower = pureTerm.toLowerCase();
     const searchableItems = result.value.items.filter(
-      (item) => !hasEnvLikePathSegment(item.relativePath),
+      (item) => !isFileFinderExcludedPath(item.relativePath),
     );
     const seenDirs = new Set<string>();
     const matchingDirItems: DirectoryCompletionItem[] = [];
@@ -139,7 +142,7 @@ async function listDirectoryCompletionItems(
   const dirPrefix = lastSlash >= 0 ? expandedParam.slice(0, lastSlash + 1) : "";
   const filter = lastSlash >= 0 ? expandedParam.slice(lastSlash + 1) : expandedParam;
 
-  if (hasEnvLikePathSegment(dirPrefix)) return [];
+  if (isFileFinderExcludedPath(dirPrefix)) return [];
 
   // Resolve and validate the target directory
   const targetDir = path.resolve(cwd, dirPrefix);
@@ -167,7 +170,7 @@ async function listDirectoryCompletionItems(
   const filterLower = filter.toLowerCase();
 
   const filtered = entries.filter((entry) => {
-    if (isEnvLikeCompletionName(entry.name)) return false;
+    if (isFileFinderExcludedName(entry.name)) return false;
     if (filterLower && !entry.name.toLowerCase().includes(filterLower)) return false;
     return true;
   });
@@ -190,17 +193,6 @@ async function listDirectoryCompletionItems(
       rawPathForDisplay(pathParam, displayPrefix + entry.name + (entry.isDirectory() ? "/" : "")),
     ),
   );
-}
-
-function isEnvLikeCompletionName(name: string): boolean {
-  return name.startsWith(ENV_FILE_PREFIX);
-}
-
-function hasEnvLikePathSegment(candidatePath: string): boolean {
-  return candidatePath
-    .split(/[\\/]+/)
-    .filter(Boolean)
-    .some((segment) => isEnvLikeCompletionName(segment));
 }
 
 function mergeCompletionItems(
