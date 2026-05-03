@@ -80,9 +80,20 @@ export async function classifyMessage(
   if (result.stream_id) {
     const existing = streams.find((ws) => ws.id === result.stream_id);
     if (existing) {
+      console.log(
+        '[router] classification: stream_name="%s" stream_id=%s',
+        existing.name,
+        existing.id,
+      );
       return { stream: existing, action: "matched" };
     }
+    console.log(
+      "[router] classification: stream_name=none stream_id=%s (unknown stream)",
+      result.stream_id,
+    );
     // LLM returned an id that doesn't exist — fall through to default
+  } else {
+    console.log("[router] classification: stream_name=none stream_id=none");
   }
 
   // No match — default agent will handle (and may create a stream via tool)
