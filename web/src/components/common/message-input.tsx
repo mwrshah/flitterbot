@@ -39,8 +39,6 @@ export type MessageInputHoverButton = {
   id: string;
   label: string;
   insertText: string;
-  /** When false, clicking the button only inserts text instead of showing the follow-up send action. */
-  showSendAction?: boolean;
 };
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
@@ -854,7 +852,7 @@ export const MessageInput = memo(function MessageInput({
       const newValue = isBlankDraft(current)
         ? button.insertText
         : `${current}\n${button.insertText}`;
-      setHoverSendAction(button.showSendAction === false ? null : newValue);
+      setHoverSendAction(newValue);
       setDraftAndStore(newValue);
       setPickerOpen(false);
       setAtPickerOpen(false);
