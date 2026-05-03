@@ -171,12 +171,99 @@ function normalizeToolExecutionResult(
   } as ToolResultMessageType;
 }
 
+const SINGLE_LINE_BUBBLE_TOLERANCE_PX = 3;
+
+function parsePixelValue(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function resolveLineHeight(style: CSSStyleDeclaration): number {
+  const lineHeight = parsePixelValue(style.lineHeight);
+  if (lineHeight > 0) return lineHeight;
+
+  const fontSize = parsePixelValue(style.fontSize);
+  return fontSize > 0 ? fontSize * 1.2 : 20;
+}
+
+function isSingleLineHeightElement(element: HTMLElement): boolean {
+  const style = getComputedStyle(element);
+  const verticalInsets =
+    parsePixelValue(style.paddingTop) +
+    parsePixelValue(style.paddingBottom) +
+    parsePixelValue(style.borderTopWidth) +
+    parsePixelValue(style.borderBottomWidth);
+  const contentHeight = element.getBoundingClientRect().height - verticalInsets;
+
+  return contentHeight <= resolveLineHeight(style) + SINGLE_LINE_BUBBLE_TOLERANCE_PX;
+}
+
 export class MessageCopyButton extends LitElement {
   @property({ attribute: false }) getText: (() => string) | undefined;
   @state() private copied = false;
+  @state() private targetIsSingleLine = true;
+
+  private resizeObserver: ResizeObserver | undefined;
+  private observedTarget: HTMLElement | undefined;
+  private pendingMeasureFrame: number | undefined;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    queueMicrotask(() => this.observeBubble());
+  }
+
+  override disconnectedCallback(): void {
+    this.resizeObserver?.disconnect();
+    if (this.pendingMeasureFrame !== undefined) {
+      cancelAnimationFrame(this.pendingMeasureFrame);
+      this.pendingMeasureFrame = undefined;
+    }
+    super.disconnectedCallback();
+  }
+
+  override updated(): void {
+    this.observeBubble();
+  }
+
+  private getBubbleElement(): HTMLElement | undefined {
+    const previous = this.previousElementSibling;
+    if (previous instanceof HTMLElement) return previous;
+
+    const parent = this.parentElement;
+    if (!parent) return undefined;
+
+    return Array.from(parent.children).find(
+      (child): child is HTMLElement => child instanceof HTMLElement && child !== this,
+    );
+  }
+
+  private observeBubble(): void {
+    const target = this.getBubbleElement();
+    if (!target || target === this.observedTarget) return;
+
+    this.resizeObserver?.disconnect();
+    this.observedTarget = target;
+    this.resizeObserver = new ResizeObserver(() => this.scheduleSingleLineMeasure());
+    this.resizeObserver.observe(target);
+    this.scheduleSingleLineMeasure();
+  }
+
+  private scheduleSingleLineMeasure(): void {
+    if (this.pendingMeasureFrame !== undefined) return;
+
+    this.pendingMeasureFrame = requestAnimationFrame(() => {
+      this.pendingMeasureFrame = undefined;
+      const nextTargetIsSingleLine = this.observedTarget
+        ? isSingleLineHeightElement(this.observedTarget)
+        : false;
+      if (this.targetIsSingleLine !== nextTargetIsSingleLine) {
+        this.targetIsSingleLine = nextTargetIsSingleLine;
+      }
+    });
   }
 
   private async copy(): Promise<void> {
@@ -194,7 +281,7 @@ export class MessageCopyButton extends LitElement {
   }
 
   override render() {
-    if (!this.getText) return nothing;
+    if (!this.getText || this.targetIsSingleLine) return nothing;
     return html`
       <button
         @click=${this.copy}
