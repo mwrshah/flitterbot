@@ -362,14 +362,13 @@ function ThinkingLevelCommandItem({
     <CommandItem
       value={`thinking ${level} ${THINKING_LEVEL_LABELS[level]}`}
       data-checked={selected}
-      disabled={disabled || selected}
+      disabled={disabled}
       onSelect={onSelect}
       title={title}
       className={cn(
-        "w-auto rounded-md border px-2 py-1 text-[11px] leading-none [&>svg]:hidden",
-        selected
-          ? "border-primary/70 bg-primary/10 text-primary data-selected:bg-primary/15 data-selected:text-primary"
-          : "border-border/60 text-muted-foreground data-selected:border-border data-selected:bg-accent/50 data-selected:text-foreground",
+        "w-auto rounded-md border border-border/60 px-2 py-1 text-[11px] leading-none text-muted-foreground [&>svg]:hidden",
+        "data-selected:border-primary/70 data-selected:bg-primary/10 data-selected:text-primary",
+        "data-[checked=true]:border-primary data-[checked=true]:bg-primary data-[checked=true]:text-primary-foreground",
       )}
     >
       {THINKING_LEVEL_LABELS[level]}
