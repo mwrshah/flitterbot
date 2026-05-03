@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ClassifierPrompts } from "../prompts/classifier.ts";
 
 const MODEL_ID = "openai/gpt-oss-120b";
 
@@ -27,7 +28,10 @@ export type ClassifyResult = {
 
 const MAX_RETRIES = 3;
 
-export async function callGroqClassify(apiKey: string, prompt: string): Promise<ClassifyResult> {
+export async function callGroqClassify(
+  apiKey: string,
+  prompts: ClassifierPrompts,
+): Promise<ClassifyResult> {
   const client = getClient(apiKey);
 
   let lastError: Error | undefined;
@@ -38,10 +42,8 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
         max_tokens: 1024,
         response_format: { type: "json_object" },
         messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
+          { role: "system", content: prompts.systemPrompt },
+          { role: "user", content: prompts.userPrompt },
         ],
       });
 
@@ -103,7 +105,7 @@ export async function callGroqClassify(apiKey: string, prompt: string): Promise<
  * Generic Groq JSON call — sends a prompt and returns the parsed JSON response.
  * Unlike callGroqClassify, this does not impose a specific return type.
  */
-export async function callGroqJson<T>(apiKey: string, prompt: string): Promise<T> {
+export async function callGroqJson<T>(apiKey: string, prompts: ClassifierPrompts): Promise<T> {
   const client = getClient(apiKey);
 
   let lastError: Error | undefined;
@@ -113,7 +115,10 @@ export async function callGroqJson<T>(apiKey: string, prompt: string): Promise<T
         model: MODEL_ID,
         max_tokens: 1024,
         response_format: { type: "json_object" },
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: prompts.systemPrompt },
+          { role: "user", content: prompts.userPrompt },
+        ],
       });
 
       const text = response.choices[0]?.message?.content;

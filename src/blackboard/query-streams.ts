@@ -114,6 +114,13 @@ export function getPreviousStreamCreatedAt(
   return row?.created_at;
 }
 
+export function getLatestStreamCreatedAt(db: BlackboardDatabase): string | undefined {
+  const row = db.get<{ created_at: string }>(
+    `SELECT datetime(created_at) as created_at FROM streams ORDER BY created_at DESC LIMIT 1`,
+  );
+  return row?.created_at;
+}
+
 export function listRecentlyClosedStreams(
   db: BlackboardDatabase,
   withinHours: number,

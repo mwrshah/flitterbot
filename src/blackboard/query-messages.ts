@@ -99,14 +99,21 @@ export function getRecentDefaultMessages(
   const rows = after
     ? db.all<Pick<MessageRow, "content" | "created_at">>(
         `SELECT content, created_at FROM messages
-         WHERE direction = 'inbound' AND stream_id IS NULL AND datetime(created_at) > datetime(?)
+         WHERE direction = 'inbound'
+           AND stream_id IS NULL
+           AND source IN ('web', 'whatsapp')
+           AND sender = 'user'
+           AND datetime(created_at) > datetime(?)
          ORDER BY created_at DESC LIMIT ?`,
         after,
         limit,
       )
     : db.all<Pick<MessageRow, "content" | "created_at">>(
         `SELECT content, created_at FROM messages
-         WHERE direction = 'inbound' AND stream_id IS NULL
+         WHERE direction = 'inbound'
+           AND stream_id IS NULL
+           AND source IN ('web', 'whatsapp')
+           AND sender = 'user'
          ORDER BY created_at DESC LIMIT ?`,
         limit,
       );
@@ -125,15 +132,27 @@ export function getRecentDefaultConversation(
   db: BlackboardDatabase,
   piSessionId: string,
   limit: number = 10,
+  after?: string,
 ): DefaultConversationSnippet[] {
-  const rows = db.all<DefaultConversationSnippet>(
-    `SELECT content, source, created_at, direction, sender
-     FROM messages
-     WHERE pi_session_id = ?
-     ORDER BY created_at DESC LIMIT ?`,
-    piSessionId,
-    limit,
-  );
+  const rows = after
+    ? db.all<DefaultConversationSnippet>(
+        `SELECT content, source, created_at, direction, sender
+         FROM messages
+         WHERE pi_session_id = ?
+           AND datetime(created_at) > datetime(?)
+         ORDER BY created_at DESC LIMIT ?`,
+        piSessionId,
+        after,
+        limit,
+      )
+    : db.all<DefaultConversationSnippet>(
+        `SELECT content, source, created_at, direction, sender
+         FROM messages
+         WHERE pi_session_id = ?
+         ORDER BY created_at DESC LIMIT ?`,
+        piSessionId,
+        limit,
+      );
   return rows.reverse();
 }
 
@@ -161,25 +180,26 @@ export function getInputSurfaceHistory(
 
 export function getRecentConversationByWorkstream(
   db: BlackboardDatabase,
-  withinHours: number,
-  maxPerWorkstream: number,
+  maxPerStream: number,
 ): Map<string, ConversationSnippet[]> {
   const rows = db.all<ConversationSnippet>(
-    `SELECT m.stream_id, w.name AS stream_name,
-            m.content, m.source, m.created_at, m.direction, m.sender
-     FROM messages m
-     JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
-     WHERE datetime(m.created_at) >= datetime('now', '-' || ? || ' hours')
-     ORDER BY m.stream_id, m.created_at DESC`,
-    withinHours,
+    `SELECT stream_id, stream_name, content, source, created_at, direction, sender
+     FROM (
+       SELECT m.stream_id, w.name AS stream_name,
+              m.content, m.source, m.created_at, m.direction, m.sender,
+              ROW_NUMBER() OVER (PARTITION BY m.stream_id ORDER BY m.created_at DESC) AS rn
+       FROM messages m
+       JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
+     )
+     WHERE rn <= ?
+     ORDER BY stream_id, created_at DESC`,
+    maxPerStream,
   );
 
   const grouped = new Map<string, ConversationSnippet[]>();
   for (const row of rows) {
     const list = grouped.get(row.stream_id) ?? [];
-    if (list.length < maxPerWorkstream) {
-      list.push(row);
-    }
+    list.push(row);
     grouped.set(row.stream_id, list);
   }
   return grouped;

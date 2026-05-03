@@ -6,22 +6,26 @@ Orchestration layer above Claude Code. A long-running control surface hosts conc
 
 ### Message Flow
 
-All inbound messages hit the control surface. Web and WhatsApp messages pass through a Groq classifier (`openai/gpt-oss-120b`) that matches against open workstreams in SQLite. Hook events and cron prompts bypass classification.
+All inbound messages hit the control surface. Web and WhatsApp messages pass through a Groq classifier (`openai/gpt-oss-120b`) that matches against open streams in SQLite. Hook events, cron prompts, and direct-targeted Pi-session messages bypass classification.
 
 Routing after classification:
-- **Matched workstream** → that workstream's orchestrator
-- **New workstream needed** → default agent (can call `create_workstream` to spawn orchestrator)
+- **Matched stream** → that stream's orchestrator
+- **New stream needed** → default agent (can call `create_stream` to spawn orchestrator)
 - **Non-work / no match** → default agent
-- **Hook events** → Pi session owning the Claude Code session (by `pi_session_id`, `workstream_id`, worktree path, or default fallback)
+- **Hook events** → Pi session owning the Claude Code session (by `pi_session_id`, `stream_id`, worktree path, or default fallback)
 - **Cron** → default agent
+
+Router classifier context is deliberately small and visible in logs. For each run, the control surface logs the exact classifier system prompt and user prompt. The user prompt contains all open streams, the last 4 messages per open stream (no time-window filter), and the last 4 default-agent messages after the most recent stream creation boundary. That boundary prevents default-agent context that led to an already-created stream from leaking into later routing decisions. The current user message is always included separately.
 
 Each Pi session has its own FIFO turn queue; all agents process concurrently.
 
 ### Workstream Lifecycle
 
-Default agent creates workstreams via `create_workstream` — inserts SQLite row, spawns a bound orchestrator, and automatically passes through the original user message. The orchestrator enriches it (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, coordinates waves through prompt-based delegation. On completion, `close_workstream` merges to main, pushes to origin, closes the row. The worktree is left on disk — cleanup cron for stale worktrees (e.g. from force-recreated or repo-switched streams) is not yet implemented. The runtime detects the `close_workstream` result and destroys the orchestrator.
+Default agent creates streams via `create_stream` — inserts a SQLite row, spawns a bound orchestrator, and by default passes relevant user context through to the new stream. For normal single-stream creation, the runtime looks at up to 10 recent default-surface real user messages (`web`/`whatsapp`, `sender=user`, no `stream_id`) after the previous stream creation boundary, asks a Groq relevance classifier which messages belong in the new stream, forces the current user message in if missing, and formats those messages as the orchestrator's initial prompt. The relevance classifier sees the stream name, the default agent's optional `message` as the stream purpose/agent context, and the candidate user messages; it is instructed to omit vague default-agent orchestration prompts unless that purpose makes the concrete task clear. If relevance classification fails, it falls back to the current user message only. `skipUserMessage=true` is reserved for batch-created streams where the default agent supplies a targeted full prompt in `message`; that mode skips user-message passthrough entirely.
 
-Soft-deleted: `status` flips to `closed` with `closed_at`. Recently closed workstreams (24h) stored for status reporting and reopening via API.
+The orchestrator enriches the stream (repo, git worktree via `create_worktree`), launches Claude Code sessions in tmux, and coordinates waves through prompt-based delegation. On completion, `close_stream` merges to the confirmed base branch, pushes when permitted by the close flow, closes the row, and the runtime destroys the orchestrator.
+
+Soft-deleted: `status` flips to `closed` with `closed_at`. Recently closed streams (24h) are stored for status reporting and reopening via API.
 
 ### Claude Code Feedback Loop
 
@@ -97,9 +101,9 @@ Endpoints: `POST /message`, `/hook/:event`, `/cron/tick`, `/stop`, `/sessions/:i
 
 Two roles with tailored system prompts and role-gated tools:
 
-**Default** — always-on triage. Delegates engineering work via `create_workstream` (spawns orchestrator, auto-passes original user message); sends messages to orchestrators via `enqueue_message`. Cannot write code.
+**Default** — always-on triage. Delegates engineering work via `create_stream` (spawns orchestrator, passes relevant user context unless explicitly skipped for batch creation); sends messages to orchestrators via `enqueue_message`. Cannot write code.
 
-**Orchestrators** — ephemeral, one per workstream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_workstream` (merge, push, cleanup, self-destruct). Cannot write code directly.
+**Orchestrators** — ephemeral, one per stream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_stream` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
 
 Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
 

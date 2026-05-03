@@ -1356,7 +1356,7 @@ export class ControlSurfaceRuntime {
             message: {
               type: "string",
               description:
-                "Pass the user's intent through to the orchestrator — verbatim where possible, carrying the task itself. Skip the meta around stream creation; that framing is yours to handle. Write it as a message from the user to the orchestrator, and optionally append a short section with your interpretation of what to investigate, build, or decide. Include spec paths, constraints, and triage context the orchestrator won't otherwise have. Keep it tight and not overly prescriptive.",
+                "Optional agent-authored context appended after the passed-through user message. Use for interpretation, constraints, repo/spec paths, or batch-created stream instructions. Do not duplicate the user's request here during normal single-stream creation — the runtime passes the user's message through automatically.",
             },
             cwd: {
               type: "string",
@@ -1366,10 +1366,10 @@ export class ControlSurfaceRuntime {
             skipUserMessage: {
               type: "boolean",
               description:
-                "Always true. Skip the programmatic user-message passthrough, since we write it out in message.",
+                "Set true only when batch-creating multiple new streams and the message field contains the targeted full prompt for this stream. Leave false/omitted for normal stream creation so the runtime can pass through the relevant user messages.",
             },
           },
-          required: ["suggested_name", "cwd", "message", "skipUserMessage"],
+          required: ["suggested_name", "cwd"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
@@ -1377,19 +1377,30 @@ export class ControlSurfaceRuntime {
             suggested_name: suggestedName,
             message: agentMessage,
             cwd: cwdParam,
+            skipUserMessage: skipUserMessageParam,
           } = params as {
             suggested_name: string;
-            message: string;
+            message?: string;
             cwd: string;
-            skipUserMessage: boolean;
+            skipUserMessage?: boolean;
           };
           // Normalize: strip intent-signal prefixes (`i-`, `wr-`, `bug-`,
           // `bs-`, `fix-`) once at the start. They communicate intent at the
           // call site but shouldn't bloat downstream names (worktree dirs,
           // branches, streams.name). Strip only when followed by more content.
           const name = stripStreamNamePrefix(suggestedName);
-          // TEMP: hardcode skipUserMessage = true (user request)
-          const skipUserMessage = true;
+          const skipUserMessage = skipUserMessageParam === true;
+          if (skipUserMessage && !agentMessage?.trim()) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: skipUserMessage=true is only valid when message contains the targeted batch prompt for this stream.",
+                },
+              ],
+              details: { error: true },
+            };
+          }
 
           // cwd is required by the schema; validate it exists.
           if (!fs.existsSync(cwdParam)) {
@@ -1431,8 +1442,9 @@ export class ControlSurfaceRuntime {
             // Pass through relevant context messages to the new stream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
+            const currentUserText = originalText?.replace(/\n\n\[Now: [^\]]+\]$/u, "");
 
-            if (originalText && !skipUserMessage) {
+            if (currentUserText && !skipUserMessage) {
               let prompt: string;
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
@@ -1450,15 +1462,21 @@ export class ControlSurfaceRuntime {
                 const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
 
                 if (apiKey && recentMessages.length > 1) {
-                  const relevance = await classifyContextRelevance(recentMessages, ws.name, apiKey);
+                  const relevance = await classifyContextRelevance(
+                    recentMessages,
+                    ws.name,
+                    apiKey,
+                    agentMessage,
+                    this.log.bind(this),
+                  );
                   const relevantTexts = recentMessages
                     .filter((_, i) => relevance[i])
                     .map((m) => m.content);
 
                   if (relevantTexts.length > 1) {
                     // Ensure the current message is included (it may not be persisted yet)
-                    if (!relevantTexts.includes(originalText)) {
-                      relevantTexts.push(originalText);
+                    if (!relevantTexts.includes(currentUserText)) {
+                      relevantTexts.push(currentUserText);
                     }
                     prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
                     this.log(
@@ -1466,7 +1484,7 @@ export class ControlSurfaceRuntime {
                     );
                   } else {
                     prompt = this.sessionManager.buildStreamPrompt(
-                      originalText,
+                      currentUserText,
                       ws.name,
                       ws.id,
                       agentMessage,
@@ -1474,7 +1492,7 @@ export class ControlSurfaceRuntime {
                   }
                 } else {
                   prompt = this.sessionManager.buildStreamPrompt(
-                    originalText,
+                    currentUserText,
                     ws.name,
                     ws.id,
                     agentMessage,
@@ -1490,7 +1508,7 @@ export class ControlSurfaceRuntime {
                     "Context classification failed — stream context limited to current message.",
                 });
                 prompt = this.sessionManager.buildStreamPrompt(
-                  originalText,
+                  currentUserText,
                   ws.name,
                   ws.id,
                   agentMessage,
@@ -1536,7 +1554,7 @@ export class ControlSurfaceRuntime {
               ? agentMessage
                 ? " with agent-authored context (batch mode)"
                 : ""
-              : originalText
+              : currentUserText
                 ? " and user message passed through"
                 : "";
             const normalizationNote =
@@ -2112,6 +2130,7 @@ export class ControlSurfaceRuntime {
             this.blackboard,
             apiKey,
             defaultPiSessionId,
+            this.log.bind(this),
           );
           routerMeta = { router_action: result.action };
           if (result.stream) {
