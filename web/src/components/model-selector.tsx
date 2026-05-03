@@ -366,9 +366,10 @@ function ThinkingLevelCommandItem({
       onSelect={onSelect}
       title={title}
       className={cn(
-        "w-auto rounded-md border border-border/60 px-2 py-1 text-[11px] leading-none text-muted-foreground [&>svg]:hidden",
-        "data-selected:border-primary/70 data-selected:bg-primary/10 data-selected:text-primary",
-        "data-[checked=true]:border-primary data-[checked=true]:bg-primary data-[checked=true]:text-primary-foreground",
+        "w-auto rounded-md border border-border/50 px-2 py-1 text-[11px] leading-none text-muted-foreground [&>svg]:hidden",
+        "data-selected:border-border data-selected:bg-accent/50 data-selected:text-foreground",
+        "data-[checked=true]:border-primary/40 data-[checked=true]:bg-primary data-[checked=true]:text-primary-foreground",
+        "data-[checked=true]:data-selected:border-border data-[checked=true]:data-selected:bg-accent/50 data-[checked=true]:data-selected:text-foreground",
       )}
     >
       {THINKING_LEVEL_LABELS[level]}
