@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { Button } from "~/components/common/button";
+import { ShortcutHint } from "~/components/common/kbd";
 import { ModelSelector } from "~/components/model-selector";
 import { PathPicker } from "~/components/path-picker";
 import { SkillPicker } from "~/components/skill-picker";
@@ -276,12 +277,12 @@ function MessageInputHoverButtons({
           </span>
           <span className="truncate">{button.label}</span>
           {messageInputButtonShortcutLabel(index) && (
-            <span
+            <ShortcutHint
+              label={messageInputButtonShortcutLabel(index)!}
+              className="ml-2 shrink-0 text-sidebar-foreground/30"
+              kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
               aria-hidden="true"
-              className="ml-2 shrink-0 text-xs tabular-nums text-sidebar-foreground/30"
-            >
-              {messageInputButtonShortcutLabel(index)}
-            </span>
+            />
           )}
         </button>
       ))}

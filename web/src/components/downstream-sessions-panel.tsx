@@ -4,6 +4,7 @@ import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
+import { ShortcutHint } from "~/components/common/kbd";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -237,7 +238,11 @@ export function DownstreamSessionsPanel({
           >
             Info
             {infoShortcutLabel && (
-              <span className="text-muted-foreground/50 text-[10px] ml-1">{infoShortcutLabel}</span>
+              <ShortcutHint
+                label={infoShortcutLabel}
+                className="ml-1"
+                kbdClassName="h-4 min-w-4 px-1 text-[9px]"
+              />
             )}
           </ToggleGroupItem>
           <ToggleGroupItem
@@ -247,7 +252,11 @@ export function DownstreamSessionsPanel({
           >
             Diff
             {diffShortcutLabel && (
-              <span className="text-muted-foreground/50 text-[10px] ml-1">{diffShortcutLabel}</span>
+              <ShortcutHint
+                label={diffShortcutLabel}
+                className="ml-1"
+                kbdClassName="h-4 min-w-4 px-1 text-[9px]"
+              />
             )}
           </ToggleGroupItem>
         </ToggleGroup>
@@ -349,11 +358,12 @@ export function DownstreamSessionsPanel({
                       ) : (
                         <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
                       )}
-                      {session.sessionId === ctTargetSessionId && (
-                        <span className="text-muted-foreground/50 text-[10px]">
-                          {tmuxCopy.copied ? "Copied!" : tmuxShortcutLabel}
-                        </span>
-                      )}
+                      {session.sessionId === ctTargetSessionId &&
+                        (tmuxCopy.copied ? (
+                          <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                        ) : (
+                          <ShortcutHint label={tmuxShortcutLabel} />
+                        ))}
                     </span>
                   )}
 
@@ -405,9 +415,11 @@ export function DownstreamSessionsPanel({
                     copied={worktreeCopy.copied}
                     onCopy={() => worktreeCopy.copy(worktree.worktreePath ?? "")}
                   />
-                  <span className="text-muted-foreground/50 text-[10px]">
-                    {worktreeCopy.copied ? "Copied!" : worktreeShortcutLabel}
-                  </span>
+                  {worktreeCopy.copied ? (
+                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                  ) : (
+                    <ShortcutHint label={worktreeShortcutLabel} />
+                  )}
                 </span>
               </div>
             </div>

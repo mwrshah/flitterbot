@@ -3,6 +3,7 @@ import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
+import { ShortcutHint } from "~/components/common/kbd";
 import { useModifierLabel } from "~/hooks/platform";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -56,7 +57,11 @@ function NavItem({
       <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
       {shortcutHint && (
-        <span className="ml-auto text-xs text-sidebar-foreground/30">{shortcutHint}</span>
+        <ShortcutHint
+          label={shortcutHint}
+          className="ml-auto text-sidebar-foreground/30"
+          kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+        />
       )}
     </Link>
   );
@@ -147,9 +152,11 @@ export const Sidebar = memo(function Sidebar() {
                     <span className="shrink-0 h-2 w-2 rounded-full bg-sidebar-foreground/25" />
                     <span className="truncate flex-1">flitterbot</span>
                     {defaultShortcut && (
-                      <span className="text-sidebar-foreground/30 tabular-nums shrink-0 ml-2 text-xs">
-                        {defaultShortcut}
-                      </span>
+                      <ShortcutHint
+                        label={String(defaultShortcut)}
+                        className="shrink-0 ml-2 text-sidebar-foreground/30"
+                        kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+                      />
                     )}
                   </Link>
                 )}
@@ -174,9 +181,11 @@ export const Sidebar = memo(function Sidebar() {
                       />
                       <span className="truncate flex-1">{ws.name}</span>
                       {streamShortcuts.has(ws.id) && (
-                        <span className="text-sidebar-foreground/30 tabular-nums shrink-0 ml-2 text-xs">
-                          {streamShortcuts.get(ws.id)}
-                        </span>
+                        <ShortcutHint
+                          label={String(streamShortcuts.get(ws.id))}
+                          className="shrink-0 ml-2 text-sidebar-foreground/30"
+                          kbdClassName="h-4 min-w-4 rounded px-1 text-[9px] text-sidebar-foreground/45"
+                        />
                       )}
                     </Link>
                   ) : (

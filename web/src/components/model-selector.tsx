@@ -1,9 +1,29 @@
-import { Menu } from "@base-ui/react/menu";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon, SearchIcon, StarIcon } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDownIcon, StarIcon } from "lucide-react";
+import {
+  type CSSProperties,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { Button } from "~/components/common/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "~/components/ui/command";
 import type {
   ModelListItem,
   ModelsListResponse,
@@ -146,16 +166,52 @@ export const ModelSelector = memo(function ModelSelector({
   );
 
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
+  const groupedAll = useMemo(() => groupByAuthKind(all), [all]);
+  const modelBusy = pinMutation.isPending || modelMutation.isPending;
+  const thinkingDisabled = thinkingMutation.isPending || (mode === "pi-session" && !piSessionId);
 
-  // Reset search each time the menu opens so stale filters don't leak.
+  const updatePopoverPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = 420;
+    setPopoverStyle({
+      position: "fixed",
+      top: rect.bottom + 6,
+      left: Math.max(8, rect.right - width),
+      width,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePopoverPosition();
+  }, [open, updatePopoverPosition]);
+
   useEffect(() => {
-    if (!open) setSearch("");
-  }, [open]);
-
-  const filteredAll = useMemo(() => filterModels(all, search), [all, search]);
-  const filteredPinned = useMemo(() => filterModels(pinned, search), [pinned, search]);
-  const groupedAll = useMemo(() => groupByAuthKind(filteredAll), [filteredAll]);
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, updatePopoverPosition]);
 
   if (pinned.length === 0 && all.length === 0) {
     return null;
@@ -164,16 +220,20 @@ export const ModelSelector = memo(function ModelSelector({
   const triggerLabel = currentModel?.label ?? "Select model";
 
   return (
-    <Menu.Root open={open} onOpenChange={setOpen}>
-      <Menu.Trigger
+    <>
+      <Button
+        ref={triggerRef}
+        type="button"
+        variant="outline"
+        size="sm"
         disabled={disabled || (mode === "pi-session" && !piSessionId)}
+        onClick={() => setOpen((value) => !value)}
         className={cn(
-          "inline-flex items-center gap-1 h-10 sm:h-7 rounded-md border border-border/60 bg-background/40 text-xs text-muted-foreground",
-          "hover:text-foreground hover:bg-accent/50 hover:border-border transition-colors",
-          "focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          "h-10 sm:h-7 border-border/60 bg-background/40 text-xs text-muted-foreground hover:bg-accent/50 hover:border-border",
           compact ? "px-1.5" : "px-2",
         )}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         title={
           currentModel
             ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
@@ -182,50 +242,66 @@ export const ModelSelector = memo(function ModelSelector({
       >
         <span className={cn("truncate max-w-[180px]", compact && "sr-only")}>{triggerLabel}</span>
         <ChevronDownIcon className="h-3 w-3 shrink-0" />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="end">
-          <Menu.Popup
-            className={cn(
-              "z-50 w-[360px] max-h-[70vh] flex flex-col rounded-lg border border-border bg-popover text-popover-foreground shadow-md outline-none",
-              "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 transition-opacity duration-100",
-            )}
-          >
-            <SearchBox value={search} onChange={setSearch} />
-            <div className="flex-1 overflow-y-auto p-1">
-              <ThinkingLevelSection
-                activeLevel={activeThinkingLevel}
-                availableLevels={availableThinkingLevels}
-                disabled={thinkingMutation.isPending || (mode === "pi-session" && !piSessionId)}
-                onSelect={(level) => thinkingMutation.mutate(level)}
-              />
-              {filteredPinned.length > 0 && (
-                <ModelSection label="Pinned">
-                  {filteredPinned.map((model) => (
-                    <ModelMenuItem
-                      key={`pinned:${model.id}`}
-                      model={model}
-                      selected={activeModelId ? matchesModelId(model, activeModelId) : false}
-                      isPinned
-                      canUnpin={pinned.length > 1}
-                      onSelect={() => {
-                        modelMutation.mutate(model.id);
-                        setOpen(false);
-                      }}
-                      onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
-                      busy={pinMutation.isPending || modelMutation.isPending}
-                    />
-                  ))}
-                </ModelSection>
-              )}
+      </Button>
+      {open &&
+        createPortal(
+          <div ref={popoverRef} className="z-50" style={popoverStyle}>
+            <Command
+              loop
+              className="h-[min(70vh,32rem)] rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+            >
+              <CommandInput placeholder="Search models…" autoFocus />
+              <CommandList className="max-h-none flex-1">
+                <CommandEmpty>No models match.</CommandEmpty>
+                <CommandGroup heading="Thinking level">
+                  {THINKING_LEVELS.map((level) => {
+                    const levelAvailable = availableThinkingLevels.includes(level);
+                    return (
+                      <ThinkingLevelCommandItem
+                        key={level}
+                        level={level}
+                        selected={level === activeThinkingLevel}
+                        disabled={thinkingDisabled || !levelAvailable}
+                        title={
+                          levelAvailable
+                            ? `Set thinking level to ${level}`
+                            : "Current model does not support this level"
+                        }
+                        onSelect={() => thinkingMutation.mutate(level)}
+                      />
+                    );
+                  })}
+                </CommandGroup>
 
-              {groupedAll.length > 0 &&
-                groupedAll.map(([section, models]) => (
-                  <ModelSection key={section} label={section}>
+                {pinned.length > 0 && (
+                  <>
+                    <CommandSeparator />
+                    <CommandGroup heading="Pinned">
+                      {pinned.map((model) => (
+                        <ModelCommandItem
+                          key={`pinned:${model.id}`}
+                          model={model}
+                          selected={activeModelId ? matchesModelId(model, activeModelId) : false}
+                          isPinned
+                          canUnpin={pinned.length > 1}
+                          onSelect={() => {
+                            modelMutation.mutate(model.id);
+                            setOpen(false);
+                          }}
+                          onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
+                          busy={modelBusy}
+                        />
+                      ))}
+                    </CommandGroup>
+                  </>
+                )}
+
+                {groupedAll.map(([section, models]) => (
+                  <CommandGroup key={section} heading={section}>
                     {models.map((model) => {
                       const isPinned = pinnedIds.has(model.id);
                       return (
-                        <ModelMenuItem
+                        <ModelCommandItem
                           key={`all:${model.id}`}
                           model={model}
                           selected={activeModelId ? matchesModelId(model, activeModelId) : false}
@@ -242,125 +318,49 @@ export const ModelSelector = memo(function ModelSelector({
                               ...(isPinned ? {} : { label: model.name ?? model.label }),
                             })
                           }
-                          busy={pinMutation.isPending || modelMutation.isPending}
+                          busy={modelBusy}
                         />
                       );
                     })}
-                  </ModelSection>
+                  </CommandGroup>
                 ))}
-
-              {filteredPinned.length === 0 && groupedAll.length === 0 && (
-                <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                  No models match "{search}"
-                </div>
-              )}
-            </div>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+              </CommandList>
+            </Command>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 });
 
-function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Autofocus the search input when the menu opens so the user can start
-  // typing immediately. Base UI steals focus onto the first MenuItem by
-  // default; we override it after the initial mount.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, []);
-  return (
-    <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-      <SearchIcon className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder="Search models…"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        // Base UI's Menu wires floating-ui's useTypeahead + useListNavigation
-        // to the popup's keydown. Any character that bubbles out of this
-        // input triggers typeahead, which sets activeIndex and steals DOM
-        // focus onto the matching MenuItem — after which no further keys
-        // reach the input. Stop all keys here except Escape (so the menu
-        // still dismisses) and Tab (so focus can leave the popup normally).
-        onKeyDown={(e) => {
-          if (e.key !== "Escape" && e.key !== "Tab") {
-            e.stopPropagation();
-          }
-        }}
-        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
-      />
-    </div>
-  );
-}
-
-function ModelSection({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-1">
-      <div className="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
-        {label}
-      </div>
-      <div className="flex flex-col">{children}</div>
-    </div>
-  );
-}
-
-function ThinkingLevelSection({
-  activeLevel,
-  availableLevels,
+function ThinkingLevelCommandItem({
+  level,
+  selected,
   disabled,
+  title,
   onSelect,
 }: {
-  activeLevel: ThinkingLevel;
-  availableLevels: ThinkingLevel[];
+  level: ThinkingLevel;
+  selected: boolean;
   disabled: boolean;
-  onSelect: (level: ThinkingLevel) => void;
+  title: string;
+  onSelect: () => void;
 }) {
-  const available = new Set(availableLevels);
   return (
-    <div className="mb-1 border-b border-border/70 pb-2">
-      <div className="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
-        Thinking level
-      </div>
-      <div className="flex flex-wrap gap-1 px-2">
-        {THINKING_LEVELS.map((level) => {
-          const levelAvailable = available.has(level);
-          const selected = level === activeLevel;
-          return (
-            <button
-              key={level}
-              type="button"
-              disabled={disabled || !levelAvailable || selected}
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelect(level);
-              }}
-              className={cn(
-                "rounded-md border px-2 py-1 text-[11px] leading-none transition-colors",
-                selected
-                  ? "border-primary/70 bg-primary/10 text-primary"
-                  : "border-border/60 text-muted-foreground hover:border-border hover:bg-accent/50 hover:text-foreground",
-                (!levelAvailable || disabled) && "cursor-not-allowed opacity-45",
-              )}
-              title={
-                levelAvailable
-                  ? `Set thinking level to ${level}`
-                  : "Current model does not support this level"
-              }
-            >
-              {THINKING_LEVEL_LABELS[level]}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <CommandItem
+      value={`thinking ${level} ${THINKING_LEVEL_LABELS[level]}`}
+      data-checked={selected}
+      disabled={disabled || selected}
+      onSelect={onSelect}
+      title={title}
+    >
+      <span className={cn("font-medium", selected && "text-primary")}>{level}</span>
+      <CommandShortcut>{selected ? "current" : THINKING_LEVEL_LABELS[level]}</CommandShortcut>
+    </CommandItem>
   );
 }
 
-function ModelMenuItem({
+function ModelCommandItem({
   model,
   selected,
   isPinned,
@@ -388,43 +388,34 @@ function ModelMenuItem({
     : "Pin to config";
 
   return (
-    <div
-      className={cn(
-        "group/row flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-sm",
-        "hover:bg-accent/50",
-        !available && "opacity-60",
-      )}
+    <CommandItem
+      value={`${model.label} ${model.provider} ${model.modelId} ${model.name ?? ""}`}
+      data-checked={selected}
+      disabled={busy}
+      onSelect={onSelect}
+      className={cn("items-start py-2", !available && "opacity-60")}
     >
-      <Menu.Item
-        onClick={onSelect}
-        className={cn(
-          "flex min-w-0 flex-1 cursor-pointer items-start gap-2 outline-none",
-          "data-[highlighted]:text-accent-foreground",
-        )}
-      >
-        <CheckIcon
-          className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")}
-        />
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate font-medium leading-tight">{model.label}</span>
-          <span className="text-[11px] text-muted-foreground/70 leading-tight truncate">
-            {model.provider} · {model.modelId}
-            {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
-            {model.thinkingLevel ? ` · thinking=${model.thinkingLevel}` : ""}
-          </span>
-        </div>
-      </Menu.Item>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium leading-tight">{model.label}</span>
+        <span className="truncate text-[11px] leading-tight text-muted-foreground/70">
+          {model.provider} · {model.modelId}
+          {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
+          {model.thinkingLevel ? ` · thinking=${model.thinkingLevel}` : ""}
+        </span>
+      </div>
       <AuthBadge model={model} />
       <button
         type="button"
         disabled={pinDisabled}
-        onClick={(e) => {
-          e.stopPropagation();
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
           onTogglePin();
         }}
         className={cn(
           "shrink-0 self-center rounded p-1 transition-colors",
-          "text-muted-foreground/50 hover:text-foreground hover:bg-accent",
+          "text-muted-foreground/50 hover:bg-accent hover:text-foreground",
           "disabled:cursor-not-allowed disabled:opacity-40",
           isPinned && "text-amber-500/80 hover:text-amber-500",
         )}
@@ -432,7 +423,7 @@ function ModelMenuItem({
       >
         <StarIcon className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
       </button>
-    </div>
+    </CommandItem>
   );
 }
 
@@ -446,19 +437,6 @@ function matchesModelId(
   stored: string,
 ): boolean {
   return m.id === stored || `${m.provider}/${m.modelId}` === stored;
-}
-
-/** Filter across `label`, `modelId`, and `provider` — whitespace-separated
- *  tokens all have to match (AND semantics) so `opus anthropic` narrows
- *  properly. Case-insensitive. */
-function filterModels(models: ModelListItem[], query: string): ModelListItem[] {
-  const trimmed = query.trim().toLowerCase();
-  if (!trimmed) return models;
-  const tokens = trimmed.split(/\s+/);
-  return models.filter((m) => {
-    const haystack = `${m.label} ${m.modelId} ${m.provider} ${m.name ?? ""}`.toLowerCase();
-    return tokens.every((t) => haystack.includes(t));
-  });
 }
 
 function AuthBadge({ model }: { model: ModelListItem }) {
