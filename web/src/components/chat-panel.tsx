@@ -600,6 +600,9 @@ export function ChatPanel({
             recoveryKind={effectiveRecoveryKind}
             onRecover={() => recoverMutation.mutate()}
             hoverButtons={inputHoverButtons}
+            internalCommandScope={
+              modelSelectorMode === "default" ? "default-stream" : "work-stream"
+            }
             isRecoverPending={recoverMutation.isPending}
           />
         </Panel>

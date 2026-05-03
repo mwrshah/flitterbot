@@ -177,7 +177,8 @@ export function surfaceTimelineQueryOptions() {
 /**
  * Skills list for the `/`-trigger picker. Merges built-in slash commands
  * (INTERNAL_COMMANDS: /clear, /reload) with server-provided skills so callers
- * receive the final picker list straight from cache.
+ * receive the base picker list straight from cache. Contextual commands like
+ * /new-stream are appended by the MessageInput renders that expose them.
  *
  * Prefetched in the root loader — cwd-independent, so one app-boot fetch warms
  * every downstream MessageInput.

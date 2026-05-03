@@ -918,6 +918,7 @@ export function Surface() {
             fillHeight
             autoFocus
             showModelSelector={false}
+            internalCommandScope="surface"
           />
         </Panel>
       </PanelGroup>

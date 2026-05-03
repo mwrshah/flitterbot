@@ -41,11 +41,13 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
 
   const onSendMessage = useCallback(
     (text: string, options?: SendUserMessageOptions) => {
-      // /clear and /reload always target the current default session, regardless
-      // of what the UI thinks the piSessionId is. Strip the target so backend
-      // routes via getDefault() — avoids stale ID after the reset/reload.
+      // Default-session commands always target the current default session,
+      // regardless of what the UI thinks the piSessionId is. Strip the target
+      // so backend routes via getDefault() — avoids stale IDs after reset/reload.
       const trimmed = text.trim();
-      const target = trimmed === "/clear" || trimmed === "/reload" ? undefined : piSessionId;
+      const targetsDefault =
+        trimmed === "/clear" || trimmed === "/reload" || trimmed.startsWith("/new-stream");
+      const target = targetsDefault ? undefined : piSessionId;
       return sendMessage(text, {
         images: options?.images,
         targetPiSessionId: target,

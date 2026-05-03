@@ -197,7 +197,7 @@ export type SkillListItem = {
   name: string;
   description: string;
   disableModelInvocation: boolean;
-  /** "command" marks built-in slash commands (/clear, /reload); absent or "skill" for regular skills. */
+  /** "command" marks built-in slash commands; absent or "skill" for regular skills. */
   kind?: "skill" | "command";
 };
 
