@@ -140,6 +140,8 @@ export function getRecentDefaultConversation(
          FROM messages
          WHERE pi_session_id = ?
            AND datetime(created_at) > datetime(?)
+           AND ((source IN ('web', 'whatsapp') AND direction = 'inbound' AND sender = 'user')
+                OR (source = 'stream_outbound' AND direction = 'outbound'))
          ORDER BY created_at DESC LIMIT ?`,
         piSessionId,
         after,
@@ -149,11 +151,13 @@ export function getRecentDefaultConversation(
         `SELECT content, source, created_at, direction, sender
          FROM messages
          WHERE pi_session_id = ?
+           AND ((source IN ('web', 'whatsapp') AND direction = 'inbound' AND sender = 'user')
+                OR (source = 'stream_outbound' AND direction = 'outbound'))
          ORDER BY created_at DESC LIMIT ?`,
         piSessionId,
         limit,
       );
-  return rows.reverse();
+  return rows;
 }
 
 /**
@@ -190,6 +194,8 @@ export function getRecentConversationByWorkstream(
               ROW_NUMBER() OVER (PARTITION BY m.stream_id ORDER BY m.created_at DESC) AS rn
        FROM messages m
        JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
+       WHERE (m.source IN ('web', 'whatsapp') AND m.direction = 'inbound' AND m.sender = 'user')
+          OR (m.source = 'stream_outbound' AND m.direction = 'outbound')
      )
      WHERE rn <= ?
      ORDER BY stream_id, created_at DESC`,
