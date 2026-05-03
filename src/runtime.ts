@@ -60,6 +60,7 @@ import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
+import { stripInjectedDatetimeBlocks } from "./streams/format-stream-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
 import { stripStreamNamePrefix } from "./streams/strip-name-prefix.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
@@ -959,7 +960,7 @@ export class ControlSurfaceRuntime {
     const nowIso = new Date(now).toISOString();
     touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
 
-    return `${formatDatetimeBlock()}\n${text}`;
+    return `${text}\n\n${formatDatetimeBlock()}`;
   }
 
   /**
@@ -1442,7 +1443,9 @@ export class ControlSurfaceRuntime {
             // Pass through relevant context messages to the new stream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
-            const currentUserText = originalText?.replace(/\n\n\[Now: [^\]]+\]$/u, "");
+            const currentUserText = originalText
+              ? stripInjectedDatetimeBlocks(originalText)
+              : undefined;
 
             if (currentUserText && !skipUserMessage) {
               let prompt: string;

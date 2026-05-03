@@ -1,5 +1,13 @@
 import { formatDatetimeBlock } from "../prompts/datetime.ts";
 
+const DATETIME_BLOCK_PATTERN = String.raw`\[Now: [^\]]+\]`;
+const LEADING_DATETIME_BLOCK_RE = new RegExp(`^${DATETIME_BLOCK_PATTERN}\\s*`, "u");
+const TRAILING_DATETIME_BLOCK_RE = new RegExp(`\\s*${DATETIME_BLOCK_PATTERN}$`, "u");
+
+export function stripInjectedDatetimeBlocks(text: string): string {
+  return text.replace(LEADING_DATETIME_BLOCK_RE, "").replace(TRAILING_DATETIME_BLOCK_RE, "");
+}
+
 /**
  * Format the initial prompt for a new stream orchestrator.
  * Accepts one or more user messages as context, and an optional agent-authored message.
