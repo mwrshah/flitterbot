@@ -1,11 +1,31 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "~/lib/utils";
 
-export function Kbd({ className, ...props }: HTMLAttributes<HTMLElement>) {
+type KbdSize = "default" | "compact";
+type KbdTone = "default" | "sidebar";
+
+const sizeStyles: Record<KbdSize, string> = {
+  default: "h-5 min-w-5 rounded-md px-1.5 text-[10px]",
+  compact: "h-4 min-w-4 rounded px-1 text-[9px]",
+};
+
+const toneStyles: Record<KbdTone, string> = {
+  default: "text-muted-foreground",
+  sidebar: "text-sidebar-foreground/45",
+};
+
+type KbdProps = HTMLAttributes<HTMLElement> & {
+  size?: KbdSize;
+  tone?: KbdTone;
+};
+
+export function Kbd({ className, size = "default", tone = "default", ...props }: KbdProps) {
   return (
     <kbd
       className={cn(
-        "inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-muted/60 px-1.5 font-mono text-[10px] font-medium leading-none text-muted-foreground",
+        "inline-flex items-center justify-center border border-border bg-muted/60 font-mono font-medium leading-none",
+        sizeStyles[size],
+        toneStyles[tone],
         className,
       )}
       {...props}
@@ -26,10 +46,14 @@ export function ShortcutHint({
   label,
   className,
   kbdClassName,
+  kbdSize = "default",
+  kbdTone = "default",
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
   kbdClassName?: string;
+  kbdSize?: KbdSize;
+  kbdTone?: KbdTone;
 }) {
   const steps = label
     .split(/\s+then\s+/i)
@@ -43,7 +67,7 @@ export function ShortcutHint({
           {index > 0 && <span className="text-[10px] text-muted-foreground/45">then</span>}
           <KbdGroup>
             {step.split("+").map((key) => (
-              <Kbd key={key} className={kbdClassName}>
+              <Kbd key={key} size={kbdSize} tone={kbdTone} className={kbdClassName}>
                 {key}
               </Kbd>
             ))}

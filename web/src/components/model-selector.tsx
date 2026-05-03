@@ -22,7 +22,6 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from "~/components/ui/command";
 import type {
   ModelListItem,
@@ -265,23 +264,25 @@ export const ModelSelector = memo(function ModelSelector({
               <CommandList className="max-h-none flex-1">
                 <CommandEmpty>No models match.</CommandEmpty>
                 <CommandGroup heading="Thinking level">
-                  {THINKING_LEVELS.map((level) => {
-                    const levelAvailable = availableThinkingLevels.includes(level);
-                    return (
-                      <ThinkingLevelCommandItem
-                        key={level}
-                        level={level}
-                        selected={level === activeThinkingLevel}
-                        disabled={thinkingDisabled || !levelAvailable}
-                        title={
-                          levelAvailable
-                            ? `Set thinking level to ${level}`
-                            : "Current model does not support this level"
-                        }
-                        onSelect={() => thinkingMutation.mutate(level)}
-                      />
-                    );
-                  })}
+                  <div className="flex flex-wrap gap-1 px-1 py-1">
+                    {THINKING_LEVELS.map((level) => {
+                      const levelAvailable = availableThinkingLevels.includes(level);
+                      return (
+                        <ThinkingLevelCommandItem
+                          key={level}
+                          level={level}
+                          selected={level === activeThinkingLevel}
+                          disabled={thinkingDisabled || !levelAvailable}
+                          title={
+                            levelAvailable
+                              ? `Set thinking level to ${level}`
+                              : "Current model does not support this level"
+                          }
+                          onSelect={() => thinkingMutation.mutate(level)}
+                        />
+                      );
+                    })}
+                  </div>
                 </CommandGroup>
 
                 {pinned.length > 0 && (
@@ -364,9 +365,14 @@ function ThinkingLevelCommandItem({
       disabled={disabled || selected}
       onSelect={onSelect}
       title={title}
+      className={cn(
+        "w-auto rounded-md border px-2 py-1 text-[11px] leading-none [&>svg]:hidden",
+        selected
+          ? "border-primary/70 bg-primary/10 text-primary data-selected:bg-primary/15 data-selected:text-primary"
+          : "border-border/60 text-muted-foreground data-selected:border-border data-selected:bg-accent/50 data-selected:text-foreground",
+      )}
     >
-      <span className={cn("font-medium", selected && "text-primary")}>{level}</span>
-      <CommandShortcut>{selected ? "current" : THINKING_LEVEL_LABELS[level]}</CommandShortcut>
+      {THINKING_LEVEL_LABELS[level]}
     </CommandItem>
   );
 }
@@ -404,7 +410,11 @@ function ModelCommandItem({
       data-checked={selected}
       disabled={busy}
       onSelect={onSelect}
-      className={cn("items-start py-2", !available && "opacity-60")}
+      className={cn(
+        "items-start py-2 [&>svg]:hidden",
+        "data-[checked=true]:bg-primary/10 data-[checked=true]:text-foreground data-[checked=true]:data-selected:bg-primary/15",
+        !available && "opacity-60",
+      )}
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium leading-tight">{model.label}</span>
