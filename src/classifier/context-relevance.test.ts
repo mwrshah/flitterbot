@@ -1,6 +1,9 @@
 import { describe, expect, mock, test } from "bun:test";
 import { buildContextRelevancePrompts } from "../prompts/context-relevance.ts";
-import { formatStreamPrompt } from "../streams/format-stream-prompt.ts";
+import {
+  formatStreamPrompt,
+  stripInjectedDatetimeBlocks,
+} from "../streams/format-stream-prompt.ts";
 
 // Mock groq-client before importing context-relevance
 const mockCallGroqJson = mock<(apiKey: string, prompts: unknown) => Promise<unknown>>();
@@ -33,7 +36,7 @@ describe("buildContextRelevancePrompts", () => {
       "Fix the token refresh bug in the auth service",
     );
 
-    expect(prompts.userPrompt).toContain("## Stream purpose / agent context");
+    expect(prompts.userPrompt).toContain("## Stream Purpose");
     expect(prompts.userPrompt).toContain("Fix the token refresh bug in the auth service");
   });
 
@@ -51,13 +54,28 @@ describe("buildContextRelevancePrompts", () => {
 // --- formatStreamPrompt tests ---
 
 describe("formatStreamPrompt", () => {
-  test("single message produces simple format", () => {
+  test("single message produces raw message + datetime tail", () => {
     const result = formatStreamPrompt(["Do the thing"], "my-ws", "ws-123");
 
     expect(result).toContain("Do the thing");
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("[Stream:");
     expect(result).not.toContain("/tmux2");
+    expect(result).toMatch(/^Do the thing\n\n\[Now: .+\]$/);
+  });
+
+  test("strips runtime-injected datetime blocks before stream prompt formatting", () => {
+    const now = "[Now: Sunday, May 3, 2026 at 02:13 PM GMT+5]";
+
+    expect(stripInjectedDatetimeBlocks(`${now}\nFix the stream timestamp placement`)).toBe(
+      "Fix the stream timestamp placement",
+    );
+    expect(stripInjectedDatetimeBlocks(`Fix the stream timestamp placement\n\n${now}`)).toBe(
+      "Fix the stream timestamp placement",
+    );
+    expect(
+      stripInjectedDatetimeBlocks(`${now}\nFix the stream timestamp placement\n\n${now}`),
+    ).toBe("Fix the stream timestamp placement");
   });
 
   test("multiple messages produces numbered format", () => {
