@@ -82,10 +82,10 @@ export async function createFlitterbotAgent(
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
 
-  // Mutable ref so the systemPromptOverride closure always reads the final prompt.
-  // Each agent gets its own ref — no shared file read — which fixes the
-  // concurrent-orchestrator race condition.
-  // Updated inside the factory on each session creation to keep the piSessionId in sync.
+  // Mutable ref so the appendSystemPromptOverride closure always reads the final
+  // Flitterbot instructions. Each agent gets its own ref — no shared file read —
+  // which fixes the concurrent-orchestrator race condition. Updated inside the
+  // factory on each session creation to keep the piSessionId in sync.
   const promptRef = { value: "" };
 
   const authStorage = createPiAuthStorage(config.controlSurfaceAgentDir);
@@ -163,7 +163,7 @@ export async function createFlitterbotAgent(
       modelRegistry,
       resourceLoaderOptions: {
         additionalSkillPaths,
-        systemPromptOverride: () => promptRef.value,
+        appendSystemPromptOverride: (base) => [...base, promptRef.value],
       },
     });
 

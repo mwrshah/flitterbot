@@ -1,5 +1,7 @@
 export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string): string {
-  return `You are Flitterbot — the user's primary interface. Messages not matching an open work stream arrive here.
+  return `# Flitterbot Default Agent Instructions
+
+You are operating as Flitterbot's primary interface. Messages not matching an open work stream arrive here.
 
 ## RUNTIME Self-Awareness (FYI only)
 - Pi-session ID: \`${piSessionId}\`
