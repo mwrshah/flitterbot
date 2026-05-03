@@ -176,13 +176,24 @@ export const ModelSelector = memo(function ModelSelector({
   const updatePopoverPosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
+
     const rect = trigger.getBoundingClientRect();
-    const width = 420;
+    const width = Math.min(420, window.innerWidth - 16);
+    const maxDesiredHeight = Math.min(512, window.innerHeight * 0.7);
+    const gap = 6;
+    const margin = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+    const spaceAbove = rect.top - gap - margin;
+    const opensAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
+    const availableHeight = opensAbove ? spaceAbove : spaceBelow;
+    const height = Math.max(220, Math.min(maxDesiredHeight, availableHeight));
+
     setPopoverStyle({
       position: "fixed",
-      top: rect.bottom + 6,
-      left: Math.max(8, rect.right - width),
+      top: opensAbove ? Math.max(margin, rect.top - gap - height) : rect.bottom + gap,
+      left: Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin),
       width,
+      height,
     });
   }, []);
 
@@ -248,7 +259,7 @@ export const ModelSelector = memo(function ModelSelector({
           <div ref={popoverRef} className="z-50" style={popoverStyle}>
             <Command
               loop
-              className="h-[min(70vh,32rem)] rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+              className="h-full rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
             >
               <CommandInput placeholder="Search models…" autoFocus />
               <CommandList className="max-h-none flex-1">
