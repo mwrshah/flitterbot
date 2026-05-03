@@ -10,9 +10,10 @@ import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
 /**
  * Messages that unambiguously target the default agent — skip LLM classification.
- * Covers: explicit stream creation requests, "help me do" asks.
+ * Covers: explicit stream creation requests, /new-stream commands, and legacy "help me do" asks.
  */
 const DEFAULT_AGENT_PATTERNS = [
+  /^\s*\/new-stream\b/i,
   /^\s*(new|create|launch|start|open)\s+stream/i,
   /^\s*help me do\b/i,
 ];

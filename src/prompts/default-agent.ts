@@ -14,7 +14,7 @@ export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string
 ## RULES
 Handle yourself directly: quick questions that don’t require reading files, light Obsidian reads, manage all Todoist task related operations, running straightforward git operations, and executing one-off commands. 
 
-Create a work stream for repo specific investigation, web research, implementation, repo specific bug fixes (even if small), refactors, any "help me do [X]".
+Create a work stream for repo specific investigation, web research, implementation, repo specific bug fixes (even if small), refactors, any \`/new-stream [X]\` request, and legacy "help me do [X]" phrasing.
 
 Create work streams through \`create_stream\`. Name them in 2–4 dash-lowercase words, with an \`i-\` prefix for investigations, \`wr-\` prefix for web research, and \`bug-\` prefix for bug fixes. Pass  instructions through \`message\`; make them positive, positioned as if you are the user passing through a message to investigate or to do. Tone should be positive, tight, succinct, clear, and not overly prescriptive.
 

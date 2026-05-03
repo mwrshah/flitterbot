@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -23,6 +24,7 @@ import {
   registerComposerFocusTarget,
   registerShortcutHandlers,
 } from "~/lib/global-shortcuts";
+import { getInternalCommandsForScope, type InternalCommandScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
 import type {
   DirectoryCompletionItem,
@@ -315,6 +317,8 @@ type MessageInputProps = {
   onRecover?: () => void;
   /** Optional plain-text snippet buttons shown inside an empty composer. */
   hoverButtons?: MessageInputHoverButton[];
+  /** Composer context controls which contextual built-in slash commands are offered. */
+  internalCommandScope: InternalCommandScope;
   /** Recovery request in flight — disables the recovery button. */
   isRecoverPending?: boolean;
 };
@@ -345,14 +349,22 @@ export const MessageInput = memo(function MessageInput({
   recoveryKind,
   onRecover,
   hoverButtons = EMPTY_HOVER_BUTTONS,
+  internalCommandScope,
   isRecoverPending = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
-  // Skills list (built-in commands + server skills) comes pre-merged from
+  // Skills list (base built-in commands + server skills) comes pre-merged from
   // skillsQueryOptions and is prefetched in the root loader, so this read is
-  // synchronous on first render after app boot.
+  // synchronous on first render after app boot. Contextual built-ins are scoped
+  // here so each composer exposes only commands valid for its surface.
   const { apiClient } = rootRouteApi.useRouteContext();
-  const { data: skills } = useQuery(skillsQueryOptions(apiClient));
+  const { data: baseSkills } = useQuery(skillsQueryOptions(apiClient));
+  const skills = useMemo(() => {
+    const contextualCommands = getInternalCommandsForScope(internalCommandScope).filter(
+      (command) => !(baseSkills ?? []).some((skill) => skill.name === command.name),
+    );
+    return [...(baseSkills ?? []), ...contextualCommands];
+  }, [baseSkills, internalCommandScope]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

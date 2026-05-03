@@ -43,7 +43,7 @@ export const SkillPicker = memo(function SkillPicker({
   const filtered = useMemo(() => {
     const lower = filter.toLowerCase();
     const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
-    // Pin command-kind items (e.g. /clear, /reload) to the bottom, preserving
+    // Pin command-kind items to the bottom, preserving
     // relative order within each group.
     const nonCommands: SkillListItem[] = [];
     const commands: SkillListItem[] = [];
