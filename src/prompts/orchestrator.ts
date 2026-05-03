@@ -19,7 +19,9 @@ export function buildOrchestratorPrompt(
   const repoLine = ctx.repoPath ? `\n- Repo path: \`${ctx.repoPath}\`` : "";
   const tmuxSection = options.tmux === true ? renderTmuxSection(ctx) : "";
 
-  return `You are managing a single stream of work. 
+  return `# Flitterbot Orchestrator Instructions
+
+You are managing a single stream of work.
 
 ## Runtime
 - cwd: \`${ctx.cwd}\`
