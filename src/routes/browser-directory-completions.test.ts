@@ -11,6 +11,7 @@ function createFixture(): string {
   fs.mkdirSync(path.join(root, ".config"));
   fs.mkdirSync(path.join(root, ".cursor"));
   fs.mkdirSync(path.join(root, ".env.d"));
+  fs.mkdirSync(path.join(root, ".git", "objects"), { recursive: true });
   fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
   fs.mkdirSync(path.join(root, "node_modules"));
   fs.mkdirSync(path.join(root, "src"));
@@ -21,6 +22,7 @@ function createFixture(): string {
   fs.writeFileSync(path.join(root, ".envrc"), "dotenv\n");
   fs.writeFileSync(path.join(root, ".env.d", "secret"), "SECRET=1\n");
   fs.writeFileSync(path.join(root, ".github", "workflows", "audit.yml"), "name: audit\n");
+  fs.writeFileSync(path.join(root, ".git", "config"), "[core]\n");
   fs.writeFileSync(path.join(root, ".gitignore"), ".env\n");
   fs.writeFileSync(path.join(root, "README.md"), "readme\n");
   fs.writeFileSync(path.join(root, "node_modules", "package.json"), "{}\n");
@@ -51,14 +53,13 @@ async function fetchCompletions(cwd: string, query: string): Promise<string[]> {
 }
 
 describe("browser directory completions", () => {
-  test("returns hidden non-env entries in directory listings", async () => {
+  test("returns hidden entries except file-finder exclusions in directory listings", async () => {
     const root = createFixture();
     try {
       const paths = await fetchCompletions(root, "");
 
       expect(paths).toContain(".config/");
       expect(paths).toContain(".cursor/");
-      expect(paths).toContain(".github/");
       expect(paths).toContain(".gitignore");
       expect(paths).toContain("node_modules/");
       expect(paths).toContain("src/");
@@ -66,6 +67,8 @@ describe("browser directory completions", () => {
       expect(paths).not.toContain(".env.example");
       expect(paths).not.toContain(".envrc");
       expect(paths).not.toContain(".env.d/");
+      expect(paths).not.toContain(".git/");
+      expect(paths).not.toContain(".github/");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -77,11 +80,12 @@ describe("browser directory completions", () => {
       const dotPaths = await fetchCompletions(root, ".");
       expect(dotPaths).toContain(".config/");
       expect(dotPaths).toContain(".cursor/");
-      expect(dotPaths).toContain(".github/");
       expect(dotPaths).toContain(".gitignore");
       expect(dotPaths).not.toContain(".env");
       expect(dotPaths).not.toContain(".env.example");
       expect(dotPaths).not.toContain(".envrc");
+      expect(dotPaths).not.toContain(".git/");
+      expect(dotPaths).not.toContain(".github/");
 
       const envPaths = await fetchCompletions(root, ".env");
       expect(envPaths).toEqual([]);
@@ -90,11 +94,12 @@ describe("browser directory completions", () => {
     }
   });
 
-  test("does not list inside env-like directories", async () => {
+  test("does not list inside file-finder excluded directories", async () => {
     const root = createFixture();
     try {
       await expect(fetchCompletions(root, ".env.d/")).resolves.toEqual([]);
-      await expect(fetchCompletions(root, ".github/")).resolves.toContain(".github/workflows/");
+      await expect(fetchCompletions(root, ".git/")).resolves.toEqual([]);
+      await expect(fetchCompletions(root, ".github/")).resolves.toEqual([]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

@@ -4,6 +4,19 @@ import { FileFinder } from "@ff-labs/fff-node";
 
 const instances = new Map<string, FileFinder>();
 const MAX_INSTANCES = 8;
+const ENV_FILE_PREFIX = ".env";
+const EXCLUDED_EXACT_PATH_SEGMENTS = new Set([".git", ".github"]);
+
+export function isFileFinderExcludedName(name: string): boolean {
+  return name.startsWith(ENV_FILE_PREFIX) || EXCLUDED_EXACT_PATH_SEGMENTS.has(name);
+}
+
+export function isFileFinderExcludedPath(candidatePath: string): boolean {
+  return candidatePath
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .some((segment) => isFileFinderExcludedName(segment));
+}
 
 /**
  * Get or create a FileFinder instance for a given repo root.
