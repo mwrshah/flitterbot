@@ -410,7 +410,7 @@ export class PiSessionManager {
    */
   async resetDefault(): Promise<void> {
     const old = this.defaultSession;
-    if (!old || !old.runtime) {
+    if (!old?.runtime) {
       throw new Error("No active default session to reset");
     }
 

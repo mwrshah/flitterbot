@@ -14,15 +14,3 @@ declare module "marked" {
   // biome-ignore lint/suspicious/noExplicitAny: vendor type stub
   export const marked: any;
 }
-
-declare module "lucide/dist/esm/createElement.js" {
-  // biome-ignore lint/suspicious/noExplicitAny: vendor type stub
-  const createElement: any;
-  export default createElement;
-}
-
-declare module "lucide/dist/esm/icons/*.js" {
-  // biome-ignore lint/suspicious/noExplicitAny: vendor type stub
-  const icon: any;
-  export default icon;
-}

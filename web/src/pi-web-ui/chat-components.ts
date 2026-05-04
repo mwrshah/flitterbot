@@ -21,16 +21,18 @@ import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import createElement from "lucide/dist/esm/createElement.js";
-import ChevronRight from "lucide/dist/esm/icons/chevron-right.js";
-import Code from "lucide/dist/esm/icons/code.js";
-import Copy from "lucide/dist/esm/icons/copy.js";
-import EllipsisVertical from "lucide/dist/esm/icons/ellipsis-vertical.js";
-import FileText from "lucide/dist/esm/icons/file-text.js";
-import FolderOpen from "lucide/dist/esm/icons/folder-open.js";
-import MessageSquare from "lucide/dist/esm/icons/message-square.js";
-import Search from "lucide/dist/esm/icons/search.js";
-import SquareTerminal from "lucide/dist/esm/icons/square-terminal.js";
+import {
+  ChevronRight,
+  Code,
+  Copy,
+  createElement,
+  EllipsisVertical,
+  FileText,
+  FolderOpen,
+  MessageSquare,
+  Search,
+  SquareTerminal,
+} from "lucide";
 import { marked } from "marked";
 import type { ActiveToolState } from "~/lib/active-tool-store";
 import { streamingPerf } from "~/lib/streaming-perf";

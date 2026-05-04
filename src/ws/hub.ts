@@ -75,7 +75,7 @@ export class WebSocketHub {
       fragmentOpcode: null,
     };
     this.clients.set(client.id, client);
-    socket.on("data", (chunk) => {
+    socket.on("data", (chunk: Buffer) => {
       client.buffer = Buffer.concat([client.buffer, chunk]);
       void this.consumeFrames(client);
     });
