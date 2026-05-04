@@ -39,19 +39,19 @@ function piStatusBanner(
     case "waiting_for_sessions":
       return {
         label: "Waiting for sessions",
-        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
       };
     case "waiting_for_user":
       return {
         label: "Waiting for user",
-        colorClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
       };
     case "ended":
       return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
       // Same /15 tinted-pill template as the other states, red hue for the
       // semantic. Not the shadcn destructive variant — just the muted red
-      // tint that matches the pattern (emerald / amber / blue / zinc / red).
+      // tint that matches the pattern (emerald / blue / amber / zinc / red).
       return {
         label: "Crashed",
         colorClass: "bg-red-500/15 text-red-600 dark:text-red-400",
