@@ -17,9 +17,9 @@ function piStatusDotClass(status: PiSessionStatus | undefined): string {
     case "active":
       return "bg-emerald-500 animate-pulse";
     case "waiting_for_sessions":
-      return "bg-amber-500";
+      return "bg-blue-500";
     case "waiting_for_user":
-      return "bg-blue-400";
+      return "bg-amber-500";
     case "crashed":
       return "bg-red-500";
     default:
