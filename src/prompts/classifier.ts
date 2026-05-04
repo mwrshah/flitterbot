@@ -90,7 +90,8 @@ Rules:
 5. If the user appears to be continuing the default agent conversation (e.g. replying to something the default agent said), return stream_id: null.
 6. Brainstorm streams are open-ended ideation sessions for a repo. If the user's message is general brainstorming, ideation, or exploratory discussion about a repo that has an open brainstorm stream, route to that brainstorm stream. Exception: if there is a different stream for the same repo that covers a specific issue the message clearly relates to, route to that specific stream instead. Specific beats general.
 7. If the user asks to create a new stream, start new work, or requests something that doesn't belong to any existing stream, return stream_id: null. Only the default agent can create streams.
-8. When in doubt, return stream_id: null — prefer routing to the default agent over a wrong match.
+8. If the user message is exactly /clear or /reload, return stream_id: null so it goes to the default agent.
+9. When in doubt, return stream_id: null — prefer routing to the default agent over a wrong match.
 
 Respond with ONLY a JSON object containing two fields: stream_id and reasoning. No other text or explanation.`;
 

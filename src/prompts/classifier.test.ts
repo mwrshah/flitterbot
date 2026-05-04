@@ -59,6 +59,14 @@ describe("buildClassificationPrompts", () => {
     expect(prompts.userPrompt).not.toContain("[web]");
   });
 
+  test("documents default routing for clear and reload commands", () => {
+    const prompts = buildClassificationPrompts("/clear", [stream()], new Map());
+
+    expect(prompts.systemPrompt).toContain(
+      "If the user message is exactly /clear or /reload, return stream_id: null",
+    );
+  });
+
   test("allows longer snippets before truncating", () => {
     const content = "x".repeat(601);
     const prompts = buildClassificationPrompts(
