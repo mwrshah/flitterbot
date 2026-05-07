@@ -121,6 +121,9 @@ export function getLatestStreamCreatedAt(db: BlackboardDatabase): string | undef
   return row?.created_at;
 }
 
+/** Rolling window for surfacing recently-closed streams (sidebar + history). */
+export const RECENTLY_CLOSED_WINDOW_HOURS = 24 * 7;
+
 export function listRecentlyClosedStreams(
   db: BlackboardDatabase,
   withinHours: number,

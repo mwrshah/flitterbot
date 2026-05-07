@@ -30,6 +30,7 @@ import {
   getPiSessionStatus,
   listOpenStreams,
   listRecentlyClosedStreams,
+  RECENTLY_CLOSED_WINDOW_HOURS,
   resetAllStreams,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
@@ -802,7 +803,10 @@ export class ControlSurfaceRuntime {
       stream,
       piSessionId: getActivePiSessionId(this.blackboard, stream.id),
     }));
-    const closedStreams = listRecentlyClosedStreams(this.blackboard, 24).map((stream) => ({
+    const closedStreams = listRecentlyClosedStreams(
+      this.blackboard,
+      RECENTLY_CLOSED_WINDOW_HOURS,
+    ).map((stream) => ({
       stream,
       piSessionId: getLatestPiSessionId(this.blackboard, stream.id),
     }));

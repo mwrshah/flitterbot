@@ -1,6 +1,10 @@
 import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
-import { getLatestPiSessionId, listRecentlyClosedStreams } from "../blackboard/query-streams.ts";
+import {
+  getLatestPiSessionId,
+  listRecentlyClosedStreams,
+  RECENTLY_CLOSED_WINDOW_HOURS,
+} from "../blackboard/query-streams.ts";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -95,8 +99,11 @@ async function handleBrowserStreamsHistoryRouteInner(
     for (const orch of runtime.sessionManager.listOrchestrators()) {
       if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
-    // Include closed streams (24h) — look up their pi_session_ids
-    const closedStreams = listRecentlyClosedStreams(runtime.blackboard, 24);
+    // Include closed streams (7d window) — look up their pi_session_ids
+    const closedStreams = listRecentlyClosedStreams(
+      runtime.blackboard,
+      RECENTLY_CLOSED_WINDOW_HOURS,
+    );
     for (const ws of closedStreams) {
       const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
       if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
