@@ -97,6 +97,10 @@ export type FlitterbotConfig = {
   extraSkillPaths: string[];
 };
 
+export const TMUX_SKILL_DIRECTIVE = "/skill:tmux";
+export const SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER =
+  "IMPORTANT! Before doing  anything else, load the /skill:tmux pls";
+
 const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
 const CONFIG_PATH = path.join(FLITTERBOT_DIR, "config.json");
@@ -256,6 +260,24 @@ function resolveDefaultModel(raw: RawConfigJson, models: ModelConfigEntry[]): st
   );
 }
 
+export function validateTmuxStreamFooterConfig(
+  config: Pick<FlitterbotConfig, "newStreamFirstMessageFooter" | "tmuxEnabled">,
+): void {
+  const footerHasTmuxSkill = config.newStreamFirstMessageFooter.includes(TMUX_SKILL_DIRECTIVE);
+
+  if (!config.tmuxEnabled && footerHasTmuxSkill) {
+    throw new Error(
+      `Invalid startup config ${FLITTERBOT_CONFIG_PATH}: newStreamFirstMessageFooter includes ${TMUX_SKILL_DIRECTIVE} but tmuxEnabled is false. Remove the tmux skill footer or set "tmuxEnabled": true.`,
+    );
+  }
+
+  if (config.tmuxEnabled && !footerHasTmuxSkill) {
+    throw new Error(
+      `Invalid startup config ${FLITTERBOT_CONFIG_PATH}: tmuxEnabled is true but newStreamFirstMessageFooter does not include ${TMUX_SKILL_DIRECTIVE}. Add "newStreamFirstMessageFooter": "${SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER}" to ${FLITTERBOT_CONFIG_PATH}.`,
+    );
+  }
+}
+
 export function loadConfig(): FlitterbotConfig {
   ensureDir(FLITTERBOT_DIR);
   ensureDir(path.join(FLITTERBOT_DIR, "logs"));
@@ -302,6 +324,8 @@ export function loadConfig(): FlitterbotConfig {
     controlSurfacePidPath: pidPath,
     controlSurfaceLogPath: logPath,
   };
+
+  validateTmuxStreamFooterConfig(config);
 
   ensureDir(config.projectsDir);
   ensureDir(controlSurfaceDir);

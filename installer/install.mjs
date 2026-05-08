@@ -534,7 +534,7 @@ async function bootstrapConfig() {
   const DEFAULT_AGENT_FIRST_MESSAGE =
     "/skill:tasks /skill:notes\n\nUse notes/tasks operations. Run ls on the project repositories directory.";
   const DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER =
-    "IMPORTANT! Before doing  anything else load the /skill:tmux pls";
+    "IMPORTANT! Before doing  anything else, load the /skill:tmux pls";
 
   const STATIC_DEFAULTS = {
     controlSurfaceHost: "127.0.0.1",
@@ -557,7 +557,7 @@ async function bootstrapConfig() {
     projectsDir: "~/development",
     defaultAgentFirstMessage: DEFAULT_AGENT_FIRST_MESSAGE,
     newStreamFirstMessageFooter: DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER,
-    tmuxEnabled: false,
+    tmuxEnabled: true,
     extraSkillPaths: [],
   };
 
