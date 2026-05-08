@@ -21,13 +21,29 @@ Run the bundled script with a JSON request. References are relative to this skil
 node scripts/tasks.mjs '{"action":"list_tasks","preset":"today"}'
 ```
 
+Default output is concise Markdown/text for model and human consumption:
+
+```text
+Found 2 tasks.
+
+- `Q4v9aP0mNz` [Inbox] Follow up — due 2026-05-10
+- `B7kLm2xTq1` [Work] Send launch notes — due 2026-05-12 14:30
+```
+
 For longer payloads, pipe JSON on stdin:
 
 ```bash
 printf '%s\n' '{"action":"create_task","project_name":"Inbox","description":"Follow up","due_at":"2026-05-10"}' | node scripts/tasks.mjs -
 ```
 
-The script returns JSON with `ok`, `message`, and action-specific data.
+Use JSON only when a caller needs machine-readable output:
+
+```bash
+node scripts/tasks.mjs --json '{"action":"list_tasks","preset":"today"}'
+# or include "format":"json" in the request payload
+```
+
+JSON output includes `ok`, `message`, and action-specific data.
 
 Supported actions:
 
