@@ -73,6 +73,7 @@ const SCHEDULER_FILES = ["flitterbot-checkin.sh", "com.flitterbot.scheduler.plis
 const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
 const WHATSAPP_FILES = ["README.md", "config.json.example"];
 const WHATSAPP_EXEC_FILES = ["run-entry.js", "cli.js", "daemon.js"];
+const BUNDLED_SKILLS_DIR = "skills";
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -272,6 +273,28 @@ function resolvePackagedSrcFile(rel) {
   return null;
 }
 
+function resolvePackagedResourcesDir(rel) {
+  const candidates = [
+    PROJECT_ROOT && join(PROJECT_ROOT, "resources", rel),
+    join(FLITTERBOT_DIR, "resources", rel),
+    join(SCRIPT_DIR, "resources", rel),
+    join(SCRIPT_DIR, "..", "resources", rel),
+  ].filter(Boolean);
+  for (const c of candidates) if (existsSync(c)) return c;
+  return null;
+}
+
+function walkFiles(dir, prefix = "") {
+  const entries = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) entries.push(...walkFiles(full, rel));
+    else if (entry.isFile()) entries.push(rel);
+  }
+  return entries.sort();
+}
+
 // ---------------------------------------------------------------------------
 // Runtime file deployment helpers
 // ---------------------------------------------------------------------------
@@ -399,7 +422,7 @@ function applyLegacyCrontabText(afterText) {
 // Preflight
 // ---------------------------------------------------------------------------
 function computeProjectRoot() {
-  if (existsSync(join(SCRIPT_DIR, "..", "features")) && existsSync(join(SCRIPT_DIR, "..", "src"))) {
+  if (existsSync(join(SCRIPT_DIR, "..", "src")) && existsSync(join(SCRIPT_DIR, "..", "package.json"))) {
     PROJECT_ROOT = resolve(SCRIPT_DIR, "..");
     return;
   }
@@ -420,6 +443,9 @@ function prepareDirectories() {
     join(FLITTERBOT_DIR, "hooks"),
     join(FLITTERBOT_DIR, "logs"),
     join(FLITTERBOT_DIR, "scripts"),
+    join(FLITTERBOT_DIR, "skills"),
+    join(FLITTERBOT_DIR, "tasks"),
+    join(FLITTERBOT_DIR, "notes"),
     join(FLITTERBOT_DIR, "src", "blackboard"),
     join(FLITTERBOT_DIR, "whatsapp", "auth"),
     join(FLITTERBOT_DIR, "whatsapp", "logs"),
@@ -510,15 +536,19 @@ async function bootstrapConfig() {
     whatsappEnabled: true,
     wipeStreamsOnStart: false,
     claudeCliCommand: "claude --dangerously-skip-permissions",
-    defaultAgentBootstrapPrompt: "/todoist /my-obsidian\n\nRun ls on the project repositories directory.",
+    defaultAgentFirstMessage: "/skill:flitterbot-tasks /skill:flitterbot-notes\n\nUse Flitterbot's bundled local tasks and notes workflows. Run ls on the project repositories directory.",
+    newStreamFirstMessageFooter: "Before doing anything else, load /skill:flitterbot-workstream.",
+    tmux2Enabled: false,
+    extraSkillPaths: [],
   };
 
-  // Defaults only fill when a key is strictly `undefined` (truly absent).
-  // Explicit null / "" / 0 / false are preserved as user intent.
+  // Defaults fill when a key is absent or null so config.json visibly records
+  // the values Flitterbot will use. Explicit "" / 0 / false are preserved.
   const configAfter = { ...configBefore };
   delete configAfter.piThinkingLevel;
+  delete configAfter.defaultAgentBootstrapPrompt;
   const setDefault = (key, value) => {
-    if (configAfter[key] === undefined) configAfter[key] = value;
+    if (configAfter[key] == null) configAfter[key] = value;
   };
 
   for (const [key, value] of Object.entries(STATIC_DEFAULTS)) setDefault(key, value);
@@ -529,7 +559,7 @@ async function bootstrapConfig() {
   setDefault("sourceRoot", configAfter.projectRoot ?? projectRoot);
   setDefault("controlSurfaceCommand", commandHint);
 
-  if (configAfter.projectsDir === undefined) {
+  if (configAfter.projectsDir == null) {
     const entered = await promptString(
       "Projects directory (absolute path where your repos live, e.g. ~/Documents/coded-programs): ",
     );
@@ -811,6 +841,12 @@ async function deployRuntimeFiles() {
     noteRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file));
   }
 
+  const skillsSrcDir = resolvePackagedResourcesDir(BUNDLED_SKILLS_DIR);
+  const bundledSkillFiles = skillsSrcDir ? walkFiles(skillsSrcDir) : [];
+  for (const file of bundledSkillFiles) {
+    noteRuntimeFile(join(skillsSrcDir, file), join(FLITTERBOT_DIR, "skills", file));
+  }
+
   if (PROJECT_ROOT) {
     noteTextFile(join(FLITTERBOT_DIR, "source-root"), PROJECT_ROOT + "\n");
   }
@@ -871,6 +907,10 @@ async function deployRuntimeFiles() {
           const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
           if (!src) continue;
           copyRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file), 0o755);
+        }
+
+        for (const file of bundledSkillFiles) {
+          copyRuntimeFile(join(skillsSrcDir, file), join(FLITTERBOT_DIR, "skills", file), 0o644);
         }
 
         if (PROJECT_ROOT) {

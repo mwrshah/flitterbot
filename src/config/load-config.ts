@@ -78,9 +78,10 @@ type RawConfigJson = {
   wipeStreamsOnStart?: boolean;
   whatsappEnabled?: boolean;
   shortcuts?: ShortcutBindingsConfig;
-  defaultAgentBootstrapPrompt?: string;
-  extraSkillPaths?: string[];
+  defaultAgentFirstMessage?: string;
+  newStreamFirstMessageFooter?: string;
   tmux2Enabled?: boolean;
+  extraSkillPaths?: string[];
 };
 
 export type FlitterbotConfig = {
@@ -112,19 +113,19 @@ export type FlitterbotConfig = {
   wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
   shortcuts: ShortcutBindingsConfig;
-  defaultAgentBootstrapPrompt: string;
-  /**
-   * When true, orchestrator prompts include the tmux2 sub-agent section and
-   * surface the pi-session ID for launching Claude Code sub-agents via tmux2.
-   * Defaults to false (solo-style orchestrator that does the work directly).
-   */
+  /** First queued instruction sent to the default agent when its session starts. */
+  defaultAgentFirstMessage: string;
+  /** Footer appended to the first prompt delivered to every newly-created stream orchestrator. */
+  newStreamFirstMessageFooter: string;
+  /** Deterministic skill root populated by the installer with bundled Flitterbot skills. */
+  flitterbotSkillsDir: string;
+  /** Include tmux2 sub-agent orchestration instructions in orchestrator prompts. */
   tmux2Enabled: boolean;
   /**
-   * Extra directories to load skills from, in addition to the built-in
-   * `~/.agents/skills/` and `~/.claude/skills/` locations. Paths are expanded
-   * (`~` → home), resolved to absolute, de-duplicated, and order is preserved.
-   * Missing paths are skipped with a warning. Name collisions with earlier
-   * paths are logged and the earlier skill wins.
+   * Extra directories to load skills from after the bundled `~/.flitterbot/skills` directory.
+   * Paths are expanded (`~` → home), resolved to absolute, de-duplicated, and order is
+   * preserved. Missing paths are skipped with a warning. Name collisions keep the earlier
+   * skill, so bundled Flitterbot skills cannot be shadowed by extras.
    */
   extraSkillPaths: string[];
 };
@@ -132,6 +133,10 @@ export type FlitterbotConfig = {
 const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
 const CONFIG_PATH = path.join(FLITTERBOT_DIR, "config.json");
+const DEFAULT_AGENT_FIRST_MESSAGE =
+  "/skill:flitterbot-tasks /skill:flitterbot-notes\n\nUse Flitterbot's bundled local tasks and notes workflows. Run ls on the project repositories directory.";
+const DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER =
+  "Before doing anything else, load /skill:flitterbot-workstream.";
 
 /** Absolute path to the user's ~/.flitterbot/config.json. Exported so helpers
  *  that mutate specific fields (e.g. the pin/unpin endpoint) can write back
@@ -158,10 +163,8 @@ function readJsonFile<T>(filePath: string): T | undefined {
 
 /**
  * Expand `~`, resolve to absolute, de-duplicate (preserving declared order),
- * and drop non-string / empty entries. Existence is NOT checked here — the
- * consumer (resource loader) re-checks and skips missing dirs with a warning,
- * and we also emit our own warn log at agent-creation time. Validating here
- * too would either double-log or require coupling config to a logger.
+ * and drop non-string / empty entries. Existence is checked by the consumer so
+ * startup logs can report missing configured skill directories in one place.
  */
 function normalizeExtraSkillPaths(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
@@ -275,9 +278,15 @@ export function loadConfig(): FlitterbotConfig {
         process.env.WHATSAPP_ENABLED.toLowerCase() !== "false"
       : (raw.whatsappEnabled ?? true);
   const shortcuts = raw.shortcuts ?? {};
-  const defaultAgentBootstrapPrompt =
-    raw.defaultAgentBootstrapPrompt ??
-    "/todoist /my-obsidian\n\nRun ls on the project repositories directory.";
+  const defaultAgentFirstMessage =
+    typeof raw.defaultAgentFirstMessage === "string"
+      ? raw.defaultAgentFirstMessage
+      : DEFAULT_AGENT_FIRST_MESSAGE;
+  const newStreamFirstMessageFooter =
+    typeof raw.newStreamFirstMessageFooter === "string"
+      ? raw.newStreamFirstMessageFooter
+      : DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER;
+  const flitterbotSkillsDir = path.join(FLITTERBOT_DIR, "skills");
   const tmux2Enabled = raw.tmux2Enabled === true;
   const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
@@ -308,7 +317,9 @@ export function loadConfig(): FlitterbotConfig {
     wipeStreamsOnStart,
     whatsappEnabled,
     shortcuts,
-    defaultAgentBootstrapPrompt,
+    defaultAgentFirstMessage,
+    newStreamFirstMessageFooter,
+    flitterbotSkillsDir,
     tmux2Enabled,
     extraSkillPaths,
 
@@ -323,6 +334,9 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(controlSurfaceDir);
   ensureDir(sessionsDir);
   ensureDir(agentDir);
+  ensureDir(flitterbotSkillsDir);
+  ensureDir(path.join(FLITTERBOT_DIR, "tasks"));
+  ensureDir(path.join(FLITTERBOT_DIR, "notes"));
   ensureDir(path.dirname(logPath));
   ensureDir(path.dirname(blackboardPath));
   ensureDir(path.dirname(whatsappSocketPath));
@@ -334,10 +348,12 @@ export function loadConfig(): FlitterbotConfig {
   const {
     piModel: _legacyPiModel,
     piThinkingLevel: _legacyPiThinkingLevel,
+    defaultAgentBootstrapPrompt: _legacyDefaultAgentBootstrapPrompt,
     ...rawWithoutLegacy
   } = raw as RawConfigJson & {
     piModel?: string;
     piThinkingLevel?: unknown;
+    defaultAgentBootstrapPrompt?: string;
   };
   const nextPersisted = {
     ...rawWithoutLegacy,
@@ -361,7 +377,8 @@ export function loadConfig(): FlitterbotConfig {
     wipeStreamsOnStart: config.wipeStreamsOnStart,
     whatsappEnabled: config.whatsappEnabled,
     shortcuts: config.shortcuts,
-    defaultAgentBootstrapPrompt: config.defaultAgentBootstrapPrompt,
+    defaultAgentFirstMessage: config.defaultAgentFirstMessage,
+    newStreamFirstMessageFooter: config.newStreamFirstMessageFooter,
     tmux2Enabled: config.tmux2Enabled,
     extraSkillPaths: config.extraSkillPaths,
   };
