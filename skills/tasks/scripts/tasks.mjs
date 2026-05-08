@@ -7,7 +7,7 @@ import path from "node:path";
 const STORE_VERSION = 1;
 const ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const ID_LENGTH = 10;
-const DEFAULT_STORE_PATH = path.join(os.homedir(), ".flitterbot", "tasks", "tasks.json");
+const DEFAULT_STORE_PATH = path.join(os.homedir(), ".flitterbot", "data", "tasks", "tasks.json");
 const STORE_PATH = process.env.FLITTERBOT_TASKS_FILE || DEFAULT_STORE_PATH;
 
 function nowIso() {

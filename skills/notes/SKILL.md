@@ -1,6 +1,6 @@
 ---
 name: notes
-description: Read and maintain local notes stored under ~/.flitterbot/notes
+description: Read and maintain local notes stored under ~/.flitterbot/data/notes
 argument-hint: "[note request]"
 disable-model-invocation: false
 ---
@@ -11,7 +11,7 @@ Use the local notes folder as the default durable memory for user-authored notes
 
 ## Location
 
-- Root: `~/.flitterbot/notes/`
+- Root: `~/.flitterbot/data/notes/`
 - Create Markdown files directly under this root unless a subfolder already fits the topic.
 - Prefer stable, lowercase, dash-separated filenames: `project-name.md`, `idea-name.md`, `meeting-topic.md`.
 

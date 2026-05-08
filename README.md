@@ -32,7 +32,7 @@ Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. T
 - `tmuxEnabled` — include tmux sub-agent orchestration instructions in orchestrator prompts.
 - `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
 
-Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Tasks are managed through Flitterbot's bundled task API; local notes live under `~/.flitterbot/notes`.
+Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
 
 ## Commands
 

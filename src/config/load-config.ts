@@ -308,8 +308,8 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(sessionsDir);
   ensureDir(agentDir);
   ensureDir(config.flitterbotSkillsDir);
-  ensureDir(path.join(FLITTERBOT_DIR, "tasks"));
-  ensureDir(path.join(FLITTERBOT_DIR, "notes"));
+  ensureDir(path.join(FLITTERBOT_DIR, "data", "tasks"));
+  ensureDir(path.join(FLITTERBOT_DIR, "data", "notes"));
   ensureDir(path.dirname(logPath));
   ensureDir(path.dirname(config.blackboardPath));
   ensureDir(path.dirname(config.whatsappSocketPath));
