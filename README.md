@@ -25,7 +25,14 @@ Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 
 `.env`: `GROQ_API_KEY` required (classifier); `ANTHROPIC_API_KEY` optional (falls back to Pi OAuth via `pi` → `/login`).
 
-Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing.
+Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. The user-facing prompt knobs are:
+
+- `defaultAgentFirstMessage` — first instruction queued when the default agent starts.
+- `newStreamFirstMessageFooter` — footer appended to the first prompt sent to every new stream orchestrator.
+- `tmux2Enabled` — include tmux2 sub-agent orchestration instructions in orchestrator prompts.
+- `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
+
+Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Tasks live in `~/.flitterbot/tasks.db` with generated JSON/Markdown projections under `~/.flitterbot/tasks/`; local notes live under `~/.flitterbot/notes`.
 
 ## Commands
 

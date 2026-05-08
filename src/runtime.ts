@@ -223,14 +223,7 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    // Bootstrap default pi session with startup skills
-    if (this.config.defaultAgentBootstrapPrompt) {
-      this.enqueue({
-        text: this.config.defaultAgentBootstrapPrompt,
-        source: "init",
-        metadata: { via: "startup" },
-      });
-    }
+    this.enqueueDefaultAgentFirstMessage("startup");
   }
 
   async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {
@@ -266,6 +259,15 @@ export class ControlSurfaceRuntime {
     destroyAllFileFinders();
   }
 
+  private enqueueDefaultAgentFirstMessage(via: "startup" | "clear"): void {
+    if (!this.config.defaultAgentFirstMessage.trim()) return;
+    this.enqueue({
+      text: this.config.defaultAgentFirstMessage,
+      source: "init",
+      metadata: { via },
+    });
+  }
+
   /**
    * Route a message to the correct pi session's queue based on classification metadata.
    */
@@ -287,9 +289,14 @@ export class ControlSurfaceRuntime {
       !input.metadata?._targetSessionId
     ) {
       this.log("/clear: resetting default session");
-      void this.sessionManager.resetDefault().catch((error) => {
-        this.log(`/clear reset failed: ${error instanceof Error ? error.message : String(error)}`);
-      });
+      void this.sessionManager
+        .resetDefault()
+        .then(() => this.enqueueDefaultAgentFirstMessage("clear"))
+        .catch((error) => {
+          this.log(
+            `/clear reset failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       return { ok: true, cleared: true };
     }
 
@@ -1485,7 +1492,13 @@ export class ControlSurfaceRuntime {
                     if (!relevantTexts.includes(currentUserText)) {
                       relevantTexts.push(currentUserText);
                     }
-                    prompt = formatStreamPrompt(relevantTexts, ws.name, ws.id, agentMessage);
+                    prompt = formatStreamPrompt(
+                      relevantTexts,
+                      ws.name,
+                      ws.id,
+                      agentMessage,
+                      this.config.newStreamFirstMessageFooter,
+                    );
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
                     );
@@ -1495,6 +1508,7 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
+                      this.config.newStreamFirstMessageFooter,
                     );
                   }
                 } else {
@@ -1503,6 +1517,7 @@ export class ControlSurfaceRuntime {
                     ws.name,
                     ws.id,
                     agentMessage,
+                    this.config.newStreamFirstMessageFooter,
                   );
                 }
               } catch (error) {
@@ -1519,6 +1534,7 @@ export class ControlSurfaceRuntime {
                   ws.name,
                   ws.id,
                   agentMessage,
+                  this.config.newStreamFirstMessageFooter,
                 );
               }
 
@@ -1538,7 +1554,13 @@ export class ControlSurfaceRuntime {
               this.log(`enqueued original user message onto stream "${ws.name}" (${ws.id})`);
             } else if (skipUserMessage && agentMessage) {
               const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
-              const prompt = formatStreamPrompt([], ws.name, ws.id, agentMessage);
+              const prompt = formatStreamPrompt(
+                [],
+                ws.name,
+                ws.id,
+                agentMessage,
+                this.config.newStreamFirstMessageFooter,
+              );
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
                 text: prompt,

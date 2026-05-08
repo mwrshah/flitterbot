@@ -98,27 +98,29 @@ export async function createFlitterbotAgent(
   settingsManager.setTransport(config.piTransport);
   // Skill paths, in precedence order:
   //   1. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
-  //   2. `extraSkillPaths` from ~/.flitterbot/config.json, in declared order
+  //   2. Bundled Flitterbot skills (`~/.flitterbot/skills`)
+  //   3. `extraSkillPaths` from ~/.flitterbot/config.json, in declared order
   // The loader de-duplicates by skill name — first occurrence wins — so
-  // built-ins cannot be shadowed by extras. Collisions surface via
+  // earlier paths cannot be shadowed by later paths. Collisions surface via
   // resourceLoader.getSkills().diagnostics and are logged below.
   const builtInSkillPaths = [
     path.join(HOME, ".claude", "skills"),
     path.join(HOME, ".agents", "skills"),
   ];
   const skillPathWarnings: string[] = [];
-  const extraSkillPaths: string[] = [];
-  for (const entry of config.extraSkillPaths) {
-    if (!fs.existsSync(entry)) {
-      skillPathWarnings.push(`extraSkillPaths: missing directory skipped: ${entry}`);
-      continue;
-    }
-    extraSkillPaths.push(entry);
+  const additionalSkillPaths: string[] = builtInSkillPaths.filter((entry) => fs.existsSync(entry));
+  if (fs.existsSync(config.flitterbotSkillsDir)) {
+    additionalSkillPaths.push(config.flitterbotSkillsDir);
+  } else {
+    skillPathWarnings.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
   }
-  const additionalSkillPaths = [
-    ...builtInSkillPaths.filter((entry) => fs.existsSync(entry)),
-    ...extraSkillPaths,
-  ];
+  for (const entry of config.extraSkillPaths) {
+    if (fs.existsSync(entry)) {
+      additionalSkillPaths.push(entry);
+    } else {
+      skillPathWarnings.push(`extraSkillPaths: missing directory skipped: ${entry}`);
+    }
+  }
 
   const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
   const modelEntry = shouldLetSessionRestoreModel
@@ -191,9 +193,8 @@ export async function createFlitterbotAgent(
   const { agentsFiles } = resourceLoader.getAgentsFiles();
   const skillNames = skills.map((s) => s.name);
   const agentsFilePaths = agentsFiles.map((f) => f.path);
-  // Surface collision / missing-path diagnostics from the loader so the
-  // orchestrator log clearly shows which skills were shadowed and which
-  // extra paths were silently dropped.
+  // Surface collision / warning diagnostics from the loader so the
+  // orchestrator log clearly shows which skill paths were loaded.
   const skillMessages: string[] = [...skillPathWarnings];
   for (const d of skillDiagnostics) {
     if (d.type === "collision" && d.collision) {

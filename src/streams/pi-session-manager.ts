@@ -564,8 +564,9 @@ export class PiSessionManager {
     streamName: string,
     streamId: string,
     agentMessage?: string,
+    footer?: string,
   ): string {
-    return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage);
+    return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage, footer);
   }
 
   private logResourceInfo(
