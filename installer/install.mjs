@@ -537,13 +537,17 @@ async function bootstrapConfig() {
     claudeCliCommand: "claude --dangerously-skip-permissions",
     defaultAgentFirstMessage: "/skill:flitterbot-tasks /skill:flitterbot-notes\n\nUse Flitterbot's bundled local tasks and notes workflows. Run ls on the project repositories directory.",
     newStreamFirstMessageFooter: "Before doing anything else, load /skill:flitterbot-workstream.",
-    tmux2Enabled: false,
+    tmuxEnabled: false,
     extraSkillPaths: [],
   };
 
   // Defaults fill when a key is absent or null so config.json visibly records
   // the values Flitterbot will use. Explicit "" / 0 / false are preserved.
   const configAfter = { ...configBefore };
+  if (configAfter.tmuxEnabled == null && configBefore.tmux2Enabled === true) {
+    configAfter.tmuxEnabled = true;
+  }
+  delete configAfter.tmux2Enabled;
   delete configAfter.piThinkingLevel;
   delete configAfter.defaultAgentBootstrapPrompt;
   const setDefault = (key, value) => {

@@ -44,8 +44,8 @@ type CreateFlitterbotAgentOptions = {
   cwd?: string;
   /** Override the model for this session. When omitted, falls back to `config.defaultModel`. */
   modelId?: string;
-  /** Enable the tmux2 sub-agent section in the orchestrator prompt. Defaults to false. */
-  tmux2Enabled?: boolean;
+  /** Enable the tmux sub-agent section in the orchestrator prompt. Defaults to false. */
+  tmuxEnabled?: boolean;
 };
 
 export type CreateFlitterbotAgentResult = {
@@ -97,23 +97,24 @@ export async function createFlitterbotAgent(
   const settingsManager = SettingsManager.inMemory();
   settingsManager.setTransport(config.piTransport);
   // Skill paths, in precedence order:
-  //   1. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
-  //   2. Bundled Flitterbot skills (`~/.flitterbot/skills`)
+  //   1. Bundled Flitterbot skills (`~/.flitterbot/skills`)
+  //   2. Built-in user-level dirs (`~/.claude/skills`, `~/.agents/skills`)
   //   3. `extraSkillPaths` from ~/.flitterbot/config.json, in declared order
   // The loader de-duplicates by skill name — first occurrence wins — so
-  // earlier paths cannot be shadowed by later paths. Collisions surface via
-  // resourceLoader.getSkills().diagnostics and are logged below.
+  // bundled skills cannot be shadowed by user-level or extra paths. Collisions
+  // surface via resourceLoader.getSkills().diagnostics and are logged below.
   const builtInSkillPaths = [
     path.join(HOME, ".claude", "skills"),
     path.join(HOME, ".agents", "skills"),
   ];
   const skillPathWarnings: string[] = [];
-  const additionalSkillPaths: string[] = builtInSkillPaths.filter((entry) => fs.existsSync(entry));
+  const additionalSkillPaths: string[] = [];
   if (fs.existsSync(config.flitterbotSkillsDir)) {
     additionalSkillPaths.push(config.flitterbotSkillsDir);
   } else {
     skillPathWarnings.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
   }
+  additionalSkillPaths.push(...builtInSkillPaths.filter((entry) => fs.existsSync(entry)));
   for (const entry of config.extraSkillPaths) {
     if (fs.existsSync(entry)) {
       additionalSkillPaths.push(entry);
@@ -154,7 +155,7 @@ export async function createFlitterbotAgent(
       factoryOpts.cwd,
       orchestratorContext,
       config.projectsDir,
-      options.tmux2Enabled ?? false,
+      options.tmuxEnabled ?? false,
     );
 
     const services = await createAgentSessionServices({
@@ -241,11 +242,11 @@ function resolveSystemPrompt(
   cwd: string,
   ctx?: OrchestratorInput,
   projectsDir?: string,
-  tmux2Enabled = false,
+  tmuxEnabled = false,
 ): string {
   if (role === "orchestrator") {
     if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorPrompt({ ...ctx, piSessionId, cwd }, { tmux: tmux2Enabled });
+    return buildOrchestratorPrompt({ ...ctx, piSessionId, cwd }, { tmux: tmuxEnabled });
   }
   return buildDefaultAgentPrompt(piSessionId, projectsDir ?? cwd);
 }

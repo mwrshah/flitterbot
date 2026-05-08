@@ -168,7 +168,7 @@ export class PiSessionManager {
       role: "orchestrator",
       orchestratorContext,
       cwd: repoPath,
-      tmux2Enabled: this.config.tmux2Enabled,
+      tmuxEnabled: this.config.tmuxEnabled,
     });
 
     const session = created.runtime.session;
@@ -338,7 +338,7 @@ export class PiSessionManager {
       },
       cwd: repoPath,
       resumeSessionFile: sessionFile && fs.existsSync(sessionFile) ? sessionFile : undefined,
-      tmux2Enabled: this.config.tmux2Enabled,
+      tmuxEnabled: this.config.tmuxEnabled,
     });
 
     const session = created.runtime.session;

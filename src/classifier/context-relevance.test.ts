@@ -60,7 +60,7 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("Do the thing");
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("[Stream:");
-    expect(result).not.toContain("/tmux2");
+    expect(result).not.toContain("/tmux");
     expect(result).toMatch(/^Do the thing\n\n\[Now: .+\]$/);
   });
 
@@ -92,14 +92,14 @@ describe("formatStreamPrompt", () => {
     expect(result).toContain("First context");
     expect(result).toContain("Second context");
     expect(result).toContain("Create the feature");
-    expect(result).not.toContain("/tmux2");
+    expect(result).not.toContain("/tmux");
   });
 
   test("empty messages array produces just datetime", () => {
     const result = formatStreamPrompt([], "empty-ws", "ws-000");
     expect(result).not.toContain("[Stream:");
     expect(result).not.toContain("User message (");
-    expect(result).not.toContain("/tmux2");
+    expect(result).not.toContain("/tmux");
     expect(result).toMatch(/^\[Now: .+\]$/);
   });
 
@@ -114,7 +114,7 @@ describe("formatStreamPrompt", () => {
     expect(result).not.toContain("The following user messages provide context");
     expect(result).toContain("--- Agent context ---");
     expect(result).toContain("Investigate renewals pipeline failure in klair-api");
-    expect(result).not.toContain("/tmux2");
+    expect(result).not.toContain("/tmux");
   });
 });
 

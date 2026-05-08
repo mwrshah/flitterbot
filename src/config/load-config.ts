@@ -80,6 +80,8 @@ type RawConfigJson = {
   shortcuts?: ShortcutBindingsConfig;
   defaultAgentFirstMessage?: string;
   newStreamFirstMessageFooter?: string;
+  tmuxEnabled?: boolean;
+  /** Legacy config key migrated to tmuxEnabled on next save. */
   tmux2Enabled?: boolean;
   extraSkillPaths?: string[];
 };
@@ -119,8 +121,8 @@ export type FlitterbotConfig = {
   newStreamFirstMessageFooter: string;
   /** Deterministic skill root populated by the installer with bundled Flitterbot skills. */
   flitterbotSkillsDir: string;
-  /** Include tmux2 sub-agent orchestration instructions in orchestrator prompts. */
-  tmux2Enabled: boolean;
+  /** Include tmux sub-agent orchestration instructions in orchestrator prompts. */
+  tmuxEnabled: boolean;
   /**
    * Extra directories to load skills from after the bundled `~/.flitterbot/skills` directory.
    * Paths are expanded (`~` → home), resolved to absolute, de-duplicated, and order is
@@ -287,7 +289,7 @@ export function loadConfig(): FlitterbotConfig {
       ? raw.newStreamFirstMessageFooter
       : DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER;
   const flitterbotSkillsDir = path.join(FLITTERBOT_DIR, "skills");
-  const tmux2Enabled = raw.tmux2Enabled === true;
+  const tmuxEnabled = raw.tmuxEnabled === true || raw.tmux2Enabled === true;
   const extraSkillPaths = normalizeExtraSkillPaths(raw.extraSkillPaths);
   const configuredClaudeCliCommand = raw.claudeCliCommand ?? "";
   const models = normalizeModels(raw.models);
@@ -320,7 +322,7 @@ export function loadConfig(): FlitterbotConfig {
     defaultAgentFirstMessage,
     newStreamFirstMessageFooter,
     flitterbotSkillsDir,
-    tmux2Enabled,
+    tmuxEnabled,
     extraSkillPaths,
 
     controlSurfaceDir,
@@ -379,7 +381,7 @@ export function loadConfig(): FlitterbotConfig {
     shortcuts: config.shortcuts,
     defaultAgentFirstMessage: config.defaultAgentFirstMessage,
     newStreamFirstMessageFooter: config.newStreamFirstMessageFooter,
-    tmux2Enabled: config.tmux2Enabled,
+    tmuxEnabled: config.tmuxEnabled,
     extraSkillPaths: config.extraSkillPaths,
   };
 
