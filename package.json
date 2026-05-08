@@ -57,8 +57,7 @@
     ],
     "ignore": [
       "src/**/*.test.ts",
-      "src/**/index.ts",
-      "src/tasks/**"
+      "src/**/index.ts"
     ]
   }
 }

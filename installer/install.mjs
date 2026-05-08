@@ -273,12 +273,11 @@ function resolvePackagedSrcFile(rel) {
   return null;
 }
 
-function resolvePackagedResourcesDir(rel) {
+function resolvePackagedRepoDir(rel) {
   const candidates = [
-    PROJECT_ROOT && join(PROJECT_ROOT, "resources", rel),
-    join(FLITTERBOT_DIR, "resources", rel),
-    join(SCRIPT_DIR, "resources", rel),
-    join(SCRIPT_DIR, "..", "resources", rel),
+    PROJECT_ROOT && join(PROJECT_ROOT, rel),
+    join(SCRIPT_DIR, "..", rel),
+    join(SCRIPT_DIR, rel),
   ].filter(Boolean);
   for (const c of candidates) if (existsSync(c)) return c;
   return null;
@@ -841,7 +840,7 @@ async function deployRuntimeFiles() {
     noteRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file));
   }
 
-  const skillsSrcDir = resolvePackagedResourcesDir(BUNDLED_SKILLS_DIR);
+  const skillsSrcDir = resolvePackagedRepoDir(BUNDLED_SKILLS_DIR);
   const bundledSkillFiles = skillsSrcDir ? walkFiles(skillsSrcDir) : [];
   for (const file of bundledSkillFiles) {
     noteRuntimeFile(join(skillsSrcDir, file), join(FLITTERBOT_DIR, "skills", file));
