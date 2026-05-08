@@ -517,13 +517,32 @@ async function bootstrapConfig() {
     }
   }
 
-  // Note: `piModel` has been removed (clean cutover to `models[]` + `defaultModel`
-  // managed by src/config/load-config.ts). The installer only seeds scalar
-  // runtime defaults here; the server owns model-list defaults on first boot.
+  const DEFAULT_MODELS = [
+    {
+      id: "claude-opus-4-7",
+      label: "Claude Opus 4.7",
+      provider: "anthropic",
+      modelId: "claude-opus-4-7",
+    },
+    {
+      id: "gpt-5.5",
+      label: "GPT 5.5",
+      provider: "openai-codex",
+      modelId: "gpt-5.5",
+    },
+  ];
+  const DEFAULT_AGENT_FIRST_MESSAGE =
+    "/skill:tasks /skill:notes\n\nUse notes/tasks operations. Run ls on the project repositories directory.";
+  const DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER =
+    "IMPORTANT! Before doing  anything else load the /skill:tmux pls";
+
   const STATIC_DEFAULTS = {
     controlSurfaceHost: "127.0.0.1",
     controlSurfacePort: 18820,
+    models: DEFAULT_MODELS,
+    defaultModel: DEFAULT_MODELS[0].id,
     defaultThinkingLevel: "high",
+    piTransport: "websocket-cached",
     stallMinutes: 15,
     toolTimeoutMinutes: 4,
     blackboardPath: "~/.flitterbot/blackboard.db",
@@ -535,8 +554,9 @@ async function bootstrapConfig() {
     whatsappEnabled: true,
     wipeStreamsOnStart: false,
     claudeCliCommand: "claude --dangerously-skip-permissions",
-    defaultAgentFirstMessage: "/skill:flitterbot-tasks /skill:flitterbot-notes\n\nUse Flitterbot's bundled local tasks and notes workflows. Run ls on the project repositories directory.",
-    newStreamFirstMessageFooter: "Before doing anything else, load /skill:flitterbot-workstream.",
+    projectsDir: "~/development",
+    defaultAgentFirstMessage: DEFAULT_AGENT_FIRST_MESSAGE,
+    newStreamFirstMessageFooter: DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER,
     tmuxEnabled: false,
     extraSkillPaths: [],
   };
@@ -544,12 +564,6 @@ async function bootstrapConfig() {
   // Defaults fill when a key is absent or null so config.json visibly records
   // the values Flitterbot will use. Explicit "" / 0 / false are preserved.
   const configAfter = { ...configBefore };
-  if (configAfter.tmuxEnabled == null && configBefore.tmux2Enabled === true) {
-    configAfter.tmuxEnabled = true;
-  }
-  delete configAfter.tmux2Enabled;
-  delete configAfter.piThinkingLevel;
-  delete configAfter.defaultAgentBootstrapPrompt;
   const setDefault = (key, value) => {
     if (configAfter[key] == null) configAfter[key] = value;
   };
@@ -561,13 +575,6 @@ async function bootstrapConfig() {
   setDefault("projectRoot", projectRoot);
   setDefault("sourceRoot", configAfter.projectRoot ?? projectRoot);
   setDefault("controlSurfaceCommand", commandHint);
-
-  if (configAfter.projectsDir == null) {
-    const entered = await promptString(
-      "Projects directory (absolute path where your repos live, e.g. ~/Documents/coded-programs): ",
-    );
-    if (entered) configAfter.projectsDir = entered;
-  }
 
   if (canonicalJson(configBefore) !== canonicalJson(configAfter)) {
     info("=== Runtime config changes ===");
@@ -626,8 +633,8 @@ function reportConfigOverrides(config, defaults) {
 async function syncWebEnv(config) {
   if (!PROJECT_ROOT) return;
   const webEnvPath = join(PROJECT_ROOT, "web", ".env");
-  const baseUrl = `http://${config.controlSurfaceHost || "127.0.0.1"}:${config.controlSurfacePort || 18820}`;
-  const token = config.controlSurfaceToken || "";
+  const baseUrl = `http://${config.controlSurfaceHost}:${config.controlSurfacePort}`;
+  const token = config.controlSurfaceToken;
   const desired = `VITE_FLITTERBOT_BASE_URL=${baseUrl}\nVITE_FLITTERBOT_TOKEN=${token}\n`;
 
   const beforeHash = existsSync(webEnvPath) ? sha256File(webEnvPath) : "";

@@ -1,13 +1,13 @@
 ---
-name: flitterbot-notes
-description: Read and maintain local Flitterbot notes stored under ~/.flitterbot/notes
+name: notes
+description: Read and maintain local notes stored under ~/.flitterbot/notes
 argument-hint: "[note request]"
 disable-model-invocation: false
 ---
 
-# Flitterbot Notes
+# Notes
 
-Use Flitterbot's local notes folder as the default durable memory for user-authored notes and reusable context.
+Use the local notes folder as the default durable memory for user-authored notes and reusable context.
 
 ## Location
 

@@ -13,17 +13,15 @@ import {
  *
  * All other fields of `config.json` are preserved verbatim (including any
  * unknown keys the user added by hand) — we read → patch → write, nothing
- * else. Pretty-printed with 2-space indent + trailing newline to match the
- * shape `loadConfig` emits.
+ * else. Pretty-printed with 2-space indent + trailing newline.
  */
 export function persistModelsToConfigFile(update: {
   models: ModelConfigEntry[];
   defaultModel?: string;
   defaultThinkingLevel?: ThinkingLevel;
 }): void {
-  const existing = readConfigFileOrEmpty();
-  const { piThinkingLevel: _legacyPiThinkingLevel, ...existingWithoutLegacy } = existing;
-  const next: Record<string, unknown> = { ...existingWithoutLegacy, models: update.models };
+  const existing = readConfigFile();
+  const next: Record<string, unknown> = { ...existing, models: update.models };
   if (update.defaultModel !== undefined) {
     next.defaultModel = update.defaultModel;
   }
@@ -33,15 +31,17 @@ export function persistModelsToConfigFile(update: {
   atomicWriteJson(FLITTERBOT_CONFIG_PATH, next);
 }
 
-function readConfigFileOrEmpty(): Record<string, unknown> {
-  if (!fs.existsSync(FLITTERBOT_CONFIG_PATH)) return {};
+function readConfigFile(): Record<string, unknown> {
+  if (!fs.existsSync(FLITTERBOT_CONFIG_PATH)) {
+    throw new Error(`Missing config file: ${FLITTERBOT_CONFIG_PATH}. Run installer first.`);
+  }
   const raw = fs.readFileSync(FLITTERBOT_CONFIG_PATH, "utf8").trim();
-  if (!raw) return {};
+  if (!raw) throw new Error(`Empty config file: ${FLITTERBOT_CONFIG_PATH}. Run installer first.`);
   const parsed = JSON.parse(raw) as unknown;
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     return parsed as Record<string, unknown>;
   }
-  return {};
+  throw new Error(`Invalid config file: ${FLITTERBOT_CONFIG_PATH} must contain a JSON object.`);
 }
 
 function atomicWriteJson(targetPath: string, data: unknown): void {

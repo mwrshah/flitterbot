@@ -8,14 +8,12 @@ describe("formatStreamPrompt", () => {
       "router-fix",
       "stream-1",
       "Use existing tests",
-      "Before doing anything else, load /skill:flitterbot-workstream.",
+      "Run the configured stream setup.",
     );
 
     expect(prompt).toContain("Fix the router");
     expect(prompt).toContain("--- Agent context ---\nUse existing tests");
-    expect(prompt).toContain(
-      "--- Flitterbot stream setup ---\nBefore doing anything else, load /skill:flitterbot-workstream.",
-    );
+    expect(prompt).toContain("--- Flitterbot stream setup ---\nRun the configured stream setup.");
     expect(prompt).toMatch(/\[Now: .+\]$/);
   });
 
@@ -25,11 +23,11 @@ describe("formatStreamPrompt", () => {
       "router-fix",
       "stream-1",
       undefined,
-      "Load /skill:flitterbot-workstream.",
+      "Run the configured stream setup.",
     );
 
     expect(prompt).toContain("--- User message (1/2) ---\nFirst");
     expect(prompt).toContain("--- User message (2/2, most recent) ---\nSecond");
-    expect(prompt).toContain("--- Flitterbot stream setup ---\nLoad /skill:flitterbot-workstream.");
+    expect(prompt).toContain("--- Flitterbot stream setup ---\nRun the configured stream setup.");
   });
 });

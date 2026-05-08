@@ -1,13 +1,13 @@
 ---
-name: flitterbot-tasks
-description: Use Flitterbot's bundled task script to read and mutate local tasks
+name: tasks
+description: Use the bundled task script to read and mutate local tasks
 argument-hint: "[task request]"
 disable-model-invocation: false
 ---
 
-# Flitterbot Tasks
+# Tasks
 
-Use Flitterbot's bundled task script for all task reads and mutations. Treat task storage as an implementation detail owned by the script.
+Use the bundled task script for all task reads and mutations. Treat task storage as an implementation detail owned by the script.
 
 ## Supporting Files
 
