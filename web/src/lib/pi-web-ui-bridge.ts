@@ -2,14 +2,14 @@
  * Bridge between the ChatPanel timeline model and the pi-web-ui Lit
  * components that expect AgentMessage[] format.
  */
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   AssistantMessage,
   ImageContent,
   TextContent,
   ThinkingContent,
   ToolCall,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,

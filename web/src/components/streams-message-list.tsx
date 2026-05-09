@@ -8,8 +8,8 @@
  * can push streaming deltas directly to the Lit component without React renders.
  */
 
-import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
-import type { AssistantMessage } from "@mariozechner/pi-ai";
+import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { memo, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { AgentSessionRuntime } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,

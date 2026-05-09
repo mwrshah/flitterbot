@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getModel } from "@mariozechner/pi-ai";
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import { getModel } from "@earendil-works/pi-ai";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
@@ -11,7 +11,7 @@ import {
   createAgentSessionServices,
   SessionManager,
   SettingsManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
 import { resolveModelEntry } from "../config/models.ts";
 import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";

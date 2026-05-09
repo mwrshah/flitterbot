@@ -38,8 +38,8 @@
   },
   "dependencies": {
     "@ff-labs/fff-node": "^0.7.0",
-    "@mariozechner/pi-ai": "latest",
-    "@mariozechner/pi-coding-agent": "latest",
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
     "@whiskeysockets/baileys": "7.0.0-rc.9",
     "dotenv": "^17.4.2",
     "openai": "latest",
