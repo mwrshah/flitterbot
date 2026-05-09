@@ -12,7 +12,7 @@ const MODES: Record<string, string> = {
     ORDER BY s.last_event_at DESC`,
 
   open_streams: `
-    SELECT id, name, repo_path, worktree_path, status, created_at
+    SELECT id, name, repo_path, worktree_path, base_branch, status, created_at
     FROM streams
     WHERE status = 'open'
     ORDER BY created_at DESC`,

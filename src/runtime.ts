@@ -1744,7 +1744,7 @@ export class ControlSurfaceRuntime {
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
-          "Create an isolated git worktree for a stream. Sets up a new branch and records repo_path + worktree_path on the stream. base_ref defaults to the orchestrator's own current branch (resolved from pi_sessions.cwd via `git rev-parse --abbrev-ref HEAD`) — NOT hardcoded to origin/main. Pass base_ref explicitly to override (e.g. 'main', 'develop'). SHAs/tags not accepted. Branch name auto-generates as NNN-<stream-slug> when omitted. Typically one worktree per stream. ALWAYS pass the main repo root as `repo_path` — never a worktree path (the tool resolves sibling directories via path.resolve(repoPath, '..', ...)). If your own cwd is itself a worktree, resolve the main repo first with `git worktree list --porcelain | head -1 | sed 's/^worktree //'`.",
+          "Create an isolated git worktree for a stream. Sets up a new branch and records repo_path + worktree_path + base_branch on the stream. base_ref defaults to the orchestrator's own current branch (resolved from pi_sessions.cwd via `git rev-parse --abbrev-ref HEAD`) — NOT hardcoded to origin/main. Pass base_ref explicitly to override (e.g. 'main', 'develop'). SHAs/tags not accepted. Branch name auto-generates as NNN-<stream-slug> when omitted. Typically one worktree per stream. ALWAYS pass the main repo root as `repo_path` — never a worktree path (the tool resolves sibling directories via path.resolve(repoPath, '..', ...)). If your own cwd is itself a worktree, resolve the main repo first with `git worktree list --porcelain | head -1 | sed 's/^worktree //'`.",
 
         parameters: {
           type: "object",

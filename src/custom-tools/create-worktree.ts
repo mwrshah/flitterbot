@@ -311,35 +311,6 @@ export async function executeCreateWorktree(
     resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
   }
 
-  // Check if branch already has a worktree
-  try {
-    const worktrees = await exec("git worktree list --porcelain", repoPath, 10_000);
-    if (worktrees.includes(`branch refs/heads/${resolvedBranch}`)) {
-      // Already checked out — find the path
-      const lines = worktrees.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i] === `branch refs/heads/${resolvedBranch}`) {
-          // worktree path is a few lines before (the "worktree <path>" line)
-          for (let j = i; j >= 0; j--) {
-            if (lines[j]!.startsWith("worktree ")) {
-              const existingPath = lines[j]!.slice("worktree ".length);
-              enrichStream(blackboard, streamId, repoPath, existingPath);
-              return {
-                ok: true,
-                streamId,
-                worktreePath: existingPath,
-                branchName: resolvedBranch,
-                message: `${cleanupMessage}Worktree already exists at ${existingPath} on branch ${resolvedBranch}`,
-              };
-            }
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore — proceed to create
-  }
-
   // Validate baseRef is a real branch (not a SHA, tag, or nonexistent ref)
   const SHA_RE = /^[0-9a-f]{7,40}$/i;
   if (SHA_RE.test(resolvedBaseRef)) {
@@ -371,10 +342,39 @@ export async function executeCreateWorktree(
     };
   }
 
+  const normalizedBase = resolvedBaseRef.replace(/^origin\//, "");
+
+  // Check if branch already has a worktree
+  try {
+    const worktrees = await exec("git worktree list --porcelain", repoPath, 10_000);
+    if (worktrees.includes(`branch refs/heads/${resolvedBranch}`)) {
+      // Already checked out — find the path
+      const lines = worktrees.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i] === `branch refs/heads/${resolvedBranch}`) {
+          // worktree path is a few lines before (the "worktree <path>" line)
+          for (let j = i; j >= 0; j--) {
+            if (lines[j]!.startsWith("worktree ")) {
+              const existingPath = lines[j]!.slice("worktree ".length);
+              enrichStream(blackboard, streamId, repoPath, existingPath, normalizedBase);
+              return {
+                ok: true,
+                streamId,
+                worktreePath: existingPath,
+                branchName: resolvedBranch,
+                message: `${cleanupMessage}Worktree already exists at ${existingPath} on branch ${resolvedBranch}. Base branch recorded as ${normalizedBase}`,
+              };
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore — proceed to create
+  }
+
   try {
     const result = await createWorktree(repoPath, resolvedBranch, resolvedBaseRef);
-
-    const normalizedBase = resolvedBaseRef.replace(/^origin\//, "");
 
     // Ensure local tracking branch exists so close-stream can `git checkout <base>`
     if (normalizedBase !== "main") {
