@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
+import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type {
   AssistantMessage as AssistantMessageType,
   ImageContent,
@@ -7,7 +7,7 @@ import type {
   ToolResultMessage as ToolResultMessageType,
   Usage,
   UserMessage as UserMessageType,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";

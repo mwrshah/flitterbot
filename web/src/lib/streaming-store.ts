@@ -11,7 +11,7 @@
  * subsequent deltas, and cleared on message_end / turn_end.
  */
 
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { streamingPerf } from "./streaming-perf";
 
 /* ── Types ── */

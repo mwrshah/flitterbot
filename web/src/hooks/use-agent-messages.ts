@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { useMemo } from "react";
 import { timelineToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import type { ChatTimelineItem } from "~/lib/types";

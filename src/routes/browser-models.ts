@@ -1,5 +1,10 @@
 import type http from "node:http";
-import { getModel, getModels, getProviders, getSupportedThinkingLevels } from "@mariozechner/pi-ai";
+import {
+  getModel,
+  getModels,
+  getProviders,
+  getSupportedThinkingLevels,
+} from "@earendil-works/pi-ai";
 import { isThinkingLevel, type ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
