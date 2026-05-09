@@ -18,14 +18,12 @@ export const Route = createFileRoute("/streams/default")({
   staticData: {
     wsMode: "streams-default",
   },
-  head: () => ({
-    meta: [{ title: "Flitterbot" }],
-  }),
   loader: async ({ context }) => {
-    const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+    const [status, items] = await Promise.all([
+      context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
+      fetchStreamsHistory({ data: {} }),
+    ]);
     const defaultPiSessionId = status.piAgent?.default?.piSessionId;
-
-    const items = await fetchStreamsHistory({ data: {} });
     const history = items as ChatTimelineItem[];
 
     // Seed the Query cache under the real piSessionId when available.
@@ -44,6 +42,9 @@ export const Route = createFileRoute("/streams/default")({
 
     return { history };
   },
+  head: () => ({
+    meta: [{ title: "Flitterbot" }],
+  }),
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
       <p>Failed to load history: {String(error)}</p>
@@ -94,6 +95,7 @@ function StreamsDefaultRoute() {
       <ResizeHandle />
       <Panel id="downstream" defaultSize="50%" minSize="20%">
         <DownstreamSessionsPanel
+          key={effectivePiSessionId}
           piSessionId={effectivePiSessionId}
           piSessionStatus={defaultStream?.piSessionStatus}
         />

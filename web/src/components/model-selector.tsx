@@ -110,6 +110,7 @@ export const ModelSelector = memo(function ModelSelector({
       // the cache keeps the server invariant: pinned catalog entries are absent
       // from `all` instead of being deduped again in the render path.
       updateModelsCache(queryClient, result);
+      queryClient.invalidateQueries({ queryKey: MODELS_QUERY_KEY });
       toast.success(vars.pin ? "Pinned to config" : "Unpinned");
     },
     onError: (error) => {
@@ -196,6 +197,11 @@ export const ModelSelector = memo(function ModelSelector({
     });
   }, []);
 
+  const updatePopoverPositionRef = useRef(updatePopoverPosition);
+  useEffect(() => {
+    updatePopoverPositionRef.current = updatePopoverPosition;
+  }, [updatePopoverPosition]);
+
   useLayoutEffect(() => {
     if (!open) return;
     updatePopoverPosition();
@@ -203,6 +209,7 @@ export const ModelSelector = memo(function ModelSelector({
 
   useEffect(() => {
     if (!open) return;
+    const handleUpdatePopoverPosition = () => updatePopoverPositionRef.current();
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
@@ -211,17 +218,17 @@ export const ModelSelector = memo(function ModelSelector({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
-    window.addEventListener("resize", updatePopoverPosition);
-    window.addEventListener("scroll", updatePopoverPosition, true);
+    window.addEventListener("resize", handleUpdatePopoverPosition);
+    window.addEventListener("scroll", handleUpdatePopoverPosition, true);
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("resize", updatePopoverPosition);
-      window.removeEventListener("scroll", updatePopoverPosition, true);
+      window.removeEventListener("resize", handleUpdatePopoverPosition);
+      window.removeEventListener("scroll", handleUpdatePopoverPosition, true);
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, updatePopoverPosition]);
+  }, [open]);
 
   if (pinned.length === 0 && all.length === 0) {
     return null;
@@ -251,7 +258,7 @@ export const ModelSelector = memo(function ModelSelector({
         }
       >
         <span className={cn("truncate max-w-[180px]", compact && "sr-only")}>{triggerLabel}</span>
-        <ChevronDownIcon className="h-3 w-3 shrink-0" />
+        <ChevronDownIcon className="size-3 shrink-0" />
       </Button>
       {open &&
         createPortal(
@@ -260,11 +267,11 @@ export const ModelSelector = memo(function ModelSelector({
               loop
               className="h-full rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
             >
-              <CommandInput placeholder="Search models…" autoFocus />
+              <CommandInput placeholder="Search models…" />
               <CommandList className="max-h-none flex-1">
                 <CommandEmpty>No models match.</CommandEmpty>
                 <CommandGroup heading="Thinking level">
-                  <div className="flex flex-wrap gap-1 px-1 py-1">
+                  <div className="flex flex-wrap gap-1 p-1">
                     {THINKING_LEVELS.map((level) => {
                       const levelAvailable = availableThinkingLevels.includes(level);
                       return (

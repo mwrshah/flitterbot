@@ -4,7 +4,6 @@ import {
   type RefObject,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -58,26 +57,6 @@ export const SkillPicker = memo(function SkillPicker({
   const pickerRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  // Reset selection to first item and scroll list to top whenever the picker
-  // opens or the filtered set changes. Including `open` is required so that
-  // reopening the picker (which leaves this component mounted but rebuilds the
-  // DOM) re-syncs selection to the top of the fresh list.
-  useEffect(() => {
-    if (!open) return;
-    setSelectedValue(filtered[0]?.name ?? "");
-    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
-    if (list) list.scrollTop = 0;
-  }, [open, filtered]);
-
-  // Keep the selected item in view as the user keyboard-navigates.
-  useEffect(() => {
-    if (!selectedValue) return;
-    requestAnimationFrame(() => {
-      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
-      el?.scrollIntoView({ block: "nearest" });
-    });
-  }, [selectedValue]);
-
   const updatePosition = useCallback(() => {
     const anchor = anchorRef.current;
     const picker = pickerRef.current;
@@ -89,9 +68,26 @@ export const SkillPicker = memo(function SkillPicker({
     setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, [anchorRef, caretLeft]);
 
-  useLayoutEffect(() => {
-    if (open) updatePosition();
-  }, [open, updatePosition, filter]);
+  // Reset selection to first item and scroll list to top whenever the picker
+  // opens or the filtered set changes. Including `open` is required so that
+  // reopening the picker (which leaves this component mounted but rebuilds the
+  // DOM) re-syncs selection to the top of the fresh list.
+  useEffect(() => {
+    if (!open) return;
+    setSelectedValue(filtered[0]?.name ?? "");
+    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
+    if (list) list.scrollTop = 0;
+    requestAnimationFrame(updatePosition);
+  }, [open, filtered, updatePosition]);
+
+  // Keep the selected item in view as the user keyboard-navigates.
+  useEffect(() => {
+    if (!selectedValue) return;
+    requestAnimationFrame(() => {
+      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
+      el?.scrollIntoView({ block: "nearest" });
+    });
+  }, [selectedValue]);
 
   if (!open || skills.length === 0) return null;
 

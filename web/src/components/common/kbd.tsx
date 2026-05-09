@@ -19,7 +19,7 @@ type KbdProps = HTMLAttributes<HTMLElement> & {
   tone?: KbdTone;
 };
 
-export function Kbd({ className, size = "default", tone = "default", ...props }: KbdProps) {
+function Kbd({ className, size = "default", tone = "default", ...props }: KbdProps) {
   return (
     <kbd
       className={cn(
@@ -33,7 +33,7 @@ export function Kbd({ className, size = "default", tone = "default", ...props }:
   );
 }
 
-export function KbdGroup({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
+function KbdGroup({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cn("inline-flex items-center gap-0.5 whitespace-nowrap align-middle", className)}
@@ -55,15 +55,16 @@ export function ShortcutHint({
   kbdSize?: KbdSize;
   kbdTone?: KbdTone;
 }) {
-  const steps = label
-    .split(/\s+then\s+/i)
-    .map((step) => step.trim())
-    .filter(Boolean);
+  const steps: string[] = [];
+  for (const step of label.split(/\s+then\s+/i)) {
+    const trimmed = step.trim();
+    if (trimmed) steps.push(trimmed);
+  }
 
   return (
     <span className={cn("inline-flex items-center gap-1 whitespace-nowrap", className)} {...props}>
       {steps.map((step, index) => (
-        <span key={`${step}:${index}`} className="inline-flex items-center gap-1">
+        <span key={step} className="inline-flex items-center gap-1">
           {index > 0 && <span className="text-[10px] text-muted-foreground/45">then</span>}
           <KbdGroup>
             {step.split("+").map((key) => (

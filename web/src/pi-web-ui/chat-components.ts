@@ -33,8 +33,8 @@ import {
   Search,
   SquareTerminal,
 } from "lucide";
-import { marked } from "marked";
 import type { ActiveToolState } from "~/lib/active-tool-store";
+import { renderSafeMarkdownHtml } from "~/lib/markdown-html";
 import { streamingPerf } from "~/lib/streaming-perf";
 
 hljs.registerLanguage("javascript", javascript);
@@ -83,7 +83,7 @@ function formatUsage(usage?: Usage): string {
 }
 
 function iconSvg(iconNode: unknown, size: "sm" | "md" = "md", className = ""): string {
-  const classes = size === "sm" ? "w-4 h-4" : "w-5 h-5";
+  const classes = size === "sm" ? "size-4" : "size-5";
   const el = createElement(iconNode as Parameters<typeof createElement>[0], {
     class: `${classes}${className ? ` ${className}` : ""}`,
   });
@@ -319,16 +319,7 @@ export class MarkdownBlock extends LitElement {
   override render() {
     if (!this.content) return html``;
 
-    const renderer = new marked.Renderer();
-    const originalLink = renderer.link;
-    renderer.link = function (...args: Parameters<typeof originalLink>) {
-      const link = originalLink.apply(this, args);
-      return link.replace("<a ", '<a target="_blank" rel="noopener noreferrer" ');
-    };
-
-    const parsed = marked.parse(this.content, { async: false, renderer }) as string;
-
-    const withCodeBlocks = parsed
+    const withCodeBlocks = renderSafeMarkdownHtml(this.content)
       .replace(
         /<pre><code class="language-([^"]+)">([\s\S]+?)<\/code><\/pre>/g,
         (_m, language, code) => {
@@ -548,15 +539,11 @@ function renderDefaultTool(
       ? i18n("Tool failed")
       : i18n("Tool Call")
     : isStreaming
-      ? i18n("Preparing tool...")
+      ? i18n("Preparing tool…")
       : i18n("Tool Call");
 
   const prettyParams = prettyValue(params);
-  const textOutput =
-    result?.content
-      ?.filter((content) => content.type === "text")
-      .map((content) => content.text)
-      .join("\n") || i18n("(no output)");
+  const textOutput = resultText(result) || i18n("(no output)");
   const prettyOutput = prettyValue(textOutput);
 
   return html`
@@ -595,17 +582,13 @@ function renderBashTool(
       ? String((params as Record<string, unknown>).command ?? "")
       : "";
 
-  const output =
-    result?.content
-      ?.filter((content) => content.type === "text")
-      .map((content) => content.text)
-      .join("\n") || "";
+  const output = resultText(result);
 
   const combined = command ? `> ${command}${output ? `\n\n${output}` : ""}` : output;
 
   return html`
     <div class="space-y-3">
-      ${renderToolHeader(SquareTerminal, command ? i18n("Running command...") : i18n("Waiting for command..."))}
+      ${renderToolHeader(SquareTerminal, command ? i18n("Running command…") : i18n("Waiting for command…"))}
       <console-block .content=${combined} .variant=${result?.isError ? "error" : "default"}></console-block>
     </div>
   `;
@@ -616,12 +599,11 @@ function paramRecord(params: unknown): Record<string, unknown> {
 }
 
 function resultText(result: ToolResultMessageType | undefined): string {
-  return (
-    result?.content
-      ?.filter((c) => c.type === "text")
-      .map((c) => c.text)
-      .join("\n") || ""
-  );
+  const parts: string[] = [];
+  for (const content of result?.content ?? []) {
+    if (content.type === "text") parts.push(content.text);
+  }
+  return parts.join("\n");
 }
 
 function toolPathParam(params: Record<string, unknown>): string {
@@ -1129,12 +1111,7 @@ export class ToolMessageDebugView extends LitElement {
 
   override render() {
     const call = prettyValue(this.callArgs);
-    const output = prettyValue(
-      this.result?.content
-        ?.filter((content) => content.type === "text")
-        .map((content) => content.text)
-        .join("\n") || "",
-    );
+    const output = prettyValue(resultText(this.result));
 
     return html`
       <div class="mt-3 flex flex-col gap-2">
@@ -1248,6 +1225,7 @@ export class AssistantMessage extends LitElement {
     if (!this.message?.content) return nothing;
 
     const orderedParts: TemplateResult[] = [];
+    const toolsByName = new Map((this.tools ?? []).map((tool) => [tool.name, tool]));
 
     for (const chunk of this.message.content) {
       if (chunk.type === "text" && chunk.text.trim() !== "") {
@@ -1257,7 +1235,7 @@ export class AssistantMessage extends LitElement {
           html`<thinking-block .content=${chunk.thinking} .isStreaming=${this.isStreaming}></thinking-block>`,
         );
       } else if (chunk.type === "toolCall" && !this.hideToolCalls) {
-        const tool = this.tools?.find((candidate) => candidate.name === chunk.name);
+        const tool = toolsByName.get(chunk.name);
         const pending = this.pendingToolCalls?.has(chunk.id) ?? false;
         const result = this.toolResultsById?.get(chunk.id);
         const aborted = this.message.stopReason === "aborted" && !result;
@@ -1645,13 +1623,11 @@ export class MessageList extends LitElement {
 
   /** Extract plain text from an assistant message's content chunks. */
   private static getAssistantPlainText(msg: AssistantMessageType): string {
-    return (msg.content || [])
-      .filter(
-        (chunk): chunk is { type: "text"; text: string } =>
-          chunk.type === "text" && chunk.text.trim() !== "",
-      )
-      .map((chunk) => chunk.text)
-      .join("\n");
+    const parts: string[] = [];
+    for (const chunk of msg.content || []) {
+      if (chunk.type === "text" && chunk.text.trim() !== "") parts.push(chunk.text);
+    }
+    return parts.join("\n");
   }
 
   /** Walk backwards from the given message to collect all assistant text in this turn. */

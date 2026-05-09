@@ -17,9 +17,6 @@ export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
     wsMode: "pi-session",
   },
-  head: () => ({
-    meta: [{ title: "Flitterbot" }],
-  }),
   loader: async ({ params, context }) => {
     // Seed from cache when available so route transitions stay instant.
     // The component query revalidates in the background on mount, giving us
@@ -42,6 +39,9 @@ export const Route = createFileRoute("/streams/$piSessionId")({
 
     return { history };
   },
+  head: () => ({
+    meta: [{ title: "Flitterbot" }],
+  }),
   errorComponent: ({ error }) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
       <p>Failed to load session history: {String(error)}</p>
@@ -105,6 +105,7 @@ function PiSessionRoute() {
       <ResizeHandle />
       <Panel id="downstream" defaultSize="50%" minSize="20%">
         <DownstreamSessionsPanel
+          key={piSessionId}
           piSessionId={piSessionId}
           piSessionStatus={stream?.piSessionStatus}
         />

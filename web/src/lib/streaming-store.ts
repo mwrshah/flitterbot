@@ -16,8 +16,8 @@ import { streamingPerf } from "./streaming-perf";
 
 /* ── Types ── */
 
-export type StreamingText = { text: string; messageId: string };
-export type StreamingThinking = { text: string; messageId: string };
+type StreamingText = { text: string; messageId: string };
+type StreamingThinking = { text: string; messageId: string };
 
 /* ── Per-session streaming callbacks (for imperative Lit component updates) ── */
 

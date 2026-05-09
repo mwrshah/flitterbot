@@ -54,9 +54,11 @@ function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null):
   if (a.piSessionId !== b.piSessionId) return false;
   if (a.eventTypes === undefined || b.eventTypes === undefined)
     return a.eventTypes === b.eventTypes;
-  if (a.eventTypes.length !== b.eventTypes.length) return false;
   const bEventTypes = b.eventTypes;
-  return a.eventTypes.every((eventType, index) => eventType === bEventTypes[index]);
+  return (
+    a.eventTypes.length === bEventTypes.length &&
+    a.eventTypes.every((eventType, index) => eventType === bEventTypes[index])
+  );
 }
 
 export function setupWsRouteSubscriptions(

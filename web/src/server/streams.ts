@@ -26,10 +26,10 @@ async function streamsRequest(path: string): Promise<unknown> {
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
   .handler(async ({ data }): Promise<ChatTimelineItem[]> => {
-    const params = new URLSearchParams();
-    if (data.piSessionId) params.set("piSessionId", data.piSessionId);
-    if (data.surface) params.set("surface", data.surface);
-    const qs = params.toString();
+    const qs = new URLSearchParams([
+      ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
+      ...(data.surface ? [["surface", data.surface] as [string, string]] : []),
+    ]).toString();
     const path = qs ? `/api/streams/history?${qs}` : "/api/streams/history";
     try {
       const res = (await streamsRequest(path)) as { items: ChatTimelineItem[] };

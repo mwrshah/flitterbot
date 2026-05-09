@@ -3,8 +3,8 @@ import type { ShortcutBindingsConfig } from "./types";
 
 let focusComposer: (() => void) | null = null;
 
-export type ShortcutAvailability = "always" | "no-input-focus";
-export type ShortcutHandlerResult = boolean | undefined;
+type ShortcutAvailability = "always" | "no-input-focus";
+type ShortcutHandlerResult = boolean | undefined;
 export type ShortcutHandler = (event: KeyboardEvent) => ShortcutHandlerResult;
 
 type ShortcutModifier = "alt" | "ctrl" | "meta" | "shift";
@@ -51,6 +51,15 @@ type BindingMatch = {
   binding: ParsedShortcutBinding;
   priority: number;
 };
+
+function nonEmptyParts(parts: string[]): string[] {
+  const result: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed) result.push(trimmed);
+  }
+  return result;
+}
 
 const DEFAULT_SEQUENCE_TIMEOUT_MS = 500;
 const STREAM_SLOT_DIGIT_CODES = [
@@ -142,7 +151,7 @@ export const SHORTCUT_ACTIONS = {
 } as const;
 
 /** Returns true when the active element is an input, textarea, contenteditable, or role=textbox. */
-export function isInputFocused(): boolean {
+function isInputFocused(): boolean {
   const el = document.activeElement;
   if (!el) return false;
   const tag = el.tagName;
@@ -172,7 +181,7 @@ export function getActiveScrollContainerSelector(): string {
   return `[data-scroll-container="${activeScrollTarget}"]`;
 }
 
-export function defineShortcutAction(actionId: string, definition: ShortcutDefinition) {
+function defineShortcutAction(actionId: string, definition: ShortcutDefinition) {
   definitions.set(actionId, {
     defaultBindings: [...definition.defaultBindings],
   });
@@ -194,7 +203,7 @@ export function setShortcutBindingOverrides(next: ShortcutBindingsConfig | null 
   for (const listener of bindingListeners) listener();
 }
 
-export function registerShortcutHandler(
+function registerShortcutHandler(
   actionId: string,
   handler: ShortcutHandler,
   options: { priority?: number } = {},
@@ -307,7 +316,7 @@ export function handleRegisteredShortcutKeyDown(event: KeyboardEvent) {
   return false;
 }
 
-export function getShortcutBindingLabel(
+function getShortcutBindingLabel(
   actionId: string,
   options: { compact?: boolean; altLabel?: string } = {},
 ) {
@@ -362,9 +371,8 @@ function getActiveBindings(inputFocused: boolean): BindingMatch[] {
 }
 
 function dispatchShortcutAction(actionId: string, event: KeyboardEvent) {
-  const entries = [...(handlerEntries.get(actionId) ?? [])].sort(
-    (a, b) => b.priority - a.priority || b.order - a.order,
-  );
+  const entries = [...(handlerEntries.get(actionId) ?? [])];
+  entries.sort((a, b) => b.priority - a.priority || b.order - a.order);
 
   for (const entry of entries) {
     try {
@@ -381,12 +389,20 @@ function dispatchShortcutAction(actionId: string, event: KeyboardEvent) {
 }
 
 function pickBestBindingMatch(matches: BindingMatch[]) {
-  return [...matches].sort(
-    (a, b) =>
-      b.priority - a.priority ||
-      b.binding.steps.length - a.binding.steps.length ||
-      b.binding.spec.length - a.binding.spec.length,
-  )[0];
+  let best = matches[0];
+  for (const match of matches.slice(1)) {
+    if (
+      !best ||
+      match.priority > best.priority ||
+      (match.priority === best.priority &&
+        (match.binding.steps.length > best.binding.steps.length ||
+          (match.binding.steps.length === best.binding.steps.length &&
+            match.binding.spec.length > best.binding.spec.length)))
+    ) {
+      best = match;
+    }
+  }
+  return best;
 }
 
 function inferBindingAvailability(spec: string): ShortcutAvailability {
@@ -428,7 +444,11 @@ function getParsedBindings(actionId: string): ParsedShortcutBinding[] {
 
 function normalizeBindingSpecs(value: string | string[] | undefined) {
   if (!value) return null;
-  const specs = (Array.isArray(value) ? value : [value]).map((spec) => spec.trim()).filter(Boolean);
+  const specs: string[] = [];
+  for (const spec of Array.isArray(value) ? value : [value]) {
+    const trimmed = spec.trim();
+    if (trimmed) specs.push(trimmed);
+  }
   return specs.length > 0 ? specs : null;
 }
 
@@ -436,9 +456,12 @@ function parseShortcutBindings(
   actionId: string,
   specs: readonly ShortcutBindingSpec[],
 ): ParsedShortcutBinding[] {
-  return specs
-    .map((bindingSpec, index) => parseShortcutBinding(actionId, bindingSpec, index))
-    .filter((binding): binding is ParsedShortcutBinding => binding !== null);
+  const bindings: ParsedShortcutBinding[] = [];
+  for (const [index, bindingSpec] of specs.entries()) {
+    const binding = parseShortcutBinding(actionId, bindingSpec, index);
+    if (binding) bindings.push(binding);
+  }
+  return bindings;
 }
 
 function parseShortcutBinding(
@@ -448,11 +471,13 @@ function parseShortcutBinding(
 ): ParsedShortcutBinding | null {
   const normalizedSpec = bindingSpec.spec.trim();
   if (!normalizedSpec) return null;
-  const stepTokens = normalizedSpec.split(/\s+/).filter(Boolean);
+  const stepTokens = nonEmptyParts(normalizedSpec.split(/\s+/));
   if (stepTokens.length === 0) return null;
-  const steps = stepTokens
-    .map(parseShortcutStepToken)
-    .filter((step): step is ShortcutStep => step !== null);
+  const steps: ShortcutStep[] = [];
+  for (const token of stepTokens) {
+    const step = parseShortcutStepToken(token);
+    if (step) steps.push(step);
+  }
   if (steps.length !== stepTokens.length) return null;
   return {
     id: `${actionId}:${index}:${normalizedSpec}`,
@@ -464,16 +489,14 @@ function parseShortcutBinding(
 }
 
 function parseShortcutStepToken(token: string): ShortcutStep | null {
-  const parts = token
-    .split("+")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const parts = nonEmptyParts(token.split("+"));
   if (parts.length === 0) return null;
 
-  const modifiers = parts
-    .slice(0, -1)
-    .map(normalizeModifierToken)
-    .filter((modifier): modifier is ShortcutModifier => modifier !== null);
+  const modifiers: ShortcutModifier[] = [];
+  for (const part of parts.slice(0, -1)) {
+    const modifier = normalizeModifierToken(part);
+    if (modifier) modifiers.push(modifier);
+  }
   if (modifiers.length !== parts.length - 1) return null;
 
   const keyToken = parts[parts.length - 1];

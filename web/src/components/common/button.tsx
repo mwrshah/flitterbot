@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
@@ -17,19 +17,22 @@ const variantStyles: Record<ButtonVariant, string> = {
 const sizeStyles: Record<ButtonSize, string> = {
   default: "h-9 px-4 py-2 text-sm",
   sm: "h-7 px-3 text-xs",
-  icon: "h-8 w-8 p-0",
-  "icon-sm": "h-7 w-7 p-0",
+  icon: "size-8 p-0",
+  "icon-sm": "size-7 p-0",
 };
 
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = React.ComponentPropsWithRef<"button"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
 };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant = "default", size = "default", ...props },
+export function Button({
+  className,
+  variant = "default",
+  size = "default",
   ref,
-) {
+  ...props
+}: ButtonProps) {
   useWhyDidYouRender("Button", { className, variant, size });
   return (
     <button
@@ -45,4 +48,4 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       {...props}
     />
   );
-});
+}

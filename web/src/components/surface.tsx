@@ -851,7 +851,7 @@ export function Surface() {
             className="p-1.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors"
             title="Settings"
           >
-            <SettingsIcon className="w-4 h-4" />
+            <SettingsIcon className="size-4" />
           </button>
         </div>
       </div>
@@ -916,7 +916,6 @@ export function Surface() {
             onAddImages={addImageFiles}
             onRemoveImage={removeImage}
             fillHeight
-            autoFocus
             showModelSelector={false}
             internalCommandScope="surface"
           />

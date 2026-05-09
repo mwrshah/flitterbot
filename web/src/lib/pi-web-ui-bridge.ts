@@ -170,19 +170,3 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 export function timelineItemsToAgentMessages(items: ChatTimelineItem[]): AgentMessage[] {
   return timelineToAgentMessages(items);
 }
-
-/**
- * Derive the set of toolUseIds that have started but not yet ended.
- */
-export function pendingToolCallsFromTimeline(timeline: ChatTimelineItem[]): Set<string> {
-  const started = new Set<string>();
-  const ended = new Set<string>();
-  for (const item of timeline) {
-    if (item.kind === "tool" && item.toolUseId) {
-      if (item.phase === "start") started.add(item.toolUseId);
-      else ended.add(item.toolUseId);
-    }
-  }
-  for (const id of ended) started.delete(id);
-  return started;
-}

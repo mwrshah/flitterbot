@@ -20,15 +20,15 @@ export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElemen
   return <div className={cn("px-5 pt-5 pb-0", className)} {...props} />;
 }
 
-export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
+export function CardTitle({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   useWhyDidYouRender("CardTitle", { className });
-  return <h2 className={cn("text-sm font-semibold", className)} {...props} />;
-}
-
-export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  useWhyDidYouRender("CardDescription", { className });
   return (
-    <p className={cn("mt-1 text-xs text-muted-foreground leading-relaxed", className)} {...props} />
+    <div
+      role="heading"
+      aria-level={2}
+      className={cn("text-sm font-semibold", className)}
+      {...props}
+    />
   );
 }
 

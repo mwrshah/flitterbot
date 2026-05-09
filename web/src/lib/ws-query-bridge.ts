@@ -30,7 +30,7 @@ import type { FlitterbotWsClient } from "~/lib/ws";
 
 /* ── Send message factory (provided via router context) ── */
 
-export type SendMessageOptions = {
+type SendMessageOptions = {
   images?: ImageAttachment[];
   targetPiSessionId?: string;
   /** Client-generated UUID matching the optimistic user-message bubble in

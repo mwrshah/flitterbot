@@ -13,9 +13,11 @@ export type DirectoryCompletionsResult = {
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
   .inputValidator((input: { query: string; piSessionId?: string; streamId?: string }) => input)
   .handler(async ({ data }): Promise<DirectoryCompletionsResult> => {
-    const params = new URLSearchParams({ query: data.query });
-    if (data.piSessionId) params.set("piSessionId", data.piSessionId);
-    if (data.streamId) params.set("streamId", data.streamId);
+    const params = new URLSearchParams([
+      ["query", data.query],
+      ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
+      ...(data.streamId ? [["streamId", data.streamId] as [string, string]] : []),
+    ]);
 
     const url = `${BASE_URL.replace(/\/$/, "")}/api/directory-completions?${params}`;
     const headers: Record<string, string> = {

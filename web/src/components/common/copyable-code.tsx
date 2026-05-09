@@ -16,9 +16,10 @@ export function CopyableCode({
   const isCopied = isControlled ? (externalCopied ?? false) : internal.copied;
 
   return (
-    <span
+    <button
+      type="button"
       onClick={() => (isControlled ? onCopy() : internal.copy(text))}
-      className="inline-block text-xs bg-muted/60 hover:bg-muted rounded px-1.5 py-0.5 cursor-pointer truncate max-w-full text-left transition-colors"
+      className="inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs transition-colors hover:bg-muted"
       title={`copy \`${text}\``}
     >
       {!isControlled && isCopied ? (
@@ -26,6 +27,6 @@ export function CopyableCode({
       ) : (
         <span>{displayText ?? text}</span>
       )}
-    </span>
+    </button>
   );
 }

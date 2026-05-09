@@ -8,9 +8,6 @@ export const Route = createFileRoute("/")({
     wsMode: "surface",
   },
   pendingMs: 0,
-  head: () => ({
-    meta: [{ title: "Flitterbot" }],
-  }),
   loader: async ({ context }) => {
     try {
       await context.queryClient.ensureQueryData(surfaceTimelineQueryOptions());
@@ -18,6 +15,9 @@ export const Route = createFileRoute("/")({
       // Leave cache unseeded; component falls back to empty array.
     }
   },
+  head: () => ({
+    meta: [{ title: "Flitterbot" }],
+  }),
   pendingComponent: SurfacePending,
   component: SurfacePage,
 });

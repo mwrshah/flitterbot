@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
@@ -100,10 +100,7 @@ export function DownstreamSessionsPanel({
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
-  useEffect(() => {
-    setPanelView("info");
-    setActiveScrollContainer("main");
-  }, [piSessionId]);
+
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
   );
@@ -132,6 +129,18 @@ export function DownstreamSessionsPanel({
   const branchCopy = useCopyToClipboard(600);
   const baseBranchCopy = useCopyToClipboard(600);
 
+  const showInfoPanel = useCallback(() => {
+    (document.activeElement as HTMLElement)?.blur?.();
+    setActiveScrollContainer("main");
+    setPanelView("info");
+  }, []);
+
+  const showDiffPanel = useCallback(() => {
+    (document.activeElement as HTMLElement)?.blur?.();
+    setActiveScrollContainer("diff");
+    setPanelView("diff");
+  }, []);
+
   useEffect(() => {
     return registerShortcutHandlers([
       {
@@ -156,9 +165,7 @@ export function DownstreamSessionsPanel({
       {
         actionId: SHORTCUT_ACTIONS.panelViewInfo,
         handler: () => {
-          (document.activeElement as HTMLElement)?.blur?.();
-          setActiveScrollContainer("main");
-          setPanelView("info");
+          showInfoPanel();
           return true;
         },
       },
@@ -166,19 +173,25 @@ export function DownstreamSessionsPanel({
         actionId: SHORTCUT_ACTIONS.panelViewDiff,
         handler: () => {
           if (!hasWorktree) return false;
-          (document.activeElement as HTMLElement)?.blur?.();
-          setActiveScrollContainer("diff");
-          setPanelView("diff");
+          showDiffPanel();
           return true;
         },
       },
     ]);
-  }, [firstTmuxSession, currentWorktreePath, tmuxCopy.copy, worktreeCopy.copy, hasWorktree]);
+  }, [
+    firstTmuxSession,
+    currentWorktreePath,
+    tmuxCopy.copy,
+    worktreeCopy.copy,
+    hasWorktree,
+    showInfoPanel,
+    showDiffPanel,
+  ]);
 
   // Parse the unified diff into react-diff-view's file/hunk/change model.
   // Inject the +/-/space prefix into each change's content so the sign is
   // part of the selectable text (the library renders content as-is in the
-  // code cell and omits the prefix by design — it signals type via color).
+  // code cell and omits the prefix by design; it signals type via color).
   const diffFiles = useMemo<FileData[]>(() => {
     if (diffQuery.data?.mode !== "diff") return [];
     const files = parseDiff(diffQuery.data.diff);
@@ -273,7 +286,7 @@ export function DownstreamSessionsPanel({
               <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
                 Diff too large ({diffQuery.data.files} files,{" "}
                 {diffQuery.data.insertions.toLocaleString()}+ /{" "}
-                {diffQuery.data.deletions.toLocaleString()}&minus;) — showing summary only
+                {diffQuery.data.deletions.toLocaleString()}&minus;), showing summary only
               </div>
               <pre className="px-4 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
                 {diffQuery.data.stat}

@@ -105,13 +105,9 @@ function MessageInputHoverButtons({
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleBlockWidthRef = useRef(0);
-  const [visibleShortcutCount, setVisibleShortcutCount] = useState(0);
 
   useLayoutEffect(() => {
-    if (buttons.length === 0) {
-      setVisibleShortcutCount(0);
-      return;
-    }
+    if (buttons.length === 0) return;
 
     let frame = 0;
     let observer: ResizeObserver | null = null;
@@ -182,7 +178,6 @@ function MessageInputHoverButtons({
       renderedButtons.forEach((button, index) => {
         if (button) button.hidden = index >= visibleCount;
       });
-      setVisibleShortcutCount((current) => (current === visibleCount ? current : visibleCount));
       return true;
     };
 
@@ -228,22 +223,21 @@ function MessageInputHoverButtons({
   };
 
   useEffect(() => {
-    const cleanup = registerShortcutHandlers(
-      buttons
-        .slice(0, Math.min(visibleShortcutCount, MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.length))
-        .map((button, index) => ({
-          actionId: getMessageInputButtonShortcutActionId(index + 1),
-          priority: 10,
-          handler: () => {
-            const node = buttonRefs.current[index];
-            if (!node || node.hidden || node.disabled) return false;
-            onInsert(button, currentVisibleBlockWidth());
-            return true;
-          },
-        })),
-    );
+    const handlers = buttons
+      .slice(0, MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.length)
+      .map((button, index) => ({
+        actionId: getMessageInputButtonShortcutActionId(index + 1),
+        priority: 10,
+        handler: () => {
+          const node = buttonRefs.current[index];
+          if (!node || node.hidden || node.disabled) return false;
+          onInsert(button, currentVisibleBlockWidth());
+          return true;
+        },
+      }));
+    const cleanup = registerShortcutHandlers(handlers);
     return cleanup;
-  }, [buttons, onInsert, visibleShortcutCount]);
+  }, [buttons, onInsert]);
 
   if (buttons.length === 0) return null;
 
@@ -892,26 +886,23 @@ export const MessageInput = memo(function MessageInput({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submitCurrentDraft();
-        }}
-        className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}
-      >
+      <div className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}>
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {pendingImages.map((img, i) => (
-              <div key={i} className="relative group">
+              <div
+                key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
+                className="relative group"
+              >
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
                   alt="Pending attachment"
-                  className="w-16 h-16 object-cover rounded-lg border border-border"
+                  className="size-16 object-cover rounded-lg border border-border"
                 />
                 <button
                   type="button"
                   onClick={() => onRemoveImage(i)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   &times;
                 </button>
@@ -1028,7 +1019,7 @@ export const MessageInput = memo(function MessageInput({
                 onClick={() => onRecover?.()}
                 className="h-10 sm:h-7 px-3"
               >
-                <RotateCcwIcon className="w-4 h-4" />
+                <RotateCcwIcon className="size-4" />
                 <span>
                   {isRecoverPending
                     ? recoveryKind === "dead"
@@ -1049,25 +1040,26 @@ export const MessageInput = memo(function MessageInput({
                 className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
                 title="Stop"
               >
-                <OctagonIcon className="w-4 h-4 fill-current" />
+                <OctagonIcon className="size-4 fill-current" />
               </Button>
             ) : (
               <Button
-                type="submit"
+                type="button"
                 size="sm"
                 disabled={isSending || !canSend}
+                onClick={submitCurrentDraft}
                 className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
               >
                 {isSending ? (
-                  <Loader2Icon className="w-4 h-4 animate-spin" />
+                  <Loader2Icon className="size-4 animate-spin" />
                 ) : (
-                  <ArrowRightIcon className="w-4 h-4" />
+                  <ArrowRightIcon className="size-4" />
                 )}
               </Button>
             )}
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 });

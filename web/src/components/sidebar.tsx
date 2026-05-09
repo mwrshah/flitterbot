@@ -54,7 +54,7 @@ function NavItem({
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
       )}
     >
-      <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>
+      <span className="shrink-0 size-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
       {shortcutHint && (
         <ShortcutHint
@@ -70,7 +70,7 @@ function NavItem({
 
 const icons = {
   surface: (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+    <svg viewBox="0 0 16 16" fill="currentColor" className="size-4">
       <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v1A1.5 1.5 0 0 1 13.5 6h-11A1.5 1.5 0 0 1 1 4.5v-1ZM1 8.5A1.5 1.5 0 0 1 2.5 7h11A1.5 1.5 0 0 1 15 8.5v1A1.5 1.5 0 0 1 13.5 11h-11A1.5 1.5 0 0 1 1 9.5v-1ZM2.5 12A1.5 1.5 0 0 0 1 13.5v.5h14v-.5a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
     </svg>
   ),
@@ -91,8 +91,12 @@ export const Sidebar = memo(function Sidebar() {
   const status = statusQuery.data;
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
   const allStreams = status?.streams ?? [];
-  const openStreams = allStreams.filter((ws: StreamSummary) => ws.status === "open");
-  const closedStreams = allStreams.filter((ws: StreamSummary) => ws.status === "closed");
+  const openStreams: StreamSummary[] = [];
+  const closedStreams: StreamSummary[] = [];
+  for (const stream of allStreams) {
+    if (stream.status === "open") openStreams.push(stream);
+    if (stream.status === "closed") closedStreams.push(stream);
+  }
 
   // Build shortcut index: default gets 1 (if present), then open streams with piSessionId
   let nextShortcut = 1;
@@ -115,15 +119,15 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Navigation */}
-      <nav className="shrink-0 px-3 py-3 space-y-0.5">
+      <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
           to={lastStreamPath}
           label="Streams"
           icon={
             <>
-              <img src={logoBlack} alt="" className="w-4 h-4 object-contain dark:hidden" />
-              <img src={logoWhite} alt="" className="w-4 h-4 object-contain hidden dark:block" />
+              <img src={logoBlack} alt="" className="size-4 object-contain dark:hidden" />
+              <img src={logoWhite} alt="" className="size-4 object-contain hidden dark:block" />
             </>
           }
           shortcutHint={streamsShortcutHint}
@@ -150,7 +154,7 @@ export const Sidebar = memo(function Sidebar() {
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
                   >
-                    <span className="shrink-0 h-2 w-2 rounded-full bg-sidebar-foreground/25" />
+                    <span className="shrink-0 size-2 rounded-full bg-sidebar-foreground/25" />
                     <span className="truncate flex-1">flitterbot</span>
                     {defaultShortcut && (
                       <ShortcutHint
@@ -177,7 +181,7 @@ export const Sidebar = memo(function Sidebar() {
                     >
                       <span
                         className={cn(
-                          "shrink-0 h-2 w-2 rounded-full",
+                          "shrink-0 size-2 rounded-full",
                           piStatusDotClass(ws.piSessionStatus),
                         )}
                       />
@@ -196,7 +200,7 @@ export const Sidebar = memo(function Sidebar() {
                       key={ws.id}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/40"
                     >
-                      <span className={cn("shrink-0 h-2 w-2 rounded-full", "bg-zinc-500")} />
+                      <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
                       <span className="truncate flex-1">{ws.name}</span>
                     </div>
                   ),
@@ -211,13 +215,12 @@ export const Sidebar = memo(function Sidebar() {
                 Recently closed
               </p>
               <div className="space-y-1">
-                {closedStreams
-                  .filter((ws) => ws.piSessionId)
-                  .map((ws) => (
+                {closedStreams.map((ws) =>
+                  ws.piSessionId ? (
                     <Link
                       key={ws.id}
                       to="/streams/$piSessionId"
-                      params={{ piSessionId: ws.piSessionId! }}
+                      params={{ piSessionId: ws.piSessionId }}
                       className={cn(
                         "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
                         currentPiSessionId === ws.piSessionId
@@ -227,7 +230,8 @@ export const Sidebar = memo(function Sidebar() {
                     >
                       <span className="truncate">{ws.name}</span>
                     </Link>
-                  ))}
+                  ) : null,
+                )}
               </div>
             </div>
           )}

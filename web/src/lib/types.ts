@@ -7,7 +7,6 @@ import type {
 } from "../../../src/contracts/timeline.ts";
 
 export type {
-  ChatTimelineDivider,
   ChatTimelineItem,
   ChatTimelineMessage,
   ChatTimelineTool,
@@ -20,11 +19,9 @@ export type {
 
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
 
-export type DeliveryMode = "followUp";
-
 /* ── Sessions ── */
 
-export type SessionSummary = {
+type SessionSummary = {
   sessionId: string;
   status: "working" | "idle" | "stale" | "ended";
   taskDescription?: string;
@@ -36,7 +33,7 @@ export type SessionSummary = {
   streamName?: string;
 };
 
-export type SessionDetail = {
+type SessionDetail = {
   sessionId: string;
   status: "working" | "idle" | "stale" | "ended";
   taskDescription?: string;
@@ -52,7 +49,7 @@ export type SessionDetail = {
   recentEvents: SessionEvent[];
 };
 
-export type SessionEvent = {
+type SessionEvent = {
   id: number;
   event_name: string;
   tool_name?: string;
@@ -60,7 +57,7 @@ export type SessionEvent = {
   timestamp: string;
 };
 
-export type TmuxSessionInspection = {
+type TmuxSessionInspection = {
   exists: boolean;
   attached: boolean;
   pane?: {
@@ -74,7 +71,7 @@ export type TmuxSessionInspection = {
 
 /* ── Transcripts ── */
 
-export type TranscriptItem = {
+type TranscriptItem = {
   id: string;
   kind: "message" | "tool_call" | "tool_result" | "event";
   role?: string;
@@ -95,7 +92,7 @@ export type TranscriptPage = {
 
 export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 
-export type PiSessionModelInfo = {
+type PiSessionModelInfo = {
   id: string;
   provider: string;
   modelId: string;
@@ -170,10 +167,6 @@ export type DownstreamSessionItem = {
   cwd: string | null;
   taskDescription: string | null;
   project: string | null;
-};
-
-export type DownstreamSessionsListResponse = {
-  items: DownstreamSessionItem[];
 };
 
 export type SessionDetailResponse = {

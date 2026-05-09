@@ -362,6 +362,5 @@ function normalizeEventTypes(eventTypes?: string[]): string[] | undefined {
 function sameEventTypes(a: string[] | undefined, b: string[] | undefined): boolean {
   if (a === undefined && b === undefined) return true;
   if (a === undefined || b === undefined) return false;
-  if (a.length !== b.length) return false;
-  return a.every((value, index) => value === b[index]);
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }

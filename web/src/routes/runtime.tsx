@@ -49,7 +49,7 @@ function RuntimePage() {
         </Button>
       </div>
 
-      {statusQuery.isPending && <p className="text-sm text-muted-foreground">Loading status...</p>}
+      {statusQuery.isPending && <p className="text-sm text-muted-foreground">Loading status…</p>}
 
       {status && (
         <>

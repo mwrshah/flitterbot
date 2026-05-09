@@ -42,7 +42,12 @@ export const SettingsDrawer = memo(function SettingsDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-black/50"
+        onClick={onClose}
+        aria-label="Close settings"
+      />
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-50 flex flex-col shadow-xl">
@@ -86,16 +91,22 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               Control Surface
             </h3>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Base URL</label>
+              <label htmlFor="settings-base-url" className="text-xs text-muted-foreground">
+                Base URL
+              </label>
               <Input
+                id="settings-base-url"
                 value={settings.baseUrl}
                 onChange={(e) => updateSettings({ baseUrl: e.target.value })}
                 placeholder="http://127.0.0.1:18820"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Bearer token</label>
+              <label htmlFor="settings-bearer-token" className="text-xs text-muted-foreground">
+                Bearer token
+              </label>
               <Input
+                id="settings-bearer-token"
                 type="password"
                 value={settings.token}
                 onChange={(e) => updateSettings({ token: e.target.value })}
@@ -120,7 +131,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
 
         <div className="px-5 py-4 border-t border-border">
           <Button variant="secondary" className="w-full" onClick={onClose}>
-            Done
+            Close settings
           </Button>
         </div>
       </div>

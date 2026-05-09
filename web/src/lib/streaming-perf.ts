@@ -89,7 +89,8 @@ function formatMs(ms: number): string {
 
 function reportSpan(label: string, samples: number[]): void {
   if (samples.length === 0) return;
-  const sorted = [...samples].sort((a, b) => a - b);
+  const sorted = Array.from(samples);
+  sorted.sort((a, b) => a - b);
   const avg = sorted.reduce((sum, sample) => sum + sample, 0) / sorted.length;
   console.log(
     `${label}: count=${sorted.length} avg=${formatMs(avg)} p50=${formatMs(percentile(sorted, 50))} p95=${formatMs(percentile(sorted, 95))} p99=${formatMs(percentile(sorted, 99))}`,

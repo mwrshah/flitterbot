@@ -1,14 +1,5 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
-import {
-  memo,
-  type Ref,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { memo, type Ref, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -86,26 +77,6 @@ export const PathPicker = memo(function PathPicker({
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Reset selection to first item and scroll list to top whenever the picker
-  // opens or the items set changes. The `open` dep is required: on reopen with
-  // an unchanged items reference (TanStack keepPreviousData), without it this
-  // effect wouldn't fire, leaving stale selectedValue pointing at an item that
-  // the fresh DOM scrolls out of view.
-  useEffect(() => {
-    if (!open) return;
-    setSelectedValue(items[0]?.path ?? "");
-    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
-    if (list) list.scrollTop = 0;
-  }, [open, items]);
-
-  // On keyboard navigation, keep the selected item visible
-  useEffect(() => {
-    if (!selectedValue) return;
-    requestAnimationFrame(() => {
-      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
-      el?.scrollIntoView({ block: "nearest" });
-    });
-  }, [selectedValue]);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const updatePosition = useCallback(() => {
@@ -119,9 +90,27 @@ export const PathPicker = memo(function PathPicker({
     setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, [anchorRef, caretLeft]);
 
-  useLayoutEffect(() => {
-    if (open) updatePosition();
-  }, [open, updatePosition, items]);
+  // Reset selection to first item and scroll list to top whenever the picker
+  // opens or the items set changes. The `open` dep is required: on reopen with
+  // an unchanged items reference (TanStack keepPreviousData), without it this
+  // effect wouldn't fire, leaving stale selectedValue pointing at an item that
+  // the fresh DOM scrolls out of view.
+  useEffect(() => {
+    if (!open) return;
+    setSelectedValue(items[0]?.path ?? "");
+    const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
+    if (list) list.scrollTop = 0;
+    requestAnimationFrame(updatePosition);
+  }, [open, items, updatePosition]);
+
+  // On keyboard navigation, keep the selected item visible
+  useEffect(() => {
+    if (!selectedValue) return;
+    requestAnimationFrame(() => {
+      const el = pickerRef.current?.querySelector<HTMLElement>("[data-selected=true]");
+      el?.scrollIntoView({ block: "nearest" });
+    });
+  }, [selectedValue]);
 
   if (!open) return null;
 

@@ -79,7 +79,7 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
                 }
                 onClick={() => startMutation.mutate()}
               >
-                {startMutation.isPending ? "Starting..." : "Start"}
+                {startMutation.isPending ? "Starting…" : "Start"}
               </Button>
               <Button
                 variant="secondary"
@@ -87,7 +87,7 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
                 disabled={stopMutation.isPending || waStatus === "stopped"}
                 onClick={() => stopMutation.mutate()}
               >
-                {stopMutation.isPending ? "Stopping..." : "Stop"}
+                {stopMutation.isPending ? "Stopping…" : "Stop"}
               </Button>
             </div>
 
