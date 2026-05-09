@@ -56,6 +56,41 @@ type RawConfigJson = {
   extraSkillPaths?: unknown;
 };
 
+const ACCEPTED_CONFIG_KEYS = [
+  "controlSurfaceHost",
+  "controlSurfacePort",
+  "controlSurfaceToken",
+  "controlSurfaceCommand",
+  "models",
+  "defaultModel",
+  "defaultThinkingLevel",
+  "piTransport",
+  "stallMinutes",
+  "toolTimeoutMinutes",
+  "blackboardPath",
+  "whatsappAuthDir",
+  "whatsappSocketPath",
+  "whatsappPidPath",
+  "whatsappCliPath",
+  "whatsappDaemonPath",
+  "claudeCliCommand",
+  "projectsDir",
+  "projectRoot",
+  "sourceRoot",
+  "wipeStreamsOnStart",
+  "whatsappEnabled",
+  "shortcuts",
+  "defaultAgentFirstMessage",
+  "newStreamFirstMessageFooter",
+  "tmuxEnabled",
+  "extraSkillPaths",
+] as const satisfies readonly (keyof RawConfigJson)[];
+
+const ACCEPTED_MODEL_CONFIG_KEYS = ["id", "label", "provider", "modelId", "thinkingLevel"] as const;
+
+const ACCEPTED_CONFIG_KEY_SET = new Set<string>(ACCEPTED_CONFIG_KEYS);
+const ACCEPTED_MODEL_CONFIG_KEY_SET = new Set<string>(ACCEPTED_MODEL_CONFIG_KEYS);
+
 export type FlitterbotConfig = {
   controlSurfaceHost: string;
   controlSurfacePort: number;
@@ -120,14 +155,53 @@ function ensureDir(dirPath: string): void {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-function readRequiredJsonFile<T>(filePath: string): T {
+function readRequiredJsonFile(filePath: string): RawConfigJson {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Missing config file: ${filePath}. Run installer to populate config.json.`);
   }
   const raw = fs.readFileSync(filePath, "utf8").trim();
   if (!raw)
     throw new Error(`Empty config file: ${filePath}. Run installer to populate config.json.`);
-  return JSON.parse(raw) as T;
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Invalid config file: ${filePath} must contain a JSON object.`);
+  }
+
+  validateKnownConfigKeys(parsed as Record<string, unknown>, filePath);
+  return parsed as RawConfigJson;
+}
+
+function collectUnknownConfigKeys(raw: Record<string, unknown>): string[] {
+  const unknownKeys = Object.keys(raw)
+    .filter((key) => !ACCEPTED_CONFIG_KEY_SET.has(key))
+    .map((key) => `"${key}"`);
+
+  if (Array.isArray(raw.models)) {
+    for (const [index, entry] of raw.models.entries()) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      for (const key of Object.keys(entry)) {
+        if (!ACCEPTED_MODEL_CONFIG_KEY_SET.has(key)) {
+          unknownKeys.push(`"models[${index}].${key}"`);
+        }
+      }
+    }
+  }
+
+  return unknownKeys.sort();
+}
+
+export function validateKnownConfigKeys(
+  raw: Record<string, unknown>,
+  filePath = FLITTERBOT_CONFIG_PATH,
+): void {
+  const unknownKeys = collectUnknownConfigKeys(raw);
+  if (unknownKeys.length === 0) return;
+
+  const keyNoun = unknownKeys.length === 1 ? "key" : "keys";
+  const removePhrase = unknownKeys.length === 1 ? "Remove this key" : "Remove these keys";
+  throw new Error(
+    `Invalid startup config ${filePath}: unknown config ${keyNoun}: ${unknownKeys.join(", ")}. ${removePhrase} from ${filePath}.`,
+  );
 }
 
 function requireConfigString(raw: RawConfigJson, key: keyof RawConfigJson): string {
@@ -282,7 +356,7 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(FLITTERBOT_DIR);
   ensureDir(path.join(FLITTERBOT_DIR, "logs"));
 
-  const raw = readRequiredJsonFile<RawConfigJson>(CONFIG_PATH);
+  const raw = readRequiredJsonFile(CONFIG_PATH);
   const controlSurfaceDir = path.join(FLITTERBOT_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
   const agentDir = path.join(controlSurfaceDir, "agent");

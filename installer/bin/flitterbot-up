@@ -165,6 +165,21 @@ write_state_file() {
   " "$STATE_FILE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$command" "$pid" "$attempt"
 }
 
+latest_startup_failure() {
+  if [[ ! -f "$LOG_FILE" ]]; then
+    return 1
+  fi
+
+  local line=""
+  line=$(grep -E '^(Reason: |FATAL control surface startup failed:|Error: |SyntaxError: |TypeError: |ReferenceError: )' "$LOG_FILE" | tail -1 || true)
+  if [[ -n "$line" ]]; then
+    printf '%s\n' "$line"
+    return 0
+  fi
+
+  return 1
+}
+
 start_once() {
   local command="$1"
   rotate_log_file "$LOG_FILE"
@@ -174,7 +189,13 @@ start_once() {
   sleep 1
 
   if ! is_pid_running "$pid"; then
-    append_log "$LOG_FILE" "ERROR" "control surface process exited immediately"
+    local failure=""
+    failure=$(latest_startup_failure || true)
+    if [[ -n "$failure" ]]; then
+      append_log "$LOG_FILE" "ERROR" "control surface process exited immediately: $failure"
+    else
+      append_log "$LOG_FILE" "ERROR" "control surface process exited immediately"
+    fi
     return 1
   fi
 
@@ -388,7 +409,13 @@ start_runtime() {
     fi
   done
 
-  append_log "$LOG_FILE" "ERROR" "control surface failed to start after retries"
+  local failure=""
+  failure=$(latest_startup_failure || true)
+  if [[ -n "$failure" ]]; then
+    append_log "$LOG_FILE" "ERROR" "control surface failed to start after retries: $failure"
+  else
+    append_log "$LOG_FILE" "ERROR" "control surface failed to start after retries"
+  fi
   return 1
 }
 

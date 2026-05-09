@@ -49,54 +49,76 @@ import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
 import { ControlSurfaceRuntime } from "./runtime.ts";
+import { errorDetail, errorMessage, formatStartupFailure } from "./startup-error.ts";
 
-const runtime = new ControlSurfaceRuntime();
-
-const server = http.createServer(async (req, res) => {
-  applyCorsHeaders(res);
-  if ((req.method ?? "GET") === "OPTIONS") {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
-  try {
-    await routeRequest(req, res);
-  } catch (error) {
-    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    runtime.log(`unhandled route error: ${detail}`);
-    const message = error instanceof Error ? error.message : String(error);
-    sendJson(res, 500, { ok: false, error: message });
-  }
-});
-
-runtime.attachServer(server);
-
-server.on("upgrade", (req, socket: import("node:net").Socket, head) => {
-  const handled = runtime.handleUpgrade(req, socket, head);
-  if (!handled) socket.destroy();
-});
+let runtime: ControlSurfaceRuntime | undefined;
 
 process.on("SIGTERM", () => {
-  void runtime.stop("sigterm").finally(() => process.exit(0));
+  void runtime?.stop("sigterm").finally(() => process.exit(0));
+  if (!runtime) process.exit(0);
 });
 process.on("SIGINT", () => {
-  void runtime.stop("sigint").finally(() => process.exit(0));
+  void runtime?.stop("sigint").finally(() => process.exit(0));
+  if (!runtime) process.exit(0);
 });
 process.on("uncaughtException", (error) => {
-  console.error(error);
-  void runtime.stop("uncaught_exception", true).finally(() => process.exit(1));
+  console.error(errorDetail(error));
+  void runtime?.stop("uncaught_exception", true).finally(() => process.exit(1));
+  if (!runtime) process.exit(1);
 });
 process.on("unhandledRejection", (error) => {
-  console.error(error);
-  void runtime.stop("unhandled_rejection", true).finally(() => process.exit(1));
+  console.error(errorDetail(error));
+  void runtime?.stop("unhandled_rejection", true).finally(() => process.exit(1));
+  if (!runtime) process.exit(1);
 });
 
-await runtime.start();
-server.listen(runtime.config.controlSurfacePort, runtime.config.controlSurfaceHost, () => {
-  console.log(
-    `Flitterbot control surface listening on http://${runtime.config.controlSurfaceHost}:${runtime.config.controlSurfacePort}`,
+try {
+  runtime = new ControlSurfaceRuntime();
+  const activeRuntime = runtime;
+  const server = createServer(activeRuntime);
+  activeRuntime.attachServer(server);
+
+  await activeRuntime.start();
+  server.listen(
+    activeRuntime.config.controlSurfacePort,
+    activeRuntime.config.controlSurfaceHost,
+    () => {
+      console.log(
+        `Flitterbot control surface listening on http://${activeRuntime.config.controlSurfaceHost}:${activeRuntime.config.controlSurfacePort}`,
+      );
+    },
   );
-});
+} catch (error) {
+  console.error(formatStartupFailure(error));
+  await runtime?.stop("startup_failure", true).catch((stopError) => {
+    console.error(`Failed to stop runtime after startup failure: ${errorDetail(stopError)}`);
+  });
+  process.exit(1);
+}
+
+function createServer(runtime: ControlSurfaceRuntime): http.Server {
+  const server = http.createServer(async (req, res) => {
+    applyCorsHeaders(res);
+    if ((req.method ?? "GET") === "OPTIONS") {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    try {
+      await routeRequest(runtime, req, res);
+    } catch (error) {
+      runtime.log(`unhandled route error: ${errorDetail(error)}`);
+      sendJson(res, 500, { ok: false, error: errorMessage(error) });
+    }
+  });
+
+  server.on("upgrade", (req, socket: import("node:net").Socket, head) => {
+    const handled = runtime.handleUpgrade(req, socket, head);
+    if (!handled) socket.destroy();
+  });
+
+  return server;
+}
 
 function applyCorsHeaders(res: http.ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -104,7 +126,11 @@ function applyCorsHeaders(res: http.ServerResponse): void {
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 }
 
-async function routeRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+async function routeRequest(
+  runtime: ControlSurfaceRuntime,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> {
   const method = req.method ?? "GET";
   const url = new URL(
     req.url ?? "/",

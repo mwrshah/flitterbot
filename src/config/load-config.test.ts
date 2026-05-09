@@ -2,8 +2,57 @@ import { describe, expect, test } from "bun:test";
 import {
   SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER,
   TMUX_SKILL_DIRECTIVE,
+  validateKnownConfigKeys,
   validateTmuxStreamFooterConfig,
 } from "./load-config.ts";
+
+describe("validateKnownConfigKeys", () => {
+  test("allows known top-level config keys and known model keys", () => {
+    expect(() =>
+      validateKnownConfigKeys(
+        {
+          controlSurfaceHost: "127.0.0.1",
+          controlSurfaceCommand: "node src/server.ts",
+          projectRoot: "/repo",
+          sourceRoot: "/repo",
+          models: [
+            {
+              id: "sonnet",
+              label: "Sonnet",
+              provider: "anthropic",
+              modelId: "claude-sonnet-4-5",
+              thinkingLevel: "low",
+            },
+          ],
+        },
+        "/tmp/config.json",
+      ),
+    ).not.toThrow();
+  });
+
+  test("rejects every unknown top-level and model key together", () => {
+    expect(() =>
+      validateKnownConfigKeys(
+        {
+          legacyFoo: true,
+          models: [
+            {
+              id: "sonnet",
+              label: "Sonnet",
+              provider: "anthropic",
+              modelId: "claude-sonnet-4-5",
+              deprecatedAlias: "old",
+            },
+          ],
+          unusedBar: "x",
+        },
+        "/tmp/config.json",
+      ),
+    ).toThrow(
+      'Invalid startup config /tmp/config.json: unknown config keys: "legacyFoo", "models[0].deprecatedAlias", "unusedBar". Remove these keys from /tmp/config.json.',
+    );
+  });
+});
 
 describe("validateTmuxStreamFooterConfig", () => {
   test("allows tmux disabled when the stream footer does not load the tmux skill", () => {

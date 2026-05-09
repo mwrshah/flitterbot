@@ -11,9 +11,9 @@ import {
  * without disturbing any other keys. Uses an atomic temp-file + rename so a
  * crash mid-write can never produce a half-written config.
  *
- * All other fields of `config.json` are preserved verbatim (including any
- * unknown keys the user added by hand) — we read → patch → write, nothing
- * else. Pretty-printed with 2-space indent + trailing newline.
+ * All other fields of `config.json` are preserved verbatim — we read → patch →
+ * write, nothing else. Startup config validation rejects unknown keys before the
+ * runtime reaches this path. Pretty-printed with 2-space indent + trailing newline.
  */
 export function persistModelsToConfigFile(update: {
   models: ModelConfigEntry[];
