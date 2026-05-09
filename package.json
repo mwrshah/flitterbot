@@ -15,32 +15,32 @@
     "up:latest": "pnpm update $(jq -r '(.dependencies // {}) + (.devDependencies // {}) | to_entries[] | select(.value == \"latest\") | .key' package.json)"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.14",
-    "@types/node": "^25.6.0",
-    "knip": "^6.11.0",
+    "@biomejs/biome": "^2.4.15",
+    "@types/node": "^25.6.2",
+    "knip": "^6.12.2",
     "lefthook": "^2.1.6",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "pnpm": {
     "overrides": {
-      "undici": ">=7.24.0",
-      "music-metadata": ">=11.12.3",
-      "h3": "2.0.1-rc.20",
-      "h3-v2": "npm:h3@2.0.1-rc.20",
-      "picomatch": ">=4.0.4",
-      "file-type": ">=21.3.1",
-      "fast-xml-parser": ">=5.5.6",
-      "srvx": ">=0.11.13",
-      "brace-expansion": ">=5.0.5",
-      "yaml": ">=2.8.3",
-      "smol-toml": ">=1.6.1"
+      "undici": "^8.2.0",
+      "music-metadata": "^11.12.3",
+      "h3": "^2.0.1-rc.22",
+      "h3-v2": "npm:h3@^2.0.1-rc.22",
+      "picomatch": "^4.0.4",
+      "file-type": "^22.0.1",
+      "fast-xml-parser": "^5.7.3",
+      "srvx": "^0.11.15",
+      "brace-expansion": "^5.0.6",
+      "yaml": "^2.8.4",
+      "smol-toml": "^1.6.1"
     }
   },
   "dependencies": {
-    "@ff-labs/fff-node": "^0.7.0",
+    "@ff-labs/fff-node": "^0.7.2",
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
-    "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "@whiskeysockets/baileys": "^7.0.0-rc10",
     "dotenv": "^17.4.2",
     "openai": "latest",
     "pino": "^10.3.1",
