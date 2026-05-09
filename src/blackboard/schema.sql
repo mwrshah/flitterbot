@@ -1,4 +1,4 @@
--- Flitterbot blackboard schema (v19)
+-- Flitterbot blackboard schema (v20)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS streams (
     worktree_path TEXT,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
-    closed_at TEXT
+    closed_at TEXT,
+    base_branch TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
