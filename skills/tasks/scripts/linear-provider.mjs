@@ -9,13 +9,14 @@ export function createLinearProvider(config, deps) {
     system: LINEAR_SYSTEM,
 
     async syncIn(store, idx, input = {}) {
+      const inbound = emptyLinearInboundStats();
       const activeMappings = mappedActiveProjects(store, deps);
-      if (activeMappings.length === 0) return { skipped: true, tasks: 0 };
+      if (activeMappings.length === 0) return { skipped: true, reason: "no_project_mapping", direction: "inbound", inbound };
 
       const viewer = await client.viewer();
-      let count = 0;
       for (const teamId of [...new Set(activeMappings.map((mapping) => mapping.teamId))]) {
         const issues = await client.listAssignedIssues({ teamId, assigneeId: viewer.id });
+        inbound.issues.seen += issues.length;
         for (const issue of issues) {
           const nextStatus = issueStateToLocalStatus(issue.state);
           const project = localProjectForIssue(activeMappings, issue);
@@ -30,35 +31,43 @@ export function createLinearProvider(config, deps) {
             deps.markInboundApplied(task, LINEAR_SYSTEM);
             deps.upsertExternalLink(task.externalLinks, linearIssueLink(issue));
             idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
-            count++;
+            inbound.completedTasks.markedDone++;
+            if (!link?.externalId) inbound.completedTasks.linked++;
             continue;
           }
           if (!project) continue;
-          const task = linkedTask
-            ?? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps)
-            ?? createLocalTaskFromLinear(store, idx, issue, project, deps);
+          let task = linkedTask ?? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps);
+          const created = !task;
+          if (!task) task = createLocalTaskFromLinear(store, idx, issue, project, deps);
           const link = deps.getExternalLink(task, LINEAR_SYSTEM);
+          const linked = !link?.externalId;
           if (link?.externalId && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
 
+          const nextDetails = stripLocalMetadata(issue.description ?? null);
+          const nextDueAt = linearDueToLocalDueAt(issue.dueDate, deps);
           const changed = task.projectId !== project.id
             || task.description !== issue.title
-            || (task.details ?? "") !== (stripLocalMetadata(issue.description ?? null) ?? "")
-            || task.dueAt !== linearDueToLocalDueAt(issue.dueDate, deps)
+            || (task.details ?? null) !== nextDetails
+            || task.dueAt !== nextDueAt
             || task.status !== nextStatus;
           task.projectId = project.id;
           task.description = issue.title;
-          task.details = stripLocalMetadata(issue.description ?? null);
-          task.dueAt = linearDueToLocalDueAt(issue.dueDate, deps);
+          task.details = nextDetails;
+          task.dueAt = nextDueAt;
           task.status = nextStatus;
           if (changed) task.updatedAt = deps.nowIso();
           deps.markInboundApplied(task, LINEAR_SYSTEM);
           deps.upsertExternalLink(task.externalLinks, linearIssueLink(issue, project, deps));
           idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
-          count++;
+          if (created) inbound.activeTasks.created++;
+          else {
+            if (changed) inbound.activeTasks.updated++;
+            if (linked) inbound.activeTasks.linked++;
+          }
         }
       }
 
-      return { skipped: false, tasks: count };
+      return { skipped: false, direction: "inbound", inbound };
     },
 
     async createProject() {
@@ -124,6 +133,14 @@ export function createLinearProvider(config, deps) {
       const updated = await client.updateIssue(remote.id, update);
       deps.upsertExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
     },
+  };
+}
+
+export function emptyLinearInboundStats() {
+  return {
+    issues: { seen: 0 },
+    activeTasks: { created: 0, updated: 0, linked: 0 },
+    completedTasks: { markedDone: 0, linked: 0 },
   };
 }
 

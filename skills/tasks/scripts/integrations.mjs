@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import { createLinearProvider } from "./linear-provider.mjs";
-import { createTodoistProvider } from "./todoist-provider.mjs";
+import { createLinearProvider, emptyLinearInboundStats } from "./linear-provider.mjs";
+import { createTodoistProvider, emptyTodoistInboundStats } from "./todoist-provider.mjs";
 
 export function loadIntegrations(configPath) {
   if (!fs.existsSync(configPath)) return {};
@@ -24,13 +24,13 @@ export function configuredProviders(configPath, deps) {
 
 export async function syncTodoistIntegration(configPath, store, idx, input, deps) {
   const integrations = loadIntegrations(configPath);
-  if (!integrations.todoist) return { skipped: true, projects: 0, activeTasks: 0, completedTasks: 0 };
+  if (!integrations.todoist) return { skipped: true, reason: "no_api_key", direction: "inbound", inbound: emptyTodoistInboundStats() };
   return createTodoistProvider(integrations.todoist, deps).syncIn(store, idx, input);
 }
 
 export async function syncLinearIntegration(configPath, store, idx, input, deps) {
   const integrations = loadIntegrations(configPath);
-  if (!integrations.linear) return { skipped: true, tasks: 0 };
+  if (!integrations.linear) return { skipped: true, reason: "no_api_key", direction: "inbound", inbound: emptyLinearInboundStats() };
   return createLinearProvider(integrations.linear, deps).syncIn(store, idx, input);
 }
 

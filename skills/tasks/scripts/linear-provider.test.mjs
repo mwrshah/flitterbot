@@ -117,7 +117,8 @@ test("Linear inbound sync marks existing local tasks done from completed issues"
 
   const result = await createLinearProvider({ apiKey: "token" }, deps).syncIn(store, makeIdx(store, deps), {});
 
-  assert.equal(result.tasks, 1);
+  assert.equal(result.inbound.issues.seen, 1);
+  assert.equal(result.inbound.completedTasks.markedDone, 1);
   assert.equal(store.tasks.length, 1);
   assert.equal(task.status, "done");
   assert.equal(task.updatedAt, "2026-05-10T10:30:00.000Z");
@@ -130,7 +131,8 @@ test("Linear inbound sync does not import completed issues absent locally", asyn
 
   const result = await createLinearProvider({ apiKey: "token" }, deps).syncIn(store, makeIdx(store, deps), {});
 
-  assert.equal(result.tasks, 0);
+  assert.equal(result.inbound.issues.seen, 1);
+  assert.equal(result.inbound.completedTasks.markedDone, 0);
   assert.equal(store.tasks.length, 0);
 });
 
@@ -141,7 +143,8 @@ test("Linear inbound sync still imports active issues", async (t) => {
 
   const result = await createLinearProvider({ apiKey: "token" }, deps).syncIn(store, makeIdx(store, deps), {});
 
-  assert.equal(result.tasks, 1);
+  assert.equal(result.inbound.issues.seen, 1);
+  assert.equal(result.inbound.activeTasks.created, 1);
   assert.equal(store.tasks.length, 1);
   assert.equal(store.tasks[0].description, "Active upstream");
   assert.equal(store.tasks[0].status, "active");

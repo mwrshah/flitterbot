@@ -125,7 +125,8 @@ test("Todoist inbound sync marks existing local tasks done from completed histor
 
   const result = await createTodoistProvider({ apiKey: "token" }, deps).syncIn(store, idx, { completed_since: "2026-02-10" });
 
-  assert.equal(result.completedTasks, 1);
+  assert.equal(result.inbound.completedTasks.seen, 1);
+  assert.equal(result.inbound.completedTasks.markedDone, 1);
   assert.equal(task.status, "done");
   assert.equal(task.updatedAt, "2026-05-10T10:30:00.000Z");
   assert.equal(completedRequests.length, 1);
@@ -158,7 +159,8 @@ test("Todoist inbound sync does not import completed tasks absent locally", asyn
 
   const result = await createTodoistProvider({ apiKey: "token" }, deps).syncIn(store, idx, {});
 
-  assert.equal(result.completedTasks, 0);
+  assert.equal(result.inbound.completedTasks.seen, 1);
+  assert.equal(result.inbound.completedTasks.markedDone, 0);
   assert.equal(store.tasks.length, 0);
 });
 
@@ -188,7 +190,8 @@ test("Todoist active inbound sync still imports active tasks", async (t) => {
 
   const result = await createTodoistProvider({ apiKey: "token" }, deps).syncIn(store, idx, {});
 
-  assert.equal(result.activeTasks, 1);
+  assert.equal(result.inbound.activeTasks.seen, 1);
+  assert.equal(result.inbound.activeTasks.created, 1);
   assert.equal(store.tasks.length, 1);
   assert.equal(store.tasks[0].description, "Active upstream");
   assert.equal(store.tasks[0].status, "active");

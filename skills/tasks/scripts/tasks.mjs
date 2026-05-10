@@ -213,7 +213,7 @@ async function execute(input) {
       const linear = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
-      return ok(`Maintained tasks: removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`, { todoist, linear, cleanup });
+      return ok(formatMaintenanceMessage({ todoist, linear, cleanup }), { todoist, linear, cleanup });
     }
     case "sync_todoist": {
       const beforeSignature = storeDataSignature(store);
@@ -221,12 +221,7 @@ async function execute(input) {
       const result = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
-      return ok(
-        result.skipped
-          ? `Todoist sync skipped. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`
-          : `Synced Todoist: ${result.projects} projects, ${result.activeTasks} active tasks, ${result.completedTasks} completed tasks. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`,
-        { ...result, cleanup },
-      );
+      return ok(formatProviderSyncMessage("Todoist", result, cleanup), { ...result, cleanup });
     }
     case "sync_linear": {
       const beforeSignature = storeDataSignature(store);
@@ -234,12 +229,7 @@ async function execute(input) {
       const result = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
-      return ok(
-        result.skipped
-          ? `Linear sync skipped. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`
-          : `Synced Linear: ${result.tasks} tasks. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`,
-        { ...result, cleanup },
-      );
+      return ok(formatProviderSyncMessage("Linear", result, cleanup), { ...result, cleanup });
     }
     default:
       throw new Error(`Unknown action: ${String(action)}`);
@@ -290,6 +280,60 @@ function cleanupCompletedTasks(store, input) {
     return updatedAt >= cutoff;
   });
   return { removedTasks: before - store.tasks.length, retentionDays };
+}
+
+function formatMaintenanceMessage({ todoist, linear, cleanup }) {
+  return [
+    "Maintained tasks.",
+    formatProviderSyncLine("Todoist", todoist),
+    formatProviderSyncLine("Linear", linear),
+    formatCleanupLine(cleanup),
+  ].join("\n");
+}
+
+function formatProviderSyncMessage(providerName, result, cleanup) {
+  return [
+    `${providerName} sync ${result.skipped ? "skipped" : "finished"}.`,
+    formatProviderSyncLine(providerName, result),
+    formatCleanupLine(cleanup),
+  ].join("\n");
+}
+
+function formatProviderSyncLine(providerName, result) {
+  const outward = "outward not run";
+  if (result.skipped) return `- ${providerName}: inward skipped${result.reason ? ` (${formatSkipReason(result.reason)})` : ""}; ${outward}.`;
+  const stats = providerName === "Todoist" ? todoistInwardTotals(result.inbound) : linearInwardTotals(result.inbound);
+  return `- ${providerName}: ${stats.created} created inward, ${stats.updated} updated inward, ${stats.linked} linked inward; ${outward}.`;
+}
+
+function todoistInwardTotals(inbound) {
+  return {
+    created: inbound.projects.created + inbound.activeTasks.created,
+    updated: inbound.projects.updated + inbound.activeTasks.updated + inbound.completedTasks.markedDone,
+    linked: inbound.projects.linked + inbound.activeTasks.linked + inbound.completedTasks.linked,
+  };
+}
+
+function linearInwardTotals(inbound) {
+  return {
+    created: inbound.activeTasks.created,
+    updated: inbound.activeTasks.updated + inbound.completedTasks.markedDone,
+    linked: inbound.activeTasks.linked + inbound.completedTasks.linked,
+  };
+}
+
+function formatCleanupLine(cleanup) {
+  return `- Cleanup: removed ${cleanup.removedTasks} completed ${plural("task", cleanup.removedTasks)} older than ${cleanup.retentionDays} days.`;
+}
+
+function formatSkipReason(reason) {
+  if (reason === "no_api_key") return "no API key configured";
+  if (reason === "no_project_mapping") return "no active project has a Linear team mapping";
+  return String(reason).replaceAll("_", " ");
+}
+
+function plural(word, count) {
+  return count === 1 ? word : `${word}s`;
 }
 
 function listProjects(store, includeArchived) {
@@ -822,7 +866,7 @@ if (process.argv.includes("--help")) {
 Default output is concise Markdown/text for model and human consumption.
 Use --json, --format json, or request field "format":"json" for machine-readable JSON.
 
-Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task, sync_todoist, sync_linear`);
+Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task, maintain_tasks, sync_todoist, sync_linear`);
   process.exit(0);
 }
 
