@@ -532,7 +532,7 @@ async function bootstrapConfig() {
     },
   ];
   const DEFAULT_AGENT_FIRST_MESSAGE =
-    "/skill:tasks /skill:notes\n\nUse notes/tasks operations. Run ls on the project repositories directory.";
+    "Load up /skill:tasks /skill:notes\n\n for notes/tasks operations. Run ls on the project repositories directory.";
   const DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER =
     "IMPORTANT! Before doing  anything else, load the /skill:tmux pls";
 
