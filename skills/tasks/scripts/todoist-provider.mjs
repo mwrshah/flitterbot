@@ -8,16 +8,21 @@ export function createTodoistProvider(config, deps) {
     system: TODOIST_SYSTEM,
 
     async syncIn(store, idx, input) {
+      const inbound = emptyTodoistInboundStats();
       const remoteProjects = await todoist.listProjects();
       const remoteActiveProjects = remoteProjects.filter((project) => !project.is_deleted && !project.is_archived);
+      inbound.projects.seen = remoteActiveProjects.length;
       assertFlattenableProjectNames(remoteActiveProjects, deps);
 
       for (const remoteProject of remoteActiveProjects) {
-        const project = idx.projectsByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteProject.id))
-          ?? idx.projectsByName.get(deps.normalizeName(remoteProject.name))
-          ?? deps.createProject(store, idx, remoteProject.name);
+        let project = idx.projectsByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteProject.id))
+          ?? idx.projectsByName.get(deps.normalizeName(remoteProject.name));
+        const created = !project;
+        if (!project) project = deps.createProject(store, idx, remoteProject.name);
         const link = deps.getExternalLink(project, TODOIST_SYSTEM);
+        const linked = !link?.externalId;
         if (link?.externalId && !deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) continue;
+        const updated = project.name !== remoteProject.name || project.archived !== false;
         project.name = remoteProject.name;
         project.archived = false;
         project.updatedAt = deps.nowIso();
@@ -25,12 +30,16 @@ export function createTodoistProvider(config, deps) {
         deps.upsertExternalLink(project.externalLinks, todoistProjectLink(remoteProject, deps));
         idx.projectsByName.set(deps.normalizeName(project.name), project);
         idx.projectsByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteProject.id), project);
+        if (created) inbound.projects.created++;
+        else {
+          if (updated) inbound.projects.updated++;
+          if (linked) inbound.projects.linked++;
+        }
       }
 
-      const activeTasks = await todoist.listTasks();
-      const seenTodoistTaskIds = new Set();
-      for (const remoteTask of activeTasks.filter((task) => !task.is_deleted)) {
-        seenTodoistTaskIds.add(remoteTask.id);
+      const activeTasks = (await todoist.listTasks()).filter((task) => !task.is_deleted);
+      inbound.activeTasks.seen = activeTasks.length;
+      for (const remoteTask of activeTasks) {
         const remoteProject = remoteProjects.find((project) => project.id === remoteTask.project_id);
         const projectName = remoteProject?.name ?? "Inbox";
         const project = idx.projectsByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.project_id))
@@ -41,25 +50,39 @@ export function createTodoistProvider(config, deps) {
           if (!projectLink?.externalId || deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) deps.upsertExternalLink(project.externalLinks, todoistProjectLink(remoteProject));
         }
 
-        const task = idx.tasksByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.id))
-          ?? findUnlinkedTaskByNameAndProject(store, remoteTask.content, project.id, deps)
-          ?? createLocalTaskFromTodoist(store, idx, remoteTask, project, deps);
+        let task = idx.tasksByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.id))
+          ?? findUnlinkedTaskByNameAndProject(store, remoteTask.content, project.id, deps);
+        const created = !task;
+        if (!task) task = createLocalTaskFromTodoist(store, idx, remoteTask, project, deps);
         const link = deps.getExternalLink(task, TODOIST_SYSTEM);
+        const linked = !link?.externalId;
         if (link?.externalId && !deps.shouldApplyInbound(task, remoteTask.updated_at, TODOIST_SYSTEM)) continue;
 
+        const nextDetails = deps.nullableTrim(remoteTask.description);
+        const nextDueAt = todoistDueToLocalDueAt(remoteTask.due, deps);
+        const updated = task.projectId !== project.id
+          || task.description !== remoteTask.content
+          || (task.details ?? null) !== nextDetails
+          || task.dueAt !== nextDueAt
+          || task.status !== "active";
         task.projectId = project.id;
         task.description = remoteTask.content;
-        task.details = deps.nullableTrim(remoteTask.description);
-        task.dueAt = todoistDueToLocalDueAt(remoteTask.due, deps);
+        task.details = nextDetails;
+        task.dueAt = nextDueAt;
         task.status = "active";
         task.updatedAt = deps.nowIso();
         deps.markInboundApplied(task, TODOIST_SYSTEM);
         deps.upsertExternalLink(task.externalLinks, todoistTaskLink(remoteTask, remoteProject, deps));
         idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
+        if (created) inbound.activeTasks.created++;
+        else {
+          if (updated) inbound.activeTasks.updated++;
+          if (linked) inbound.activeTasks.linked++;
+        }
       }
 
-      const completedTasks = await syncExistingTodoistCompletions(todoist, store, idx, remoteProjects, input, deps);
-      return { skipped: false, projects: remoteActiveProjects.length, activeTasks: activeTasks.length, completedTasks };
+      inbound.completedTasks = await syncExistingTodoistCompletions(todoist, store, idx, remoteProjects, input, deps);
+      return { skipped: false, direction: "inbound", inbound };
     },
 
     async createProject({ name }) {
@@ -139,21 +162,31 @@ export function createTodoistProvider(config, deps) {
 
 async function syncExistingTodoistCompletions(todoist, store, idx, remoteProjects, input, deps) {
   const completedTasks = await todoist.listCompleted(completedSyncRange(input, deps));
-  let count = 0;
+  const stats = { seen: completedTasks.length, markedDone: 0, linked: 0 };
   for (const remoteTask of completedTasks) {
     const project = resolveTodoistProjectForTask(idx, remoteProjects, remoteTask, deps);
     const task = idx.tasksByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.id))
       ?? (project ? findUnlinkedTaskByNameAndProject(store, remoteTask.content, project.id, deps) : undefined);
     if (!task || task.status === "done") continue;
-    if (!deps.shouldApplyInbound(task, remoteTask.completed_at ?? remoteTask.updated_at, TODOIST_SYSTEM)) continue;
+    const link = deps.getExternalLink(task, TODOIST_SYSTEM);
+    if (link?.externalId && !deps.shouldApplyInbound(task, remoteTask.completed_at ?? remoteTask.updated_at, TODOIST_SYSTEM)) continue;
     task.status = "done";
     task.updatedAt = deps.nowIso();
     deps.markInboundApplied(task, TODOIST_SYSTEM);
     deps.upsertExternalLink(task.externalLinks, todoistTaskLink(remoteTask));
     idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
-    count++;
+    stats.markedDone++;
+    if (!link?.externalId) stats.linked++;
   }
-  return count;
+  return stats;
+}
+
+export function emptyTodoistInboundStats() {
+  return {
+    projects: { seen: 0, created: 0, updated: 0, linked: 0 },
+    activeTasks: { seen: 0, created: 0, updated: 0, linked: 0 },
+    completedTasks: { seen: 0, markedDone: 0, linked: 0 },
+  };
 }
 
 function resolveTodoistProjectForTask(idx, remoteProjects, remoteTask, deps) {
