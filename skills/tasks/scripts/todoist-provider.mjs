@@ -58,22 +58,8 @@ export function createTodoistProvider(config, deps) {
         idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
       }
 
-      const completedSince = deps.optionalString(input.completed_since) ?? deps.isoDate(deps.addDays(new Date(), -Number(input.completed_days ?? 90)));
-      const completedTasks = await todoist.listCompleted(completedSince);
-      const completedById = new Map(completedTasks.map((task) => [task.id, task]));
-      for (const task of store.tasks) {
-        const link = deps.getExternalLink(task, TODOIST_SYSTEM);
-        if (!link?.externalId || seenTodoistTaskIds.has(link.externalId)) continue;
-        const completed = completedById.get(link.externalId);
-        if (!completed) continue;
-        if (!deps.shouldApplyInbound(task, completed.completed_at, TODOIST_SYSTEM)) continue;
-        task.status = "done";
-        task.updatedAt = deps.nowIso();
-        deps.markInboundApplied(task, TODOIST_SYSTEM);
-        deps.upsertExternalLink(task.externalLinks, todoistCompletedTaskLink(link));
-      }
-
-      return { skipped: false, projects: remoteActiveProjects.length, activeTasks: activeTasks.length, completedTasks: completedTasks.length };
+      const completedTasks = await syncExistingTodoistCompletions(todoist, store, idx, remoteProjects, input, deps);
+      return { skipped: false, projects: remoteActiveProjects.length, activeTasks: activeTasks.length, completedTasks };
     },
 
     async createProject({ name }) {
@@ -149,6 +135,33 @@ export function createTodoistProvider(config, deps) {
       deps.upsertExternalLink(patch.externalLinks, link);
     },
   };
+}
+
+async function syncExistingTodoistCompletions(todoist, store, idx, remoteProjects, input, deps) {
+  const completedTasks = await todoist.listCompleted(completedSyncRange(input, deps));
+  let count = 0;
+  for (const remoteTask of completedTasks) {
+    const project = resolveTodoistProjectForTask(idx, remoteProjects, remoteTask, deps);
+    const task = idx.tasksByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.id))
+      ?? (project ? findUnlinkedTaskByNameAndProject(store, remoteTask.content, project.id, deps) : undefined);
+    if (!task || task.status === "done") continue;
+    if (!deps.shouldApplyInbound(task, remoteTask.completed_at ?? remoteTask.updated_at, TODOIST_SYSTEM)) continue;
+    task.status = "done";
+    task.updatedAt = deps.nowIso();
+    deps.markInboundApplied(task, TODOIST_SYSTEM);
+    deps.upsertExternalLink(task.externalLinks, todoistTaskLink(remoteTask));
+    idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
+    count++;
+  }
+  return count;
+}
+
+function resolveTodoistProjectForTask(idx, remoteProjects, remoteTask, deps) {
+  const projectId = remoteTask.project_id;
+  if (!projectId) return undefined;
+  const remoteProject = remoteProjects.find((project) => project.id === projectId);
+  return idx.projectsByExternal.get(deps.externalKey(TODOIST_SYSTEM, projectId))
+    ?? (remoteProject ? idx.projectsByName.get(deps.normalizeName(remoteProject.name)) : undefined);
 }
 
 function assertFlattenableProjectNames(remoteActiveProjects, deps) {
@@ -246,7 +259,7 @@ function todoistClient(apiKey) {
         out.push(...data);
         cursor = null;
       } else {
-        out.push(...(data?.results ?? []));
+        out.push(...(data?.results ?? data?.items ?? []));
         cursor = data?.next_cursor ?? null;
       }
     } while (cursor);
@@ -266,8 +279,26 @@ function todoistClient(apiKey) {
     updateTask: (id, body) => request("POST", `/tasks/${encodeURIComponent(id)}`, body),
     moveTask: (id, body) => request("POST", `/tasks/${encodeURIComponent(id)}/move`, body),
     completeTask: (id) => request("POST", `/tasks/${encodeURIComponent(id)}/close`, {}),
-    listCompleted: (since) => listPaginated("/tasks/completed/by_completion_date", { since, limit: 200 }),
+    listCompleted: ({ since, until }) => listPaginated("/tasks/completed/by_completion_date", { since, until, limit: 200 }),
   };
+}
+
+function completedSyncRange(input, deps) {
+  const explicitUntil = deps.optionalString(input.completed_until);
+  const until = toTodoistDateTime(explicitUntil ?? deps.nowIso(), "completed_until");
+  const explicitSince = deps.optionalString(input.completed_since);
+  const days = Number(input.completed_days ?? 90);
+  const retentionDays = Number.isFinite(days) && days >= 0 ? days : 90;
+  const since = explicitSince
+    ? toTodoistDateTime(explicitSince, "completed_since")
+    : deps.addDays(new Date(until), -retentionDays).toISOString();
+  return { since, until };
+}
+
+function toTodoistDateTime(value, name) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`${name} must be a valid date or datetime`);
+  return date.toISOString();
 }
 
 function todoistProjectLink(project) {
@@ -283,10 +314,6 @@ function todoistTaskLink(task) {
     externalId: task.id,
     url: task.url,
   };
-}
-
-function todoistCompletedTaskLink(previousLink) {
-  return { ...previousLink };
 }
 
 function todoistDueToLocalDueAt(due, deps) {

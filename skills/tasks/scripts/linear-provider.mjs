@@ -11,23 +11,35 @@ export function createLinearProvider(config, deps) {
     async syncIn(store, idx, input = {}) {
       const activeMappings = mappedActiveProjects(store, deps);
       if (activeMappings.length === 0) return { skipped: true, tasks: 0 };
-      const completedCutoff = completedSyncCutoff(input, deps);
 
       const viewer = await client.viewer();
       let count = 0;
       for (const teamId of [...new Set(activeMappings.map((mapping) => mapping.teamId))]) {
         const issues = await client.listAssignedIssues({ teamId, assigneeId: viewer.id });
         for (const issue of issues) {
-          if (!shouldSyncLinearIssue(issue, completedCutoff)) continue;
+          const nextStatus = issueStateToLocalStatus(issue.state);
           const project = localProjectForIssue(activeMappings, issue);
+          const linkedTask = idx.tasksByExternal.get(deps.externalKey(LINEAR_SYSTEM, issue.id));
+          if (nextStatus === "done") {
+            const task = linkedTask ?? (project ? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps) : undefined);
+            if (!task || task.status === "done") continue;
+            const link = deps.getExternalLink(task, LINEAR_SYSTEM);
+            if (link?.externalId && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
+            task.status = "done";
+            task.updatedAt = deps.nowIso();
+            deps.markInboundApplied(task, LINEAR_SYSTEM);
+            deps.upsertExternalLink(task.externalLinks, linearIssueLink(issue));
+            idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
+            count++;
+            continue;
+          }
           if (!project) continue;
-          const task = idx.tasksByExternal.get(deps.externalKey(LINEAR_SYSTEM, issue.id))
+          const task = linkedTask
             ?? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps)
             ?? createLocalTaskFromLinear(store, idx, issue, project, deps);
           const link = deps.getExternalLink(task, LINEAR_SYSTEM);
           if (link?.externalId && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
 
-          const nextStatus = issueStateToLocalStatus(issue.state);
           const changed = task.projectId !== project.id
             || task.description !== issue.title
             || (task.details ?? "") !== (stripLocalMetadata(issue.description ?? null) ?? "")
@@ -79,6 +91,7 @@ export function createLinearProvider(config, deps) {
       if (!existingLink?.externalId && !mapping?.teamId) return;
 
       if (!existingLink?.externalId) {
+        if (patch.status === "done") return;
         await this.createTask({
           project: patch.project,
           description: patch.description,
@@ -181,24 +194,6 @@ async function statesForTeam(client, cache, teamId) {
 function stateIdForLocalTask(states, task) {
   if (task.status === "done") return stateByType(states, "completed")?.id;
   return stateByType(states, "unstarted")?.id ?? stateByType(states, "backlog")?.id;
-}
-
-function shouldSyncLinearIssue(issue, completedCutoff) {
-  if (issueStateToLocalStatus(issue.state) !== "done") return true;
-  const completedAt = Date.parse(issue.completedAt ?? issue.updatedAt ?? "");
-  if (Number.isNaN(completedAt)) return false;
-  return completedAt >= completedCutoff;
-}
-
-function completedSyncCutoff(input, deps) {
-  const explicit = deps.optionalString(input.completed_since);
-  if (explicit) {
-    const parsed = Date.parse(explicit);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  const days = Number(input.completed_days ?? 90);
-  const retentionDays = Number.isFinite(days) && days >= 0 ? days : 90;
-  return deps.addDays(new Date(), -retentionDays).getTime();
 }
 
 function issueStateToLocalStatus(state) {

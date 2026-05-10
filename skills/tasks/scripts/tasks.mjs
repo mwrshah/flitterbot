@@ -507,7 +507,6 @@ function providerDeps(syncContext) {
     createProject,
     externalKey,
     getExternalLink,
-    isoDate,
     localDateKey,
     localTodayStartIso,
     normalizeMaybeDate,
@@ -626,10 +625,6 @@ function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
-}
-
-function isoDate(date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function localDateKey(date) {

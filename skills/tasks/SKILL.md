@@ -115,7 +115,7 @@ node scripts/tasks.mjs '{"action":"maintain_tasks"}'
 - Do not run maintenance periodically after that inside the same agent session. New skill invocations/sessions are the periodic boundary.
 
 ## Todoist Sync Rules
-- Inbound sync: Todoist wins. Cloud changes overwrite local linked tasks and attach Todoist IDs to matching local tasks by project + description. Completed Todoist history is read for the last 90 days by default.
+- Inbound sync imports active Todoist tasks and updates existing local tasks from completed Todoist history. Completed Todoist tasks are never imported as new local tasks; they only mark an already-local linked or project+description-matched task `done`. `completed_days` defaults to 90, and `completed_since`/`completed_until` can override the completion window.
 - Outbound mutation: Flitterbot wins only if Todoist is not newer than the local record. If Todoist `updated_at` is newer than local `updatedAt`, the mutation fails and local data is not changed; run maintenance/sync first.
 - Todoist recurring task completion is intentionally disabled for sync-out. Complete recurring tasks in Todoist, then run `sync_todoist`.
 - Local `create_task`, `update_task`, `create_project`, and `update_project` auto-mutate configured providers before local write.
@@ -126,9 +126,10 @@ node scripts/tasks.mjs '{"action":"maintain_tasks"}'
 - A local project syncs to Linear only when its project object has `linearTeamId`. Optional `linearProjectId` assigns created/updated issues to a Linear Project.
 - Local project name is appended to Linear issue descriptions as `[proj_name-<local project>]`.
 - Linear workflow statuses are team-specific, but local sync only uses Linear status categories. Local `active` maps to the first `unstarted` state; local `done` maps to the first `completed` state. Inbound Linear `completed` and `canceled` issues become local `done`; all other Linear states become local `active`.
-- Linear inbound sync pulls only issues assigned to the current Linear API user from teams linked to active local projects. Completed/canceled Linear issues sync in only if completed in the last 90 days by default.
+- Linear inbound sync pulls issues assigned to the current Linear API user from teams linked to active local projects. Active issues may create/update local tasks. Completed/canceled Linear issues never create new local tasks; they only mark an already-local linked or project+description-matched task `done`.
 - Linear wins on inbound sync when Linear `updatedAt` is newer than local `updatedAt`. Outbound local mutation fails if the Linear issue `updatedAt` is newer than local `updatedAt`.
 - Local due dates map to Linear `dueDate`.
+- Linear outbound sync does not create new Linear issues for already-completed local tasks. Existing linked Linear issues can still be marked complete when the local task is completed.
 
 ## Workflow
 
