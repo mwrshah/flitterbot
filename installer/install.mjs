@@ -559,6 +559,8 @@ async function bootstrapConfig() {
     newStreamFirstMessageFooter: DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER,
     tmuxEnabled: true,
     extraSkillPaths: [],
+    todoistApiKey: "",
+    linearApiKey: "",
   };
 
   // Defaults fill when a key is absent or null so config.json visibly records
@@ -614,6 +616,7 @@ function normalizeHomePath(v) {
 function reportConfigOverrides(config, defaults) {
   const overrides = [];
   for (const [key, def] of Object.entries(defaults)) {
+    if (key === "todoistApiKey" || key === "linearApiKey") continue;
     const a = canonicalJson(normalizeHomePath(config[key]));
     const b = canonicalJson(normalizeHomePath(def));
     if (a !== b) {

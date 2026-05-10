@@ -24,6 +24,8 @@ describe("validateKnownConfigKeys", () => {
               thinkingLevel: "low",
             },
           ],
+          todoistApiKey: "secret",
+          linearApiKey: "secret",
         },
         "/tmp/config.json",
       ),

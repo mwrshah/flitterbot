@@ -3,12 +3,15 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { configuredProviders, syncLinearIntegration, syncTodoistIntegration } from "./integrations.mjs";
 
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
+const DEFAULT_COMPLETED_RETENTION_DAYS = 90;
 const ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const ID_LENGTH = 10;
 const DEFAULT_STORE_PATH = path.join(os.homedir(), ".flitterbot", "data", "tasks", "tasks.json");
 const STORE_PATH = process.env.FLITTERBOT_TASKS_FILE || DEFAULT_STORE_PATH;
+const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || path.join(os.homedir(), ".flitterbot", "config.json");
 
 function nowIso() {
   return new Date().toISOString();
@@ -41,6 +44,15 @@ function writeStore(store) {
   fs.writeFileSync(tmp, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   fs.renameSync(tmp, STORE_PATH);
   return normalized;
+}
+
+function writeStoreIfChanged(store, beforeSignature) {
+  if (storeDataSignature(store) === beforeSignature) return store;
+  return writeStore(store);
+}
+
+function storeDataSignature(store) {
+  return JSON.stringify({ version: store.version, projects: store.projects, tasks: store.tasks });
 }
 
 function normalizeStore(input) {
@@ -85,6 +97,9 @@ function normalizeProject(input) {
     id: stringOr(value.id, compactId()),
     name: stringOr(value.name, "Inbox").trim() || "Inbox",
     archived: value.archived === true,
+    externalLinks: normalizeExternalLinks(value.externalLinks ?? value.external_links ?? []),
+    linearTeamId: optionalString(value.linearTeamId ?? value.linear_team_id) ?? null,
+    linearProjectId: optionalString(value.linearProjectId ?? value.linear_project_id) ?? null,
     createdAt: normalizeMaybeDate(value.createdAt, now),
     updatedAt: normalizeMaybeDate(value.updatedAt, now),
   };
@@ -93,24 +108,32 @@ function normalizeProject(input) {
 function normalizeTask(input) {
   const value = input && typeof input === "object" ? input : {};
   const now = nowIso();
-  const status = value.status === "done" ? "done" : "active";
   return {
     id: stringOr(value.id, compactId()),
     projectId: stringOr(value.projectId, ""),
     description: stringOr(value.description, "").trim(),
     details: nullableTrim(value.details),
     dueAt: normalizeMaybeDate(value.dueAt, localTodayStartIso()),
-    status,
+    status: value.status === "done" ? "done" : "active",
     externalLinks: normalizeExternalLinks(value.externalLinks ?? value.external_links ?? []),
     createdAt: normalizeMaybeDate(value.createdAt, now),
     updatedAt: normalizeMaybeDate(value.updatedAt, now),
-    completedAt: status === "done" ? normalizeMaybeDate(value.completedAt, now) : null,
   };
 }
 
 function normalizeExternalLinks(links) {
   if (!Array.isArray(links)) return [];
-  return links.map(normalizeExternalLink).filter((link) => link.system);
+  const seen = new Set();
+  const out = [];
+  for (const input of links) {
+    const link = normalizeExternalLink(input);
+    if (!link.system) continue;
+    const key = `${normalizeName(link.system)}:${link.externalId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
 }
 
 function normalizeExternalLink(input) {
@@ -118,8 +141,6 @@ function normalizeExternalLink(input) {
   const link = { system: typeof input.system === "string" ? input.system.trim() : "" };
   if (typeof input.externalId === "string" && input.externalId.trim()) link.externalId = input.externalId.trim();
   if (typeof input.url === "string" && input.url.trim()) link.url = input.url.trim();
-  if (typeof input.syncedAt === "string" && input.syncedAt.trim()) link.syncedAt = normalizeDateTime(input.syncedAt);
-  if (input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata)) link.metadata = input.metadata;
   return link;
 }
 
@@ -128,15 +149,25 @@ function indexes(store) {
   const projectsByName = new Map(store.projects.map((project) => [normalizeName(project.name), project]));
   const tasksById = new Map(store.tasks.map((task) => [task.id, task]));
   const tasksByProjectId = new Map();
+  const tasksByExternal = new Map();
+  const projectsByExternal = new Map();
+  for (const project of store.projects) {
+    for (const link of project.externalLinks) {
+      if (link.externalId) projectsByExternal.set(externalKey(link.system, link.externalId), project);
+    }
+  }
   for (const task of store.tasks) {
     const list = tasksByProjectId.get(task.projectId) ?? [];
     list.push(task);
     tasksByProjectId.set(task.projectId, list);
+    for (const link of task.externalLinks) {
+      if (link.externalId) tasksByExternal.set(externalKey(link.system, link.externalId), task);
+    }
   }
-  return { projectsById, projectsByName, tasksById, tasksByProjectId };
+  return { projectsById, projectsByName, projectsByExternal, tasksById, tasksByProjectId, tasksByExternal };
 }
 
-function execute(input) {
+async function execute(input) {
   const action = input.action;
   const store = readStore();
   const idx = indexes(store);
@@ -147,18 +178,12 @@ function execute(input) {
       return ok(`Found ${projects.length} project${projects.length === 1 ? "" : "s"}.`, { projects });
     }
     case "create_project": {
-      const project = createProject(store, idx, requiredString(input.project_name, "project_name"));
+      const project = await createProjectWithProviders(store, idx, input);
       writeStore(store);
       return ok(`Created project "${project.name}".`, { project });
     }
     case "update_project": {
-      const project = resolveProject(idx, input.project_id, input.project_name);
-      if (typeof input.project_name === "string" && input.project_name.trim() && normalizeName(input.project_name) !== normalizeName(project.name)) {
-        assertProjectNameAvailable(idx, input.project_name, project.id);
-        project.name = input.project_name.trim();
-      }
-      if (typeof input.project_archived === "boolean") project.archived = input.project_archived;
-      project.updatedAt = nowIso();
+      const project = await updateProjectWithProviders(store, idx, input);
       writeStore(store);
       return ok(`Updated project "${project.name}".`, { project });
     }
@@ -172,54 +197,169 @@ function execute(input) {
       return ok(`Found task "${task.description}".`, { task: toTaskItem(task, idx) });
     }
     case "create_task": {
-      const project = typeof input.project_id === "string" && input.project_id.trim()
-        ? resolveProject(idx, input.project_id, undefined)
-        : upsertProject(store, idx, optionalString(input.project_name) ?? "Inbox");
-      const now = nowIso();
-      const task = {
-        id: uniqueId(idx, "tasks"),
-        projectId: project.id,
-        description: requiredString(input.description, "description").trim(),
-        details: nullableTrim(input.details),
-        dueAt: resolveDueAt(input.due_at, input.due_in_days),
-        status: "active",
-        externalLinks: normalizeExternalLinks(input.external_links ?? []),
-        createdAt: now,
-        updatedAt: now,
-        completedAt: null,
-      };
-      store.tasks.push(task);
+      const task = await createTaskWithProviders(store, idx, input);
       writeStore(store);
       return ok(`Created task "${task.description}".`, { task: toTaskItem(task, indexes(store)) });
     }
     case "update_task": {
-      const task = idx.tasksById.get(requiredString(input.task_id, "task_id"));
-      if (!task) throw new Error("Task not found");
-      const project = input.project_id || input.project_name
-        ? (input.project_id ? resolveProject(idx, input.project_id, undefined) : upsertProject(store, idx, input.project_name))
-        : idx.projectsById.get(task.projectId);
-      if (!project) throw new Error("Project not found");
-      if (input.description !== undefined) task.description = requiredString(input.description, "description").trim();
-      if (input.details !== undefined) task.details = nullableTrim(input.details);
-      if (input.due_at !== undefined || input.due_in_days !== undefined) task.dueAt = resolveDueAt(input.due_at, input.due_in_days);
-      if (input.status !== undefined && input.status !== "any") task.status = normalizeStatus(input.status);
-      if (input.external_links !== undefined) task.externalLinks = normalizeExternalLinks(input.external_links);
-      task.projectId = project.id;
-      task.completedAt = task.status === "done" ? (task.completedAt ?? nowIso()) : null;
-      task.updatedAt = nowIso();
+      const task = await updateTaskWithProviders(store, idx, input);
       writeStore(store);
       return ok(`Updated task "${task.description}".`, { task: toTaskItem(task, indexes(store)) });
+    }
+    case "maintain_tasks": {
+      const beforeSignature = storeDataSignature(store);
+      const syncContext = createSyncContext(store);
+      const todoist = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const linear = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const cleanup = cleanupCompletedTasks(store, input);
+      writeStoreIfChanged(store, beforeSignature);
+      return ok(`Maintained tasks: removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`, { todoist, linear, cleanup });
+    }
+    case "sync_todoist": {
+      const beforeSignature = storeDataSignature(store);
+      const syncContext = createSyncContext(store);
+      const result = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const cleanup = cleanupCompletedTasks(store, input);
+      writeStoreIfChanged(store, beforeSignature);
+      return ok(
+        result.skipped
+          ? `Todoist sync skipped. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`
+          : `Synced Todoist: ${result.projects} projects, ${result.activeTasks} active tasks, ${result.completedTasks} completed tasks. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`,
+        { ...result, cleanup },
+      );
+    }
+    case "sync_linear": {
+      const beforeSignature = storeDataSignature(store);
+      const syncContext = createSyncContext(store);
+      const result = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const cleanup = cleanupCompletedTasks(store, input);
+      writeStoreIfChanged(store, beforeSignature);
+      return ok(
+        result.skipped
+          ? `Linear sync skipped. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`
+          : `Synced Linear: ${result.tasks} tasks. Removed ${cleanup.removedTasks} completed task${cleanup.removedTasks === 1 ? "" : "s"}.`,
+        { ...result, cleanup },
+      );
     }
     default:
       throw new Error(`Unknown action: ${String(action)}`);
   }
 }
 
+function createSyncContext(store) {
+  return {
+    baselineUpdatedAt: new Map([
+      ...store.projects.map((project) => [project.id, project.updatedAt]),
+      ...store.tasks.map((task) => [task.id, task.updatedAt]),
+    ]),
+    changedByProvider: new Map(),
+  };
+}
+
+function shouldApplyInbound(syncContext, record, remoteUpdatedAt, provider) {
+  const baselineUpdatedAt = syncContext?.baselineUpdatedAt.get(record.id) ?? record.updatedAt;
+  if (!remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) return false;
+  const priorProvider = syncContext?.changedByProvider.get(record.id);
+  if (priorProvider && priorProvider !== provider) {
+    throw new Error(`Local record "${record.description ?? record.name ?? record.id}" changed upstream in both ${priorProvider} and ${provider}; resolve one side before syncing.`);
+  }
+  return true;
+}
+
+function markInboundApplied(syncContext, record, provider) {
+  syncContext?.changedByProvider.set(record.id, provider);
+}
+
+function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
+  if (!remoteUpdatedAt || !localUpdatedAt) return true;
+  const remote = Date.parse(remoteUpdatedAt);
+  const local = Date.parse(localUpdatedAt);
+  if (Number.isNaN(remote) || Number.isNaN(local)) return true;
+  return remote > local + 1000;
+}
+
+function cleanupCompletedTasks(store, input) {
+  const days = Number(input.cleanup_days ?? input.completed_days ?? DEFAULT_COMPLETED_RETENTION_DAYS);
+  const retentionDays = Number.isFinite(days) && days >= 0 ? days : DEFAULT_COMPLETED_RETENTION_DAYS;
+  const cutoff = addDays(new Date(), -retentionDays).getTime();
+  const before = store.tasks.length;
+  store.tasks = store.tasks.filter((task) => {
+    if (task.status !== "done") return true;
+    const updatedAt = Date.parse(task.updatedAt ?? "");
+    if (Number.isNaN(updatedAt)) return true;
+    return updatedAt >= cutoff;
+  });
+  return { removedTasks: before - store.tasks.length, retentionDays };
+}
+
 function listProjects(store, includeArchived) {
   return store.projects
     .filter((project) => includeArchived || !project.archived)
     .sort(compareProjects)
-    .map((project) => ({ ...project }));
+    .map((project) => cloneProject(project));
+}
+
+async function createProjectWithProviders(store, idx, input) {
+  const trimmed = requiredString(input.project_name, "project_name").trim();
+  if (!trimmed) throw new Error("project_name is required");
+  assertProjectNameAvailable(idx, trimmed);
+
+  const links = normalizeExternalLinks(input.external_links ?? []);
+  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+    const link = await provider.createProject({ name: trimmed, links });
+    if (link) upsertExternalLink(links, link);
+  }
+
+  const now = nowIso();
+  const project = {
+    id: uniqueId(idx, "projects"),
+    name: trimmed,
+    archived: false,
+    externalLinks: links,
+    linearTeamId: optionalString(input.linear_team_id ?? input.linearTeamId) ?? null,
+    linearProjectId: optionalString(input.linear_project_id ?? input.linearProjectId) ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.projects.push(project);
+  idx.projectsById.set(project.id, project);
+  idx.projectsByName.set(normalizeName(project.name), project);
+  for (const link of links) idx.projectsByExternal.set(externalKey(link.system, link.externalId), project);
+  return project;
+}
+
+async function updateProjectWithProviders(store, idx, input) {
+  const project = resolveProject(idx, input.project_id, input.project_name_current ?? input.current_project_name ?? input.project_name);
+  const nextName = typeof input.project_name === "string" && input.project_name.trim() ? input.project_name.trim() : undefined;
+  const nextArchived = typeof input.project_archived === "boolean" ? input.project_archived : undefined;
+
+  const patch = {
+    name: nextName,
+    archived: nextArchived,
+    externalLinks: input.external_links !== undefined
+      ? normalizeExternalLinks(input.external_links)
+      : project.externalLinks.map(cloneExternalLink),
+    linearTeamId: input.linear_team_id !== undefined || input.linearTeamId !== undefined
+      ? optionalString(input.linear_team_id ?? input.linearTeamId) ?? null
+      : project.linearTeamId,
+    linearProjectId: input.linear_project_id !== undefined || input.linearProjectId !== undefined
+      ? optionalString(input.linear_project_id ?? input.linearProjectId) ?? null
+      : project.linearProjectId,
+  };
+  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+    await provider.updateProject({ project, patch });
+  }
+
+  if (nextName && normalizeName(nextName) !== normalizeName(project.name)) {
+    assertProjectNameAvailable(idx, nextName, project.id);
+    project.name = nextName;
+  }
+  if (nextArchived !== undefined) project.archived = nextArchived;
+  project.externalLinks = patch.externalLinks;
+  project.linearTeamId = patch.linearTeamId;
+  project.linearProjectId = patch.linearProjectId;
+  project.updatedAt = nowIso();
+  return project;
 }
 
 function createProject(store, idx, name) {
@@ -227,7 +367,7 @@ function createProject(store, idx, name) {
   if (!trimmed) throw new Error("project_name is required");
   assertProjectNameAvailable(idx, trimmed);
   const now = nowIso();
-  const project = { id: uniqueId(idx, "projects"), name: trimmed, archived: false, createdAt: now, updatedAt: now };
+  const project = { id: uniqueId(idx, "projects"), name: trimmed, archived: false, externalLinks: [], linearTeamId: null, linearProjectId: null, createdAt: now, updatedAt: now };
   store.projects.push(project);
   idx.projectsById.set(project.id, project);
   idx.projectsByName.set(normalizeName(project.name), project);
@@ -258,6 +398,65 @@ function resolveProject(idx, id, name) {
   throw new Error("project_id or project_name is required");
 }
 
+async function createTaskWithProviders(store, idx, input) {
+  const project = typeof input.project_id === "string" && input.project_id.trim()
+    ? resolveProject(idx, input.project_id, undefined)
+    : upsertProject(store, idx, optionalString(input.project_name) ?? "Inbox");
+  const description = requiredString(input.description, "description").trim();
+  const details = nullableTrim(input.details);
+  const dueAt = resolveDueAt(input.due_at, input.due_in_days);
+  const links = normalizeExternalLinks(input.external_links ?? []);
+  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+    await provider.createTask({ store, idx, project, description, details, dueAt, links });
+  }
+
+  const now = nowIso();
+  const task = {
+    id: uniqueId(idx, "tasks"),
+    projectId: project.id,
+    description,
+    details,
+    dueAt,
+    status: "active",
+    externalLinks: links,
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.tasks.push(task);
+  return task;
+}
+
+async function updateTaskWithProviders(store, idx, input) {
+  const task = idx.tasksById.get(requiredString(input.task_id, "task_id"));
+  if (!task) throw new Error("Task not found");
+  const project = input.project_id || input.project_name
+    ? (input.project_id ? resolveProject(idx, input.project_id, undefined) : upsertProject(store, idx, input.project_name))
+    : idx.projectsById.get(task.projectId);
+  if (!project) throw new Error("Project not found");
+
+  const patch = {
+    project,
+    description: input.description !== undefined ? requiredString(input.description, "description").trim() : task.description,
+    details: input.details !== undefined ? nullableTrim(input.details) : task.details,
+    dueAt: input.due_at !== undefined || input.due_in_days !== undefined ? resolveDueAt(input.due_at, input.due_in_days) : task.dueAt,
+    status: input.status !== undefined && input.status !== "any" ? normalizeStatus(input.status) : task.status,
+    externalLinks: input.external_links !== undefined ? normalizeExternalLinks(input.external_links) : task.externalLinks.map(cloneExternalLink),
+  };
+
+  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+    await provider.updateTask({ store, idx, task, patch });
+  }
+
+  task.description = patch.description;
+  task.details = patch.details;
+  task.dueAt = patch.dueAt;
+  task.status = patch.status;
+  task.externalLinks = patch.externalLinks;
+  task.projectId = patch.project.id;
+  task.updatedAt = nowIso();
+  return task;
+}
+
 function listTasks(store, idx, options) {
   const projectNameKey = options.projectName ? normalizeName(options.projectName) : undefined;
   const project = projectNameKey ? idx.projectsByName.get(projectNameKey) : undefined;
@@ -283,7 +482,7 @@ function listTasks(store, idx, options) {
 function toTaskItem(task, idx) {
   const project = idx.projectsById.get(task.projectId);
   if (!project) throw new Error("Project not found");
-  return { ...task, externalLinks: task.externalLinks.map((link) => ({ ...link })), projectName: project.name };
+  return { ...task, externalLinks: task.externalLinks.map(cloneExternalLink), projectName: project.name };
 }
 
 function toListOptions(input) {
@@ -299,6 +498,51 @@ function toListOptions(input) {
     startAt: optionalString(input.start_at),
     endAt: optionalString(input.end_at),
   };
+}
+
+function providerDeps(syncContext) {
+  return {
+    addDays,
+    cloneExternalLink,
+    createProject,
+    externalKey,
+    getExternalLink,
+    isoDate,
+    localDateKey,
+    localTodayStartIso,
+    normalizeMaybeDate,
+    normalizeName,
+    nullableTrim,
+    optionalString,
+    nowIso,
+    remoteNewerThanLocal,
+    shouldApplyInbound: (record, remoteUpdatedAt, provider) => shouldApplyInbound(syncContext, record, remoteUpdatedAt, provider),
+    markInboundApplied: (record, provider) => markInboundApplied(syncContext, record, provider),
+    uniqueId,
+    upsertExternalLink,
+  };
+}
+
+function getExternalLink(item, system) {
+  return item.externalLinks?.find((link) => normalizeName(link.system) === normalizeName(system));
+}
+
+function upsertExternalLink(links, nextLink) {
+  const index = links.findIndex((link) => normalizeName(link.system) === normalizeName(nextLink.system));
+  if (index >= 0) links[index] = nextLink;
+  else links.push(nextLink);
+}
+
+function externalKey(system, externalId) {
+  return `${normalizeName(system)}:${String(externalId ?? "")}`;
+}
+
+function cloneProject(project) {
+  return { ...project, externalLinks: project.externalLinks.map(cloneExternalLink) };
+}
+
+function cloneExternalLink(link) {
+  return { ...link };
 }
 
 function buildRange(options) {
@@ -382,6 +626,14 @@ function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function localDateKey(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
 function requiredString(value, name) {
@@ -558,10 +810,6 @@ function relativeDateLabel(date) {
   return "";
 }
 
-function localDateKey(date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
 function pad2(value) {
   return String(value).padStart(2, "0");
 }
@@ -579,7 +827,7 @@ if (process.argv.includes("--help")) {
 Default output is concise Markdown/text for model and human consumption.
 Use --json, --format json, or request field "format":"json" for machine-readable JSON.
 
-Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task`);
+Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task, sync_todoist, sync_linear`);
   process.exit(0);
 }
 
@@ -590,7 +838,7 @@ try {
   const raw = await readInput(cli.inputArg);
   const input = raw.trim() ? JSON.parse(raw) : { action: "list_tasks" };
   outputFormat = normalizeOutputFormat(cli.outputFormat ?? input.format ?? input.output_format ?? "markdown");
-  console.log(formatOutput(execute(input), outputFormat));
+  console.log(formatOutput(await execute(input), outputFormat));
 } catch (error) {
   console.log(formatError(error, outputFormat));
   process.exitCode = 1;

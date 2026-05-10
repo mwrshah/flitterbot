@@ -54,6 +54,8 @@ type RawConfigJson = {
   newStreamFirstMessageFooter?: unknown;
   tmuxEnabled?: unknown;
   extraSkillPaths?: unknown;
+  todoistApiKey?: unknown;
+  linearApiKey?: unknown;
 };
 
 const ACCEPTED_CONFIG_KEYS = [
@@ -84,6 +86,8 @@ const ACCEPTED_CONFIG_KEYS = [
   "newStreamFirstMessageFooter",
   "tmuxEnabled",
   "extraSkillPaths",
+  "todoistApiKey",
+  "linearApiKey",
 ] as const satisfies readonly (keyof RawConfigJson)[];
 
 const ACCEPTED_MODEL_CONFIG_KEYS = ["id", "label", "provider", "modelId", "thinkingLevel"] as const;
