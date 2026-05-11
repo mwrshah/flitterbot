@@ -680,7 +680,7 @@ export const MessageInput = memo(function MessageInput({
       // guard fires and inlines SKILL.md at send time. Built-in commands are not
       // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
       const before = value.slice(0, slashIdx);
-      const after = value.slice(tokenEnd);
+      const after = value.slice(tokenEnd).trimStart();
       const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
       const newValue = before + inserted + after;
       setDraftAndStore(newValue);
@@ -704,7 +704,7 @@ export const MessageInput = memo(function MessageInput({
       let tokenEnd = atIdx + 1;
       while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
       const before = value.slice(0, atIdx);
-      const after = value.slice(tokenEnd);
+      const after = value.slice(tokenEnd).trimStart();
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
