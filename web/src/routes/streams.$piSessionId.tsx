@@ -73,15 +73,18 @@ function PiSessionRoute() {
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
   const isDefaultSession = piSessionId === defaultPiSessionId;
-  const wasDefaultSessionRef = useRef(false);
+  const previousDefaultPiSessionIdRef = useRef(defaultPiSessionId);
 
   useEffect(() => {
-    if (isDefaultSession) wasDefaultSessionRef.current = true;
-  }, [isDefaultSession]);
+    const previousDefaultPiSessionId = previousDefaultPiSessionIdRef.current;
+    if (defaultPiSessionId) previousDefaultPiSessionIdRef.current = defaultPiSessionId;
 
-  useEffect(() => {
-    if (!wasDefaultSessionRef.current) return;
-    if (!defaultPiSessionId || defaultPiSessionId === piSessionId) return;
+    // Follow the default session only when this route is still pointing at the
+    // previous default session. Manual navigation to a work stream must not be
+    // pulled back to the default stream just because this component was once on
+    // the default route.
+    if (!previousDefaultPiSessionId || !defaultPiSessionId) return;
+    if (piSessionId !== previousDefaultPiSessionId || piSessionId === defaultPiSessionId) return;
     navigate({
       to: "/streams/$piSessionId",
       params: { piSessionId: defaultPiSessionId },
