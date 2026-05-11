@@ -501,10 +501,28 @@ export const MessageInput = memo(function MessageInput({
    * followed by zero or more non-whitespace chars up to the cursor.
    */
   const handleDraftChange = useCallback(
-    (value: string) => {
+    (rawValue: string, inputEvent?: InputEvent) => {
       setHoverSendAction(null);
-      setDraftAndStore(value);
+      let value = rawValue;
       const cursor = textareaRef.current?.selectionStart ?? value.length;
+
+      // Only the literal `/` keystroke gets this normalization. Backspace,
+      // paste, programmatic edits, and later typing within `/command| text`
+      // must not keep re-inserting spaces just because a slash is nearby.
+      const typedSlash = inputEvent?.inputType === "insertText" && inputEvent.data === "/";
+      const slashBeforeCursor = cursor - 1;
+      const typedSlashBeforeText =
+        typedSlash &&
+        value.charAt(slashBeforeCursor) === "/" &&
+        /\S/.test(value.charAt(cursor)) &&
+        (slashBeforeCursor === 0 || /\s/.test(value.charAt(slashBeforeCursor - 1)));
+      if (typedSlashBeforeText) {
+        value = `${value.slice(0, cursor)} ${value.slice(cursor)}`;
+        requestAnimationFrame(() => {
+          textareaRef.current?.setSelectionRange(cursor, cursor);
+        });
+      }
+      setDraftAndStore(value);
 
       // Scan backwards from cursor to find a "/" trigger
       let slashIdx = -1;
@@ -950,7 +968,7 @@ export const MessageInput = memo(function MessageInput({
           <textarea
             ref={textareaRef}
             value={draft}
-            onChange={(e) => handleDraftChange(e.target.value)}
+            onChange={(e) => handleDraftChange(e.target.value, e.nativeEvent as InputEvent)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             rows={fillHeight ? undefined : rows}
