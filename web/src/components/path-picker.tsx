@@ -86,7 +86,9 @@ export const PathPicker = memo(function PathPicker({
     const rect = anchor.getBoundingClientRect();
     const pickerHeight = picker.offsetHeight;
     const top = Math.max(0, rect.top - pickerHeight - 4);
-    const left = rect.left + (caretLeft ?? 0);
+    const maxCaretLeft = Math.max(0, anchor.offsetWidth - picker.offsetWidth);
+    const clampedCaretLeft = Math.min(Math.max(0, caretLeft ?? 0), maxCaretLeft);
+    const left = rect.left + clampedCaretLeft;
     setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, [anchorRef, caretLeft]);
 

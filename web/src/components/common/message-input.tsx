@@ -488,7 +488,7 @@ export const MessageInput = memo(function MessageInput({
   );
 
   /**
-   * Compute the pixel X position of a character index in the textarea,
+   * Compute the pixel X position just after a trigger character in the textarea,
    * relative to the container div, using pretext's prepare + layout.
    */
   const computeSlashLeft = useCallback((value: string, slashIdx: number) => {
@@ -503,16 +503,14 @@ export const MessageInput = memo(function MessageInput({
     const contentWidth = textarea.offsetWidth - paddingLeft - paddingRight;
     const lineHeight = parseFloat(style.lineHeight);
 
-    const textBeforeTrigger = value.slice(0, slashIdx);
-    const prepared = prepareWithSegments(textBeforeTrigger, font, { whiteSpace: "pre-wrap" });
+    const textThroughTrigger = value.slice(0, slashIdx + 1);
+    const prepared = prepareWithSegments(textThroughTrigger, font, { whiteSpace: "pre-wrap" });
     const result = layoutWithLines(prepared, contentWidth, lineHeight);
 
     const lastLine = result.lines[result.lines.length - 1];
     const xOffset = lastLine ? lastLine.width : 0;
 
-    const popoverWidth = 320; // w-80
-    const maxLeft = container.offsetWidth - popoverWidth;
-    setCaretLeft(Math.min(Math.max(0, paddingLeft + xOffset), maxLeft));
+    setCaretLeft(Math.max(0, paddingLeft + xOffset));
   }, []);
 
   /**
