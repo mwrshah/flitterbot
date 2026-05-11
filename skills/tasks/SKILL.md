@@ -5,8 +5,9 @@ argument-hint: "[task request]"
 disable-model-invocation: false
 ---
 
-This skill helps us use the task system with flitterbot. Local tasks are saved by flitterbot (called local in contrast to external systems like Todoist, and Linear which can be synchronized with) 
-Use the bundled script for all actions. Optional Todoist/Linear sync runs only when their API keys are present in config.json.
+This skill helps us use the task system. Local tasks are saved to a json file (called local task store in contrast to external systems like Todoist, and Linear which can be synchronized with)
+
+We only use the bundled script for all reads, updates, writes though, for all operations. Optional Todoist/Linear sync runs only when their API keys are present in config.json.
 
 ## Supporting Files
 
