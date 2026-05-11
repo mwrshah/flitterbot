@@ -1,11 +1,9 @@
-import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
-import type { StatusResponse } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
-type WsMode = "surface" | "streams-default" | "pi-session";
+type WsMode = "surface" | "pi-session";
 
 type SubscriptionTarget = {
   piSessionId: string;
@@ -15,17 +13,9 @@ type SubscriptionTarget = {
 type MatchWithWsData = {
   staticData?: { wsMode?: WsMode };
   params?: { piSessionId?: string };
-  loaderData?: { defaultPiSessionId?: string };
 };
 
-function defaultPiSessionIdFromCache(queryClient: QueryClient): string | undefined {
-  return queryClient.getQueryData<StatusResponse>(["status"])?.piAgent?.default?.piSessionId;
-}
-
-function resolveSubscriptionTarget(
-  router: AnyRouter,
-  queryClient: QueryClient,
-): SubscriptionTarget | null {
+function resolveSubscriptionTarget(router: AnyRouter): SubscriptionTarget | null {
   const matches = router.state.matches as MatchWithWsData[];
   const activeMatch = [...matches].reverse().find((match) => match.staticData?.wsMode);
   if (!activeMatch) return null;
@@ -33,13 +23,6 @@ function resolveSubscriptionTarget(
   switch (activeMatch.staticData?.wsMode) {
     case "surface":
       return { piSessionId: "*", eventTypes: INPUT_SURFACE_EVENT_TYPES };
-    case "streams-default": {
-      // Prefer the live cache value over stale loader data — the default Streams
-      // session may have restarted with a new piSessionId since the loader ran.
-      const piSessionId =
-        defaultPiSessionIdFromCache(queryClient) ?? activeMatch.loaderData?.defaultPiSessionId;
-      return piSessionId ? { piSessionId } : null;
-    }
     case "pi-session":
       return activeMatch.params?.piSessionId
         ? { piSessionId: activeMatch.params.piSessionId }
@@ -64,12 +47,11 @@ function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null):
 export function setupWsRouteSubscriptions(
   router: AnyRouter,
   wsClient: FlitterbotWsClient,
-  queryClient: QueryClient,
 ): () => void {
   let activeTarget: SubscriptionTarget | null = null;
 
   const apply = () => {
-    const nextTarget = resolveSubscriptionTarget(router, queryClient);
+    const nextTarget = resolveSubscriptionTarget(router);
     if (sameTarget(activeTarget, nextTarget)) return;
 
     activeTarget = nextTarget;
@@ -83,15 +65,9 @@ export function setupWsRouteSubscriptions(
 
   apply();
   const unsubscribeRouter = router.subscribe("onResolved", apply);
-  const unsubscribeStatusCache = queryClient.getQueryCache().subscribe((event) => {
-    const key = event.query?.queryKey;
-    if (!key || key[0] !== "status") return;
-    apply();
-  });
 
   return () => {
     unsubscribeRouter();
-    unsubscribeStatusCache();
     wsClient.clearSessionSubscription();
   };
 }

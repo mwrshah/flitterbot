@@ -145,10 +145,11 @@ export const Sidebar = memo(function Sidebar() {
               <div className="space-y-1">
                 {defaultPiSessionId && (
                   <Link
-                    to="/streams/default"
+                    to="/streams/$piSessionId"
+                    params={{ piSessionId: defaultPiSessionId }}
                     className={cn(
                       "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
-                      currentPiSessionId === "default" ||
+                      currentPiSessionId === defaultPiSessionId ||
                         (pathname === "/streams" && !currentPiSessionId)
                         ? "bg-accent text-accent-foreground font-medium"
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",

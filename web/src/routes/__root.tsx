@@ -99,7 +99,9 @@ function useShortcutStatus(apiClient: FlitterbotApiClient) {
 function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | undefined): string[] {
   return useMemo(() => {
     const paths: string[] = [];
-    if (status?.piAgent?.default?.piSessionId) paths.push("/streams/default");
+    if (status?.piAgent?.default?.piSessionId) {
+      paths.push(`/streams/${status.piAgent.default.piSessionId}`);
+    }
     for (const s of status?.streams ?? []) {
       if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
     }

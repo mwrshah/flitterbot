@@ -8,8 +8,6 @@ disable-model-invocation: false
 This skill helps us use the task system with flitterbot. Local tasks are saved by flitterbot (called local in contrast to external systems like Todoist, and Linear which can be synchronized with) 
 Use the bundled script for all actions. Optional Todoist/Linear sync runs only when their API keys are present in config.json.
 
-FIRST THINGS FIRST ON LOAD: has a `periodic_sync_and_cleanup` already run? If it hasn’t, run it now before continuing.
-
 ## Supporting Files
 
 See [scripts/tasks.mjs](scripts/tasks.mjs) for the task API script.

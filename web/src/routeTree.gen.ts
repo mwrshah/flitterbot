@@ -13,7 +13,6 @@ import { Route as RuntimeRouteImport } from './routes/runtime'
 import { Route as StreamsRouteRouteImport } from './routes/streams.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamsIndexRouteImport } from './routes/streams.index'
-import { Route as StreamsDefaultRouteImport } from './routes/streams.default'
 import { Route as StreamsPiSessionIdRouteImport } from './routes/streams.$piSessionId'
 
 const RuntimeRoute = RuntimeRouteImport.update({
@@ -36,11 +35,6 @@ const StreamsIndexRoute = StreamsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => StreamsRouteRoute,
 } as any)
-const StreamsDefaultRoute = StreamsDefaultRouteImport.update({
-  id: '/default',
-  path: '/default',
-  getParentRoute: () => StreamsRouteRoute,
-} as any)
 const StreamsPiSessionIdRoute = StreamsPiSessionIdRouteImport.update({
   id: '/$piSessionId',
   path: '/$piSessionId',
@@ -52,14 +46,12 @@ export interface FileRoutesByFullPath {
   '/streams': typeof StreamsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
-  '/streams/default': typeof StreamsDefaultRoute
   '/streams/': typeof StreamsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/runtime': typeof RuntimeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
-  '/streams/default': typeof StreamsDefaultRoute
   '/streams': typeof StreamsIndexRoute
 }
 export interface FileRoutesById {
@@ -68,7 +60,6 @@ export interface FileRoutesById {
   '/streams': typeof StreamsRouteRouteWithChildren
   '/runtime': typeof RuntimeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
-  '/streams/default': typeof StreamsDefaultRoute
   '/streams/': typeof StreamsIndexRoute
 }
 export interface FileRouteTypes {
@@ -78,22 +69,15 @@ export interface FileRouteTypes {
     | '/streams'
     | '/runtime'
     | '/streams/$piSessionId'
-    | '/streams/default'
     | '/streams/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/runtime'
-    | '/streams/$piSessionId'
-    | '/streams/default'
-    | '/streams'
+  to: '/' | '/runtime' | '/streams/$piSessionId' | '/streams'
   id:
     | '__root__'
     | '/'
     | '/streams'
     | '/runtime'
     | '/streams/$piSessionId'
-    | '/streams/default'
     | '/streams/'
   fileRoutesById: FileRoutesById
 }
@@ -133,13 +117,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamsIndexRouteImport
       parentRoute: typeof StreamsRouteRoute
     }
-    '/streams/default': {
-      id: '/streams/default'
-      path: '/default'
-      fullPath: '/streams/default'
-      preLoaderRoute: typeof StreamsDefaultRouteImport
-      parentRoute: typeof StreamsRouteRoute
-    }
     '/streams/$piSessionId': {
       id: '/streams/$piSessionId'
       path: '/$piSessionId'
@@ -152,13 +129,11 @@ declare module '@tanstack/react-router' {
 
 interface StreamsRouteRouteChildren {
   StreamsPiSessionIdRoute: typeof StreamsPiSessionIdRoute
-  StreamsDefaultRoute: typeof StreamsDefaultRoute
   StreamsIndexRoute: typeof StreamsIndexRoute
 }
 
 const StreamsRouteRouteChildren: StreamsRouteRouteChildren = {
   StreamsPiSessionIdRoute: StreamsPiSessionIdRoute,
-  StreamsDefaultRoute: StreamsDefaultRoute,
   StreamsIndexRoute: StreamsIndexRoute,
 }
 

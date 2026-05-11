@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi, redirect } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
@@ -12,30 +13,37 @@ import {
   streamsHistoryQueryOptions,
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
+import { getBestStreamPiSessionId, isKnownStreamPiSession } from "~/lib/stream-route-targets";
+import type { StatusResponse } from "~/lib/types";
 
 export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
     wsMode: "pi-session",
   },
   loader: async ({ params, context }) => {
+    const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+    if (!isKnownStreamPiSession(status, params.piSessionId)) {
+      redirectToBestStream(status);
+    }
+
+    // Sessions and worktree are non-blocking — kick off prefetches so they're
+    // in cache when DownstreamSessionsPanel mounts, but don't hold up navigation.
+    void context.queryClient.prefetchQuery(
+      streamsDownstreamSessionsQueryOptions(params.piSessionId),
+    );
+    void context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId));
+
     // Seed from cache when available so route transitions stay instant.
     // The component query revalidates in the background on mount, giving us
     // stale-while-revalidate behavior instead of trusting cached history forever.
-    const [, history] = await Promise.all([
-      context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
-      context.queryClient
-        .ensureQueryData(streamsHistoryQueryOptions(params.piSessionId))
-        .catch((error: unknown) => {
-          if (error instanceof Error && /404|not found/i.test(error.message)) {
-            throw redirect({ to: "/streams/default" });
-          }
-          throw error;
-        }),
-      // Sessions and worktree are non-blocking — kick off prefetches so they're
-      // in cache when DownstreamSessionsPanel mounts, but don't hold up navigation.
-      context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.piSessionId)),
-      context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
-    ]);
+    const history = await context.queryClient
+      .ensureQueryData(streamsHistoryQueryOptions(params.piSessionId))
+      .catch((error: unknown) => {
+        if (error instanceof Error && /404|not found/i.test(error.message)) {
+          redirectToBestStream(status);
+        }
+        throw error;
+      });
 
     return { history };
   },
@@ -61,19 +69,40 @@ function PiSessionRoute() {
   const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
+  const navigate = useNavigate();
   const { data: status } = useQuery(statusQueryOptions(apiClient));
+  const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
+  const isDefaultSession = piSessionId === defaultPiSessionId;
+  const wasDefaultSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (isDefaultSession) wasDefaultSessionRef.current = true;
+  }, [isDefaultSession]);
+
+  useEffect(() => {
+    if (!wasDefaultSessionRef.current) return;
+    if (!defaultPiSessionId || defaultPiSessionId === piSessionId) return;
+    navigate({
+      to: "/streams/$piSessionId",
+      params: { piSessionId: defaultPiSessionId },
+      replace: true,
+    });
+  }, [defaultPiSessionId, navigate, piSessionId]);
+
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
   // Recovery kind drives which button (if any) renders in the chat header:
   //   - 'closed'  → stream itself was closed; show "Reopen"
   //   - 'dead'    → stream is open but its orchestrator pi-session ended or
   //                 crashed; show "Recover"
   //   - undefined → nothing to recover
-  const recoveryKind: "closed" | "dead" | undefined =
-    stream?.status === "closed"
+  const recoveryKind: "closed" | "dead" | undefined = isDefaultSession
+    ? undefined
+    : stream?.status === "closed"
       ? "closed"
       : stream?.piSessionStatus === "ended" || stream?.piSessionStatus === "crashed"
         ? "dead"
         : undefined;
+  const selectedModel = isDefaultSession ? status?.piAgent?.default?.model : stream?.model;
 
   const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
     piSessionId,
@@ -93,23 +122,31 @@ function PiSessionRoute() {
           timeline={timeline}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
-          streamId={stream?.id}
-          streamName={stream?.name}
-          streamHasWorktree={!!stream?.worktreePath}
-          modelSelectorMode="pi-session"
-          selectedModelId={stream?.model?.id}
-          selectedThinkingLevel={stream?.model?.thinkingLevel}
+          streamId={isDefaultSession ? undefined : stream?.id}
+          streamName={isDefaultSession ? "flitterbot" : stream?.name}
+          streamHasWorktree={!isDefaultSession && !!stream?.worktreePath}
+          modelSelectorMode={isDefaultSession ? "default" : "pi-session"}
+          selectedModelId={selectedModel?.id}
+          selectedThinkingLevel={selectedModel?.thinkingLevel}
           recoveryKind={recoveryKind}
         />
       </Panel>
       <ResizeHandle />
       <Panel id="downstream" defaultSize="50%" minSize="20%">
         <DownstreamSessionsPanel
-          key={piSessionId}
-          piSessionId={piSessionId}
-          piSessionStatus={stream?.piSessionStatus}
+          key={effectivePiSessionId}
+          piSessionId={effectivePiSessionId}
+          piSessionStatus={isDefaultSession ? undefined : stream?.piSessionStatus}
         />
       </Panel>
     </PanelGroup>
   );
+}
+
+function redirectToBestStream(status: StatusResponse): never {
+  const piSessionId = getBestStreamPiSessionId(status);
+  if (piSessionId) {
+    throw redirect({ to: "/streams/$piSessionId", params: { piSessionId } });
+  }
+  throw redirect({ to: "/" });
 }

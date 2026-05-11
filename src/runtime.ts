@@ -69,6 +69,7 @@ import {
   clearWorktreePathIfStale,
   shouldReconcileWorktreeOnRecovery,
 } from "./streams/worktree-link.ts";
+import { fireAndForgetPeriodicTaskSync } from "./tasks/periodic-sync.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
@@ -131,7 +132,6 @@ export class ControlSurfaceRuntime {
     status: "stopped",
     managedByControlSurface: true,
   };
-
   get whatsappEnabled(): boolean {
     return this.config.whatsappEnabled;
   }
@@ -168,6 +168,7 @@ export class ControlSurfaceRuntime {
     }
 
     await this.sessionManager.createDefault(this.createCustomTools("default"));
+    fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
 
     // Rehydrate dormant orchestrators for open streams from the pi sessions DB.
     // No live SDK agent is created — just the in-memory maps are populated so that
@@ -291,7 +292,10 @@ export class ControlSurfaceRuntime {
       this.log("/clear: resetting default session");
       void this.sessionManager
         .resetDefault()
-        .then(() => this.enqueueDefaultAgentFirstMessage("clear"))
+        .then(() => {
+          fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
+          this.enqueueDefaultAgentFirstMessage("clear");
+        })
         .catch((error) => {
           this.log(
             `/clear reset failed: ${error instanceof Error ? error.message : String(error)}`,
