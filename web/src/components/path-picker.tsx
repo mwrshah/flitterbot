@@ -1,6 +1,6 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
-import { memo, type Ref, type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { memo, type Ref, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
@@ -57,7 +57,6 @@ type PathPickerProps = {
   onSelect: (item: DirectoryCompletionItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
-  anchorRef: RefObject<HTMLDivElement | null>;
   /** When true, display compact mixed search results with path as secondary text. */
   fuzzy?: boolean;
 };
@@ -68,7 +67,6 @@ export const PathPicker = memo(function PathPicker({
   onSelect,
   caretLeft,
   commandRef,
-  anchorRef,
   fuzzy,
 }: PathPickerProps) {
   useWhyDidYouRender("PathPicker", { open, items, caretLeft, fuzzy });
@@ -77,33 +75,17 @@ export const PathPicker = memo(function PathPicker({
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  const updatePosition = useCallback(() => {
-    const anchor = anchorRef.current;
-    const picker = pickerRef.current;
-    if (!anchor || !picker) return;
-    const rect = anchor.getBoundingClientRect();
-    const pickerHeight = picker.offsetHeight;
-    const top = Math.max(0, rect.top - pickerHeight - 4);
-    const maxCaretLeft = Math.max(0, anchor.offsetWidth - picker.offsetWidth);
-    const clampedCaretLeft = Math.min(Math.max(0, caretLeft ?? 0), maxCaretLeft);
-    const left = rect.left + clampedCaretLeft;
-    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
-  }, [anchorRef, caretLeft]);
-
   // Reset selection to first item and scroll list to top whenever the picker
   // opens or the items set changes. The `open` dep is required: on reopen with
   // an unchanged items reference (TanStack keepPreviousData), without it this
   // effect wouldn't fire, leaving stale selectedValue pointing at an item that
   // the fresh DOM scrolls out of view.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     setSelectedValue(items[0]?.path ?? "");
     const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
     if (list) list.scrollTop = 0;
-    requestAnimationFrame(updatePosition);
-  }, [open, items, updatePosition]);
+  }, [open, items]);
 
   // On keyboard navigation, keep the selected item visible
   useEffect(() => {
@@ -116,8 +98,8 @@ export const PathPicker = memo(function PathPicker({
 
   if (!open) return null;
 
-  return createPortal(
-    <div ref={pickerRef} className="fixed w-[28rem] z-50" style={{ top: pos.top, left: pos.left }}>
+  return (
+    <CaretPickerPositioner ref={pickerRef} caretLeft={caretLeft}>
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -158,7 +140,6 @@ export const PathPicker = memo(function PathPicker({
           })}
         </CommandList>
       </Command>
-    </div>,
-    document.body,
+    </CaretPickerPositioner>
   );
 });
