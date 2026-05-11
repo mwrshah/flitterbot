@@ -734,6 +734,10 @@ function localDateKey(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
 function requiredString(value, name) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${name} is required`);
   return value;
