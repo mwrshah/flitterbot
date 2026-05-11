@@ -10,6 +10,51 @@ import { fileURLToPath } from "node:url";
 const execFileAsync = promisify(execFile);
 const TASKS_SCRIPT = fileURLToPath(new URL("./tasks.mjs", import.meta.url));
 
+test("tasks module exposes parseable contracts and thin action wrappers", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flitterbot-tasks-contracts-test-"));
+  const storePath = path.join(tmp, "tasks.json");
+  const configPath = path.join(tmp, "config.json");
+  fs.writeFileSync(configPath, "{}\n", "utf8");
+
+  const previousStorePath = process.env.FLITTERBOT_TASKS_FILE;
+  const previousConfigPath = process.env.FLITTERBOT_CONFIG;
+  process.env.FLITTERBOT_TASKS_FILE = storePath;
+  process.env.FLITTERBOT_CONFIG = configPath;
+
+  try {
+    const tasksModule = await import(new URL(`./tasks.mjs?contracts=${Date.now()}`, import.meta.url).href);
+
+    assert.deepEqual(Object.keys(tasksModule.TASK_ACTION_CONTRACTS), tasksModule.TASK_ACTION_NAMES);
+    assert.doesNotThrow(() => JSON.stringify(tasksModule.TASK_CONTRACTS));
+    for (const actionName of tasksModule.TASK_ACTION_NAMES) {
+      assert.equal(typeof tasksModule[actionName], "function", `${actionName} should be a named wrapper export`);
+      assert.equal(typeof tasksModule.taskActions[actionName], "function", `${actionName} should be exposed in taskActions`);
+      assert.equal(tasksModule.TASK_ACTION_CONTRACTS[actionName].action, actionName);
+    }
+
+    const projectResult = await tasksModule.create_project({ project_name: "Contracts" });
+    assert.equal(projectResult.project.name, "Contracts");
+
+    const taskResult = await tasksModule.create_task({
+      project_id: projectResult.project.id,
+      description: "Exercise exported wrapper",
+      due_at: "2026-05-11",
+    });
+    assert.equal(taskResult.task.projectName, "Contracts");
+
+    const listed = await tasksModule.list_tasks({ project_name: "Contracts" });
+    assert.deepEqual(listed.tasks.map((task) => task.id), [taskResult.task.id]);
+
+    const fetched = await tasksModule.execute({ action: "get_task", task_id: taskResult.task.id });
+    assert.equal(fetched.task.description, "Exercise exported wrapper");
+  } finally {
+    if (previousStorePath === undefined) delete process.env.FLITTERBOT_TASKS_FILE;
+    else process.env.FLITTERBOT_TASKS_FILE = previousStorePath;
+    if (previousConfigPath === undefined) delete process.env.FLITTERBOT_CONFIG;
+    else process.env.FLITTERBOT_CONFIG = previousConfigPath;
+  }
+});
+
 test("periodic_sync_and_cleanup reports provider sync and cleanup stats", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flitterbot-tasks-test-"));
   const storePath = path.join(tmp, "tasks.json");
