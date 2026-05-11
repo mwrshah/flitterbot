@@ -2,7 +2,7 @@
 
 ## Goal
 
-Prove the task sync design works end-to-end across local tasks, Todoist, Linear, and maintenance cleanup.
+Prove the task sync design works end-to-end across local tasks, Todoist, Linear, periodic provider sync, and cleanup.
 
 This plan focuses on observable behavior, not implementation details. Each test should use a disposable Todoist project, a disposable Linear team/project mapping, and a temporary local task store unless explicitly testing the real store.
 
@@ -36,10 +36,10 @@ node skills/tasks/scripts/tasks.mjs --json '{
 }'
 ```
 
-Primary maintenance entrypoint:
+Primary periodic sync and cleanup entrypoint:
 
 ```bash
-node skills/tasks/scripts/tasks.mjs --json '{"action":"maintain_tasks"}'
+node skills/tasks/scripts/tasks.mjs --json '{"action":"periodic_sync_and_cleanup"}'
 ```
 
 ## Invariants to Check Throughout
@@ -47,20 +47,20 @@ node skills/tasks/scripts/tasks.mjs --json '{"action":"maintain_tasks"}'
 - Local tasks store only essential task fields: no `completedAt`, no provider timestamp snapshots.
 - Provider links stay minimal and provider-specific: Todoist uses `projectId`/`taskId`; Linear uses project-level `teamId`/`projectId` and task-level `issueId`; task links may include `url`.
 - Missing provider keys quietly skip sync while cleanup still runs.
-- Inbound sync compares provider `updated_at` / `updatedAt` against the local `updatedAt` snapshot captured at the start of the maintenance run.
-- If Todoist and Linear are both newer than the same local task snapshot in one maintenance run, maintenance errors instead of silently choosing one provider.
+- Inbound sync compares provider `updated_at` / `updatedAt` against the local `updatedAt` snapshot captured at the start of the periodic sync and cleanup run.
+- If Todoist and Linear are both newer than the same local task snapshot in one periodic sync and cleanup run, periodic sync and cleanup errors instead of silently choosing one provider.
 - Local cleanup deletes old local `done` tasks only; it never deletes or completes upstream provider tasks.
 
 ## Core E2E Cases
 
-### 1. First maintenance with no provider config
+### 1. First periodic sync and cleanup with no provider config
 
 Setup:
 - Config has empty or missing `todoistApiKey` and `linearApiKey`.
 - Local store has one active task and one old completed task where `status = "done"` and `updatedAt` is older than 90 days.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Todoist sync reports skipped.
@@ -77,7 +77,7 @@ Setup:
 - Local store has no matching task.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Todoist project is created/linked locally if absent.
@@ -95,7 +95,7 @@ Setup:
 - Local store has no matching task.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Linear issue is created locally as a task.
@@ -164,7 +164,7 @@ Expected:
 - Action fails.
 - Local task is not changed.
 - Linear should not be left completed if Todoist fails; verify remote-first/provider ordering does not create split state.
-- User should complete recurring task in Todoist, then run maintenance.
+- User should complete recurring task in Todoist, then run `periodic_sync_and_cleanup`.
 
 ### 8. Restore completed task to active
 
@@ -177,41 +177,41 @@ Action:
 Expected:
 - Action fails for Todoist-linked tasks.
 - Local task remains `done`.
-- User should restore in Todoist, then run maintenance.
+- User should restore in Todoist, then run `periodic_sync_and_cleanup`.
 
 ## Inbound Change Cases
 
-### 9. Todoist changed first, then maintenance
+### 9. Todoist changed first, then periodic sync and cleanup
 
 Setup:
 - Local task linked to Todoist.
 - Modify task in Todoist after local `updatedAt`.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Todoist `updated_at` is newer than snapshotted local `updatedAt`.
 - Todoist wins inbound.
 - Local fields mirror Todoist.
-- Local `updatedAt` advances to maintenance time.
+- Local `updatedAt` advances to periodic sync and cleanup time.
 
-### 10. Linear changed first, then maintenance
+### 10. Linear changed first, then periodic sync and cleanup
 
 Setup:
 - Local task linked to Linear.
 - Modify issue in Linear after local `updatedAt`.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Linear `updatedAt` is newer than snapshotted local `updatedAt`.
 - Linear wins inbound.
 - Local fields mirror Linear.
-- Local `updatedAt` advances to maintenance time.
+- Local `updatedAt` advances to periodic sync and cleanup time.
 
-### 11. Todoist changed first, then local update without maintenance
+### 11. Todoist changed first, then local update without periodic sync and cleanup
 
 Setup:
 - Local task linked to Todoist.
@@ -222,11 +222,11 @@ Action:
 
 Expected:
 - Action fails before local write.
-- Error tells user to run maintenance/sync first.
+- Error tells user to run `periodic_sync_and_cleanup` first.
 - Local JSON remains unchanged.
 - Linear should not be mutated if Todoist conflict is detected first.
 
-### 12. Linear changed first, then local update without maintenance
+### 12. Linear changed first, then local update without periodic sync and cleanup
 
 Setup:
 - Local task linked to Linear.
@@ -237,10 +237,10 @@ Action:
 
 Expected:
 - Action fails before local write.
-- Error tells user to run maintenance/sync first.
+- Error tells user to run `periodic_sync_and_cleanup` first.
 - Local JSON remains unchanged.
 
-### 13. Todoist and Linear both changed before one maintenance run
+### 13. Todoist and Linear both changed before one periodic sync and cleanup run
 
 Setup:
 - Local task is linked to both providers.
@@ -249,27 +249,27 @@ Setup:
 - Modify Linear after that timestamp.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
-- Maintenance snapshots local `updatedAt` before any provider sync.
+- `periodic_sync_and_cleanup` snapshots local `updatedAt` before any provider sync.
 - Todoist is detected as newer than the snapshot.
 - Linear is also detected as newer than the same snapshot, even if Todoist synced first and advanced local `updatedAt`.
-- Maintenance fails with a conflict instead of overwriting one provider with the other.
+- `periodic_sync_and_cleanup` fails with a conflict instead of overwriting one provider with the other.
 - The test should verify whether partial local writes happen before the conflict; if they do, decide whether to add transactional rollback.
 
-### 14. Provider unchanged during maintenance
+### 14. Provider unchanged during periodic sync and cleanup
 
 Setup:
 - Local task linked to provider.
 - Provider `updated_at` / `updatedAt` is equal to or older than local `updatedAt`.
 
 Action:
-- Run `maintain_tasks` twice.
+- Run `periodic_sync_and_cleanup` twice.
 
 Expected:
 - Second run does not rewrite local task/project.
-- Top-level store `updatedAt` does not advance on a no-op maintenance run.
+- Top-level store `updatedAt` does not advance on a no-op periodic sync and cleanup run.
 - No task fields change.
 
 ## 90-Day Retention and Re-Creation Cases
@@ -281,7 +281,7 @@ Setup:
 - Task may have Todoist and/or Linear links.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Local task is removed from JSON.
@@ -294,7 +294,7 @@ Setup:
 - Local linked copy was removed by cleanup.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Todoist completed history query only considers last 90 days by default.
@@ -307,7 +307,7 @@ Setup:
 - Local linked copy was removed by cleanup.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Linear completed/canceled issue is filtered out by completed cutoff.
@@ -320,7 +320,7 @@ Setup:
 - Local task is absent or active and linked.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Provider completion syncs inward.
@@ -334,7 +334,7 @@ Setup:
 - Local task has `status: "active"` and `updatedAt` older than 90 days.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Task remains local.
@@ -363,7 +363,7 @@ Setup:
 - Update project with Linear `teamId`.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Linear inbound sync begins for assigned issues in that team.
@@ -404,10 +404,10 @@ Setup:
 - Todoist has two active projects whose names collide after local normalization.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
-- Maintenance fails with a clear duplicate flattened project-name error.
+- `periodic_sync_and_cleanup` fails with a clear duplicate flattened project-name error.
 - Local store is not silently merged incorrectly.
 
 ## Status Mapping Cases
@@ -418,7 +418,7 @@ Setup:
 - Linear issues in states of type `backlog`, `unstarted`, `started`, `completed`, and `canceled`.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - `completed` and `canceled` become local `done`.
@@ -443,7 +443,7 @@ Setup:
 - Todoist active task and recently completed task.
 
 Action:
-- Run `maintain_tasks`.
+- Run `periodic_sync_and_cleanup`.
 
 Expected:
 - Active Todoist task becomes local `active`.
@@ -452,7 +452,7 @@ Expected:
 
 ## Minimal Storage Verification
 
-After each write or maintenance run, inspect `tasks.json`.
+After each write or periodic sync and cleanup run, inspect `tasks.json`.
 
 Expected task fields:
 

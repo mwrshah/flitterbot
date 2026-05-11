@@ -121,7 +121,7 @@ export function createLinearProvider(config, deps) {
       }
 
       const remote = await client.getIssue(linearIssueId(existingLink));
-      assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run sync_linear before mutating it locally.`);
+      assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
       const states = await statesForTeam(client, teamStateCache, remote.team.id);
       const update = {
         title: patch.description,

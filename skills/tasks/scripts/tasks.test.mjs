@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const execFileAsync = promisify(execFile);
 const TASKS_SCRIPT = fileURLToPath(new URL("./tasks.mjs", import.meta.url));
 
-test("maintain_tasks reports provider sync and cleanup stats", async () => {
+test("periodic_sync_and_cleanup reports provider sync and cleanup stats", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flitterbot-tasks-test-"));
   const storePath = path.join(tmp, "tasks.json");
   const configPath = path.join(tmp, "config.json");
@@ -41,11 +41,11 @@ test("maintain_tasks reports provider sync and cleanup stats", async () => {
     }],
   }, null, 2)}\n`, "utf8");
 
-  const { stdout } = await execFileAsync(process.execPath, [TASKS_SCRIPT, JSON.stringify({ action: "maintain_tasks" })], {
+  const { stdout } = await execFileAsync(process.execPath, [TASKS_SCRIPT, JSON.stringify({ action: "periodic_sync_and_cleanup" })], {
     env: { ...process.env, FLITTERBOT_TASKS_FILE: storePath, FLITTERBOT_CONFIG: configPath },
   });
 
-  assert.match(stdout, /Maintained tasks\./);
+  assert.match(stdout, /Periodic sync and cleanup finished\./);
   assert.match(stdout, /- Todoist: inward skipped \(no API key configured\); outward not run\./);
   assert.match(stdout, /- Linear: inward skipped \(no API key configured\); outward not run\./);
   assert.match(stdout, /- Cleanup: removed 1 completed task older than 90 days\./);
@@ -54,7 +54,7 @@ test("maintain_tasks reports provider sync and cleanup stats", async () => {
   assert.deepEqual(store.tasks, []);
 });
 
-test("maintain_tasks migrates provider-specific external link fields and backs up old shape", async () => {
+test("periodic_sync_and_cleanup migrates provider-specific external link fields and backs up old shape", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flitterbot-tasks-migration-test-"));
   const storePath = path.join(tmp, "tasks.json");
   const configPath = path.join(tmp, "config.json");
@@ -88,7 +88,7 @@ test("maintain_tasks migrates provider-specific external link fields and backs u
     }],
   }, null, 2)}\n`, "utf8");
 
-  await execFileAsync(process.execPath, [TASKS_SCRIPT, JSON.stringify({ action: "maintain_tasks" })], {
+  await execFileAsync(process.execPath, [TASKS_SCRIPT, JSON.stringify({ action: "periodic_sync_and_cleanup" })], {
     env: { ...process.env, FLITTERBOT_TASKS_FILE: storePath, FLITTERBOT_CONFIG: configPath },
   });
 

@@ -269,30 +269,14 @@ async function execute(input) {
       writeStore(store);
       return ok(`Updated task "${task.description}".`, { task: toTaskItem(task, indexes(store)) });
     }
-    case "maintain_tasks": {
+    case "periodic_sync_and_cleanup": {
       const beforeSignature = storeDataSignature(store);
       const syncContext = createSyncContext(store);
       const todoist = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const linear = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
-      return ok(formatMaintenanceMessage({ todoist, linear, cleanup }), { todoist, linear, cleanup });
-    }
-    case "sync_todoist": {
-      const beforeSignature = storeDataSignature(store);
-      const syncContext = createSyncContext(store);
-      const result = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
-      const cleanup = cleanupCompletedTasks(store, input);
-      writeStoreIfChanged(store, beforeSignature);
-      return ok(formatProviderSyncMessage("Todoist", result, cleanup), { ...result, cleanup });
-    }
-    case "sync_linear": {
-      const beforeSignature = storeDataSignature(store);
-      const syncContext = createSyncContext(store);
-      const result = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
-      const cleanup = cleanupCompletedTasks(store, input);
-      writeStoreIfChanged(store, beforeSignature);
-      return ok(formatProviderSyncMessage("Linear", result, cleanup), { ...result, cleanup });
+      return ok(formatPeriodicSyncAndCleanupMessage({ todoist, linear, cleanup }), { todoist, linear, cleanup });
     }
     default:
       throw new Error(`Unknown action: ${String(action)}`);
@@ -345,19 +329,11 @@ function cleanupCompletedTasks(store, input) {
   return { removedTasks: before - store.tasks.length, retentionDays };
 }
 
-function formatMaintenanceMessage({ todoist, linear, cleanup }) {
+function formatPeriodicSyncAndCleanupMessage({ todoist, linear, cleanup }) {
   return [
-    "Maintained tasks.",
+    "Periodic sync and cleanup finished.",
     formatProviderSyncLine("Todoist", todoist),
     formatProviderSyncLine("Linear", linear),
-    formatCleanupLine(cleanup),
-  ].join("\n");
-}
-
-function formatProviderSyncMessage(providerName, result, cleanup) {
-  return [
-    `${providerName} sync ${result.skipped ? "skipped" : "finished"}.`,
-    formatProviderSyncLine(providerName, result),
     formatCleanupLine(cleanup),
   ].join("\n");
 }
@@ -942,7 +918,7 @@ if (process.argv.includes("--help")) {
 Default output is concise Markdown/text for model and human consumption.
 Use --json, --format json, or request field "format":"json" for machine-readable JSON.
 
-Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task, maintain_tasks, sync_todoist, sync_linear`);
+Actions: list_projects, create_project, update_project, list_tasks, get_task, create_task, update_task, periodic_sync_and_cleanup`);
   process.exit(0);
 }
 

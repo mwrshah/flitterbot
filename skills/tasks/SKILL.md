@@ -1,17 +1,17 @@
 ---
 name: tasks
-description: Use the bundled task script to read and mutate local tasks
+description: Use the bundled task script to read, mutate, sync, and clean up local tasks
 argument-hint: "[task request]"
 disable-model-invocation: false
 ---
 
 # Tasks
 
-Use the bundled task script for all task reads and mutations. Treat task storage as an implementation detail owned by the script.
+Use the bundled task script for all task reads, mutations, periodic provider sync, and cleanup. Treat task storage and provider scripts as implementation details owned by the script.
 
 ## Supporting Files
 
-See [scripts/tasks.mjs](scripts/tasks.mjs) for the task API script. Provider orchestration lives in [scripts/integrations.mjs](scripts/integrations.mjs); Todoist inbound/outbound sync lives in [scripts/todoist-provider.mjs](scripts/todoist-provider.mjs).
+See [scripts/tasks.mjs](scripts/tasks.mjs) for the task API script. It is the only supported caller/agent entrypoint. Provider orchestration lives in [scripts/integrations.mjs](scripts/integrations.mjs); Todoist and Linear provider logic lives in `scripts/*-provider.mjs` for internal extension and testing only.
 
 ## Interface
 
@@ -54,9 +54,7 @@ Supported actions:
 - `get_task`
 - `create_task`
 - `update_task`
-- `maintain_tasks`
-- `sync_todoist`
-- `sync_linear`
+- `periodic_sync_and_cleanup`
 
 ## Data Model
 
@@ -101,26 +99,26 @@ Linear requires per-local-project routing, because Linear issues must belong to 
 
 Task links use `{ "system": "todoist", "taskId": "..." }` and `{ "system": "linear", "issueId": "..." }`. If a provider key or local project mapping is absent, sync and outbound provider mutation quietly do not run for that provider/project. Todoist and Linear links are first-class in the data model. Add new providers by registering them in `scripts/integrations.mjs` and keeping provider-specific read/write logic in their own `scripts/*-provider.mjs` file.
 
-## Maintenance and Sync Rules
+## Periodic Sync and Cleanup Rules
 
-- Run maintenance once when `/skill:tasks` is first loaded/used in an agent session, before normal task reads or mutations:
+- Run `periodic_sync_and_cleanup` once when `/skill:tasks` is first loaded/used in an agent session, before normal task reads or mutations:
 
 ```bash
-node scripts/tasks.mjs '{"action":"maintain_tasks"}'
+node scripts/tasks.mjs '{"action":"periodic_sync_and_cleanup"}'
 ```
 
-- Maintenance always removes local `done` tasks whose local `updatedAt` is more than 90 days old. Status changes update `updatedAt`, so no separate local completion timestamp is stored. This deletion is local-only and is never synced upstream to Todoist or Linear.
-- Maintenance also runs configured provider inbound sync. Missing provider keys quietly skip sync while cleanup still runs.
-- Maintenance snapshots every local record's `updatedAt` before provider sync starts. Todoist and Linear inbound comparisons both use that snapshot, so one provider syncing inward cannot hide a concurrent upstream change in the other provider.
-- Maintenance also persists the external-link shape migration when it sees old `externalId` links or old top-level Linear project fields. Before the migration write, it creates a same-directory `tasks.json.pre-external-links-migration-*.bak` backup.
+- `periodic_sync_and_cleanup` always removes local `done` tasks whose local `updatedAt` is more than 90 days old. Status changes update `updatedAt`, so no separate local completion timestamp is stored. This deletion is local-only and is never synced upstream to Todoist or Linear.
+- `periodic_sync_and_cleanup` also runs configured provider inbound sync. Missing provider keys quietly skip sync while cleanup still runs.
+- `periodic_sync_and_cleanup` snapshots every local record's `updatedAt` before provider sync starts. Todoist and Linear inbound comparisons both use that snapshot, so one provider syncing inward cannot hide a concurrent upstream change in the other provider.
+- `periodic_sync_and_cleanup` also persists the external-link shape migration when it sees old `externalId` links or old top-level Linear project fields. Before the migration write, it creates a same-directory `tasks.json.pre-external-links-migration-*.bak` backup.
 - Inbound sync compares the provider record's `updated_at`/`updatedAt` to the snapshotted local `updatedAt`. If upstream is not newer, sync leaves the local task/project untouched. Provider update timestamps are not stored locally.
-- If two providers both have newer upstream versions for the same local record in one maintenance run, maintenance fails instead of letting the second provider overwrite the first.
-- Do not run maintenance periodically after that inside the same agent session. New skill invocations/sessions are the periodic boundary.
+- If two providers both have newer upstream versions for the same local record in one run, `periodic_sync_and_cleanup` fails instead of letting the second provider overwrite the first.
+- Do not run `periodic_sync_and_cleanup` repeatedly inside the same agent session. New skill invocations/sessions are the periodic boundary.
 
 ## Todoist Sync Rules
 - Inbound sync imports active Todoist tasks and updates existing local tasks from completed Todoist history. Completed Todoist tasks are never imported as new local tasks; they only mark an already-local linked or project+description-matched task `done`. `completed_days` defaults to 90, and `completed_since`/`completed_until` can override the completion window.
-- Outbound mutation: Flitterbot wins only if Todoist is not newer than the local record. If Todoist `updated_at` is newer than local `updatedAt`, the mutation fails and local data is not changed; run maintenance/sync first.
-- Todoist recurring task completion is intentionally disabled for sync-out. Complete recurring tasks in Todoist, then run `sync_todoist`.
+- Outbound mutation: Flitterbot wins only if Todoist is not newer than the local record. If Todoist `updated_at` is newer than local `updatedAt`, the mutation fails and local data is not changed; run `periodic_sync_and_cleanup` first.
+- Todoist recurring task completion is intentionally disabled for sync-out. Complete recurring tasks in Todoist, then run `periodic_sync_and_cleanup`.
 - Local `create_task`, `update_task`, `create_project`, and `update_project` auto-mutate configured providers before local write.
 
 ## Linear Sync Rules
@@ -136,7 +134,7 @@ node scripts/tasks.mjs '{"action":"maintain_tasks"}'
 
 ## Workflow
 
-1. On first use in the agent session, run `maintain_tasks` once; cleanup always runs, configured provider sync runs, and missing provider keys quietly skip.
+1. On first use in the agent session, run `periodic_sync_and_cleanup` once; cleanup always runs, configured provider sync runs, and missing provider keys quietly skip.
 2. Before creating a task, call the script with `action: "list_tasks"` and a relevant filter to avoid duplicates.
 3. Use `create_project` only when no existing project fits.
 4. Use `create_task` for new tasks and `update_task` to mark done, change due date, move projects, or edit text/details.

@@ -98,7 +98,7 @@ export function createTodoistProvider(config, deps) {
         return;
       }
       const remote = await todoist.getProject(todoistLinkId(link));
-      assertTodoistNotAhead(project, remote.updated_at, `Todoist project "${project.name}" changed upstream; run sync_todoist before mutating it locally.`);
+      assertTodoistNotAhead(project, remote.updated_at, `Todoist project "${project.name}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
       if (patch.name && deps.normalizeName(patch.name) !== deps.normalizeName(project.name)) await todoist.updateProject(remote.id, { name: patch.name });
       if (patch.archived === true && project.archived !== true) await todoist.archiveProject(remote.id);
       if (patch.archived === false && project.archived === true) await todoist.unarchiveProject(remote.id);
@@ -132,11 +132,11 @@ export function createTodoistProvider(config, deps) {
       }
 
       const remote = await todoist.getTask(todoistLinkId(link));
-      assertTodoistNotAhead(task, remote.updated_at, `Todoist task "${task.description}" changed upstream; run sync_todoist before mutating it locally.`);
+      assertTodoistNotAhead(task, remote.updated_at, `Todoist task "${task.description}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
 
       const remoteRecurring = remote.due?.is_recurring === true;
       if (patch.status === "done" && task.status !== "done" && remoteRecurring) {
-        throw new Error(`Todoist task "${task.description}" is recurring; sync-out completion is disabled. Complete it in Todoist or run sync_todoist after Todoist advances it.`);
+        throw new Error(`Todoist task "${task.description}" is recurring; sync-out completion is disabled. Complete it in Todoist, then run periodic_sync_and_cleanup after Todoist advances it.`);
       }
 
       if (patch.project.id !== task.projectId) {
@@ -151,7 +151,7 @@ export function createTodoistProvider(config, deps) {
       if (Object.keys(update).length > 0) await todoist.updateTask(remote.id, update);
 
       if (patch.status === "done" && task.status !== "done") await todoist.completeTask(remote.id);
-      if (patch.status === "active" && task.status === "done") throw new Error("Restoring completed Todoist tasks from local state is not supported yet; run sync_todoist and restore in Todoist if needed.");
+      if (patch.status === "active" && task.status === "done") throw new Error("Restoring completed Todoist tasks from local state is not supported yet; run periodic_sync_and_cleanup and restore in Todoist if needed.");
 
       const nextRemote = patch.status === "done" ? { ...remote, checked: true, completed_at: deps.nowIso(), updated_at: deps.nowIso() } : await todoist.getTask(remote.id);
       link = todoistTaskLink(nextRemote, undefined, deps);
