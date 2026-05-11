@@ -20,14 +20,14 @@ export function createTodoistProvider(config, deps) {
         const created = !project;
         if (!project) project = deps.createProject(store, idx, remoteProject.name);
         const link = deps.getExternalLink(project, TODOIST_SYSTEM);
-        const linked = !link?.externalId;
-        if (link?.externalId && !deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) continue;
+        const linked = !todoistLinkId(link);
+        if (todoistLinkId(link) && !deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) continue;
         const updated = project.name !== remoteProject.name || project.archived !== false;
         project.name = remoteProject.name;
         project.archived = false;
         project.updatedAt = deps.nowIso();
         deps.markInboundApplied(project, TODOIST_SYSTEM);
-        deps.upsertExternalLink(project.externalLinks, todoistProjectLink(remoteProject, deps));
+        deps.setExternalLink(project.externalLinks, todoistProjectLink(remoteProject, deps));
         idx.projectsByName.set(deps.normalizeName(project.name), project);
         idx.projectsByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteProject.id), project);
         if (created) inbound.projects.created++;
@@ -47,7 +47,7 @@ export function createTodoistProvider(config, deps) {
           ?? deps.createProject(store, idx, projectName);
         if (remoteProject) {
           const projectLink = deps.getExternalLink(project, TODOIST_SYSTEM);
-          if (!projectLink?.externalId || deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) deps.upsertExternalLink(project.externalLinks, todoistProjectLink(remoteProject));
+          if (!todoistLinkId(projectLink) || deps.shouldApplyInbound(project, remoteProject.updated_at, TODOIST_SYSTEM)) deps.setExternalLink(project.externalLinks, todoistProjectLink(remoteProject));
         }
 
         let task = idx.tasksByExternal.get(deps.externalKey(TODOIST_SYSTEM, remoteTask.id))
@@ -55,8 +55,8 @@ export function createTodoistProvider(config, deps) {
         const created = !task;
         if (!task) task = createLocalTaskFromTodoist(store, idx, remoteTask, project, deps);
         const link = deps.getExternalLink(task, TODOIST_SYSTEM);
-        const linked = !link?.externalId;
-        if (link?.externalId && !deps.shouldApplyInbound(task, remoteTask.updated_at, TODOIST_SYSTEM)) continue;
+        const linked = !todoistLinkId(link);
+        if (todoistLinkId(link) && !deps.shouldApplyInbound(task, remoteTask.updated_at, TODOIST_SYSTEM)) continue;
 
         const nextDetails = deps.nullableTrim(remoteTask.description);
         const nextDueAt = todoistDueToLocalDueAt(remoteTask.due, deps);
@@ -72,7 +72,7 @@ export function createTodoistProvider(config, deps) {
         task.status = "active";
         task.updatedAt = deps.nowIso();
         deps.markInboundApplied(task, TODOIST_SYSTEM);
-        deps.upsertExternalLink(task.externalLinks, todoistTaskLink(remoteTask, remoteProject, deps));
+        deps.setExternalLink(task.externalLinks, todoistTaskLink(remoteTask, remoteProject, deps));
         idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
         if (created) inbound.activeTasks.created++;
         else {
@@ -91,18 +91,18 @@ export function createTodoistProvider(config, deps) {
 
     async updateProject({ project, patch }) {
       const link = deps.getExternalLink({ externalLinks: patch.externalLinks }, TODOIST_SYSTEM) ?? deps.getExternalLink(project, TODOIST_SYSTEM);
-      if (!link?.externalId) {
+      if (!todoistLinkId(link)) {
         const remote = await todoist.createProject(patch.name ?? project.name);
-        deps.upsertExternalLink(patch.externalLinks, todoistProjectLink(remote, deps));
+        deps.setExternalLink(patch.externalLinks, todoistProjectLink(remote, deps));
         if (patch.archived === true) await todoist.archiveProject(remote.id);
         return;
       }
-      const remote = await todoist.getProject(link.externalId);
+      const remote = await todoist.getProject(todoistLinkId(link));
       assertTodoistNotAhead(project, remote.updated_at, `Todoist project "${project.name}" changed upstream; run sync_todoist before mutating it locally.`);
       if (patch.name && deps.normalizeName(patch.name) !== deps.normalizeName(project.name)) await todoist.updateProject(remote.id, { name: patch.name });
       if (patch.archived === true && project.archived !== true) await todoist.archiveProject(remote.id);
       if (patch.archived === false && project.archived === true) await todoist.unarchiveProject(remote.id);
-      deps.upsertExternalLink(patch.externalLinks, todoistProjectLink(await todoist.getProject(remote.id), deps));
+      deps.setExternalLink(patch.externalLinks, todoistProjectLink(await todoist.getProject(remote.id), deps));
     },
 
     async createTask({ store, idx, project, description, details, dueAt, links }) {
@@ -113,12 +113,12 @@ export function createTodoistProvider(config, deps) {
         project_id: remoteProject.id,
         ...todoistDuePayload(dueAt, deps),
       });
-      deps.upsertExternalLink(links, todoistTaskLink(remote, remoteProject, deps));
+      deps.setExternalLink(links, todoistTaskLink(remote, remoteProject, deps));
     },
 
     async updateTask({ store, idx, task, patch }) {
       let link = deps.getExternalLink({ externalLinks: patch.externalLinks }, TODOIST_SYSTEM) ?? deps.getExternalLink(task, TODOIST_SYSTEM);
-      if (!link?.externalId) {
+      if (!todoistLinkId(link)) {
         const remoteProject = await ensureTodoistProject(todoist, store, idx, patch.project, deps);
         const created = await todoist.createTask({
           content: patch.description,
@@ -126,12 +126,12 @@ export function createTodoistProvider(config, deps) {
           project_id: remoteProject.id,
           ...todoistDuePayload(patch.dueAt, deps),
         });
-        deps.upsertExternalLink(patch.externalLinks, todoistTaskLink(created, remoteProject, deps));
+        deps.setExternalLink(patch.externalLinks, todoistTaskLink(created, remoteProject, deps));
         if (patch.status === "done") await todoist.completeTask(created.id);
         return;
       }
 
-      const remote = await todoist.getTask(link.externalId);
+      const remote = await todoist.getTask(todoistLinkId(link));
       assertTodoistNotAhead(task, remote.updated_at, `Todoist task "${task.description}" changed upstream; run sync_todoist before mutating it locally.`);
 
       const remoteRecurring = remote.due?.is_recurring === true;
@@ -155,7 +155,7 @@ export function createTodoistProvider(config, deps) {
 
       const nextRemote = patch.status === "done" ? { ...remote, checked: true, completed_at: deps.nowIso(), updated_at: deps.nowIso() } : await todoist.getTask(remote.id);
       link = todoistTaskLink(nextRemote, undefined, deps);
-      deps.upsertExternalLink(patch.externalLinks, link);
+      deps.setExternalLink(patch.externalLinks, link);
     },
   };
 }
@@ -169,14 +169,14 @@ async function syncExistingTodoistCompletions(todoist, store, idx, remoteProject
       ?? (project ? findUnlinkedTaskByNameAndProject(store, remoteTask.content, project.id, deps) : undefined);
     if (!task || task.status === "done") continue;
     const link = deps.getExternalLink(task, TODOIST_SYSTEM);
-    if (link?.externalId && !deps.shouldApplyInbound(task, remoteTask.completed_at ?? remoteTask.updated_at, TODOIST_SYSTEM)) continue;
+    if (todoistLinkId(link) && !deps.shouldApplyInbound(task, remoteTask.completed_at ?? remoteTask.updated_at, TODOIST_SYSTEM)) continue;
     task.status = "done";
     task.updatedAt = deps.nowIso();
     deps.markInboundApplied(task, TODOIST_SYSTEM);
-    deps.upsertExternalLink(task.externalLinks, todoistTaskLink(remoteTask));
+    deps.setExternalLink(task.externalLinks, todoistTaskLink(remoteTask));
     idx.tasksByExternal.set(deps.externalKey(TODOIST_SYSTEM, remoteTask.id), task);
     stats.markedDone++;
-    if (!link?.externalId) stats.linked++;
+    if (!todoistLinkId(link)) stats.linked++;
   }
   return stats;
 }
@@ -236,13 +236,13 @@ function findUnlinkedTaskByNameAndProject(store, description, projectId, deps) {
 
 async function ensureTodoistProject(todoist, store, idx, project, deps) {
   let link = deps.getExternalLink(project, TODOIST_SYSTEM);
-  if (link?.externalId) return { id: link.externalId, name: project.name };
+  if (todoistLinkId(link)) return { id: todoistLinkId(link), name: project.name };
 
   const remoteProjects = await todoist.listProjects();
   const existing = remoteProjects.find((remote) => !remote.is_deleted && !remote.is_archived && deps.normalizeName(remote.name) === deps.normalizeName(project.name));
   const remote = existing ?? await todoist.createProject(project.name);
   link = todoistProjectLink(remote, deps);
-  deps.upsertExternalLink(project.externalLinks, link);
+  deps.setExternalLink(project.externalLinks, link);
   idx.projectsByExternal.set(deps.externalKey(TODOIST_SYSTEM, remote.id), project);
   return remote;
 }
@@ -334,17 +334,21 @@ function toTodoistDateTime(value, name) {
   return date.toISOString();
 }
 
+function todoistLinkId(link) {
+  return link?.projectId ?? link?.taskId;
+}
+
 function todoistProjectLink(project) {
   return {
     system: TODOIST_SYSTEM,
-    externalId: project.id,
+    projectId: project.id,
   };
 }
 
 function todoistTaskLink(task) {
   return {
     system: TODOIST_SYSTEM,
-    externalId: task.id,
+    taskId: task.id,
     url: task.url,
   };
 }

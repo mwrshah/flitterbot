@@ -25,14 +25,14 @@ export function createLinearProvider(config, deps) {
             const task = linkedTask ?? (project ? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps) : undefined);
             if (!task || task.status === "done") continue;
             const link = deps.getExternalLink(task, LINEAR_SYSTEM);
-            if (link?.externalId && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
+            if (linearIssueId(link) && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
             task.status = "done";
             task.updatedAt = deps.nowIso();
             deps.markInboundApplied(task, LINEAR_SYSTEM);
-            deps.upsertExternalLink(task.externalLinks, linearIssueLink(issue));
+            deps.setExternalLink(task.externalLinks, linearIssueLink(issue));
             idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
             inbound.completedTasks.markedDone++;
-            if (!link?.externalId) inbound.completedTasks.linked++;
+            if (!linearIssueId(link)) inbound.completedTasks.linked++;
             continue;
           }
           if (!project) continue;
@@ -40,8 +40,8 @@ export function createLinearProvider(config, deps) {
           const created = !task;
           if (!task) task = createLocalTaskFromLinear(store, idx, issue, project, deps);
           const link = deps.getExternalLink(task, LINEAR_SYSTEM);
-          const linked = !link?.externalId;
-          if (link?.externalId && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
+          const linked = !linearIssueId(link);
+          if (linearIssueId(link) && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
 
           const nextDetails = stripLocalMetadata(issue.description ?? null);
           const nextDueAt = linearDueToLocalDueAt(issue.dueDate, deps);
@@ -57,7 +57,7 @@ export function createLinearProvider(config, deps) {
           task.status = nextStatus;
           if (changed) task.updatedAt = deps.nowIso();
           deps.markInboundApplied(task, LINEAR_SYSTEM);
-          deps.upsertExternalLink(task.externalLinks, linearIssueLink(issue, project, deps));
+          deps.setExternalLink(task.externalLinks, linearIssueLink(issue, project, deps));
           idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
           if (created) inbound.activeTasks.created++;
           else {
@@ -91,15 +91,15 @@ export function createLinearProvider(config, deps) {
         dueDate: localDueDate(dueAt, deps),
         stateId: stateIdForLocalTask(states, { status: "active", dueAt }),
       });
-      deps.upsertExternalLink(links, linearIssueLink(issue, project, deps));
+      deps.setExternalLink(links, linearIssueLink(issue, project, deps));
     },
 
     async updateTask({ task, patch }) {
       const existingLink = deps.getExternalLink({ externalLinks: patch.externalLinks }, LINEAR_SYSTEM) ?? deps.getExternalLink(task, LINEAR_SYSTEM);
       const mapping = mappingForProject(patch.project);
-      if (!existingLink?.externalId && !mapping?.teamId) return;
+      if (!linearIssueId(existingLink) && !mapping?.teamId) return;
 
-      if (!existingLink?.externalId) {
+      if (!linearIssueId(existingLink)) {
         if (patch.status === "done") return;
         await this.createTask({
           project: patch.project,
@@ -110,17 +110,17 @@ export function createLinearProvider(config, deps) {
         });
         if (patch.status === "done") {
           const createdLink = deps.getExternalLink({ externalLinks: patch.externalLinks }, LINEAR_SYSTEM);
-          if (createdLink?.externalId) {
-            const created = await client.getIssue(createdLink.externalId);
+          if (linearIssueId(createdLink)) {
+            const created = await client.getIssue(linearIssueId(createdLink));
             const states = await statesForTeam(client, teamStateCache, created.team.id);
             const updated = await client.updateIssue(created.id, { stateId: stateIdForLocalTask(states, patch) });
-            deps.upsertExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
+            deps.setExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
           }
         }
         return;
       }
 
-      const remote = await client.getIssue(existingLink.externalId);
+      const remote = await client.getIssue(linearIssueId(existingLink));
       assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run sync_linear before mutating it locally.`);
       const states = await statesForTeam(client, teamStateCache, remote.team.id);
       const update = {
@@ -131,7 +131,7 @@ export function createLinearProvider(config, deps) {
       };
       if (mapping?.projectId) update.projectId = mapping.projectId;
       const updated = await client.updateIssue(remote.id, update);
-      deps.upsertExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
+      deps.setExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
     },
   };
 }
@@ -160,11 +160,12 @@ function mappedActiveProjects(store, deps) {
 }
 
 function mappingForProject(project) {
-  const teamId = stringOr(project.linearTeamId ?? project.linear_team_id);
+  const link = project?.externalLinks?.find((item) => normalizeName(item.system) === LINEAR_SYSTEM);
+  const teamId = stringOr(link?.teamId ?? link?.team_id);
   if (!teamId) return undefined;
   return {
     teamId,
-    projectId: stringOr(project.linearProjectId ?? project.linear_project_id),
+    projectId: stringOr(link?.projectId ?? link?.project_id),
   };
 }
 
@@ -233,10 +234,14 @@ function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
   return remote > local + 1000;
 }
 
+function linearIssueId(link) {
+  return link?.issueId;
+}
+
 function linearIssueLink(issue) {
   return {
     system: LINEAR_SYSTEM,
-    externalId: issue.id,
+    issueId: issue.id,
     url: issue.url,
   };
 }
@@ -356,6 +361,10 @@ function linearClient(apiKey) {
 
 function stripUndefined(input) {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+}
+
+function normalizeName(value) {
+  return String(value ?? "").trim().toLocaleLowerCase();
 }
 
 function stringOr(value) {

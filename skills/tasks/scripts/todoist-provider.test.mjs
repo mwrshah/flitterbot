@@ -60,7 +60,7 @@ function makeDeps(now = "2026-05-10T10:30:00.000Z") {
     uniqueId() {
       return "task-new";
     },
-    upsertExternalLink(links, nextLink) {
+    setExternalLink(links, nextLink) {
       const index = links.findIndex((link) => this.normalizeName(link.system) === this.normalizeName(nextLink.system));
       if (index >= 0) links[index] = nextLink;
       else links.push(nextLink);
@@ -75,11 +75,11 @@ function makeIdx(store, deps) {
   const tasksById = new Map();
   for (const project of store.projects) {
     projectsByName.set(deps.normalizeName(project.name), project);
-    for (const link of project.externalLinks) projectsByExternal.set(deps.externalKey(link.system, link.externalId), project);
+    for (const link of project.externalLinks) projectsByExternal.set(deps.externalKey(link.system, link.projectId ?? link.taskId ?? link.externalId), project);
   }
   for (const task of store.tasks) {
     tasksById.set(task.id, task);
-    for (const link of task.externalLinks) tasksByExternal.set(deps.externalKey(link.system, link.externalId), task);
+    for (const link of task.externalLinks) tasksByExternal.set(deps.externalKey(link.system, link.projectId ?? link.taskId ?? link.externalId), task);
   }
   return { projectsByExternal, projectsByName, tasksByExternal, tasksById };
 }
@@ -90,7 +90,7 @@ function jsonResponse(body) {
 
 test("Todoist inbound sync marks existing local tasks done from completed history", async (t) => {
   const deps = makeDeps();
-  const project = { id: "project-local", name: "Inbox", archived: false, externalLinks: [{ system: "todoist", externalId: "project-remote" }], updatedAt: "2026-05-01T00:00:00.000Z" };
+  const project = { id: "project-local", name: "Inbox", archived: false, externalLinks: [{ system: "todoist", projectId: "project-remote" }], updatedAt: "2026-05-01T00:00:00.000Z" };
   const task = {
     id: "task-local",
     projectId: project.id,
@@ -98,7 +98,7 @@ test("Todoist inbound sync marks existing local tasks done from completed histor
     details: null,
     dueAt: "2026-05-10T00:00:00.000Z",
     status: "active",
-    externalLinks: [{ system: "todoist", externalId: "todoist-task" }],
+    externalLinks: [{ system: "todoist", taskId: "todoist-task" }],
     updatedAt: "2026-05-01T00:00:00.000Z",
   };
   const store = { projects: [project], tasks: [task] };
@@ -136,7 +136,7 @@ test("Todoist inbound sync marks existing local tasks done from completed histor
 
 test("Todoist inbound sync does not import completed tasks absent locally", async (t) => {
   const deps = makeDeps();
-  const project = { id: "project-local", name: "Inbox", archived: false, externalLinks: [{ system: "todoist", externalId: "project-remote" }], updatedAt: "2026-05-01T00:00:00.000Z" };
+  const project = { id: "project-local", name: "Inbox", archived: false, externalLinks: [{ system: "todoist", projectId: "project-remote" }], updatedAt: "2026-05-01T00:00:00.000Z" };
   const store = { projects: [project], tasks: [] };
   const idx = makeIdx(store, deps);
   const originalFetch = globalThis.fetch;

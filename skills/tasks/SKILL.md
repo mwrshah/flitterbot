@@ -64,7 +64,7 @@ Supported actions:
 - A task belongs to exactly one project.
 - A task has `description` as its primary task text.
 - A task always has `due_at`; if no due input is provided, the script resolves it to today.
-- A task may have `details` and generic `external_links` for first-class provider mappings such as Todoist and Linear.
+- A task may have `details` and provider-specific `external_links` for first-class mappings such as Todoist and Linear.
 - Task status is `active` or `done`.
 - Archived projects and their tasks are hidden from normal queries unless explicitly requested.
 - Todoist subprojects are flattened locally as plain local project names; Todoist project IDs/parent metadata stay hidden in `external_links`.
@@ -86,18 +86,20 @@ Date-only ranges are inclusive by date. Datetime ranges are inclusive by timesta
 
 Provider sync is enabled only by flat integration proof in `~/.flitterbot/config.json`; to enable it, add `todoistApiKey` or `linearApiKey` there.
 
-Linear requires per-local-project routing, because Linear issues must belong to a team and local projects are not inherently Linear teams/projects. Store that mapping as flat optional fields on the local project object itself, not in config:
+Linear requires per-local-project routing, because Linear issues must belong to a team and local projects are not inherently Linear teams/projects. Store that mapping as the Linear project external link, not in config:
 
 ```json
 {
   "id": "local-project-id",
   "name": "Local Project Name",
-  "linearTeamId": "linear-team-id",
-  "linearProjectId": "optional-linear-project-id"
+  "externalLinks": [
+    { "system": "todoist", "projectId": "todoist-project-id" },
+    { "system": "linear", "teamId": "linear-team-id", "projectId": "optional-linear-project-id" }
+  ]
 }
 ```
 
-If a provider key or local project mapping is absent, sync and outbound provider mutation quietly do not run for that provider/project. Todoist and Linear links are first-class in the data model. Add new providers by registering them in `scripts/integrations.mjs` and keeping provider-specific read/write logic in their own `scripts/*-provider.mjs` file.
+Task links use `{ "system": "todoist", "taskId": "..." }` and `{ "system": "linear", "issueId": "..." }`. If a provider key or local project mapping is absent, sync and outbound provider mutation quietly do not run for that provider/project. Todoist and Linear links are first-class in the data model. Add new providers by registering them in `scripts/integrations.mjs` and keeping provider-specific read/write logic in their own `scripts/*-provider.mjs` file.
 
 ## Maintenance and Sync Rules
 
@@ -110,6 +112,7 @@ node scripts/tasks.mjs '{"action":"maintain_tasks"}'
 - Maintenance always removes local `done` tasks whose local `updatedAt` is more than 90 days old. Status changes update `updatedAt`, so no separate local completion timestamp is stored. This deletion is local-only and is never synced upstream to Todoist or Linear.
 - Maintenance also runs configured provider inbound sync. Missing provider keys quietly skip sync while cleanup still runs.
 - Maintenance snapshots every local record's `updatedAt` before provider sync starts. Todoist and Linear inbound comparisons both use that snapshot, so one provider syncing inward cannot hide a concurrent upstream change in the other provider.
+- Maintenance also persists the external-link shape migration when it sees old `externalId` links or old top-level Linear project fields. Before the migration write, it creates a same-directory `tasks.json.pre-external-links-migration-*.bak` backup.
 - Inbound sync compares the provider record's `updated_at`/`updatedAt` to the snapshotted local `updatedAt`. If upstream is not newer, sync leaves the local task/project untouched. Provider update timestamps are not stored locally.
 - If two providers both have newer upstream versions for the same local record in one maintenance run, maintenance fails instead of letting the second provider overwrite the first.
 - Do not run maintenance periodically after that inside the same agent session. New skill invocations/sessions are the periodic boundary.
@@ -123,7 +126,7 @@ node scripts/tasks.mjs '{"action":"maintain_tasks"}'
 ## Linear Sync Rules
 
 - Linear issues map to local tasks; Linear teams/projects do not map automatically to local projects.
-- A local project syncs to Linear only when its project object has `linearTeamId`. Optional `linearProjectId` assigns created/updated issues to a Linear Project.
+- A local project syncs to Linear only when its project `externalLinks` contains `{ "system": "linear", "teamId": "..." }`. Optional `projectId` assigns created/updated issues to a Linear Project.
 - Local project name is appended to Linear issue descriptions as `[proj_name-<local project>]`.
 - Linear workflow statuses are team-specific, but local sync only uses Linear status categories. Local `active` maps to the first `unstarted` state; local `done` maps to the first `completed` state. Inbound Linear `completed` and `canceled` issues become local `done`; all other Linear states become local `active`.
 - Linear inbound sync pulls issues assigned to the current Linear API user from teams linked to active local projects. Active issues may create/update local tasks. Completed/canceled Linear issues never create new local tasks; they only mark an already-local linked or project+description-matched task `done`.

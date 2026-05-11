@@ -12,6 +12,7 @@ const ID_LENGTH = 10;
 const DEFAULT_STORE_PATH = path.join(os.homedir(), ".flitterbot", "data", "tasks", "tasks.json");
 const STORE_PATH = process.env.FLITTERBOT_TASKS_FILE || DEFAULT_STORE_PATH;
 const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || path.join(os.homedir(), ".flitterbot", "config.json");
+const MIGRATION_NEEDED = Symbol("migrationNeeded");
 
 function nowIso() {
   return new Date().toISOString();
@@ -31,13 +32,20 @@ function emptyStore() {
 function readStore() {
   if (!fs.existsSync(STORE_PATH)) return emptyStore();
   try {
-    return normalizeStore(JSON.parse(fs.readFileSync(STORE_PATH, "utf8")));
+    const raw = JSON.parse(fs.readFileSync(STORE_PATH, "utf8"));
+    const normalized = normalizeStore(raw);
+    Object.defineProperty(normalized, MIGRATION_NEEDED, {
+      value: rawDataSignature(raw) !== storeDataSignature(normalized),
+      enumerable: false,
+    });
+    return normalized;
   } catch (error) {
     throw new Error(`Task data could not be read: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 function writeStore(store) {
+  if (store[MIGRATION_NEEDED]) backupStoreBeforeMigration();
   const normalized = normalizeStore({ ...store, updatedAt: nowIso() });
   fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
   const tmp = path.join(path.dirname(STORE_PATH), `.tmp-${path.basename(STORE_PATH)}-${process.pid}-${Date.now()}`);
@@ -47,12 +55,24 @@ function writeStore(store) {
 }
 
 function writeStoreIfChanged(store, beforeSignature) {
-  if (storeDataSignature(store) === beforeSignature) return store;
+  if (!store[MIGRATION_NEEDED] && storeDataSignature(store) === beforeSignature) return store;
   return writeStore(store);
+}
+
+function backupStoreBeforeMigration() {
+  if (!fs.existsSync(STORE_PATH)) return;
+  const directory = path.dirname(STORE_PATH);
+  const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
+  const backupPath = path.join(directory, `${path.basename(STORE_PATH)}.pre-external-links-migration-${stamp}.bak`);
+  fs.copyFileSync(STORE_PATH, backupPath, fs.constants.COPYFILE_EXCL);
 }
 
 function storeDataSignature(store) {
   return JSON.stringify({ version: store.version, projects: store.projects, tasks: store.tasks });
+}
+
+function rawDataSignature(input) {
+  return JSON.stringify({ version: input?.version, projects: input?.projects, tasks: input?.tasks });
 }
 
 function normalizeStore(input) {
@@ -97,9 +117,7 @@ function normalizeProject(input) {
     id: stringOr(value.id, compactId()),
     name: stringOr(value.name, "Inbox").trim() || "Inbox",
     archived: value.archived === true,
-    externalLinks: normalizeExternalLinks(value.externalLinks ?? value.external_links ?? []),
-    linearTeamId: optionalString(value.linearTeamId ?? value.linear_team_id) ?? null,
-    linearProjectId: optionalString(value.linearProjectId ?? value.linear_project_id) ?? null,
+    externalLinks: normalizeProjectExternalLinks(value.externalLinks ?? value.external_links ?? [], value),
     createdAt: normalizeMaybeDate(value.createdAt, now),
     updatedAt: normalizeMaybeDate(value.updatedAt, now),
   };
@@ -115,33 +133,76 @@ function normalizeTask(input) {
     details: nullableTrim(value.details),
     dueAt: normalizeMaybeDate(value.dueAt, localTodayStartIso()),
     status: value.status === "done" ? "done" : "active",
-    externalLinks: normalizeExternalLinks(value.externalLinks ?? value.external_links ?? []),
+    externalLinks: normalizeTaskExternalLinks(value.externalLinks ?? value.external_links ?? []),
     createdAt: normalizeMaybeDate(value.createdAt, now),
     updatedAt: normalizeMaybeDate(value.updatedAt, now),
   };
 }
 
-function normalizeExternalLinks(links) {
-  if (!Array.isArray(links)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const input of links) {
-    const link = normalizeExternalLink(input);
-    if (!link.system) continue;
-    const key = `${normalizeName(link.system)}:${link.externalId ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(link);
+function normalizeProjectExternalLinks(links, projectInput = {}) {
+  const out = normalizeExternalLinks(links, "project");
+  const teamId = optionalString(projectInput.linearTeamId ?? projectInput.linear_team_id);
+  if (teamId) {
+    setExternalLink(out, {
+      system: "linear",
+      teamId,
+      projectId: optionalString(projectInput.linearProjectId ?? projectInput.linear_project_id) ?? null,
+    });
   }
   return out;
 }
 
-function normalizeExternalLink(input) {
+function normalizeTaskExternalLinks(links) {
+  return normalizeExternalLinks(links, "task");
+}
+
+function normalizeExternalLinks(links, recordKind) {
+  if (!Array.isArray(links)) return [];
+  const out = [];
+  for (const input of links) {
+    const link = normalizeExternalLink(input, recordKind);
+    if (!link.system) continue;
+    setExternalLink(out, link);
+  }
+  return out;
+}
+
+function normalizeExternalLink(input, recordKind) {
   if (!input || typeof input !== "object") return { system: "" };
-  const link = { system: typeof input.system === "string" ? input.system.trim() : "" };
-  if (typeof input.externalId === "string" && input.externalId.trim()) link.externalId = input.externalId.trim();
-  if (typeof input.url === "string" && input.url.trim()) link.url = input.url.trim();
+  const system = typeof input.system === "string" ? normalizeName(input.system) : "";
+  if (!system) return { system: "" };
+
+  if (system === "todoist") {
+    const idKey = recordKind === "project" ? "projectId" : "taskId";
+    const id = optionalString(input[idKey] ?? input.externalId);
+    const link = { system, ...(id ? { [idKey]: id } : {}) };
+    addLinkUrl(link, input);
+    return link;
+  }
+
+  if (system === "linear") {
+    if (recordKind === "project") {
+      const teamId = optionalString(input.teamId ?? input.team_id);
+      const link = { system, ...(teamId ? { teamId, projectId: optionalString(input.projectId ?? input.project_id) ?? null } : {}) };
+      return link;
+    }
+    const issueId = optionalString(input.issueId ?? input.issue_id ?? input.externalId);
+    const link = { system, ...(issueId ? { issueId } : {}) };
+    addLinkUrl(link, input);
+    return link;
+  }
+
+  const link = { system };
+  for (const [key, value] of Object.entries(input)) {
+    if (key === "system") continue;
+    if (typeof value === "string" && value.trim()) link[key] = value.trim();
+    else if (typeof value === "number" || typeof value === "boolean" || value === null) link[key] = value;
+  }
   return link;
+}
+
+function addLinkUrl(link, input) {
+  if (typeof input.url === "string" && input.url.trim()) link.url = input.url.trim();
 }
 
 function indexes(store) {
@@ -153,7 +214,8 @@ function indexes(store) {
   const projectsByExternal = new Map();
   for (const project of store.projects) {
     for (const link of project.externalLinks) {
-      if (link.externalId) projectsByExternal.set(externalKey(link.system, link.externalId), project);
+      const externalId = projectLinkExternalId(link);
+      if (externalId) projectsByExternal.set(externalKey(link.system, externalId), project);
     }
   }
   for (const task of store.tasks) {
@@ -161,7 +223,8 @@ function indexes(store) {
     list.push(task);
     tasksByProjectId.set(task.projectId, list);
     for (const link of task.externalLinks) {
-      if (link.externalId) tasksByExternal.set(externalKey(link.system, link.externalId), task);
+      const externalId = taskLinkExternalId(link);
+      if (externalId) tasksByExternal.set(externalKey(link.system, externalId), task);
     }
   }
   return { projectsById, projectsByName, projectsByExternal, tasksById, tasksByProjectId, tasksByExternal };
@@ -348,10 +411,10 @@ async function createProjectWithProviders(store, idx, input) {
   if (!trimmed) throw new Error("project_name is required");
   assertProjectNameAvailable(idx, trimmed);
 
-  const links = normalizeExternalLinks(input.external_links ?? []);
+  const links = normalizeProjectExternalLinks(input.external_links ?? []);
   for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
     const link = await provider.createProject({ name: trimmed, links });
-    if (link) upsertExternalLink(links, link);
+    if (link) setExternalLink(links, link);
   }
 
   const now = nowIso();
@@ -360,15 +423,16 @@ async function createProjectWithProviders(store, idx, input) {
     name: trimmed,
     archived: false,
     externalLinks: links,
-    linearTeamId: optionalString(input.linear_team_id ?? input.linearTeamId) ?? null,
-    linearProjectId: optionalString(input.linear_project_id ?? input.linearProjectId) ?? null,
     createdAt: now,
     updatedAt: now,
   };
   store.projects.push(project);
   idx.projectsById.set(project.id, project);
   idx.projectsByName.set(normalizeName(project.name), project);
-  for (const link of links) idx.projectsByExternal.set(externalKey(link.system, link.externalId), project);
+  for (const link of links) {
+    const externalId = projectLinkExternalId(link);
+    if (externalId) idx.projectsByExternal.set(externalKey(link.system, externalId), project);
+  }
   return project;
 }
 
@@ -380,15 +444,7 @@ async function updateProjectWithProviders(store, idx, input) {
   const patch = {
     name: nextName,
     archived: nextArchived,
-    externalLinks: input.external_links !== undefined
-      ? normalizeExternalLinks(input.external_links)
-      : project.externalLinks.map(cloneExternalLink),
-    linearTeamId: input.linear_team_id !== undefined || input.linearTeamId !== undefined
-      ? optionalString(input.linear_team_id ?? input.linearTeamId) ?? null
-      : project.linearTeamId,
-    linearProjectId: input.linear_project_id !== undefined || input.linearProjectId !== undefined
-      ? optionalString(input.linear_project_id ?? input.linearProjectId) ?? null
-      : project.linearProjectId,
+    externalLinks: projectPatchExternalLinks(project, input),
   };
   for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
     await provider.updateProject({ project, patch });
@@ -400,8 +456,6 @@ async function updateProjectWithProviders(store, idx, input) {
   }
   if (nextArchived !== undefined) project.archived = nextArchived;
   project.externalLinks = patch.externalLinks;
-  project.linearTeamId = patch.linearTeamId;
-  project.linearProjectId = patch.linearProjectId;
   project.updatedAt = nowIso();
   return project;
 }
@@ -411,7 +465,7 @@ function createProject(store, idx, name) {
   if (!trimmed) throw new Error("project_name is required");
   assertProjectNameAvailable(idx, trimmed);
   const now = nowIso();
-  const project = { id: uniqueId(idx, "projects"), name: trimmed, archived: false, externalLinks: [], linearTeamId: null, linearProjectId: null, createdAt: now, updatedAt: now };
+  const project = { id: uniqueId(idx, "projects"), name: trimmed, archived: false, externalLinks: [], createdAt: now, updatedAt: now };
   store.projects.push(project);
   idx.projectsById.set(project.id, project);
   idx.projectsByName.set(normalizeName(project.name), project);
@@ -421,6 +475,12 @@ function createProject(store, idx, name) {
 function upsertProject(store, idx, name) {
   const existing = idx.projectsByName.get(normalizeName(name));
   return existing ?? createProject(store, idx, name);
+}
+
+function projectPatchExternalLinks(project, input) {
+  return input.external_links !== undefined
+    ? normalizeProjectExternalLinks(input.external_links)
+    : project.externalLinks.map(cloneExternalLink);
 }
 
 function assertProjectNameAvailable(idx, name, exceptProjectId) {
@@ -449,7 +509,7 @@ async function createTaskWithProviders(store, idx, input) {
   const description = requiredString(input.description, "description").trim();
   const details = nullableTrim(input.details);
   const dueAt = resolveDueAt(input.due_at, input.due_in_days);
-  const links = normalizeExternalLinks(input.external_links ?? []);
+  const links = normalizeTaskExternalLinks(input.external_links ?? []);
   for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
     await provider.createTask({ store, idx, project, description, details, dueAt, links });
   }
@@ -484,7 +544,7 @@ async function updateTaskWithProviders(store, idx, input) {
     details: input.details !== undefined ? nullableTrim(input.details) : task.details,
     dueAt: input.due_at !== undefined || input.due_in_days !== undefined ? resolveDueAt(input.due_at, input.due_in_days) : task.dueAt,
     status: input.status !== undefined && input.status !== "any" ? normalizeStatus(input.status) : task.status,
-    externalLinks: input.external_links !== undefined ? normalizeExternalLinks(input.external_links) : task.externalLinks.map(cloneExternalLink),
+    externalLinks: input.external_links !== undefined ? normalizeTaskExternalLinks(input.external_links) : task.externalLinks.map(cloneExternalLink),
   };
 
   for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
@@ -562,7 +622,7 @@ function providerDeps(syncContext) {
     shouldApplyInbound: (record, remoteUpdatedAt, provider) => shouldApplyInbound(syncContext, record, remoteUpdatedAt, provider),
     markInboundApplied: (record, provider) => markInboundApplied(syncContext, record, provider),
     uniqueId,
-    upsertExternalLink,
+    setExternalLink,
   };
 }
 
@@ -570,10 +630,24 @@ function getExternalLink(item, system) {
   return item.externalLinks?.find((link) => normalizeName(link.system) === normalizeName(system));
 }
 
-function upsertExternalLink(links, nextLink) {
+function setExternalLink(recordOrLinks, nextLink) {
+  const links = Array.isArray(recordOrLinks) ? recordOrLinks : recordOrLinks.externalLinks;
   const index = links.findIndex((link) => normalizeName(link.system) === normalizeName(nextLink.system));
   if (index >= 0) links[index] = nextLink;
   else links.push(nextLink);
+}
+
+function projectLinkExternalId(link) {
+  const system = normalizeName(link.system);
+  if (system === "todoist") return link.projectId;
+  return link.externalId ?? link.id;
+}
+
+function taskLinkExternalId(link) {
+  const system = normalizeName(link.system);
+  if (system === "todoist") return link.taskId;
+  if (system === "linear") return link.issueId;
+  return link.externalId ?? link.id;
 }
 
 function externalKey(system, externalId) {
@@ -824,7 +898,9 @@ function formatProjectBlocks(projects) {
 
 function formatExternalLink(link) {
   const parts = [oneLine(link.system)];
-  if (link.externalId) parts.push(oneLine(link.externalId));
+  for (const key of ["projectId", "taskId", "teamId", "issueId", "id", "externalId"]) {
+    if (link[key]) parts.push(oneLine(link[key]));
+  }
   if (link.url) parts.push(`— ${oneLine(link.url)}`);
   return parts.join(" ");
 }

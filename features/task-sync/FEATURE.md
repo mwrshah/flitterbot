@@ -30,8 +30,9 @@ Use one local project mapped to Linear:
 node skills/tasks/scripts/tasks.mjs --json '{
   "action": "create_project",
   "project_name": "Task Sync E2E",
-  "linearTeamId": "<linear-team-id>",
-  "linearProjectId": "<optional-linear-project-id>"
+  "external_links": [
+    { "system": "linear", "teamId": "<linear-team-id>", "projectId": "<optional-linear-project-id>" }
+  ]
 }'
 ```
 
@@ -44,7 +45,7 @@ node skills/tasks/scripts/tasks.mjs --json '{"action":"maintain_tasks"}'
 ## Invariants to Check Throughout
 
 - Local tasks store only essential task fields: no `completedAt`, no provider timestamp snapshots.
-- Provider links stay minimal: `system`, `externalId`, optional `url`.
+- Provider links stay minimal and provider-specific: Todoist uses `projectId`/`taskId`; Linear uses project-level `teamId`/`projectId` and task-level `issueId`; task links may include `url`.
 - Missing provider keys quietly skip sync while cleanup still runs.
 - Inbound sync compares provider `updated_at` / `updatedAt` against the local `updatedAt` snapshot captured at the start of the maintenance run.
 - If Todoist and Linear are both newer than the same local task snapshot in one maintenance run, maintenance errors instead of silently choosing one provider.
@@ -89,7 +90,7 @@ Expected:
 
 Setup:
 - Config has `linearApiKey` only.
-- Local project has `linearTeamId` and optional `linearProjectId`.
+- Local project has a Linear external link with `teamId` and optional `projectId`.
 - Linear has an assigned issue in that team/project.
 - Local store has no matching task.
 
@@ -100,13 +101,13 @@ Expected:
 - Linear issue is created locally as a task.
 - Local status is `active` unless Linear state type is `completed` or `canceled`.
 - Local task gets a Linear external link.
-- Local project mapping remains flat on `linearTeamId` / `linearProjectId`.
+- Local project mapping remains on the Linear project external link.
 
 ### 4. Local create task with both providers configured
 
 Setup:
 - Config has both keys.
-- Local project exists and has `linearTeamId`.
+- Local project exists and has a Linear external link with `teamId`.
 
 Action:
 - Run `create_task` for project `Task Sync E2E`.
@@ -341,11 +342,11 @@ Expected:
 
 ## Project Mapping Cases
 
-### 20. Linear key present, project has no `linearTeamId`
+### 20. Linear key present, project has no Linear external link
 
 Setup:
 - Config has `linearApiKey`.
-- Local project has no `linearTeamId`.
+- Local project has no Linear external link with `teamId`.
 
 Action:
 - Create or update a local task in that project.
@@ -355,25 +356,25 @@ Expected:
 - Todoist still runs if configured.
 - Local write succeeds.
 
-### 21. Add `linearTeamId` to an existing project
+### 21. Add Linear `teamId` to an existing project
 
 Setup:
 - Local project has existing unlinked local tasks.
-- Update project with `linearTeamId`.
+- Update project with Linear `teamId`.
 
 Action:
 - Run `maintain_tasks`.
 
 Expected:
 - Linear inbound sync begins for assigned issues in that team.
-- Existing local tasks are not bulk-created in Linear merely because the project gained `linearTeamId`.
+- Existing local tasks are not bulk-created in Linear merely because the project gained a Linear `teamId`.
 - Existing local tasks sync outward only when individually created or updated after mapping exists.
 
-### 22. Add `linearProjectId`
+### 22. Add Linear `projectId`
 
 Setup:
-- Local project has `linearTeamId`.
-- Update project with `linearProjectId`.
+- Local project has a Linear `teamId`.
+- Update project with Linear `projectId`.
 
 Action:
 - Create a new local task.
@@ -477,8 +478,6 @@ Expected project fields:
   "name": "...",
   "archived": false,
   "externalLinks": [],
-  "linearTeamId": null,
-  "linearProjectId": null,
   "createdAt": "...",
   "updatedAt": "..."
 }
@@ -487,8 +486,10 @@ Expected project fields:
 Expected provider links:
 
 ```json
-{ "system": "todoist", "externalId": "...", "url": "..." }
-{ "system": "linear", "externalId": "...", "url": "..." }
+{ "system": "todoist", "projectId": "..." }
+{ "system": "todoist", "taskId": "...", "url": "..." }
+{ "system": "linear", "teamId": "...", "projectId": "..." }
+{ "system": "linear", "issueId": "...", "url": "..." }
 ```
 
 Forbidden local storage:

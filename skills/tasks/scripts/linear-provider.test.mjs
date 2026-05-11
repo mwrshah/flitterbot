@@ -33,7 +33,7 @@ function makeDeps(now = "2026-05-10T10:30:00.000Z") {
     uniqueId() {
       return "task-new";
     },
-    upsertExternalLink(links, nextLink) {
+    setExternalLink(links, nextLink) {
       const index = links.findIndex((link) => this.normalizeName(link.system) === this.normalizeName(nextLink.system));
       if (index >= 0) links[index] = nextLink;
       else links.push(nextLink);
@@ -46,7 +46,7 @@ function makeIdx(store, deps) {
   const tasksById = new Map();
   for (const task of store.tasks) {
     tasksById.set(task.id, task);
-    for (const link of task.externalLinks) tasksByExternal.set(deps.externalKey(link.system, link.externalId), task);
+    for (const link of task.externalLinks) tasksByExternal.set(deps.externalKey(link.system, link.issueId ?? link.externalId), task);
   }
   return { tasksByExternal, tasksById };
 }
@@ -56,9 +56,7 @@ function mappedProject() {
     id: "project-local",
     name: "Linear Project",
     archived: false,
-    externalLinks: [],
-    linearTeamId: "team-1",
-    linearProjectId: null,
+    externalLinks: [{ system: "linear", teamId: "team-1", projectId: null }],
     updatedAt: "2026-05-01T00:00:00.000Z",
   };
 }
@@ -109,7 +107,7 @@ test("Linear inbound sync marks existing local tasks done from completed issues"
     details: null,
     dueAt: "2026-05-08T00:00:00.000Z",
     status: "active",
-    externalLinks: [{ system: "linear", externalId: "linear-issue" }],
+    externalLinks: [{ system: "linear", issueId: "linear-issue" }],
     updatedAt: "2026-05-01T00:00:00.000Z",
   };
   const store = { projects: [project], tasks: [task] };

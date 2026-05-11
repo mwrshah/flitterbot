@@ -53,3 +53,55 @@ test("maintain_tasks reports provider sync and cleanup stats", async () => {
   const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
   assert.deepEqual(store.tasks, []);
 });
+
+test("maintain_tasks migrates provider-specific external link fields and backs up old shape", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flitterbot-tasks-migration-test-"));
+  const storePath = path.join(tmp, "tasks.json");
+  const configPath = path.join(tmp, "config.json");
+  fs.writeFileSync(configPath, "{}\n", "utf8");
+  fs.writeFileSync(storePath, `${JSON.stringify({
+    version: 2,
+    updatedAt: "2026-05-10T00:00:00.000Z",
+    projects: [{
+      id: "project-1",
+      name: "Inbox",
+      archived: false,
+      externalLinks: [{ system: "todoist", externalId: "todoist-project" }],
+      linearTeamId: "linear-team",
+      linearProjectId: "linear-project",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    }],
+    tasks: [{
+      id: "task-1",
+      projectId: "project-1",
+      description: "Linked task",
+      details: null,
+      dueAt: "2026-05-10T00:00:00.000Z",
+      status: "active",
+      externalLinks: [
+        { system: "todoist", externalId: "todoist-task" },
+        { system: "linear", externalId: "linear-issue", url: "https://linear.app/issue/LIN-1" },
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    }],
+  }, null, 2)}\n`, "utf8");
+
+  await execFileAsync(process.execPath, [TASKS_SCRIPT, JSON.stringify({ action: "maintain_tasks" })], {
+    env: { ...process.env, FLITTERBOT_TASKS_FILE: storePath, FLITTERBOT_CONFIG: configPath },
+  });
+
+  const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  assert.equal("linearTeamId" in store.projects[0], false);
+  assert.equal("linearProjectId" in store.projects[0], false);
+  assert.deepEqual(store.projects[0].externalLinks, [
+    { system: "todoist", projectId: "todoist-project" },
+    { system: "linear", teamId: "linear-team", projectId: "linear-project" },
+  ]);
+  assert.deepEqual(store.tasks[0].externalLinks, [
+    { system: "todoist", taskId: "todoist-task" },
+    { system: "linear", issueId: "linear-issue", url: "https://linear.app/issue/LIN-1" },
+  ]);
+  assert.equal(fs.readdirSync(tmp).filter((name) => name.includes("pre-external-links-migration")).length, 1);
+});
