@@ -45,6 +45,7 @@ export type MessageInputHoverButton = {
 };
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
+const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
 /** Sub-pixel safety margin so a button that "just fits" in pretext pixels
  *  doesn't get clipped by browser rounding or fractional widths. */
@@ -85,6 +86,18 @@ function autoExpandedDuplicateSlashIndex(filter: string) {
   const nestedDotDot = "/..//";
   const nestedIndex = filter.lastIndexOf(nestedDotDot);
   return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
+}
+
+function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
+  const lower = filter.toLowerCase();
+  const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
+  // Pin command-kind items to the bottom, preserving relative order within each group.
+  const nonCommands: SkillListItem[] = [];
+  const commands: SkillListItem[] = [];
+  for (const item of matched) {
+    (item.kind === "command" ? commands : nonCommands).push(item);
+  }
+  return [...nonCommands, ...commands];
 }
 
 function messageInputButtonShortcutLabel(index: number) {
@@ -418,6 +431,13 @@ export const MessageInput = memo(function MessageInput({
   const { data: pathResult } = useQuery(
     directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen, { streamId }),
   );
+  const filteredSkills = useMemo(
+    () => filterSkillsForPicker(skills, pickerFilter),
+    [skills, pickerFilter],
+  );
+  const pathPickerItems = pathResult?.items ?? EMPTY_PATH_ITEMS;
+  const skillPickerVisible = pickerOpen && filteredSkills.length > 0;
+  const pathPickerVisible = atPickerOpen && pathPickerItems.length > 0;
 
   // Warm the cache for the empty query on mount so the first `@` has items
   // ready without a loading flash. Re-runs when streamId changes.
@@ -722,10 +742,10 @@ export const MessageInput = memo(function MessageInput({
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Escape") {
-        if (slashPositionRef.current >= 0) {
+        if (skillPickerVisible && slashPositionRef.current >= 0) {
           event.preventDefault();
           closePicker(slashPositionRef.current, setPickerOpen, slashPositionRef);
-        } else if (atPositionRef.current >= 0) {
+        } else if (pathPickerVisible && atPositionRef.current >= 0) {
           event.preventDefault();
           closePicker(atPositionRef.current, setAtPickerOpen, atPositionRef);
         } else {
@@ -787,11 +807,11 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      // When a picker is open, forward navigation keys to cmdk.
+      // When a visible picker is open, forward navigation keys to cmdk.
       // Tab is mapped to Enter so it accepts the highlighted item.
-      // Use position refs (synchronously set) instead of state-synced open refs.
+      // Keep empty-result pickers closed so they don't intercept composer keys.
       const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
-      if (slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
+      if (skillPickerVisible && slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
         skillCommandRef.current?.dispatchEvent(
           new KeyboardEvent("keydown", {
@@ -801,7 +821,7 @@ export const MessageInput = memo(function MessageInput({
         );
         return;
       }
-      if (atPositionRef.current >= 0 && navKeys.includes(event.key)) {
+      if (pathPickerVisible && atPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
         pathCommandRef.current?.dispatchEvent(
           new KeyboardEvent("keydown", {
@@ -817,7 +837,7 @@ export const MessageInput = memo(function MessageInput({
         submitCurrentDraft();
       }
     },
-    [closePicker, handleDraftChange, submitCurrentDraft],
+    [closePicker, handleDraftChange, pathPickerVisible, skillPickerVisible, submitCurrentDraft],
   );
 
   const handlePaste = useCallback(
@@ -948,17 +968,16 @@ export const MessageInput = memo(function MessageInput({
           )}
         >
           <SkillPicker
-            open={pickerOpen}
-            filter={pickerFilter}
-            skills={skills ?? []}
+            open={skillPickerVisible}
+            items={filteredSkills}
             onSelect={handleSkillSelect}
             caretLeft={caretLeft}
             commandRef={skillCommandRef}
             anchorRef={containerRef}
           />
           <PathPicker
-            open={atPickerOpen}
-            items={pathResult?.items ?? []}
+            open={pathPickerVisible}
+            items={pathPickerItems}
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}

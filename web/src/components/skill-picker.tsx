@@ -1,13 +1,4 @@
-import {
-  memo,
-  type Ref,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, type Ref, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Command, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -15,8 +6,7 @@ import type { SkillListItem } from "~/lib/types";
 
 type SkillPickerProps = {
   open: boolean;
-  filter: string;
-  skills: SkillListItem[];
+  items: SkillListItem[];
   onSelect: (skill: SkillListItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
@@ -25,8 +15,7 @@ type SkillPickerProps = {
 
 export const SkillPicker = memo(function SkillPicker({
   open,
-  filter,
-  skills,
+  items,
   onSelect,
   caretLeft,
   commandRef,
@@ -34,23 +23,9 @@ export const SkillPicker = memo(function SkillPicker({
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
     open,
-    filter,
-    skills,
+    items,
     onSelect,
   });
-
-  const filtered = useMemo(() => {
-    const lower = filter.toLowerCase();
-    const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
-    // Pin command-kind items to the bottom, preserving
-    // relative order within each group.
-    const nonCommands: SkillListItem[] = [];
-    const commands: SkillListItem[] = [];
-    for (const item of matched) {
-      (item.kind === "command" ? commands : nonCommands).push(item);
-    }
-    return [...nonCommands, ...commands];
-  }, [skills, filter]);
 
   // Manual selection management (cmdk won't auto-select with shouldFilter={false})
   const [selectedValue, setSelectedValue] = useState("");
@@ -74,11 +49,11 @@ export const SkillPicker = memo(function SkillPicker({
   // DOM) re-syncs selection to the top of the fresh list.
   useEffect(() => {
     if (!open) return;
-    setSelectedValue(filtered[0]?.name ?? "");
+    setSelectedValue(items[0]?.name ?? "");
     const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
     if (list) list.scrollTop = 0;
     requestAnimationFrame(updatePosition);
-  }, [open, filtered, updatePosition]);
+  }, [open, items, updatePosition]);
 
   // Keep the selected item in view as the user keyboard-navigates.
   useEffect(() => {
@@ -89,7 +64,7 @@ export const SkillPicker = memo(function SkillPicker({
     });
   }, [selectedValue]);
 
-  if (!open || skills.length === 0) return null;
+  if (!open) return null;
 
   return createPortal(
     <div ref={pickerRef} className="fixed w-[28rem] z-50" style={{ top: pos.top, left: pos.left }}>
@@ -102,10 +77,10 @@ export const SkillPicker = memo(function SkillPicker({
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
-          {filtered.length === 0 ? (
+          {items.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">No matching skills</div>
           ) : (
-            filtered.map((skill) => {
+            items.map((skill) => {
               const isCommand = skill.kind === "command";
               return (
                 <CommandItem
