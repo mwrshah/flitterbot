@@ -548,7 +548,7 @@ export function ChatPanel({
 
         <HorizontalResizeHandle />
 
-        <Panel id="input" defaultSize="15%" minSize="9%">
+        <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
           <Dialog
             open={pruneTarget !== null}
             onOpenChange={(open) => !open && setPruneTarget(null)}

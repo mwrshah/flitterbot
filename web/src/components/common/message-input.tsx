@@ -971,7 +971,6 @@ export const MessageInput = memo(function MessageInput({
             onSelect={handleSkillSelect}
             caretLeft={caretLeft}
             commandRef={skillCommandRef}
-            anchorRef={containerRef}
           />
           <PathPicker
             open={pathPickerVisible}
@@ -979,7 +978,6 @@ export const MessageInput = memo(function MessageInput({
             onSelect={handlePathSelect}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}
-            anchorRef={containerRef}
             fuzzy
           />
           <textarea

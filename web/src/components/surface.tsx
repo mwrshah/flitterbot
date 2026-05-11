@@ -907,7 +907,7 @@ export function Surface() {
 
         <HorizontalResizeHandle />
 
-        <Panel id="input" defaultSize="15%" minSize="9%">
+        <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
           <MessageInput
             draftKey="__surface__"
             isSending={isSending}

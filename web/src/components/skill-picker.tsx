@@ -1,5 +1,5 @@
-import { memo, type Ref, type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { memo, type Ref, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
 import { Command, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { SkillListItem } from "~/lib/types";
@@ -10,7 +10,6 @@ type SkillPickerProps = {
   onSelect: (skill: SkillListItem) => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
-  anchorRef: RefObject<HTMLDivElement | null>;
 };
 
 export const SkillPicker = memo(function SkillPicker({
@@ -19,43 +18,28 @@ export const SkillPicker = memo(function SkillPicker({
   onSelect,
   caretLeft,
   commandRef,
-  anchorRef,
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
     open,
     items,
     onSelect,
+    caretLeft,
   });
 
   // Manual selection management (cmdk won't auto-select with shouldFilter={false})
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  const updatePosition = useCallback(() => {
-    const anchor = anchorRef.current;
-    const picker = pickerRef.current;
-    if (!anchor || !picker) return;
-    const rect = anchor.getBoundingClientRect();
-    const pickerHeight = picker.offsetHeight;
-    const top = Math.max(0, rect.top - pickerHeight - 4); // 4px gap (mb-1)
-    const maxCaretLeft = Math.max(0, anchor.offsetWidth - picker.offsetWidth);
-    const clampedCaretLeft = Math.min(Math.max(0, caretLeft ?? 0), maxCaretLeft);
-    const left = rect.left + clampedCaretLeft;
-    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
-  }, [anchorRef, caretLeft]);
 
   // Reset selection to first item and scroll list to top whenever the picker
   // opens or the filtered set changes. Including `open` is required so that
   // reopening the picker (which leaves this component mounted but rebuilds the
   // DOM) re-syncs selection to the top of the fresh list.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     setSelectedValue(items[0]?.name ?? "");
     const list = pickerRef.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
     if (list) list.scrollTop = 0;
-    requestAnimationFrame(updatePosition);
-  }, [open, items, updatePosition]);
+  }, [open, items]);
 
   // Keep the selected item in view as the user keyboard-navigates.
   useEffect(() => {
@@ -68,8 +52,8 @@ export const SkillPicker = memo(function SkillPicker({
 
   if (!open) return null;
 
-  return createPortal(
-    <div ref={pickerRef} className="fixed w-[28rem] z-50" style={{ top: pos.top, left: pos.left }}>
+  return (
+    <CaretPickerPositioner ref={pickerRef} caretLeft={caretLeft}>
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -110,7 +94,6 @@ export const SkillPicker = memo(function SkillPicker({
           )}
         </CommandList>
       </Command>
-    </div>,
-    document.body,
+    </CaretPickerPositioner>
   );
 });
