@@ -81,9 +81,9 @@ describe("executeCreateWorktree", () => {
       );
 
       expect(result.ok).toBe(true);
-      expect(result.worktreePath).toBe(worktree);
+      expect(fs.realpathSync(result.worktreePath!)).toBe(fs.realpathSync(worktree));
       expect(state.getStream().base_branch).toBe("main");
-      expect(state.getStream().worktree_path).toBe(worktree);
+      expect(fs.realpathSync(state.getStream().worktree_path!)).toBe(fs.realpathSync(worktree));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

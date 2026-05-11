@@ -12,8 +12,8 @@ describe("formatStreamPrompt", () => {
     );
 
     expect(prompt).toContain("Fix the router");
-    expect(prompt).toContain("--- Agent context ---\nUse existing tests");
-    expect(prompt).toContain("--- Flitterbot stream setup ---\nRun the configured stream setup.");
+    expect(prompt).toContain("Additional context:\nUse existing tests");
+    expect(prompt).toContain("---\nStream setup:\nRun the configured stream setup.");
     expect(prompt).toMatch(/\[Now: .+\]$/);
   });
 
@@ -26,8 +26,8 @@ describe("formatStreamPrompt", () => {
       "Run the configured stream setup.",
     );
 
-    expect(prompt).toContain("--- User message (1/2) ---\nFirst");
-    expect(prompt).toContain("--- User message (2/2, most recent) ---\nSecond");
-    expect(prompt).toContain("--- Flitterbot stream setup ---\nRun the configured stream setup.");
+    expect(prompt).toContain("Stream Context:\n\nUser message (1/2):\nFirst");
+    expect(prompt).toContain("User message (2/2, CURRENT):\nSecond");
+    expect(prompt).toContain("---\nStream setup:\nRun the configured stream setup.");
   });
 });

@@ -86,9 +86,10 @@ describe("formatStreamPrompt", () => {
     );
 
     expect(result).not.toContain("[Stream:");
-    expect(result).toContain("--- User message (1/3) ---");
-    expect(result).toContain("--- User message (2/3) ---");
-    expect(result).toContain("--- User message (3/3, most recent) ---");
+    expect(result).toContain("Stream Context:");
+    expect(result).toContain("User message (1/3):");
+    expect(result).toContain("User message (2/3):");
+    expect(result).toContain("User message (3/3, CURRENT):");
     expect(result).toContain("First context");
     expect(result).toContain("Second context");
     expect(result).toContain("Create the feature");
@@ -112,7 +113,7 @@ describe("formatStreamPrompt", () => {
     );
     expect(result).not.toContain("User message (");
     expect(result).not.toContain("The following user messages provide context");
-    expect(result).toContain("--- Agent context ---");
+    expect(result).toContain("Additional context:");
     expect(result).toContain("Investigate renewals pipeline failure in klair-api");
     expect(result).not.toContain("/tmux");
   });

@@ -24,10 +24,8 @@ export function formatStreamPrompt(
   footer?: string,
 ): string {
   const datetime = formatDatetimeBlock();
-  const agentSection = agentMessage ? `\n\n--- Agent context ---\n${agentMessage}` : "";
-  const footerSection = footer?.trim()
-    ? `\n\n--- Flitterbot stream setup ---\n${footer.trim()}`
-    : "";
+  const agentSection = agentMessage ? `\n\nAdditional context:\n${agentMessage}` : "";
+  const footerSection = footer?.trim() ? `\n---\nStream setup:\n${footer.trim()}` : "";
 
   if (messages.length <= 1) {
     const head = `${messages[0] ?? ""}${agentSection}${footerSection}`;
@@ -37,10 +35,10 @@ export function formatStreamPrompt(
   const total = messages.length;
   const body = messages
     .map((m, i) => {
-      const label = i === total - 1 ? `${i + 1}/${total}, most recent` : `${i + 1}/${total}`;
-      return `--- User message (${label}) ---\n${m}`;
+      const label = i === total - 1 ? `${i + 1}/${total}, CURRENT` : `${i + 1}/${total}`;
+      return `User message (${label}):\n${m}`;
     })
     .join("\n\n");
 
-  return `The following user messages provide context for this stream:\n\n${body}${agentSection}${footerSection}\n\n${datetime}`;
+  return `Stream Context:\n\n${body}${agentSection}${footerSection}\n\n${datetime}`;
 }
