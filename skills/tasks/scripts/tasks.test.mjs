@@ -45,8 +45,25 @@ test("tasks module exposes parseable contracts and thin action wrappers", async 
     const listed = await tasksModule.list_tasks({ project_name: "Contracts" });
     assert.deepEqual(listed.tasks.map((task) => task.id), [taskResult.task.id]);
 
+    const detailsTaskResult = await tasksModule.create_task({
+      project_id: projectResult.project.id,
+      description: "Plain task title",
+      details: "Need API search coverage",
+      due_at: "2026-05-12",
+    });
+
     const fetched = await tasksModule.execute({ action: "get_task", task_id: taskResult.task.id });
     assert.equal(fetched.task.description, "Exercise exported wrapper");
+
+    const descriptionSearch = await tasksModule.search_tasks({ query: "exported wrapper" });
+    assert.deepEqual(descriptionSearch.tasks.map((task) => task.id), [taskResult.task.id]);
+
+    const detailsSearch = await tasksModule.execute({ action: "search_tasks", q: "api coverage" });
+    assert.deepEqual(detailsSearch.tasks.map((task) => task.id), [detailsTaskResult.task.id]);
+
+    const projectSearch = await tasksModule.search_tasks({ query: "contracts", limit: 1 });
+    assert.equal(projectSearch.tasks.length, 1);
+    assert.equal(projectSearch.tasks[0].projectName, "Contracts");
   } finally {
     if (previousStorePath === undefined) delete process.env.FLITTERBOT_TASKS_FILE;
     else process.env.FLITTERBOT_TASKS_FILE = previousStorePath;

@@ -98,6 +98,26 @@ export const TASK_ACTION_CONTRACTS = deepFreeze({
     output: { ok: "boolean", message: "string", tasks: "Task[]" },
     sorting: ["dueAt", "projectName", "createdAt"],
   },
+  search_tasks: {
+    action: "search_tasks",
+    description: "Search local tasks by task description, task details, or project name.",
+    input: {
+      query: { type: "string", required: true, aliases: ["q", "search"] },
+      project_id: { type: "string", optional: true },
+      project_name: { type: "string", optional: true },
+      status: { type: "active|done|any", optional: true, default: "active" },
+      include_archived_projects: { type: "boolean", optional: true, default: false },
+      preset: { type: "overdue|today|tomorrow|next_days|between|all", optional: true, default: "all" },
+      days: { type: "number", optional: true, appliesWhen: { preset: "next_days" }, default: 7 },
+      start_date: { type: "YYYY-MM-DD", optional: true, appliesWhen: { preset: "between" } },
+      end_date: { type: "YYYY-MM-DD", optional: true, appliesWhen: { preset: "between" } },
+      start_at: { type: "ISO datetime string", optional: true, appliesWhen: { preset: "between" } },
+      end_at: { type: "ISO datetime string", optional: true, appliesWhen: { preset: "between" } },
+      limit: { type: "number", optional: true, notes: "Positive integer maximum result count." },
+    },
+    output: { ok: "boolean", message: "string", tasks: "Task[]" },
+    matching: ["Case-insensitive substring search", "All query terms must appear across description, details, or projectName", "Description matches rank ahead of details, then project name"],
+  },
   get_task: {
     action: "get_task",
     description: "Fetch one task by local ID.",
@@ -187,6 +207,10 @@ export async function list_tasks(input = {}) {
   return actionImplementations.list_tasks(input);
 }
 
+export async function search_tasks(input = {}) {
+  return actionImplementations.search_tasks(input);
+}
+
 export async function get_task(input = {}) {
   return actionImplementations.get_task(input);
 }
@@ -208,6 +232,7 @@ export const taskActions = Object.freeze({
   create_project,
   update_project,
   list_tasks,
+  search_tasks,
   get_task,
   create_task,
   update_task,

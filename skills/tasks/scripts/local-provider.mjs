@@ -221,6 +221,7 @@ export const TASK_ACTION_NAMES = [
   "create_project",
   "update_project",
   "list_tasks",
+  "search_tasks",
   "get_task",
   "create_task",
   "update_task",
@@ -255,6 +256,13 @@ export function createTaskActions({ storePath, configPath }) {
       const { store, idx } = taskContext();
       const tasks = listTasks(store, idx, toListOptions(input));
       return ok(`Found ${tasks.length} task${tasks.length === 1 ? "" : "s"}.`, { tasks });
+    },
+
+    async search_tasks(input) {
+      const { store, idx } = taskContext();
+      const options = toSearchOptions(input);
+      const tasks = searchTasks(store, idx, options);
+      return ok(`Found ${tasks.length} task${tasks.length === 1 ? "" : "s"} matching "${options.query}".`, { tasks });
     },
 
     async get_task(input) {
@@ -553,6 +561,24 @@ async function updateTaskWithProviders(store, idx, input) {
 }
 
 function listTasks(store, idx, options) {
+  return filterTasks(store, idx, options)
+    .map((task) => toTaskItem(task, idx))
+    .sort(compareTaskItems);
+}
+
+function searchTasks(store, idx, options) {
+  const limit = normalizeLimit(options.limit);
+  const matches = filterTasks(store, idx, options)
+    .map((task) => {
+      const item = toTaskItem(task, idx);
+      return { item, score: searchTaskScore(item, options.query) };
+    })
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || compareTaskItems(a.item, b.item));
+  return matches.slice(0, limit ?? matches.length).map((match) => match.item);
+}
+
+function filterTasks(store, idx, options) {
   const projectNameKey = options.projectName ? normalizeName(options.projectName) : undefined;
   const project = projectNameKey ? idx.projectsByName.get(projectNameKey) : undefined;
   const candidates = options.projectId
@@ -562,16 +588,51 @@ function listTasks(store, idx, options) {
       : store.tasks;
   const range = buildRange(options);
   const status = options.status ?? "active";
-  return candidates
-    .filter((task) => {
-      const taskProject = idx.projectsById.get(task.projectId);
-      if (!taskProject) return false;
-      if (!options.includeArchivedProjects && taskProject.archived) return false;
-      if (status !== "any" && task.status !== status) return false;
-      return taskMatchesRange(task, range);
-    })
-    .map((task) => toTaskItem(task, idx))
-    .sort(compareTaskItems);
+  return candidates.filter((task) => {
+    const taskProject = idx.projectsById.get(task.projectId);
+    if (!taskProject) return false;
+    if (!options.includeArchivedProjects && taskProject.archived) return false;
+    if (status !== "any" && task.status !== status) return false;
+    return taskMatchesRange(task, range);
+  });
+}
+
+function searchTaskScore(task, rawQuery) {
+  const query = normalizeSearchText(rawQuery);
+  if (!query) return 0;
+  const tokens = query.split(" ").filter(Boolean);
+  const fields = [
+    { text: normalizeSearchText(task.description), phraseWeight: 100, tokenWeight: 10 },
+    { text: normalizeSearchText(task.details), phraseWeight: 60, tokenWeight: 6 },
+    { text: normalizeSearchText(task.projectName), phraseWeight: 40, tokenWeight: 4 },
+  ];
+  if (!tokens.every((token) => fields.some((field) => field.text.includes(token)))) return 0;
+
+  let score = 0;
+  for (const field of fields) {
+    if (field.text === query) score += field.phraseWeight * 2;
+    else if (field.text.includes(query)) score += field.phraseWeight;
+    for (const token of tokens) {
+      if (field.text.includes(token)) score += field.tokenWeight;
+    }
+  }
+  return score;
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeLimit(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit < 1) throw new Error("limit must be a positive number");
+  return Math.trunc(limit);
 }
 
 function toTaskItem(task, idx) {
@@ -592,6 +653,14 @@ function toListOptions(input) {
     endDate: optionalString(input.end_date),
     startAt: optionalString(input.start_at),
     endAt: optionalString(input.end_at),
+  };
+}
+
+function toSearchOptions(input) {
+  return {
+    ...toListOptions(input),
+    query: requiredString(input.query ?? input.q ?? input.search, "query").trim(),
+    limit: input.limit,
   };
 }
 

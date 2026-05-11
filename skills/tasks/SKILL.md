@@ -28,7 +28,7 @@ Default output is concise Markdown. Add `--json` / `--format json` / `"format":"
 ## Workflow
 
 1. On the first task call in a session, run `periodic_sync_and_cleanup`.
-2. Before `create_task`, run `list_tasks` with a relevant filter to avoid duplicates.
+2. Before `create_task`, run `search_tasks` or `list_tasks` with a relevant filter to avoid duplicates.
 3. Use `update_task` to mark a task status as`done`, change due date, move projects, or edit text.
 4. Pass `status: "any"` only when the user wants completed tasks included.
 
@@ -61,6 +61,14 @@ All actions take `{action, ...}`. Inputs use `snake_case`; stored records use `c
   - Filters: `project_id?`, `project_name?`, `status?: "active"|"done"|"any"` (default `"active"`), `include_archived_projects?: bool`
   - Range (default `all`): `preset?: "overdue"|"today"|"tomorrow"|"next_days"|"between"|"all"`, `days?` (for `next_days`), `start_date`/`end_date` (date-inclusive `between`), `start_at`/`end_at` (datetime-inclusive `between`)
 - **Output**: `{tasks: Task[]}` sorted by due date
+
+### search_tasks
+- **Input**:
+  - `query` (required; aliases: `q`, `search`)
+  - Filters: `project_id?`, `project_name?`, `status?: "active"|"done"|"any"` (default `"active"`), `include_archived_projects?: bool`, `limit?: number`
+  - Range (default `all`): same range fields as `list_tasks`
+- **Searches**: local task `description`, `details`, and `projectName`. Case-insensitive; all query terms must match across those fields.
+- **Output**: `{tasks: Task[]}` ranked by match quality, then due date
 
 ### get_task
 - **Input**: `task_id` (required)
