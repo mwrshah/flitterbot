@@ -1,0 +1,8 @@
+blockExoticSubdeps: false
+allowBuilds:
+  "@google/genai": true
+  "@whiskeysockets/baileys": true
+  koffi: true
+  lefthook: true
+  protobufjs: true
+  sharp: true
