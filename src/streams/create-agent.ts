@@ -91,7 +91,9 @@ export async function createFlitterbotAgent(
   const authStorage = createPiAuthStorage(config.controlSurfaceAgentDir);
   // Use the control-surface agent dir so the resource loader doesn't pick up
   // ~/.pi/agent skills or AGENTS.md. Auth and models still resolve from
-  // ~/.pi/agent explicitly.
+  // ~/.pi/agent explicitly. The user-level ~/.agents/AGENTS.md is injected
+  // separately below via agentsFilesOverride so both default and orchestrator
+  // sessions always see it regardless of cwd.
   const agentDir = config.controlSurfaceAgentDir;
   const modelRegistry = createPiModelRegistry(authStorage, agentDir);
   const settingsManager = SettingsManager.inMemory();
@@ -121,6 +123,25 @@ export async function createFlitterbotAgent(
     } else {
       skillPathWarnings.push(`extraSkillPaths: missing directory skipped: ${entry}`);
     }
+  }
+
+  // Load ~/.agents/AGENTS.md once at factory-construction time. This is the
+  // user's global agent instructions file — essential context that must be
+  // present for every Flitterbot session (default + orchestrator) regardless
+  // of cwd or which agentDir the resource loader scans.
+  const userAgentsMdPath = path.join(HOME, ".agents", "AGENTS.md");
+  let userAgentsMdEntry: { path: string; content: string } | null = null;
+  try {
+    if (fs.existsSync(userAgentsMdPath)) {
+      userAgentsMdEntry = {
+        path: userAgentsMdPath,
+        content: fs.readFileSync(userAgentsMdPath, "utf-8"),
+      };
+    }
+  } catch (err) {
+    skillPathWarnings.push(
+      `failed to read ${userAgentsMdPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
@@ -167,6 +188,17 @@ export async function createFlitterbotAgent(
       resourceLoaderOptions: {
         additionalSkillPaths,
         appendSystemPromptOverride: (base) => [...base, promptRef.value],
+        // Prepend ~/.agents/AGENTS.md to the context files the SDK passes into
+        // the system prompt. De-duped by path so a re-scan that happens to
+        // include it (e.g. cwd ancestor walk) doesn't double-inject.
+        agentsFilesOverride: (baseAgents) => {
+          if (!userAgentsMdEntry) return baseAgents;
+          const already = baseAgents.agentsFiles.some((f) => f.path === userAgentsMdEntry?.path);
+          if (already) return baseAgents;
+          return {
+            agentsFiles: [userAgentsMdEntry, ...baseAgents.agentsFiles],
+          };
+        },
       },
     });
 
