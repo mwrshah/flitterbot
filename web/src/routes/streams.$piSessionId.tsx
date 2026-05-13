@@ -135,7 +135,7 @@ function PiSessionRoute() {
         />
       </Panel>
       <ResizeHandle />
-      <Panel id="downstream" defaultSize="50%" minSize="20%">
+      <Panel id="downstream" defaultSize="50%" minSize="25%" collapsible collapsedSize="2px">
         <DownstreamSessionsPanel
           key={effectivePiSessionId}
           piSessionId={effectivePiSessionId}
