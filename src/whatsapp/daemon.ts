@@ -240,15 +240,18 @@ class WhatsAppDaemon {
       for (const message of upsert.messages) {
         const rejectionReason = getInboundMessageRejectionReason(message, allowedJids);
         if (rejectionReason) {
-          logger.info(
+          logger.warn(
             {
               upsertType: upsert.type,
               waMessageId: message.key.id,
               remoteJid: message.key.remoteJid,
+              participant: message.key.participant,
+              pushName: message.pushName,
               fromMe: message.key.fromMe,
               rejectionReason,
+              hint: "add remoteJid to allowedJids in ~/.flitterbot/whatsapp/config.json if intended",
             },
-            "filtered inbound WhatsApp message before persistence",
+            "rejected inbound WhatsApp message \u2014 not in allowlist",
           );
           continue;
         }

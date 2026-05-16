@@ -167,7 +167,19 @@ export class ControlSurfaceRuntime {
         this.log(`wiped ${closed} open stream(s) on startup (wipeStreamsOnStart=true)`);
     }
 
-    await this.sessionManager.createDefault(this.createCustomTools("default"));
+    // FLITTERBOT_RESUME_DEFAULT_SESSION: optional path to a JSONL session file.
+    // When set, the default agent resumes from that session instead of starting
+    // fresh — preserves piSessionId and full conversation history. Used to
+    // restore a previous default conversation across a server restart.
+    const resumeDefaultSessionFile =
+      process.env.FLITTERBOT_RESUME_DEFAULT_SESSION?.trim() || undefined;
+    if (resumeDefaultSessionFile) {
+      this.log(`resuming default session from ${resumeDefaultSessionFile}`);
+    }
+    await this.sessionManager.createDefault(
+      this.createCustomTools("default"),
+      resumeDefaultSessionFile,
+    );
     fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
 
     // Rehydrate dormant orchestrators for open streams from the pi sessions DB.

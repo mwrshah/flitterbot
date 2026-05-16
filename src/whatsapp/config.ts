@@ -66,7 +66,10 @@ function normalizePhoneNumber(value: string): string {
 }
 
 function toWhatsAppJid(value: string): string {
-  if (value.endsWith("@s.whatsapp.net")) {
+  // Already-qualified JIDs (any @domain) pass through verbatim so config
+  // entries like `xxxxx@lid` or `xxxxx@g.us` are preserved. Bare numeric
+  // strings are normalized into phone-format JIDs.
+  if (value.includes("@")) {
     return value;
   }
 

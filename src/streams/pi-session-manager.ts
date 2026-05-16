@@ -101,7 +101,10 @@ export class PiSessionManager {
     return Array.from(this.orchestrators.values());
   }
 
-  async createDefault(customTools: unknown[]): Promise<ManagedPiSession> {
+  async createDefault(
+    customTools: unknown[],
+    resumeSessionFile?: string,
+  ): Promise<ManagedPiSession> {
     // Only reconcile the default session — orchestrator sessions for active streams
     // must survive restarts so their piSessionId (and associated messages) are preserved.
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
@@ -110,6 +113,7 @@ export class PiSessionManager {
       config: this.config,
       customTools,
       role: "default",
+      ...(resumeSessionFile ? { resumeSessionFile } : {}),
     });
 
     const session = created.runtime.session;

@@ -132,8 +132,19 @@ is_healthy() {
 acquire_lock() {
   local waited=0
   while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    local owner_pid=""
+    if [[ -f "$LOCK_DIR/owner" ]]; then
+      owner_pid=$(tr -d '[:space:]' < "$LOCK_DIR/owner" 2>/dev/null || true)
+    fi
+    if [[ -n "$owner_pid" ]] && ! is_pid_running "$owner_pid"; then
+      append_log "$LOG_FILE" "WARN" "stealing stale start lock from dead pid=$owner_pid"
+      rm -f "$LOCK_DIR/owner"
+      rmdir "$LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+
     if (( waited >= 30 )); then
-      append_log "$LOG_FILE" "ERROR" "timed out waiting for startup lock"
+      append_log "$LOG_FILE" "ERROR" "timed out waiting for startup lock (owner pid=${owner_pid:-unknown})"
       return 1
     fi
 
@@ -145,7 +156,8 @@ acquire_lock() {
     waited=$((waited + 1))
   done
 
-  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+  printf '%s' "$$" > "$LOCK_DIR/owner"
+  trap 'rm -f "$LOCK_DIR/owner"; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
   return 0
 }
 
