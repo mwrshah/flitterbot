@@ -19,7 +19,6 @@ import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/r
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type {
@@ -592,7 +591,6 @@ export function Surface() {
   const [surfaceWidth, setSurfaceWidth] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
-  const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
   const [measurementToken, setMeasurementToken] = useState(0);
@@ -603,9 +601,7 @@ export function Surface() {
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
-  const { viewportRef, isAtBottomRef, scrollToBottom, engageAndScroll } = useStickToBottom();
-  const prevEntryCountRef = useRef(0);
-  const didInitialBottomPaintRef = useRef(false);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
   const setViewportRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -729,57 +725,6 @@ export function Surface() {
     }
   }, [measurementReady, visibleVirtualRows, measurementToken]);
 
-  useLayoutEffect(() => {
-    const node = viewportRef.current;
-    if (
-      !node ||
-      !measurementReady ||
-      !visibleLayoutReady ||
-      didInitialBottomPaintRef.current ||
-      measuredEntries.length === 0
-    )
-      return;
-
-    node.scrollTop = node.scrollHeight;
-    isAtBottomRef.current = true;
-    setScrollTop(node.scrollTop);
-    didInitialBottomPaintRef.current = true;
-    setInitialPositionReady(true);
-  }, [
-    isAtBottomRef,
-    measuredEntries.length,
-    measurementReady,
-    viewportRef,
-    virtualRows.totalHeight,
-    visibleLayoutReady,
-  ]);
-
-  // Re-settle scroll when virtual height changes after initial paint.
-  // Catches measurement settling: bottom rows render after the initial scroll
-  // repositions the viewport, and their actual heights differ from estimates.
-  useLayoutEffect(() => {
-    const node = viewportRef.current;
-    if (!node || !didInitialBottomPaintRef.current || !isAtBottomRef.current) return;
-    scrollToBottom();
-    setScrollTop(node.scrollTop);
-  }, [virtualRows.totalHeight, viewportRef, isAtBottomRef, scrollToBottom]);
-
-  useEffect(() => {
-    if (measuredEntries.length === 0) {
-      didInitialBottomPaintRef.current = false;
-      setInitialPositionReady(true);
-    }
-  }, [measuredEntries.length]);
-
-  // Auto-scroll when new entries arrive while pinned to bottom
-  useEffect(() => {
-    const prev = prevEntryCountRef.current;
-    prevEntryCountRef.current = measuredEntries.length;
-    if (prev > 0 && measuredEntries.length > prev && isAtBottomRef.current) {
-      scrollToBottom();
-    }
-  }, [measuredEntries.length, isAtBottomRef, scrollToBottom]);
-
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
@@ -820,7 +765,6 @@ export function Surface() {
       if (!text && !images?.length) return;
 
       setIsSending(true);
-      engageAndScroll();
 
       try {
         await sendMessage(text || "(image)", { images });
@@ -832,7 +776,7 @@ export function Surface() {
         setIsSending(false);
       }
     },
-    [engageAndScroll, sendMessage],
+    [sendMessage],
   );
 
   return (
@@ -871,10 +815,7 @@ export function Surface() {
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
             style={{
-              visibility:
-                initialPositionReady && measurementReady && visibleLayoutReady
-                  ? "visible"
-                  : "hidden",
+              visibility: measurementReady && visibleLayoutReady ? "visible" : "hidden",
             }}
           >
             {entries.length === 0 && (
