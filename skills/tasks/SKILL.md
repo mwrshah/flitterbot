@@ -5,7 +5,7 @@ argument-hint: "[task request]"
 disable-model-invocation: false
 ---
 
-This skill helps us use the task system. Local tasks are saved to a json file (called local task store in contrast to external systems like Todoist, and Linear which can be synchronized with)
+This skill helps us use the task system. Local tasks are saved to a json file (called local task store in contrast to external systems like Todoist, and Linear which are synchronized with it)
 
 We only use the bundled script for all reads, updates, writes though, for all operations. Optional Todoist/Linear sync runs only when their API keys are present in config.json.
 
@@ -27,10 +27,9 @@ Default output is concise Markdown. Add `--json` / `--format json` / `"format":"
 
 ## Workflow
 
-1. On the first task call in a session, run `periodic_sync_and_cleanup`.
-2. Before `create_task`, run `search_tasks` or `list_tasks` with a relevant filter to avoid duplicates.
-3. Use `update_task` to mark a task status as`done`, change due date, move projects, or edit text.
-4. Pass `status: "any"` only when the user wants completed tasks included.
+1. Before `create_task`, run `search_tasks` or `list_tasks` with a relevant filter to avoid duplicates.
+2. Use `update_task` to mark a task status as`done`, change due date, move projects, or edit text.
+3. Pass `status: "any"` only when the user wants completed tasks included.
 
 ## Data Model
 

@@ -592,6 +592,7 @@ export function Surface() {
   const [viewportHeight, setViewportHeight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
+  const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
   const [measurementToken, setMeasurementToken] = useState(0);
   const invalidateMeasurement = useCallback(() => setMeasurementToken((t) => t + 1), []);
@@ -602,6 +603,7 @@ export function Surface() {
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const didInitialBottomPaintRef = useRef(false);
   const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
   const setViewportRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -725,6 +727,22 @@ export function Surface() {
     }
   }, [measurementReady, visibleVirtualRows, measurementToken]);
 
+  // One-shot: snap to bottom on initial load. Never auto-scrolls again.
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    if (!node || didInitialBottomPaintRef.current) return;
+    if (!measurementReady || !visibleLayoutReady) return;
+    if (measuredEntries.length === 0) {
+      // Empty feed — mark ready so visibility unhides, but don't lock the one-shot.
+      setInitialPositionReady(true);
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
+    setScrollTop(node.scrollTop);
+    didInitialBottomPaintRef.current = true;
+    setInitialPositionReady(true);
+  }, [measurementReady, visibleLayoutReady, measuredEntries.length, virtualRows.totalHeight]);
+
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
@@ -815,7 +833,10 @@ export function Surface() {
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
             style={{
-              visibility: measurementReady && visibleLayoutReady ? "visible" : "hidden",
+              visibility:
+                initialPositionReady && measurementReady && visibleLayoutReady
+                  ? "visible"
+                  : "hidden",
             }}
           >
             {entries.length === 0 && (
