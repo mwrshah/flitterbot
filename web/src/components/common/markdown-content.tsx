@@ -29,12 +29,7 @@ function tokenTitle(token: MarkdownToken): string | undefined {
 
 function MarkdownInlineTokens({ tokens }: { tokens: MarkdownToken[] | undefined }) {
   if (!tokens?.length) return null;
-  return tokens.map((token, index) => (
-    <MarkdownInline
-      token={token}
-      key={`${token.type ?? "token"}:${token.raw ?? token.text ?? index}`}
-    />
-  ));
+  return tokens.map((token, index) => <MarkdownInline token={token} key={index} />);
 }
 
 function MarkdownInline({ token }: { token: MarkdownToken }): ReactNode {
@@ -97,12 +92,7 @@ function MarkdownInline({ token }: { token: MarkdownToken }): ReactNode {
 
 function MarkdownBlocks({ tokens }: { tokens: MarkdownToken[] | undefined }) {
   if (!tokens?.length) return null;
-  return tokens.map((token, index) => (
-    <MarkdownBlock
-      token={token}
-      key={`${token.type ?? "block"}:${token.raw ?? token.text ?? index}`}
-    />
-  ));
+  return tokens.map((token, index) => <MarkdownBlock token={token} key={index} />);
 }
 
 function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
@@ -142,8 +132,8 @@ function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
       const ListTag = token.ordered ? "ol" : "ul";
       return (
         <ListTag start={typeof token.start === "number" ? token.start : undefined}>
-          {(token.items ?? []).map((item: MarkdownToken) => (
-            <li key={`${item.raw ?? item.text ?? "item"}`}>
+          {(token.items ?? []).map((item: MarkdownToken, itemIndex: number) => (
+            <li key={itemIndex}>
               <MarkdownBlocks tokens={item.tokens} />
             </li>
           ))}
@@ -163,8 +153,8 @@ function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
         <table>
           <thead>
             <tr>
-              {(token.header ?? []).map((cell: MarkdownToken) => (
-                <th key={`${cell.raw ?? cell.text ?? "header"}`}>
+              {(token.header ?? []).map((cell: MarkdownToken, cellIndex: number) => (
+                <th key={cellIndex}>
                   <MarkdownInlineTokens tokens={cell.tokens} />
                 </th>
               ))}
@@ -172,13 +162,9 @@ function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
           </thead>
           <tbody>
             {(token.rows ?? []).map((row: MarkdownToken[], rowIndex: number) => (
-              <tr
-                key={
-                  row.map((cell) => cell.raw ?? cell.text ?? "cell").join("|") || String(rowIndex)
-                }
-              >
-                {row.map((cell) => (
-                  <td key={`${cell.raw ?? cell.text ?? "cell"}`}>
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex}>
                     <MarkdownInlineTokens tokens={cell.tokens} />
                   </td>
                 ))}

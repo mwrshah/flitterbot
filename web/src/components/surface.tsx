@@ -2,6 +2,7 @@ import { layout, prepare } from "@chenglou/pretext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { CopyIcon, SettingsIcon } from "lucide-react";
+import { marked } from "marked";
 import {
   type MouseEvent,
   memo,
@@ -59,7 +60,20 @@ type MeasuredSurfaceEntry = SurfaceEntry & {
   metrics: {
     estimatedHeight: number;
     isOverflowing: boolean;
+    lineHeight: number;
   };
+};
+
+type MarkdownMetrics = {
+  lineHeight: number;
+  paragraphGap: number;
+  bubbleChrome: number;
+};
+
+const DEFAULT_MARKDOWN_METRICS: MarkdownMetrics = {
+  lineHeight: 24,
+  paragraphGap: 9,
+  bubbleChrome: 18,
 };
 
 type MeasuredInboundEntry = Extract<MeasuredSurfaceEntry, { kind: "inbound" }>;
@@ -95,21 +109,56 @@ const timeFormatter = new Intl.DateTimeFormat(undefined, {
 
 const MAX_LINES = 30;
 const SURFACE_FONT = '400 14px "Geist Variable", sans-serif';
-const SURFACE_LINE_HEIGHT = 20;
 const SURFACE_MIN_BUBBLE_WIDTH = 240;
-const SURFACE_BUBBLE_CHROME_WIDTH = 24;
+// px-3 (12+12) horizontal padding + 1px border on each side. Pretext is given
+// the actual inner content width so its wrapping matches the rendered DOM.
+const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN_ABOVE_RATIO = 0.5;
 const SURFACE_OVERSCAN_BELOW_RATIO = 1;
 const SURFACE_ROW_MIN_HEIGHT = 44;
-const SURFACE_BUBBLE_VERTICAL_PADDING = 16;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
 const SURFACE_IMAGE_HEIGHT = 200;
 const SURFACE_IMAGE_GAP = 8;
 const SURFACE_HOOK_TITLE_HEIGHT = 20;
 const SURFACE_HOOK_DETAIL_GAP = 8;
+
+// Markdown block-style constants — values are derived from styles.css:50-92
+// and browser defaults at the bubble's 14px font-size context. Used to model
+// per-block heights and inter-block collapsed margins so the row estimator
+// matches what `marked` + `.markdown-body` actually render.
+const FONT_SIZE_PX = 14;
+const MARKDOWN_LINE_HEIGHT_RATIO = 1.65; // .markdown-body { line-height: 1.65 }
+const PARAGRAPH_MARGIN_PX = 0.6 * FONT_SIZE_PX; // .markdown-body p { margin: 0.6em 0 }
+const LIST_INDENT_PX = 1.5 * FONT_SIZE_PX; // .markdown-body ul/ol { padding-left: 1.5em }
+const LIST_MARGIN_PX = 0.5 * FONT_SIZE_PX; // .markdown-body ul/ol { margin: 0.5em 0 }
+const BQ_INDENT_PX = 0.8 * FONT_SIZE_PX + 3; // padding-left + 3px border
+const BQ_MARGIN_PX = 0.5 * FONT_SIZE_PX;
+const CODE_PADDING_PX = 2 * 0.8 * FONT_SIZE_PX; // pre code { padding: 0.8em 1em } top+bottom
+const CODE_LINE_HEIGHT_PX = 0.8 * FONT_SIZE_PX * 1.5; // font-size: 0.8em, line-height: 1.5
+const CODE_MARGIN_PX = 1 * FONT_SIZE_PX; // <pre> browser-default 1em
+const HR_HEIGHT_PX = 1;
+const HR_MARGIN_PX = 0.5 * FONT_SIZE_PX;
+// Browser defaults for heading font sizes and (top/bottom) margins, in em of the heading's own font size.
+const HEADING_FONT_SIZE_EM: Record<number, number> = {
+  1: 2,
+  2: 1.5,
+  3: 1.17,
+  4: 1,
+  5: 0.83,
+  6: 0.67,
+};
+const HEADING_MARGIN_EM: Record<number, number> = {
+  1: 0.67,
+  2: 0.83,
+  3: 1,
+  4: 1.33,
+  5: 1.5,
+  6: 1.67,
+};
+
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
 /**
@@ -128,40 +177,184 @@ function getPreparedText(text: string) {
   return prepared;
 }
 
-function getPlainTextMetrics(text: string, maxWidth: number) {
-  const prepared = getPreparedText(text);
-  const { lineCount } = layout(prepared, maxWidth, SURFACE_LINE_HEIGHT);
+/**
+ * Markdown estimation walks `marked.lexer` tokens block-by-block instead of
+ * treating the entire string as plain prose. Each block contributes its own
+ * content height + outer margins, and adjacent blocks share a collapsed margin
+ * (max of neighbors). The `.markdown-body :first-child { margin-top: 0 }` /
+ * `:last-child { margin-bottom: 0 }` rule applies to any first/last child
+ * descendant — so it cascades through `<li>` and `<blockquote>` and is modeled
+ * here by simply not adding the outer block's own margins at the stack edges.
+ */
+type MarkdownTokenLite = {
+  type?: string;
+  text?: unknown;
+  raw?: unknown;
+  tokens?: MarkdownTokenLite[];
+  items?: MarkdownTokenLite[];
+  rows?: unknown[];
+  depth?: unknown;
+};
 
+type BlockMetrics = { height: number; marginTop: number; marginBottom: number };
+
+const markdownTokenCache = new Map<string, MarkdownTokenLite[]>();
+
+function getMarkdownTokens(text: string): MarkdownTokenLite[] {
+  const cached = markdownTokenCache.get(text);
+  if (cached) return cached;
+  const tokens = marked.lexer(text) as MarkdownTokenLite[];
+  markdownTokenCache.set(text, tokens);
+  return tokens;
+}
+
+// marked's default (gfm without `breaks: true`) renders a single `\n` inside a
+// paragraph as whitespace — adjacent lines join with a space. Pretext with
+// `whiteSpace: "pre-wrap"` would otherwise treat each `\n` as a hard break and
+// over-count lines by one per soft break.
+function collapseSoftBreaks(text: string): string {
+  return text.replace(/[ \t]*\n[ \t]*/g, " ");
+}
+
+function measureInlineLines(text: string, maxWidth: number, lineHeight: number): number {
+  if (!text) return 1;
+  const collapsed = collapseSoftBreaks(text);
+  const prepared = getPreparedText(collapsed);
+  const { lineCount } = layout(prepared, Math.max(1, maxWidth), lineHeight);
+  return Math.max(1, lineCount);
+}
+
+function measureBlock(
+  token: MarkdownTokenLite,
+  maxWidth: number,
+  m: MarkdownMetrics,
+): BlockMetrics {
+  switch (token.type) {
+    case "paragraph":
+    case "text": {
+      const raw = String(token.text ?? token.raw ?? "");
+      const lines = measureInlineLines(raw, maxWidth, m.lineHeight);
+      return {
+        height: lines * m.lineHeight,
+        marginTop: PARAGRAPH_MARGIN_PX,
+        marginBottom: PARAGRAPH_MARGIN_PX,
+      };
+    }
+    case "heading": {
+      const depth = Math.min(Math.max(Number(token.depth) || 2, 1), 6);
+      const fontSize = (HEADING_FONT_SIZE_EM[depth] ?? 1) * FONT_SIZE_PX;
+      const lh = fontSize * MARKDOWN_LINE_HEIGHT_RATIO;
+      const lines = measureInlineLines(String(token.text ?? ""), maxWidth, lh);
+      const marginPx = (HEADING_MARGIN_EM[depth] ?? 1) * fontSize;
+      return { height: lines * lh, marginTop: marginPx, marginBottom: marginPx };
+    }
+    case "code": {
+      const codeText = String(token.text ?? "");
+      const codeLines = codeText.length === 0 ? 1 : codeText.split("\n").length;
+      return {
+        height: CODE_PADDING_PX + codeLines * CODE_LINE_HEIGHT_PX,
+        marginTop: CODE_MARGIN_PX,
+        marginBottom: CODE_MARGIN_PX,
+      };
+    }
+    case "blockquote": {
+      const inner = (token.tokens ?? []).map((t) => measureBlock(t, maxWidth - BQ_INDENT_PX, m));
+      return {
+        height: stackBlocks(inner),
+        marginTop: BQ_MARGIN_PX,
+        marginBottom: BQ_MARGIN_PX,
+      };
+    }
+    case "list": {
+      const items = token.items ?? [];
+      let total = 0;
+      for (const item of items) {
+        const inner = (item.tokens ?? []).map((t) => measureBlock(t, maxWidth - LIST_INDENT_PX, m));
+        total += stackBlocks(inner);
+      }
+      return { height: total, marginTop: LIST_MARGIN_PX, marginBottom: LIST_MARGIN_PX };
+    }
+    case "table": {
+      const rowCount = 1 + (Array.isArray(token.rows) ? token.rows.length : 0);
+      return {
+        height: rowCount * m.lineHeight,
+        marginTop: PARAGRAPH_MARGIN_PX,
+        marginBottom: PARAGRAPH_MARGIN_PX,
+      };
+    }
+    case "hr":
+      return { height: HR_HEIGHT_PX, marginTop: HR_MARGIN_PX, marginBottom: HR_MARGIN_PX };
+    case "space":
+      return { height: 0, marginTop: 0, marginBottom: 0 };
+    default: {
+      // Includes `html` and any unknown block types — treat as paragraph.
+      const lines = measureInlineLines(
+        String(token.text ?? token.raw ?? ""),
+        maxWidth,
+        m.lineHeight,
+      );
+      return {
+        height: lines * m.lineHeight,
+        marginTop: PARAGRAPH_MARGIN_PX,
+        marginBottom: PARAGRAPH_MARGIN_PX,
+      };
+    }
+  }
+}
+
+// Sum block heights with CSS-collapsed margins between adjacent blocks.
+// First/last child outer margins are dropped (matches the `.markdown-body
+// :first-child / :last-child` rule which applies recursively).
+function stackBlocks(blocks: BlockMetrics[]): number {
+  const visible = blocks.filter((b) => b.height > 0);
+  if (visible.length === 0) return 0;
+  let total = visible[0]!.height;
+  for (let i = 1; i < visible.length; i++) {
+    total += Math.max(visible[i - 1]!.marginBottom, visible[i]!.marginTop) + visible[i]!.height;
+  }
+  return total;
+}
+
+function getMarkdownMetrics(text: string, maxWidth: number, m: MarkdownMetrics) {
+  const tokens = getMarkdownTokens(text);
+  const blocks = tokens.map((t) => measureBlock(t, maxWidth, m));
+  const rawTextHeight = stackBlocks(blocks);
+  const clampHeight = MAX_LINES * m.lineHeight;
+  const isOverflowing = rawTextHeight > clampHeight;
+  // PlainTextBlock clamps with `maxHeight: MAX_LINES * lineHeight; overflow: hidden`
+  // so when overflowing the visible text height is exactly the clamp regardless
+  // of how tall the underlying content would have rendered. Mirror that here.
   return {
-    lineCount,
-    isOverflowing: lineCount > MAX_LINES,
+    textHeight: isOverflowing ? clampHeight : rawTextHeight,
+    isOverflowing,
   };
 }
 
 function estimateMessageRowHeight(
-  lineCount: number,
+  textHeight: number,
   hasBadge: boolean,
   isOverflowing: boolean,
+  metrics: MarkdownMetrics,
 ): number {
-  const visibleLines = Math.max(1, Math.min(lineCount, MAX_LINES));
-  const textHeight = visibleLines * SURFACE_LINE_HEIGHT;
   const badgeHeight = hasBadge ? SURFACE_BADGE_HEIGHT : 0;
   const collapseHeight = isOverflowing ? SURFACE_COLLAPSE_TOGGLE_HEIGHT : 0;
   return Math.max(
     SURFACE_ROW_MIN_HEIGHT,
-    SURFACE_BUBBLE_VERTICAL_PADDING + badgeHeight + textHeight + collapseHeight,
+    metrics.bubbleChrome + badgeHeight + textHeight + collapseHeight,
   );
 }
 
-function estimateHookRowHeight(detail: string): number {
+function estimateHookRowHeight(detail: string, maxWidth: number, metrics: MarkdownMetrics): number {
   if (!detail) return SURFACE_ROW_MIN_HEIGHT;
-  const { lineCount } = getPlainTextMetrics(detail, 520);
+  // Hooks render MarkdownContent directly (no PlainTextBlock clamp) so use the
+  // raw stack height — getMarkdownMetrics only clamps for the message bubble's
+  // overflow case.
+  const tokens = getMarkdownTokens(detail);
+  const blocks = tokens.map((t) => measureBlock(t, maxWidth, metrics));
+  const textHeight = stackBlocks(blocks);
   return Math.max(
     SURFACE_ROW_MIN_HEIGHT,
-    SURFACE_BUBBLE_VERTICAL_PADDING +
-      SURFACE_HOOK_TITLE_HEIGHT +
-      SURFACE_HOOK_DETAIL_GAP +
-      Math.max(1, lineCount) * SURFACE_LINE_HEIGHT,
+    metrics.bubbleChrome + SURFACE_HOOK_TITLE_HEIGHT + SURFACE_HOOK_DETAIL_GAP + textHeight,
   );
 }
 
@@ -236,13 +429,17 @@ function getMeasurementWidth(maxWidth: number): number {
  * For 200 entries, total measurement time is ~0.04ms (all cache hits).
  * First-time measurement of 200 unique texts is ~8ms (prepare + layout).
  */
-function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurfaceEntry {
+function measureEntry(
+  entry: SurfaceEntry,
+  bubbleMaxWidth: number,
+  mdMetrics: MarkdownMetrics,
+): MeasuredSurfaceEntry {
   const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
   const displayTime = formatTime(entry.timestamp);
   switch (entry.kind) {
     case "inbound":
     case "streams-response": {
-      const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+      const textMetrics = getMarkdownMetrics(entry.content, measurementWidth, mdMetrics);
       const imageCount = entry.images?.length ?? 0;
       const imageHeight =
         imageCount > 0 ? imageCount * SURFACE_IMAGE_HEIGHT + imageCount * SURFACE_IMAGE_GAP : 0;
@@ -251,24 +448,31 @@ function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurf
         displayTime,
         metrics: {
           estimatedHeight:
-            estimateMessageRowHeight(metrics.lineCount, !!entry.streamName, metrics.isOverflowing) +
-            imageHeight,
-          isOverflowing: metrics.isOverflowing,
+            estimateMessageRowHeight(
+              textMetrics.textHeight,
+              !!entry.streamName,
+              textMetrics.isOverflowing,
+              mdMetrics,
+            ) + imageHeight,
+          isOverflowing: textMetrics.isOverflowing,
+          lineHeight: mdMetrics.lineHeight,
         },
       };
     }
     case "outbound": {
-      const metrics = getPlainTextMetrics(entry.content, measurementWidth);
+      const textMetrics = getMarkdownMetrics(entry.content, measurementWidth, mdMetrics);
       return {
         ...entry,
         displayTime,
         metrics: {
           estimatedHeight: estimateMessageRowHeight(
-            metrics.lineCount,
+            textMetrics.textHeight,
             false,
-            metrics.isOverflowing,
+            textMetrics.isOverflowing,
+            mdMetrics,
           ),
-          isOverflowing: metrics.isOverflowing,
+          isOverflowing: textMetrics.isOverflowing,
+          lineHeight: mdMetrics.lineHeight,
         },
       };
     }
@@ -277,8 +481,9 @@ function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurf
         ...entry,
         displayTime,
         metrics: {
-          estimatedHeight: estimateHookRowHeight(entry.detail),
+          estimatedHeight: estimateHookRowHeight(entry.detail, measurementWidth, mdMetrics),
           isOverflowing: false,
+          lineHeight: mdMetrics.lineHeight,
         },
       };
   }
@@ -289,11 +494,13 @@ function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurf
 function PlainTextBlock({
   text,
   isOverflowing,
+  lineHeight,
   fadeClassName = "from-card",
   onExpandToggle,
 }: {
   text: string;
   isOverflowing: boolean;
+  lineHeight: number;
   fadeClassName?: string;
   onExpandToggle?: () => void;
 }) {
@@ -305,7 +512,7 @@ function PlainTextBlock({
         style={
           !expanded
             ? {
-                maxHeight: `${MAX_LINES * SURFACE_LINE_HEIGHT}px`,
+                maxHeight: `${MAX_LINES * lineHeight}px`,
                 overflow: "hidden",
               }
             : undefined
@@ -459,6 +666,7 @@ const InboundEntry = memo(function InboundEntry({
         <PlainTextBlock
           text={displayContent}
           isOverflowing={entry.metrics.isOverflowing}
+          lineHeight={entry.metrics.lineHeight}
           onExpandToggle={onExpandToggle}
         />
         {entry.images && entry.images.length > 0 && <ImageStack images={entry.images} />}
@@ -519,6 +727,7 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
         <PlainTextBlock
           text={entry.content}
           isOverflowing={entry.metrics.isOverflowing}
+          lineHeight={entry.metrics.lineHeight}
           fadeClassName="from-muted/30"
           onExpandToggle={onExpandToggle}
         />
@@ -575,6 +784,87 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
   }
 });
 
+/* ── Markdown Metrics Probe ── */
+
+/**
+ * Hidden probe that measures the actual rendered CSS metrics of a bubble:
+ * - line-height (incl. `.markdown-body { line-height: 1.65 }`)
+ * - paragraph gap (the collapsed margin between two <p> tags)
+ * - bubble chrome (border + vertical padding)
+ *
+ * Mirrors the bubble class chain so cascaded styles match the real bubbles.
+ * Re-measures on width changes (browser zoom and panel resizes both change
+ * computed px sizes via surfaceWidth, so this is sufficient for both).
+ */
+function MarkdownMetricsProbe({
+  width,
+  onMeasure,
+}: {
+  width: number;
+  onMeasure: (m: MarkdownMetrics) => void;
+}) {
+  const oneRef = useRef<HTMLDivElement>(null);
+  const twoRef = useRef<HTMLDivElement>(null);
+  const oneLineRef = useRef<HTMLParagraphElement>(null);
+  const lastEmitRef = useRef<MarkdownMetrics | null>(null);
+
+  useLayoutEffect(() => {
+    if (!oneRef.current || !twoRef.current || !oneLineRef.current) return;
+    if (width <= 0) return;
+
+    const lineHeight = oneLineRef.current.getBoundingClientRect().height;
+    const oneBubbleHeight = oneRef.current.getBoundingClientRect().height;
+    const twoBubbleHeight = twoRef.current.getBoundingClientRect().height;
+
+    const bubbleChrome = Math.max(0, oneBubbleHeight - lineHeight);
+    const paragraphGap = Math.max(0, twoBubbleHeight - oneBubbleHeight - lineHeight);
+
+    const next: MarkdownMetrics = {
+      lineHeight: lineHeight > 0 ? lineHeight : DEFAULT_MARKDOWN_METRICS.lineHeight,
+      paragraphGap,
+      bubbleChrome: bubbleChrome > 0 ? bubbleChrome : DEFAULT_MARKDOWN_METRICS.bubbleChrome,
+    };
+
+    const prev = lastEmitRef.current;
+    if (
+      prev &&
+      Math.abs(prev.lineHeight - next.lineHeight) < 0.5 &&
+      Math.abs(prev.paragraphGap - next.paragraphGap) < 0.5 &&
+      Math.abs(prev.bubbleChrome - next.bubbleChrome) < 0.5
+    ) {
+      return;
+    }
+    lastEmitRef.current = next;
+    onMeasure(next);
+  }, [width, onMeasure]);
+
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        visibility: "hidden",
+        pointerEvents: "none",
+        top: -9999,
+        left: 0,
+        width,
+      }}
+    >
+      <div ref={oneRef} className="rounded-lg border border-border bg-card px-3 py-2">
+        <div className="markdown-body text-sm text-foreground break-words">
+          <p ref={oneLineRef}>x</p>
+        </div>
+      </div>
+      <div ref={twoRef} className="rounded-lg border border-border bg-card px-3 py-2">
+        <div className="markdown-body text-sm text-foreground break-words">
+          <p>x</p>
+          <p>x</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ── */
 
 const rootApi = getRouteApi("__root__");
@@ -594,6 +884,7 @@ export function Surface() {
   const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
   const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
+  const [mdMetrics, setMdMetrics] = useState<MarkdownMetrics>(DEFAULT_MARKDOWN_METRICS);
   const [measurementToken, setMeasurementToken] = useState(0);
   const invalidateMeasurement = useCallback(() => setMeasurementToken((t) => t + 1), []);
 
@@ -656,8 +947,14 @@ export function Surface() {
    */
   const measuredEntries = useMemo(() => {
     if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
-    return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
-  }, [entries, bubbleMaxWidth]);
+    return entries.map((entry) => measureEntry(entry, bubbleMaxWidth, mdMetrics));
+  }, [entries, bubbleMaxWidth, mdMetrics]);
+
+  // Latch the one-shot only after the LAST entry's real DOM height is known.
+  // Until then, the initial scroll uses estimates for off-screen bottom rows and
+  // misses the true bottom by tens of px.
+  const lastEntryId = measuredEntries[measuredEntries.length - 1]?.id;
+  const lastEntryMeasured = lastEntryId ? measuredHeights[lastEntryId] !== undefined : true;
 
   const virtualRows = useMemo(() => {
     const offsets: number[] = new Array(measuredEntries.length);
@@ -728,6 +1025,8 @@ export function Surface() {
   }, [measurementReady, visibleVirtualRows, measurementToken]);
 
   // One-shot: snap to bottom on initial load. Never auto-scrolls again.
+  // Runs multiple passes (deps re-fire on totalHeight changes) until the last
+  // entry's real DOM height is captured — then latches.
   useLayoutEffect(() => {
     const node = viewportRef.current;
     if (!node || didInitialBottomPaintRef.current) return;
@@ -737,11 +1036,23 @@ export function Surface() {
       setInitialPositionReady(true);
       return;
     }
+    // Each pass scrolls to the current (estimated → real) bottom. As bottom
+    // rows enter the visible window they render + measure, virtualRows.totalHeight
+    // updates, this effect re-fires, and we re-scroll. Latch only when the
+    // last entry's actual DOM height is in measuredHeights.
     node.scrollTop = node.scrollHeight;
     setScrollTop(node.scrollTop);
-    didInitialBottomPaintRef.current = true;
-    setInitialPositionReady(true);
-  }, [measurementReady, visibleLayoutReady, measuredEntries.length, virtualRows.totalHeight]);
+    if (lastEntryMeasured) {
+      didInitialBottomPaintRef.current = true;
+      setInitialPositionReady(true);
+    }
+  }, [
+    measurementReady,
+    visibleLayoutReady,
+    measuredEntries.length,
+    virtualRows.totalHeight,
+    lastEntryMeasured,
+  ]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -819,6 +1130,13 @@ export function Surface() {
       </div>
 
       <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
+
+      {bubbleMaxWidth !== null && (
+        <MarkdownMetricsProbe
+          width={getMeasurementWidth(bubbleMaxWidth)}
+          onMeasure={setMdMetrics}
+        />
+      )}
 
       <PanelGroup
         orientation="vertical"
