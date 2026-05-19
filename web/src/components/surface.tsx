@@ -541,7 +541,17 @@ function PlainTextBlock({
   );
 }
 
-function ImageStack({ images }: { images: ImageAttachment[] }) {
+function ImageStack({
+  images,
+  onImageLoad,
+}: {
+  images: ImageAttachment[];
+  // Fired per <img> when the browser finishes decoding the data: URI. The row's
+  // measured height grows from ~0 (pre-decode) to the rendered image height,
+  // and the parent uses this signal to re-measure so the virtualizer's
+  // totalHeight (and the one-shot bottom-snap) reflects the post-load layout.
+  onImageLoad?: () => void;
+}) {
   return (
     <div className="flex flex-col gap-2 mt-2">
       {images.map((img, i) => (
@@ -551,6 +561,7 @@ function ImageStack({ images }: { images: ImageAttachment[] }) {
           alt=""
           className="max-w-full rounded-md object-contain"
           style={{ maxHeight: `${SURFACE_IMAGE_HEIGHT}px` }}
+          onLoad={onImageLoad}
         />
       ))}
     </div>
@@ -644,9 +655,11 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
 const InboundEntry = memo(function InboundEntry({
   entry,
   onExpandToggle,
+  onImageLoad,
 }: {
   entry: MeasuredInboundEntry;
   onExpandToggle?: () => void;
+  onImageLoad?: () => void;
 }) {
   const displayContent = entry.content;
 
@@ -669,7 +682,9 @@ const InboundEntry = memo(function InboundEntry({
           lineHeight={entry.metrics.lineHeight}
           onExpandToggle={onExpandToggle}
         />
-        {entry.images && entry.images.length > 0 && <ImageStack images={entry.images} />}
+        {entry.images && entry.images.length > 0 && (
+          <ImageStack images={entry.images} onImageLoad={onImageLoad} />
+        )}
         <MessageCopyButton text={displayContent} />
       </div>
     </div>
@@ -709,9 +724,11 @@ const OutboundEntry = memo(function OutboundEntry({
 const StreamsResponseEntry = memo(function StreamsResponseEntry({
   entry,
   onExpandToggle,
+  onImageLoad,
 }: {
   entry: MeasuredStreamsResponseEntry;
   onExpandToggle?: () => void;
+  onImageLoad?: () => void;
 }) {
   return (
     <div className="flex gap-3 items-start">
@@ -731,7 +748,9 @@ const StreamsResponseEntry = memo(function StreamsResponseEntry({
           fadeClassName="from-muted/30"
           onExpandToggle={onExpandToggle}
         />
-        {entry.images && entry.images.length > 0 && <ImageStack images={entry.images} />}
+        {entry.images && entry.images.length > 0 && (
+          <ImageStack images={entry.images} onImageLoad={onImageLoad} />
+        )}
         <MessageCopyButton text={entry.content} />
       </div>
     </div>
@@ -763,13 +782,21 @@ const HookEntry = memo(function HookEntry({
 const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
   entry,
   onExpandToggle,
+  onImageLoad,
 }: {
   entry: MeasuredSurfaceEntry;
   onExpandToggle?: () => void;
+  onImageLoad?: () => void;
 }) {
   switch (entry.kind) {
     case "inbound":
-      return <InboundEntry entry={entry as MeasuredInboundEntry} onExpandToggle={onExpandToggle} />;
+      return (
+        <InboundEntry
+          entry={entry as MeasuredInboundEntry}
+          onExpandToggle={onExpandToggle}
+          onImageLoad={onImageLoad}
+        />
+      );
     case "outbound":
       return <OutboundEntry entry={entry} />;
     case "streams-response":
@@ -777,6 +804,7 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
         <StreamsResponseEntry
           entry={entry as MeasuredStreamsResponseEntry}
           onExpandToggle={onExpandToggle}
+          onImageLoad={onImageLoad}
         />
       );
     case "hook":
@@ -895,6 +923,11 @@ export function Surface() {
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const didInitialBottomPaintRef = useRef(false);
+  // Restartable timer that latches the one-shot bottom-snap after a window
+  // with no totalHeight changes (i.e., async content like image decodes has
+  // settled). Without this, new SSE messages arriving later would re-trigger
+  // the snap-to-bottom effect — stick-to-bottom was intentionally removed.
+  const initialSnapLatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
   const setViewportRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -919,10 +952,31 @@ export function Surface() {
     const onScroll = () => {
       setScrollTop(node.scrollTop);
     };
+    // Real user gestures latch the one-shot bottom-snap immediately so the
+    // settle-window timer can't yank the viewport back to bottom mid-scroll.
+    // Programmatic scrollTop writes never fire these events.
+    const onUserGesture = () => {
+      if (didInitialBottomPaintRef.current) return;
+      didInitialBottomPaintRef.current = true;
+      if (initialSnapLatchTimerRef.current) {
+        clearTimeout(initialSnapLatchTimerRef.current);
+        initialSnapLatchTimerRef.current = null;
+      }
+    };
     node.addEventListener("scroll", onScroll, { passive: true });
+    node.addEventListener("wheel", onUserGesture, { passive: true });
+    node.addEventListener("touchstart", onUserGesture, { passive: true });
+    node.addEventListener("keydown", onUserGesture);
     return () => {
       node.removeEventListener("scroll", onScroll);
+      node.removeEventListener("wheel", onUserGesture);
+      node.removeEventListener("touchstart", onUserGesture);
+      node.removeEventListener("keydown", onUserGesture);
       resizeObserver.disconnect();
+      if (initialSnapLatchTimerRef.current) {
+        clearTimeout(initialSnapLatchTimerRef.current);
+        initialSnapLatchTimerRef.current = null;
+      }
     };
   }, [viewportRef]);
 
@@ -949,12 +1003,6 @@ export function Surface() {
     if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
     return entries.map((entry) => measureEntry(entry, bubbleMaxWidth, mdMetrics));
   }, [entries, bubbleMaxWidth, mdMetrics]);
-
-  // Latch the one-shot only after the LAST entry's real DOM height is known.
-  // Until then, the initial scroll uses estimates for off-screen bottom rows and
-  // misses the true bottom by tens of px.
-  const lastEntryId = measuredEntries[measuredEntries.length - 1]?.id;
-  const lastEntryMeasured = lastEntryId ? measuredHeights[lastEntryId] !== undefined : true;
 
   const virtualRows = useMemo(() => {
     const offsets: number[] = new Array(measuredEntries.length);
@@ -1025,8 +1073,14 @@ export function Surface() {
   }, [measurementReady, visibleVirtualRows, measurementToken]);
 
   // One-shot: snap to bottom on initial load. Never auto-scrolls again.
-  // Runs multiple passes (deps re-fire on totalHeight changes) until the last
-  // entry's real DOM height is captured — then latches.
+  //
+  // The effect re-fires whenever totalHeight changes (any row's measurement
+  // updates, including post-image-decode growth via <img onLoad> bumping
+  // measurementToken). Each pass re-pins to bottom. A restartable timer
+  // latches the one-shot once layout has been quiet for SETTLE_MS — the
+  // settle window is shorter than typical first-user-interaction latency
+  // but generous enough for data-URI image decodes. Real user gestures
+  // (wheel/touch/keydown handled above) latch immediately.
   useLayoutEffect(() => {
     const node = viewportRef.current;
     if (!node || didInitialBottomPaintRef.current) return;
@@ -1036,23 +1090,17 @@ export function Surface() {
       setInitialPositionReady(true);
       return;
     }
-    // Each pass scrolls to the current (estimated → real) bottom. As bottom
-    // rows enter the visible window they render + measure, virtualRows.totalHeight
-    // updates, this effect re-fires, and we re-scroll. Latch only when the
-    // last entry's actual DOM height is in measuredHeights.
     node.scrollTop = node.scrollHeight;
     setScrollTop(node.scrollTop);
-    if (lastEntryMeasured) {
+    setInitialPositionReady(true);
+
+    const SETTLE_MS = 600;
+    if (initialSnapLatchTimerRef.current) clearTimeout(initialSnapLatchTimerRef.current);
+    initialSnapLatchTimerRef.current = setTimeout(() => {
       didInitialBottomPaintRef.current = true;
-      setInitialPositionReady(true);
-    }
-  }, [
-    measurementReady,
-    visibleLayoutReady,
-    measuredEntries.length,
-    virtualRows.totalHeight,
-    lastEntryMeasured,
-  ]);
+      initialSnapLatchTimerRef.current = null;
+    }, SETTLE_MS);
+  }, [measurementReady, visibleLayoutReady, measuredEntries.length, virtualRows.totalHeight]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -1177,7 +1225,11 @@ export function Surface() {
                     className="absolute left-0 right-0"
                     style={{ top: `${top}px` }}
                   >
-                    <SurfaceEntryRenderer entry={entry} onExpandToggle={invalidateMeasurement} />
+                    <SurfaceEntryRenderer
+                      entry={entry}
+                      onExpandToggle={invalidateMeasurement}
+                      onImageLoad={invalidateMeasurement}
+                    />
                   </div>
                 ))}
               </div>
