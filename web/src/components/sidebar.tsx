@@ -81,7 +81,7 @@ export const Sidebar = memo(function Sidebar() {
   const lastStreamPath = useLastStreamPath();
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
-  const { apiClient } = rootApi.useRouteContext();
+  const { apiClient, sendMessage } = rootApi.useRouteContext();
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
@@ -139,9 +139,19 @@ export const Sidebar = memo(function Sidebar() {
         <div className="pl-4 pr-3.5 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
           {(defaultPiSessionId || openStreams.length > 0) && (
             <>
-              <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium mb-2">
-                Active streams
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium">
+                  Active streams
+                </p>
+                <button
+                  type="button"
+                  onClick={() => sendMessage("/new-stream").catch(() => {})}
+                  aria-label="New stream"
+                  className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none"
+                >
+                  +
+                </button>
+              </div>
               <div className="space-y-1">
                 {defaultPiSessionId && (
                   <Link
