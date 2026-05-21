@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  type ErrorComponentProps,
+  getRouteApi,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import type { Layout as PanelLayout } from "react-resizable-panels";
 import { ChatPanel } from "~/components/chat-panel";
 import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
 import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
@@ -50,7 +57,7 @@ export const Route = createFileRoute("/streams/$piSessionId")({
   head: () => ({
     meta: [{ title: "Flitterbot" }],
   }),
-  errorComponent: ({ error }) => (
+  errorComponent: ({ error }: ErrorComponentProps) => (
     <div className="flex items-center justify-center h-full p-8 text-destructive">
       <p>Failed to load session history: {String(error)}</p>
     </div>
@@ -117,7 +124,7 @@ function PiSessionRoute() {
       orientation="horizontal"
       className="h-full"
       defaultLayout={streamsLayout}
-      onLayoutChanged={(layout) => setConfig(STREAMS_MAIN_KEY, JSON.stringify(layout))}
+      onLayoutChanged={(layout: PanelLayout) => setConfig(STREAMS_MAIN_KEY, JSON.stringify(layout))}
     >
       <Panel id="chat" defaultSize="50%" minSize="30%">
         <ChatPanel

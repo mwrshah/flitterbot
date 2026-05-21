@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "~/components/common/markdown-content";
 import { MessageInput } from "~/components/common/message-input";
@@ -1074,7 +1075,9 @@ export function Surface() {
         orientation="vertical"
         className="flex-1 min-h-0"
         defaultLayout={chatLayout}
-        onLayoutChanged={(layout) => setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))}
+        onLayoutChanged={(layout: PanelLayout) =>
+          setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
+        }
       >
         {/* Activity feed */}
         <Panel id="feed" defaultSize="85%" minSize="20%">

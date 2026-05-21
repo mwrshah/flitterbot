@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Diff, type FileData, Hunk, parseDiff } from "react-diff-view";
+import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
@@ -304,8 +304,8 @@ export function DownstreamSessionsPanel({
                       {path}
                     </div>
                     <Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
-                      {(hunks) =>
-                        hunks.map((hunk) => (
+                      {(hunks: HunkData[]) =>
+                        hunks.map((hunk: HunkData) => (
                           <Hunk
                             key={`${hunk.oldStart},${hunk.oldLines} ${hunk.newStart},${hunk.newLines}`}
                             hunk={hunk}

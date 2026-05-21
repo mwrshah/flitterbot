@@ -1,6 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  type ErrorComponentProps,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
+import { Agentation } from "agentation";
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
@@ -72,7 +78,7 @@ export const Route = createRootRouteWithContext<{
       { rel: "icon", href: "/favicon.ico" },
     ],
   }),
-  errorComponent: (props) => (
+  errorComponent: (props: ErrorComponentProps) => (
     <RootDocument>
       <DefaultCatchBoundary {...props} />
     </RootDocument>
@@ -164,6 +170,7 @@ function RootDocument({
             },
           }}
         />
+        {import.meta.env.DEV && <Agentation />}
         <Scripts />
       </body>
     </html>
