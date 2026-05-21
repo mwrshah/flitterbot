@@ -37,6 +37,7 @@ import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type FlitterbotConfig, loadConfig, type ThinkingLevel } from "./config/load-config.ts";
 import { resolveModelEntry } from "./config/models.ts";
+import { persistModelsToConfigFile } from "./config/persist-models.ts";
 import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
@@ -685,6 +686,7 @@ export class ControlSurfaceRuntime {
     }
 
     const modelEntry = resolveModelEntry(this.config, modelId);
+    const isDefaultSession = this.sessionManager.getDefault()?.piSessionId === piSessionId;
     if (
       managed.modelInfo.provider === modelEntry.provider &&
       managed.modelInfo.id === modelEntry.modelId
@@ -697,6 +699,7 @@ export class ControlSurfaceRuntime {
         managed.modelInfo.id,
         managed.modelInfo.thinkingLevel,
       );
+      if (isDefaultSession) this.persistDefaultModel(modelId);
       return this.toPiSessionModelInfo(managed.modelInfo);
     }
 
@@ -733,18 +736,30 @@ export class ControlSurfaceRuntime {
     this.log(
       `pi-session model switched: ${managed.piSessionId} → ${managed.modelInfo.provider}/${managed.modelInfo.id}`,
     );
+
+    // When this pi-session is the default agent, the same call doubles as the
+    // "set default model" mutation: persist the new defaultModel to config and
+    // apply the model's curated thinking level (if any). The web client uses a
+    // single per-pi-session endpoint for both default and orchestrator streams
+    // — the default-stream specifics live here, not in a separate route.
+    if (isDefaultSession) {
+      this.persistDefaultModel(modelId);
+      return this.setPiSessionThinkingLevel(
+        piSessionId,
+        modelEntry.thinkingLevel ?? this.config.defaultThinkingLevel,
+      );
+    }
+
     return this.toPiSessionModelInfo(managed.modelInfo);
   }
 
-  async setDefaultModel(modelId: string): Promise<PiSessionModelInfo | undefined> {
-    const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
-    if (!defaultPiSessionId) return undefined;
-    await this.setPiSessionModel(defaultPiSessionId, modelId);
-    const modelEntry = resolveModelEntry(this.config, modelId);
-    return this.setPiSessionThinkingLevel(
-      defaultPiSessionId,
-      modelEntry.thinkingLevel ?? this.config.defaultThinkingLevel,
-    );
+  private persistDefaultModel(modelId: string): void {
+    this.config.defaultModel = modelId;
+    persistModelsToConfigFile({
+      models: this.config.models,
+      defaultModel: modelId,
+    });
+    this.log(`models: defaultModel set to ${modelId}`);
   }
 
   async setPiSessionThinkingLevel(
@@ -794,15 +809,20 @@ export class ControlSurfaceRuntime {
     this.log(
       `pi-session thinking level switched: ${managed.piSessionId} → ${managed.modelInfo.thinkingLevel}`,
     );
-    return this.toPiSessionModelInfo(managed.modelInfo);
-  }
 
-  async setDefaultThinkingLevel(
-    thinkingLevel: ThinkingLevel,
-  ): Promise<PiSessionModelInfo | undefined> {
-    const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
-    if (!defaultPiSessionId) return undefined;
-    return this.setPiSessionThinkingLevel(defaultPiSessionId, thinkingLevel);
+    // When this pi-session is the default agent, persist the new
+    // defaultThinkingLevel to config — matches the setPiSessionModel behavior
+    // and keeps the web client on a single per-pi-session endpoint.
+    if (this.sessionManager.getDefault()?.piSessionId === piSessionId) {
+      this.config.defaultThinkingLevel = thinkingLevel;
+      persistModelsToConfigFile({
+        models: this.config.models,
+        defaultThinkingLevel: thinkingLevel,
+      });
+      this.log(`models: defaultThinkingLevel set to ${thinkingLevel}`);
+    }
+
+    return this.toPiSessionModelInfo(managed.modelInfo);
   }
 
   getStatus(): StatusResponse {

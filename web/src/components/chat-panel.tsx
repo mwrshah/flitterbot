@@ -45,7 +45,6 @@ type ChatPanelProps = {
   streamId?: string;
   streamName?: string;
   streamHasWorktree?: boolean;
-  modelSelectorMode?: "default" | "pi-session";
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
   /** Recovery action to offer in the header, if any:
@@ -110,7 +109,6 @@ export function ChatPanel({
   streamId,
   streamName,
   streamHasWorktree = false,
-  modelSelectorMode = "default",
   selectedModelId,
   selectedThinkingLevel,
   recoveryKind,
@@ -455,15 +453,15 @@ export function ChatPanel({
 
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
     if (!streamId) {
-      return modelSelectorMode === "default"
-        ? [
-            {
-              id: "clear-session",
-              label: "clear session",
-              insertText: "/clear ",
-            },
-          ]
-        : [];
+      // No streamId means we're on the default-stream view; offer the
+      // session-clear shortcut that's only meaningful for the default agent.
+      return [
+        {
+          id: "clear-session",
+          label: "clear session",
+          insertText: "/clear ",
+        },
+      ];
     }
     if (streamHasWorktree) {
       const buttons: MessageInputHoverButton[] = [
@@ -490,14 +488,7 @@ export function ChatPanel({
         insertText: "close stream with the no-op option",
       },
     ];
-  }, [
-    modelSelectorMode,
-    streamHasWorktree,
-    streamId,
-    worktree?.baseBranch,
-    worktree?.branch,
-    worktree?.worktreePath,
-  ]);
+  }, [streamHasWorktree, streamId, worktree?.baseBranch, worktree?.branch, worktree?.worktreePath]);
 
   return (
     <div className="flex flex-col h-full">
@@ -589,7 +580,6 @@ export function ChatPanel({
             fillHeight
             autoFocus
             streamId={streamId}
-            modelSelectorMode={modelSelectorMode}
             modelSelectorPiSessionId={piSessionId}
             selectedModelId={selectedModelId}
             selectedThinkingLevel={selectedThinkingLevel}
@@ -600,9 +590,7 @@ export function ChatPanel({
             recoveryKind={effectiveRecoveryKind}
             onRecover={() => recoverMutation.mutate()}
             hoverButtons={inputHoverButtons}
-            internalCommandScope={
-              modelSelectorMode === "default" ? "default-stream" : "work-stream"
-            }
+            internalCommandScope={streamId ? "work-stream" : "default-stream"}
             isRecoverPending={recoverMutation.isPending}
           />
         </Panel>

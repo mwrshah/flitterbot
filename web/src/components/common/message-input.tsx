@@ -304,7 +304,11 @@ type MessageInputProps = {
   draftKey?: string;
   /** Show the model-selector popover-trigger left of the send button. Default: true. */
   showModelSelector?: boolean;
-  modelSelectorMode?: "default" | "pi-session";
+  /**
+   * Pi-session id whose model the selector mutates. Required when
+   * `showModelSelector` is true — the backend handles default-vs-orchestrator
+   * routing based on this id, so callers don't need a separate mode prop.
+   */
   modelSelectorPiSessionId?: string;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
@@ -345,7 +349,6 @@ export const MessageInput = memo(function MessageInput({
   fillHeight = false,
   draftKey,
   showModelSelector = true,
-  modelSelectorMode = "default",
   modelSelectorPiSessionId,
   selectedModelId,
   selectedThinkingLevel,
@@ -1034,10 +1037,9 @@ export const MessageInput = memo(function MessageInput({
             />
           )}
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            {showModelSelector && (
+            {showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
                 disabled={isSending}
-                mode={modelSelectorMode}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
                 selectedThinkingLevel={selectedThinkingLevel}

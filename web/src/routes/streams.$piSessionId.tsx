@@ -128,7 +128,6 @@ function PiSessionRoute() {
           streamId={isDefaultSession ? undefined : stream?.id}
           streamName={isDefaultSession ? "flitterbot" : stream?.name}
           streamHasWorktree={!isDefaultSession && !!stream?.worktreePath}
-          modelSelectorMode={isDefaultSession ? "default" : "pi-session"}
           selectedModelId={selectedModel?.id}
           selectedThinkingLevel={selectedModel?.thinkingLevel}
           recoveryKind={recoveryKind}

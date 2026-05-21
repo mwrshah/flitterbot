@@ -397,11 +397,6 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/api/models/pin",
     auth: "bearer",
   },
-  modelsDefault: {
-    method: "PUT",
-    path: "/api/models/default",
-    auth: "bearer",
-  },
   stop: {
     method: "POST",
     path: "/stop",

@@ -95,18 +95,6 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ id, pin, ...(label ? { label } : {}) }),
       }),
 
-    setDefaultModel: (id: string) =>
-      request<ModelsMutationResponse>("/api/models/default", {
-        method: "PUT",
-        body: JSON.stringify({ id }),
-      }),
-
-    setDefaultThinkingLevel: (level: ThinkingLevel) =>
-      request<ModelsMutationResponse>("/api/models/default-thinking-level", {
-        method: "PUT",
-        body: JSON.stringify({ level }),
-      }),
-
     setPiSessionModel: (piSessionId: string, id: string) =>
       request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/model`, {
         method: "PUT",
