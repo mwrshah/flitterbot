@@ -81,7 +81,7 @@ export const Sidebar = memo(function Sidebar() {
   const lastStreamPath = useLastStreamPath();
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
-  const { apiClient, sendMessage } = rootApi.useRouteContext();
+  const { apiClient } = rootApi.useRouteContext();
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
@@ -145,7 +145,7 @@ export const Sidebar = memo(function Sidebar() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => sendMessage("/new-stream").catch(() => {})}
+                  onClick={() => apiClient.createStream().catch(() => {})}
                   aria-label="New stream"
                   className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none"
                 >

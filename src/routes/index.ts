@@ -9,6 +9,7 @@ export { handleBrowserSessionDetailRoute, handleBrowserSessionsRoute } from "./b
 export { handleBrowserSkillsRoute } from "./browser-skills.ts";
 export { handleBrowserStreamsHistoryRoute } from "./browser-streams.ts";
 export { handleBrowserTranscriptRoute } from "./browser-transcript.ts";
+export { handleCreateStreamRoute } from "./create-stream.ts";
 export { handleCronTickRoute } from "./cron-tick.ts";
 export { handleDirectSessionMessageRoute } from "./direct-session-message.ts";
 export { handleHookRoute } from "./hooks.ts";

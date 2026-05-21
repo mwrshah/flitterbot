@@ -1193,6 +1193,68 @@ export class ControlSurfaceRuntime {
     }
   }
 
+  /**
+   * Programmatic stream creation — no LLM in the loop, no user message.
+   * Reuses the same primitives the `create_stream` tool uses
+   * (insertStream + enrichStream + sessionManager.createOrchestrator +
+   * streams_changed broadcast). When no name is supplied, generates
+   * `scratch-<6-hex>`. When no cwd is supplied, defaults to the configured
+   * projects directory. The new orchestrator sits in `waiting_for_user`
+   * with an empty queue until the user sends something.
+   */
+  async createStreamProgrammatic(input?: {
+    name?: string;
+    cwd?: string;
+  }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
+    const { insertStream, enrichStream, getStreamByName } = await import(
+      "./blackboard/query-streams.ts"
+    );
+
+    // Resolve name: caller-provided (after prefix-stripping) or auto-generated
+    // `scratch-<6-hex>`, regenerating on the rare collision.
+    let name = input?.name ? stripStreamNamePrefix(input.name) : "";
+    if (!name) {
+      for (let i = 0; i < 5; i++) {
+        const candidate = `scratch-${crypto.randomUUID().slice(0, 6)}`;
+        if (!getStreamByName(this.blackboard, candidate)) {
+          name = candidate;
+          break;
+        }
+      }
+      if (!name) throw new Error("Failed to generate unique stream name");
+    }
+
+    const effectiveCwd = input?.cwd ?? this.config.projectsDir;
+    if (!fs.existsSync(effectiveCwd)) {
+      throw new Error(`cwd path "${effectiveCwd}" does not exist`);
+    }
+
+    const ws = insertStream(this.blackboard, name);
+    enrichStream(this.blackboard, ws.id, effectiveCwd);
+    this.log(`programmatic stream created "${name}" (${ws.id}) cwd=${effectiveCwd}`);
+
+    const orchestrator = await this.sessionManager.createOrchestrator(
+      ws.id,
+      ws.name,
+      effectiveCwd,
+      this.createCustomTools("orchestrator", ws.id),
+    );
+
+    this.wsHub.broadcast({
+      type: "streams_changed",
+      reason: "created",
+      streamId: ws.id,
+      streamName: ws.name,
+    });
+
+    return {
+      ok: true,
+      streamId: ws.id,
+      streamName: ws.name,
+      piSessionId: orchestrator.piSessionId,
+    };
+  }
+
   async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {
     const { reopenStream, getStreamById } = await import("./blackboard/query-streams.ts");
 

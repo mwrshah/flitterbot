@@ -79,6 +79,15 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
+    createStream: (body?: { name?: string; cwd?: string }) =>
+      request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
+        "/api/streams",
+        {
+          method: "POST",
+          body: JSON.stringify(body ?? {}),
+        },
+      ),
+
     pruneStreamHistory: (piSessionId: string, entryId: string) =>
       request<{ ok: true; piSessionId: string; messageCount: number }>("/api/streams/prune", {
         method: "POST",

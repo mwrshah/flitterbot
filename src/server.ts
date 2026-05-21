@@ -34,6 +34,7 @@ import {
   handleBrowserUserConfigGetRoute,
   handleBrowserUserConfigPutRoute,
 } from "./routes/browser-user-config.ts";
+import { handleCreateStreamRoute } from "./routes/create-stream.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
@@ -289,6 +290,9 @@ async function routeRequest(
     segments[3] === "reopen"
   ) {
     return handleReopenStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (method === "POST" && segments[0] === "api" && segments[1] === "streams" && !segments[2]) {
+    return handleCreateStreamRoute(runtime, req, res);
   }
   if (
     method === "POST" &&
