@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
@@ -83,6 +83,7 @@ export const Sidebar = memo(function Sidebar() {
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const statusQuery = useQuery({
@@ -92,7 +93,13 @@ export const Sidebar = memo(function Sidebar() {
 
   const createStreamMutation = useMutation({
     mutationFn: () => apiClient.createStream(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+    onSuccess: async (stream) => {
+      await queryClient.invalidateQueries({ queryKey: ["status"] });
+      await navigate({
+        to: "/streams/$piSessionId",
+        params: { piSessionId: stream.piSessionId },
+      });
+    },
     onError: (error) => {
       toast.error(
         `Failed to create stream: ${error instanceof Error ? error.message : String(error)}`,
