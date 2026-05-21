@@ -1,11 +1,21 @@
 import { rmSync } from "node:fs";
 import { createServer, Socket } from "node:net";
+import pino from "pino";
 import type { DaemonCommand, DaemonResponse } from "../contracts/index.ts";
 import { getWhatsAppSocketPath } from "./paths.ts";
+
+const logger = pino({ level: process.env.FLITTERBOT_WA_LOG_LEVEL ?? "info" });
 
 type DaemonCommandHandler = (command: DaemonCommand) => Promise<DaemonResponse>;
 
 function writeJson(socket: Socket, payload: DaemonResponse): void {
+  // The client may have already gone away (timeout, crash, restart). Writing
+  // to a half-closed pipe surfaces as an EPIPE 'error' event on the socket;
+  // if we don't guard it here it gets thrown as unhandled and tears down the
+  // whole daemon process. The connection-level error handler logs it.
+  if (socket.destroyed || socket.writableEnded) {
+    return;
+  }
   socket.write(`${JSON.stringify(payload)}\n`);
 }
 
@@ -15,6 +25,17 @@ export async function createIpcServer(handler: DaemonCommandHandler) {
 
   const server = createServer((socket) => {
     let buffer = "";
+
+    // Without this listener, any socket error (most commonly EPIPE when the
+    // client times out and destroys its end while we're still mid-write)
+    // becomes an unhandled 'error' event and crashes the daemon.
+    socket.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "EPIPE" || error.code === "ECONNRESET") {
+        logger.debug({ code: error.code }, "IPC client disconnected before response was written");
+        return;
+      }
+      logger.warn({ err: error }, "IPC socket error");
+    });
 
     socket.setEncoding("utf8");
     socket.on("data", async (chunk) => {
@@ -38,7 +59,9 @@ export async function createIpcServer(handler: DaemonCommandHandler) {
           status: "error",
         });
       } finally {
-        socket.end();
+        if (!socket.destroyed) {
+          socket.end();
+        }
       }
     });
   });
