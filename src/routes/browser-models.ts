@@ -5,7 +5,7 @@ import {
   getProviders,
   getSupportedThinkingLevels,
 } from "@earendil-works/pi-ai";
-import { isThinkingLevel, type ModelConfigEntry } from "../config/load-config.ts";
+import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
   ModelListItem,
@@ -119,93 +119,6 @@ export async function handleBrowserModelsPinRoute(
   runtime.log(
     `models: ${body.pin ? "pinned" : "unpinned"} id=${id}; total=${nextList.length}; default=${nextDefault}`,
   );
-
-  return sendJson(res, 200, await buildModelsMutationResponse(runtime));
-}
-
-/**
- * PUT /api/models/default — set `defaultModel` in config. Body: `{ id: string }`.
- * The id must match a currently-pinned entry OR be a composite `provider/modelId`
- * that resolves against the pi SDK catalog.
- */
-export async function handleBrowserModelsDefaultRoute(
-  runtime: ControlSurfaceRuntime,
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-) {
-  if (!requireBearer(req, runtime.config.controlSurfaceToken)) {
-    return sendJson(res, 401, { ok: false, error: "unauthorized" });
-  }
-  const body = await readJsonBody<{ id: unknown }>(req);
-  if (typeof body.id !== "string" || !body.id.trim()) {
-    return sendJson(res, 400, { ok: false, error: "id (string) is required" });
-  }
-  const id = body.id.trim();
-
-  const isPinned = runtime.config.models.some((m) => m.id === id);
-  const isComposite = id.includes("/") && Boolean(buildEntryFromId(id, "", runtime.config.models));
-  if (!isPinned && !isComposite) {
-    return sendJson(res, 400, {
-      ok: false,
-      error: `Cannot set defaultModel to "${id}" — not pinned and not a valid provider/modelId pair`,
-    });
-  }
-
-  try {
-    await runtime.setDefaultModel(id);
-  } catch (error) {
-    return sendJson(res, 400, {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  runtime.config.defaultModel = id;
-  persistModelsToConfigFile({
-    models: runtime.config.models,
-    defaultModel: id,
-  });
-  runtime.log(`models: defaultModel set to ${id}`);
-
-  return sendJson(res, 200, await buildModelsMutationResponse(runtime));
-}
-
-/**
- * PUT /api/models/default-thinking-level — set the global `defaultThinkingLevel`
- * in config and apply it to the live default Pi session when one is active.
- */
-export async function handleBrowserModelsDefaultThinkingLevelRoute(
-  runtime: ControlSurfaceRuntime,
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-) {
-  if (!requireBearer(req, runtime.config.controlSurfaceToken)) {
-    return sendJson(res, 401, { ok: false, error: "unauthorized" });
-  }
-  const body = await readJsonBody<{ level: unknown }>(req);
-  if (!isThinkingLevel(body.level)) {
-    return sendJson(res, 400, {
-      ok: false,
-      error: "level must be one of: off, minimal, low, medium, high, xhigh",
-    });
-  }
-
-  try {
-    await runtime.setDefaultThinkingLevel(body.level);
-  } catch (error) {
-    return sendJson(res, 400, {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  runtime.config.defaultThinkingLevel = body.level;
-  persistModelsToConfigFile({
-    models: runtime.config.models,
-    defaultModel: runtime.config.defaultModel,
-    defaultThinkingLevel: body.level,
-  });
-  runtime.log(`models: defaultThinkingLevel set to ${body.level}`);
 
   return sendJson(res, 200, await buildModelsMutationResponse(runtime));
 }

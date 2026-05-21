@@ -14,12 +14,7 @@ import {
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
-import {
-  handleBrowserModelsDefaultRoute,
-  handleBrowserModelsDefaultThinkingLevelRoute,
-  handleBrowserModelsPinRoute,
-  handleBrowserModelsRoute,
-} from "./routes/browser-models.ts";
+import { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./routes/browser-models.ts";
 import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
 import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
 import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
@@ -34,6 +29,7 @@ import {
   handleBrowserUserConfigGetRoute,
   handleBrowserUserConfigPutRoute,
 } from "./routes/browser-user-config.ts";
+import { handleCreateStreamRoute } from "./routes/create-stream.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
@@ -198,12 +194,6 @@ async function routeRequest(
   if (method === "POST" && pathname === "/api/models/pin") {
     return handleBrowserModelsPinRoute(runtime, req, res);
   }
-  if (method === "PUT" && pathname === "/api/models/default") {
-    return handleBrowserModelsDefaultRoute(runtime, req, res);
-  }
-  if (method === "PUT" && pathname === "/api/models/default-thinking-level") {
-    return handleBrowserModelsDefaultThinkingLevelRoute(runtime, req, res);
-  }
   if (
     method === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.method &&
     pathname === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.path
@@ -289,6 +279,9 @@ async function routeRequest(
     segments[3] === "reopen"
   ) {
     return handleReopenStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (method === "POST" && segments[0] === "api" && segments[1] === "streams" && !segments[2]) {
+    return handleCreateStreamRoute(runtime, req, res);
   }
   if (
     method === "POST" &&

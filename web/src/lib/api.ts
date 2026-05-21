@@ -79,6 +79,15 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
+    createStream: (body?: { name?: string; cwd?: string }) =>
+      request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
+        "/api/streams",
+        {
+          method: "POST",
+          body: JSON.stringify(body ?? {}),
+        },
+      ),
+
     pruneStreamHistory: (piSessionId: string, entryId: string) =>
       request<{ ok: true; piSessionId: string; messageCount: number }>("/api/streams/prune", {
         method: "POST",
@@ -93,18 +102,6 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       request<ModelsMutationResponse>("/api/models/pin", {
         method: "POST",
         body: JSON.stringify({ id, pin, ...(label ? { label } : {}) }),
-      }),
-
-    setDefaultModel: (id: string) =>
-      request<ModelsMutationResponse>("/api/models/default", {
-        method: "PUT",
-        body: JSON.stringify({ id }),
-      }),
-
-    setDefaultThinkingLevel: (level: ThinkingLevel) =>
-      request<ModelsMutationResponse>("/api/models/default-thinking-level", {
-        method: "PUT",
-        body: JSON.stringify({ level }),
       }),
 
     setPiSessionModel: (piSessionId: string, id: string) =>
