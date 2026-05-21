@@ -1,14 +1,4 @@
-/**
- * Default-session system prompt body.
- *
- * The returned string is **appended after the pi-sdk's default coding-agent
- * system prompt** via `appendSystemPromptOverride` in
- * `src/streams/create-agent.ts`. It does *not* replace the SDK body.
- *
- * See `./sdk-prompt-reference.ts` for the verbatim SDK default body and the
- * full assembly order at runtime (SDK body → this string → project context →
- * skills index → date/cwd footer).
- */
+// Appended after the SDK default body (see ./sdk-prompt-reference.ts).
 export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string): string {
   return `# Flitterbot Default Agent Instructions
 
