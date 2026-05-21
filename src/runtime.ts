@@ -1214,10 +1214,77 @@ export class ControlSurfaceRuntime {
   }
 
   /**
+   * Shared lifecycle helper used by both the `create_stream` LLM tool and
+   * the programmatic `POST /api/streams` route. Validates cwd, inserts and
+   * enriches the stream row, spawns the orchestrator, and broadcasts
+   * `streams_changed` on success. Caller controls rollback policy:
+   *   - rollbackOnSpawnFailure: true  → atomic (HTTP route UX): delete the
+   *     row on spawn failure so no orphan stream survives.
+   *   - rollbackOnSpawnFailure: false → preserve the row (LLM tool): the
+   *     agent can still see and act on the orphan.
+   *
+   * Inputs are assumed pre-normalized (name already prefix-stripped). The
+   * helper does NOT enqueue any bootstrap message — that's the caller's job.
+   */
+  private async spawnStreamWithOrchestrator(opts: {
+    name: string;
+    cwd: string;
+    rollbackOnSpawnFailure: boolean;
+  }): Promise<
+    | { ok: true; streamId: string; streamName: string; orchestrator: ManagedPiSession }
+    | { ok: false; streamId: string | null; streamName: string; spawnError: Error }
+  > {
+    const { insertStream, enrichStream, deleteStream } = await import(
+      "./blackboard/query-streams.ts"
+    );
+
+    if (!fs.existsSync(opts.cwd)) {
+      throw new Error(`cwd path "${opts.cwd}" does not exist`);
+    }
+
+    const ws = insertStream(this.blackboard, opts.name);
+    enrichStream(this.blackboard, ws.id, opts.cwd);
+
+    try {
+      const orchestrator = await this.sessionManager.createOrchestrator(
+        ws.id,
+        ws.name,
+        opts.cwd,
+        this.createCustomTools("orchestrator", ws.id),
+      );
+      this.wsHub.broadcast({
+        type: "streams_changed",
+        reason: "created",
+        streamId: ws.id,
+        streamName: ws.name,
+      });
+      return { ok: true, streamId: ws.id, streamName: ws.name, orchestrator };
+    } catch (error) {
+      const spawnError = error instanceof Error ? error : new Error(String(error));
+      if (opts.rollbackOnSpawnFailure) {
+        try {
+          deleteStream(this.blackboard, ws.id);
+          this.log(
+            `orchestrator spawn failed for "${ws.name}" (${ws.id}); rolled back stream row: ${spawnError.message}`,
+          );
+        } catch (cleanupError) {
+          this.log(
+            `orchestrator spawn failed and rollback failed for "${ws.name}" (${ws.id}): spawn=${spawnError.message} cleanup=${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          );
+        }
+        return { ok: false, streamId: null, streamName: ws.name, spawnError };
+      }
+      this.log(
+        `orchestrator spawn failed for "${ws.name}" (${ws.id}); leaving orphan stream row for caller: ${spawnError.message}`,
+      );
+      return { ok: false, streamId: ws.id, streamName: ws.name, spawnError };
+    }
+  }
+
+  /**
    * Programmatic stream creation — no LLM in the loop, no user message.
-   * Reuses the same primitives the `create_stream` tool uses
-   * (insertStream + enrichStream + sessionManager.createOrchestrator +
-   * streams_changed broadcast). When no name is supplied, generates
+   * Atomic: on orchestrator spawn failure the stream row is rolled back so
+   * the UI never surfaces an orphan. When no name is supplied, generates
    * `scratch-<6-hex>`. When no cwd is supplied, defaults to the configured
    * projects directory. The new orchestrator sits in `waiting_for_user`
    * with an empty queue until the user sends something.
@@ -1226,9 +1293,7 @@ export class ControlSurfaceRuntime {
     name?: string;
     cwd?: string;
   }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
-    const { insertStream, enrichStream, getStreamByName } = await import(
-      "./blackboard/query-streams.ts"
-    );
+    const { getStreamByName } = await import("./blackboard/query-streams.ts");
 
     // Resolve name: caller-provided (after prefix-stripping) or auto-generated
     // `scratch-<6-hex>`, regenerating on the rare collision.
@@ -1245,33 +1310,22 @@ export class ControlSurfaceRuntime {
     }
 
     const effectiveCwd = input?.cwd ?? this.config.projectsDir;
-    if (!fs.existsSync(effectiveCwd)) {
-      throw new Error(`cwd path "${effectiveCwd}" does not exist`);
-    }
+    this.log(`programmatic stream create requested name="${name}" cwd=${effectiveCwd}`);
 
-    const ws = insertStream(this.blackboard, name);
-    enrichStream(this.blackboard, ws.id, effectiveCwd);
-    this.log(`programmatic stream created "${name}" (${ws.id}) cwd=${effectiveCwd}`);
-
-    const orchestrator = await this.sessionManager.createOrchestrator(
-      ws.id,
-      ws.name,
-      effectiveCwd,
-      this.createCustomTools("orchestrator", ws.id),
-    );
-
-    this.wsHub.broadcast({
-      type: "streams_changed",
-      reason: "created",
-      streamId: ws.id,
-      streamName: ws.name,
+    const result = await this.spawnStreamWithOrchestrator({
+      name,
+      cwd: effectiveCwd,
+      rollbackOnSpawnFailure: true,
     });
-
+    if (!result.ok) {
+      throw result.spawnError;
+    }
+    this.log(`programmatic stream created "${result.streamName}" (${result.streamId})`);
     return {
       ok: true,
-      streamId: ws.id,
-      streamName: ws.name,
-      piSessionId: orchestrator.piSessionId,
+      streamId: result.streamId,
+      streamName: result.streamName,
+      piSessionId: result.orchestrator.piSessionId,
     };
   }
 
@@ -1526,29 +1580,43 @@ export class ControlSurfaceRuntime {
           }
           const effectiveCwd = cwdParam;
 
-          const { insertStream, enrichStream } = await import("./blackboard/query-streams.ts");
-          const ws = insertStream(this.blackboard, name);
-          enrichStream(this.blackboard, ws.id, effectiveCwd);
-
           const nameTrace =
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
-          this.log(`default agent created stream ${nameTrace} (${ws.id}) cwd=${effectiveCwd}`);
+          this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
+
+          // Tool path: preserve partial-success semantics. If orchestrator
+          // spawn fails, keep the stream row so the agent can still surface
+          // the ID to the user and decide what to do.
+          const spawn = await this.spawnStreamWithOrchestrator({
+            name,
+            cwd: effectiveCwd,
+            rollbackOnSpawnFailure: false,
+          });
+
+          if (!spawn.ok) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: spawn.streamId
+                    ? `Stream "${spawn.streamName}" created (ID: ${spawn.streamId}, canonical name: "${spawn.streamName}") but orchestrator failed to spawn: ${spawn.spawnError.message}`
+                    : `Stream creation failed before orchestrator spawn: ${spawn.spawnError.message}`,
+                },
+              ],
+              details: {
+                streamId: spawn.streamId,
+                canonicalName: spawn.streamName,
+                suggestedName,
+                namePrefixStripped: suggestedName !== name,
+                error: true,
+              },
+            };
+          }
+
+          const ws = { id: spawn.streamId, name: spawn.streamName };
+          const orchestrator = spawn.orchestrator;
 
           try {
-            const orchestrator = await this.sessionManager.createOrchestrator(
-              ws.id,
-              ws.name,
-              effectiveCwd,
-              this.createCustomTools("orchestrator", ws.id),
-            );
-
-            this.wsHub.broadcast({
-              type: "streams_changed",
-              reason: "created",
-              streamId: ws.id,
-              streamName: ws.name,
-            });
-
             // Pass through relevant context messages to the new stream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
@@ -1703,11 +1771,14 @@ export class ControlSurfaceRuntime {
               },
             };
           } catch (error) {
+            // Stream + orchestrator spawned successfully but the post-spawn
+            // prompt enqueue / context classification failed. Surface that
+            // distinctly from a spawn failure.
             return {
               content: [
                 {
                   type: "text",
-                  text: `Stream "${ws.name}" created (ID: ${ws.id}, canonical name: "${ws.name}") but orchestrator failed to spawn: ${error instanceof Error ? error.message : String(error)}`,
+                  text: `Stream "${ws.name}" (ID: ${ws.id}) created and orchestrator spawned, but bootstrap prompt enqueue failed: ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
               details: {

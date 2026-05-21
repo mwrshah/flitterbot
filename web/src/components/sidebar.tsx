@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
+import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
 import { ShortcutHint } from "~/components/common/kbd";
@@ -82,10 +83,21 @@ export const Sidebar = memo(function Sidebar() {
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
+  const queryClient = useQueryClient();
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
+  });
+
+  const createStreamMutation = useMutation({
+    mutationFn: () => apiClient.createStream(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+    onError: (error) => {
+      toast.error(
+        `Failed to create stream: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
   });
 
   const status = statusQuery.data;
@@ -145,9 +157,10 @@ export const Sidebar = memo(function Sidebar() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => apiClient.createStream().catch(() => {})}
+                  onClick={() => createStreamMutation.mutate()}
+                  disabled={createStreamMutation.isPending}
                   aria-label="New stream"
-                  className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none"
+                  className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   +
                 </button>

@@ -16,11 +16,15 @@ export async function handleCreateStreamRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  let body: CreateStreamRequest = {};
+  // readJsonBody returns {} for empty/whitespace bodies and throws SyntaxError
+  // on malformed JSON. Empty body is the expected "no-args" shape (button
+  // click); malformed JSON is a client bug and gets 400.
+  let body: CreateStreamRequest;
   try {
     body = await readJsonBody<CreateStreamRequest>(req);
-  } catch {
-    // empty / non-JSON body is fine — the route accepts a bare POST
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return sendJson(res, 400, { ok: false, error: `invalid JSON body: ${message}` });
   }
 
   try {

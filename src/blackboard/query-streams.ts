@@ -96,6 +96,10 @@ export function reopenStream(db: BlackboardDatabase, streamId: string): StreamRo
   return getStreamById(db, streamId);
 }
 
+export function deleteStream(db: BlackboardDatabase, streamId: string): void {
+  db.prepare("DELETE FROM streams WHERE id = ?").run(streamId);
+}
+
 export function resetAllStreams(db: BlackboardDatabase): number {
   const count = db.get<CountRow>("SELECT COUNT(*) as count FROM streams");
   db.prepare("DELETE FROM streams").run();
