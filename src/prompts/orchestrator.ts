@@ -12,6 +12,7 @@ export type OrchestratorPromptOptions = {
   tmux?: boolean;
 };
 
+// Appended after the SDK default body (see ./sdk-prompt-reference.ts).
 export function buildOrchestratorPrompt(
   ctx: OrchestratorContext,
   options: OrchestratorPromptOptions = {},

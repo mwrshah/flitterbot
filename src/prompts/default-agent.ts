@@ -1,3 +1,4 @@
+// Appended after the SDK default body (see ./sdk-prompt-reference.ts).
 export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string): string {
   return `# Flitterbot Default Agent Instructions
 
