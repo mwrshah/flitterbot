@@ -48,9 +48,13 @@ export type ModelSelectorProps = {
   /** Compact mode hides the label text in the trigger, showing only the chevron. */
   compact?: boolean;
   disabled?: boolean;
-  /** Default mode updates config and the live default Pi session. Pi-session mode only changes that session. */
-  mode?: "default" | "pi-session";
-  piSessionId?: string;
+  /**
+   * Pi-session whose model/thinking-level this selector mutates. Required.
+   * When the pi-session is the default agent, the backend additionally
+   * persists `config.defaultModel` / `defaultThinkingLevel` — callers don't
+   * need to special-case the default stream.
+   */
+  piSessionId: string;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
 };
@@ -63,13 +67,14 @@ export type ModelSelectorProps = {
  *      type-to-filter search. Entries whose provider has no auth configured
  *      are rendered dimmed with a small badge.
  *
- * Selecting a model either updates the default model (default route) or switches
- * the currently viewed Pi session (stream route).
+ * Selecting a model always hits `PUT /api/pi-sessions/:piSessionId/model`.
+ * The default-vs-orchestrator distinction is detected server-side: when the
+ * target pi-session is the default agent, the backend also updates the
+ * `defaultModel` config so a restart picks up the choice.
  */
 export const ModelSelector = memo(function ModelSelector({
   compact,
   disabled,
-  mode = "default",
   piSessionId,
   selectedModelId,
   selectedThinkingLevel,
@@ -119,16 +124,13 @@ export const ModelSelector = memo(function ModelSelector({
   });
   const modelMutation = useMutation({
     mutationFn: (id: string) => {
-      if (mode === "pi-session") {
-        if (!piSessionId) throw new Error("No Pi session selected");
-        return apiClient.setPiSessionModel(piSessionId, id);
-      }
-      return apiClient.setDefaultModel(id);
+      if (!piSessionId) throw new Error("No Pi session selected");
+      return apiClient.setPiSessionModel(piSessionId, id);
     },
     onSuccess: (result) => {
       updateModelsCache(queryClient, result);
       queryClient.invalidateQueries({ queryKey: ["status"] });
-      toast.success(mode === "pi-session" ? "Stream model switched" : "Default model updated");
+      toast.success("Model switched");
     },
     onError: (error) => {
       toast.error(`Set model failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -136,11 +138,8 @@ export const ModelSelector = memo(function ModelSelector({
   });
   const thinkingMutation = useMutation({
     mutationFn: (level: ThinkingLevel) => {
-      if (mode === "pi-session") {
-        if (!piSessionId) throw new Error("No Pi session selected");
-        return apiClient.setPiSessionThinkingLevel(piSessionId, level);
-      }
-      return apiClient.setDefaultThinkingLevel(level);
+      if (!piSessionId) throw new Error("No Pi session selected");
+      return apiClient.setPiSessionThinkingLevel(piSessionId, level);
     },
     onSuccess: (result, level) => {
       updateModelsCache(queryClient, result);
@@ -171,7 +170,7 @@ export const ModelSelector = memo(function ModelSelector({
   const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
   const groupedAll = useMemo(() => groupByAuthKind(all), [all]);
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
-  const thinkingDisabled = thinkingMutation.isPending || (mode === "pi-session" && !piSessionId);
+  const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
 
   const updatePopoverPosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -243,7 +242,7 @@ export const ModelSelector = memo(function ModelSelector({
         type="button"
         variant="outline"
         size="sm"
-        disabled={disabled || (mode === "pi-session" && !piSessionId)}
+        disabled={disabled || !piSessionId}
         onClick={() => setOpen((value) => !value)}
         className={cn(
           "h-10 sm:h-7 border-border/60 bg-background/40 text-xs text-muted-foreground hover:bg-accent/50 hover:border-border",

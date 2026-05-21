@@ -14,12 +14,7 @@ import {
 } from "./contracts/index.ts";
 import { sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
-import {
-  handleBrowserModelsDefaultRoute,
-  handleBrowserModelsDefaultThinkingLevelRoute,
-  handleBrowserModelsPinRoute,
-  handleBrowserModelsRoute,
-} from "./routes/browser-models.ts";
+import { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./routes/browser-models.ts";
 import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
 import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
 import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
@@ -198,12 +193,6 @@ async function routeRequest(
   }
   if (method === "POST" && pathname === "/api/models/pin") {
     return handleBrowserModelsPinRoute(runtime, req, res);
-  }
-  if (method === "PUT" && pathname === "/api/models/default") {
-    return handleBrowserModelsDefaultRoute(runtime, req, res);
-  }
-  if (method === "PUT" && pathname === "/api/models/default-thinking-level") {
-    return handleBrowserModelsDefaultThinkingLevelRoute(runtime, req, res);
   }
   if (
     method === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.method &&
