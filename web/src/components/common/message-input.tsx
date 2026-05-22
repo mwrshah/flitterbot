@@ -1246,7 +1246,7 @@ export const MessageInput = memo(function MessageInput({
                 size="sm"
                 disabled={isSending || !canSend}
                 onClick={submitCurrentDraft}
-                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+                className="h-10 w-10 border border-border sm:h-7 sm:w-auto sm:px-3"
               >
                 {isSending ? (
                   <Loader2Icon className="size-4 animate-spin" />
