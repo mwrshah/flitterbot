@@ -15,6 +15,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { activeToolStore } from "~/lib/active-tool-store";
+import { streamingUiDebug } from "~/lib/debug-log";
 import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
@@ -83,7 +84,7 @@ function appendTimelineItem(
           return false;
         });
         if (dupIdx >= 0) {
-          console.log(
+          streamingUiDebug(
             "[debug][ws-bridge] appendTimelineItem DEDUP surface-timeline: replacing idx=%d with id=%s role=%s",
             dupIdx,
             msg.id,
@@ -115,7 +116,7 @@ function appendTimelineItem(
             (existing as ChatTimelineTool).phase !== "end",
         );
         if (dup) {
-          console.log(
+          streamingUiDebug(
             "[debug][ws-bridge] appendTimelineItem DEDUP skipped active toolUseId=%s phase=%s session=%s",
             tool.toolUseId,
             tool.phase,
@@ -131,7 +132,7 @@ function appendTimelineItem(
           (existing as ChatTimelineTool).phase === tool.phase,
       );
       if (dup) {
-        console.log(
+        streamingUiDebug(
           "[debug][ws-bridge] appendTimelineItem DEDUP skipped toolUseId=%s phase=%s session=%s",
           tool.toolUseId,
           tool.phase,
@@ -142,7 +143,7 @@ function appendTimelineItem(
     } else if (item.kind === "message") {
       const dup = items.some((existing) => existing.id === item.id);
       if (dup) {
-        console.log(
+        streamingUiDebug(
           "[debug][ws-bridge] appendTimelineItem DEDUP skipped id=%s session=%s",
           item.id,
           sessionId,
@@ -152,7 +153,7 @@ function appendTimelineItem(
     }
 
     const next = [...items, item];
-    console.log(
+    streamingUiDebug(
       "[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s",
       item.kind,
       next.length,
@@ -207,7 +208,7 @@ export function setupWsQueryBridge(deps: {
 
     // ── message_ack → optimistic user message on surface timeline ──
     if (message.type === "message_ack") {
-      console.log(
+      streamingUiDebug(
         "[debug][ws-bridge] message_ack: adding optimistic entry smId=%s cacheSize=%d",
         message.serverMessageId,
         (queryClient.getQueryData<ChatTimelineItem[]>(["surface-timeline"]) ?? []).length,
@@ -386,7 +387,7 @@ export function setupWsQueryBridge(deps: {
         if (!isUser) {
           const agentMessages = timelineItemsToAgentMessages(committedItems);
           if (agentMessages.length > 0) {
-            console.log(
+            streamingUiDebug(
               "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
               agentMessages.length,
               piSessionId,
@@ -414,7 +415,7 @@ export function setupWsQueryBridge(deps: {
       if (smId) {
         queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
           if (!old) {
-            console.log(
+            streamingUiDebug(
               "[debug][ws-bridge] stream_surfaced: no cache, creating fresh smId=%s",
               smId,
             );
@@ -432,7 +433,7 @@ export function setupWsQueryBridge(deps: {
           return [...old, surfacedMessage];
         });
       } else {
-        console.log(
+        streamingUiDebug(
           "[debug][ws-bridge] stream_surfaced: no serverMessageId, appending via appendTimelineItem. surfacedId=%s role=%s",
           surfacedMessage.id,
           surfacedMessage.role,
@@ -496,7 +497,10 @@ export function setupWsQueryBridge(deps: {
 
     // ── turn_end ──
     if (message.type === "turn_end") {
-      console.log("[debug][ws-bridge] turn_end: calling clearSession for session=%s", piSessionId);
+      streamingUiDebug(
+        "[debug][ws-bridge] turn_end: calling clearSession for session=%s",
+        piSessionId,
+      );
       streamingStore.clearSession(piSessionId);
       activeToolStore.clearSession(piSessionId);
       return;

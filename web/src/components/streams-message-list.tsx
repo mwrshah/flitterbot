@@ -13,6 +13,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { memo, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";
+import { streamingUiDebug } from "~/lib/debug-log";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList } from "~/pi-web-ui/chat-components";
@@ -126,7 +127,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     // suppress the redundant render.
     if (committedRef.current) {
       committedRef.current = false;
-      console.log(
+      streamingUiDebug(
         "[debug][StreamsMessageList] React catch-up: skipping perf tracking (Lit already committed)",
       );
       el.messages = messages;

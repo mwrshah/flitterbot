@@ -33,6 +33,7 @@ import {
   SquareTerminal,
 } from "lucide";
 import type { ActiveToolState } from "~/lib/active-tool-store";
+import { streamingUiDebug, streamingUiDebugWarn } from "~/lib/debug-log";
 import { renderSafeMarkdownHtml } from "~/lib/markdown-html";
 import { streamingPerf } from "~/lib/streaming-perf";
 
@@ -1354,7 +1355,7 @@ export class MessageList extends LitElement {
       // Drop committed state and allow a full render so the old DOM is thrown
       // away and the new (shorter) list renders correctly.
       if (newLength < this._committedTotal) {
-        console.log(
+        streamingUiDebug(
           "[debug][message-list] shouldUpdate FALLTHROUGH: history shrank (messages.length=%d, committedTotal=%d) — full render",
           newLength,
           this._committedTotal,
@@ -1367,7 +1368,7 @@ export class MessageList extends LitElement {
       // already rendered imperatively. Accept the new property value (Lit has
       // already assigned it) but skip the expensive render cycle.
       if (newLength === this._committedTotal) {
-        console.log(
+        streamingUiDebug(
           "[debug][message-list] shouldUpdate SUPPRESSED: React catch-up render skipped (messages.length=%d, committedTotal=%d)",
           newLength,
           this._committedTotal,
@@ -1378,7 +1379,7 @@ export class MessageList extends LitElement {
       }
       // More messages than committed means a later canonical event landed
       // before React caught up — allow a full render.
-      console.log(
+      streamingUiDebug(
         "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
         newLength,
         this._committedTotal,
@@ -1486,7 +1487,7 @@ export class MessageList extends LitElement {
     this._cachedRenderItems.push(...newItems);
     this._committedTotal = (this.messages as RenderMessage[]).length + messages.length;
 
-    console.log(
+    streamingUiDebug(
       "[debug][message-list] commitStreaming: appending %d items (cachedTotal=%d → %d)",
       newItems.length,
       cachedBefore,
@@ -1501,7 +1502,7 @@ export class MessageList extends LitElement {
     const target = this._toolMessageEls.get(toolResult.toolCallId);
     if (!target) {
       this._pendingToolResultCommits.set(toolResult.toolCallId, toolResult);
-      console.log(
+      streamingUiDebug(
         "[debug][message-list] commitToolResult queued: waiting for tool-message target toolCallId=%s",
         toolResult.toolCallId,
       );
@@ -1511,7 +1512,7 @@ export class MessageList extends LitElement {
     this.applyToolResultCommitToElement(target, toolResult);
     this.noteToolResultCommit(1);
 
-    console.log(
+    streamingUiDebug(
       "[debug][message-list] commitToolResult: toolCallId=%s committedTotal=%d",
       toolResult.toolCallId,
       this._committedTotal,
@@ -1612,7 +1613,7 @@ export class MessageList extends LitElement {
     }
     if (appliedCount > 0) {
       this.noteToolResultCommit(appliedCount);
-      console.log(
+      streamingUiDebug(
         "[debug][message-list] applyPendingToolResultCommits: applied=%d committedTotal=%d",
         appliedCount,
         this._committedTotal,
@@ -1677,7 +1678,7 @@ export class MessageList extends LitElement {
 
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
     if (this._committedTotal > 0) {
-      console.warn(
+      streamingUiDebugWarn(
         "[message-list] buildRenderItems called while committedTotal=%d — expected imperative path to handle this",
         this._committedTotal,
       );
@@ -1757,7 +1758,7 @@ export class MessageList extends LitElement {
     let items: Array<{ key: string; template: TemplateResult }>;
     if (this._cachedRenderItems) {
       items = this._cachedRenderItems;
-      console.log(
+      streamingUiDebug(
         "[debug][message-list] render: using cached render items (count=%d)",
         items.length,
       );
@@ -1767,7 +1768,7 @@ export class MessageList extends LitElement {
       }
     } else {
       items = this.buildRenderItems();
-      console.log(
+      streamingUiDebug(
         "[debug][message-list] render: FULL buildRenderItems (count=%d messages=%d)",
         items.length,
         (this.messages as RenderMessage[]).length,

@@ -12,6 +12,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { streamingUiDebug } from "./debug-log";
 import { streamingPerf } from "./streaming-perf";
 
 /* ── Types ── */
@@ -113,14 +114,14 @@ export const streamingStore = {
       texts.has(sessionId) || thinking.has(sessionId) || thinkingActive.has(sessionId);
 
     if (!hadState) {
-      console.log(
+      streamingUiDebug(
         "[debug][streaming-store] clearSession SKIPPED (already clear) for session=%s",
         sessionId,
       );
       return;
     }
 
-    console.log("[debug][streaming-store] clearSession for session=%s", sessionId);
+    streamingUiDebug("[debug][streaming-store] clearSession for session=%s", sessionId);
     texts.delete(sessionId);
     thinking.delete(sessionId);
     thinkingActive.delete(sessionId);
@@ -157,7 +158,7 @@ export const streamingStore = {
    *  Called from ws-query-bridge after message_end setQueryData. */
   commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
     const cb = commitCallbacks.get(sessionId);
-    console.log(
+    streamingUiDebug(
       "[debug][streaming-store] commitMessage: session=%s messages=%d hasCallback=%s",
       sessionId,
       agentMessages.length,
@@ -176,7 +177,7 @@ export const streamingStore = {
 
   commitToolResult(sessionId: string, agentMessage: AgentMessage) {
     const cb = toolResultCommitCallbacks.get(sessionId);
-    console.log(
+    streamingUiDebug(
       "[debug][streaming-store] commitToolResult: session=%s hasCallback=%s",
       sessionId,
       String(!!cb),

@@ -20,6 +20,7 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
+import { streamingUiDebug } from "~/lib/debug-log";
 import { statusQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -289,7 +290,7 @@ export function ChatPanel({
             isThinkingStreaming,
           );
         } else {
-          console.log(
+          streamingUiDebug(
             "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
             piSessionId,
           );
