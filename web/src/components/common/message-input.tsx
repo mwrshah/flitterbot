@@ -101,6 +101,13 @@ function autoExpandedDuplicateSlashIndex(filter: string) {
   return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
 }
 
+function collapseSingleFollowingSpace(value: string) {
+  if (value[0] !== " ") return value;
+  const next = value[1];
+  if (next !== undefined && /\s/.test(next)) return value;
+  return value.slice(1);
+}
+
 function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
   const lower = filter.toLowerCase();
   const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
@@ -530,24 +537,37 @@ export const MessageInput = memo(function MessageInput({
     setIsDraftBlank((current) => (current === nextIsDraftBlank ? current : nextIsDraftBlank));
   }, []);
 
-  /** Close a picker on Escape: remove trigger text, reset position ref, refocus. */
-  const closePicker = useCallback(
-    (triggerPos: number, setOpen: (v: boolean) => void, posRef: React.MutableRefObject<number>) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      setOpen(false);
-      const value = draftRef.current;
-      const cursor = textarea.selectionStart ?? value.length;
-      const newValue = value.slice(0, triggerPos) + value.slice(cursor);
-      setDraftAndStore(newValue);
-      posRef.current = -1;
-      requestAnimationFrame(() => {
-        textarea.setSelectionRange(triggerPos, triggerPos);
-        textarea.focus();
-      });
-    },
-    [setDraftAndStore],
-  );
+  const refocusTextarea = useCallback(() => {
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, []);
+
+  const closeSkillPicker = useCallback(() => {
+    setPickerOpen(false);
+    slashPositionRef.current = -1;
+    refocusTextarea();
+  }, [refocusTextarea]);
+
+  const closePathPicker = useCallback(() => {
+    setAtPickerOpen(false);
+    atPositionRef.current = -1;
+    tildeExpandedRef.current = false;
+    dotDotExpandedRef.current = false;
+    refocusTextarea();
+  }, [refocusTextarea]);
+
+  const closeActivePicker = useCallback(() => {
+    if (atPickerOpen || atPositionRef.current >= 0) {
+      closePathPicker();
+      return true;
+    }
+    if (pickerOpen || slashPositionRef.current >= 0) {
+      closeSkillPicker();
+      return true;
+    }
+    return false;
+  }, [atPickerOpen, closePathPicker, closeSkillPicker, pickerOpen]);
 
   /**
    * Compute the pixel X position just after a trigger character in the textarea,
@@ -766,7 +786,7 @@ export const MessageInput = memo(function MessageInput({
       let tokenEnd = atIdx + 1;
       while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
       const before = value.slice(0, atIdx);
-      const after = value.slice(tokenEnd).trimStart();
+      const after = collapseSingleFollowingSpace(value.slice(tokenEnd));
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
@@ -802,12 +822,9 @@ export const MessageInput = memo(function MessageInput({
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Escape") {
-        if (skillPickerVisible && slashPositionRef.current >= 0) {
+        if (closeActivePicker()) {
           event.preventDefault();
-          closePicker(slashPositionRef.current, setPickerOpen, slashPositionRef);
-        } else if (pathPickerVisible && atPositionRef.current >= 0) {
-          event.preventDefault();
-          closePicker(atPositionRef.current, setAtPickerOpen, atPositionRef);
+          event.stopPropagation();
         } else {
           // No picker open — defocus the input
           textareaRef.current?.blur();
@@ -897,7 +914,13 @@ export const MessageInput = memo(function MessageInput({
         submitCurrentDraft();
       }
     },
-    [closePicker, handleDraftChange, pathPickerVisible, skillPickerVisible, submitCurrentDraft],
+    [
+      closeActivePicker,
+      handleDraftChange,
+      pathPickerVisible,
+      skillPickerVisible,
+      submitCurrentDraft,
+    ],
   );
 
   const handlePaste = useCallback(
@@ -1061,6 +1084,7 @@ export const MessageInput = memo(function MessageInput({
             open={skillPickerVisible}
             items={filteredSkills}
             onSelect={handleSkillSelect}
+            onEscape={closeSkillPicker}
             caretLeft={caretLeft}
             commandRef={skillCommandRef}
           />
@@ -1068,6 +1092,7 @@ export const MessageInput = memo(function MessageInput({
             open={pathPickerVisible}
             items={pathPickerItems}
             onSelect={handlePathSelect}
+            onEscape={closePathPicker}
             caretLeft={caretLeft}
             commandRef={pathCommandRef}
             fuzzy

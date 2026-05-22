@@ -1,4 +1,13 @@
-import { memo, type Ref, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  memo,
+  type Ref,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
 import { Command, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -8,6 +17,7 @@ type SkillPickerProps = {
   open: boolean;
   items: SkillListItem[];
   onSelect: (skill: SkillListItem) => void;
+  onEscape?: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
 };
@@ -16,6 +26,7 @@ export const SkillPicker = memo(function SkillPicker({
   open,
   items,
   onSelect,
+  onEscape,
   caretLeft,
   commandRef,
 }: SkillPickerProps) {
@@ -23,6 +34,7 @@ export const SkillPicker = memo(function SkillPicker({
     open,
     items,
     onSelect,
+    onEscape,
     caretLeft,
   });
 
@@ -50,6 +62,16 @@ export const SkillPicker = memo(function SkillPicker({
     });
   }, [selectedValue]);
 
+  const handleCommandKeyDownCapture = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Escape" || !onEscape) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onEscape();
+    },
+    [onEscape],
+  );
+
   if (!open) return null;
 
   return (
@@ -60,6 +82,7 @@ export const SkillPicker = memo(function SkillPicker({
         loop
         value={selectedValue}
         onValueChange={setSelectedValue}
+        onKeyDownCapture={handleCommandKeyDownCapture}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
