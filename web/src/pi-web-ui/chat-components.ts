@@ -906,6 +906,10 @@ function renderTool(
   return renderDefaultTool(params, result, isStreaming);
 }
 
+function shouldToolDisclosureStartOpen(toolName: string): boolean {
+  return toolName.toLowerCase() === "edit";
+}
+
 function summarizeToolCall(
   toolName: string,
   params: unknown,
@@ -1144,6 +1148,8 @@ export class ToolMessage extends LitElement {
   @property({ type: Boolean }) aborted = false;
   @property({ type: Boolean }) isStreaming = false;
 
+  @state() private disclosureOpenOverride?: boolean;
+
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -1152,6 +1158,17 @@ export class ToolMessage extends LitElement {
     super.connectedCallback();
     this.style.display = "block";
   }
+
+  override willUpdate(changedProperties: Map<string, unknown>): void {
+    const previousToolCall = changedProperties.get("toolCall") as ToolCall | undefined;
+    if (previousToolCall && previousToolCall.id !== this.toolCall?.id) {
+      this.disclosureOpenOverride = undefined;
+    }
+  }
+
+  private _onDisclosureToggle = (ev: Event): void => {
+    this.disclosureOpenOverride = (ev.currentTarget as HTMLDetailsElement).open;
+  };
 
   override render() {
     const toolName = this.tool?.name || this.toolCall.name;
@@ -1174,8 +1191,14 @@ export class ToolMessage extends LitElement {
       this.aborted,
     );
 
+    const disclosureOpen = this.disclosureOpenOverride ?? shouldToolDisclosureStartOpen(toolName);
+
     return html`
-      <details class="tool-disclosure border border-border rounded-md bg-card text-card-foreground shadow-xs">
+      <details
+        class="tool-disclosure border border-border rounded-md bg-card text-card-foreground shadow-xs"
+        ?open=${disclosureOpen}
+        @toggle=${this._onDisclosureToggle}
+      >
         <summary class="tool-disclosure-summary list-none cursor-pointer select-none px-3 py-2">
           <div class="flex items-center gap-2 min-w-0">
             <span class="tool-disclosure-chevron text-muted-foreground shrink-0">${unsafeHTML(iconSvg(ChevronRight, "sm"))}</span>
