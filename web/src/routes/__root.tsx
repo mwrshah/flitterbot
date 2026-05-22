@@ -6,7 +6,6 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Agentation } from "agentation";
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
@@ -125,6 +124,12 @@ function RootComponent() {
 
   useEffect(() => startRealtime(), [startRealtime]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      void import("react-grab");
+    }
+  }, []);
+
   const children = useMemo(
     () => (
       <>
@@ -170,7 +175,6 @@ function RootDocument({
             },
           }}
         />
-        {import.meta.env.DEV && <Agentation />}
         <Scripts />
       </body>
     </html>
