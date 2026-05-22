@@ -762,7 +762,7 @@ export const MessageInput = memo(function MessageInput({
       // guard fires and inlines SKILL.md at send time. Built-in commands are not
       // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
       const before = value.slice(0, slashIdx);
-      const after = value.slice(tokenEnd).trimStart();
+      const after = collapseSingleFollowingSpace(value.slice(tokenEnd));
       const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
       const newValue = before + inserted + after;
       setDraftAndStore(newValue);
