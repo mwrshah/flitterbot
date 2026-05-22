@@ -44,7 +44,20 @@ export type MessageInputHoverButton = {
   insertText: string;
 };
 
+type HoverSendAction = {
+  text: string;
+  sourceButtonId: string;
+};
+
+type MessageInputHoverButtonSlot = {
+  button: MessageInputHoverButton;
+  action: "insert" | "send";
+  ghost?: boolean;
+  reserveButton?: MessageInputHoverButton;
+};
+
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
+const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
 const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
 /** Sub-pixel safety margin so a button that "just fits" in pretext pixels
@@ -105,22 +118,25 @@ function messageInputButtonShortcutLabel(index: number) {
 }
 
 function MessageInputHoverButtons({
-  buttons,
+  slots,
   composerRef,
   toolbarRef,
-  onInsert,
+  onSlotAction,
 }: {
-  buttons: MessageInputHoverButton[];
+  slots: MessageInputHoverButtonSlot[];
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
-  onInsert: (button: MessageInputHoverButton, visibleBlockWidth: number) => void;
+  onSlotAction: (slot: MessageInputHoverButtonSlot, visibleBlockWidth: number) => void;
 }) {
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
+  const slotRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleBlockWidthRef = useRef(0);
+  const buttonClassName =
+    "pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring";
 
   useLayoutEffect(() => {
-    if (buttons.length === 0) return;
+    if (slots.length === 0) return;
 
     let frame = 0;
     let observer: ResizeObserver | null = null;
@@ -149,8 +165,8 @@ function MessageInputHoverButtons({
       if (!elements) return false;
 
       const { toolbar, buttonRow } = elements;
-      const renderedButtons = buttonRefs.current.slice(0, buttons.length);
-      const firstButton = renderedButtons[0];
+      const renderedSlots = slotRefs.current.slice(0, slots.length);
+      const firstButton = buttonRefs.current[0];
       if (!firstButton) return false;
 
       const buttonRowRect = buttonRow.getBoundingClientRect();
@@ -174,12 +190,13 @@ function MessageInputHoverButtons({
 
       let usedWidth = 0;
       let visibleCount = 0;
-      for (const [index, button] of buttons.entries()) {
+      for (const [index, slot] of slots.entries()) {
+        const reserveButton = slot.reserveButton ?? slot.button;
         const shortcutLabel = messageInputButtonShortcutLabel(index);
         const shortcutWidth = shortcutLabel
           ? pretextTextWidth(shortcutLabel, font, lineHeight) + shortcutMargin
           : 0;
-        const textWidth = pretextTextWidth(button.label, font, lineHeight) + shortcutWidth;
+        const textWidth = pretextTextWidth(reserveButton.label, font, lineHeight) + shortcutWidth;
         const nextWidth =
           usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
         if (nextWidth > availableWidth) break;
@@ -188,8 +205,8 @@ function MessageInputHoverButtons({
       }
 
       visibleBlockWidthRef.current = usedWidth;
-      renderedButtons.forEach((button, index) => {
-        if (button) button.hidden = index >= visibleCount;
+      renderedSlots.forEach((slotNode, index) => {
+        if (slotNode) slotNode.hidden = index >= visibleCount;
       });
       return true;
     };
@@ -218,7 +235,7 @@ function MessageInputHoverButtons({
       observer?.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [buttons, composerRef, toolbarRef]);
+  }, [slots, composerRef, toolbarRef]);
 
   const currentVisibleBlockWidth = () => {
     const buttonRow = buttonRowRef.current;
@@ -227,62 +244,104 @@ function MessageInputHoverButtons({
     const buttonGap = numericStyleValue(window.getComputedStyle(buttonRow).columnGap);
     let width = 0;
     let visibleCount = 0;
-    for (const button of buttonRefs.current.slice(0, buttons.length)) {
-      if (!button || button.hidden) continue;
-      width += button.getBoundingClientRect().width + (visibleCount > 0 ? buttonGap : 0);
+    for (const slotNode of slotRefs.current.slice(0, slots.length)) {
+      if (!slotNode || slotNode.hidden) continue;
+      width += slotNode.getBoundingClientRect().width + (visibleCount > 0 ? buttonGap : 0);
       visibleCount += 1;
     }
     return width || visibleBlockWidthRef.current;
   };
 
   useEffect(() => {
-    const handlers = buttons
+    const handlers = slots
       .slice(0, MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.length)
-      .map((button, index) => ({
+      .map((slot, index) => ({
         actionId: getMessageInputButtonShortcutActionId(index + 1),
         priority: 10,
         handler: () => {
-          const node = buttonRefs.current[index];
-          if (!node || node.hidden || node.disabled) return false;
-          onInsert(button, currentVisibleBlockWidth());
+          const slotNode = slotRefs.current[index];
+          if (slot.ghost || !slotNode || slotNode.hidden) return false;
+          onSlotAction(slot, currentVisibleBlockWidth());
           return true;
         },
       }));
     const cleanup = registerShortcutHandlers(handlers);
     return cleanup;
-  }, [buttons, onInsert]);
+  }, [slots, onSlotAction]);
 
-  if (buttons.length === 0) return null;
+  if (slots.length === 0) return null;
+
+  const renderButtonContent = (label: string, index: number) => (
+    <>
+      <span className="truncate">{label}</span>
+      {messageInputButtonShortcutLabel(index) && (
+        <ShortcutHint
+          label={messageInputButtonShortcutLabel(index)!}
+          className="ml-2 shrink-0 text-sidebar-foreground/30"
+          kbdSize="compact"
+          kbdTone="sidebar"
+          aria-hidden="true"
+        />
+      )}
+    </>
+  );
 
   return (
     <div
       ref={buttonRowRef}
       className="pointer-events-none absolute left-2.5 bottom-2 flex items-center gap-1.5 overflow-hidden"
     >
-      {buttons.map((button, index) => (
-        <button
-          key={button.id}
-          ref={(node) => {
-            buttonRefs.current[index] = node;
-          }}
-          type="button"
-          onClick={() => onInsert(button, currentVisibleBlockWidth())}
-          className="pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring"
-          aria-label={`Insert ${button.label}`}
-          title={`Insert ${button.insertText}`}
-        >
-          <span className="truncate">{button.label}</span>
-          {messageInputButtonShortcutLabel(index) && (
-            <ShortcutHint
-              label={messageInputButtonShortcutLabel(index)!}
-              className="ml-2 shrink-0 text-sidebar-foreground/30"
-              kbdSize="compact"
-              kbdTone="sidebar"
-              aria-hidden="true"
-            />
-          )}
-        </button>
-      ))}
+      {slots.map((slot, index) => {
+        const reserveButton = slot.reserveButton ?? slot.button;
+        const isReservedSendSlot = slot.action === "send" && Boolean(slot.reserveButton);
+        return (
+          <span
+            key={reserveButton.id}
+            ref={(node) => {
+              slotRefs.current[index] = node;
+            }}
+            className="relative inline-flex max-w-full shrink-0"
+          >
+            <button
+              ref={(node) => {
+                buttonRefs.current[index] = node;
+              }}
+              type="button"
+              tabIndex={slot.ghost || isReservedSendSlot ? -1 : undefined}
+              disabled={slot.ghost || isReservedSendSlot}
+              onClick={
+                slot.ghost || isReservedSendSlot
+                  ? undefined
+                  : () => onSlotAction(slot, currentVisibleBlockWidth())
+              }
+              className={cn(
+                buttonClassName,
+                (slot.ghost || isReservedSendSlot) && "invisible pointer-events-none",
+              )}
+              aria-hidden={slot.ghost || isReservedSendSlot ? "true" : undefined}
+              aria-label={
+                slot.ghost || isReservedSendSlot ? undefined : `Insert ${slot.button.label}`
+              }
+              title={
+                slot.ghost || isReservedSendSlot ? undefined : `Insert ${slot.button.insertText}`
+              }
+            >
+              {renderButtonContent(reserveButton.label, index)}
+            </button>
+            {isReservedSendSlot && (
+              <button
+                type="button"
+                onClick={() => onSlotAction(slot, currentVisibleBlockWidth())}
+                className={cn(buttonClassName, "absolute left-0 top-0")}
+                aria-label="Send inserted message"
+                title="Send inserted message"
+              >
+                {renderButtonContent(slot.button.label, index)}
+              </button>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -385,7 +444,7 @@ export const MessageInput = memo(function MessageInput({
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
   const imagesDisabled = isSessionBusy || attachmentsDisabled;
-  const [hoverSendAction, setHoverSendAction] = useState<string | null>(null);
+  const [hoverSendAction, setHoverSendAction] = useState<HoverSendAction | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
@@ -885,21 +944,51 @@ export const MessageInput = memo(function MessageInput({
     !isSending &&
     !isSessionBusy &&
     !recoveryKind;
+  const hoverSendSourceExists =
+    hoverSendAction !== null &&
+    hoverButtons.some((button) => button.id === hoverSendAction.sourceButtonId);
+
+  useEffect(() => {
+    if (hoverSendAction && !hoverSendSourceExists) setHoverSendAction(null);
+  }, [hoverSendAction, hoverSendSourceExists]);
+
   const shouldShowHoverButtons = hoverControlsEnabled && isDraftBlank;
   const shouldShowHoverSendAction =
-    hoverControlsEnabled && hoverSendAction !== null && draft === hoverSendAction;
+    hoverControlsEnabled &&
+    hoverSendAction !== null &&
+    hoverSendSourceExists &&
+    draft === hoverSendAction.text;
 
-  const handleHoverButtonClick = useCallback(
-    (button: MessageInputHoverButton, _visibleBlockWidth: number) => {
-      if (button.insertText === "") {
+  const hoverButtonSlots = useMemo<MessageInputHoverButtonSlot[]>(
+    () => hoverButtons.map((button) => ({ button, action: "insert" })),
+    [hoverButtons],
+  );
+
+  const hoverSendSlots = useMemo<MessageInputHoverButtonSlot[]>(() => {
+    if (!hoverSendAction || !hoverSendSourceExists) return EMPTY_HOVER_BUTTON_SLOTS;
+    return hoverButtons.map((button) =>
+      button.id === hoverSendAction.sourceButtonId
+        ? {
+            button: { id: "hover-send", label: "click to send", insertText: "" },
+            action: "send",
+            reserveButton: button,
+          }
+        : { button, action: "insert", ghost: true },
+    );
+  }, [hoverButtons, hoverSendAction, hoverSendSourceExists]);
+
+  const handleHoverButtonSlotAction = useCallback(
+    (slot: MessageInputHoverButtonSlot, _visibleBlockWidth: number) => {
+      if (slot.ghost) return;
+      if (slot.action === "send") {
         submitCurrentDraft();
         return;
       }
       const current = draftRef.current;
       const newValue = isBlankDraft(current)
-        ? button.insertText
-        : `${current}\n${button.insertText}`;
-      setHoverSendAction(newValue);
+        ? slot.button.insertText
+        : `${current}\n${slot.button.insertText}`;
+      setHoverSendAction({ text: newValue, sourceButtonId: slot.button.id });
       setDraftAndStore(newValue);
       setPickerOpen(false);
       setAtPickerOpen(false);
@@ -1026,14 +1115,10 @@ export const MessageInput = memo(function MessageInput({
           {/* Hover buttons fit against the whole right toolbar, including model selector and send/recovery. */}
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
-              buttons={
-                shouldShowHoverSendAction
-                  ? [{ id: "hover-send", label: "click to send", insertText: "" }]
-                  : hoverButtons
-              }
+              slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
               composerRef={containerRef}
               toolbarRef={toolbarRef}
-              onInsert={handleHoverButtonClick}
+              onSlotAction={handleHoverButtonSlotAction}
             />
           )}
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
