@@ -439,6 +439,7 @@ export const MessageInput = memo(function MessageInput({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const draftKeyRef = useRef(draftKey);
+  const [recoveryButtonWidth, setRecoveryButtonWidth] = useState<number | null>(null);
   const [draft, setDraft] = useState(() => (draftKey ? (draftStore.get(draftKey) ?? "") : ""));
   const [isDraftBlank, setIsDraftBlank] = useState(() =>
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
@@ -1005,6 +1006,47 @@ export const MessageInput = memo(function MessageInput({
   const canSend =
     (!isDraftBlank || pendingImages.length > 0) && !(imagesDisabled && pendingImages.length > 0);
 
+  useLayoutEffect(() => {
+    if (recoveryKind) return;
+
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    let frame = 0;
+    const measureToolbar = () => {
+      // Remember the normal toolbar width (model picker + gap + send/stop). When
+      // recovery replaces send, the model picker is hidden and the recovery
+      // button takes this width so the right edge stays anchored without a jerk.
+      // Reference state is exactly ModelSelector + send/stop button; don't cache recovery-only widths.
+      if (toolbar.children.length <= 1) return;
+      const width = toolbar.getBoundingClientRect().width;
+      if (width <= 0) return;
+      const roundedWidth = Math.ceil(width);
+      setRecoveryButtonWidth((current) => (current === roundedWidth ? current : roundedWidth));
+    };
+    const scheduleMeasure = () => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        measureToolbar();
+      });
+    };
+
+    measureToolbar();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(toolbar);
+    window.addEventListener("resize", scheduleMeasure);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
+  }, [recoveryKind]);
+
+  const recoveryButtonStyle =
+    recoveryKind && recoveryButtonWidth !== null ? { width: recoveryButtonWidth } : undefined;
+
   return (
     <div
       className={cn(
@@ -1122,7 +1164,7 @@ export const MessageInput = memo(function MessageInput({
             />
           )}
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
-            {showModelSelector && modelSelectorPiSessionId && (
+            {!recoveryKind && showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
                 disabled={isSending}
                 piSessionId={modelSelectorPiSessionId}
@@ -1137,7 +1179,8 @@ export const MessageInput = memo(function MessageInput({
                 size="sm"
                 disabled={isRecoverPending || !onRecover}
                 onClick={() => onRecover?.()}
-                className="h-10 sm:h-7 px-3"
+                className="h-10 shrink-0 px-3 sm:h-7"
+                style={recoveryButtonStyle}
               >
                 <RotateCcwIcon className="size-4" />
                 <span>
