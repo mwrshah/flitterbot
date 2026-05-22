@@ -108,6 +108,11 @@ function collapseSingleFollowingSpace(value: string) {
   return value.slice(1);
 }
 
+function normalizePathPickerRemainder(inserted: string, remainder: string) {
+  if (inserted.endsWith("/") && remainder.startsWith(" /")) return remainder.slice(2);
+  return collapseSingleFollowingSpace(remainder);
+}
+
 function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
   const lower = filter.toLowerCase();
   const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
@@ -792,11 +797,11 @@ export const MessageInput = memo(function MessageInput({
       let tokenEnd = atIdx + 1;
       while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
       const before = value.slice(0, atIdx);
-      const after = collapseSingleFollowingSpace(value.slice(tokenEnd));
       // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
       const inserted = `@${item.insertText}${isDir ? "" : " "}`;
+      const after = normalizePathPickerRemainder(inserted, value.slice(tokenEnd));
       const newValue = before + inserted + after;
       setDraftAndStore(newValue);
       if (!isDir) {
