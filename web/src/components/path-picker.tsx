@@ -1,5 +1,14 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
-import { memo, type Ref, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  memo,
+  type Ref,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
 import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -55,6 +64,7 @@ type PathPickerProps = {
   open: boolean;
   items: DirectoryCompletionItem[];
   onSelect: (item: DirectoryCompletionItem) => void;
+  onEscape?: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
   /** When true, display compact mixed search results with path as secondary text. */
@@ -65,11 +75,12 @@ export const PathPicker = memo(function PathPicker({
   open,
   items,
   onSelect,
+  onEscape,
   caretLeft,
   commandRef,
   fuzzy,
 }: PathPickerProps) {
-  useWhyDidYouRender("PathPicker", { open, items, caretLeft, fuzzy });
+  useWhyDidYouRender("PathPicker", { open, items, onEscape, caretLeft, fuzzy });
   // shouldFilter={false} means cmdk won't auto-select on children change.
   // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
@@ -96,6 +107,16 @@ export const PathPicker = memo(function PathPicker({
     });
   }, [selectedValue]);
 
+  const handleCommandKeyDownCapture = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Escape" || !onEscape) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onEscape();
+    },
+    [onEscape],
+  );
+
   if (!open) return null;
 
   return (
@@ -106,6 +127,7 @@ export const PathPicker = memo(function PathPicker({
         loop
         value={selectedValue}
         onValueChange={setSelectedValue}
+        onKeyDownCapture={handleCommandKeyDownCapture}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
