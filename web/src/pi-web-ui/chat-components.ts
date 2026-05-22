@@ -27,7 +27,6 @@ import {
   Copy,
   createElement,
   EllipsisVertical,
-  FileText,
   FolderOpen,
   MessageSquare,
   Search,
@@ -696,6 +695,14 @@ function buildEditDiffRows(oldText: string, newText: string): EditDiffRow[] {
   return rows;
 }
 
+function writeRowsFromContent(content: string): EditDiffRow[] {
+  return splitEditLines(content).map((line, index) => ({
+    type: "insert",
+    newLine: index + 1,
+    content: line,
+  }));
+}
+
 function editPairRowsFromParams(params: Record<string, unknown>): EditDiffRow[] {
   const oldStr = params.old_string ?? params.oldString;
   const newStr = params.new_string ?? params.newString;
@@ -796,14 +803,13 @@ function renderWriteTool(
   result: ToolResultMessageType | undefined,
 ): TemplateResult {
   const p = paramRecord(params);
-  const filePath = toolPathParam(p);
   const content = String(p.content ?? "");
-  const { lines, truncated } = truncateLines(content, 10);
 
+  // Write creates a whole file, so render every content line as an insertion.
+  // Do not apply the read/tool preview truncation here: the content is the value.
   return html`
     <div class="space-y-2">
-      ${renderToolHeader(FileText, `Writing ${filePath}`)}
-      <pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>
+      ${renderEditDiffRows(writeRowsFromContent(content))}
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
     </div>
   `;
@@ -907,7 +913,8 @@ function renderTool(
 }
 
 function shouldToolDisclosureStartOpen(toolName: string): boolean {
-  return toolName.toLowerCase() === "edit";
+  const name = toolName.toLowerCase();
+  return name === "edit" || name === "write";
 }
 
 function summarizeToolCall(
