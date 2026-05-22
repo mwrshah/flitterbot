@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
+import { CopyableCode } from "~/components/common/copyable-code";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import {
@@ -503,12 +504,11 @@ export function ChatPanel({
           {worktree?.cwd && worktree.cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
-              <span
-                className="inline-block text-xs text-muted-foreground truncate max-w-full"
-                title={worktree.cwdAbsolute}
-              >
-                {worktree.cwd}
-              </span>
+              <CopyableCode
+                text={worktree.cwdAbsolute}
+                displayText={worktree.cwd}
+                className="text-muted-foreground"
+              />
             </>
           )}
         </div>

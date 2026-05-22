@@ -112,6 +112,16 @@ export function useGlobalShortcuts({
     return true;
   });
 
+  const copyBranchFallback = useEffectEvent(() => {
+    toast.error("No branch available");
+    return true;
+  });
+
+  const copyTargetBranchFallback = useEffectEvent(() => {
+    toast.error("No target branch available");
+    return true;
+  });
+
   useEffect(() => {
     setShortcutBindingOverrides(shortcutBindings);
     return () => setShortcutBindingOverrides(undefined);
@@ -132,6 +142,11 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.composerFocus, handler: () => focusComposer() },
       { actionId: SHORTCUT_ACTIONS.streamCopyTmuxAttach, handler: () => copyTmuxFallback() },
       { actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath, handler: () => copyWorktreeFallback() },
+      { actionId: SHORTCUT_ACTIONS.streamCopyBranch, handler: () => copyBranchFallback() },
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyTargetBranch,
+        handler: () => copyTargetBranchFallback(),
+      },
       ...Array.from({ length: 9 }, (_, index) => ({
         actionId: getStreamSlotShortcutActionId(index + 1),
         handler: () => navigateStreamSlot(index + 1),

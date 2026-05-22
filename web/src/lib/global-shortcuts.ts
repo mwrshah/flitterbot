@@ -144,6 +144,8 @@ export const SHORTCUT_ACTIONS = {
   composerFocus: "composer.focus",
   streamCopyTmuxAttach: "stream.copy-tmux-attach",
   streamCopyWorktreePath: "stream.copy-worktree-path",
+  streamCopyBranch: "stream.copy-branch",
+  streamCopyTargetBranch: "stream.copy-target-branch",
   scrollSmallDown: "scroll.small-down",
   scrollSmallUp: "scroll.small-up",
   panelViewInfo: "panel.view.info",
@@ -712,10 +714,16 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [{ spec: "i", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyTmuxAttach, {
-    defaultBindings: [{ spec: "c t", when: "no-input-focus" }],
+    defaultBindings: [{ spec: "c a", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyWorktreePath, {
     defaultBindings: [{ spec: "c w", when: "no-input-focus" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.streamCopyBranch, {
+    defaultBindings: [{ spec: "c b", when: "no-input-focus" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.streamCopyTargetBranch, {
+    defaultBindings: [{ spec: "c t", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.panelViewInfo, {
     defaultBindings: [{ spec: "Ctrl+KeyI", when: "always" }],
