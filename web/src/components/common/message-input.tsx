@@ -110,7 +110,7 @@ function collapseSingleFollowingSpace(value: string) {
 
 function normalizePathPickerRemainder(inserted: string, remainder: string) {
   if (inserted.endsWith("/") && remainder.startsWith(" /")) return remainder.slice(2);
-  return collapseSingleFollowingSpace(remainder);
+  return remainder;
 }
 
 function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
