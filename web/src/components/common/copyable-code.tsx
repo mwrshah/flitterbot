@@ -1,15 +1,18 @@
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { cn } from "~/lib/utils";
 
 export function CopyableCode({
   text,
   displayText,
   copied: externalCopied,
   onCopy,
+  className,
 }: {
   text: string;
   displayText?: string;
   copied?: boolean;
   onCopy?: () => void;
+  className?: string;
 }) {
   const internal = useCopyToClipboard(600);
   const isControlled = onCopy !== undefined;
@@ -19,7 +22,10 @@ export function CopyableCode({
     <button
       type="button"
       onClick={() => (isControlled ? onCopy() : internal.copy(text))}
-      className="inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs transition-colors hover:bg-muted"
+      className={cn(
+        "inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs transition-colors hover:bg-muted",
+        className,
+      )}
       title={`copy \`${text}\``}
     >
       {!isControlled && isCopied ? (

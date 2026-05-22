@@ -113,14 +113,21 @@ export function DownstreamSessionsPanel({
   const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
 
   // Register stream copy handlers with higher priority than the root fallback.
-  const ctTargetSessionId = data?.find((s) => s.tmuxSession)?.sessionId ?? null;
+  const tmuxShortcutTargetSessionId = data?.find((s) => s.tmuxSession)?.sessionId ?? null;
   const firstTmuxSession = data?.find((s) => s.tmuxSession)?.tmuxSession ?? null;
   const currentWorktreePath = worktree?.worktreePath ?? null;
+  const currentBranch = worktree?.branch ?? null;
+  const targetBranch = worktree?.baseBranch ?? (hasWorktree ? "main" : null);
   const tmuxShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "c then t";
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTmuxAttach, { compact: true }) || "c then a";
   const worktreeShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
     "c then w";
+  const branchShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyBranch, { compact: true }) || "c then b";
+  const targetBranchShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTargetBranch, { compact: true }) ||
+    "c then t";
   const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo);
   const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff);
 
@@ -163,6 +170,24 @@ export function DownstreamSessionsPanel({
         },
       },
       {
+        actionId: SHORTCUT_ACTIONS.streamCopyBranch,
+        priority: 10,
+        handler: () => {
+          if (!currentBranch) return false;
+          void branchCopy.copy(currentBranch).catch(() => toast.error("Failed to copy"));
+          return true;
+        },
+      },
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyTargetBranch,
+        priority: 10,
+        handler: () => {
+          if (!targetBranch) return false;
+          void baseBranchCopy.copy(targetBranch).catch(() => toast.error("Failed to copy"));
+          return true;
+        },
+      },
+      {
         actionId: SHORTCUT_ACTIONS.panelViewInfo,
         handler: () => {
           showInfoPanel();
@@ -181,8 +206,12 @@ export function DownstreamSessionsPanel({
   }, [
     firstTmuxSession,
     currentWorktreePath,
+    currentBranch,
+    targetBranch,
     tmuxCopy.copy,
     worktreeCopy.copy,
+    branchCopy.copy,
+    baseBranchCopy.copy,
     hasWorktree,
     showInfoPanel,
     showDiffPanel,
@@ -354,7 +383,7 @@ export function DownstreamSessionsPanel({
                   {session.tmuxSession && (
                     <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                       tmux:{" "}
-                      {session.sessionId === ctTargetSessionId ? (
+                      {session.sessionId === tmuxShortcutTargetSessionId ? (
                         <CopyableCode
                           text={`tmux attach -t ${session.tmuxSession}`}
                           copied={tmuxCopy.copied}
@@ -363,7 +392,7 @@ export function DownstreamSessionsPanel({
                       ) : (
                         <CopyableCode text={`tmux attach -t ${session.tmuxSession}`} />
                       )}
-                      {session.sessionId === ctTargetSessionId &&
+                      {session.sessionId === tmuxShortcutTargetSessionId &&
                         (tmuxCopy.copied ? (
                           <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
                         ) : (
@@ -389,24 +418,28 @@ export function DownstreamSessionsPanel({
                 <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Branch:{" "}
                   <CopyableCode
-                    text={worktree.branch ?? ""}
+                    text={currentBranch ?? ""}
                     copied={branchCopy.copied}
-                    onCopy={() => branchCopy.copy(worktree.branch ?? "")}
+                    onCopy={() => currentBranch && branchCopy.copy(currentBranch)}
                   />
-                  <span className="text-muted-foreground/50 text-[10px]">
-                    {branchCopy.copied ? "Copied!" : ""}
-                  </span>
+                  {branchCopy.copied ? (
+                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                  ) : (
+                    <ShortcutHint label={branchShortcutLabel} />
+                  )}
                 </span>
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Merge Target:{" "}
                   <CopyableCode
-                    text={worktree.baseBranch ?? "main"}
+                    text={targetBranch ?? ""}
                     copied={baseBranchCopy.copied}
-                    onCopy={() => baseBranchCopy.copy(worktree.baseBranch ?? "main")}
+                    onCopy={() => targetBranch && baseBranchCopy.copy(targetBranch)}
                   />
-                  <span className="text-muted-foreground/50 text-[10px]">
-                    {baseBranchCopy.copied ? "Copied!" : ""}
-                  </span>
+                  {baseBranchCopy.copied ? (
+                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                  ) : (
+                    <ShortcutHint label={targetBranchShortcutLabel} />
+                  )}
                 </span>
                 <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Worktree:{" "}
