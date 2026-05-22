@@ -109,8 +109,11 @@ function collapseSingleFollowingSpace(value: string) {
 }
 
 function normalizePathPickerRemainder(inserted: string, remainder: string) {
-  if (inserted.endsWith("/") && remainder.startsWith(" /")) return remainder.slice(2);
-  return remainder;
+  if (inserted.endsWith("/") && remainder.startsWith(" /"))
+    return { value: remainder.slice(2), closesPicker: true };
+  if (inserted.endsWith(" ") && remainder.startsWith(" "))
+    return { value: remainder.slice(1), closesPicker: true };
+  return { value: remainder, closesPicker: false };
 }
 
 function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
@@ -801,24 +804,23 @@ export const MessageInput = memo(function MessageInput({
       // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
       const inserted = `@${item.insertText}${isDir ? "" : " "}`;
-      const after = normalizePathPickerRemainder(inserted, value.slice(tokenEnd));
-      const newValue = before + inserted + after;
+      const remainder = normalizePathPickerRemainder(inserted, value.slice(tokenEnd));
+      const newValue = before + inserted + remainder.value;
       setDraftAndStore(newValue);
-      if (!isDir) {
-        setAtPickerOpen(false);
-        atPositionRef.current = -1;
+      if (!isDir || remainder.closesPicker) {
+        closePathPicker();
       }
       const newCursor = before.length + inserted.length;
       requestAnimationFrame(() => {
         textareaRef.current?.setSelectionRange(newCursor, newCursor);
         textareaRef.current?.focus();
         // For directories, re-trigger the change handler so the picker refetches
-        if (isDir) {
+        if (isDir && !remainder.closesPicker) {
           handleDraftChange(newValue);
         }
       });
     },
-    [handleDraftChange, setDraftAndStore],
+    [closePathPicker, handleDraftChange, setDraftAndStore],
   );
 
   const submitCurrentDraft = useCallback(() => {
