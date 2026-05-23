@@ -1220,7 +1220,7 @@ export const MessageInput = memo(function MessageInput({
                 style={recoveryButtonStyle}
               >
                 <RotateCcwIcon className="size-4" />
-                <span className="text-sm">
+                <span className="text-base">
                   {isRecoverPending
                     ? recoveryKind === "dead"
                       ? "Recovering…"

@@ -503,7 +503,7 @@ export function ChatPanel({
           </h1>
           {worktree?.cwd && worktree.cwdAbsolute && (
             <>
-              <span className="text-muted-foreground/50 text-xs shrink-0">|</span>
+              <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
               <CopyableCode
                 text={worktree.cwdAbsolute}
                 displayText={worktree.cwd}

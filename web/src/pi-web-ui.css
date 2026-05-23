@@ -144,7 +144,7 @@
   }
 
   .markdown-content p {
-     @apply leading-relaxed mt-2 first:mt-0 max-w-full;
+     @apply leading-relaxed mt-1.5 first:mt-0 max-w-full;
   }
 
   .markdown-content a {
@@ -160,7 +160,7 @@
   }
 
   .markdown-content ul {
-     @apply list-disc my-4 pl-6 space-y-2;
+     @apply list-disc my-1.5 pl-6 space-y-2;
   }
 
   .markdown-content ol {
@@ -174,12 +174,12 @@
   /* Nested lists should have less top margin */
   .markdown-content li > ul,
   .markdown-content li > ol {
-     @apply mt-2 mb-0;
+     @apply mt-1.5 mb-0;
   }
 
   /* Paragraphs in lists need proper spacing */
   .markdown-content li > p {
-     @apply mb-2;
+     @apply mb-1.5;
   }
 
   .markdown-content li > p:last-child {
