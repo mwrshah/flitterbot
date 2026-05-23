@@ -22,7 +22,6 @@ import type { StatusResponse } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 import type { WsConnectionStore } from "~/lib/ws-connection-store";
 import type { SendMessageFn } from "~/lib/ws-query-bridge";
-import piWebUiCss from "~/pi-web-ui.css?url";
 import appCss from "~/styles.css?url";
 import { seo } from "~/utils/seo";
 
@@ -55,7 +54,6 @@ export const Route = createRootRouteWithContext<{
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "stylesheet", href: piWebUiCss },
       {
         rel: "apple-touch-icon",
         sizes: "180x180",
