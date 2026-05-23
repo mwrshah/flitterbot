@@ -1,7 +1,7 @@
 import { layout, prepare } from "@chenglou/pretext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { CopyIcon, SettingsIcon } from "lucide-react";
 import { marked } from "marked";
 import { type MouseEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -60,6 +60,12 @@ type MeasuredInboundEntry = Extract<MeasuredSurfaceEntry, { kind: "inbound" }>;
 
 type MeasuredStreamsResponseEntry = Extract<MeasuredSurfaceEntry, { kind: "streams-response" }>;
 
+type SurfaceScrollRestoreState = {
+  offset: number;
+  width: number;
+  snapshot: VirtualItem[];
+};
+
 /* ── Helpers ── */
 
 const SOURCE_COLORS: Record<MessageSource, string> = {
@@ -96,6 +102,9 @@ const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
+const SURFACE_SCROLL_RESTORE_KEY = "flitterbot:surface:virtual-scroll:v1";
+const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 2;
+const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
@@ -396,6 +405,57 @@ function getSurfaceBubbleMaxWidth(viewportWidth: number): number {
 
 function getMeasurementWidth(maxWidth: number): number {
   return Math.max(SURFACE_MIN_BUBBLE_WIDTH, maxWidth - SURFACE_BUBBLE_CHROME_WIDTH);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function readSurfaceScrollRestoreState(
+  measuredEntries: MeasuredSurfaceEntry[],
+  surfaceWidth: number,
+): SurfaceScrollRestoreState | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(SURFACE_SCROLL_RESTORE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<SurfaceScrollRestoreState>;
+    if (!isFiniteNumber(parsed.offset) || parsed.offset < 0) return null;
+    if (!isFiniteNumber(parsed.width) || parsed.width <= 0) return null;
+    if (Math.abs(parsed.width - surfaceWidth) > SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE) {
+      return null;
+    }
+    if (!Array.isArray(parsed.snapshot)) return null;
+
+    for (const item of parsed.snapshot) {
+      if (!isFiniteNumber(item.index) || item.index < 0) return null;
+      if (!isFiniteNumber(item.start) || !isFiniteNumber(item.size) || !isFiniteNumber(item.end)) {
+        return null;
+      }
+      if (!isFiniteNumber(item.lane)) return null;
+      if (measuredEntries[item.index]?.id !== item.key) return null;
+    }
+
+    return {
+      offset: parsed.offset,
+      width: parsed.width,
+      snapshot: parsed.snapshot,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(SURFACE_SCROLL_RESTORE_KEY, JSON.stringify(state));
+  } catch {
+    // Session storage may be unavailable or full; scroll restoration is best-effort.
+  }
 }
 
 /**
@@ -781,6 +841,9 @@ export function Surface() {
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const measuredEntriesRef = useRef<MeasuredSurfaceEntry[]>([]);
+  const surfaceWidthRef = useRef(surfaceWidth);
+  const measurementReadyRef = useRef(false);
+  const restoredScrollStateRef = useRef<SurfaceScrollRestoreState | null | undefined>(undefined);
   const setViewportRef = useCallback((node: HTMLDivElement | null) => {
     viewportRef.current = node;
     if (!node) return;
@@ -806,6 +869,11 @@ export function Surface() {
   );
   const measurementReady = bubbleMaxWidth !== null;
 
+  useEffect(() => {
+    surfaceWidthRef.current = surfaceWidth;
+    measurementReadyRef.current = measurementReady;
+  });
+
   /**
    * Synchronous size estimates for TanStack Virtual.
    *
@@ -818,6 +886,11 @@ export function Surface() {
     return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
   }, [entries, bubbleMaxWidth]);
   measuredEntriesRef.current = measuredEntries;
+
+  if (measurementReady && restoredScrollStateRef.current === undefined) {
+    restoredScrollStateRef.current = readSurfaceScrollRestoreState(measuredEntries, surfaceWidth);
+  }
+  const restoredScrollState = restoredScrollStateRef.current ?? null;
 
   const getVirtualItemKey = useCallback(
     (index: number) => measuredEntriesRef.current[index]?.id ?? index,
@@ -837,12 +910,26 @@ export function Surface() {
     gap: SURFACE_ROW_GAP,
     getItemKey: getVirtualItemKey,
     getScrollElement,
+    initialMeasurementsCache: restoredScrollState?.snapshot ?? EMPTY_SURFACE_SCROLL_SNAPSHOT,
+    initialOffset: restoredScrollState?.offset ?? 0,
     overscan: SURFACE_OVERSCAN,
     useFlushSync: false,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const remeasureVirtualizer = useCallback(() => {
     rowVirtualizer.measure();
+  }, [rowVirtualizer]);
+
+  useEffect(() => {
+    return () => {
+      if (!measurementReadyRef.current) return;
+
+      writeSurfaceScrollRestoreState({
+        offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
+        width: surfaceWidthRef.current,
+        snapshot: rowVirtualizer.takeSnapshot(),
+      });
+    };
   }, [rowVirtualizer]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
@@ -945,26 +1032,32 @@ export function Surface() {
             )}
             {entries.length > 0 && (
               <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
-                {virtualItems.map((virtualItem) => {
-                  const entry = measuredEntries[virtualItem.index];
-                  if (!entry) return null;
+                <div
+                  className="absolute left-0 right-0 top-0 flex flex-col"
+                  style={{
+                    gap: `${SURFACE_ROW_GAP}px`,
+                    transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
+                  }}
+                >
+                  {virtualItems.map((virtualItem) => {
+                    const entry = measuredEntries[virtualItem.index];
+                    if (!entry) return null;
 
-                  return (
-                    <div
-                      key={virtualItem.key}
-                      data-index={virtualItem.index}
-                      ref={rowVirtualizer.measureElement}
-                      className="absolute left-0 right-0 top-0"
-                      style={{ transform: `translateY(${virtualItem.start}px)` }}
-                    >
-                      <SurfaceEntryRenderer
-                        entry={entry}
-                        onExpandToggle={remeasureVirtualizer}
-                        onImageLoad={remeasureVirtualizer}
-                      />
-                    </div>
-                  );
-                })}
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        data-index={virtualItem.index}
+                        ref={rowVirtualizer.measureElement}
+                      >
+                        <SurfaceEntryRenderer
+                          entry={entry}
+                          onExpandToggle={remeasureVirtualizer}
+                          onImageLoad={remeasureVirtualizer}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
