@@ -178,7 +178,7 @@ export const Sidebar = memo(function Sidebar() {
                     to="/streams/$piSessionId"
                     params={{ piSessionId: defaultPiSessionId }}
                     className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
+                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                       currentPiSessionId === defaultPiSessionId ||
                         (pathname === "/streams" && !currentPiSessionId)
                         ? "bg-accent text-accent-foreground font-medium"
@@ -204,7 +204,7 @@ export const Sidebar = memo(function Sidebar() {
                       to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId }}
                       className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
+                        "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                         currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
@@ -229,7 +229,7 @@ export const Sidebar = memo(function Sidebar() {
                   ) : (
                     <div
                       key={ws.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/40"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40"
                     >
                       <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
                       <span className="truncate flex-1">{ws.name}</span>
@@ -253,7 +253,7 @@ export const Sidebar = memo(function Sidebar() {
                       to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId }}
                       className={cn(
-                        "flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors",
+                        "flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                         currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
