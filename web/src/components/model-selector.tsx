@@ -245,7 +245,7 @@ export const ModelSelector = memo(function ModelSelector({
         disabled={disabled || !piSessionId}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "h-10 sm:h-7 border-border/60 bg-background/40 text-xs text-muted-foreground hover:bg-accent/50 hover:border-border",
+          "h-10 sm:h-7 border-border/60 bg-background/40 text-sm text-muted-foreground hover:bg-accent/50 hover:border-border",
           compact ? "px-1.5" : "px-2",
         )}
         aria-haspopup="dialog"
