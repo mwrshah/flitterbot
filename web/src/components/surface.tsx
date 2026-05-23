@@ -102,11 +102,11 @@ const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
-const SURFACE_SCROLL_RESTORE_KEY = "flitterbot:surface:virtual-scroll:v1";
-const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 2;
+const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 32;
 // Temporary diagnostic logging while validating TanStack Virtual snapshot restore.
 const SURFACE_SCROLL_RESTORE_DEBUG = true;
 const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
+let surfaceScrollRestoreState: SurfaceScrollRestoreState | null = null;
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
@@ -417,27 +417,24 @@ function logSurfaceScrollRestore(message: string, details?: unknown) {
   if (!SURFACE_SCROLL_RESTORE_DEBUG) return;
 
   if (details === undefined) {
-    console.debug(`[surface scroll restore] ${message}`);
+    console.log(`[surface scroll restore] ${message}`);
     return;
   }
 
-  console.debug(`[surface scroll restore] ${message}`, details);
+  console.log(`[surface scroll restore] ${message}`, details);
 }
 
 function readSurfaceScrollRestoreState(
   measuredEntries: MeasuredSurfaceEntry[],
   surfaceWidth: number,
 ): SurfaceScrollRestoreState | null {
-  if (typeof window === "undefined") return null;
-
   try {
-    const raw = window.sessionStorage.getItem(SURFACE_SCROLL_RESTORE_KEY);
-    if (!raw) {
+    const parsed = surfaceScrollRestoreState;
+    if (!parsed) {
       logSurfaceScrollRestore("no saved snapshot");
       return null;
     }
 
-    const parsed = JSON.parse(raw) as Partial<SurfaceScrollRestoreState>;
     logSurfaceScrollRestore("saved snapshot found", {
       savedOffset: parsed.offset,
       savedWidth: parsed.width,
@@ -507,21 +504,14 @@ function readSurfaceScrollRestoreState(
 }
 
 function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.sessionStorage.setItem(SURFACE_SCROLL_RESTORE_KEY, JSON.stringify(state));
-    logSurfaceScrollRestore("saved snapshot", {
-      offset: state.offset,
-      width: state.width,
-      snapshotLength: state.snapshot.length,
-      firstItem: state.snapshot[0],
-      lastItem: state.snapshot.at(-1),
-    });
-  } catch (error) {
-    logSurfaceScrollRestore("failed to save snapshot", error);
-    // Session storage may be unavailable or full; scroll restoration is best-effort.
-  }
+  surfaceScrollRestoreState = state;
+  logSurfaceScrollRestore("saved snapshot", {
+    offset: state.offset,
+    width: state.width,
+    snapshotLength: state.snapshot.length,
+    firstItem: state.snapshot[0],
+    lastItem: state.snapshot.at(-1),
+  });
 }
 
 /**
