@@ -104,6 +104,8 @@ const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
 const SURFACE_SCROLL_RESTORE_KEY = "flitterbot:surface:virtual-scroll:v1";
 const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 2;
+// Temporary diagnostic logging while validating TanStack Virtual snapshot restore.
+const SURFACE_SCROLL_RESTORE_DEBUG = true;
 const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BADGE_HEIGHT = 22;
@@ -411,6 +413,17 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function logSurfaceScrollRestore(message: string, details?: unknown) {
+  if (!SURFACE_SCROLL_RESTORE_DEBUG) return;
+
+  if (details === undefined) {
+    console.debug(`[surface scroll restore] ${message}`);
+    return;
+  }
+
+  console.debug(`[surface scroll restore] ${message}`, details);
+}
+
 function readSurfaceScrollRestoreState(
   measuredEntries: MeasuredSurfaceEntry[],
   surfaceWidth: number,
@@ -419,31 +432,76 @@ function readSurfaceScrollRestoreState(
 
   try {
     const raw = window.sessionStorage.getItem(SURFACE_SCROLL_RESTORE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as Partial<SurfaceScrollRestoreState>;
-    if (!isFiniteNumber(parsed.offset) || parsed.offset < 0) return null;
-    if (!isFiniteNumber(parsed.width) || parsed.width <= 0) return null;
-    if (Math.abs(parsed.width - surfaceWidth) > SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE) {
+    if (!raw) {
+      logSurfaceScrollRestore("no saved snapshot");
       return null;
     }
-    if (!Array.isArray(parsed.snapshot)) return null;
+
+    const parsed = JSON.parse(raw) as Partial<SurfaceScrollRestoreState>;
+    logSurfaceScrollRestore("saved snapshot found", {
+      savedOffset: parsed.offset,
+      savedWidth: parsed.width,
+      currentWidth: surfaceWidth,
+      currentEntryCount: measuredEntries.length,
+      snapshotLength: Array.isArray(parsed.snapshot) ? parsed.snapshot.length : null,
+    });
+
+    if (!isFiniteNumber(parsed.offset) || parsed.offset < 0) {
+      logSurfaceScrollRestore("discarding snapshot: invalid offset", parsed.offset);
+      return null;
+    }
+    if (!isFiniteNumber(parsed.width) || parsed.width <= 0) {
+      logSurfaceScrollRestore("discarding snapshot: invalid width", parsed.width);
+      return null;
+    }
+    if (Math.abs(parsed.width - surfaceWidth) > SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE) {
+      logSurfaceScrollRestore("discarding snapshot: width mismatch", {
+        savedWidth: parsed.width,
+        currentWidth: surfaceWidth,
+      });
+      return null;
+    }
+    if (!Array.isArray(parsed.snapshot)) {
+      logSurfaceScrollRestore("discarding snapshot: snapshot is not an array");
+      return null;
+    }
 
     for (const item of parsed.snapshot) {
-      if (!isFiniteNumber(item.index) || item.index < 0) return null;
-      if (!isFiniteNumber(item.start) || !isFiniteNumber(item.size) || !isFiniteNumber(item.end)) {
+      if (!isFiniteNumber(item.index) || item.index < 0) {
+        logSurfaceScrollRestore("discarding snapshot: invalid item index", item);
         return null;
       }
-      if (!isFiniteNumber(item.lane)) return null;
-      if (measuredEntries[item.index]?.id !== item.key) return null;
+      if (!isFiniteNumber(item.start) || !isFiniteNumber(item.size) || !isFiniteNumber(item.end)) {
+        logSurfaceScrollRestore("discarding snapshot: invalid item dimensions", item);
+        return null;
+      }
+      if (!isFiniteNumber(item.lane)) {
+        logSurfaceScrollRestore("discarding snapshot: invalid item lane", item);
+        return null;
+      }
+      if (measuredEntries[item.index]?.id !== item.key) {
+        logSurfaceScrollRestore("discarding snapshot: item key mismatch", {
+          index: item.index,
+          savedKey: item.key,
+          currentKey: measuredEntries[item.index]?.id,
+        });
+        return null;
+      }
     }
+
+    logSurfaceScrollRestore("accepted snapshot", {
+      offset: parsed.offset,
+      width: parsed.width,
+      snapshotLength: parsed.snapshot.length,
+    });
 
     return {
       offset: parsed.offset,
       width: parsed.width,
       snapshot: parsed.snapshot,
     };
-  } catch {
+  } catch (error) {
+    logSurfaceScrollRestore("discarding snapshot: read/parse failed", error);
     return null;
   }
 }
@@ -453,7 +511,15 @@ function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
 
   try {
     window.sessionStorage.setItem(SURFACE_SCROLL_RESTORE_KEY, JSON.stringify(state));
-  } catch {
+    logSurfaceScrollRestore("saved snapshot", {
+      offset: state.offset,
+      width: state.width,
+      snapshotLength: state.snapshot.length,
+      firstItem: state.snapshot[0],
+      lastItem: state.snapshot.at(-1),
+    });
+  } catch (error) {
+    logSurfaceScrollRestore("failed to save snapshot", error);
     // Session storage may be unavailable or full; scroll restoration is best-effort.
   }
 }
@@ -921,13 +987,42 @@ export function Surface() {
   }, [rowVirtualizer]);
 
   useEffect(() => {
+    if (!measurementReady) return;
+
+    logSurfaceScrollRestore("virtualizer mounted", {
+      restored: !!restoredScrollState,
+      initialOffset: restoredScrollState?.offset ?? 0,
+      initialSnapshotLength: restoredScrollState?.snapshot.length ?? 0,
+      entryCount: measuredEntries.length,
+      surfaceWidth,
+      currentScrollOffset: rowVirtualizer.scrollOffset,
+      viewportScrollTop: viewportRef.current?.scrollTop,
+    });
+  }, [measurementReady, measuredEntries.length, restoredScrollState, rowVirtualizer, surfaceWidth]);
+
+  useEffect(() => {
     return () => {
-      if (!measurementReadyRef.current) return;
+      if (!measurementReadyRef.current) {
+        logSurfaceScrollRestore("skipping save: measurements were never ready");
+        return;
+      }
+
+      const snapshot = rowVirtualizer.takeSnapshot();
+      const offset = rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0;
+
+      logSurfaceScrollRestore("unmount capture", {
+        offset,
+        rowVirtualizerScrollOffset: rowVirtualizer.scrollOffset,
+        viewportScrollTop: viewportRef.current?.scrollTop,
+        width: surfaceWidthRef.current,
+        measuredEntryCount: measuredEntriesRef.current.length,
+        snapshotLength: snapshot.length,
+      });
 
       writeSurfaceScrollRestoreState({
-        offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
+        offset,
         width: surfaceWidthRef.current,
-        snapshot: rowVirtualizer.takeSnapshot(),
+        snapshot,
       });
     };
   }, [rowVirtualizer]);
