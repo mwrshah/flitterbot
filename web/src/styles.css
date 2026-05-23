@@ -263,60 +263,6 @@
     color: var(--color-muted-foreground);
   }
 
-  /* react-diff-view overrides. */
-  .diff-viewer-panel {
-    --diff-background-color: transparent;
-    --diff-text-color: var(--foreground);
-    --diff-font-family: var(--font-mono);
-    --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
-    --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
-    --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
-    --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
-    --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
-    --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
-  }
-
-  .diff-viewer-panel .diff {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--diff-font-family);
-    font-size: inherit;
-    color: var(--diff-text-color);
-    background: var(--diff-background-color);
-  }
-
-  .diff-viewer-panel .diff-gutter-col {
-    width: 3.5ch;
-  }
-
-  .diff-viewer-panel .diff-gutter {
-    padding: 0 0.25ch;
-    font-size: 0.85em;
-    border-right: 1px solid var(--border);
-  }
-
-  .diff-viewer-panel .diff-code {
-    padding: 0 0.5em;
-    white-space: pre-wrap;
-    word-break: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .diff-viewer-panel .diff-gutter-insert {
-    background: var(--diff-gutter-insert-background-color);
-  }
-
-  .diff-viewer-panel .diff-gutter-delete {
-    background: var(--diff-gutter-delete-background-color);
-  }
-
-  .diff-viewer-panel .diff-code-insert {
-    background: var(--diff-code-insert-background-color);
-  }
-
-  .diff-viewer-panel .diff-code-delete {
-    background: var(--diff-code-delete-background-color);
-  }
 
   /* Sonner toast token bridge. */
   [data-sonner-toast] [data-description] {
@@ -339,6 +285,66 @@
     background: var(--primary);
     color: var(--primary-foreground);
   }
+}
+
+/*
+ * react-diff-view overrides are intentionally unlayered. The library stylesheet
+ * is imported from DownstreamSessionsPanel as unlayered CSS; if these rules live
+ * in @layer components, the library's `.diff-gutter-col { width: 7ch }` and
+ * `.diff-gutter { padding: 0 1ch }` win regardless of selector specificity.
+ */
+.diff-viewer-panel {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--foreground);
+  --diff-font-family: var(--font-mono);
+  --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
+  --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
+  --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
+  --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
+  --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
+  --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
+}
+
+.diff-viewer-panel .diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--diff-font-family);
+  font-size: inherit;
+  color: var(--diff-text-color);
+  background: var(--diff-background-color);
+}
+
+.diff-viewer-panel .diff-gutter-col {
+  width: 3.5ch;
+}
+
+.diff-viewer-panel .diff-gutter {
+  padding: 0 0.25ch;
+  font-size: 0.85em;
+  border-right: 1px solid var(--border);
+}
+
+.diff-viewer-panel .diff-code {
+  padding: 0 0.5em;
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.diff-viewer-panel .diff-gutter-insert {
+  background: var(--diff-gutter-insert-background-color);
+}
+
+.diff-viewer-panel .diff-gutter-delete {
+  background: var(--diff-gutter-delete-background-color);
+}
+
+.diff-viewer-panel .diff-code-insert {
+  background: var(--diff-code-insert-background-color);
+}
+
+.diff-viewer-panel .diff-code-delete {
+  background: var(--diff-code-delete-background-color);
 }
 
 @layer utilities {
