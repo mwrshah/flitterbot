@@ -1,183 +1,352 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "./pi-web-ui.css";
+
+@source "./pi-web-ui";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
- * Flitterbot Web — Minimal base styles.
- * Tailwind handles layout, spacing, typography, and color.
- * This file covers resets and a few things Tailwind doesn't own.
+ * Flitterbot Web CSS architecture:
+ * - Tailwind/shadcn own element reset and component sizing.
+ * - This file owns theme tokens, base app shell defaults, and scoped adapters
+ *   for rendered/vendor content that cannot be expressed at the call site.
+ * - No unlayered global element styling. If a rule touches real elements, keep
+ *   it in @layer base/components/utilities so Tailwind utilities can override it.
  */
 
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+  --font-heading: var(--font-sans);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+}
+
 :root {
-  color-scheme: light; /* default until useTheme applies the user's preference */
+  color-scheme: light;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.92 0 0);
+  --accent-foreground: oklch(0.4 0.18 240);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.81 0.1 252);
+  --chart-2: oklch(53.553% 0.02798 259.829);
+  --chart-3: oklch(0.55 0.22 263);
+  --chart-4: oklch(0.49 0.22 264);
+  --chart-5: oklch(0.42 0.18 266);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --radius: 0.625rem;
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --syntax-keyword: oklch(0.577 0.245 27.325);
+  --syntax-entity: oklch(0.511 0.136 307.715);
+  --syntax-constant: oklch(0.435 0.141 237.016);
+  --syntax-string: oklch(0.296 0.103 244.038);
+  --syntax-variable: oklch(0.608 0.178 54.291);
+  --syntax-comment: oklch(0.54 0.019 247.858);
+  --syntax-tag: oklch(0.403 0.111 145.348);
+  --syntax-heading: oklch(0.435 0.141 237.016);
+  --syntax-list: oklch(0.537 0.108 88.766);
+  --syntax-addition-bg: oklch(0.984 0.029 166.113);
+  --syntax-addition-fg: oklch(0.403 0.111 145.348);
+  --syntax-deletion-bg: oklch(0.981 0.025 17.672);
+  --syntax-deletion-fg: oklch(0.431 0.183 27.522);
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.3 0 0);
+  --accent-foreground: oklch(0.75 0.18 85);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.275 0 0);
+  --input: oklch(0.325 0 0);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.81 0.1 252);
+  --chart-2: oklch(0.62 0.19 260);
+  --chart-3: oklch(0.55 0.22 263);
+  --chart-4: oklch(0.49 0.22 264);
+  --chart-5: oklch(0.42 0.18 266);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.275 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+
+  --syntax-keyword: oklch(0.698 0.159 21.174);
+  --syntax-entity: oklch(0.792 0.124 307.715);
+  --syntax-constant: oklch(0.732 0.137 237.016);
+  --syntax-string: oklch(0.786 0.08 237.016);
+  --syntax-variable: oklch(0.74 0.141 54.291);
+  --syntax-comment: oklch(0.626 0.025 247.858);
+  --syntax-tag: oklch(0.812 0.159 145.348);
+  --syntax-heading: oklch(0.523 0.181 237.016);
+  --syntax-list: oklch(0.866 0.141 88.766);
+  --syntax-addition-bg: oklch(0.188 0.06 166.113);
+  --syntax-addition-fg: oklch(0.87 0.147 145.348);
+  --syntax-deletion-bg: oklch(0.233 0.129 17.672);
+  --syntax-deletion-fg: oklch(0.92 0.067 17.672);
 }
 
-html,
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  overflow: hidden;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow: hidden;
+    font-size: 16px;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+@layer components {
+  /* Markdown rendered by the React chat surface. */
+  .markdown-body {
+    line-height: 1.65;
+  }
+
+  .markdown-body p {
+    margin: 0.6em 0;
+  }
+
+  .markdown-body :first-child {
+    margin-top: 0;
+  }
+
+  .markdown-body :last-child {
+    margin-bottom: 0;
+  }
+
+  .markdown-body pre {
+    white-space: pre-wrap;
+  }
+
+  .markdown-body code {
+    font-size: 0.85em;
+    padding: 0.15em 0.35em;
+    border-radius: 0.25rem;
+    background: var(--color-muted);
+  }
+
+  .markdown-body pre code {
+    display: block;
+    padding: 0.8em 1em;
+    overflow-x: auto;
+    font-size: 0.8em;
+    line-height: 1.5;
+    border-radius: 0.375rem;
+  }
+
+  .markdown-body a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .markdown-body ul,
+  .markdown-body ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+  }
+
+  .markdown-body blockquote {
+    border-left: 3px solid var(--color-border);
+    padding-left: 0.8em;
+    margin: 0.5em 0;
+    color: var(--color-muted-foreground);
+  }
+
+  /* react-diff-view overrides. */
+  .diff-viewer-panel {
+    --diff-background-color: transparent;
+    --diff-text-color: var(--foreground);
+    --diff-font-family: var(--font-mono);
+    --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
+    --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
+    --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
+    --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
+    --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
+    --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
+  }
+
+  .diff-viewer-panel .diff {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--diff-font-family);
+    font-size: inherit;
+    color: var(--diff-text-color);
+    background: var(--diff-background-color);
+  }
+
+  .diff-viewer-panel .diff-gutter-col {
+    width: 3.5ch;
+  }
+
+  .diff-viewer-panel .diff-gutter {
+    padding: 0 0.25ch;
+    font-size: 0.85em;
+    border-right: 1px solid var(--border);
+  }
+
+  .diff-viewer-panel .diff-code {
+    padding: 0 0.5em;
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .diff-viewer-panel .diff-gutter-insert {
+    background: var(--diff-gutter-insert-background-color);
+  }
+
+  .diff-viewer-panel .diff-gutter-delete {
+    background: var(--diff-gutter-delete-background-color);
+  }
+
+  .diff-viewer-panel .diff-code-insert {
+    background: var(--diff-code-insert-background-color);
+  }
+
+  .diff-viewer-panel .diff-code-delete {
+    background: var(--diff-code-delete-background-color);
+  }
+
+  /* Sonner toast token bridge. */
+  [data-sonner-toast] [data-description] {
+    color: var(--muted-foreground);
+  }
+
+  [data-sonner-toast] [data-close-button] {
+    background: var(--muted);
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+
+  [data-sonner-toast][data-type="error"] {
+    background: var(--destructive) !important;
+    color: var(--destructive-foreground) !important;
+    border-color: var(--destructive) !important;
+  }
+
+  [data-sonner-toast] [data-button] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
 }
 
-pre,
-code,
-.mono {
-  font-family: var(--font-mono);
-}
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none !important;
+  }
 
-/* Status dot colors — used by Badge status variants */
-.dot-working { background: oklch(0.72 0.19 145); }
-.dot-idle     { background: oklch(0.72 0.14 240); }
-.dot-stale    { background: oklch(0.78 0.16 85); }
-.dot-ended    { background: oklch(0.65 0 0); }
-
-/* Markdown rendered inside chat bubbles */
-.markdown-body {
-  line-height: 1.65;
-}
-.markdown-body p {
-  margin: 0.6em 0;
-}
-.markdown-body :first-child {
-  margin-top: 0;
-}
-.markdown-body :last-child {
-  margin-bottom: 0;
-}
-.markdown-body pre {
-  white-space: pre-wrap;
-}
-.markdown-body code {
-  font-size: 0.85em;
-  padding: 0.15em 0.35em;
-  border-radius: 0.25rem;
-  background: var(--color-muted);
-}
-.markdown-body pre code {
-  display: block;
-  padding: 0.8em 1em;
-  overflow-x: auto;
-  font-size: 0.8em;
-  line-height: 1.5;
-  border-radius: 0.375rem;
-}
-.markdown-body a {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.markdown-body ul, .markdown-body ol {
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-.markdown-body blockquote {
-  border-left: 3px solid var(--color-border);
-  padding-left: 0.8em;
-  margin: 0.5em 0;
-  color: var(--color-muted-foreground);
-}
-
-/* react-diff-view overrides — theme with app tokens + size for narrow panel.
-
-   Library renders a <table class="diff"> per file with:
-     <colgroup><col.diff-gutter-col/><col.diff-gutter-col/><col/></colgroup>
-     <tbody class="diff-hunk">
-       <tr class="diff-line diff-line-{type}">
-         <td.diff-gutter.diff-gutter-{type}>oldLine</td>
-         <td.diff-gutter.diff-gutter-{type}>newLine</td>
-         <td.diff-code.diff-code-{type}>content</td>
-       </tr>
-       …
-     </tbody>
-   Everything is a real table — no absolute positioning, no tricks. Gutter
-   cells scroll with rows by construction. Content is plain text in a <td>
-   with white-space:pre-wrap + word-break:break-all from library default,
-   which handles wrapping cleanly. We just narrow the gutter, drop the
-   break-all aggression, and theme the colors. */
-.diff-viewer-panel .diff {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--diff-font-family);
-  font-size: inherit;
-  color: var(--diff-text-color);
-  background: var(--diff-background-color);
-}
-.diff-viewer-panel .diff-gutter-col {
-  /* Two gutter cols in unified view. 3.5ch each = 7ch total; fits 3-digit
-     line numbers comfortably and holds the layout stable for larger files. */
-  width: 3.5ch;
-}
-.diff-viewer-panel .diff-gutter {
-  padding: 0 0.25ch;
-  font-size: 0.85em;
-  border-right: 1px solid var(--border);
-}
-.diff-viewer-panel .diff-code {
-  padding: 0 0.5em;
-  /* Library ships word-break:break-all which chops mid-word aggressively.
-     word-break:normal + overflow-wrap:anywhere wraps at whitespace first
-     and only breaks inside tokens when a single token overflows. */
-  white-space: pre-wrap;
-  word-break: normal;
-  overflow-wrap: anywhere;
-}
-.diff-viewer-panel .diff-gutter-insert {
-  background: var(--diff-gutter-insert-background-color);
-}
-.diff-viewer-panel .diff-gutter-delete {
-  background: var(--diff-gutter-delete-background-color);
-}
-.diff-viewer-panel .diff-code-insert {
-  background: var(--diff-code-insert-background-color);
-}
-.diff-viewer-panel .diff-code-delete {
-  background: var(--diff-code-delete-background-color);
-}
-/* Theme mapping: library CSS variables → app color tokens. One block for
-   both light and dark; values are alpha-composited against the app bg so
-   they read well in either theme. */
-.diff-viewer-panel {
-  --diff-background-color: transparent;
-  --diff-text-color: var(--foreground);
-  --diff-font-family: var(--font-mono);
-  --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
-  --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
-  --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
-  --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
-  --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
-  --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
-}
-
-/* Hide scrollbars while keeping scroll functionality */
-.no-scrollbar {
-  scrollbar-width: none !important;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none !important;
-}
-
-/* Sonner toast overrides — use app CSS variables */
-[data-sonner-toast] [data-description] {
-  color: var(--muted-foreground);
-}
-[data-sonner-toast] [data-close-button] {
-  background: var(--muted);
-  border-color: var(--border);
-  color: var(--foreground);
-}
-[data-sonner-toast][data-type="error"] {
-  background: var(--destructive) !important;
-  color: var(--destructive-foreground) !important;
-  border-color: var(--destructive) !important;
-}
-[data-sonner-toast] [data-button] {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+  }
 }
