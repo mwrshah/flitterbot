@@ -27,13 +27,6 @@ a {
   text-decoration: none;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
 pre,
 code,
 .mono {
