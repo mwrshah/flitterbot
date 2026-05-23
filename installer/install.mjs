@@ -740,7 +740,14 @@ async function bootstrapWhatsappConfig() {
 // ---------------------------------------------------------------------------
 // Blackboard initialization
 // ---------------------------------------------------------------------------
-const BLACKBOARD_SCHEMA_VERSION = 11;
+function readBlackboardSchemaVersion(schemaFile) {
+  try {
+    const schema = readFileSync(schemaFile, "utf8");
+    const match = schema.match(/blackboard schema \(v(\d+)\)/i);
+    if (match) return Number.parseInt(match[1], 10);
+  } catch {}
+  return 0;
+}
 
 function initBlackboard() {
   if (DRY_RUN) {
@@ -752,6 +759,11 @@ function initBlackboard() {
     || join(FLITTERBOT_DIR, "src", "blackboard", "schema.sql");
   if (!existsSync(schemaFile)) {
     warn(`Schema file not found at ${schemaFile}; skipping blackboard initialization`);
+    return;
+  }
+  const schemaVersion = readBlackboardSchemaVersion(schemaFile);
+  if (!schemaVersion) {
+    warn(`Could not determine blackboard schema version from ${schemaFile}; skipping blackboard initialization`);
     return;
   }
 
@@ -783,14 +795,14 @@ function initBlackboard() {
 
     if (!hasSessions) {
       execSync(`sqlite3 "${dbPath}" < "${schemaFile}"`, { stdio: "pipe" });
-      sqlite(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (${BLACKBOARD_SCHEMA_VERSION});`);
-      info(`blackboard.db created at ${dbPath} (schema v${BLACKBOARD_SCHEMA_VERSION})`);
+      sqlite(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (${schemaVersion});`);
+      info(`blackboard.db created at ${dbPath} (schema v${schemaVersion})`);
     } else {
       let current = "0";
       try { current = sqlite("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;"); } catch {}
       info(`blackboard.db exists at ${dbPath} (schema v${current})`);
-      if (parseInt(current, 10) < BLACKBOARD_SCHEMA_VERSION) {
-        info(`  note: server will migrate v${current} → v${BLACKBOARD_SCHEMA_VERSION} on next startup`);
+      if (parseInt(current, 10) < schemaVersion) {
+        info(`  note: server will migrate v${current} → v${schemaVersion} on next startup`);
       }
     }
   } catch (e) {

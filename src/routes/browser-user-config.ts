@@ -41,9 +41,6 @@ export async function handleBrowserUserConfigPutRoute(
     if (typeof v !== "string") {
       return sendJson(res, 400, { ok: false, error: `Value for key "${k}" must be a string` });
     }
-    if (v.length > 10_240) {
-      return sendJson(res, 400, { ok: false, error: `Value for key "${k}" exceeds 10KB limit` });
-    }
   }
 
   setUserConfig(runtime.blackboard, userId, body.config);

@@ -76,6 +76,23 @@ type SurfaceScrollRestoreState = {
   expandedIds: string[];
 };
 
+type CompactSurfaceVirtualItem = [
+  index: number,
+  key: string | number,
+  start: number,
+  size: number,
+  end: number,
+  lane: number,
+];
+
+type StoredSurfaceScrollRestoreState = {
+  v: 1;
+  o: number;
+  w: number;
+  s: CompactSurfaceVirtualItem[];
+  e: string[];
+};
+
 /* ── Helpers ── */
 
 const SOURCE_COLORS: Record<MessageSource, string> = {
@@ -112,9 +129,9 @@ const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
 const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 32;
-const SURFACE_SCROLL_RESTORE_DEBUG = true;
+const SURFACE_SCROLL_RESTORE_DEBUG = false;
 const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
-let surfaceScrollRestoreState: SurfaceScrollRestoreState | null = null;
+const SURFACE_ESTIMATE_SAFETY_PX = 8;
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
@@ -133,8 +150,11 @@ const LIST_INDENT_PX = 1.5 * FONT_SIZE_PX;
 const LIST_MARGIN_PX = 0.5 * FONT_SIZE_PX;
 const BQ_INDENT_PX = 0.8 * FONT_SIZE_PX + 3;
 const BQ_MARGIN_PX = 0.5 * FONT_SIZE_PX;
+const CODE_FONT_SIZE_PX = 0.8 * FONT_SIZE_PX;
+const CODE_FONT = `400 ${CODE_FONT_SIZE_PX}px ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace`;
 const CODE_PADDING_PX = 2 * 0.8 * FONT_SIZE_PX;
-const CODE_LINE_HEIGHT_PX = 0.8 * FONT_SIZE_PX * 1.5;
+const CODE_HORIZONTAL_PADDING_PX = 2 * CODE_FONT_SIZE_PX;
+const CODE_LINE_HEIGHT_PX = CODE_FONT_SIZE_PX * 1.5;
 const CODE_MARGIN_PX = 1 * FONT_SIZE_PX;
 const HR_HEIGHT_PX = 1;
 const HR_MARGIN_PX = 0.5 * FONT_SIZE_PX;
@@ -158,6 +178,7 @@ const HEADING_MARGIN_EM: Record<number, number> = {
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
 const plainTextPrepareCache = new Map<string, ReturnType<typeof prepare>>();
+const codeTextPrepareCache = new Map<string, ReturnType<typeof prepare>>();
 
 function getPreparedText(text: string) {
   const cached = plainTextPrepareCache.get(text);
@@ -165,6 +186,15 @@ function getPreparedText(text: string) {
 
   const prepared = prepare(text, SURFACE_FONT, { whiteSpace: "pre-wrap" });
   plainTextPrepareCache.set(text, prepared);
+  return prepared;
+}
+
+function getPreparedCodeText(text: string) {
+  const cached = codeTextPrepareCache.get(text);
+  if (cached) return cached;
+
+  const prepared = prepare(text, CODE_FONT, { whiteSpace: "pre-wrap" });
+  codeTextPrepareCache.set(text, prepared);
   return prepared;
 }
 
@@ -203,6 +233,24 @@ function measureInlineLines(text: string, maxWidth: number, lineHeight: number):
   return Math.max(1, lineCount);
 }
 
+function measureCodeLines(text: string, maxWidth: number): number {
+  const lines = text.split("\n");
+  if (lines.length === 0) return 1;
+
+  const contentWidth = Math.max(1, maxWidth - CODE_HORIZONTAL_PADDING_PX);
+  let total = 0;
+  for (const line of lines) {
+    if (!line) {
+      total += 1;
+      continue;
+    }
+    const prepared = getPreparedCodeText(line);
+    const { lineCount } = layout(prepared, contentWidth, CODE_LINE_HEIGHT_PX);
+    total += Math.max(1, lineCount);
+  }
+  return total;
+}
+
 function measureBlock(token: MarkdownTokenLite, maxWidth: number): BlockMetrics {
   switch (token.type) {
     case "paragraph":
@@ -225,9 +273,8 @@ function measureBlock(token: MarkdownTokenLite, maxWidth: number): BlockMetrics 
     }
     case "code": {
       const codeText = String(token.text ?? "");
-      const codeLines = codeText.length === 0 ? 1 : codeText.split("\n").length;
       return {
-        height: CODE_PADDING_PX + codeLines * CODE_LINE_HEIGHT_PX,
+        height: CODE_PADDING_PX + measureCodeLines(codeText, maxWidth) * CODE_LINE_HEIGHT_PX,
         marginTop: CODE_MARGIN_PX,
         marginBottom: CODE_MARGIN_PX,
       };
@@ -298,6 +345,10 @@ function getMarkdownMetrics(text: string, maxWidth: number) {
   };
 }
 
+function withEstimateSafety(height: number): number {
+  return height + SURFACE_ESTIMATE_SAFETY_PX;
+}
+
 function estimateMessageRowHeight(
   textHeight: number,
   hasBadge: boolean,
@@ -305,20 +356,21 @@ function estimateMessageRowHeight(
 ): number {
   const badgeHeight = hasBadge ? SURFACE_BADGE_HEIGHT : 0;
   const collapseHeight = isOverflowing ? SURFACE_COLLAPSE_TOGGLE_HEIGHT : 0;
-  return Math.max(
-    SURFACE_ROW_MIN_HEIGHT,
-    BUBBLE_CHROME_PX + badgeHeight + textHeight + collapseHeight,
+  return withEstimateSafety(
+    Math.max(SURFACE_ROW_MIN_HEIGHT, BUBBLE_CHROME_PX + badgeHeight + textHeight + collapseHeight),
   );
 }
 
 function estimateHookRowHeight(detail: string, maxWidth: number): number {
-  if (!detail) return SURFACE_ROW_MIN_HEIGHT;
+  if (!detail) return withEstimateSafety(SURFACE_ROW_MIN_HEIGHT);
   const tokens = getMarkdownTokens(detail);
   const blocks = tokens.map((t) => measureBlock(t, maxWidth));
   const textHeight = stackBlocks(blocks);
-  return Math.max(
-    SURFACE_ROW_MIN_HEIGHT,
-    BUBBLE_CHROME_PX + SURFACE_HOOK_TITLE_HEIGHT + SURFACE_HOOK_DETAIL_GAP + textHeight,
+  return withEstimateSafety(
+    Math.max(
+      SURFACE_ROW_MIN_HEIGHT,
+      BUBBLE_CHROME_PX + SURFACE_HOOK_TITLE_HEIGHT + SURFACE_HOOK_DETAIL_GAP + textHeight,
+    ),
   );
 }
 
@@ -392,12 +444,78 @@ function logSurfaceScrollRestore(message: string, details?: unknown) {
   console.log(`[surface scroll restore] ${message}`, details);
 }
 
+function roundSurfacePx(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function compactVirtualItem(item: VirtualItem): CompactSurfaceVirtualItem {
+  return [
+    item.index,
+    typeof item.key === "number" ? item.key : String(item.key),
+    roundSurfacePx(item.start),
+    roundSurfacePx(item.size),
+    roundSurfacePx(item.end),
+    item.lane,
+  ];
+}
+
+function expandVirtualItem(item: CompactSurfaceVirtualItem): VirtualItem {
+  return {
+    index: item[0],
+    key: item[1],
+    start: item[2],
+    size: item[3],
+    end: item[4],
+    lane: item[5],
+  };
+}
+
+function serializeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState): string {
+  const payload: StoredSurfaceScrollRestoreState = {
+    v: 1,
+    o: roundSurfacePx(state.offset),
+    w: roundSurfacePx(state.width),
+    s: state.snapshot.map(compactVirtualItem),
+    e: state.expandedIds,
+  };
+  return JSON.stringify(payload);
+}
+
+function parseSurfaceScrollRestoreState(raw: string | undefined): SurfaceScrollRestoreState | null {
+  if (!raw) return null;
+
+  const parsed = JSON.parse(raw) as Partial<StoredSurfaceScrollRestoreState>;
+  if (parsed.v !== 1) return null;
+  if (!isFiniteNumber(parsed.o) || !isFiniteNumber(parsed.w)) return null;
+  if (!Array.isArray(parsed.s) || !Array.isArray(parsed.e)) return null;
+
+  const snapshot: VirtualItem[] = [];
+  for (const item of parsed.s) {
+    if (!Array.isArray(item) || item.length !== 6) return null;
+    const [index, key, start, size, end, lane] = item;
+    if (!isFiniteNumber(index) || index < 0) return null;
+    if (typeof key !== "string" && typeof key !== "number") return null;
+    if (!isFiniteNumber(start) || !isFiniteNumber(size) || !isFiniteNumber(end)) return null;
+    if (!isFiniteNumber(lane)) return null;
+    snapshot.push(expandVirtualItem(item));
+  }
+
+  const expandedIds = parsed.e.filter((id): id is string => typeof id === "string");
+  return {
+    offset: parsed.o,
+    width: parsed.w,
+    snapshot,
+    expandedIds,
+  };
+}
+
 function readSurfaceScrollRestoreState(
+  raw: string | undefined,
   measuredEntries: MeasuredSurfaceEntry[],
   surfaceWidth: number,
 ): SurfaceScrollRestoreState | null {
   try {
-    const parsed = surfaceScrollRestoreState;
+    const parsed = parseSurfaceScrollRestoreState(raw);
     if (!parsed) {
       logSurfaceScrollRestore("no saved snapshot");
       return null;
@@ -408,14 +526,14 @@ function readSurfaceScrollRestoreState(
       savedWidth: parsed.width,
       currentWidth: surfaceWidth,
       currentEntryCount: measuredEntries.length,
-      snapshotLength: Array.isArray(parsed.snapshot) ? parsed.snapshot.length : null,
+      snapshotLength: parsed.snapshot.length,
     });
 
-    if (!isFiniteNumber(parsed.offset) || parsed.offset < 0) {
+    if (parsed.offset < 0) {
       logSurfaceScrollRestore("discarding snapshot: invalid offset", parsed.offset);
       return null;
     }
-    if (!isFiniteNumber(parsed.width) || parsed.width <= 0) {
+    if (parsed.width <= 0) {
       logSurfaceScrollRestore("discarding snapshot: invalid width", parsed.width);
       return null;
     }
@@ -426,28 +544,8 @@ function readSurfaceScrollRestoreState(
       });
       return null;
     }
-    if (!Array.isArray(parsed.snapshot)) {
-      logSurfaceScrollRestore("discarding snapshot: snapshot is not an array");
-      return null;
-    }
-    if (!Array.isArray(parsed.expandedIds)) {
-      logSurfaceScrollRestore("discarding snapshot: expandedIds is not an array");
-      return null;
-    }
 
     for (const item of parsed.snapshot) {
-      if (!isFiniteNumber(item.index) || item.index < 0) {
-        logSurfaceScrollRestore("discarding snapshot: invalid item index", item);
-        return null;
-      }
-      if (!isFiniteNumber(item.start) || !isFiniteNumber(item.size) || !isFiniteNumber(item.end)) {
-        logSurfaceScrollRestore("discarding snapshot: invalid item dimensions", item);
-        return null;
-      }
-      if (!isFiniteNumber(item.lane)) {
-        logSurfaceScrollRestore("discarding snapshot: invalid item lane", item);
-        return null;
-      }
       if (measuredEntries[item.index]?.id !== item.key) {
         logSurfaceScrollRestore("discarding snapshot: item key mismatch", {
           index: item.index,
@@ -464,25 +562,11 @@ function readSurfaceScrollRestoreState(
       snapshotLength: parsed.snapshot.length,
     });
 
-    return {
-      offset: parsed.offset,
-      width: parsed.width,
-      snapshot: parsed.snapshot,
-      expandedIds: parsed.expandedIds,
-    };
+    return parsed;
   } catch (error) {
     logSurfaceScrollRestore("discarding snapshot: read/parse failed", error);
     return null;
   }
-}
-
-function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
-  surfaceScrollRestoreState = state;
-  logSurfaceScrollRestore("saved snapshot", {
-    offset: state.offset,
-    snapshotLength: state.snapshot.length,
-    expandedCount: state.expandedIds.length,
-  });
 }
 
 // Sum of pretext estimateSize values + gaps; seeds initialOffset to the bottom.
@@ -559,13 +643,26 @@ function PlainTextBlock({
   onToggle: () => void;
   fadeClassName?: string;
 }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const clampHeight = MAX_LINES * MARKDOWN_LINE_HEIGHT_PX;
+  const [actualOverflowing, setActualOverflowing] = useState(isOverflowing);
+
+  useLayoutEffect(() => {
+    const node = contentRef.current;
+    const domOverflowing = node ? node.scrollHeight > clampHeight + 1 : false;
+    setActualOverflowing(isOverflowing || domOverflowing);
+  }, [clampHeight, expanded, isOverflowing, text]);
+
+  const showToggle = actualOverflowing || expanded;
+
   return (
     <div className="relative">
       <div
+        ref={contentRef}
         style={
           !expanded
             ? {
-                maxHeight: `${MAX_LINES * MARKDOWN_LINE_HEIGHT_PX}px`,
+                maxHeight: `${clampHeight}px`,
                 overflow: "hidden",
               }
             : undefined
@@ -573,12 +670,12 @@ function PlainTextBlock({
       >
         <MarkdownContent content={text} />
       </div>
-      {isOverflowing && !expanded && (
+      {actualOverflowing && !expanded && (
         <div
           className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${fadeClassName} to-transparent pointer-events-none`}
         />
       )}
-      {(isOverflowing || expanded) && (
+      {showToggle && (
         <button
           type="button"
           onClick={onToggle}
@@ -832,6 +929,7 @@ const SurfaceEntryRenderer = memo(function SurfaceEntryRenderer({
 
 const rootApi = getRouteApi("__root__");
 
+const SURFACE_SCROLL_RESTORE_KEY = "surface:scroll-restore";
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
 
@@ -839,6 +937,7 @@ export function Surface() {
   const { sendMessage } = rootApi.useRouteContext();
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
+  const setConfigRef = useRef(setConfig);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [surfaceWidth, setSurfaceWidth] = useState(0);
@@ -852,6 +951,9 @@ export function Surface() {
   const measurementReadyRef = useRef(false);
   const restoredScrollStateRef = useRef<SurfaceScrollRestoreState | null | undefined>(undefined);
   const initialOffsetRef = useRef<number | null>(null);
+  const initialRestoredExpandedIdsRef = useRef<Set<string> | null>(null);
+  const initialBottomCorrectionDoneRef = useRef(false);
+  const widthMeasurementResetRef = useRef<number | null>(null);
   // Lifted out of PlainTextBlock so it survives row recycle and matches snapshot heights.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const expandedIdsRef = useRef(expandedIds);
@@ -884,6 +986,14 @@ export function Surface() {
     surfaceWidthRef.current = surfaceWidth;
     measurementReadyRef.current = measurementReady;
     expandedIdsRef.current = expandedIds;
+    setConfigRef.current = setConfig;
+  });
+
+  useLayoutEffect(() => {
+    const restored = initialRestoredExpandedIdsRef.current;
+    if (!restored) return;
+    initialRestoredExpandedIdsRef.current = null;
+    setExpandedIds(restored);
   });
 
   const measuredEntries = useMemo(() => {
@@ -895,13 +1005,19 @@ export function Surface() {
 
   // One-shot init: restore snapshot, else seed initialOffset to bottom.
   if (measurementReady && restoredScrollStateRef.current === undefined) {
-    const restored = readSurfaceScrollRestoreState(measuredEntries, surfaceWidth);
+    const restored = readSurfaceScrollRestoreState(
+      config[SURFACE_SCROLL_RESTORE_KEY],
+      measuredEntries,
+      surfaceWidth,
+    );
     restoredScrollStateRef.current = restored;
     if (restored) {
       initialOffsetRef.current = restored.offset;
       const validIds = new Set(measuredEntries.map((e) => e.id));
       const restoredExpanded = restored.expandedIds.filter((id) => validIds.has(id));
-      if (restoredExpanded.length > 0) setExpandedIds(new Set(restoredExpanded));
+      if (restoredExpanded.length > 0) {
+        initialRestoredExpandedIdsRef.current = new Set(restoredExpanded);
+      }
     } else {
       const total = computeTotalEstimatedHeight(measuredEntries);
       const viewportHeight = viewportRef.current?.clientHeight ?? 0;
@@ -936,9 +1052,30 @@ export function Surface() {
       restoredScrollStateRef.current?.snapshot ?? EMPTY_SURFACE_SCROLL_SNAPSHOT,
     initialOffset: initialOffsetRef.current ?? 0,
     overscan: SURFACE_OVERSCAN,
-    useFlushSync: false,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
+  const renderedExpandedIds = initialRestoredExpandedIdsRef.current ?? expandedIds;
+
+  useLayoutEffect(() => {
+    if (!measurementReady || surfaceWidth <= 0) return;
+    const previousWidth = widthMeasurementResetRef.current;
+    if (previousWidth === null) {
+      widthMeasurementResetRef.current = surfaceWidth;
+      return;
+    }
+    if (Math.abs(previousWidth - surfaceWidth) < 1) return;
+
+    widthMeasurementResetRef.current = surfaceWidth;
+    rowVirtualizer.measure();
+  }, [measurementReady, rowVirtualizer, surfaceWidth]);
+
+  useLayoutEffect(() => {
+    if (!measurementReady || initialBottomCorrectionDoneRef.current) return;
+    if (restoredScrollStateRef.current || measuredEntries.length === 0) return;
+
+    initialBottomCorrectionDoneRef.current = true;
+    rowVirtualizer.scrollToIndex(measuredEntries.length - 1, { align: "end" });
+  }, [measurementReady, measuredEntries.length, rowVirtualizer]);
 
   // Stable per-id handlers so memoized rows don't churn on every Set identity change.
   // measureElement's ResizeObserver picks up the maxHeight un-clamp on commit.
@@ -972,12 +1109,13 @@ export function Surface() {
   useEffect(() => {
     return () => {
       if (!measurementReadyRef.current) return;
-      writeSurfaceScrollRestoreState({
+      const serialized = serializeSurfaceScrollRestoreState({
         offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
         width: surfaceWidthRef.current,
         snapshot: rowVirtualizer.takeSnapshot(),
         expandedIds: Array.from(expandedIdsRef.current),
       });
+      setConfigRef.current(SURFACE_SCROLL_RESTORE_KEY, serialized);
     };
   }, [rowVirtualizer]);
 
@@ -1098,7 +1236,7 @@ export function Surface() {
                       >
                         <SurfaceEntryRenderer
                           entry={entry}
-                          expanded={expandedIds.has(entry.id)}
+                          expanded={renderedExpandedIds.has(entry.id)}
                           onToggle={getToggleHandler(entry.id)}
                         />
                       </div>
