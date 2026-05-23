@@ -522,22 +522,17 @@ function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
   surfaceScrollRestoreState = state;
   logSurfaceScrollRestore("saved snapshot", {
     offset: state.offset,
-    width: state.width,
     snapshotLength: state.snapshot.length,
     expandedCount: state.expandedIds.length,
-    firstItem: state.snapshot[0],
-    lastItem: state.snapshot.at(-1),
   });
 }
 
-// Pretext-derived total list height (sum of estimateSize + gaps between rows).
-// Used to seed `initialOffset` to the bottom on first load so the viewport
-// paints pinned to bottom without a post-mount scroll jump or visibility flash.
+// Sum of pretext-estimated row heights + gaps. Used to seed `initialOffset`
+// to the bottom on first load — no post-mount scroll jump, no visibility flash.
 function computeTotalEstimatedHeight(entries: MeasuredSurfaceEntry[]): number {
   if (entries.length === 0) return 0;
-  let total = 0;
+  let total = (entries.length - 1) * SURFACE_ROW_GAP;
   for (const entry of entries) total += entry.metrics.estimatedHeight;
-  total += (entries.length - 1) * SURFACE_ROW_GAP;
   return total;
 }
 
@@ -650,10 +645,6 @@ function PlainTextBlock({
 }
 
 function ImageStack({ images }: { images: ImageAttachment[] }) {
-  // Each row's wrapping div is observed by TanStack's built-in ResizeObserver
-  // (via `rowVirtualizer.measureElement`). When an <img> finishes decoding the
-  // data: URI and the row grows, the RO fires and the virtualizer's totalSize
-  // updates automatically — no explicit onLoad signal needed.
   return (
     <div className="flex flex-col gap-2 mt-2">
       {images.map((img, i) => (
@@ -916,10 +907,8 @@ export function Surface() {
   const measurementReadyRef = useRef(false);
   const restoredScrollStateRef = useRef<SurfaceScrollRestoreState | null | undefined>(undefined);
   const initialOffsetRef = useRef<number | null>(null);
-  // Per-entry Read more / Show less state. Lifted out of PlainTextBlock so it
-  // survives row unmount/remount as the virtualizer recycles rows, and so the
-  // restore snapshot's measured heights stay consistent with the rendered DOM
-  // on remount (rows render in the same expansion state they were captured in).
+  // Read more / Show less state lifted out of PlainTextBlock so it survives
+  // row recycle and matches the heights captured in takeSnapshot() on remount.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const expandedIdsRef = useRef(expandedIds);
   const setViewportRef = useCallback((node: HTMLDivElement | null) => {
@@ -947,8 +936,8 @@ export function Surface() {
   );
   const measurementReady = bubbleMaxWidth !== null;
 
-  // These refs back the unmount-capture effect; commit-time sync is fine
-  // because the snapshot writer only reads them at unmount.
+  // Mirrors for the unmount-capture effect; read only at unmount, so
+  // commit-time sync is sufficient.
   useLayoutEffect(() => {
     surfaceWidthRef.current = surfaceWidth;
     measurementReadyRef.current = measurementReady;
@@ -966,34 +955,20 @@ export function Surface() {
     if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
     return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
   }, [entries, bubbleMaxWidth]);
-  // Keep ref in sync during render: TanStack's useVirtualizer reads
-  // estimateSize / getItemKey synchronously while computing the initial range,
-  // so a post-commit useLayoutEffect would leave the ref empty on first render.
-  // Mirror-during-render is safe here — measuredEntries is fully derived state,
-  // no side effects, idempotent across re-renders.
+  // Mirror-during-render: useVirtualizer reads estimateSize / getItemKey
+  // synchronously, so a post-commit ref write would be empty on first render.
   measuredEntriesRef.current = measuredEntries;
 
-  // One-shot init when the first measurement pass becomes ready:
-  //   1. Read any saved snapshot. If it matches the current entries+width,
-  //      restore expanded set and use the saved scroll offset.
-  //   2. Otherwise compute the initial offset from the pretext-estimated
-  //      total height so the viewport paints pinned to the bottom — no
-  //      post-mount scroll jump, no visibility flash.
-  // React-endorsed lazy-init pattern (https://react.dev/reference/react/useRef
-  // → "Avoiding recreating the ref contents"). Safe during render because
-  // the branch only runs on the first ready render.
+  // One-shot init on first ready render: restore from snapshot if any,
+  // otherwise seed initialOffset to the bottom from pretext totals.
   if (measurementReady && restoredScrollStateRef.current === undefined) {
     const restored = readSurfaceScrollRestoreState(measuredEntries, surfaceWidth);
     restoredScrollStateRef.current = restored;
-
     if (restored) {
       initialOffsetRef.current = restored.offset;
-      if (restored.expandedIds.length > 0) {
-        // Filter to ids that still exist in the current timeline.
-        const validIds = new Set(measuredEntries.map((e) => e.id));
-        const restoredExpanded = new Set(restored.expandedIds.filter((id) => validIds.has(id)));
-        if (restoredExpanded.size > 0) setExpandedIds(restoredExpanded);
-      }
+      const validIds = new Set(measuredEntries.map((e) => e.id));
+      const restoredExpanded = restored.expandedIds.filter((id) => validIds.has(id));
+      if (restoredExpanded.length > 0) setExpandedIds(new Set(restoredExpanded));
     } else {
       const total = computeTotalEstimatedHeight(measuredEntries);
       const viewportHeight = viewportRef.current?.clientHeight ?? 0;
@@ -1002,11 +977,9 @@ export function Surface() {
         total,
         viewportHeight,
         initialOffset: initialOffsetRef.current,
-        entryCount: measuredEntries.length,
       });
     }
   }
-  const restoredScrollState = restoredScrollStateRef.current ?? null;
 
   const getVirtualItemKey = useCallback(
     (index: number) => measuredEntriesRef.current[index]?.id ?? index,
@@ -1026,81 +999,52 @@ export function Surface() {
     gap: SURFACE_ROW_GAP,
     getItemKey: getVirtualItemKey,
     getScrollElement,
-    initialMeasurementsCache: restoredScrollState?.snapshot ?? EMPTY_SURFACE_SCROLL_SNAPSHOT,
+    initialMeasurementsCache:
+      restoredScrollStateRef.current?.snapshot ?? EMPTY_SURFACE_SCROLL_SNAPSHOT,
     initialOffset: initialOffsetRef.current ?? 0,
     overscan: SURFACE_OVERSCAN,
     useFlushSync: false,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
 
-  const toggleExpanded = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    // No explicit virtualizer.measure() call. The row's wrapping div is
-    // observed by the built-in ResizeObserver via measureElement; when the
-    // PlainTextBlock un-clamps its maxHeight, the RO fires after commit and
-    // the virtualizer re-measures just that row.
-  }, []);
-  // Stable per-entry toggle handlers keyed by id, so memoized row components
-  // don't re-render every time the expanded Set identity changes.
+  // Stable per-id toggle handlers so memoized row components don't re-render
+  // every time the expanded Set identity changes. No virtualizer.measure() call
+  // — measureElement's ResizeObserver picks up the maxHeight un-clamp on commit.
   const toggleHandlersRef = useRef(new Map<string, () => void>());
-  const getToggleHandler = useCallback(
-    (id: string) => {
-      let handler = toggleHandlersRef.current.get(id);
-      if (!handler) {
-        handler = () => toggleExpanded(id);
-        toggleHandlersRef.current.set(id, handler);
-      }
-      return handler;
-    },
-    [toggleExpanded],
-  );
+  const getToggleHandler = (id: string): (() => void) => {
+    const cached = toggleHandlersRef.current.get(id);
+    if (cached) return cached;
+    const handler = () =>
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    toggleHandlersRef.current.set(id, handler);
+    return handler;
+  };
 
   useEffect(() => {
     if (!measurementReady) return;
-
+    const restored = restoredScrollStateRef.current;
     logSurfaceScrollRestore("virtualizer mounted", {
-      restored: !!restoredScrollState,
+      restored: !!restored,
       initialOffset: initialOffsetRef.current ?? 0,
-      initialSnapshotLength: restoredScrollState?.snapshot.length ?? 0,
-      restoredExpandedCount: restoredScrollState?.expandedIds.length ?? 0,
+      snapshotLength: restored?.snapshot.length ?? 0,
+      expandedCount: restored?.expandedIds.length ?? 0,
       entryCount: measuredEntries.length,
-      surfaceWidth,
-      currentScrollOffset: rowVirtualizer.scrollOffset,
-      viewportScrollTop: viewportRef.current?.scrollTop,
     });
-  }, [measurementReady, measuredEntries.length, restoredScrollState, rowVirtualizer, surfaceWidth]);
+  }, [measurementReady, measuredEntries.length]);
 
   useEffect(() => {
     return () => {
-      if (!measurementReadyRef.current) {
-        logSurfaceScrollRestore("skipping save: measurements were never ready");
-        return;
-      }
-
-      const snapshot = rowVirtualizer.takeSnapshot();
-      const offset = rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0;
-      const expandedIdsSnapshot = Array.from(expandedIdsRef.current);
-
-      logSurfaceScrollRestore("unmount capture", {
-        offset,
-        rowVirtualizerScrollOffset: rowVirtualizer.scrollOffset,
-        viewportScrollTop: viewportRef.current?.scrollTop,
-        width: surfaceWidthRef.current,
-        measuredEntryCount: measuredEntriesRef.current.length,
-        snapshotLength: snapshot.length,
-        expandedCount: expandedIdsSnapshot.length,
-      });
-
+      if (!measurementReadyRef.current) return;
       writeSurfaceScrollRestoreState({
-        offset,
+        offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
         width: surfaceWidthRef.current,
-        snapshot,
-        expandedIds: expandedIdsSnapshot,
+        snapshot: rowVirtualizer.takeSnapshot(),
+        expandedIds: Array.from(expandedIdsRef.current),
       });
     };
   }, [rowVirtualizer]);
@@ -1196,12 +1140,9 @@ export function Surface() {
             ref={setViewportRef}
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
-            // contain: strict + overflow-anchor: none follow the canonical
-            // TanStack Virtual dynamic-row recipe. overflow-anchor: none is
-            // critical: without it, when a row above the viewport is
-            // re-measured (image decodes, Read-more toggles), the browser's
-            // scroll-anchoring fights the virtualizer's positioning and
-            // produces mid-list jitter.
+            // overflow-anchor: none stops the browser from fighting the
+            // virtualizer when above-viewport rows re-measure (image decode,
+            // Read-more). contain: strict matches the canonical recipe.
             style={{ contain: "strict", overflowAnchor: "none" }}
           >
             {entries.length === 0 && (
