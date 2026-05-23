@@ -276,7 +276,7 @@ export function DownstreamSessionsPanel({
         >
           <ToggleGroupItem
             value="info"
-            className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            className="text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
           >
             Info
             {infoShortcutLabel && (
@@ -286,7 +286,7 @@ export function DownstreamSessionsPanel({
           <ToggleGroupItem
             value="diff"
             disabled={!hasWorktree}
-            className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            className="text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
           >
             Diff
             {diffShortcutLabel && (
