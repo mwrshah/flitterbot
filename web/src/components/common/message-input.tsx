@@ -148,7 +148,7 @@ function MessageInputHoverButtons({
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleBlockWidthRef = useRef(0);
   const buttonClassName =
-    "pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring";
+    "pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring";
 
   useLayoutEffect(() => {
     if (slots.length === 0) return;
