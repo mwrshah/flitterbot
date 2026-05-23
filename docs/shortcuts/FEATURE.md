@@ -39,8 +39,8 @@ type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 | `scroll.small-up` | `k` | Small scroll up (20% viewport) |
 | `scroll.half-page-down` | `Ctrl+D`, `d` | Scroll half page down (60% viewport) |
 | `scroll.half-page-up` | `Ctrl+U`, `u` | Scroll half page up (60% viewport) |
-| `scroll.full-page-down` | `Ctrl+F`, `f` | Scroll full page down (90% viewport) |
-| `scroll.full-page-up` | `Ctrl+B`, `b` | Scroll full page up (90% viewport) |
+| `scroll.full-page-down` | User-configurable only | Scroll full page down (90% viewport) |
+| `scroll.full-page-up` | User-configurable only | Scroll full page up (90% viewport) |
 | `scroll.top` | `g g` | Scroll to top |
 | `scroll.bottom` | `Shift+G` | Scroll to bottom |
 | `composer.focus` | `i` | Focus the composer input |
@@ -52,7 +52,7 @@ type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 
 ## Scroll Target Switching
 
-When `Ctrl+K` activates the diff panel, scroll shortcuts (`Ctrl+D/U/F/B`, bare `d/u/f/b/j/k`, `g g`, `Shift+G`) retarget to the diff panel's scrollable area. `Ctrl+I` or `i` (composer focus) restores the scroll target to the main message list. Implementation uses a value-based approach: scrollable containers are marked with `data-scroll-container="main"` or `data-scroll-container="diff"`, and a module-level JS variable selects the active target. No DOM mutation on switch — `querySelector` runs at scroll time against the current value.
+When `Ctrl+K` activates the diff panel, scroll shortcuts (`Ctrl+D/U`, bare `d/u/j/k`, `g g`, `Shift+G`) retarget to the diff panel's scrollable area. `Ctrl+I` or `i` (composer focus) restores the scroll target to the main message list. Implementation uses a value-based approach: scrollable containers are marked with `data-scroll-container="main"` or `data-scroll-container="diff"`, and a module-level JS variable selects the active target. No DOM mutation on switch — `querySelector` runs at scroll time against the current value.
 
 ## Files
 
