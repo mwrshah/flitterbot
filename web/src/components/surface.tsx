@@ -106,14 +106,12 @@ const timeFormatter = new Intl.DateTimeFormat(undefined, {
 const MAX_LINES = 30;
 const SURFACE_FONT = '400 14px "Geist Variable", sans-serif';
 const SURFACE_MIN_BUBBLE_WIDTH = 240;
-// px-3 (12+12) horizontal padding + 1px border on each side. Pretext is given
-// the actual inner content width so its wrapping matches the rendered DOM.
+// px-3 + 1px border each side; pretext measures inner content width.
 const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
 const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 32;
-// Temporary diagnostic logging while validating TanStack Virtual snapshot restore.
 const SURFACE_SCROLL_RESTORE_DEBUG = true;
 const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
 let surfaceScrollRestoreState: SurfaceScrollRestoreState | null = null;
@@ -125,28 +123,21 @@ const SURFACE_IMAGE_GAP = 8;
 const SURFACE_HOOK_TITLE_HEIGHT = 20;
 const SURFACE_HOOK_DETAIL_GAP = 8;
 
-// Markdown block-style constants — values are derived from styles.css:50-92
-// and browser defaults at the bubble's 14px font-size context. Used to model
-// per-block heights and inter-block collapsed margins so the row estimator
-// matches what `marked` + `.markdown-body` actually render. A hidden probe
-// used to measure these against the live DOM, but the re-snap loop converges
-// regardless of small estimation error and the CSS-derived values track the
-// stylesheet 1:1 — the probe was earning nothing.
+// Markdown estimator constants derived from styles.css + browser defaults at 14px.
 const FONT_SIZE_PX = 14;
-const MARKDOWN_LINE_HEIGHT_RATIO = 1.65; // .markdown-body { line-height: 1.65 }
-const MARKDOWN_LINE_HEIGHT_PX = FONT_SIZE_PX * MARKDOWN_LINE_HEIGHT_RATIO; // 23.1
-const BUBBLE_CHROME_PX = 2 * 1 + 2 * 8; // 1px border each side + py-2 each side
-const PARAGRAPH_MARGIN_PX = 0.6 * FONT_SIZE_PX; // .markdown-body p { margin: 0.6em 0 }
-const LIST_INDENT_PX = 1.5 * FONT_SIZE_PX; // .markdown-body ul/ol { padding-left: 1.5em }
-const LIST_MARGIN_PX = 0.5 * FONT_SIZE_PX; // .markdown-body ul/ol { margin: 0.5em 0 }
-const BQ_INDENT_PX = 0.8 * FONT_SIZE_PX + 3; // padding-left + 3px border
+const MARKDOWN_LINE_HEIGHT_RATIO = 1.65;
+const MARKDOWN_LINE_HEIGHT_PX = FONT_SIZE_PX * MARKDOWN_LINE_HEIGHT_RATIO;
+const BUBBLE_CHROME_PX = 2 * 1 + 2 * 8;
+const PARAGRAPH_MARGIN_PX = 0.6 * FONT_SIZE_PX;
+const LIST_INDENT_PX = 1.5 * FONT_SIZE_PX;
+const LIST_MARGIN_PX = 0.5 * FONT_SIZE_PX;
+const BQ_INDENT_PX = 0.8 * FONT_SIZE_PX + 3;
 const BQ_MARGIN_PX = 0.5 * FONT_SIZE_PX;
-const CODE_PADDING_PX = 2 * 0.8 * FONT_SIZE_PX; // pre code { padding: 0.8em 1em } top+bottom
-const CODE_LINE_HEIGHT_PX = 0.8 * FONT_SIZE_PX * 1.5; // font-size: 0.8em, line-height: 1.5
-const CODE_MARGIN_PX = 1 * FONT_SIZE_PX; // <pre> browser-default 1em
+const CODE_PADDING_PX = 2 * 0.8 * FONT_SIZE_PX;
+const CODE_LINE_HEIGHT_PX = 0.8 * FONT_SIZE_PX * 1.5;
+const CODE_MARGIN_PX = 1 * FONT_SIZE_PX;
 const HR_HEIGHT_PX = 1;
 const HR_MARGIN_PX = 0.5 * FONT_SIZE_PX;
-// Browser defaults for heading font sizes and (top/bottom) margins, in em of the heading's own font size.
 const HEADING_FONT_SIZE_EM: Record<number, number> = {
   1: 2,
   2: 1.5,
@@ -166,11 +157,6 @@ const HEADING_MARGIN_EM: Record<number, number> = {
 
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
-/**
- * Module-level cache for pretext prepare() results, keyed by text content.
- * prepare() is the expensive one-time pass (~0.04ms per text).
- * layout() is pure arithmetic (~0.0002ms) and doesn't need caching.
- */
 const plainTextPrepareCache = new Map<string, ReturnType<typeof prepare>>();
 
 function getPreparedText(text: string) {
@@ -182,15 +168,6 @@ function getPreparedText(text: string) {
   return prepared;
 }
 
-/**
- * Markdown estimation walks `marked.lexer` tokens block-by-block instead of
- * treating the entire string as plain prose. Each block contributes its own
- * content height + outer margins, and adjacent blocks share a collapsed margin
- * (max of neighbors). The `.markdown-body :first-child { margin-top: 0 }` /
- * `:last-child { margin-bottom: 0 }` rule applies to any first/last child
- * descendant — so it cascades through `<li>` and `<blockquote>` and is modeled
- * here by simply not adding the outer block's own margins at the stack edges.
- */
 type MarkdownTokenLite = {
   type?: string;
   text?: unknown;
@@ -213,10 +190,7 @@ function getMarkdownTokens(text: string): MarkdownTokenLite[] {
   return tokens;
 }
 
-// marked's default (gfm without `breaks: true`) renders a single `\n` inside a
-// paragraph as whitespace — adjacent lines join with a space. Pretext with
-// `whiteSpace: "pre-wrap"` would otherwise treat each `\n` as a hard break and
-// over-count lines by one per soft break.
+// Soft \n inside a paragraph collapses to space; pretext pre-wrap would treat as hard break.
 function collapseSoftBreaks(text: string): string {
   return text.replace(/[ \t]*\n[ \t]*/g, " ");
 }
@@ -288,7 +262,6 @@ function measureBlock(token: MarkdownTokenLite, maxWidth: number): BlockMetrics 
     case "space":
       return { height: 0, marginTop: 0, marginBottom: 0 };
     default: {
-      // Includes `html` and any unknown block types — treat as paragraph.
       const lines = measureInlineLines(
         String(token.text ?? token.raw ?? ""),
         maxWidth,
@@ -303,9 +276,6 @@ function measureBlock(token: MarkdownTokenLite, maxWidth: number): BlockMetrics 
   }
 }
 
-// Sum block heights with CSS-collapsed margins between adjacent blocks.
-// First/last child outer margins are dropped (matches the `.markdown-body
-// :first-child / :last-child` rule which applies recursively).
 function stackBlocks(blocks: BlockMetrics[]): number {
   const visible = blocks.filter((b) => b.height > 0);
   if (visible.length === 0) return 0;
@@ -322,9 +292,6 @@ function getMarkdownMetrics(text: string, maxWidth: number) {
   const rawTextHeight = stackBlocks(blocks);
   const clampHeight = MAX_LINES * MARKDOWN_LINE_HEIGHT_PX;
   const isOverflowing = rawTextHeight > clampHeight;
-  // PlainTextBlock clamps with `maxHeight: MAX_LINES * lineHeight; overflow: hidden`
-  // so when overflowing the visible text height is exactly the clamp regardless
-  // of how tall the underlying content would have rendered. Mirror that here.
   return {
     textHeight: isOverflowing ? clampHeight : rawTextHeight,
     isOverflowing,
@@ -346,9 +313,6 @@ function estimateMessageRowHeight(
 
 function estimateHookRowHeight(detail: string, maxWidth: number): number {
   if (!detail) return SURFACE_ROW_MIN_HEIGHT;
-  // Hooks render MarkdownContent directly (no PlainTextBlock clamp) so use the
-  // raw stack height — getMarkdownMetrics only clamps for the message bubble's
-  // overflow case.
   const tokens = getMarkdownTokens(detail);
   const blocks = tokens.map((t) => measureBlock(t, maxWidth));
   const textHeight = stackBlocks(blocks);
@@ -399,12 +363,6 @@ function timelineToSurfaceEntries(timeline: ChatTimelineItem[]): SurfaceEntry[] 
         streamId: item.streamId,
         streamName: item.streamName,
       });
-      continue;
-    }
-
-    if (item.kind === "tool") {
-      // Skip all tool calls — only user messages and streams responses shown
-      // (mirrors WhatsApp: user message in, streams final text response out)
     }
   }
 
@@ -527,8 +485,7 @@ function writeSurfaceScrollRestoreState(state: SurfaceScrollRestoreState) {
   });
 }
 
-// Sum of pretext-estimated row heights + gaps. Used to seed `initialOffset`
-// to the bottom on first load — no post-mount scroll jump, no visibility flash.
+// Sum of pretext estimateSize values + gaps; seeds initialOffset to the bottom.
 function computeTotalEstimatedHeight(entries: MeasuredSurfaceEntry[]): number {
   if (entries.length === 0) return 0;
   let total = (entries.length - 1) * SURFACE_ROW_GAP;
@@ -536,16 +493,6 @@ function computeTotalEstimatedHeight(entries: MeasuredSurfaceEntry[]): number {
   return total;
 }
 
-/**
- * Synchronously measure a single entry using pretext.
- *
- * This is fast because:
- * - prepare() results are cached in plainTextPrepareCache by text content
- * - layout() is pure arithmetic (~0.0002ms per call)
- *
- * For 200 entries, total measurement time is ~0.04ms (all cache hits).
- * First-time measurement of 200 unique texts is ~8ms (prepare + layout).
- */
 function measureEntry(entry: SurfaceEntry, bubbleMaxWidth: number): MeasuredSurfaceEntry {
   const measurementWidth = getMeasurementWidth(bubbleMaxWidth);
   const displayTime = formatTime(entry.timestamp);
@@ -701,7 +648,6 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
 
   if (!streamName) return null;
 
-  // Look up piSessionId from the status cache
   let piSessionId: string | undefined;
   if (streamId) {
     const status = queryClient.getQueryData<StatusResponse>(["status"]);
@@ -898,7 +844,6 @@ export function Surface() {
   const [surfaceWidth, setSurfaceWidth] = useState(0);
   const [isSending, setIsSending] = useState(false);
 
-  // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -907,8 +852,7 @@ export function Surface() {
   const measurementReadyRef = useRef(false);
   const restoredScrollStateRef = useRef<SurfaceScrollRestoreState | null | undefined>(undefined);
   const initialOffsetRef = useRef<number | null>(null);
-  // Read more / Show less state lifted out of PlainTextBlock so it survives
-  // row recycle and matches the heights captured in takeSnapshot() on remount.
+  // Lifted out of PlainTextBlock so it survives row recycle and matches snapshot heights.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const expandedIdsRef = useRef(expandedIds);
   const setViewportRef = useCallback((node: HTMLDivElement | null) => {
@@ -928,7 +872,6 @@ export function Surface() {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Recompute only when timeline reference changes (setQueryData creates new arrays)
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
   const bubbleMaxWidth = useMemo(
     () => (surfaceWidth > 0 ? getSurfaceBubbleMaxWidth(surfaceWidth) : null),
@@ -936,31 +879,21 @@ export function Surface() {
   );
   const measurementReady = bubbleMaxWidth !== null;
 
-  // Mirrors for the unmount-capture effect; read only at unmount, so
-  // commit-time sync is sufficient.
+  // Mirrors for the unmount-capture effect.
   useLayoutEffect(() => {
     surfaceWidthRef.current = surfaceWidth;
     measurementReadyRef.current = measurementReady;
     expandedIdsRef.current = expandedIds;
   });
 
-  /**
-   * Synchronous size estimates for TanStack Virtual.
-   *
-   * Real row sizes are provided by rowVirtualizer.measureElement after render;
-   * these estimates keep the initial range and scrollbar close enough before
-   * markdown/image/read-more content is measured by the virtualizer.
-   */
   const measuredEntries = useMemo(() => {
     if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
     return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
   }, [entries, bubbleMaxWidth]);
-  // Mirror-during-render: useVirtualizer reads estimateSize / getItemKey
-  // synchronously, so a post-commit ref write would be empty on first render.
+  // useVirtualizer reads estimateSize / getItemKey synchronously; ref must be set during render.
   measuredEntriesRef.current = measuredEntries;
 
-  // One-shot init on first ready render: restore from snapshot if any,
-  // otherwise seed initialOffset to the bottom from pretext totals.
+  // One-shot init: restore snapshot, else seed initialOffset to bottom.
   if (measurementReady && restoredScrollStateRef.current === undefined) {
     const restored = readSurfaceScrollRestoreState(measuredEntries, surfaceWidth);
     restoredScrollStateRef.current = restored;
@@ -1007,9 +940,8 @@ export function Surface() {
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
 
-  // Stable per-id toggle handlers so memoized row components don't re-render
-  // every time the expanded Set identity changes. No virtualizer.measure() call
-  // — measureElement's ResizeObserver picks up the maxHeight un-clamp on commit.
+  // Stable per-id handlers so memoized rows don't churn on every Set identity change.
+  // measureElement's ResizeObserver picks up the maxHeight un-clamp on commit.
   const toggleHandlersRef = useRef(new Map<string, () => void>());
   const getToggleHandler = (id: string): (() => void) => {
     const cached = toggleHandlersRef.current.get(id);
@@ -1077,7 +1009,6 @@ export function Surface() {
     setSettingsOpen(false);
   }, []);
 
-  // Ref for stable handleSubmit closure
   const pendingImagesRef = useRef(pendingImages);
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
@@ -1105,7 +1036,6 @@ export function Surface() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-1.5 border-b border-border shrink-0">
         <div>
           <h1 className="text-sm font-semibold text-foreground">Surface</h1>
@@ -1134,15 +1064,12 @@ export function Surface() {
           setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
         }
       >
-        {/* Activity feed */}
         <Panel id="feed" defaultSize="85%" minSize="20%">
           <div
             ref={setViewportRef}
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
-            // overflow-anchor: none stops the browser from fighting the
-            // virtualizer when above-viewport rows re-measure (image decode,
-            // Read-more). contain: strict matches the canonical recipe.
+            // overflow-anchor: none required — browser anchoring fights virtualizer re-measures.
             style={{ contain: "strict", overflowAnchor: "none" }}
           >
             {entries.length === 0 && (
