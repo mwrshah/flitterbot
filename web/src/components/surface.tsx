@@ -1,18 +1,10 @@
 import { layout, prepare } from "@chenglou/pretext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { CopyIcon, SettingsIcon } from "lucide-react";
 import { marked } from "marked";
-import {
-  type MouseEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type MouseEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "~/components/common/markdown-content";
@@ -103,8 +95,7 @@ const SURFACE_MIN_BUBBLE_WIDTH = 240;
 const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
-const SURFACE_OVERSCAN_ABOVE_RATIO = 0.5;
-const SURFACE_OVERSCAN_BELOW_RATIO = 1;
+const SURFACE_OVERSCAN = 8;
 const SURFACE_ROW_MIN_HEIGHT = 44;
 const SURFACE_BADGE_HEIGHT = 22;
 const SURFACE_COLLAPSE_TOGGLE_HEIGHT = 24;
@@ -579,24 +570,6 @@ function MessageCopyButton({ text }: { text: string }) {
   );
 }
 
-function findVirtualIndex(offsets: number[], target: number): number {
-  let low = 0;
-  let high = offsets.length - 1;
-  let result = offsets.length;
-
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (offsets[mid]! >= target) {
-      result = mid;
-      high = mid - 1;
-    } else {
-      low = mid + 1;
-    }
-  }
-
-  return result;
-}
-
 /* ── Entry Renderers ── */
 
 function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?: string }) {
@@ -801,37 +774,18 @@ export function Surface() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [surfaceWidth, setSurfaceWidth] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [visibleLayoutReady, setVisibleLayoutReady] = useState(false);
-  const [initialPositionReady, setInitialPositionReady] = useState(false);
-  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
-  const [measurementToken, setMeasurementToken] = useState(0);
-  const invalidateMeasurement = useCallback(() => setMeasurementToken((t) => t + 1), []);
-
   const [isSending, setIsSending] = useState(false);
 
   // Timeline from Query cache — seeded by route loader, appended by WS bridge.
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const didInitialBottomPaintRef = useRef(false);
-  // Restartable timer that latches the one-shot bottom-snap after a window
-  // with no totalHeight changes (i.e., async content like image decodes has
-  // settled). Without this, new SSE messages arriving later would re-trigger
-  // the snap-to-bottom effect — stick-to-bottom was intentionally removed.
-  const initialSnapLatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
-  const setViewportRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      viewportRef.current = node;
-      if (!node) return;
-      setSurfaceWidth(node.clientWidth);
-      setViewportHeight(node.clientHeight);
-      setScrollTop(node.scrollTop);
-    },
-    [viewportRef],
-  );
+  const measuredEntriesRef = useRef<MeasuredSurfaceEntry[]>([]);
+  const setViewportRef = useCallback((node: HTMLDivElement | null) => {
+    viewportRef.current = node;
+    if (!node) return;
+    setSurfaceWidth(node.clientWidth);
+  }, []);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -839,38 +793,10 @@ export function Surface() {
 
     const resizeObserver = new ResizeObserver(() => {
       setSurfaceWidth(node.clientWidth);
-      setViewportHeight(node.clientHeight);
     });
     resizeObserver.observe(node);
-    // Latch the one-shot bottom-snap on real user scroll. We diff against the
-    // bottom edge instead of listening for wheel/touchstart/keydown because a
-    // stray touch (or focus, or trackpad rest) that doesn't actually move the
-    // viewport shouldn't lock the snap — only actual movement away from bottom
-    // counts. Programmatic scrollTop writes leave us at-bottom, so the snap
-    // itself doesn't self-latch.
-    const BOTTOM_LATCH_THRESHOLD_PX = 8;
-    const onScroll = () => {
-      setScrollTop(node.scrollTop);
-      if (didInitialBottomPaintRef.current) return;
-      const distanceFromBottom = node.scrollHeight - node.clientHeight - node.scrollTop;
-      if (distanceFromBottom > BOTTOM_LATCH_THRESHOLD_PX) {
-        didInitialBottomPaintRef.current = true;
-        if (initialSnapLatchTimerRef.current) {
-          clearTimeout(initialSnapLatchTimerRef.current);
-          initialSnapLatchTimerRef.current = null;
-        }
-      }
-    };
-    node.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      node.removeEventListener("scroll", onScroll);
-      resizeObserver.disconnect();
-      if (initialSnapLatchTimerRef.current) {
-        clearTimeout(initialSnapLatchTimerRef.current);
-        initialSnapLatchTimerRef.current = null;
-      }
-    };
-  }, [viewportRef]);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Recompute only when timeline reference changes (setQueryData creates new arrays)
   const entries = useMemo(() => timelineToSurfaceEntries(timeline), [timeline]);
@@ -881,118 +807,43 @@ export function Surface() {
   const measurementReady = bubbleMaxWidth !== null;
 
   /**
-   * Synchronous measurement of all entries via pretext.
+   * Synchronous size estimates for TanStack Virtual.
    *
-   * This replaces the old async surfaceMeasurementStore. It's fast because:
-   * - prepare() results are cached in plainTextPrepareCache (keyed by text)
-   * - layout() is pure arithmetic (~0.0002ms per entry)
-   *
-   * When a new message appends, only its prepare() runs (~0.04ms). All
-   * existing entries hit the cache, so layout() is the only work — ~0.04ms
-   * total for 200 entries. No fallback heights, no async, no flash.
+   * Real row sizes are provided by rowVirtualizer.measureElement after render;
+   * these estimates keep the initial range and scrollbar close enough before
+   * markdown/image/read-more content is measured by the virtualizer.
    */
   const measuredEntries = useMemo(() => {
     if (bubbleMaxWidth === null) return [] as MeasuredSurfaceEntry[];
     return entries.map((entry) => measureEntry(entry, bubbleMaxWidth));
   }, [entries, bubbleMaxWidth]);
+  measuredEntriesRef.current = measuredEntries;
 
-  const virtualRows = useMemo(() => {
-    const offsets: number[] = new Array(measuredEntries.length);
-    let runningOffset = 0;
-    for (let index = 0; index < measuredEntries.length; index++) {
-      offsets[index] = runningOffset;
-      const entry = measuredEntries[index]!;
-      const rowHeight = measuredHeights[entry.id] ?? entry.metrics.estimatedHeight;
-      runningOffset += rowHeight + SURFACE_ROW_GAP;
-    }
-    const totalHeight = measuredEntries.length === 0 ? 0 : runningOffset - SURFACE_ROW_GAP;
-    return {
-      offsets,
-      totalHeight,
-    };
-  }, [measuredEntries, measuredHeights]);
+  const getVirtualItemKey = useCallback(
+    (index: number) => measuredEntriesRef.current[index]?.id ?? index,
+    [],
+  );
+  const estimateVirtualItemSize = useCallback(
+    (index: number) =>
+      measuredEntriesRef.current[index]?.metrics.estimatedHeight ?? SURFACE_ROW_MIN_HEIGHT,
+    [],
+  );
+  const getScrollElement = useCallback(() => viewportRef.current, []);
 
-  const visibleVirtualRows = useMemo(() => {
-    if (measuredEntries.length === 0) return [];
-
-    const overscanAbove = viewportHeight * SURFACE_OVERSCAN_ABOVE_RATIO;
-    const overscanBelow = viewportHeight * SURFACE_OVERSCAN_BELOW_RATIO;
-    const windowStart = Math.max(0, scrollTop - overscanAbove);
-    const windowEnd = scrollTop + viewportHeight + overscanBelow;
-
-    const startIndex = Math.max(0, findVirtualIndex(virtualRows.offsets, windowStart) - 1);
-    let endIndex = findVirtualIndex(virtualRows.offsets, windowEnd);
-    if (endIndex === measuredEntries.length) endIndex = measuredEntries.length - 1;
-
-    const items = [];
-    for (let index = startIndex; index <= endIndex; index++) {
-      items.push({
-        entry: measuredEntries[index]!,
-        top: virtualRows.offsets[index]!,
-      });
-    }
-    return items;
-  }, [measuredEntries, scrollTop, viewportHeight, virtualRows]);
-
-  useLayoutEffect(() => {
-    if (!measurementReady || visibleVirtualRows.length === 0) return;
-
-    let hasAllNodes = true;
-    let changed = false;
-
-    setMeasuredHeights((prev) => {
-      const next = { ...prev };
-
-      for (const { entry } of visibleVirtualRows) {
-        const node = rowElementsRef.current.get(entry.id);
-        if (!node) {
-          hasAllNodes = false;
-          continue;
-        }
-        const measuredHeight = Math.ceil(node.getBoundingClientRect().height);
-        if (next[entry.id] !== measuredHeight) {
-          next[entry.id] = measuredHeight;
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
-    });
-
-    if (hasAllNodes) {
-      setVisibleLayoutReady(true);
-    }
-  }, [measurementReady, visibleVirtualRows, measurementToken]);
-
-  // One-shot: snap to bottom on initial load. Never auto-scrolls again.
-  //
-  // The effect re-fires whenever totalHeight changes (any row's measurement
-  // updates, including post-image-decode growth via <img onLoad> bumping
-  // measurementToken). Each pass re-pins to bottom. A restartable timer
-  // latches the one-shot once layout has been quiet for SETTLE_MS — the
-  // settle window is shorter than typical first-user-interaction latency
-  // but generous enough for data-URI image decodes. Real user gestures
-  // (wheel/touch/keydown handled above) latch immediately.
-  useLayoutEffect(() => {
-    const node = viewportRef.current;
-    if (!node || didInitialBottomPaintRef.current) return;
-    if (!measurementReady || !visibleLayoutReady) return;
-    if (measuredEntries.length === 0) {
-      // Empty feed — mark ready so visibility unhides, but don't lock the one-shot.
-      setInitialPositionReady(true);
-      return;
-    }
-    node.scrollTop = node.scrollHeight;
-    setScrollTop(node.scrollTop);
-    setInitialPositionReady(true);
-
-    const SETTLE_MS = 600;
-    if (initialSnapLatchTimerRef.current) clearTimeout(initialSnapLatchTimerRef.current);
-    initialSnapLatchTimerRef.current = setTimeout(() => {
-      didInitialBottomPaintRef.current = true;
-      initialSnapLatchTimerRef.current = null;
-    }, SETTLE_MS);
-  }, [measurementReady, visibleLayoutReady, measuredEntries.length, virtualRows.totalHeight]);
+  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: measuredEntries.length,
+    enabled: measurementReady,
+    estimateSize: estimateVirtualItemSize,
+    gap: SURFACE_ROW_GAP,
+    getItemKey: getVirtualItemKey,
+    getScrollElement,
+    overscan: SURFACE_OVERSCAN,
+    useFlushSync: false,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const remeasureVirtualizer = useCallback(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -1085,12 +936,7 @@ export function Surface() {
             ref={setViewportRef}
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
-            style={{
-              visibility:
-                initialPositionReady && measurementReady && visibleLayoutReady
-                  ? "visible"
-                  : "hidden",
-            }}
+            style={{ visibility: measurementReady ? "visible" : "hidden" }}
           >
             {entries.length === 0 && (
               <div className="flex items-center justify-center h-full">
@@ -1098,27 +944,27 @@ export function Surface() {
               </div>
             )}
             {entries.length > 0 && (
-              <div className="relative" style={{ height: `${virtualRows.totalHeight}px` }}>
-                {visibleVirtualRows.map(({ entry, top }) => (
-                  <div
-                    key={entry.id}
-                    ref={(node) => {
-                      if (node) {
-                        rowElementsRef.current.set(entry.id, node);
-                      } else {
-                        rowElementsRef.current.delete(entry.id);
-                      }
-                    }}
-                    className="absolute left-0 right-0"
-                    style={{ top: `${top}px` }}
-                  >
-                    <SurfaceEntryRenderer
-                      entry={entry}
-                      onExpandToggle={invalidateMeasurement}
-                      onImageLoad={invalidateMeasurement}
-                    />
-                  </div>
-                ))}
+              <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+                {virtualItems.map((virtualItem) => {
+                  const entry = measuredEntries[virtualItem.index];
+                  if (!entry) return null;
+
+                  return (
+                    <div
+                      key={virtualItem.key}
+                      data-index={virtualItem.index}
+                      ref={rowVirtualizer.measureElement}
+                      className="absolute left-0 right-0 top-0"
+                      style={{ transform: `translateY(${virtualItem.start}px)` }}
+                    >
+                      <SurfaceEntryRenderer
+                        entry={entry}
+                        onExpandToggle={remeasureVirtualizer}
+                        onImageLoad={remeasureVirtualizer}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
