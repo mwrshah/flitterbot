@@ -22,7 +22,6 @@ import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
-  ChevronRight,
   Code,
   Copy,
   createElement,
@@ -324,12 +323,12 @@ export class MarkdownBlock extends LitElement {
         /<pre><code class="language-([^"]+)">([\s\S]+?)<\/code><\/pre>/g,
         (_m, language, code) => {
           const decoded = decodeHtmlEntities(code);
-          return `<code-block code="${encodeUtf8Base64(decoded)}" language="${language}"></code-block>`;
+          return `<code-block class="mt-3" code="${encodeUtf8Base64(decoded)}" language="${language}"></code-block>`;
         },
       )
       .replace(/<pre><code>([\s\S]+?)<\/code><\/pre>/g, (_m, code) => {
         const decoded = decodeHtmlEntities(code);
-        return `<code-block code="${encodeUtf8Base64(decoded)}" language="text"></code-block>`;
+        return `<code-block class="mt-3" code="${encodeUtf8Base64(decoded)}" language="text"></code-block>`;
       });
 
     return html`${unsafeHTML(withCodeBlocks)}`;
@@ -494,12 +493,11 @@ export class ThinkingBlock extends LitElement {
       <div class="thinking-block">
         <button
           type="button"
-          class="thinking-header flex w-full items-center justify-between gap-3 rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          class="thinking-header flex w-full items-center justify-between gap-3 rounded-sm px-1 pl-0 pb-1 text-left text-base text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded=${String(isOpen)}
           @click=${this.toggleExpanded}
         >
           <span class="flex min-w-0 items-center gap-2">
-            <span class="inline-block h-2 w-2 rounded-full bg-muted-foreground/45" aria-hidden="true"></span>
             <span class="${shimmerClasses}">${i18n("Thinking…")}</span>
           </span>
           <span class="shrink-0 text-[11px] uppercase tracking-[0.16em] text-muted-foreground/70">
@@ -508,7 +506,7 @@ export class ThinkingBlock extends LitElement {
         </button>
         ${
           isOpen
-            ? html`<div class="pl-8 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
+            ? html`<div class="pl-2 pb-2 pt-1"><markdown-block .content=${this.content} .isThinking=${true}></markdown-block></div>`
             : ""
         }
       </div>
@@ -554,7 +552,7 @@ function renderDefaultTool(
           ? html`
             <div>
               <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Input")}</div>
-              <code-block .code=${encodeUtf8Base64(prettyParams.content)} language=${prettyParams.language}></code-block>
+              <code-block class="mt-3" .code=${encodeUtf8Base64(prettyParams.content)} language=${prettyParams.language}></code-block>
             </div>
           `
           : ""
@@ -564,7 +562,7 @@ function renderDefaultTool(
           ? html`
             <div>
               <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Output")}</div>
-              <code-block .code=${encodeUtf8Base64(prettyOutput.content)} language=${prettyOutput.language}></code-block>
+              <code-block class="mt-3" .code=${encodeUtf8Base64(prettyOutput.content)} language=${prettyOutput.language}></code-block>
             </div>
           `
           : ""
@@ -743,7 +741,7 @@ function editResultDiffText(result: ToolResultMessageType | undefined): string {
 
 function renderEditDiffRows(rows: EditDiffRow[]): TemplateResult {
   return html`
-    <div class="diff-viewer-panel text-xs rounded-md border border-border overflow-x-auto">
+    <div class="diff-viewer-panel text-xs rounded-sm border border-border overflow-x-auto">
       <table class="diff">
         <colgroup>
           <col class="diff-gutter-col" />
@@ -791,7 +789,7 @@ function renderEditTool(
       ${rows.length ? renderEditDiffRows(rows) : ""}
       ${
         resultDiff
-          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-x-auto whitespace-pre-wrap">${resultDiff}</pre>`
+          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-x-auto whitespace-pre-wrap">${resultDiff}</pre>`
           : ""
       }
       ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
@@ -827,7 +825,7 @@ function renderReadTool(
     <div>
       ${
         output
-          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`
+          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`
           : ""
       }
       ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
@@ -849,7 +847,7 @@ function renderGrepTool(
       ${renderToolHeader(Search, `grep ${pattern} ${path}`)}
       ${
         output
-          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
+          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
           : ""
       }
       ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
@@ -867,7 +865,7 @@ function renderLsTool(params: unknown, result: ToolResultMessageType | undefined
       ${renderToolHeader(FolderOpen, `ls ${path}`)}
       ${
         output
-          ? html`<pre class="text-xs font-mono rounded-md border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
+          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
           : ""
       }
     </div>
@@ -1040,7 +1038,7 @@ export class UserMessage extends LitElement {
     const canPrune = Boolean(this.entryId);
 
     return html`
-      <div class="flex justify-start mx-4 group/user-message">
+      <div class="flex justify-start ml-2 mr-4 mt-8 mb-2 group/user-message">
         <div class="relative">
           <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
@@ -1071,7 +1069,7 @@ export class UserMessage extends LitElement {
               data-open=${this.menuOpen ? "true" : "false"}
               aria-haspopup="menu"
               aria-expanded=${this.menuOpen ? "true" : "false"}
-              class="absolute top-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-100 cursor-pointer"
+              class="absolute top-2 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-100 cursor-pointer"
               title="${i18n("Message actions")}"
             >
               ${unsafeHTML(iconSvg(EllipsisVertical, "sm"))}
@@ -1129,13 +1127,13 @@ export class ToolMessageDebugView extends LitElement {
       <div class="mt-3 flex flex-col gap-2">
         <div>
           <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Call")}</div>
-          <code-block .code=${encodeUtf8Base64(call.content)} language=${call.language}></code-block>
+          <code-block class="mt-3" .code=${encodeUtf8Base64(call.content)} language=${call.language}></code-block>
         </div>
         <div>
           <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Result")}</div>
           ${
             this.hasResult
-              ? html`<code-block .code=${encodeUtf8Base64(output.content)} language=${output.language}></code-block>`
+              ? html`<code-block class="mt-3" .code=${encodeUtf8Base64(output.content)} language=${output.language}></code-block>`
               : html`<div class="text-xs text-muted-foreground">${i18n("(no result)")}</div>`
           }
         </div>
@@ -1203,20 +1201,19 @@ export class ToolMessage extends LitElement {
 
     return html`
       <details
-        class="tool-disclosure border border-border rounded-md bg-card text-card-foreground shadow-xs"
+        class="tool-disclosure rounded-sm bg-card text-card-foreground"
         ?open=${disclosureOpen}
         @toggle=${this._onDisclosureToggle}
       >
-        <summary class="tool-disclosure-summary list-none cursor-pointer select-none px-3 py-2">
+        <summary class="tool-disclosure-summary group list-none cursor-pointer select-none pb-2">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="tool-disclosure-chevron text-muted-foreground shrink-0">${unsafeHTML(iconSvg(ChevronRight, "sm"))}</span>
-            <div class="min-w-0 flex-1">
-              <div class="text-sm font-medium leading-none truncate">${summary.title}</div>
-              <div class="text-xs text-muted-foreground truncate mt-1">${summary.subtitle}</div>
+            <div class="min-w-0 flex-1 flex items-baseline gap-2">
+              <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline">${summary.title}</div>
+              <div class="text-xs text-muted-foreground leading-none truncate min-w-0 group-hover:underline">${summary.subtitle}</div>
             </div>
           </div>
         </summary>
-        <div class="px-3 pb-3 pt-1">
+        <div class="pb-3 pt-1">
           ${renderTool(toolName, this.toolCall.arguments, effectiveResult, !this.aborted && (this.isStreaming || this.pending))}
         </div>
       </details>
@@ -1285,7 +1282,7 @@ export class AssistantMessage extends LitElement {
 
     return html`
       <div class="relative">
-        ${orderedParts.length ? html`<div class="px-4 pr-8 flex flex-col gap-3">${orderedParts}</div>` : ""}
+        ${orderedParts.length ? html`<div class="px-4 pr-6 mt-2 flex flex-col gap-1">${orderedParts}</div>` : ""}
         ${this.getCopyText ? html`<message-copy-button .getText=${this.getCopyText}></message-copy-button>` : nothing}
         ${
           this.message.usage && !this.isStreaming
@@ -1774,7 +1771,7 @@ export class MessageList extends LitElement {
         (this.messages as RenderMessage[]).length,
       );
     }
-    return html`<div class="flex flex-col gap-3">
+    return html`<div class="flex flex-col">
       ${repeat(
         items,
         (item) => item.key,

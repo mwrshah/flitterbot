@@ -144,7 +144,7 @@
   }
 
   .markdown-content p {
-     @apply leading-relaxed mt-4 first:mt-0 max-w-full;
+     @apply leading-relaxed mt-2 first:mt-0 max-w-full;
   }
 
   .markdown-content a {
@@ -235,13 +235,6 @@
     display: none;
   }
 
-  .tool-disclosure[open] .tool-disclosure-chevron {
-    transform: rotate(90deg);
-  }
-
-  .tool-disclosure-chevron {
-    transition: transform 0.15s ease;
-  }
 
   /* User message with fancy pill styling */
   .user-message-container {
