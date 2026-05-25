@@ -292,11 +292,37 @@ export function createTaskActions({ storePath, configPath }) {
       const syncContext = createSyncContext(store);
       const todoist = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
       const linear = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const outbound = await propagateInboundTaskChanges(store, idx, syncContext);
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
-      return ok(formatPeriodicSyncAndCleanupMessage({ todoist, linear, cleanup }), { todoist, linear, cleanup });
+      return ok(formatPeriodicSyncAndCleanupMessage({ todoist, linear, outbound, cleanup }), { todoist, linear, outbound, cleanup });
     },
   };
+}
+
+async function propagateInboundTaskChanges(store, idx, syncContext) {
+  const providers = configuredProviders(CONFIG_PATH, providerDeps());
+  const outbound = Object.fromEntries(providers.map((provider) => [provider.system, { created: 0, updated: 0, skipped: 0 }]));
+  for (const [recordId, sourceProvider] of syncContext.changedByProvider) {
+    const task = idx.tasksById.get(recordId);
+    if (!task) continue;
+    const project = idx.projectsById.get(task.projectId);
+    if (!project) continue;
+    const baseline = syncContext.baselineTasks.get(recordId) ?? cloneTaskRecord(task);
+    for (const provider of providers) {
+      if (provider.system === sourceProvider) continue;
+      const beforeLink = getExternalLink(task, provider.system);
+      const patch = { ...cloneTaskRecord(task), project, externalLinks: task.externalLinks.map(cloneExternalLink) };
+      await provider.updateTask({ store, idx, task: baseline, patch, force: true });
+      const afterLink = getExternalLink({ externalLinks: patch.externalLinks }, provider.system);
+      task.externalLinks = patch.externalLinks;
+      if (!beforeLink && !afterLink) outbound[provider.system].skipped++;
+      else if (!beforeLink && afterLink) outbound[provider.system].created++;
+      else outbound[provider.system].updated++;
+      indexTaskExternalLinks(idx, task);
+    }
+  }
+  return outbound;
 }
 
 function taskContext() {
@@ -310,6 +336,7 @@ function createSyncContext(store) {
       ...store.projects.map((project) => [project.id, project.updatedAt]),
       ...store.tasks.map((task) => [task.id, task.updatedAt]),
     ]),
+    baselineTasks: new Map(store.tasks.map((task) => [task.id, cloneTaskRecord(task)])),
     changedByProvider: new Map(),
   };
 }
@@ -318,9 +345,7 @@ function shouldApplyInbound(syncContext, record, remoteUpdatedAt, provider) {
   const baselineUpdatedAt = syncContext?.baselineUpdatedAt.get(record.id) ?? record.updatedAt;
   if (!remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) return false;
   const priorProvider = syncContext?.changedByProvider.get(record.id);
-  if (priorProvider && priorProvider !== provider) {
-    throw new Error(`Local record "${record.description ?? record.name ?? record.id}" changed upstream in both ${priorProvider} and ${provider}; resolve one side before syncing.`);
-  }
+  if (priorProvider && priorProvider !== provider) return false;
   return true;
 }
 
@@ -350,20 +375,25 @@ function cleanupCompletedTasks(store, input) {
   return { removedTasks: before - store.tasks.length, retentionDays };
 }
 
-function formatPeriodicSyncAndCleanupMessage({ todoist, linear, cleanup }) {
+function formatPeriodicSyncAndCleanupMessage({ todoist, linear, outbound, cleanup }) {
   return [
     "Periodic sync and cleanup finished.",
-    formatProviderSyncLine("Todoist", todoist),
-    formatProviderSyncLine("Linear", linear),
+    formatProviderSyncLine("Todoist", todoist, outbound?.todoist),
+    formatProviderSyncLine("Linear", linear, outbound?.linear),
     formatCleanupLine(cleanup),
   ].join("\n");
 }
 
-function formatProviderSyncLine(providerName, result) {
-  const outward = "outward not run";
+function formatProviderSyncLine(providerName, result, outwardStats) {
+  const outward = formatOutwardStats(outwardStats);
   if (result.skipped) return `- ${providerName}: inward skipped${result.reason ? ` (${formatSkipReason(result.reason)})` : ""}; ${outward}.`;
   const stats = providerName === "Todoist" ? todoistInwardTotals(result.inbound) : linearInwardTotals(result.inbound);
   return `- ${providerName}: ${stats.created} created inward, ${stats.updated} updated inward, ${stats.linked} linked inward; ${outward}.`;
+}
+
+function formatOutwardStats(stats) {
+  if (!stats) return "outward not run";
+  return `${stats.created} created outward, ${stats.updated} updated outward, ${stats.skipped} skipped outward`;
 }
 
 function todoistInwardTotals(inbound) {
@@ -710,6 +740,17 @@ function externalKey(system, externalId) {
 
 function cloneProject(project) {
   return { ...project, externalLinks: project.externalLinks.map(cloneExternalLink) };
+}
+
+function cloneTaskRecord(task) {
+  return { ...task, externalLinks: task.externalLinks.map(cloneExternalLink) };
+}
+
+function indexTaskExternalLinks(idx, task) {
+  for (const link of task.externalLinks) {
+    const externalId = taskLinkExternalId(link);
+    if (externalId) idx.tasksByExternal.set(externalKey(link.system, externalId), task);
+  }
 }
 
 function cloneExternalLink(link) {

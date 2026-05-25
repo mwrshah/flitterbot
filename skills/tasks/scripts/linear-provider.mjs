@@ -11,60 +11,30 @@ export function createLinearProvider(config, deps) {
     async syncIn(store, idx, input = {}) {
       const inbound = emptyLinearInboundStats();
       const activeMappings = mappedActiveProjects(store, deps);
-      if (activeMappings.length === 0) return { skipped: true, reason: "no_project_mapping", direction: "inbound", inbound };
+      const assignedIssueIds = new Set();
+      const linkedIssueIds = linkedLinearIssueIds(store, deps);
+      if (activeMappings.length === 0 && linkedIssueIds.length === 0) {
+        return { skipped: true, reason: "no_project_mapping", direction: "inbound", inbound };
+      }
 
-      const viewer = await client.viewer();
-      for (const teamId of [...new Set(activeMappings.map((mapping) => mapping.teamId))]) {
-        const issues = await client.listAssignedIssues({ teamId, assigneeId: viewer.id });
-        inbound.issues.seen += issues.length;
-        for (const issue of issues) {
-          const nextStatus = issueStateToLocalStatus(issue.state);
-          const project = localProjectForIssue(activeMappings, issue);
-          const linkedTask = idx.tasksByExternal.get(deps.externalKey(LINEAR_SYSTEM, issue.id));
-          if (nextStatus === "done") {
-            const task = linkedTask ?? (project ? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps) : undefined);
-            if (!task || task.status === "done") continue;
-            const link = deps.getExternalLink(task, LINEAR_SYSTEM);
-            if (linearIssueId(link) && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
-            task.status = "done";
-            task.updatedAt = deps.nowIso();
-            deps.markInboundApplied(task, LINEAR_SYSTEM);
-            deps.setExternalLink(task.externalLinks, linearIssueLink(issue));
-            idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
-            inbound.completedTasks.markedDone++;
-            if (!linearIssueId(link)) inbound.completedTasks.linked++;
-            continue;
-          }
-          if (!project) continue;
-          let task = linkedTask ?? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps);
-          const created = !task;
-          if (!task) task = createLocalTaskFromLinear(store, idx, issue, project, deps);
-          const link = deps.getExternalLink(task, LINEAR_SYSTEM);
-          const linked = !linearIssueId(link);
-          if (linearIssueId(link) && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) continue;
-
-          const nextDetails = stripLocalMetadata(issue.description ?? null);
-          const nextDueAt = linearDueToLocalDueAt(issue.dueDate, deps);
-          const changed = task.projectId !== project.id
-            || task.description !== issue.title
-            || (task.details ?? null) !== nextDetails
-            || task.dueAt !== nextDueAt
-            || task.status !== nextStatus;
-          task.projectId = project.id;
-          task.description = issue.title;
-          task.details = nextDetails;
-          task.dueAt = nextDueAt;
-          task.status = nextStatus;
-          if (changed) task.updatedAt = deps.nowIso();
-          deps.markInboundApplied(task, LINEAR_SYSTEM);
-          deps.setExternalLink(task.externalLinks, linearIssueLink(issue, project, deps));
-          idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
-          if (created) inbound.activeTasks.created++;
-          else {
-            if (changed) inbound.activeTasks.updated++;
-            if (linked) inbound.activeTasks.linked++;
+      if (activeMappings.length > 0) {
+        const viewer = await client.viewer();
+        for (const teamId of [...new Set(activeMappings.map((mapping) => mapping.teamId))]) {
+          const issues = await client.listAssignedIssues({ teamId, assigneeId: viewer.id });
+          inbound.issues.seen += issues.length;
+          for (const issue of issues) {
+            assignedIssueIds.add(issue.id);
+            reconcileLinearIssue({ store, idx, issue, mappings: activeMappings, deps, inbound, allowDiscovery: true });
           }
         }
+      }
+
+      for (const issueId of linkedIssueIds) {
+        if (assignedIssueIds.has(issueId)) continue;
+        const issue = await client.getIssue(issueId);
+        if (!issue) continue;
+        inbound.issues.seen++;
+        reconcileLinearIssue({ store, idx, issue, mappings: activeMappings, deps, inbound, allowDiscovery: false });
       }
 
       return { skipped: false, direction: "inbound", inbound };
@@ -94,7 +64,7 @@ export function createLinearProvider(config, deps) {
       deps.setExternalLink(links, linearIssueLink(issue, project, deps));
     },
 
-    async updateTask({ task, patch }) {
+    async updateTask({ task, patch, force = false }) {
       const existingLink = deps.getExternalLink({ externalLinks: patch.externalLinks }, LINEAR_SYSTEM) ?? deps.getExternalLink(task, LINEAR_SYSTEM);
       const mapping = mappingForProject(patch.project);
       if (!linearIssueId(existingLink) && !mapping?.teamId) return;
@@ -121,7 +91,7 @@ export function createLinearProvider(config, deps) {
       }
 
       const remote = await client.getIssue(linearIssueId(existingLink));
-      assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
+      if (!force) assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
       const states = await statesForTeam(client, teamStateCache, remote.team.id);
       const update = {
         title: patch.description,
@@ -176,6 +146,77 @@ function localProjectForIssue(mappings, issue) {
   }
   const sameTeam = mappings.filter((mapping) => mapping.teamId === issue.team.id && !mapping.projectId);
   return sameTeam.length === 1 ? sameTeam[0].project : undefined;
+}
+
+function linkedLinearIssueIds(store, deps) {
+  const ids = [];
+  const seen = new Set();
+  for (const task of store.tasks) {
+    const id = linearIssueId(deps.getExternalLink(task, LINEAR_SYSTEM));
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function reconcileLinearIssue({ store, idx, issue, mappings, deps, inbound, allowDiscovery }) {
+  const nextStatus = issueStateToLocalStatus(issue.state);
+  const project = localProjectForIssue(mappings, issue);
+  const linkedTask = idx.tasksByExternal.get(deps.externalKey(LINEAR_SYSTEM, issue.id));
+  if (linkedTask) {
+    reconcileLinearTask({ task: linkedTask, issue, project, nextStatus, deps, idx, inbound, created: false });
+    return;
+  }
+  if (!allowDiscovery) return;
+
+  if (nextStatus === "done") {
+    const task = project ? findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps) : undefined;
+    if (!task || task.status === "done") return;
+    reconcileLinearTask({ task, issue, project, nextStatus, deps, idx, inbound, created: false });
+    return;
+  }
+
+  if (!project) return;
+  let task = findUnlinkedTaskByNameAndProject(store, issue.title, project.id, deps);
+  const created = !task;
+  if (!task) task = createLocalTaskFromLinear(store, idx, issue, project, deps);
+  reconcileLinearTask({ task, issue, project, nextStatus, deps, idx, inbound, created });
+}
+
+function reconcileLinearTask({ task, issue, project, nextStatus, deps, idx, inbound, created }) {
+  const link = deps.getExternalLink(task, LINEAR_SYSTEM);
+  const linked = !linearIssueId(link);
+  if (linearIssueId(link) && !deps.shouldApplyInbound(task, issue.updatedAt, LINEAR_SYSTEM)) return;
+
+  const nextProjectId = project?.id ?? task.projectId;
+  const nextDetails = stripLocalMetadata(issue.description ?? null);
+  const nextDueAt = linearDueToLocalDueAt(issue.dueDate, deps);
+  const wasDone = task.status === "done";
+  const changed = task.projectId !== nextProjectId
+    || task.description !== issue.title
+    || (task.details ?? null) !== nextDetails
+    || task.dueAt !== nextDueAt
+    || task.status !== nextStatus;
+  task.projectId = nextProjectId;
+  task.description = issue.title;
+  task.details = nextDetails;
+  task.dueAt = nextDueAt;
+  task.status = nextStatus;
+  if (changed) task.updatedAt = deps.nowIso();
+  if (created || changed || linked) deps.markInboundApplied(task, LINEAR_SYSTEM);
+  deps.setExternalLink(task.externalLinks, linearIssueLink(issue));
+  idx.tasksByExternal.set(deps.externalKey(LINEAR_SYSTEM, issue.id), task);
+
+  if (created) {
+    inbound.activeTasks.created++;
+  } else if (!wasDone && nextStatus === "done") {
+    inbound.completedTasks.markedDone++;
+    if (linked) inbound.completedTasks.linked++;
+  } else if (nextStatus !== "done") {
+    if (changed) inbound.activeTasks.updated++;
+    if (linked) inbound.activeTasks.linked++;
+  }
 }
 
 function createLocalTaskFromLinear(store, idx, issue, project, deps) {
