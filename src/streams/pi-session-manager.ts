@@ -17,6 +17,7 @@ import { createFlitterbotAgent } from "./create-agent.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
 import { PiSessionState } from "./pi-session-state.ts";
 import { subscribeToPiSession } from "./pi-subscribe.ts";
+import { createToolDisplayContextCache, type ToolDisplayContextCache } from "./tool-display.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 
 export { formatStreamPrompt };
@@ -66,6 +67,7 @@ export class PiSessionManager {
   private readonly startedAt: number;
   private readonly processCallback: ProcessQueueItemCallback;
   private readonly log: (message: string) => void;
+  readonly toolDisplayCache: ToolDisplayContextCache;
 
   constructor(
     config: FlitterbotConfig,
@@ -83,6 +85,7 @@ export class PiSessionManager {
     this.startedAt = startedAt;
     this.processCallback = processCallback;
     this.log = log;
+    this.toolDisplayCache = createToolDisplayContextCache(blackboard);
   }
 
   getDefault(): ManagedPiSession | undefined {
@@ -353,6 +356,7 @@ export class PiSessionManager {
       managed.state,
       this.blackboard,
       this.wsHub,
+      this.toolDisplayCache,
       managed.streamId,
       managed.streamName,
       (lastAssistantMessage) => {
@@ -403,6 +407,7 @@ export class PiSessionManager {
 
     this.orchestrators.delete(streamId);
     this.byPiSessionId.delete(managed.piSessionId);
+    this.toolDisplayCache.deletePiSession(managed.piSessionId);
     this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
   }
 
@@ -430,6 +435,7 @@ export class PiSessionManager {
 
     // 2. End the old pi_session in the DB
     endPiSession(this.blackboard, oldPiSessionId, "ended", "clear", new Date().toISOString());
+    this.toolDisplayCache.deletePiSession(oldPiSessionId);
 
     // 3. Call newSession() on the AgentSessionRuntime — tears down old session,
     //    creates a new one via the stored factory
@@ -507,11 +513,13 @@ export class PiSessionManager {
     });
 
     // 9. Re-subscribe to SDK events on the new session
+    this.toolDisplayCache.invalidatePiSession(newPiSessionId);
     old.unsubscribe = subscribeToPiSession(
       newSession,
       old.state,
       this.blackboard,
       this.wsHub,
+      this.toolDisplayCache,
       null,
       null,
       (lastAssistantMessage) => {
@@ -556,6 +564,7 @@ export class PiSessionManager {
         /* ignore */
       }
       this.byPiSessionId.delete(this.defaultSession.piSessionId);
+      this.toolDisplayCache.deletePiSession(this.defaultSession.piSessionId);
       this.defaultSession = undefined;
     }
   }
@@ -674,6 +683,7 @@ export class PiSessionManager {
       state,
       this.blackboard,
       this.wsHub,
+      this.toolDisplayCache,
       streamId,
       streamName,
       (lastAssistantMessage) => {

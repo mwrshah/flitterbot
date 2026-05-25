@@ -13,6 +13,7 @@ import type {
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readStreamsHistory, readStreamsHistoryFromSession } from "../streams/history.ts";
 import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
+import { enrichTimelineToolDisplays } from "../streams/tool-display.ts";
 import { sendJson } from "./_shared.ts";
 
 async function readSessionHistory(
@@ -140,10 +141,13 @@ async function handleBrowserStreamsHistoryRouteInner(
       if (row?.session_file) {
         const diskBody = readStreamsHistory(piSessionId, row.session_file, historyMode);
         if (diskBody.items.length > 0) {
+          const formatter =
+            runtime.sessionManager.toolDisplayCache.formatterForPiSession(piSessionId);
+          const enriched = enrichTimelineToolDisplays(diskBody.items, formatter);
           const body: StreamsHistoryResponse = {
             piSessionId: piSessionId,
             sessionFile: row.session_file,
-            items: diskBody.items,
+            items: enriched,
           };
           return sendJson(response, 200, body);
         }
@@ -163,7 +167,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     return sendJson(response, 404, { error: "Session not found" });
   }
 
-  const items = await readSessionHistory(targetSession, historyMode);
+  let items = await readSessionHistory(targetSession, historyMode);
   if (targetSession.streamName) {
     for (const item of items) {
       if (item.kind === "message") {
@@ -172,6 +176,15 @@ async function handleBrowserStreamsHistoryRouteInner(
     }
   }
   const snapshot = targetSession.state.getSnapshot();
+  // One enrichment pass for both live and disk-derived items. Live
+  // tool events already carry displayArgs via pi-subscribe; the helper
+  // skips items that already have displayArgs set.
+  if (snapshot.piSessionId) {
+    const formatter = runtime.sessionManager.toolDisplayCache.formatterForPiSession(
+      snapshot.piSessionId,
+    );
+    items = enrichTimelineToolDisplays(items, formatter);
+  }
   const body: StreamsHistoryResponse = {
     piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,

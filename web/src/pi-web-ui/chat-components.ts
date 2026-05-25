@@ -8,6 +8,19 @@ import type {
   Usage,
   UserMessage as UserMessageType,
 } from "@earendil-works/pi-ai";
+import type { RenderableToolCall } from "~/lib/pi-web-ui-bridge";
+
+/**
+ * Pick the display-projected arguments when the bridge layer attached
+ * them, falling back to canonical `arguments`. Renderers MUST go through
+ * this helper instead of reading `toolCall.arguments` directly so the
+ * stream-relative path display stays in sync with the timeline contract.
+ */
+function toolDisplayArguments(call: ToolCall): Record<string, unknown> {
+  const renderable = call as RenderableToolCall;
+  return renderable.displayArguments ?? call.arguments;
+}
+
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";
@@ -1188,9 +1201,10 @@ export class ToolMessage extends LitElement {
           timestamp: Date.now(),
         } as ToolResultMessageType)
       : this.result;
+    const renderArguments = toolDisplayArguments(this.toolCall);
     const summary = summarizeToolCall(
       toolName,
-      this.toolCall.arguments,
+      renderArguments,
       effectiveResult,
       this.pending,
       this.isStreaming,
@@ -1214,7 +1228,7 @@ export class ToolMessage extends LitElement {
           </div>
         </summary>
         <div class="pb-3 pt-1">
-          ${renderTool(toolName, this.toolCall.arguments, effectiveResult, !this.aborted && (this.isStreaming || this.pending))}
+          ${renderTool(toolName, renderArguments, effectiveResult, !this.aborted && (this.isStreaming || this.pending))}
         </div>
       </details>
     `;

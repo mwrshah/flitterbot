@@ -10,6 +10,19 @@ import type {
   ThinkingContent,
   ToolCall,
 } from "@earendil-works/pi-ai";
+
+/**
+ * App-owned render extension of vendor `ToolCall`. The Flitterbot Lit
+ * components read `displayArguments` for summaries and detail rendering;
+ * the canonical `arguments` remains available for any action path that
+ * needs raw values. Defined here (not as a private underscore field on
+ * the vendor type) so the contract is explicit and the render layer can
+ * fall through with `displayArguments ?? arguments`.
+ */
+export type RenderableToolCall = ToolCall & {
+  displayArguments?: Record<string, unknown>;
+};
+
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -93,7 +106,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
 
     if (item.kind === "message" && item.role === "assistant") {
       const message = item as ChatTimelineMessage;
-      const toolCalls: ToolCall[] = [];
+      const toolCalls: RenderableToolCall[] = [];
       for (let j = i + 1; j < timeline.length; j++) {
         const next = timeline[j];
         if (!next) break;
@@ -108,6 +121,9 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
             id: next.toolUseId,
             name: next.tool,
             arguments: (next.args as Record<string, unknown>) ?? {},
+            ...(next.displayArgs !== undefined
+              ? { displayArguments: next.displayArgs as Record<string, unknown> }
+              : {}),
           });
           consumed.add(j);
         }
@@ -131,16 +147,18 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
       item.toolUseId
     ) {
       // Orphan tool — no preceding assistant message (e.g. after reconnect).
+      const orphanCall: RenderableToolCall = {
+        type: "toolCall",
+        id: item.toolUseId,
+        name: item.tool,
+        arguments: (item.args as Record<string, unknown>) ?? {},
+        ...(item.displayArgs !== undefined
+          ? { displayArguments: item.displayArgs as Record<string, unknown> }
+          : {}),
+      };
       messages.push({
         role: "assistant",
-        content: [
-          {
-            type: "toolCall",
-            id: item.toolUseId,
-            name: item.tool,
-            arguments: (item.args as Record<string, unknown>) ?? {},
-          },
-        ],
+        content: [orphanCall],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
       } as unknown as AgentMessage);

@@ -17,6 +17,7 @@ import type {
 import type { WebSocketHub } from "../ws/hub.ts";
 import { toolResultMessageToTimelineItem } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
+import type { ToolDisplayContextCache } from "./tool-display.ts";
 
 type PiSessionSubscriptionEvent =
   | {
@@ -165,7 +166,12 @@ function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
 }
 
 type MessageBlock = { type: "text"; text: string } | { type: "thinking"; thinking: string };
-type ExtractedToolCall = { toolUseId: string; toolName: string; args?: unknown };
+type ExtractedToolCall = {
+  toolUseId: string;
+  toolName: string;
+  args?: unknown;
+  displayArgs?: unknown;
+};
 
 /**
  * Extract structured blocks (text + thinking) and tool calls from a message's
@@ -253,6 +259,7 @@ export function subscribeToPiSession(
   state: PiSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
+  toolDisplayCache: ToolDisplayContextCache,
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
@@ -416,7 +423,19 @@ export function subscribeToPiSession(
         const capturedClientMessageId = currentItem?.clientMessageId;
         const capturedHasThinking = blocks.some((b) => b.type === "thinking");
         const capturedBlocks = capturedHasThinking ? blocks : undefined;
-        const capturedToolCalls = toolCalls.length > 0 ? toolCalls : undefined;
+        // Stamp displayArgs on each extracted tool call from the active
+        // session formatter. O(1) per call on a warm cache; one SQL
+        // lookup per pi-session lifetime (invalidated on worktree
+        // mutation). The canonical `args` is untouched.
+        const enrichedToolCalls: ExtractedToolCall[] = toolCalls.map((tc) => {
+          const display = toolDisplayCache.displayArgsForTool(
+            session.sessionId,
+            tc.toolName,
+            tc.args,
+          );
+          return display ? { ...tc, displayArgs: display } : tc;
+        });
+        const capturedToolCalls = enrichedToolCalls.length > 0 ? enrichedToolCalls : undefined;
 
         queueMicrotask(() => {
           const entryId = session.sessionManager.getLeafId();
@@ -467,12 +486,18 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_start": {
+        const args = event.args ?? event.parameters;
+        const toolName = event.toolName as string | undefined;
+        const displayArgs = toolName
+          ? toolDisplayCache.displayArgsForTool(session.sessionId, toolName, args)
+          : undefined;
         const payload: ToolExecutionStartWebSocketEvent = {
           type: "tool_execution_start",
           piSessionId: session.sessionId,
-          tool: event.toolName as string | undefined,
+          tool: toolName,
           toolUseId: event.toolCallId as string | undefined,
-          args: event.args ?? event.parameters,
+          args,
+          ...(displayArgs ? { displayArgs } : {}),
           timestamp: now,
           event,
         };
