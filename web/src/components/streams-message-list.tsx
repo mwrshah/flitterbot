@@ -37,6 +37,9 @@ type StreamsMessageListProps = {
   onMessagesRendered?: () => void;
   /** Called when a user message's “Delete (including me)” menu item is clicked. */
   onPruneRequested?: (entryId: string) => void;
+  /** When true, the Lit <message-list> suppresses the copy button on the
+   *  trailing turn — prevents premature copy while the agent is mid-turn. */
+  isSessionBusy?: boolean;
   ref?: Ref<StreamsMessageListHandle>;
 };
 
@@ -44,9 +47,10 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   messages,
   onMessagesRendered,
   onPruneRequested,
+  isSessionBusy = false,
   ref,
 }: StreamsMessageListProps) {
-  useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered });
+  useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered, isSessionBusy });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<MessageListElement | null>(null);
   const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
@@ -133,6 +137,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       el.messages = messages;
       el.tools = EMPTY_TOOLS;
       el.pendingToolCalls = EMPTY_PENDING;
+      el.isSessionBusy = isSessionBusy;
       flushActiveTools();
       return;
     }
@@ -141,11 +146,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     el.messages = messages;
     el.tools = EMPTY_TOOLS;
     el.pendingToolCalls = EMPTY_PENDING;
+    el.isSessionBusy = isSessionBusy;
     void el.updateComplete.then(() => {
       streamingPerf.endCommittedLitRender(renderToken);
       notifyMessagesRendered();
     });
-  }, [ready, messages, onMessagesRendered]);
+  }, [ready, messages, onMessagesRendered, isSessionBusy]);
 
   useEffect(() => {
     return () => {
@@ -248,5 +254,5 @@ function areStreamsMessageListPropsEqual(
   prev: StreamsMessageListProps,
   next: StreamsMessageListProps,
 ) {
-  return prev.messages === next.messages;
+  return prev.messages === next.messages && prev.isSessionBusy === next.isSessionBusy;
 }

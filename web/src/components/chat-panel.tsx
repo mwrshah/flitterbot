@@ -535,6 +535,7 @@ export function ChatPanel({
                 messages={agentMessages}
                 onMessagesRendered={handleMessagesRendered}
                 onPruneRequested={handlePruneRequested}
+                isSessionBusy={isSessionBusy}
               />
             </div>
             <QueuedBusyOverlay text={busyQueuedText} />

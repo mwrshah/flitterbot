@@ -1333,6 +1333,10 @@ export class MessageList extends LitElement {
   @property({ type: Array }) tools: AgentTool[] = [];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
   @property({ attribute: false }) onCostClick?: () => void;
+  /** When true, the trailing turn (assistant messages after the last user message)
+   *  must NOT receive a copy button — the turn is mid-flight and showing the copy
+   *  affordance prematurely would expose an incomplete capture. */
+  @property({ type: Boolean }) isSessionBusy = false;
 
   private _streamingEl: AssistantMessage | null = null;
   private _activeToolStates = new Map<string, ActiveToolState>();
@@ -1356,6 +1360,15 @@ export class MessageList extends LitElement {
   }
 
   override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
+    // When isSessionBusy flips, the trailing-turn copy-button gate must be
+    // re-evaluated. Drop the imperative-commit cache so the next render runs
+    // buildRenderItems fresh — otherwise the cached items keep their old
+    // getCopyText bindings and the button never (dis)appears.
+    if (changedProperties.has("isSessionBusy")) {
+      this._committedTotal = 0;
+      this._cachedRenderItems = null;
+      return true;
+    }
     if (
       this._committedTotal > 0 &&
       changedProperties.has("messages") &&
@@ -1558,6 +1571,11 @@ export class MessageList extends LitElement {
           template: html`<user-message .message=${msg} .entryId=${entryId}></user-message>`,
         });
       } else if (role === "assistant") {
+        // Imperative commit appends to the trailing turn. While busy, that turn
+        // must not surface a copy button — mirrors the buildRenderItems gate.
+        const getCopyText = this.isSessionBusy
+          ? undefined
+          : () => MessageList.getAssistantPlainText(msg as AssistantMessageType);
         items.push({
           key,
           template: html`
@@ -1569,7 +1587,7 @@ export class MessageList extends LitElement {
               .toolResultsById=${new Map()}
               .hideToolCalls=${false}
               .onCostClick=${this.onCostClick}
-              .getCopyText=${() => MessageList.getAssistantPlainText(msg as AssistantMessageType)}
+              .getCopyText=${getCopyText}
             ></assistant-message>
           `,
         });
@@ -1706,6 +1724,10 @@ export class MessageList extends LitElement {
 
     // Pre-pass: identify which assistant messages are last in their turn
     // (turn = assistant messages between user messages). Only these show the copy button.
+    //
+    // While the session is busy, the trailing turn is mid-flight — skip the
+    // final add so its last assistant gets no copy button. Closed turns
+    // (those followed by a later user message) still get one.
     const lastAssistantInTurn = new Set<AssistantMessageType>();
     let lastAssistant: AssistantMessageType | null = null;
     for (const msg of this.messages) {
@@ -1717,7 +1739,7 @@ export class MessageList extends LitElement {
         lastAssistant = msg as AssistantMessageType;
       }
     }
-    if (lastAssistant) lastAssistantInTurn.add(lastAssistant);
+    if (lastAssistant && !this.isSessionBusy) lastAssistantInTurn.add(lastAssistant);
 
     const items: Array<{ key: string; template: TemplateResult }> = [];
     let fallbackIndex = 0;
