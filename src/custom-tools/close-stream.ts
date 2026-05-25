@@ -64,15 +64,16 @@ type CommitResult =
   | { hasChanges: true; ok: true }
   | { hasChanges: true; ok: false; message: string };
 
-async function commitUncommittedChanges(worktreePath: string): Promise<CommitResult> {
+async function commitUncommittedChanges(
+  worktreePath: string,
+  commitMessage: string,
+): Promise<CommitResult> {
   const status = await exec("git status --porcelain", worktreePath, 5_000);
   if (!status) return { hasChanges: false };
   try {
     await exec("git add -A", worktreePath);
-    await exec(
-      'git commit -m "chore: auto-commit uncommitted changes before stream close"',
-      worktreePath,
-    );
+    const escaped = commitMessage.replace(/'/g, "'\\''");
+    await exec(`git commit -m '${escaped}'`, worktreePath);
     return { hasChanges: true, ok: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -114,7 +115,6 @@ async function mergeToTarget(
   repoPath: string,
   branch: string,
   targetBranch: string,
-  commitMessage?: string,
 ): Promise<MergeResult> {
   // Fetch latest
   try {
@@ -159,10 +159,10 @@ async function mergeToTarget(
 
   // Attempt merge
   try {
-    const mergeCmd = commitMessage
-      ? `git merge ${branch} -m '${commitMessage.replace(/'/g, "'\\''")}'`
-      : `git merge ${branch} --no-edit`;
-    await exec(mergeCmd, mergeCwd);
+    // Use git's default merge commit message ("Merge branch 'X' into Y") —
+    // the model-authored commit_message goes to the auto-commit of in-flight
+    // work, not to the merge commit itself.
+    await exec(`git merge ${branch} --no-edit`, mergeCwd);
     return { ok: true, mergedAt: mergeCwd };
   } catch {
     const conflicts = await getConflictedFiles(mergeCwd);
@@ -201,7 +201,7 @@ export async function executeCloseStream(
   piSessionId: string,
   streamId: string,
   mode: "merge" | "noop",
-  mergeCommitMessage?: string,
+  commitMessage: string,
   baseBranchOverride?: string,
 ): Promise<CloseStreamResult> {
   const stream = getStreamById(blackboard, streamId);
@@ -272,7 +272,7 @@ export async function executeCloseStream(
           };
         }
         resolvedTargetBranch = targetBranch;
-        const commitResult = await commitUncommittedChanges(worktreePath);
+        const commitResult = await commitUncommittedChanges(worktreePath, commitMessage);
         if (commitResult.hasChanges && !commitResult.ok) {
           return {
             ok: false,
@@ -280,7 +280,7 @@ export async function executeCloseStream(
             message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
           };
         }
-        const mergeResult = await mergeToTarget(repoPath, branch, targetBranch, mergeCommitMessage);
+        const mergeResult = await mergeToTarget(repoPath, branch, targetBranch);
         if (mergeResult.ok === false) {
           // Return early — resolve conflicts and call again
           return {

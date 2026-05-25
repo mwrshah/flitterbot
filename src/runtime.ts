@@ -2018,7 +2018,7 @@ export class ControlSurfaceRuntime {
         name: "close_stream",
         label: "Close Stream",
         description:
-          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. Before the confirming call, inspect `git log <base>..HEAD --oneline` and `git diff HEAD` and author a concise merge_commit_message — never rely on git\'s default. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_stream again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
+          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_stream again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
         parameters: {
           type: "object",
           properties: {
@@ -2029,10 +2029,10 @@ export class ControlSurfaceRuntime {
               description:
                 '"merge" commits uncommitted changes, merges branch to the stream\'s base branch, and pushes. On the first merge call without base_branch, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the stream and ends the session.',
             },
-            merge_commit_message: {
+            commit_message: {
               type: "string",
               description:
-                "Optional commit message for the merge commit when mode is merge. Ignored for noop mode. Falls back to git's default merge commit message if omitted.",
+                'Commit message used when auto-committing any uncommitted in-flight work in the worktree before the merge. Required. Must describe the actual work in this stream — do NOT use placeholder/chore filler. Ignored for noop mode and on preview calls, but still required (write a short reason like "closing: <why>").',
             },
             base_branch: {
               type: "string",
@@ -2040,14 +2040,14 @@ export class ControlSurfaceRuntime {
                 "Target branch to merge into. Supersedes the stream's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
             },
           },
-          required: ["stream_id", "mode"],
+          required: ["stream_id", "mode", "commit_message"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, mode, merge_commit_message, base_branch } = params as {
+          const { stream_id, mode, commit_message, base_branch } = params as {
             stream_id: string;
             mode: "merge" | "noop";
-            merge_commit_message?: string;
+            commit_message: string;
             base_branch?: string;
           };
           const managed = closeStreamId
@@ -2065,7 +2065,7 @@ export class ControlSurfaceRuntime {
             streamsSessId,
             stream_id,
             mode,
-            merge_commit_message,
+            commit_message,
             base_branch,
           );
           if (result.ok) {
