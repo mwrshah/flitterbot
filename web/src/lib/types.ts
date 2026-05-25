@@ -254,7 +254,17 @@ export type WsMessage =
       type: "message_end";
       piSessionId?: string;
       message: ChatTimelineMessage;
-      toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
+      /**
+       * `args` is canonical tool input. `displayArgs` is a UI-only render
+       * projection produced server-side and must never be fed back into
+       * tool execution.
+       */
+      toolCalls?: Array<{
+        toolUseId: string;
+        toolName: string;
+        args?: unknown;
+        displayArgs?: unknown;
+      }>;
       /** Set on user-role message_end when the originating WS `message` event
        *  carried a `clientMessageId`. Reconciles the optimistic UI bubble. */
       clientMessageId?: string;
@@ -265,6 +275,8 @@ export type WsMessage =
       tool?: string;
       toolUseId?: string;
       args?: unknown;
+      /** UI-only display projection of `args`. Undefined when unchanged. */
+      displayArgs?: unknown;
       result?: unknown;
       isError?: boolean;
       event?: unknown;

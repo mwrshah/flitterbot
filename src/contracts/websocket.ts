@@ -87,8 +87,17 @@ export interface MessageEndWebSocketEvent {
   type: "message_end";
   piSessionId?: string;
   message: ChatTimelineMessage;
-  /** Tool calls extracted from the SDK message content array. */
-  toolCalls?: Array<{ toolUseId: string; toolName: string; args?: unknown }>;
+  /**
+   * Tool calls extracted from the SDK message content array.
+   * `args` is canonical. `displayArgs` is a UI-only projection produced
+   * by tool-display.ts and must never be fed back into tool execution.
+   */
+  toolCalls?: Array<{
+    toolUseId: string;
+    toolName: string;
+    args?: unknown;
+    displayArgs?: unknown;
+  }>;
   /**
    * Present on user-role `message_end` when the originating WS `message` event
    * carried a `clientMessageId`. Clients use this to reconcile their optimistic
@@ -102,7 +111,13 @@ export interface ToolExecutionStartWebSocketEvent {
   piSessionId?: string;
   tool?: string;
   toolUseId?: string;
+  /** Canonical tool input. */
   args?: unknown;
+  /**
+   * UI-only display projection of `args` (see ChatTimelineTool.displayArgs).
+   * Undefined when no transformation applies.
+   */
+  displayArgs?: unknown;
   timestamp?: string;
   event?: unknown;
 }

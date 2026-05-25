@@ -310,6 +310,10 @@ export function setupWsQueryBridge(deps: {
               phase: "start",
               toolUseId: tc.toolUseId,
               args: tc.args as JsonValue | undefined,
+              // Canonical-vs-display invariant: `args` stays raw, this
+              // mirrors the server's UI projection. Never sent back into
+              // tool execution.
+              displayArgs: tc.displayArgs as JsonValue | undefined,
               createdAt: now,
             });
           }

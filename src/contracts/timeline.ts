@@ -82,7 +82,20 @@ export type ChatTimelineTool = {
   tool: string;
   phase: "start" | "update" | "end";
   toolUseId?: string;
+  /**
+   * Canonical tool input. Persistent across history reads and live events.
+   * MUST remain unchanged through any UI rendering — replay, debug, and
+   * future action paths read raw values from here.
+   */
   args?: JsonValue;
+  /**
+   * UI-only display projection of `args`. Produced server-side by
+   * `tool-display.ts` from the active pi-session cwd and (when present)
+   * the stream worktree. MUST NEVER be sent back into tool execution.
+   * Undefined when no transformation applies; the UI uses `displayArgs
+   * ?? args` as its single render rule.
+   */
+  displayArgs?: JsonValue;
   result?: JsonValue;
   isError?: boolean;
   createdAt: string;

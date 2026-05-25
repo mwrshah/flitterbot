@@ -2002,6 +2002,11 @@ export class ControlSurfaceRuntime {
           if (result.ok) {
             const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;
             if (worktreePiSessionId) {
+              // Invalidate display-path cache BEFORE the broadcast so the
+              // next tool event for this session resolves the new
+              // worktree_path. No-op when no entry exists yet (history
+              // route will build fresh from the updated DB row).
+              this.sessionManager.toolDisplayCache.invalidatePiSession(worktreePiSessionId);
               this.wsHub.broadcast({
                 type: "worktree_changed",
                 piSessionId: worktreePiSessionId,
