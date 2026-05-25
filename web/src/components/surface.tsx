@@ -948,12 +948,16 @@ export function Surface() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const measuredEntriesRef = useRef<MeasuredSurfaceEntry[]>([]);
   const surfaceWidthRef = useRef(surfaceWidth);
-  const measurementReadyRef = useRef(false);
+  const widthReadyRef = useRef(false);
+  const heightsReadyRef = useRef(false);
   const restoredScrollStateRef = useRef<SurfaceScrollRestoreState | null | undefined>(undefined);
   const initialOffsetRef = useRef<number | null>(null);
   const initialRestoredExpandedIdsRef = useRef<Set<string> | null>(null);
-  const initialBottomCorrectionDoneRef = useRef(false);
   const widthMeasurementResetRef = useRef<number | null>(null);
+  // Two-stage readiness: widthReady gates the virtualizer enable; heightsReady gates the feed
+  // visibility + one-shot bottom scroll, so the user never sees the layout shift from
+  // measureElement reconciling estimated row heights down to actuals on first paint.
+  const [heightsReady, setHeightsReady] = useState(false);
   // Lifted out of PlainTextBlock so it survives row recycle and matches snapshot heights.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const expandedIdsRef = useRef(expandedIds);
@@ -979,12 +983,13 @@ export function Surface() {
     () => (surfaceWidth > 0 ? getSurfaceBubbleMaxWidth(surfaceWidth) : null),
     [surfaceWidth],
   );
-  const measurementReady = bubbleMaxWidth !== null;
+  const widthReady = bubbleMaxWidth !== null;
 
   // Mirrors for the unmount-capture effect.
   useLayoutEffect(() => {
     surfaceWidthRef.current = surfaceWidth;
-    measurementReadyRef.current = measurementReady;
+    widthReadyRef.current = widthReady;
+    heightsReadyRef.current = heightsReady;
     expandedIdsRef.current = expandedIds;
     setConfigRef.current = setConfig;
   });
@@ -1004,7 +1009,7 @@ export function Surface() {
   measuredEntriesRef.current = measuredEntries;
 
   // One-shot init: restore snapshot, else seed initialOffset to bottom.
-  if (measurementReady && restoredScrollStateRef.current === undefined) {
+  if (widthReady && restoredScrollStateRef.current === undefined) {
     const restored = readSurfaceScrollRestoreState(
       config[SURFACE_SCROLL_RESTORE_KEY],
       measuredEntries,
@@ -1043,7 +1048,7 @@ export function Surface() {
 
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: measuredEntries.length,
-    enabled: measurementReady,
+    enabled: widthReady,
     estimateSize: estimateVirtualItemSize,
     gap: SURFACE_ROW_GAP,
     getItemKey: getVirtualItemKey,
@@ -1054,10 +1059,11 @@ export function Surface() {
     overscan: SURFACE_OVERSCAN,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
   const renderedExpandedIds = initialRestoredExpandedIdsRef.current ?? expandedIds;
 
   useLayoutEffect(() => {
-    if (!measurementReady || surfaceWidth <= 0) return;
+    if (!widthReady || surfaceWidth <= 0) return;
     const previousWidth = widthMeasurementResetRef.current;
     if (previousWidth === null) {
       widthMeasurementResetRef.current = surfaceWidth;
@@ -1067,15 +1073,24 @@ export function Surface() {
 
     widthMeasurementResetRef.current = surfaceWidth;
     rowVirtualizer.measure();
-  }, [measurementReady, rowVirtualizer, surfaceWidth]);
+  }, [widthReady, rowVirtualizer, surfaceWidth]);
 
-  useLayoutEffect(() => {
-    if (!measurementReady || initialBottomCorrectionDoneRef.current) return;
-    if (restoredScrollStateRef.current || measuredEntries.length === 0) return;
-
-    initialBottomCorrectionDoneRef.current = true;
-    rowVirtualizer.scrollToIndex(measuredEntries.length - 1, { align: "end" });
-  }, [measurementReady, measuredEntries.length, rowVirtualizer]);
+  // Stage-2 gate: once totalSize has been stable across a frame (i.e. measureElement has
+  // reconciled all rendered rows), scroll to bottom and reveal. Latches on first success;
+  // restored snapshots already carry final sizes, so they short-circuit immediately.
+  useEffect(() => {
+    if (!widthReady || heightsReady || measuredEntries.length === 0) return;
+    if (restoredScrollStateRef.current) {
+      setHeightsReady(true);
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      if (rowVirtualizer.getTotalSize() !== totalSize) return;
+      rowVirtualizer.scrollToIndex(measuredEntries.length - 1, { align: "end" });
+      setHeightsReady(true);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [widthReady, heightsReady, totalSize, measuredEntries.length, rowVirtualizer]);
 
   // Stable per-id handlers so memoized rows don't churn on every Set identity change.
   // measureElement's ResizeObserver picks up the maxHeight un-clamp on commit.
@@ -1095,7 +1110,7 @@ export function Surface() {
   };
 
   useEffect(() => {
-    if (!measurementReady) return;
+    if (!widthReady) return;
     const restored = restoredScrollStateRef.current;
     logSurfaceScrollRestore("virtualizer mounted", {
       restored: !!restored,
@@ -1104,11 +1119,13 @@ export function Surface() {
       expandedCount: restored?.expandedIds.length ?? 0,
       entryCount: measuredEntries.length,
     });
-  }, [measurementReady, measuredEntries.length]);
+  }, [widthReady, measuredEntries.length]);
 
   useEffect(() => {
     return () => {
-      if (!measurementReadyRef.current) return;
+      // Only persist if we got far enough to have stable measurements; otherwise the snapshot
+      // would capture mid-settle estimates and poison the next restore.
+      if (!widthReadyRef.current || !heightsReadyRef.current) return;
       const serialized = serializeSurfaceScrollRestoreState({
         offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
         width: surfaceWidthRef.current,
@@ -1216,7 +1233,15 @@ export function Surface() {
               </div>
             )}
             {entries.length > 0 && (
-              <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+              <div
+                className="relative"
+                style={{
+                  height: `${totalSize}px`,
+                  // visibility (not display) keeps rows mounted so measureElement's
+                  // ResizeObserver can still fire while the feed is hidden.
+                  visibility: heightsReady ? "visible" : "hidden",
+                }}
+              >
                 <div
                   className="absolute left-0 right-0 top-0 flex flex-col"
                   style={{
