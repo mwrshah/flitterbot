@@ -253,49 +253,70 @@ export async function executeCloseStream(
   let pushed = false;
   let resolvedTargetBranch: string | undefined;
 
-  // Step 1: Merge branch to target (only in merge mode)
+  // Step 1: Merge branch to target (only in merge mode). Every precondition
+  // failure here returns an explicit error — silent skips would close the
+  // stream record while no git work happened, which is invisible to the user.
   if (mode === "merge") {
     const worktreePath = stream.worktree_path;
     const repoPath = stream.repo_path;
 
-    if (worktreePath && fs.existsSync(worktreePath) && repoPath) {
-      const branch = await inferBranchFromWorktree(worktreePath);
-
-      if (branch) {
-        const targetBranch = baseBranchOverride ?? stream.base_branch ?? null;
-        if (!targetBranch) {
-          return {
-            ok: false,
-            streamId,
-            message:
-              "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_stream, or call close_stream with mode:noop.",
-          };
-        }
-        resolvedTargetBranch = targetBranch;
-        const commitResult = await commitUncommittedChanges(worktreePath, commitMessage);
-        if (commitResult.hasChanges && !commitResult.ok) {
-          return {
-            ok: false,
-            streamId,
-            message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
-          };
-        }
-        const mergeResult = await mergeToTarget(repoPath, branch, targetBranch);
-        if (mergeResult.ok === false) {
-          // Return early — resolve conflicts and call again
-          return {
-            ok: false,
-            streamId,
-            message: `${mergeResult.message}. Resolve conflicts there, then call close_stream again.`,
-            conflicts: mergeResult.conflicts,
-          };
-        }
-        merged = true;
-
-        // Push from wherever the merge happened
-        pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
-      }
+    if (!worktreePath || !repoPath) {
+      return {
+        ok: false,
+        streamId,
+        message:
+          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use create_worktree with update_worktree_path for an existing worktree, or create one fresh) and try again, or call close_stream with mode:noop to close without merging.",
+      };
     }
+    if (!fs.existsSync(worktreePath)) {
+      return {
+        ok: false,
+        streamId,
+        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via create_worktree update_worktree_path) and try again, or call close_stream with mode:noop to close without merging.`,
+      };
+    }
+
+    const branch = await inferBranchFromWorktree(worktreePath);
+    if (!branch) {
+      return {
+        ok: false,
+        streamId,
+        message: `Could not determine current branch in worktree ${worktreePath} (detached HEAD or git failure). Restore the branch and try again, or call close_stream with mode:noop to close without merging.`,
+      };
+    }
+
+    const targetBranch = baseBranchOverride ?? stream.base_branch ?? null;
+    if (!targetBranch) {
+      return {
+        ok: false,
+        streamId,
+        message:
+          "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_stream, or call close_stream with mode:noop.",
+      };
+    }
+    resolvedTargetBranch = targetBranch;
+    const commitResult = await commitUncommittedChanges(worktreePath, commitMessage);
+    if (commitResult.hasChanges && !commitResult.ok) {
+      return {
+        ok: false,
+        streamId,
+        message: `Failed to commit uncommitted changes in worktree. Commit manually before closing. (${commitResult.message})`,
+      };
+    }
+    const mergeResult = await mergeToTarget(repoPath, branch, targetBranch);
+    if (mergeResult.ok === false) {
+      // Return early — resolve conflicts and call again
+      return {
+        ok: false,
+        streamId,
+        message: `${mergeResult.message}. Resolve conflicts there, then call close_stream again.`,
+        conflicts: mergeResult.conflicts,
+      };
+    }
+    merged = true;
+
+    // Push from wherever the merge happened
+    pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
   }
 
   // Step 2: Close stream and end Pi session (worktree left on disk)
