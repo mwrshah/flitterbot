@@ -25,16 +25,6 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const rawQuery = url.searchParams.get("query") ?? "";
   const streamId = url.searchParams.get("streamId");
-
-  // Empty / whitespace-only query: bail before any search or fs work.
-  if (!rawQuery.trim()) {
-    return sendJson(res, 200, {
-      items: [],
-      cwd: "",
-      query: rawQuery,
-    } satisfies DirectoryCompletionsResponse);
-  }
-
   const baseCwd = await resolveBaseCwd(runtime, streamId);
   const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery);
 
