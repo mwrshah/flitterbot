@@ -542,6 +542,11 @@ function readSurfaceScrollRestoreState(
       logSurfaceScrollRestore("discarding snapshot: invalid width", parsed.width);
       return null;
     }
+    // Offset-only restores skip the heightsReady settle pass and can land in estimate-only space.
+    if (measuredEntries.length > 0 && parsed.snapshot.length === 0) {
+      logSurfaceScrollRestore("discarding snapshot: empty measurements");
+      return null;
+    }
     if (Math.abs(parsed.width - surfaceWidth) > SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE) {
       logSurfaceScrollRestore("discarding snapshot: width mismatch", {
         savedWidth: parsed.width,
@@ -1140,10 +1145,14 @@ export function Surface() {
       // Only persist if we got far enough to have stable measurements; otherwise the snapshot
       // would capture mid-settle estimates and poison the next restore.
       if (!widthReadyRef.current || !heightsReadyRef.current) return;
+      const snapshot = rowVirtualizer.takeSnapshot();
+      // Don't overwrite a usable restore with an offset-only snapshot.
+      if (measuredEntriesRef.current.length > 0 && snapshot.length === 0) return;
+
       const serialized = serializeSurfaceScrollRestoreState({
         offset: rowVirtualizer.scrollOffset ?? viewportRef.current?.scrollTop ?? 0,
         width: surfaceWidthRef.current,
-        snapshot: rowVirtualizer.takeSnapshot(),
+        snapshot,
         expandedIds: Array.from(expandedIdsRef.current),
       });
       setConfigRef.current(SURFACE_SCROLL_RESTORE_KEY, serialized);
