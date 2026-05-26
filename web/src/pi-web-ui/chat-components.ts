@@ -1222,8 +1222,8 @@ export class ToolMessage extends LitElement {
         <summary class="tool-disclosure-summary group list-none cursor-pointer select-none pb-2">
           <div class="flex items-center gap-2 min-w-0">
             <div class="min-w-0 flex-1 flex items-baseline gap-2">
-              <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline">${summary.title}</div>
-              <div class="text-xs text-muted-foreground leading-none truncate min-w-0 group-hover:underline">${summary.subtitle}</div>
+              <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline select-text">${summary.title}</div>
+              <div class="text-xs text-muted-foreground leading-none truncate min-w-0 group-hover:underline select-text">${summary.subtitle}</div>
             </div>
           </div>
         </summary>
