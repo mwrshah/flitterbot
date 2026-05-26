@@ -13,7 +13,6 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { memo, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";
-import { streamingUiDebug } from "~/lib/debug-log";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList } from "~/pi-web-ui/chat-components";
@@ -55,9 +54,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const elementRef = useRef<MessageListElement | null>(null);
   const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
   const clearActiveToolsQueuedRef = useRef(false);
-  /** Set to true after commitStreaming — the next React-driven messages update
-   *  skips perf tracking since the Lit component already has the data. */
-  const committedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
@@ -121,23 +117,9 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     const el = elementRef.current as MessageListElement & Record<string, unknown>;
     flushActiveTools();
 
-    // If Lit already committed these messages imperatively (message_end path),
-    // sync the property for internal consistency (e.g. getTurnCopyText) but
-    // skip perf tracking and scroll — the Lit component's shouldUpdate will
-    // suppress the redundant render.
-    if (committedRef.current) {
-      committedRef.current = false;
-      streamingUiDebug(
-        "[debug][StreamsMessageList] React catch-up: skipping perf tracking (Lit already committed)",
-      );
-      el.messages = messages;
-      el.tools = EMPTY_TOOLS;
-      el.pendingToolCalls = EMPTY_PENDING;
-      el.isSessionBusy = isSessionBusy;
-      flushActiveTools();
-      return;
-    }
-
+    // Always assign. When Lit already committed these messages imperatively
+    // (message_end path), its shouldUpdate (_committedTotal) suppresses the
+    // redundant render.
     const renderToken = streamingPerf.beginCommittedLitRender();
     el.messages = messages;
     el.tools = EMPTY_TOOLS;
@@ -190,15 +172,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     },
     commitStreaming(messages: AgentMessage[]) {
       elementRef.current?.commitStreaming(messages);
-      committedRef.current = true;
       notifyMessagesRendered();
     },
     commitToolResult(message: AgentMessage) {
       const committed = elementRef.current?.commitToolResult(message) ?? false;
-      if (committed) {
-        committedRef.current = true;
-        notifyMessagesRendered();
-      }
+      if (committed) notifyMessagesRendered();
       return committed;
     },
     setActiveTools(states: ActiveToolState[]) {
