@@ -432,7 +432,7 @@ export function ChatPanel({
         buttons.push({
           id: "merge-base-branch",
           label: "merge into base",
-          insertText: `Pls commit all changes in ${worktree.worktreePath}, then merge the current worktree branch ${worktree.branch} into the base branch: ${worktree.baseBranch}.`,
+          insertText: `Pls commit all changes in ${worktree.worktreePath}, then merge the current worktree branch ${worktree.branch} (using bash tool) into branch "${worktree.baseBranch}".`,
         });
       }
       return buttons;
