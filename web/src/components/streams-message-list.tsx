@@ -55,7 +55,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const elementRef = useRef<MessageListElement | null>(null);
   const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
   const clearActiveToolsQueuedRef = useRef(false);
-  const renderNotificationSeqRef = useRef(0);
   /** Set to true after commitStreaming — the next React-driven messages update
    *  skips perf tracking since the Lit component already has the data. */
   const committedRef = useRef(false);
@@ -65,16 +64,13 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const notifyMessagesRendered = (renderComplete?: Promise<unknown>) => {
     const el = elementRef.current;
     if (!el) return;
-    const seq = ++renderNotificationSeqRef.current;
     void (renderComplete ?? el.updateComplete).then(() => {
-      if (seq !== renderNotificationSeqRef.current) return;
       if (elementRef.current !== el) return;
       flushActiveTools();
       // Defer scroll until after the browser runs layout — updateComplete
       // resolves when the parent Lit element finishes, but child components
       // may still be rendering. rAF ensures scrollHeight reflects final DOM.
       requestAnimationFrame(() => {
-        if (seq !== renderNotificationSeqRef.current) return;
         onMessagesRendered?.();
       });
     });

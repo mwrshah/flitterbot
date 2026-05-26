@@ -220,21 +220,12 @@ export function ChatPanel({
     initialScrollKey: piSessionId,
   });
 
-  // One-shot intent set by handleSubmit: the next render-complete callback
-  // unconditionally scrolls to bottom and re-pins, regardless of the current
-  // pinned state. Optimistic insert must always reveal the user's own message.
-  const forceScrollOnNextRenderRef = useRef(false);
-
   const handleMessagesRendered = useCallback(() => {
+    if (!isAtBottomRef.current) return;
     const scrollToken = streamingPerf.beginScroll();
-    if (forceScrollOnNextRenderRef.current) {
-      forceScrollOnNextRenderRef.current = false;
-      engageAndScroll();
-    } else if (isAtBottomRef.current) {
-      scrollToBottom();
-    }
+    scrollToBottom();
     streamingPerf.endScroll(scrollToken);
-  }, [engageAndScroll, isAtBottomRef, scrollToBottom]);
+  }, [isAtBottomRef, scrollToBottom]);
 
   // Wire streaming deltas from the streaming store to the Lit web component.
   // We drive scroll explicitly here instead of using MutationObserver /
@@ -387,13 +378,10 @@ export function ChatPanel({
         ...(images?.length ? { images } : {}),
       };
       const cacheKey = ["streams-history", piSessionId, "agent"] as const;
-      // Force-scroll on the next render-complete callback. Set BEFORE the
-      // cache write so the React render it triggers (and the Lit commit that
-      // follows) lands with the intent already armed. This always reveals the
-      // optimistic message — independent of whether the user was already
-      // pinned to the bottom.
-      forceScrollOnNextRenderRef.current = true;
       queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [...(old ?? []), optimistic]);
+      // Re-pin and scroll immediately. The Lit render that follows will grow
+      // scrollHeight; handleMessagesRendered then lands on the real bottom.
+      engageAndScroll();
 
       setIsSending(true);
 
@@ -413,7 +401,7 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [appendBusyQueuedText, isSessionBusy, onSendMessage, piSessionId, queryClient],
+    [appendBusyQueuedText, engageAndScroll, isSessionBusy, onSendMessage, piSessionId, queryClient],
   );
 
   // Recover/Reopen is only meaningful when we have a streamId to act on.
