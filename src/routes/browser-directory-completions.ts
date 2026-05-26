@@ -25,6 +25,16 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const rawQuery = url.searchParams.get("query") ?? "";
   const streamId = url.searchParams.get("streamId");
+
+  // Empty / whitespace-only query: bail before any search or fs work.
+  if (!rawQuery.trim()) {
+    return sendJson(res, 200, {
+      items: [],
+      cwd: "",
+      query: rawQuery,
+    } satisfies DirectoryCompletionsResponse);
+  }
+
   const baseCwd = await resolveBaseCwd(runtime, streamId);
   const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery);
 
@@ -63,27 +73,34 @@ export async function handleBrowserDirectoryCompletionsRoute(
       (item) => !isFileFinderExcludedPath(item.relativePath),
     );
     const seenDirs = new Set<string>();
-    const matchingDirItems: DirectoryCompletionItem[] = [];
+    // Two buckets in a single pass: prefix matches outrank substring matches.
+    // Dedup spans both buckets so a later contains-hit can't shadow an earlier
+    // starts-with-hit (or vice versa).
+    const startsWithDirItems: DirectoryCompletionItem[] = [];
+    const containsDirItems: DirectoryCompletionItem[] = [];
     for (const item of searchableItems) {
       // Walk only downstream directories (skip upstream prefix segments)
       const parts = item.relativePath.split("/");
       for (let i = prefixDepth; i < parts.length - 1; i++) {
-        if (parts[i]!.toLowerCase().includes(termLower)) {
-          const dirRel = parts.slice(0, i + 1).join("/");
-          if (!seenDirs.has(dirRel)) {
-            seenDirs.add(dirRel);
-            matchingDirItems.push(
-              toCompletionItem(
-                path.join(resolution.repoRoot, dirRel),
-                "directory",
-                baseCwd,
-                rawQuery,
-              ),
-            );
-          }
+        const segLower = parts[i]!.toLowerCase();
+        if (!segLower.includes(termLower)) continue;
+        const dirRel = parts.slice(0, i + 1).join("/");
+        if (seenDirs.has(dirRel)) continue;
+        seenDirs.add(dirRel);
+        const completionItem = toCompletionItem(
+          path.join(resolution.repoRoot, dirRel),
+          "directory",
+          baseCwd,
+          rawQuery,
+        );
+        if (segLower.startsWith(termLower)) {
+          startsWithDirItems.push(completionItem);
+        } else {
+          containsDirItems.push(completionItem);
         }
       }
     }
+    const matchingDirItems = [...startsWithDirItems, ...containsDirItems];
 
     const fuzzyFileItems = searchableItems.map((item) =>
       toCompletionItem(
@@ -169,18 +186,30 @@ async function listDirectoryCompletionItems(
 
   const filterLower = filter.toLowerCase();
 
-  const filtered = entries.filter((entry) => {
-    if (isFileFinderExcludedName(entry.name)) return false;
-    if (filterLower && !entry.name.toLowerCase().includes(filterLower)) return false;
-    return true;
-  });
+  // Single pass: filter + tag each surviving entry with a startsWith flag so
+  // the sort can prioritize prefix matches over substring matches without a
+  // second scan or extra string ops inside the comparator.
+  type Tagged = { entry: import("node:fs").Dirent; startsWith: boolean };
+  const filtered: Tagged[] = [];
+  for (const entry of entries) {
+    if (isFileFinderExcludedName(entry.name)) continue;
+    if (!filterLower) {
+      filtered.push({ entry, startsWith: true });
+      continue;
+    }
+    const nameLower = entry.name.toLowerCase();
+    if (!nameLower.includes(filterLower)) continue;
+    filtered.push({ entry, startsWith: nameLower.startsWith(filterLower) });
+  }
 
-  const dirs = filtered.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
-  const files = filtered
-    .filter((e) => !e.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const cmp = (a: Tagged, b: Tagged) => {
+    if (a.startsWith !== b.startsWith) return a.startsWith ? -1 : 1;
+    return a.entry.name.localeCompare(b.entry.name);
+  };
+  const dirs = filtered.filter((t) => t.entry.isDirectory()).sort(cmp);
+  const files = filtered.filter((t) => !t.entry.isDirectory()).sort(cmp);
 
-  const sorted = [...dirs, ...files].slice(0, MAX_ITEMS);
+  const sorted = [...dirs, ...files].slice(0, MAX_ITEMS).map((t) => t.entry);
   const displayPrefix = isTilde
     ? pathParam.slice(0, pathParam.lastIndexOf("/") + 1) || "~/"
     : dirPrefix;
