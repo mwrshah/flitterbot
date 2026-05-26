@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
 import type http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -10,6 +13,59 @@ import { sendJson } from "./_shared.ts";
 
 const MAX_FILES = 50;
 const MAX_CHANGED_LINES = 5000;
+
+type GitExecOpts = {
+  cwd: string;
+  encoding: "utf8";
+  timeout: number;
+  maxBuffer: number;
+  env?: NodeJS.ProcessEnv;
+};
+
+async function prepareDiffIndex(
+  execOpts: GitExecOpts,
+): Promise<{ execOpts: GitExecOpts; cleanup: () => Promise<void> }> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "-z"],
+    execOpts,
+  );
+  const untrackedFiles = stdout.split("\0").filter(Boolean);
+  if (untrackedFiles.length === 0) {
+    return { execOpts, cleanup: async () => {} };
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "flitterbot-diff-index-"));
+  try {
+    const { stdout: indexPathRaw } = await execFileAsync(
+      "git",
+      ["rev-parse", "--git-path", "index"],
+      execOpts,
+    );
+    const indexPath = indexPathRaw.trim();
+    const sourceIndexPath = path.isAbsolute(indexPath)
+      ? indexPath
+      : path.join(execOpts.cwd, indexPath);
+    const tempIndexPath = path.join(tempDir, "index");
+    await fs.copyFile(sourceIndexPath, tempIndexPath);
+
+    const diffExecOpts = {
+      ...execOpts,
+      env: { ...process.env, ...execOpts.env, GIT_INDEX_FILE: tempIndexPath },
+    };
+    await execFileAsync("git", ["add", "--intent-to-add", "--", ...untrackedFiles], diffExecOpts);
+
+    return {
+      execOpts: diffExecOpts,
+      cleanup: async () => {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      },
+    };
+  } catch (err) {
+    await fs.rm(tempDir, { recursive: true, force: true });
+    throw err;
+  }
+}
 
 function parseStatSummary(stat: string): {
   files: number;
@@ -63,51 +119,73 @@ export async function handleBrowserPiSessionDiffRoute(
     return sendJson(response, 500, { ok: false, error: "Failed to find merge base" });
   }
 
-  // Preflight: cheap --stat to check size
-  let stat: string;
+  let preparedDiffIndex: { execOpts: GitExecOpts; cleanup: () => Promise<void> };
   try {
-    const { stdout } = await execFileAsync("git", ["diff", base, "--stat"], execOpts);
-    stat = stdout;
+    preparedDiffIndex = await prepareDiffIndex(execOpts);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    runtime.log(`diff stat error: ${message}`);
+    runtime.log(`diff index error: ${message}`);
     return sendJson(response, 500, { ok: false, error: "Failed to compute diff" });
   }
 
-  if (!stat.trim()) {
-    response.statusCode = 204;
-    response.end();
-    return;
-  }
-
-  const { files, insertions, deletions } = parseStatSummary(stat);
-
-  if (files > MAX_FILES || insertions + deletions > MAX_CHANGED_LINES) {
-    return sendJson(response, 200, {
-      mode: "summary",
-      stat,
-      files,
-      insertions,
-      deletions,
-    });
-  }
-
-  // Full diff
-  let diff: string;
   try {
-    const { stdout } = await execFileAsync("git", ["diff", base], execOpts);
-    diff = stdout;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    runtime.log(`diff route error: ${message}`);
-    return sendJson(response, 500, { ok: false, error: "Failed to compute diff" });
-  }
+    // Preflight: cheap --stat to check size
+    let stat: string;
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["diff", base, "--stat"],
+        preparedDiffIndex.execOpts,
+      );
+      stat = stdout;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      runtime.log(`diff stat error: ${message}`);
+      return sendJson(response, 500, { ok: false, error: "Failed to compute diff" });
+    }
 
-  if (!diff.trim()) {
-    response.statusCode = 204;
-    response.end();
-    return;
-  }
+    if (!stat.trim()) {
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
 
-  return sendJson(response, 200, { mode: "diff", diff });
+    const { files, insertions, deletions } = parseStatSummary(stat);
+
+    if (files > MAX_FILES || insertions + deletions > MAX_CHANGED_LINES) {
+      return sendJson(response, 200, {
+        mode: "summary",
+        stat,
+        files,
+        insertions,
+        deletions,
+      });
+    }
+
+    // Full diff
+    let diff: string;
+    try {
+      const { stdout } = await execFileAsync("git", ["diff", base], preparedDiffIndex.execOpts);
+      diff = stdout;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      runtime.log(`diff route error: ${message}`);
+      return sendJson(response, 500, { ok: false, error: "Failed to compute diff" });
+    }
+
+    if (!diff.trim()) {
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+
+    return sendJson(response, 200, { mode: "diff", diff });
+  } finally {
+    try {
+      await preparedDiffIndex.cleanup();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      runtime.log(`diff index cleanup error: ${message}`);
+    }
+  }
 }
