@@ -128,6 +128,11 @@ const SURFACE_BUBBLE_CHROME_WIDTH = 26;
 const COPY_RESET_MS = 1500;
 const SURFACE_ROW_GAP = 12;
 const SURFACE_OVERSCAN = 8;
+// Distance-from-end (px) under which virtual-core treats the viewport as "at the
+// bottom" for anchorTo: 'end' pinning and followOnAppend autoscroll. One row gap
+// plus a few px of breathing room — if a user has scrolled even slightly back to
+// read history, streaming growth should NOT yank them forward.
+const SURFACE_SCROLL_END_THRESHOLD = 32;
 const SURFACE_SCROLL_RESTORE_WIDTH_TOLERANCE = 32;
 const SURFACE_SCROLL_RESTORE_DEBUG = false;
 const EMPTY_SURFACE_SCROLL_SNAPSHOT: VirtualItem[] = [];
@@ -1057,6 +1062,15 @@ export function Surface() {
       restoredScrollStateRef.current?.snapshot ?? EMPTY_SURFACE_SCROLL_SNAPSHOT,
     initialOffset: initialOffsetRef.current ?? 0,
     overscan: SURFACE_OVERSCAN,
+    // anchorTo='end' pins the viewport to the bottom when the last message grows
+    // during streaming output (resizeItem path) AND when new messages are appended
+    // while the user is already within scrollEndThreshold of the bottom. It is a
+    // no-op on first mount (gated on prevOptions !== undefined in virtual-core),
+    // so our pretext-based initialOffset + heightsReady reveal-gate still own
+    // first-paint bottom landing and the estimate→actual reconciliation bridge.
+    anchorTo: "end",
+    followOnAppend: "smooth",
+    scrollEndThreshold: SURFACE_SCROLL_END_THRESHOLD,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
