@@ -35,6 +35,7 @@ import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
+  Check,
   Code,
   Copy,
   createElement,
@@ -300,10 +301,10 @@ export class MessageCopyButton extends LitElement {
       <button
         @click=${this.copy}
         data-copied=${this.copied ? "true" : "false"}
-        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-60 hover:opacity-100 data-[copied=true]:text-emerald-500 data-[copied=true]:opacity-100 transition-opacity cursor-pointer"
+        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 opacity-60 transition-opacity cursor-pointer data-[copied=false]:hover:text-muted-foreground data-[copied=false]:hover:opacity-100 data-[copied=true]:opacity-100 data-[copied=true]:cursor-default"
         title="${i18n("Copy message")}"
       >
-        ${unsafeHTML(iconSvg(Copy, "sm"))}
+        ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
       </button>
     `;
   }
