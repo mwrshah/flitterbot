@@ -121,6 +121,17 @@ function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
   for (const item of matched) {
     (item.kind === "command" ? commands : nonCommands).push(item);
   }
+  // Rank prefix matches ahead of mid-string matches within each group, alpha tie-break.
+  const cmp = (a: SkillListItem, b: SkillListItem) => {
+    const aStarts = a.name.toLowerCase().startsWith(lower);
+    const bStarts = b.name.toLowerCase().startsWith(lower);
+    if (aStarts !== bStarts) return aStarts ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  };
+  if (filter) {
+    nonCommands.sort(cmp);
+    commands.sort(cmp);
+  }
   return [...nonCommands, ...commands];
 }
 
