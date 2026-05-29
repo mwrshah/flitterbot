@@ -936,7 +936,7 @@ function summarizeToolCall(
   pending: boolean,
   isStreaming: boolean,
   aborted: boolean,
-): { title: string; subtitle: string } {
+): { title: string; state: string; subtitle: string } {
   const state = aborted
     ? i18n("aborted")
     : pending || isStreaming
@@ -949,29 +949,29 @@ function summarizeToolCall(
 
   const p = paramRecord(params);
   const name = toolName.toLowerCase();
-  const title = `${toolName} ${state}`;
+  const title = name === "send_to_user" ? "Notify User" : toolName;
 
   if (name === "bash") {
-    return { title, subtitle: String(p.command ?? "") };
+    return { title, state, subtitle: String(p.command ?? "") };
   }
 
   if (name === "edit" || name === "write" || name === "read") {
-    return { title, subtitle: toolPathParam(p) };
+    return { title, state, subtitle: toolPathParam(p) };
   }
 
   if (name === "grep") {
-    return { title, subtitle: String(p.pattern ?? "") };
+    return { title, state, subtitle: String(p.pattern ?? "") };
   }
 
   if (name === "ls" || name === "glob") {
-    return { title, subtitle: String(p.path ?? p.pattern ?? p.directory ?? ".") };
+    return { title, state, subtitle: String(p.path ?? p.pattern ?? p.directory ?? ".") };
   }
 
   if (name === "send_to_user") {
-    return { title: `Notify User ${state}`, subtitle: String(p.text ?? p.message ?? "") };
+    return { title, state, subtitle: String(p.text ?? p.message ?? "") };
   }
 
-  return { title, subtitle: "" };
+  return { title, state, subtitle: "" };
 }
 
 export class UserMessage extends LitElement {
@@ -1212,7 +1212,7 @@ export class ToolMessage extends LitElement {
         <summary class="tool-disclosure-summary group list-none cursor-pointer select-none pb-2">
           <div class="flex items-center gap-2 min-w-0">
             <div class="min-w-0 flex-1 flex items-baseline gap-2">
-              <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline select-text">${summary.title}</div>
+              <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline select-text"><span class="inline-block w-[1em] text-center">${summary.state}</span> ${summary.title}</div>
               <div class="text-xs text-muted-foreground leading-none truncate min-w-0 group-hover:underline select-text">${summary.subtitle}</div>
             </div>
           </div>
