@@ -938,7 +938,7 @@ function summarizeToolCall(
   aborted: boolean,
 ): { title: string; state: string; subtitle: string } {
   const state = aborted
-    ? i18n("aborted")
+    ? "–"
     : pending || isStreaming
       ? "↺"
       : result?.isError
