@@ -940,12 +940,12 @@ function summarizeToolCall(
   const state = aborted
     ? i18n("aborted")
     : pending || isStreaming
-      ? i18n("running")
+      ? "↺"
       : result?.isError
-        ? i18n("error")
+        ? "✕"
         : result
-          ? i18n("done")
-          : i18n("pending");
+          ? "✓"
+          : "↺";
 
   const p = paramRecord(params);
   const name = toolName.toLowerCase();
