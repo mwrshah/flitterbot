@@ -16,7 +16,7 @@ import { cn } from "~/lib/utils";
 function piStatusDotClass(status: PiSessionStatus | undefined): string {
   switch (status) {
     case "active":
-      return "bg-emerald-500 animate-pulse";
+      return "bg-emerald-500";
     case "waiting_for_sessions":
       return "bg-lime-400";
     case "waiting_for_user":
