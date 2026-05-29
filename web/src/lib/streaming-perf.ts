@@ -1,11 +1,3 @@
-/**
- * Streaming pipeline performance instrumentation.
- *
- * Enable via browser console: window.__STREAMING_PERF = true
- * View report: streamingPerf.report()
- * Reset data: streamingPerf.reset()
- */
-
 type SpanKind =
   | "deltaToCallback"
   | "streamingDomWrite"

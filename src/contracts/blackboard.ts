@@ -1,7 +1,5 @@
 export const BLACKBOARD_SCHEMA_VERSION = 20;
 
-// --- Shared types used across multiple files ---
-
 export type MessageMetadata = {
   router_action?: string;
   stream_id?: string;

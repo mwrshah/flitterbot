@@ -95,9 +95,7 @@ async function terminateDaemonPids(
   for (const pid of unique) {
     try {
       process.kill(pid, signal);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   const deadline = Date.now() + waitMs;

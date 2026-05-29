@@ -51,8 +51,6 @@ export async function handleBrowserDirectoryCompletionsRoute(
       } satisfies DirectoryCompletionsResponse);
     }
 
-    // Extract directories whose NAME matches the search term, deduped.
-    // Only check segments DOWNSTREAM of the path prefix — upstream dirs are already locked in.
     const spaceIdx = resolution.searchTerm.lastIndexOf(" ");
     const pathPrefix = spaceIdx >= 0 ? resolution.searchTerm.slice(0, spaceIdx) : "";
     const pureTerm =
@@ -63,13 +61,9 @@ export async function handleBrowserDirectoryCompletionsRoute(
       (item) => !isFileFinderExcludedPath(item.relativePath),
     );
     const seenDirs = new Set<string>();
-    // Two buckets in a single pass: prefix matches outrank substring matches.
-    // Dedup spans both buckets so a later contains-hit can't shadow an earlier
-    // starts-with-hit (or vice versa).
     const startsWithDirItems: DirectoryCompletionItem[] = [];
     const containsDirItems: DirectoryCompletionItem[] = [];
     for (const item of searchableItems) {
-      // Walk only downstream directories (skip upstream prefix segments)
       const parts = item.relativePath.split("/");
       for (let i = prefixDepth; i < parts.length - 1; i++) {
         const segLower = parts[i]!.toLowerCase();
@@ -100,7 +94,6 @@ export async function handleBrowserDirectoryCompletionsRoute(
         rawQuery,
       ),
     );
-    // Directories first, then files, within the limit
     const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, MAX_ITEMS);
     const items = mergeCompletionItems(directoryItems, fuzzyItems);
     runtime.log(
@@ -123,11 +116,6 @@ export async function handleBrowserDirectoryCompletionsRoute(
   }
 }
 
-/**
- * True when `child` is `parent` itself or a descendant of it. Uses
- * `path.relative` rather than `startsWith` so prefix collisions like
- * `/Users/foo` vs `/Users/foo2` don't yield false positives.
- */
 function isUnder(child: string, parent: string): boolean {
   const rel = path.relative(parent, child);
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
@@ -137,27 +125,20 @@ async function listDirectoryCompletionItems(
   cwd: string,
   pathParam: string,
 ): Promise<DirectoryCompletionItem[]> {
-  // Expand leading ~ to the user's home directory
   const isAbsolute = pathParam.startsWith("/");
   const isTilde = pathParam.startsWith("~");
   const expandedParam = isTilde
     ? os.homedir() + (pathParam.length === 1 ? "/" : pathParam.slice(1))
     : pathParam;
 
-  // Split path into directory prefix and filter suffix
   const lastSlash = expandedParam.lastIndexOf("/");
   const dirPrefix = lastSlash >= 0 ? expandedParam.slice(0, lastSlash + 1) : "";
   const filter = lastSlash >= 0 ? expandedParam.slice(lastSlash + 1) : expandedParam;
 
   if (isFileFinderExcludedPath(dirPrefix)) return [];
 
-  // Resolve and validate the target directory
   const targetDir = path.resolve(cwd, dirPrefix);
 
-  // Security: allow explicit absolute paths and tilde-expanded paths.
-  // For relative paths, ensure they don't escape the project directory —
-  // EXCEPT when the user explicitly types `..` traversal, in which case the
-  // climb is allowed up to (but not above) the user's home directory.
   if (!isAbsolute && !isTilde) {
     const isParentTraversal = pathParam === ".." || pathParam.startsWith("../");
     if (isParentTraversal) {
@@ -176,9 +157,6 @@ async function listDirectoryCompletionItems(
 
   const filterLower = filter.toLowerCase();
 
-  // Single pass: filter + tag each surviving entry with a startsWith flag so
-  // the sort can prioritize prefix matches over substring matches without a
-  // second scan or extra string ops inside the comparator.
   type Tagged = { entry: import("node:fs").Dirent; startsWith: boolean };
   const filtered: Tagged[] = [];
   for (const entry of entries) {
@@ -254,7 +232,6 @@ function resolveRepoSearch(
   baseCwd: string,
   rawQuery: string,
 ): { repoRoot: string; searchTerm: string } | null {
-  // Trailing slash = directory drill-down, not a fuzzy search
   if (rawQuery.endsWith("/")) return null;
 
   const absoluteQuery = resolveAbsoluteQuery(baseCwd, rawQuery);
@@ -263,8 +240,6 @@ function resolveRepoSearch(
   const relativeToRepo = path.relative(repoRoot, absoluteQuery).replaceAll(path.sep, "/");
   const cleaned = relativeToRepo.replace(/^(\.\/|\/)+/, "").trim();
   if (!cleaned || cleaned === ".") return null;
-  // Split into fff-node's "pathPrefix/ searchTerm" format:
-  // "src/file-finder/smt" → "src/file-finder/ smt"
   const lastSlash = cleaned.lastIndexOf("/");
   const searchTerm =
     lastSlash >= 0 && cleaned.length > lastSlash + 1

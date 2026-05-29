@@ -7,24 +7,16 @@ import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
   images?: ImageAttachment[];
-  /** Client-generated UUID matching an optimistic bubble in cache. */
   clientMessageId?: string;
 };
 
 const rootApi = getRouteApi("__root__");
 
-/**
- * Shared hook for Streams chat routes (default + per-session).
- * Pulls timeline, connection state, and sendMessage from
- * TanStack Query cache and router context — no imperative subscriptions.
- */
 export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
   const { data: timeline = [] } = useQuery({
     ...streamsHistoryQueryOptions(piSessionId),
-    // Stale-while-revalidate: render cached/loader history immediately, then
-    // always revalidate session history in the background on mount/key change.
     initialData: loaderHistory,
     refetchOnMount: "always",
   });
@@ -41,9 +33,6 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
 
   const onSendMessage = useCallback(
     (text: string, options?: SendUserMessageOptions) => {
-      // Default-session commands always target the current default session,
-      // regardless of what the UI thinks the piSessionId is. Strip the target
-      // so backend routes via getDefault() — avoids stale IDs after reset/reload.
       const trimmed = text.trim();
       const targetsDefault =
         trimmed === "/clear" || trimmed === "/reload" || trimmed.startsWith("/new-stream");

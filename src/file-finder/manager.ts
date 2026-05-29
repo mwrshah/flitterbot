@@ -18,10 +18,6 @@ export function isFileFinderExcludedPath(candidatePath: string): boolean {
     .some((segment) => isFileFinderExcludedName(segment));
 }
 
-/**
- * Get or create a FileFinder instance for a given repo root.
- * One instance per repo root, reused across requests.
- */
 export function getOrCreate(repoRoot: string): FileFinder {
   const normalized = path.resolve(repoRoot);
 
@@ -33,7 +29,6 @@ export function getOrCreate(repoRoot: string): FileFinder {
     return existing;
   }
 
-  // Validate it's a git repo
   if (!fs.existsSync(path.join(normalized, ".git"))) {
     throw new Error(`Not a git repository: ${normalized}`);
   }
@@ -47,15 +42,11 @@ export function getOrCreate(repoRoot: string): FileFinder {
   instances.set(normalized, finder);
   evictIfNeeded();
 
-  // Warm up scan in background — don't block
   finder.waitForScan(5000).catch(() => {});
 
   return finder;
 }
 
-/**
- * Destroy all FileFinder instances. Call on runtime shutdown.
- */
 export function destroyAll(): void {
   for (const [key, finder] of instances) {
     if (!finder.isDestroyed) finder.destroy();

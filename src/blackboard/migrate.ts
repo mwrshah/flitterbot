@@ -28,8 +28,7 @@ function hasLegacyMarkers(db: DatabaseSync): boolean {
   if (!hasTable(db, "sessions")) {
     return false;
   }
-  // stream_sessions exists in V16/V17 DBs (pi_sessions was renamed);
-  // these are NOT legacy — they just need V18 to rename back.
+  // stream_sessions (V16/V17) is not legacy — V18 renames it back to pi_sessions
   if (hasTable(db, "stream_sessions")) {
     return false;
   }
@@ -155,7 +154,6 @@ function applyV4Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // Add workstreams table
     db.exec(`
       CREATE TABLE IF NOT EXISTS workstreams (
           id TEXT PRIMARY KEY,
@@ -166,12 +164,10 @@ function applyV4Migration(db: DatabaseSync): void {
       );
     `);
 
-    // Add workstream_id column to sessions
     db.exec(
       "ALTER TABLE sessions ADD COLUMN workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL;",
     );
 
-    // Recreate pi_sessions with updated status CHECK constraint
     db.exec(`
       CREATE TABLE pi_sessions_v4 (
           pi_session_id TEXT PRIMARY KEY,
@@ -219,19 +215,16 @@ function applyV5Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // 1. Add pi_session_id to sessions
     db.exec(
       "ALTER TABLE sessions ADD COLUMN pi_session_id TEXT REFERENCES pi_sessions(pi_session_id) ON DELETE SET NULL;",
     );
     db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);");
 
-    // 2. Add status + closed_at to workstreams
     db.exec(
       "ALTER TABLE workstreams ADD COLUMN status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed'));",
     );
     db.exec("ALTER TABLE workstreams ADD COLUMN closed_at TEXT;");
 
-    // 3. Recreate pi_sessions without 'idle' in CHECK constraint, migrate idle → waiting_for_user
     db.exec(`
       CREATE TABLE pi_sessions_v5 (
           pi_session_id TEXT PRIMARY KEY,
@@ -334,8 +327,7 @@ function applyV7Migration(db: DatabaseSync): void {
 }
 
 function applyV8Migration(db: DatabaseSync): void {
-  // No-op table recreation — 'init' was already in V6's CHECK constraint.
-  // Kept for migration-chain continuity; V11 later adds 'agent'.
+  // No-op recreation — 'init' already in V6's CHECK; kept for migration-chain continuity
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
@@ -389,13 +381,11 @@ function applyV9Migration(db: DatabaseSync): void {
 }
 
 function applyV10Migration(db: DatabaseSync): void {
-  // Drop launch_id from sessions; remove 'processed' from whatsapp_messages status CHECK.
-  // SQLite doesn't support DROP COLUMN (pre-3.35) or ALTER CHECK — recreate both tables.
+  // SQLite can't DROP COLUMN (pre-3.35) or ALTER CHECK, so both tables are recreated
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // 1. Recreate sessions without launch_id
     db.exec(`
       CREATE TABLE sessions_v10 (
           session_id TEXT PRIMARY KEY,
@@ -439,7 +429,6 @@ function applyV10Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
     `);
 
-    // 2. Recreate whatsapp_messages without 'processed' in CHECK
     db.exec(`
       CREATE TABLE whatsapp_messages_v10 (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,10 +464,7 @@ function applyV10Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V11: Add 'agent' to messages source CHECK constraint.
- * SQLite CHECK constraints are part of the table definition, so we recreate the table.
- */
+// SQLite CHECK constraints are part of the table definition, so the table is recreated
 function applyV11Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
@@ -517,16 +503,11 @@ function applyV11Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V12: Change messages.id from INTEGER AUTOINCREMENT to TEXT (UUID PK).
- * Add message_id_map table for agent UUID → server UUID bridging.
- */
 function applyV12Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // Recreate messages table with TEXT PK
     db.exec(`
       CREATE TABLE messages_v12 (
           id TEXT PRIMARY KEY,
@@ -571,10 +552,6 @@ function applyV12Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V13: Add pi_session_id to messages table so messages can be scoped to
- * the PI session that produced/consumed them.
- */
 function applyV13Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
@@ -593,9 +570,6 @@ function applyV13Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V14: Add last_datetime_reported_at to pi_sessions for per-session datetime injection tracking.
- */
 function applyV14Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
@@ -613,19 +587,13 @@ function applyV14Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V15: Rename workstreams → streams table and workstream_id → stream_id columns.
- * Recreate sessions, pi_sessions, and messages tables with the new column names.
- */
 function applyV15Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // 1. Rename workstreams table → streams
     db.exec(`ALTER TABLE workstreams RENAME TO streams;`);
 
-    // 2. Recreate sessions with stream_id instead of workstream_id
     db.exec(`
       CREATE TABLE sessions_v15 (
           session_id TEXT PRIMARY KEY,
@@ -669,7 +637,6 @@ function applyV15Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
     `);
 
-    // 3. Recreate pi_sessions with stream_id instead of workstream_id
     db.exec(`
       CREATE TABLE pi_sessions_v15 (
           pi_session_id TEXT PRIMARY KEY,
@@ -709,7 +676,6 @@ function applyV15Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
     `);
 
-    // 4. Recreate messages with stream_id instead of workstream_id
     db.exec(`
       CREATE TABLE messages_v15 (
           id TEXT PRIMARY KEY,
@@ -756,7 +722,6 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   let version = getSchemaVersion(db);
   if (version === 0) {
-    // Fresh database — apply full schema at once
     applyFullSchema(db);
     db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)").run(
       LATEST_BLACKBOARD_SCHEMA_VERSION,
@@ -856,16 +821,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
   return getSchemaVersion(db);
 }
 
-/**
- * V16: Rename pi_sessions → stream_sessions table and pi_session_id → stream_session_id columns.
- * Affects: pi_sessions, sessions (FK column), messages (FK column), message_id_map (column).
- */
 function applyV16Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // 1. Rename pi_sessions table → stream_sessions, rename pi_session_id → stream_session_id
     db.exec(`
       CREATE TABLE stream_sessions (
           stream_session_id TEXT PRIMARY KEY,
@@ -904,7 +864,6 @@ function applyV16Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_stream_sessions_stream ON stream_sessions(stream_id);
     `);
 
-    // 2. Recreate sessions with stream_session_id instead of pi_session_id
     db.exec(`
       CREATE TABLE sessions_v16 (
           session_id TEXT PRIMARY KEY,
@@ -948,7 +907,6 @@ function applyV16Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_sessions_stream_session ON sessions(stream_session_id);
     `);
 
-    // 3. Recreate messages with stream_session_id instead of pi_session_id
     db.exec(`
       CREATE TABLE messages_v16 (
           id TEXT PRIMARY KEY,
@@ -976,7 +934,6 @@ function applyV16Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_messages_stream_session ON messages(stream_session_id);
     `);
 
-    // 4. Recreate message_id_map with stream_session_id instead of pi_session_id
     db.exec(`
       CREATE TABLE message_id_map_v16 (
           server_id TEXT PRIMARY KEY,
@@ -1005,17 +962,12 @@ function applyV16Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V17: Rename pi_outbound → stream_outbound in messages source CHECK constraint.
- */
 function applyV17Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // Recreate messages table with updated CHECK constraint,
-    // transforming pi_outbound → stream_outbound during the INSERT
-    // (can't UPDATE in-place — old CHECK constraint rejects 'stream_outbound')
+    // transform pi_outbound → stream_outbound on INSERT; old CHECK rejects an in-place UPDATE
     db.exec(`
       CREATE TABLE messages_v17 (
           id TEXT PRIMARY KEY,
@@ -1055,16 +1007,11 @@ function applyV17Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V18: Revert V16 — rename stream_sessions → pi_sessions table and
- * stream_session_id → pi_session_id columns in sessions, messages, message_id_map.
- */
 function applyV18Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // 1. Rename stream_sessions table → pi_sessions, rename stream_session_id → pi_session_id
     db.exec(`
       CREATE TABLE pi_sessions (
           pi_session_id TEXT PRIMARY KEY,
@@ -1103,7 +1050,6 @@ function applyV18Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
     `);
 
-    // 2. Recreate sessions with pi_session_id instead of stream_session_id
     db.exec(`
       CREATE TABLE sessions_v18 (
           session_id TEXT PRIMARY KEY,
@@ -1147,7 +1093,6 @@ function applyV18Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_sessions_pi_session ON sessions(pi_session_id);
     `);
 
-    // 3. Recreate messages with pi_session_id instead of stream_session_id
     db.exec(`
       CREATE TABLE messages_v18 (
           id TEXT PRIMARY KEY,
@@ -1175,7 +1120,6 @@ function applyV18Migration(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_messages_pi_session ON messages(pi_session_id);
     `);
 
-    // 4. Recreate message_id_map with pi_session_id instead of stream_session_id
     db.exec(`
       CREATE TABLE message_id_map_v18 (
           server_id TEXT PRIMARY KEY,
@@ -1204,9 +1148,6 @@ function applyV18Migration(db: DatabaseSync): void {
   }
 }
 
-/**
- * V19: Add user_config table for persistent user preferences (panel layouts, theme, etc.).
- */
 function applyV19Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 

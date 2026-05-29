@@ -21,26 +21,20 @@ export async function handlePiSessionInterruptRoute(
     return sendJson(res, 404, body);
   }
 
-  // Abort the current in-flight streams turn; the queue pump will pick up the next item naturally
   let bashAborted = false;
   const session = managed.runtime?.session;
   if (session) {
     try {
       session.abort?.();
-    } catch {
-      // Non-fatal — continue to bash abort and CC signals
-    }
+    } catch {}
     try {
       if (session.isBashRunning) {
         session.abortBash?.();
         bashAborted = true;
       }
-    } catch {
-      // Non-fatal — continue to CC signals
-    }
+    } catch {}
   }
 
-  // Send Escape to each linked CC session — graceful interrupt without killing the process
   const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, piSessionId);
   let signaledSessions = 0;
   for (const ccSession of ccSessions) {
@@ -48,9 +42,7 @@ export async function handlePiSessionInterruptRoute(
       try {
         await sendEscapeToTmuxSession(ccSession.tmuxSession);
         signaledSessions++;
-      } catch {
-        // Stale tmux session reference — skip silently
-      }
+      } catch {}
     }
   }
 

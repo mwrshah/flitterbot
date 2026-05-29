@@ -38,14 +38,9 @@ export const SkillPicker = memo(function SkillPicker({
     caretLeft,
   });
 
-  // Manual selection management (cmdk won't auto-select with shouldFilter={false})
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Reset selection to first item and scroll list to top whenever the picker
-  // opens or the filtered set changes. Including `open` is required so that
-  // reopening the picker (which leaves this component mounted but rebuilds the
-  // DOM) re-syncs selection to the top of the fresh list.
   useLayoutEffect(() => {
     if (!open) return;
     setSelectedValue(items[0]?.name ?? "");
@@ -53,7 +48,6 @@ export const SkillPicker = memo(function SkillPicker({
     if (list) list.scrollTop = 0;
   }, [open, items]);
 
-  // Keep the selected item in view as the user keyboard-navigates.
   useEffect(() => {
     if (!selectedValue) return;
     requestAnimationFrame(() => {

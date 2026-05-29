@@ -1,7 +1,5 @@
 import type { BlackboardDatabase } from "./db.ts";
 
-// ── Pre-built query modes ──────────────────────────────────────────────────
-
 const MODES: Record<string, string> = {
   active_sessions: `
     SELECT s.session_id, s.tmux_session, s.project, s.status, s.started_at,
@@ -36,8 +34,6 @@ const MODES: Record<string, string> = {
     WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     ORDER BY m.name, p.cid`,
 };
-
-// ── Schema description (embedded in tool description for LLM context) ──────
 
 const SCHEMA_DESCRIPTION = `Run read-only SQL against the Flitterbot blackboard database (SQLite).
 
@@ -113,8 +109,6 @@ PARAMETERS:
   - mode: optional shortcut — one of: active_sessions, open_streams, session_summary, schema
     When mode is provided, sql is ignored.`;
 
-// ── Execution logic ────────────────────────────────────────────────────────
-
 function executeQuery(
   db: BlackboardDatabase,
   sql: string | undefined,
@@ -144,8 +138,6 @@ function executeQuery(
 
   return db.prepare(query).all() as Array<Record<string, unknown>>;
 }
-
-// ── Tool definition factory ────────────────────────────────────────────────
 
 export interface QueryBlackboardTool {
   name: string;

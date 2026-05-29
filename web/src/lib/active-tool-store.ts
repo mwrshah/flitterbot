@@ -1,11 +1,3 @@
-/**
- * Ephemeral per-session state for live tool execution progress.
- *
- * Tool execution start/update events are UI-only progress signals. They are
- * kept out of TanStack Query so the durable timeline stays stable while the
- * Lit tool cards update imperatively by toolUseId.
- */
-
 export type ActiveToolState = {
   toolUseId: string;
   pending: boolean;
@@ -59,13 +51,6 @@ export const activeToolStore = {
     emit(sessionId, { type: "upsert", state: { ...merged } });
   },
 
-  /**
-   * Remove a tool from the backing store without emitting a UI clear event.
-   *
-   * The canonical tool_result render path takes over immediately after this
-   * point, so silent removal avoids a transient clear/flicker while also
-   * preventing stale hydration on remount.
-   */
   dropTool(sessionId: string, toolUseId: string): void {
     const tools = activeToolsBySession.get(sessionId);
     if (!tools) return;

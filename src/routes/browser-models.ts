@@ -16,24 +16,6 @@ import { createPiAuthStorage } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
-/**
- * GET /api/models — return the configured model selector entries plus the
- * unpinned pi-mono catalog entries so the web client can offer the complete
- * list without render-path deduping.
- *
- * Response shape:
- *   - `pinned`:        curated favorites from `config.models[]`
- *   - `all`:           every unpinned provider/model in the pi SDK catalog,
- *                      annotated with an `available` flag derived from Pi's
- *                      canonical auth (API keys, OAuth subscription tokens,
- *                      or environment variables).
- *   - `defaultModel`:  id used when the web client sends no explicit override
- *
- * IDs in `all` use the composite `provider/modelId` format because pi-mono has
- * 142+ duplicate bare ids across providers (e.g. `claude-opus-4-7` in both
- * `anthropic` and `opencode`). `resolveModelEntry` on the server accepts
- * either form.
- */
 export async function handleBrowserModelsRoute(
   runtime: ControlSurfaceRuntime,
   _req: http.IncomingMessage,
@@ -42,21 +24,6 @@ export async function handleBrowserModelsRoute(
   return sendJson(res, 200, await buildModelsListResponse(runtime));
 }
 
-/**
- * POST /api/models/pin — toggle pinning for a given model id. Body:
- *   { id: "<curated id | provider/modelId>", pin: boolean }
- *
- * On `pin: true`, adds a `ModelConfigEntry` for the id to `config.models[]`
- * (creating it from the pi SDK catalog if the id is a composite), mutates
- * the in-memory runtime config, atomically rewrites `~/.flitterbot/config.json`,
- * and broadcasts a `resources_reloaded` WS event so every open tab refetches.
- *
- * On `pin: false`, removes the entry with matching id. Idempotent — no-ops
- * when the id is already absent.
- *
- * Returns the updated pinned list + defaultModel so callers can reconcile
- * without a separate GET.
- */
 export async function handleBrowserModelsPinRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,
@@ -80,7 +47,6 @@ export async function handleBrowserModelsPinRoute(
 
   if (body.pin) {
     if (current.some((m) => m.id === id)) {
-      // Already pinned — idempotent success.
       return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
     const entry = buildEntryFromId(id, userLabel, current);
@@ -94,7 +60,6 @@ export async function handleBrowserModelsPinRoute(
   } else {
     nextList = current.filter((m) => m.id !== id);
     if (nextList.length === current.length) {
-      // Nothing to remove — idempotent success.
       return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
     if (nextList.length === 0) {
@@ -105,9 +70,6 @@ export async function handleBrowserModelsPinRoute(
     }
   }
 
-  // If the current defaultModel is being unpinned AND the defaultModel was a
-  // curated id (not a composite), switch to the first remaining pinned id so
-  // config stays internally consistent.
   let nextDefault = runtime.config.defaultModel;
   if (!body.pin && runtime.config.defaultModel === id && !id.includes("/")) {
     nextDefault = nextList[0]!.id;
@@ -219,16 +181,6 @@ async function resolveProviderAvailability(
   return new Map(entries);
 }
 
-/**
- * Build a `ModelConfigEntry` for the given id. The id can be:
- *
- *   - A curated id already in `existing` (copy-through — useful for re-pinning
- *     after an unpin, though that path is already idempotent above).
- *   - A composite `provider/modelId` — resolved against the pi SDK catalog
- *     and synthesized into a fresh `ModelConfigEntry`.
- *
- * Returns null when the id matches neither form.
- */
 function buildEntryFromId(
   id: string,
   userLabel: string,

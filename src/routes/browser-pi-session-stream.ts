@@ -9,11 +9,6 @@ import { sendJson } from "./_shared.ts";
 
 const execPromise = promisify(cpExec);
 
-/**
- * Resolve the actual git branch checked out in a worktree. Returns null on
- * detached HEAD, missing path, or any git failure — callers render "unknown"
- * rather than blocking the stream info response on a flaky git read.
- */
 async function resolveWorktreeBranch(worktreePath: string): Promise<string | null> {
   try {
     const { stdout } = await execPromise("git rev-parse --abbrev-ref HEAD", {
@@ -34,10 +29,6 @@ export async function handleBrowserPiSessionStreamRoute(
   response: http.ServerResponse,
   piSessionId: string,
 ) {
-  // cwd is sourced exclusively from pi_sessions.cwd — i.e. where
-  // createAgentSession was invoked for this pi session. No fallback to
-  // stream.worktree_path / repo_path: the agent's actual working directory
-  // is the single source of truth.
   const piSession = runtime.blackboard.get<{ cwd: string }>(
     "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
     piSessionId,

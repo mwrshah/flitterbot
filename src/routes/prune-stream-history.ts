@@ -7,13 +7,6 @@ type PruneBody = {
   entryId?: unknown;
 };
 
-/**
- * POST /api/streams/prune
- * Body: { piSessionId: string, entryId: string }
- *
- * Prunes the pi session's conversation history from `entryId` onwards by
- * moving the SessionManager leaf backwards (see runtime.pruneStreamHistory).
- */
 export async function handlePruneStreamHistoryRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,

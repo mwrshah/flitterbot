@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-/**
- * Flitterbot uninstaller — Node.js rewrite of uninstall.sh.
- * Standalone ESM script using only node:* built-in modules.
- *
- * Usage: node uninstall.mjs [--dry-run] [--yes] [--meta] [--external-only]
- */
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -16,9 +10,6 @@ import { homedir, platform } from "node:os";
 import { execSync } from "node:child_process";
 import { createInterface } from "node:readline";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 const HOME = homedir();
 const FLITTERBOT_DIR = join(HOME, ".flitterbot");
 const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
@@ -34,9 +25,6 @@ const LEGACY_CRONTAB_TARGET = "crontab:user";
 const LOG_FILE = join(FLITTERBOT_DIR, "logs", "install.log");
 const CURRENT_OS = platform() === "darwin" ? "Darwin" : platform() === "linux" ? "Linux" : platform();
 
-// ---------------------------------------------------------------------------
-// CLI args
-// ---------------------------------------------------------------------------
 let DRY_RUN = false;
 let AUTO_YES = false;
 let REMOVE_RUNTIME = true;
@@ -49,9 +37,6 @@ for (const arg of process.argv.slice(2)) {
   else if (arg === "--external-only") REMOVE_RUNTIME = false;
 }
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
 let LOG_ENABLED = true;
 
 function sha256Text(text) {
@@ -153,9 +138,6 @@ function commandExists(cmd) {
   try { execSync(`command -v ${cmd}`, { stdio: "pipe" }); return true; } catch { return false; }
 }
 
-// ---------------------------------------------------------------------------
-// Manifest operations
-// ---------------------------------------------------------------------------
 function manifestDeleteTarget(targetKey) {
   if (!MANIFEST_AVAILABLE) return;
   let manifest;
@@ -181,9 +163,6 @@ function manifestGetTarget(targetKey) {
   } catch { return null; }
 }
 
-// ---------------------------------------------------------------------------
-// Prereqs
-// ---------------------------------------------------------------------------
 function ensurePrereqs() {
   mkdirSync(join(FLITTERBOT_DIR, "logs"), { recursive: true });
 
@@ -201,9 +180,6 @@ function ensurePrereqs() {
   warn(`Manifest not found at ${MANIFEST}. Proceeding with best-effort uninstall.`);
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall hooks
-// ---------------------------------------------------------------------------
 async function uninstallHooks() {
   if (!existsSync(SETTINGS)) {
     if (manifestTargetExists("~/.claude/settings.json")) {
@@ -224,7 +200,6 @@ async function uninstallHooks() {
   const prefix = `${HOME}/.flitterbot/hooks/`;
   const prefixNode = `node ${HOME}/.flitterbot/hooks/`;
 
-  // Drift detection
   if (manifestTargetExists("~/.claude/settings.json")) {
     const target = manifestGetTarget("~/.claude/settings.json");
     const expectedHash = target?.checksums?.file_after_install || "";
@@ -235,7 +210,6 @@ async function uninstallHooks() {
       }
     }
 
-    // Check if manifest-tracked entries were externally modified
     const mods = target?.modifications || [];
     const allHookEntries = [];
     if (settings.hooks) {
@@ -260,7 +234,6 @@ async function uninstallHooks() {
     });
   };
 
-  // Filter out Flitterbot hooks
   const filtered = { ...settings };
   if (filtered.hooks && typeof filtered.hooks === "object") {
     const newHooks = {};
@@ -276,7 +249,6 @@ async function uninstallHooks() {
     }
   }
 
-  // Check if anything changed
   if (canonicalJson(settings) === canonicalJson(filtered)) {
     info("Flitterbot hook entries are already absent.");
     if (!DRY_RUN) manifestDeleteTarget("~/.claude/settings.json");
@@ -301,9 +273,6 @@ async function uninstallHooks() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall launchd (macOS)
-// ---------------------------------------------------------------------------
 async function uninstallLaunchd() {
   if (!existsSync(PLIST) && !manifestTargetExists("~/Library/LaunchAgents/com.flitterbot.scheduler.plist")) {
     return;
@@ -326,9 +295,6 @@ async function uninstallLaunchd() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall systemd (Linux)
-// ---------------------------------------------------------------------------
 function systemctlUserAvailable() {
   try {
     execSync("systemctl --user show-environment", { stdio: "pipe" });
@@ -374,9 +340,6 @@ async function uninstallLinuxSystemd() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall legacy crontab
-// ---------------------------------------------------------------------------
 function computeLegacyCrontabAfterText(beforeText) {
   return beforeText
     .split("\n")
@@ -440,9 +403,6 @@ async function uninstallLinuxLegacyCrontab() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall web/.env
-// ---------------------------------------------------------------------------
 const FLITTERBOT_ENV_KEYS = ["VITE_FLITTERBOT_BASE_URL", "VITE_FLITTERBOT_TOKEN"];
 const WEB_ENV_MANIFEST_KEY = "web/.env";
 
@@ -522,9 +482,6 @@ async function uninstallWebEnv() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall scheduler (combined)
-// ---------------------------------------------------------------------------
 async function uninstallScheduler() {
   if (CURRENT_OS === "Darwin") {
     await uninstallLaunchd();
@@ -534,9 +491,6 @@ async function uninstallScheduler() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Graceful stop
-// ---------------------------------------------------------------------------
 function gracefulStop() {
   const upScript = join(FLITTERBOT_DIR, "bin", "flitterbot-up");
   if (existsSync(upScript)) {
@@ -548,9 +502,6 @@ function gracefulStop() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Uninstall runtime tree
-// ---------------------------------------------------------------------------
 async function uninstallRuntimeTree() {
   if (!REMOVE_RUNTIME) return;
 
@@ -579,9 +530,6 @@ async function uninstallRuntimeTree() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cleanup manifest if empty
-// ---------------------------------------------------------------------------
 function cleanupManifestIfEmpty() {
   if (!REMOVE_RUNTIME && !DRY_RUN && existsSync(MANIFEST)) {
     try {
@@ -595,9 +543,6 @@ function cleanupManifestIfEmpty() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 async function main() {
   ensurePrereqs();
 

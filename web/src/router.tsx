@@ -16,9 +16,7 @@ export function getRouter() {
   let startRealtime = () => () => {};
 
   const settingsStore = createSettingsStore((_settings) => {
-    // Reconnect WS when settings change
     wsClient.reconnect();
-    // Invalidate user-config so it refetches from the new backend
     queryClient.invalidateQueries({ queryKey: ["user-config"] });
   });
 

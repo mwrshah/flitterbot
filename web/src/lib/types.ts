@@ -1,5 +1,3 @@
-/* ── Chat timeline (shared with backend) ── */
-
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -15,11 +13,7 @@ export type {
   MessageSource,
 } from "../../../src/contracts/timeline.ts";
 
-/* ── Connection ── */
-
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
-
-/* ── Sessions ── */
 
 type SessionSummary = {
   sessionId: string;
@@ -69,8 +63,6 @@ type TmuxSessionInspection = {
   };
 };
 
-/* ── Transcripts ── */
-
 type TranscriptItem = {
   id: string;
   kind: "message" | "tool_call" | "tool_result" | "event";
@@ -87,8 +79,6 @@ export type TranscriptPage = {
   items: TranscriptItem[];
   nextCursor?: string;
 };
-
-/* ── Status ── */
 
 export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
 
@@ -129,8 +119,6 @@ export type StatusResponse = {
   shortcuts?: ShortcutBindingsConfig;
 };
 
-/* ── Streams ── */
-
 export type PiSessionStatus =
   | "active"
   | "waiting_for_user"
@@ -151,8 +139,6 @@ export type StreamSummary = {
   sessionCount: number;
   createdAt: string;
 };
-
-/* ── API responses ── */
 
 export type SessionListResponse = {
   items: SessionSummary[];
@@ -184,21 +170,16 @@ export type StreamsHistoryResponse = {
   items: ChatTimelineItem[];
 };
 
-/* ── Skills ── */
-
 export type SkillListItem = {
   name: string;
   description: string;
   disableModelInvocation: boolean;
-  /** "command" marks built-in slash commands; absent or "skill" for regular skills. */
   kind?: "skill" | "command";
 };
 
 export type SkillsListResponse = {
   items: SkillListItem[];
 };
-
-/* ── Models ── */
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -227,8 +208,6 @@ export type ModelsMutationResponse = ModelsListResponse & {
   ok: true;
 };
 
-/* ── Directory Completions ── */
-
 export type DirectoryCompletionItem = {
   name: string;
   kind: "directory" | "file";
@@ -242,8 +221,6 @@ export type DirectoryCompletionsResponse = {
   query: string;
 };
 
-/* ── WebSocket messages (inbound) ── */
-
 export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; piSessionId?: string }
@@ -254,19 +231,12 @@ export type WsMessage =
       type: "message_end";
       piSessionId?: string;
       message: ChatTimelineMessage;
-      /**
-       * `args` is canonical tool input. `displayArgs` is a UI-only render
-       * projection produced server-side and must never be fed back into
-       * tool execution.
-       */
       toolCalls?: Array<{
         toolUseId: string;
         toolName: string;
         args?: unknown;
         displayArgs?: unknown;
       }>;
-      /** Set on user-role message_end when the originating WS `message` event
-       *  carried a `clientMessageId`. Reconciles the optimistic UI bubble. */
       clientMessageId?: string;
     }
   | {
@@ -275,7 +245,6 @@ export type WsMessage =
       tool?: string;
       toolUseId?: string;
       args?: unknown;
-      /** UI-only display projection of `args`. Undefined when unchanged. */
       displayArgs?: unknown;
       result?: unknown;
       isError?: boolean;

@@ -1,16 +1,3 @@
-/**
- * WS → Query Cache bridge.
- *
- * Routes WebSocket events to TanStack Query cache via queryClient.setQueryData().
- * Replaces useStreamWsHandler — this is a plain function, not a React hook.
- *
- * Lifecycle: call setupWsQueryBridge() once at app startup (in router.tsx or
- * root route). It returns a teardown function for cleanup.
- *
- * Streaming deltas (text_delta, thinking_delta, toolcall_*) go to the
- * streaming-store instead of Query cache (high-frequency, imperative updates).
- */
-
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -29,14 +16,9 @@ import type {
 import { createId } from "~/lib/utils";
 import type { FlitterbotWsClient } from "~/lib/ws";
 
-/* ── Send message factory (provided via router context) ── */
-
 type SendMessageOptions = {
   images?: ImageAttachment[];
   targetPiSessionId?: string;
-  /** Client-generated UUID matching the optimistic user-message bubble in
-   *  cache. The server echoes this on user-role `message_end` so the bridge
-   *  can swap the optimistic entry for the canonical server-side one. */
   clientMessageId?: string;
 };
 
@@ -58,8 +40,6 @@ export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendM
   };
 }
 
-/* ── Timeline append helper with dedup ── */
-
 function appendTimelineItem(
   queryClient: QueryClient,
   sessionId: string,
@@ -70,9 +50,6 @@ function appendTimelineItem(
     queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
       const items = old ?? [];
 
-      // Dedup: check for an existing entry with same id, same serverMessageId,
-      // or same content+role (catches optimistic entries from message_ack that
-      // won't share an id with the surfaced message).
       if (item.kind === "message") {
         const msg = item as ChatTimelineMessage;
         const dupIdx = items.findIndex((existing) => {
@@ -104,8 +81,6 @@ function appendTimelineItem(
   queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
     const items = old ?? [];
 
-    // Dedup: skip if an item with the same identity already exists.
-    // For tool end items, match on toolUseId+phase; for messages, match on id.
     if (item.kind === "tool" && (item as ChatTimelineTool).toolUseId) {
       const tool = item as ChatTimelineTool;
       if (tool.phase !== "end") {
@@ -163,8 +138,6 @@ function appendTimelineItem(
   });
 }
 
-/* ── Main setup ── */
-
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;
@@ -172,19 +145,15 @@ export function setupWsQueryBridge(deps: {
 }): () => void {
   const { queryClient, wsClient, router } = deps;
 
-  /* ── WS message handler ── */
-
   const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
     const piSessionId =
       "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
 
-    // ── streams_changed / status_changed ──
     if (message.type === "streams_changed" || message.type === "status_changed") {
       queryClient.invalidateQueries({ queryKey: ["status"] });
       return;
     }
 
-    // ── sessions_changed ──
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
         queryKey: ["streams-downstream-sessions", message.piSessionId],
@@ -192,13 +161,11 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── worktree_changed ──
     if (message.type === "worktree_changed") {
       queryClient.invalidateQueries({ queryKey: ["streams-worktree", message.piSessionId] });
       return;
     }
 
-    // ── history_rewritten ──
     if (message.type === "history_rewritten") {
       queryClient.invalidateQueries({
         queryKey: ["streams-history", message.piSessionId],
@@ -206,7 +173,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── message_ack → optimistic user message on surface timeline ──
     if (message.type === "message_ack") {
       streamingUiDebug(
         "[debug][ws-bridge] message_ack: adding optimistic entry smId=%s cacheSize=%d",
@@ -228,13 +194,11 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── error ──
     if (message.type === "error") {
       toast.error(message.message);
       return;
     }
 
-    // ── resources_reloaded → refresh skills list + toast confirmation ──
     if (message.type === "resources_reloaded") {
       queryClient.invalidateQueries({ queryKey: ["skills"] });
       toast.success("Resources reloaded");
@@ -243,13 +207,11 @@ export function setupWsQueryBridge(deps: {
 
     if (!piSessionId) return;
 
-    // ── text_delta → streaming store ──
     if (message.type === "text_delta") {
       streamingStore.appendTextDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
-    // ── thinking lifecycle → streaming store ──
     if (message.type === "thinking_start") {
       streamingStore.setThinkingStreaming(piSessionId, true, message.messageId);
       return;
@@ -265,17 +227,13 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── toolcall_start (no-op — tool calls are committed via message_end) ──
     if (message.type === "toolcall_start") {
       return;
     }
 
-    // ── message_end → commit message + tool calls atomically ──
     if (message.type === "message_end") {
       const msg = message.message;
 
-      // Build all new timeline items from server-provided data, then commit
-      // in a single setQueryData call to avoid intermediate renders.
       const blocks = (msg as ChatTimelineMessage).blocks;
       const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
       const isUser = msg.role === "user";
@@ -284,15 +242,8 @@ export function setupWsQueryBridge(deps: {
       if (hasContent || message.toolCalls?.length) {
         const now = new Date().toISOString();
 
-        // Build the committed timeline items for both Query cache and imperative commit.
         const committedItems: ChatTimelineItem[] = [];
         if (hasContent) {
-          // Stamp the echoed clientMessageId onto the canonical user message
-          // so the structural-sharing comparator (mergeTimelineItems) can
-          // recognise the optimistic bubble (id === clientMessageId) as
-          // covered by the canonical (id === SDK entry.id). Without this,
-          // structuralSharing re-appends the optimistic as an "extra" and
-          // the user message renders twice.
           const stamped: ChatTimelineMessage =
             isUser && clientMessageId
               ? { ...msg, ...(blocks ? { blocks } : {}), clientMessageId }
@@ -310,9 +261,6 @@ export function setupWsQueryBridge(deps: {
               phase: "start",
               toolUseId: tc.toolUseId,
               args: tc.args as JsonValue | undefined,
-              // Canonical-vs-display invariant: `args` stays raw, this
-              // mirrors the server's UI projection. Never sent back into
-              // tool execution.
               displayArgs: tc.displayArgs as JsonValue | undefined,
               createdAt: now,
             });
@@ -324,13 +272,6 @@ export function setupWsQueryBridge(deps: {
           (old) => {
             const items = old ?? [];
 
-            // Upsert the message. Try reconciling against existing entries in
-            // this priority order:
-            //   1. clientMessageId (web optimistic bubbles)
-            //   2. serverMessageId (surface/input DB rows keyed by the
-            //      runtime's pre-allocated DB row id)
-            //   3. canonical id (entry.id) match for direct re-broadcasts
-            // Falls through to append when nothing matches.
             let next = items;
             if (hasContent) {
               const committed = committedItems[0] as ChatTimelineMessage;
@@ -361,7 +302,6 @@ export function setupWsQueryBridge(deps: {
               }
             }
 
-            // Append tool call start items from the server (dedup by toolUseId).
             if (message.toolCalls?.length) {
               const base = next === items ? [...items] : next;
               const toolItems = hasContent ? committedItems.slice(1) : committedItems;
@@ -384,10 +324,6 @@ export function setupWsQueryBridge(deps: {
           },
         );
 
-        // Imperative commit bypasses React for assistant messages (streaming
-        // perf). User messages always render through the React path — the
-        // optimistic entry is already in cache and on-screen by the time this
-        // echo arrives, so a duplicate imperative append would double-render.
         if (!isUser) {
           const agentMessages = timelineItemsToAgentMessages(committedItems);
           if (agentMessages.length > 0) {
@@ -405,7 +341,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── stream_surfaced → input surface Query cache ──
     if (message.type === "stream_surfaced") {
       const surfacedMessage: ChatTimelineMessage = {
         ...message.message,
@@ -414,7 +349,6 @@ export function setupWsQueryBridge(deps: {
       };
       if (!surfacedMessage.content.trim()) return;
 
-      // Reconcile: if this message has a serverMessageId, replace the optimistic entry
       const smId = surfacedMessage.serverMessageId;
       if (smId) {
         queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
@@ -447,7 +381,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_execution_update → imperative active-tool channel ──
     if (message.type === "tool_execution_update") {
       if (!message.toolUseId) return;
       activeToolStore.upsertTool(piSessionId, {
@@ -458,7 +391,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_execution_start → imperative active-tool channel ──
     if (message.type === "tool_execution_start") {
       if (!message.toolUseId) return;
       activeToolStore.upsertTool(piSessionId, {
@@ -468,7 +400,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_execution_end ──
     if (message.type === "tool_execution_end") {
       const eventRecord =
         message.event && typeof message.event === "object"
@@ -485,7 +416,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── tool_result → canonical durable tool flush ──
     if (message.type === "tool_result") {
       appendTimelineItem(queryClient, piSessionId, message.item);
 
@@ -499,7 +429,6 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── turn_end ──
     if (message.type === "turn_end") {
       streamingUiDebug(
         "[debug][ws-bridge] turn_end: calling clearSession for session=%s",
@@ -510,19 +439,16 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    // ── agent_end ──
     if (message.type === "agent_end") {
       streamingStore.clearSession(piSessionId);
       activeToolStore.clearSession(piSessionId);
       if (message.aborted) {
-        // message_end was skipped (abort) — revalidate from the server session file.
+        // abort skips message_end, so revalidate from the server session file
         queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
       }
       return;
     }
   });
-
-  /* ── Connection state handler — query cache + reconnect invalidation ── */
 
   let prevConnectionState = wsClient.connectionState;
 
@@ -531,15 +457,12 @@ export function setupWsQueryBridge(deps: {
     prevConnectionState = state;
 
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
-      // Re-fetch stale data after reconnect
       queryClient.invalidateQueries({ queryKey: ["status"] });
       queryClient.invalidateQueries({ queryKey: ["streams-history"] });
       queryClient.invalidateQueries({ queryKey: ["surface-timeline"] });
       router.invalidate();
     }
   });
-
-  /* ── Teardown ── */
 
   return () => {
     unsubscribeMessages();

@@ -1,7 +1,3 @@
-/**
- * Bridge between the ChatPanel timeline model and the pi-web-ui Lit
- * components that expect AgentMessage[] format.
- */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   AssistantMessage,
@@ -11,14 +7,6 @@ import type {
   ToolCall,
 } from "@earendil-works/pi-ai";
 
-/**
- * App-owned render extension of vendor `ToolCall`. The Flitterbot Lit
- * components read `displayArguments` for summaries and detail rendering;
- * the canonical `arguments` remains available for any action path that
- * needs raw values. Defined here (not as a private underscore field on
- * the vendor type) so the contract is explicit and the render layer can
- * fall through with `displayArguments ?? arguments`.
- */
 export type RenderableToolCall = ToolCall & {
   displayArguments?: Record<string, unknown>;
 };
@@ -53,18 +41,6 @@ function assistantBlocksToContent(message: ChatTimelineMessage): AssistantMessag
   });
 }
 
-/**
- * Convert our ChatTimelineItem[] into the AgentMessage[] shape that
- * pi-web-ui's <message-list> web component expects.
- *
- * Ordering: toolcall_start is now buffered in the streaming store until
- * message_end, so tool items always arrive in the Query cache *after* the
- * assistant message. The forward look-ahead finds them correctly.
- *
- * phase "update": tool_execution_update transitions "start" → "update" in-place.
- * Both phases carry the same toolUseId/name/args so the look-ahead treats them
- * identically — the tool call block stays visible throughout execution.
- */
 export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMessage[] {
   const messages: AgentMessage[] = [];
   const consumed = new Set<number>();
@@ -95,10 +71,6 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         content,
         timestamp: new Date(item.createdAt).getTime(),
         source,
-        // Non-standard passthrough: ChatTimelineMessage.id IS the SDK
-        // SessionManager entry id (post-message_end), so it can be passed
-        // straight through as the prune target. The <user-message> Lit
-        // component reads `_entryId` to expose the "delete from here" menu.
         _entryId: item.id,
       } as AgentMessage & { source: MessageSource; _entryId?: string });
       continue;
@@ -180,11 +152,6 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
   return messages;
 }
 
-/**
- * Convert a small set of timeline items (e.g. one message + its tool calls
- * from message_end) into AgentMessage[] format. Same logic as
- * timelineToAgentMessages but semantically named for the imperative commit path.
- */
 export function timelineItemsToAgentMessages(items: ChatTimelineItem[]): AgentMessage[] {
   return timelineToAgentMessages(items);
 }

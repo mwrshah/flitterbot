@@ -2,13 +2,11 @@ export type OrchestratorContext = {
   streamName: string;
   streamId: string;
   repoPath?: string;
-  /** Working directory of the orchestrator's pi session (pi_sessions.cwd). */
   cwd: string;
   piSessionId: string;
 };
 
 export type OrchestratorPromptOptions = {
-  /** When true, splice in the tmux sub-agent section and surface the pi-session ID. */
   tmux?: boolean;
 };
 

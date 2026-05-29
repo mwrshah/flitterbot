@@ -59,8 +59,6 @@ export function pingBlackboard(db: BlackboardDatabase): boolean {
   return db.ping();
 }
 
-/* ── Message ID mapping helpers ── */
-
 export function insertIdMapping(
   db: BlackboardDatabase,
   serverId: string,
@@ -83,7 +81,6 @@ export function resolveServerId(db: BlackboardDatabase, agentId: string): string
   return row?.server_id ?? null;
 }
 
-/** Returns a resolver function suitable for passing to the history parser. */
 export function createIdResolver(db: BlackboardDatabase): (agentId: string) => string | null {
   return (agentId: string) => resolveServerId(db, agentId);
 }

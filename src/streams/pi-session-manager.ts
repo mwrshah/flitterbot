@@ -23,7 +23,6 @@ import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 export { formatStreamPrompt };
 
 export interface ManagedPiSession {
-  /** Live SDK runtime. Null for dormant sessions rehydrated from DB on restart. */
   runtime: AgentSessionRuntime | null;
   queue: TurnQueue;
   state: PiSessionState;
@@ -32,12 +31,6 @@ export interface ManagedPiSession {
   streamName: string | null;
   piSessionId: string;
   createdAt: string;
-  /**
-   * Current effective model for this session. `entryId` is the `config.models[].id`
-   * that produced this model (used to skip redundant `setModel()` calls when the
-   * same override arrives). `provider`+`id` are the pi SDK identifiers persisted
-   * to `pi_sessions.model_provider` / `pi_sessions.model_id`.
-   */
   modelInfo: {
     provider: string;
     id: string;
@@ -45,9 +38,7 @@ export interface ManagedPiSession {
     thinkingLevel: ThinkingLevel;
   };
   unsubscribe: () => void;
-  /** Set during close_stream tool execution; checked post-turn to destroy after the turn completes. */
   pendingDestroy?: boolean;
-  /** Populated by pi-subscribe on agent_end; consumed by runtime.ts to broadcast stream_surfaced after persist. */
   lastSurfacedAssistantMessage?: ChatTimelineMessage;
 }
 
@@ -108,8 +99,6 @@ export class PiSessionManager {
     customTools: unknown[],
     resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
-    // Only reconcile the default session — orchestrator sessions for active streams
-    // must survive restarts so their piSessionId (and associated messages) are preserved.
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
 
     const created = await createFlitterbotAgent({
@@ -141,7 +130,6 @@ export class PiSessionManager {
       lastEventAt: new Date().toISOString(),
     });
 
-    // Re-associate orphaned sessions from ended pi sessions to this new default session
     const reassociated = reassociateOrphanedSessions(this.blackboard, managed.piSessionId);
     if (reassociated > 0) {
       this.log(`reassociated ${reassociated} orphaned session(s) to new default pi session`);
@@ -159,7 +147,6 @@ export class PiSessionManager {
     repoPath?: string,
     customTools?: unknown[],
   ): Promise<ManagedPiSession> {
-    // If one already exists for this stream, return it
     const existing = this.orchestrators.get(streamId);
     if (existing) return existing;
 
@@ -208,15 +195,6 @@ export class PiSessionManager {
     return managed;
   }
 
-  /**
-   * Rehydrate a dormant orchestrator from a pi_sessions DB row.
-   * No live SDK agent is created — just the in-memory maps are populated so that
-   * getInputSurfaceHistory() finds messages via the preserved piSessionId, and
-   * readSessionHistory() falls through to reading the JSONL file on disk.
-   *
-   * When a new message arrives for this stream, activateOrchestrator() creates
-   * the live agent session pointing at the existing session_file.
-   */
   rehydrateOrchestrator(
     streamId: string,
     streamName: string,
@@ -244,9 +222,6 @@ export class PiSessionManager {
       streamName,
       piSessionId,
       createdAt,
-      // Dormant sessions have no live SDK to query — record whatever the DB
-      // last knew. entryId is unknown until activation, so leave it blank;
-      // the first model override call will do a full setModel().
       modelInfo: {
         provider: modelProvider ?? "unknown",
         id: modelId ?? "unknown",
@@ -298,7 +273,6 @@ export class PiSessionManager {
       },
     });
 
-    // Update the DB row to reflect the new runtime instance
     upsertPiSession(this.blackboard, {
       piSessionId: piSessionId,
       role: "orchestrator",
@@ -320,13 +294,8 @@ export class PiSessionManager {
     return managed;
   }
 
-  /**
-   * Activate a dormant orchestrator by creating a live SDK agent session that
-   * resumes from the existing JSONL session_file. Called lazily when the first
-   * message arrives for a rehydrated stream.
-   */
   async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
-    if (managed.runtime) return; // already active
+    if (managed.runtime) return;
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
 
     const snapshot = managed.state.getSnapshot();
@@ -367,7 +336,6 @@ export class PiSessionManager {
       },
     );
 
-    // Re-initialize state with actual message count from the resumed session
     managed.state.initialize(session.sessionId, session.sessionFile, session.messages.length);
 
     this.log(
@@ -383,18 +351,11 @@ export class PiSessionManager {
     managed.queue.stop();
     try {
       managed.unsubscribe();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     try {
-      // dispose() is async on AgentSessionRuntime — fire and forget in sync context
       void managed.runtime?.dispose();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
 
-    // On clean shutdown, leave the session in waiting_for_user so the rehydration
-    // query finds it on next restart. Only permanently end on crash or explicit close.
     if (reason !== "shutdown") {
       const status = reason === "crashed" ? "crashed" : "ended";
       endPiSession(this.blackboard, managed.piSessionId, status, reason, new Date().toISOString());
@@ -411,12 +372,6 @@ export class PiSessionManager {
     this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
   }
 
-  /**
-   * Reset the default session: end the old pi_session, call newSession() on
-   * the SDK AgentSessionRuntime to tear down and recreate the session, update
-   * all in-memory maps and DB rows, re-subscribe, and broadcast so the frontend
-   * picks up the new piSessionId.
-   */
   async resetDefault(): Promise<void> {
     const old = this.defaultSession;
     if (!old?.runtime) {
@@ -425,33 +380,24 @@ export class PiSessionManager {
 
     const oldPiSessionId = old.piSessionId;
 
-    // 1. Stop queue and unsubscribe from SDK events
     old.queue.stop();
     try {
       old.unsubscribe();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
 
-    // 2. End the old pi_session in the DB
     endPiSession(this.blackboard, oldPiSessionId, "ended", "clear", new Date().toISOString());
     this.toolDisplayCache.deletePiSession(oldPiSessionId);
 
-    // 3. Call newSession() on the AgentSessionRuntime — tears down old session,
-    //    creates a new one via the stored factory
     await old.runtime.newSession();
 
     const newSession = old.runtime.session;
     const newPiSessionId = newSession.sessionId;
     const newSessionFile = newSession.sessionFile;
 
-    // 4. Re-initialize state with the new session
     old.state.initialize(newPiSessionId, newSessionFile, newSession.messages.length);
 
-    // 5. Update the managed session's piSessionId
     old.piSessionId = newPiSessionId;
 
-    // 6. Upsert the new pi_sessions row
     upsertPiSession(this.blackboard, {
       piSessionId: newPiSessionId,
       role: "default",
@@ -468,11 +414,9 @@ export class PiSessionManager {
       lastEventAt: new Date().toISOString(),
     });
 
-    // 7. Update byPiSessionId map
     this.byPiSessionId.delete(oldPiSessionId);
     this.byPiSessionId.set(newPiSessionId, old);
 
-    // 8. Create a new TurnQueue (old one is stopped)
     const processCallback = this.processCallback;
     old.queue = new TurnQueue({
       process: (item) => processCallback(old, item),
@@ -512,7 +456,6 @@ export class PiSessionManager {
       },
     });
 
-    // 9. Re-subscribe to SDK events on the new session
     this.toolDisplayCache.invalidatePiSession(newPiSessionId);
     old.unsubscribe = subscribeToPiSession(
       newSession,
@@ -527,7 +470,6 @@ export class PiSessionManager {
       },
     );
 
-    // 10. Broadcast status_changed so frontend picks up the new piSessionId
     this.wsHub.broadcast({
       type: "status_changed",
       subsystem: "pi_session",
@@ -538,19 +480,15 @@ export class PiSessionManager {
   }
 
   disposeAll(): void {
-    // Dispose orchestrators first
     for (const [streamId] of this.orchestrators) {
       this.destroyOrchestrator(streamId, "shutdown");
     }
 
-    // Dispose default
     if (this.defaultSession) {
       this.defaultSession.queue.stop();
       try {
         this.defaultSession.unsubscribe();
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       endPiSession(
         this.blackboard,
         this.defaultSession.piSessionId,
@@ -560,18 +498,13 @@ export class PiSessionManager {
       );
       try {
         void this.defaultSession.runtime?.dispose();
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       this.byPiSessionId.delete(this.defaultSession.piSessionId);
       this.toolDisplayCache.deletePiSession(this.defaultSession.piSessionId);
       this.defaultSession = undefined;
     }
   }
 
-  /**
-   * Build the initial prompt for a new orchestrator stream.
-   */
   buildStreamPrompt(
     currentMessage: string,
     streamName: string,
@@ -616,8 +549,6 @@ export class PiSessionManager {
     streamName: string | null,
   ): ManagedPiSession {
     const session = created.runtime.session;
-    // Circular init: queue callback closes over `managed`, so the object must exist first.
-    // null! signals deferred initialization — both fields are set immediately below.
     const managed: ManagedPiSession = {
       runtime: created.runtime,
       queue: null!,

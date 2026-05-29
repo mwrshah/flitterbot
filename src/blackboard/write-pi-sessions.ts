@@ -174,10 +174,6 @@ export function updatePiSessionModel(
   ).run(modelProvider, modelId, thinkingLevel, timestamp, piSessionId);
 }
 
-/**
- * Re-associate orphaned sessions whose pi_session_id points to an ended pi session.
- * Moves them to the given new (active) pi session.
- */
 export function reassociateOrphanedSessions(
   db: BlackboardDatabase,
   newPiSessionId: string,

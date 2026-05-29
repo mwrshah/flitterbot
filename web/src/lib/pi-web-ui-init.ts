@@ -1,8 +1,3 @@
-/**
- * Lazy-load and register the pi-web-ui Lit web components.
- * Components are defined in ../pi-web-ui/chat-components.ts.
- */
-
 let initPromise: Promise<void> | null = null;
 let initError: unknown = null;
 

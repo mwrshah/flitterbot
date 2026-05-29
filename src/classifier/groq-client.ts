@@ -5,9 +5,6 @@ const MODEL_ID = "openai/gpt-oss-120b";
 
 let cachedClient: OpenAI | null = null;
 
-/**
- * Resolve Groq API key from GROQ_API_KEY environment variable.
- */
 export function resolveGroqApiKey(): string | undefined {
   return process.env.GROQ_API_KEY;
 }
@@ -92,14 +89,9 @@ export async function callGroqClassify(
     }
   }
 
-  // All retries exhausted
   throw lastError;
 }
 
-/**
- * Generic Groq JSON call — sends a prompt and returns the parsed JSON response.
- * Unlike callGroqClassify, this does not impose a specific return type.
- */
 export async function callGroqJson<T>(apiKey: string, prompts: ClassifierPrompts): Promise<T> {
   const client = getClient(apiKey);
 
@@ -137,7 +129,6 @@ export async function callGroqJson<T>(apiKey: string, prompts: ClassifierPrompts
   throw lastError;
 }
 
-/** Reset cached client (for testing or key rotation). */
 export function resetGroqClient(): void {
   cachedClient = null;
 }

@@ -195,9 +195,9 @@ async function isSessionFree(sessionName: string): Promise<boolean> {
   if (!pane?.panePid) return true;
   try {
     await execFile("pgrep", ["-P", String(pane.panePid)]);
-    return false; // has children → busy
+    return false;
   } catch {
-    return true; // no children → free
+    return true;
   }
 }
 
@@ -205,12 +205,6 @@ const KILL_POLL_INTERVAL_MS = 500;
 const KILL_MAX_WAIT_MS = 8000;
 const KILL_MAX_ATTEMPTS = 3;
 
-/**
- * Quit Claude Code running in a tmux session without destroying the session.
- * Sends Escape + Ctrl+C twice, then polls until the process exits.
- * Retries up to 3 times with a total timeout of ~8s per attempt.
- * The tmux session remains alive and FREE for reuse.
- */
 export async function killTmuxSession(sessionName: string): Promise<void> {
   if (!(await tmuxSessionExists(sessionName))) {
     return;

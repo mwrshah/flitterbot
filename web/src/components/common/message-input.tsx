@@ -35,7 +35,6 @@ import type {
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
-/** Module-level store: persists draft text per route across navigations. */
 const draftStore = new Map<string, string>();
 
 export type MessageInputHoverButton = {
@@ -60,8 +59,6 @@ const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
 const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
-/** Sub-pixel safety margin so a button that "just fits" in pretext pixels
- *  doesn't get clipped by browser rounding or fractional widths. */
 
 function pretextTextWidth(text: string, font: string, lineHeight: number) {
   const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
@@ -119,7 +116,6 @@ function normalizePathPickerRemainder(inserted: string, remainder: string) {
 function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
   const lower = filter.toLowerCase();
   const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
-  // Pin command-kind items to the bottom, preserving relative order within each group.
   const nonCommands: SkillListItem[] = [];
   const commands: SkillListItem[] = [];
   for (const item of matched) {
@@ -230,7 +226,6 @@ function MessageInputHoverButtons({
       if (frame !== 0) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        // pretext returns CSS pixels; everything here is measured in CSS pixels.
         const measured = measureAndApply();
         attachObserver();
         if (!measured && retryCount < 10) {
@@ -240,8 +235,6 @@ function MessageInputHoverButtons({
       });
     }
 
-    // Measure synchronously before first paint so hidden buttons never flash over
-    // the model selector. The rAF pass catches late ref/font/layout settlement.
     measureAndApply();
     attachObserver();
     scheduleMeasure();
@@ -363,7 +356,6 @@ function MessageInputHoverButtons({
 
 type MessageInputProps = {
   isSending: boolean;
-  /** Submit handler — selected model is set server-side via the inline selector. */
   onSubmit: (text: string) => void;
   pendingImages: ImageAttachment[];
   onAddImages: (files: FileList | File[]) => void;
@@ -371,40 +363,21 @@ type MessageInputProps = {
   placeholder?: string;
   rows?: number;
   autoFocus?: boolean;
-  /** Stream ID — when set, enables fuzzy file search within the stream's repo. */
   streamId?: string;
   fillHeight?: boolean;
-  /** Key into draftStore — when set, persists draft text across route navigations. */
   draftKey?: string;
-  /** Show the model-selector popover-trigger left of the send button. Default: true. */
   showModelSelector?: boolean;
-  /**
-   * Pi-session id whose model the selector mutates. Required when
-   * `showModelSelector` is true — the backend handles default-vs-orchestrator
-   * routing based on this id, so callers don't need a separate mode prop.
-   */
   modelSelectorPiSessionId?: string;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
-  /** Agent is generating — send button swaps to a stop-sign icon. */
   isSessionBusy?: boolean;
-  /** Disable image attach/paste/drop without changing the session action button. */
   attachmentsDisabled?: boolean;
-  /** Triggered when the user clicks the stop-sign while session is busy. */
   onInterrupt?: () => void;
-  /** Interrupt request in flight — disables the stop button. */
   isInterruptPending?: boolean;
-  /** When set, send button is replaced with a Reopen/Recover action.
-   *  - 'closed' → stream itself was closed; label is "Reopen"
-   *  - 'dead'   → stream is open but its pi-session ended/crashed; label is "Recover" */
   recoveryKind?: "closed" | "dead";
-  /** Triggered when the user clicks the recovery action. */
   onRecover?: () => void;
-  /** Optional plain-text snippet buttons shown inside an empty composer. */
   hoverButtons?: MessageInputHoverButton[];
-  /** Composer context controls which contextual built-in slash commands are offered. */
   internalCommandScope: InternalCommandScope;
-  /** Recovery request in flight — disables the recovery button. */
   isRecoverPending?: boolean;
 };
 
@@ -437,10 +410,6 @@ export const MessageInput = memo(function MessageInput({
   isRecoverPending = false,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
-  // Skills list (base built-in commands + server skills) comes pre-merged from
-  // skillsQueryOptions and is prefetched in the root loader, so this read is
-  // synchronous on first render after app boot. Contextual built-ins are scoped
-  // here so each composer exposes only commands valid for its surface.
   const { apiClient } = rootRouteApi.useRouteContext();
   const { data: baseSkills } = useQuery(skillsQueryOptions(apiClient));
   const skills = useMemo(() => {
@@ -464,22 +433,16 @@ export const MessageInput = memo(function MessageInput({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
   const [caretLeft, setCaretLeft] = useState(0);
-  // Track the position of the "/" that triggered the picker
   const slashPositionRef = useRef<number>(-1);
   const skillCommandRef = useRef<HTMLDivElement>(null);
 
-  // @ path picker state (parallel to slash picker)
   const [atPickerOpen, setAtPickerOpen] = useState(false);
   const [atPickerFilter, setAtPickerFilter] = useState("");
   const pathCommandRef = useRef<HTMLDivElement>(null);
   const atPositionRef = useRef<number>(-1);
   const tildeExpandedRef = useRef(false);
-  // One-shot: tracks whether we've already auto-appended "/" after a trailing
-  // bare `..` segment. Resets when the trailing segment is no longer `..`,
-  // so chained `..` `..` `..` keystrokes produce `../../../`.
   const dotDotExpandedRef = useRef(false);
 
-  // Auto-focus textarea on mount when requested, cursor to end of any hydrated draft
   useEffect(() => {
     if (autoFocus) {
       const textarea = textareaRef.current;
@@ -496,16 +459,12 @@ export const MessageInput = memo(function MessageInput({
     return () => registerComposerFocusTarget(null);
   }, []);
 
-  // Debounce the path filter before querying
   const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
   useEffect(() => {
     const id = setTimeout(() => setDebouncedAtFilter(atPickerFilter), 150);
     return () => clearTimeout(id);
   }, [atPickerFilter]);
 
-  // Query directory completions for the @-picker. `keepPreviousData` in the
-  // query options preserves the last list across refetches, so typing doesn't
-  // flicker to empty. Cache is keyed per (query, streamId).
   const { data: pathResult } = useQuery(
     directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen, { streamId }),
   );
@@ -517,14 +476,11 @@ export const MessageInput = memo(function MessageInput({
   const skillPickerVisible = pickerOpen && filteredSkills.length > 0;
   const pathPickerVisible = atPickerOpen && pathPickerItems.length > 0;
 
-  // Warm the cache for the empty query on mount so the first `@` has items
-  // ready without a loading flash. Re-runs when streamId changes.
   const queryClient = useQueryClient();
   useEffect(() => {
     queryClient.prefetchQuery(directoryCompletionsQueryOptions("", true, { streamId }));
   }, [queryClient, streamId]);
 
-  // Refs for stable useCallback closures
   const draftRef = useRef(draft);
   const onSubmitRef = useRef(onSubmit);
   const onAddImagesRef = useRef(onAddImages);
@@ -578,10 +534,6 @@ export const MessageInput = memo(function MessageInput({
     return false;
   }, [atPickerOpen, closePathPicker, closeSkillPicker, pickerOpen]);
 
-  /**
-   * Compute the pixel X position just after a trigger character in the textarea,
-   * relative to the container div, using pretext's prepare + layout.
-   */
   const computeSlashLeft = useCallback((value: string, slashIdx: number) => {
     const textarea = textareaRef.current;
     const container = containerRef.current;
@@ -604,21 +556,12 @@ export const MessageInput = memo(function MessageInput({
     setCaretLeft(Math.max(0, paddingLeft + xOffset));
   }, []);
 
-  /**
-   * Detect a slash command token at the cursor position.
-   * A slash trigger is "/" preceded by start-of-string or whitespace,
-   * followed by zero or more non-whitespace chars up to the cursor.
-   */
   const handleDraftChange = useCallback(
     (rawValue: string, inputEvent?: InputEvent) => {
       setHoverSendAction(null);
       let value = rawValue;
       const cursor = textareaRef.current?.selectionStart ?? value.length;
 
-      // Only the literal trigger keystroke gets this normalization. Backspace,
-      // paste, programmatic edits, and later typing within `/command| text` or
-      // `@path| text` must not keep re-inserting spaces just because a trigger
-      // is nearby.
       const typedTrigger =
         inputEvent?.inputType === "insertText" &&
         (inputEvent.data === "/" || inputEvent.data === "@")
@@ -638,7 +581,6 @@ export const MessageInput = memo(function MessageInput({
       }
       setDraftAndStore(value);
 
-      // Scan backwards from cursor to find a "/" trigger
       let slashIdx = -1;
       for (let i = cursor - 1; i >= 0; i--) {
         const ch = value[i];
@@ -651,8 +593,6 @@ export const MessageInput = memo(function MessageInput({
         if (/\s/.test(ch!)) break;
       }
 
-      // Scan backwards from cursor to find an "@" trigger
-      // Unlike "/" scan, we do NOT stop at "/" characters (paths contain slashes)
       let atIdx = -1;
       for (let i = cursor - 1; i >= 0; i--) {
         const ch = value[i];
@@ -665,12 +605,9 @@ export const MessageInput = memo(function MessageInput({
         if (/\s/.test(ch!)) break;
       }
 
-      // Only one picker at a time: @ takes priority when both could match
       if (atIdx >= 0) {
         const filter = value.slice(atIdx + 1, cursor);
 
-        // Auto-append "/" when user types @~ so the picker queries home dir contents
-        // One-shot: skip if we already expanded ~ to ~/ this session
         if (filter === "~" && !tildeExpandedRef.current) {
           tildeExpandedRef.current = true;
           const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
@@ -688,15 +625,10 @@ export const MessageInput = memo(function MessageInput({
           return;
         }
 
-        // Reset one-shot tilde flag when filter no longer starts with ~
         if (!filter.startsWith("~")) {
           tildeExpandedRef.current = false;
         }
 
-        // Auto-append "/" when the trailing segment of the filter is a bare `..`,
-        // so the picker drills into the parent directory. One-shot per segment:
-        // resets below when the trailing segment is no longer `..`, which lets
-        // chained `..` keystrokes produce `../../../`.
         const trailingDotDot = filter === ".." || filter.endsWith("/..");
         if (trailingDotDot && !dotDotExpandedRef.current) {
           dotDotExpandedRef.current = true;
@@ -718,7 +650,6 @@ export const MessageInput = memo(function MessageInput({
           dotDotExpandedRef.current = false;
         }
 
-        // Collapse the user's own "/" keystroke when it doubles an auto-inserted slash.
         const extraSlash = autoExpandedDuplicateSlashIndex(filter);
         if (extraSlash >= 0) {
           const extra = atIdx + 1 + extraSlash;
@@ -741,7 +672,6 @@ export const MessageInput = memo(function MessageInput({
         computeSlashLeft(value, atIdx);
         setAtPickerOpen(true);
         setAtPickerFilter(filter);
-        // Close slash picker
         slashPositionRef.current = -1;
         setPickerOpen(false);
       } else if (slashIdx >= 0 && skills?.length) {
@@ -750,7 +680,6 @@ export const MessageInput = memo(function MessageInput({
         computeSlashLeft(value, slashIdx);
         setPickerOpen(true);
         setPickerFilter(filter);
-        // Close @ picker
         atPositionRef.current = -1;
         setAtPickerOpen(false);
       } else {
@@ -769,12 +698,8 @@ export const MessageInput = memo(function MessageInput({
     (skill: SkillListItem) => {
       const value = draftRef.current;
       const slashIdx = slashPositionRef.current;
-      // Find end of the trigger token (non-whitespace run from trigger position)
       let tokenEnd = slashIdx + 1;
       while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-      // Regular skills need "/skill:<name> " so the pi-sdk's `_expandSkillCommand`
-      // guard fires and inlines SKILL.md at send time. Built-in commands are not
-      // skills; keep them as literal slash commands (e.g. "/clear", "/reload").
       const before = value.slice(0, slashIdx);
       const after = collapseSingleFollowingSpace(value.slice(tokenEnd));
       const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
@@ -782,7 +707,6 @@ export const MessageInput = memo(function MessageInput({
       setDraftAndStore(newValue);
       setPickerOpen(false);
       slashPositionRef.current = -1;
-      // Restore cursor position after the inserted command
       const newCursor = before.length + inserted.length;
       requestAnimationFrame(() => {
         textareaRef.current?.setSelectionRange(newCursor, newCursor);
@@ -796,12 +720,9 @@ export const MessageInput = memo(function MessageInput({
     (item: DirectoryCompletionItem) => {
       const value = draftRef.current;
       const atIdx = atPositionRef.current;
-      // Find end of the trigger token (non-whitespace run from trigger position)
       let tokenEnd = atIdx + 1;
       while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
       const before = value.slice(0, atIdx);
-      // Directories: insert @path/ (no trailing space, keeps picker open for drill-down)
-      // Files: insert @path (trailing space, closes picker)
       const isDir = item.kind === "directory";
       const inserted = `@${item.insertText}${isDir ? "" : " "}`;
       const remainder = normalizePathPickerRemainder(inserted, value.slice(tokenEnd));
@@ -814,7 +735,6 @@ export const MessageInput = memo(function MessageInput({
       requestAnimationFrame(() => {
         textareaRef.current?.setSelectionRange(newCursor, newCursor);
         textareaRef.current?.focus();
-        // For directories, re-trigger the change handler so the picker refetches
         if (isDir && !remainder.closesPicker) {
           handleDraftChange(newValue);
         }
@@ -839,13 +759,11 @@ export const MessageInput = memo(function MessageInput({
           event.preventDefault();
           event.stopPropagation();
         } else {
-          // No picker open — defocus the input
           textareaRef.current?.blur();
         }
         return;
       }
 
-      // Ctrl+W / Ctrl+Backspace: backward-kill-word
       if (
         event.ctrlKey &&
         (event.key === "w" || event.key === "Backspace") &&
@@ -859,21 +777,17 @@ export const MessageInput = memo(function MessageInput({
         if (cursor === 0) return;
         let i = cursor;
         const isDelim = (ch: string) => ch === "/" || ch === "@";
-        // Skip whitespace before cursor
         const beforeWS = i;
         while (i > 0 && /\s/.test(value[i - 1]!)) i--;
         const skippedWhitespace = i < beforeWS;
         if (i > 0 && isDelim(value[i - 1]!)) {
           if (skippedWhitespace) {
-            // Whitespace separated cursor from delimiter — eat delimiter(s) but stop before the word
             while (i > 0 && isDelim(value[i - 1]!)) i--;
           } else {
-            // Cursor was right next to delimiter — eat it and the word before it
             while (i > 0 && isDelim(value[i - 1]!)) i--;
             while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
           }
         } else {
-          // Skip word characters, stopping at whitespace or delimiters
           while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
         }
         const newValue = value.slice(0, i) + value.slice(cursor);
@@ -884,7 +798,6 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      // Ctrl+L: clear input (terminal-style)
       if (
         event.ctrlKey &&
         event.key === "l" &&
@@ -897,9 +810,6 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      // When a visible picker is open, forward navigation keys to cmdk.
-      // Tab is mapped to Enter so it accepts the highlighted item.
-      // Keep empty-result pickers closed so they don't intercept composer keys.
       const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
       if (skillPickerVisible && slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
@@ -1049,10 +959,6 @@ export const MessageInput = memo(function MessageInput({
 
     let frame = 0;
     const measureToolbar = () => {
-      // Remember the normal toolbar width (model picker + gap + send/stop). When
-      // recovery replaces send, the model picker is hidden and the recovery
-      // button takes this width so the right edge stays anchored without a jerk.
-      // Reference state is exactly ModelSelector + send/stop button; don't cache recovery-only widths.
       if (toolbar.children.length <= 1) return;
       const width = toolbar.getBoundingClientRect().width;
       if (width <= 0) return;
@@ -1164,7 +1070,6 @@ export const MessageInput = memo(function MessageInput({
               fillHeight && "flex-1 min-h-0",
             )}
           />
-          {/* Attach button — top left */}
           <button
             type="button"
             tabIndex={-1}
@@ -1191,7 +1096,6 @@ export const MessageInput = memo(function MessageInput({
               <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
             </svg>
           </button>
-          {/* Hover buttons fit against the whole right toolbar, including model selector and send/recovery. */}
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}

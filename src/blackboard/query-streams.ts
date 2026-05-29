@@ -61,7 +61,6 @@ export function getPiSessionStatus(
   return row?.status;
 }
 
-/** Returns the most recent pi_session_id for a stream, regardless of session status. */
 export function getLatestPiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
   const row = db.get<{ pi_session_id: string }>(
     `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? ORDER BY started_at DESC LIMIT 1`,
@@ -106,7 +105,6 @@ export function resetAllStreams(db: BlackboardDatabase): number {
   return count?.count ?? 0;
 }
 
-/** Returns created_at of the most recent stream before the given one, or undefined if none. */
 export function getPreviousStreamCreatedAt(
   db: BlackboardDatabase,
   excludeId: string,
@@ -125,7 +123,6 @@ export function getLatestStreamCreatedAt(db: BlackboardDatabase): string | undef
   return row?.created_at;
 }
 
-/** Rolling window for surfacing recently-closed streams (sidebar + history). */
 export const RECENTLY_CLOSED_WINDOW_HOURS = 24 * 7;
 
 export function listRecentlyClosedStreams(

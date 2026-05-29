@@ -23,9 +23,7 @@ function loadSettings(): ControlSurfaceSettings {
         useStubFallback: parsed.useStubFallback ?? true,
       };
     }
-  } catch {
-    // Ignore corrupted storage.
-  }
+  } catch {}
 
   return {
     baseUrl: import.meta.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820",

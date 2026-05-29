@@ -14,20 +14,13 @@ export interface WebSocketClientMessageEvent {
   deliveryMode?: DeliveryMode;
   images?: ImageAttachment[];
   targetPiSessionId?: string;
-  /** Per-message model override (id from `config.models[]`). */
   modelId?: string;
-  /**
-   * Client-generated UUID for the optimistic user message bubble.
-   * The server echoes this back on the corresponding user-role `message_end`
-   * so the client can reconcile the optimistic entry with the canonical one.
-   */
   clientMessageId?: string;
 }
 
 export interface WebSocketClientSubscribeEvent {
   type: "subscribe";
   piSessionId: string;
-  /** If provided, only deliver events of these types for this subscription. Omit for all. */
   eventTypes?: string[];
 }
 
@@ -87,22 +80,13 @@ export interface MessageEndWebSocketEvent {
   type: "message_end";
   piSessionId?: string;
   message: ChatTimelineMessage;
-  /**
-   * Tool calls extracted from the SDK message content array.
-   * `args` is canonical. `displayArgs` is a UI-only projection produced
-   * by tool-display.ts and must never be fed back into tool execution.
-   */
+  /** `displayArgs` is a UI-only projection — never feed it back into tool execution. */
   toolCalls?: Array<{
     toolUseId: string;
     toolName: string;
     args?: unknown;
     displayArgs?: unknown;
   }>;
-  /**
-   * Present on user-role `message_end` when the originating WS `message` event
-   * carried a `clientMessageId`. Clients use this to reconcile their optimistic
-   * user message bubble with the canonical server-side entry.
-   */
   clientMessageId?: string;
 }
 
@@ -111,12 +95,7 @@ export interface ToolExecutionStartWebSocketEvent {
   piSessionId?: string;
   tool?: string;
   toolUseId?: string;
-  /** Canonical tool input. */
   args?: unknown;
-  /**
-   * UI-only display projection of `args` (see ChatTimelineTool.displayArgs).
-   * Undefined when no transformation applies.
-   */
   displayArgs?: unknown;
   timestamp?: string;
   event?: unknown;
@@ -199,7 +178,6 @@ export interface StreamsChangedWebSocketEvent {
 
 export interface StatusChangedWebSocketEvent {
   type: "status_changed";
-  /** Which subsystem changed — e.g. 'whatsapp', 'pi', 'blackboard' */
   subsystem: string;
   timestamp: string;
 }
@@ -244,7 +222,6 @@ export interface AgentStartWebSocketEvent {
 export interface AgentEndWebSocketEvent {
   type: "agent_end";
   piSessionId?: string;
-  /** True when the agent run was aborted before message_end fired. */
   aborted?: boolean;
 }
 
@@ -273,15 +250,9 @@ export interface AutoRetryEndWebSocketEvent {
   piSessionId?: string;
 }
 
-/**
- * Emitted when server-side history is mutated non-append-only (e.g. a prune
- * operation that moves the session leaf backwards). Clients should invalidate
- * any cached history for the referenced piSessionId.
- */
 export interface HistoryRewrittenWebSocketEvent {
   type: "history_rewritten";
   piSessionId: string;
-  /** Reason for the rewrite. Currently only "prune" is emitted. */
   reason: "prune";
 }
 

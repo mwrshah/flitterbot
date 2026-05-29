@@ -85,10 +85,6 @@ type MergeResult =
   | { ok: true; mergedAt: string }
   | { ok: false; conflicts: string[]; message: string };
 
-/**
- * Parses `git worktree list --porcelain` output and returns the worktree path
- * that has `branch` checked out, or null if no worktree currently has it.
- */
 async function findWorktreeForBranch(repoPath: string, branch: string): Promise<string | null> {
   let output: string;
   try {
@@ -116,22 +112,17 @@ async function mergeToTarget(
   branch: string,
   targetBranch: string,
 ): Promise<MergeResult> {
-  // Fetch latest
   try {
     await exec("git fetch origin", repoPath);
   } catch {
     // Non-fatal — continue with local state
   }
 
-  // Check if already merged
   if (await isBranchAncestorOf(repoPath, branch, targetBranch)) {
     return { ok: true, mergedAt: repoPath };
   }
 
-  // Find a worktree that already has the target branch checked out. If none,
-  // fall back to checking it out in repoPath. (Git refuses `git checkout main`
-  // in repoPath when another worktree has main checked out, which is the
-  // common case.)
+  // Git refuses `git checkout main` in repoPath when another worktree already has it checked out, so merge there instead.
   const existingWorktree = await findWorktreeForBranch(repoPath, targetBranch);
   let mergeCwd: string;
   if (existingWorktree) {
@@ -150,18 +141,14 @@ async function mergeToTarget(
     mergeCwd = repoPath;
   }
 
-  // Pull latest target
   try {
     await exec(`git pull origin ${targetBranch} --ff-only`, mergeCwd);
   } catch {
     // Non-fatal — continue with local state
   }
 
-  // Attempt merge
   try {
-    // Use git's default merge commit message ("Merge branch 'X' into Y") —
-    // the model-authored commit_message goes to the auto-commit of in-flight
-    // work, not to the merge commit itself.
+    // git's default merge message — the model-authored commit_message goes to the in-flight auto-commit, not the merge commit.
     await exec(`git merge ${branch} --no-edit`, mergeCwd);
     return { ok: true, mergedAt: mergeCwd };
   } catch {
@@ -169,9 +156,7 @@ async function mergeToTarget(
     if (conflicts.length > 0) {
       try {
         await exec("git merge --abort", mergeCwd);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       return {
         ok: false,
         conflicts,
@@ -180,9 +165,7 @@ async function mergeToTarget(
     }
     try {
       await exec("git merge --abort", mergeCwd);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     return { ok: false, conflicts: [], message: "Merge failed (non-conflict error)" };
   }
 }
@@ -212,9 +195,6 @@ export async function executeCloseStream(
     return { ok: false, streamId, message: `Stream ${streamId} is already closed` };
   }
 
-  // Preview step: when merging without an explicit base_branch override, return
-  // a non-destructive preview for user confirmation. No sessions killed, no
-  // commits, no merges, no push, no stream closure.
   if (mode === "merge" && baseBranchOverride === undefined) {
     const currentBranch = stream.worktree_path
       ? await inferBranchFromWorktree(stream.worktree_path)
@@ -230,7 +210,6 @@ export async function executeCloseStream(
     };
   }
 
-  // Step 0: Kill active CC sessions belonging to this stream
   const activeSessions = blackboard
     .prepare(
       `SELECT session_id, tmux_session
@@ -253,9 +232,7 @@ export async function executeCloseStream(
   let pushed = false;
   let resolvedTargetBranch: string | undefined;
 
-  // Step 1: Merge branch to target (only in merge mode). Every precondition
-  // failure here returns an explicit error — silent skips would close the
-  // stream record while no git work happened, which is invisible to the user.
+  // Every precondition failure returns an explicit error — a silent skip would close the stream while no git work happened, invisibly to the user.
   if (mode === "merge") {
     const worktreePath = stream.worktree_path;
     const repoPath = stream.repo_path;
@@ -305,7 +282,6 @@ export async function executeCloseStream(
     }
     const mergeResult = await mergeToTarget(repoPath, branch, targetBranch);
     if (mergeResult.ok === false) {
-      // Return early — resolve conflicts and call again
       return {
         ok: false,
         streamId,
@@ -315,11 +291,9 @@ export async function executeCloseStream(
     }
     merged = true;
 
-    // Push from wherever the merge happened
     pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
   }
 
-  // Step 2: Close stream and end Pi session (worktree left on disk)
   closeStream(blackboard, streamId);
   endPiSession(blackboard, piSessionId, "ended", "stream_closed");
 

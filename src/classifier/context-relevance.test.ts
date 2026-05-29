@@ -5,13 +5,10 @@ import {
   stripInjectedDatetimeBlocks,
 } from "../streams/format-stream-prompt.ts";
 
-// Mock groq-client before importing context-relevance
 const mockCallGroqJson = mock<(apiKey: string, prompts: unknown) => Promise<unknown>>();
 mock.module("./groq-client.ts", () => ({
   callGroqJson: (...args: unknown[]) => mockCallGroqJson(...(args as [string, unknown])),
 }));
-
-// --- Prompt builder tests ---
 
 describe("buildContextRelevancePrompts", () => {
   test("includes stream name and all messages", () => {
@@ -23,7 +20,6 @@ describe("buildContextRelevancePrompts", () => {
 
     expect(prompts.userPrompt).toContain('"fix-login-bug"');
     expect(prompts.userPrompt).toContain("[Message 1]");
-    // The last message is tagged "CURRENT" so rule #3 in the prompt can reference it.
     expect(prompts.userPrompt).toContain("[Message 2 \u2014 CURRENT]");
     expect(prompts.userPrompt).toContain("Fix the login bug");
     expect(prompts.userPrompt).toContain("It happens on Chrome");
@@ -50,8 +46,6 @@ describe("buildContextRelevancePrompts", () => {
     expect(prompts.systemPrompt).toContain("Omit vague user messages");
   });
 });
-
-// --- formatStreamPrompt tests ---
 
 describe("formatStreamPrompt", () => {
   test("single message produces raw message + datetime tail", () => {
@@ -118,8 +112,6 @@ describe("formatStreamPrompt", () => {
     expect(result).not.toContain("/tmux");
   });
 });
-
-// --- classifyContextRelevance tests (mock Groq) ---
 
 // Import after mock.module is set up
 const { classifyContextRelevance } = await import("./context-relevance.ts");

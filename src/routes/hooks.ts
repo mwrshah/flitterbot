@@ -15,7 +15,6 @@ export async function handleHookRoute(
   const payload = await readJsonBody<ClaudeHookPayload>(req);
   const sessionId = payload.session_id ?? payload.sessionId;
   const result: HookResponse = runtime.handleHook(eventName, payload as Record<string, unknown>);
-  // Single summary log — only include response detail for non-ok results
   const parts = [`hook ${eventName}: session_id=${sessionId ?? "none"}`];
   if (result.bookkeeping) parts.push("bookkeeping=true");
   if (result.filtered) parts.push("filtered=true");

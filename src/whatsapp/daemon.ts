@@ -206,15 +206,10 @@ class WhatsAppDaemon {
       syncFullHistory: false,
     });
 
-    // Build the set of JIDs we accept inbound messages from.
-    // Includes the configured phone JID and the account's LID (Linked Identity)
-    // since Baileys may deliver self-chat messages using either format.
-    // Rebuilt on each creds.update so the LID stays current.
     const allowedJids = new Set<string>([recipientJid, ...resolveAllowedJids(config)]);
     const rebuildAllowedJids = () => {
       const lidRaw = state.creds.me?.lid;
       if (lidRaw) {
-        // Strip device suffix (e.g. "278567367778515:33@lid" → "278567367778515@lid")
         allowedJids.add(lidRaw.replace(/:\d+@/, "@"));
       }
       logger.info({ allowedJids: [...allowedJids] }, "accepted inbound JIDs");
@@ -298,9 +293,7 @@ class WhatsAppDaemon {
       writeFileSync(getWhatsAppStatusSignalPath(), `${this.status}\n${Date.now()}\n`, {
         mode: 0o600,
       });
-    } catch {
-      // non-critical — runtime will still pick up the change on next poll
-    }
+    } catch {}
   }
 
   private async onConnectionUpdate(update: Partial<ConnectionState>): Promise<void> {
@@ -501,9 +494,7 @@ class WhatsAppDaemon {
     rmSync(getWhatsAppStatusSignalPath(), { force: true });
     try {
       this.db.close();
-    } catch {
-      // ignore
-    }
+    } catch {}
     this.status = "stopped";
   }
 }

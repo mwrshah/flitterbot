@@ -152,7 +152,6 @@ export const SHORTCUT_ACTIONS = {
   panelViewDiff: "panel.view.diff",
 } as const;
 
-/** Returns true when the active element is an input, textarea, contenteditable, or role=textbox. */
 function isInputFocused(): boolean {
   const el = document.activeElement;
   if (!el) return false;
@@ -163,8 +162,6 @@ function isInputFocused(): boolean {
   return false;
 }
 
-// The app currently exposes one primary composer at a time, so a single
-// registered focus target keeps global shortcut ownership centralized.
 export function registerComposerFocusTarget(handler: (() => void) | null) {
   focusComposer = handler;
 }

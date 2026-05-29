@@ -15,7 +15,6 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "~/lib/types";
 
 function dirFromPath(path: string, name: string): string {
-  // Strip trailing slash for directory entries (e.g. "docs/" -> "docs")
   const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
   if (cleanPath.endsWith(`/${name}`)) return cleanPath.slice(0, -(name.length + 1));
   if (cleanPath === name) return "";
@@ -38,7 +37,6 @@ function smartMiddleTruncate(dir: string, availableWidth: number, font: string):
   const ellipsis = "\u2026";
   const prefixEllipsisWidth = measureTextWidth(prefix + ellipsis, font);
 
-  // Binary search for longest tail that fits
   let lo = 1;
   let hi = dir.length - 2;
   let best = 1;
@@ -54,7 +52,6 @@ function smartMiddleTruncate(dir: string, availableWidth: number, font: string):
     }
   }
 
-  // If even the minimal truncation doesn't fit, return what we can
   if (prefixEllipsisWidth > availableWidth) return prefix + ellipsis;
 
   return prefix + ellipsis + dir.slice(-best);
@@ -67,7 +64,6 @@ type PathPickerProps = {
   onEscape?: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;
-  /** When true, display compact mixed search results with path as secondary text. */
   fuzzy?: boolean;
 };
 
@@ -81,16 +77,9 @@ export const PathPicker = memo(function PathPicker({
   fuzzy,
 }: PathPickerProps) {
   useWhyDidYouRender("PathPicker", { open, items, onEscape, caretLeft, fuzzy });
-  // shouldFilter={false} means cmdk won't auto-select on children change.
-  // Manually reset selection to first item when server-filtered results arrive.
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Reset selection to first item and scroll list to top whenever the picker
-  // opens or the items set changes. The `open` dep is required: on reopen with
-  // an unchanged items reference (TanStack keepPreviousData), without it this
-  // effect wouldn't fire, leaving stale selectedValue pointing at an item that
-  // the fresh DOM scrolls out of view.
   useLayoutEffect(() => {
     if (!open) return;
     setSelectedValue(items[0]?.path ?? "");
@@ -98,7 +87,6 @@ export const PathPicker = memo(function PathPicker({
     if (list) list.scrollTop = 0;
   }, [open, items]);
 
-  // On keyboard navigation, keep the selected item visible
   useEffect(() => {
     if (!selectedValue) return;
     requestAnimationFrame(() => {

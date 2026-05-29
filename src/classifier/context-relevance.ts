@@ -5,11 +5,6 @@ type ContextRelevanceResult = {
   relevant: boolean[];
 };
 
-/**
- * Classify which messages are relevant to a stream being created.
- * Returns a boolean array (same length as messages) indicating relevance.
- * Throws on Groq failure — caller should handle fallback.
- */
 export async function classifyContextRelevance(
   messages: { content: string; created_at: string }[],
   streamName: string,

@@ -53,7 +53,6 @@ function RuntimePage() {
 
       {status && (
         <>
-          {/* Streams Agent */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -78,7 +77,6 @@ function RuntimePage() {
             </CardContent>
           </Card>
 
-          {/* Streams Orchestrators */}
           {(status.piAgent?.orchestrators?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
@@ -112,7 +110,6 @@ function RuntimePage() {
             </Card>
           )}
 
-          {/* Control Surface */}
           <Card>
             <CardHeader>
               <CardTitle>Control Surface</CardTitle>
@@ -126,7 +123,6 @@ function RuntimePage() {
             </CardContent>
           </Card>
 
-          {/* WhatsApp */}
           <WhatsAppControls status={status} />
         </>
       )}

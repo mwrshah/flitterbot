@@ -82,7 +82,6 @@ import {
 } from "./whatsapp/process.ts";
 import { type WebSocketClient, WebSocketHub } from "./ws/hub.ts";
 
-/** Custom tool shape using plain JSON Schema (not TypeBox). Cast to ToolDefinition[] at the SDK boundary. */
 type CustomToolDefinition = {
   name: string;
   label: string;
@@ -106,8 +105,6 @@ type EnqueueInput = {
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   serverMessageId?: string;
-  /** Client-generated UUID threaded through to pi-subscribe so the user-role
-   *  `message_end` WS envelope can echo it back for optimistic UI reconcile. */
   clientMessageId?: string;
 };
 
@@ -168,10 +165,6 @@ export class ControlSurfaceRuntime {
         this.log(`wiped ${closed} open stream(s) on startup (wipeStreamsOnStart=true)`);
     }
 
-    // FLITTERBOT_RESUME_DEFAULT_SESSION: optional path to a JSONL session file.
-    // When set, the default agent resumes from that session instead of starting
-    // fresh — preserves piSessionId and full conversation history. Used to
-    // restore a previous default conversation across a server restart.
     const resumeDefaultSessionFile =
       process.env.FLITTERBOT_RESUME_DEFAULT_SESSION?.trim() || undefined;
     if (resumeDefaultSessionFile) {
@@ -183,10 +176,6 @@ export class ControlSurfaceRuntime {
     );
     fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
 
-    // Rehydrate dormant orchestrators for open streams from the pi sessions DB.
-    // No live SDK agent is created — just the in-memory maps are populated so that
-    // message lookups find the correct piSessionId. The agent is lazily activated
-    // when the first new message arrives for the stream.
     const openStreams = listOpenStreams(this.blackboard);
     for (const ws of openStreams) {
       const streamsRow = this.blackboard.get<{
@@ -215,10 +204,6 @@ export class ControlSurfaceRuntime {
           streamsRow.model_id,
         );
       } else {
-        // Latest pi_session is crashed/ended (or missing). Do NOT auto-spawn
-        // a fresh orchestrator — that orphans prior messages bound to the old
-        // pi_session_id and masks the crash in the UI. Recovery is explicit:
-        // user clicks "Recover" → POST /api/streams/:id/reopen → reopenStream().
         this.log(
           `skipping orchestrator spawn for open stream "${ws.name}" (${ws.id}) — no alive pi_session; awaiting explicit Recover`,
         );
@@ -250,14 +235,10 @@ export class ControlSurfaceRuntime {
     try {
       await this.stopWhatsAppDaemon();
       await this.refreshWhatsAppStatus();
-    } catch {
-      // ignore
-    }
+    } catch {}
     try {
       this.wsHub.closeAll();
-    } catch {
-      // ignore
-    }
+    } catch {}
     await new Promise<void>((resolve) => {
       if (!this.server) return resolve();
       this.server.close(() => resolve());
@@ -265,9 +246,7 @@ export class ControlSurfaceRuntime {
     try {
       if (fs.existsSync(this.config.controlSurfacePidPath))
         fs.unlinkSync(this.config.controlSurfacePidPath);
-    } catch {
-      // ignore
-    }
+    } catch {}
     this.blackboard.close();
     const { destroyAll: destroyAllFileFinders } = await import("./file-finder/manager.ts");
     destroyAllFileFinders();
@@ -282,21 +261,11 @@ export class ControlSurfaceRuntime {
     });
   }
 
-  /**
-   * Route a message to the correct pi session's queue based on classification metadata.
-   */
   enqueue(
     input: EnqueueInput,
   ): { ok: true; item: QueueItem } | { ok: true; cleared: true } | { ok: true; reloaded: true } {
-    // Normalize ingress text: trim head/tail whitespace so leading `/skill:<name>` or
-    // `/<command>` tokens land at the literal start of the prompt (the pi-sdk's
-    // expansion guards are strict `startsWith(...)` checks). All downstream
-    // callers see the trimmed value via the same `input.text` field.
     input.text = input.text.trim();
 
-    // /clear command: reset the default session without persisting or enqueuing.
-    // The frontend strips _targetSessionId for /clear, so if neither stream_id nor
-    // _targetSessionId is set, the message is bound for the default session.
     if (
       input.text === "/clear" &&
       !input.metadata?.stream_id &&
@@ -317,9 +286,6 @@ export class ControlSurfaceRuntime {
       return { ok: true, cleared: true };
     }
 
-    // /reload command: reload skills/prompts/extensions on the default session
-    // without persisting or enqueuing. Frontend strips _targetSessionId for
-    // /reload, so it always lands on the default session.
     if (
       input.text === "/reload" &&
       !input.metadata?.stream_id &&
@@ -343,11 +309,7 @@ export class ControlSurfaceRuntime {
       data: img.data,
       mimeType: img.mimeType,
     }));
-    // Use pre-generated serverMessageId if provided (e.g. from WS handler), else generate one
     const messageUuid = input.serverMessageId ?? crypto.randomUUID();
-    // sender = "user" only for real user-input channels (web/whatsapp). cron
-    // scheduled nudges are agent-generated, so they're tagged "system" and do
-    // NOT coalesce with user messages.
     const sender: "user" | "system" =
       input.source === "web" || input.source === "whatsapp" ? "user" : "system";
     const item: QueueItem = {
@@ -386,23 +348,15 @@ export class ControlSurfaceRuntime {
       this.log(`message persist failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    // Route to the correct session's queue
     const target = this.resolveTargetSession(input, item);
     if (!target) {
       throw new Error("No target session available");
     }
 
-    // Datetime injection: append current date+time context to user messages when >= 1 hour
-    // has elapsed since we last told this pi session what time it is. Injecting via turns
-    // (not the system prompt) keeps the system prompt stable and cache-friendly.
     if (item.source === "web" || item.source === "whatsapp") {
       item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
     }
 
-    // Steer bypass: if the queue is busy, deliver directly via session.prompt() with
-    // streamingBehavior: "steer". The SDK handles both streaming and non-streaming states.
-    // Skip for dormant sessions (no live SDK agent) — the message will go through the queue
-    // and trigger lazy activation instead.
     if (item.deliveryMode === "steer" && target.queue.isBusy() && target.runtime?.session) {
       this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`);
       void target.runtime.session.prompt(formatPromptWithContext(item), {
@@ -435,7 +389,6 @@ export class ControlSurfaceRuntime {
       return { ok: true, filtered: true };
     }
 
-    // Check if this session belongs to any of our pi sessions
     const isOwnPiSession = this.sessionManager.getByPiSessionId(sessionId) !== undefined;
 
     if (normalized === "session-start") {
@@ -533,7 +486,6 @@ export class ControlSurfaceRuntime {
       return { ok: true, bookkeeping: true };
     }
 
-    // Use Claude Code's native last_assistant_message from the stop hook payload
     const lastAssistantText = pickString(payload, [
       "last_assistant_message",
       "lastAssistantMessage",
@@ -542,7 +494,6 @@ export class ControlSurfaceRuntime {
       payload.lastAssistantText = lastAssistantText;
     }
 
-    // Route stop event to the pi session that owns this CC session
     const piSessionIdFromPayload = pickString(payload, [
       "pi_session_id",
       "piSessionId",
@@ -595,7 +546,6 @@ export class ControlSurfaceRuntime {
       streamName: targetQueue.streamName ?? undefined,
     };
 
-    // Persist inbound
     try {
       persistInboundMessage(this.blackboard, {
         source: "hook",
@@ -737,11 +687,6 @@ export class ControlSurfaceRuntime {
       `pi-session model switched: ${managed.piSessionId} → ${managed.modelInfo.provider}/${managed.modelInfo.id}`,
     );
 
-    // When this pi-session is the default agent, the same call doubles as the
-    // "set default model" mutation: persist the new defaultModel to config and
-    // apply the model's curated thinking level (if any). The web client uses a
-    // single per-pi-session endpoint for both default and orchestrator streams
-    // — the default-stream specifics live here, not in a separate route.
     if (isDefaultSession) {
       this.persistDefaultModel(modelId);
       return this.setPiSessionThinkingLevel(
@@ -810,9 +755,6 @@ export class ControlSurfaceRuntime {
       `pi-session thinking level switched: ${managed.piSessionId} → ${managed.modelInfo.thinkingLevel}`,
     );
 
-    // When this pi-session is the default agent, persist the new
-    // defaultThinkingLevel to config — matches the setPiSessionModel behavior
-    // and keeps the web client on a single per-pi-session endpoint.
     if (this.sessionManager.getDefault()?.piSessionId === piSessionId) {
       this.config.defaultThinkingLevel = thinkingLevel;
       persistModelsToConfigFile({
@@ -990,12 +932,8 @@ export class ControlSurfaceRuntime {
     return this.wsHub.handleUpgrade(req, socket, head, this.config.controlSurfaceToken);
   }
 
-  private static readonly DATETIME_INJECTION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  private static readonly DATETIME_INJECTION_INTERVAL_MS = 60 * 60 * 1000;
 
-  /**
-   * Append a datetime context block to `text` if >= 1 hour has elapsed since the last
-   * injection for this pi session, then update the timestamp in SQLite.
-   */
   private maybeInjectDatetime(piSessionId: string, text: string): string {
     const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, piSessionId);
     const now = Date.now();
@@ -1010,44 +948,32 @@ export class ControlSurfaceRuntime {
     return `${text}\n\n${formatDatetimeBlock()}`;
   }
 
-  /**
-   * Resolve which ManagedPiSession should handle this message.
-   * May lazily create an orchestrator if needed.
-   */
   private resolveTargetSession(
     input: EnqueueInput,
     _item: QueueItem,
   ): ManagedPiSession | undefined {
     const meta = input.metadata;
 
-    // Direct-targeted session (web UI tab input) — bypass all routing
     const targetSessionId = meta?._targetSessionId as string | undefined;
     if (targetSessionId) {
       const target = this.sessionManager.getByPiSessionId(targetSessionId);
       if (target) return target;
     }
 
-    // Cron always goes to default
     if (input.source === "cron") {
       return this.sessionManager.getDefault();
     }
 
-    // Router matched an existing stream — route to its orchestrator if running
     const streamId = meta?.stream_id as string | undefined;
     if (streamId && meta?.router_action === "matched") {
       const existing = this.sessionManager.getByStream(streamId);
       if (existing) return existing;
     }
 
-    // Everything else goes to the default agent (which can create streams via tool)
     return this.sessionManager.getDefault();
   }
 
-  /**
-   * Per-session queue processing callback.
-   */
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
-    // Lazily activate dormant orchestrators on first message after restart
     if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
       this.log(`activating dormant orchestrator for stream ${managed.streamId}`);
       await this.sessionManager.activateOrchestrator(
@@ -1065,7 +991,6 @@ export class ControlSurfaceRuntime {
       `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""} text=${item.text.slice(0, 80)}...`,
     );
 
-    // Turn starts → set streams status to 'active'
     const promptAt = managed.state.notePrompt(session.messages.length);
     touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
     this.broadcastStatusChanged("pi_session");
@@ -1081,10 +1006,6 @@ export class ControlSurfaceRuntime {
       await session.prompt(promptText, { images: item.images });
     }
 
-    // Stamp the user message in the SDK's messages array with the server UUID
-    // so the history API returns IDs matching WS events (prevents duplicate rendering).
-    // The SDK user message has no `id` field, so history.ts falls back to `memory-N` —
-    // a positional ID that differs from the server UUID used in WS message_end events.
     const serverMsgId = item.metadata?.serverMessageId as string | undefined;
     if (serverMsgId) {
       for (let i = session.messages.length - 1; i >= 0; i--) {
@@ -1098,7 +1019,6 @@ export class ControlSurfaceRuntime {
 
     this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
 
-    // Check for API errors
     const lastMsg = session.messages[session.messages.length - 1];
     if (lastMsg?.role === "assistant") {
       const assistantMsg = lastMsg as AssistantMessage;
@@ -1112,18 +1032,14 @@ export class ControlSurfaceRuntime {
 
     managed.state.noteEvent(session.messages.length);
 
-    // Turn ends → transition state
     this.transitionStreamsAfterTurn(piSessionId);
 
-    // Auto-surface final assistant message
     const finalAssistant = extractFinalAssistantMessage(session);
-    // Clear pending surface regardless — avoids stale data on tool-only turns.
     const pendingSurface = managed.lastSurfacedAssistantMessage;
     managed.lastSurfacedAssistantMessage = undefined;
     if (finalAssistant) {
       const { text: finalText, messageId: finalMessageId } = finalAssistant;
 
-      // Persist outbound with resolved server UUID (when available)
       let persistedId: string | undefined;
       try {
         const streamId = managed.streamId ?? (item.metadata?.stream_id as string) ?? undefined;
@@ -1141,11 +1057,6 @@ export class ControlSurfaceRuntime {
         );
       }
 
-      // Broadcast stream_surfaced with serverMessageId so the Surface timeline
-      // can dedup against the DB record on refetch. The timeline message was
-      // captured by pi-subscribe on agent_end and stored on managed.
-      // Uses the actual DB row id (not responseId) so it works even when
-      // the provider doesn't return a responseId.
       if (pendingSurface && persistedId) {
         pendingSurface.serverMessageId = persistedId;
         const surfacedPayload: StreamSurfacedWebSocketEvent = {
@@ -1158,14 +1069,11 @@ export class ControlSurfaceRuntime {
         this.wsHub.broadcast(surfacedPayload);
       }
 
-      // Surface with stream label for orchestrators
       const surfaceText =
         managed.role === "orchestrator" && managed.streamName
           ? `*[${managed.streamName}]* ${finalText}`
           : finalText;
 
-      // WhatsApp has a ~65 536 character practical limit per message.
-      // Truncate to avoid silent send failures on very large AI responses.
       const MAX_WHATSAPP_LENGTH = 60_000;
       const waText =
         surfaceText.length > MAX_WHATSAPP_LENGTH
@@ -1190,9 +1098,6 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  /**
-   * After a pi session turn ends, check managed downstream sessions to determine next state.
-   */
   private transitionStreamsAfterTurn(piSessionId: string): void {
     try {
       const row = this.blackboard
@@ -1213,19 +1118,6 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  /**
-   * Shared lifecycle helper used by both the `create_stream` LLM tool and
-   * the programmatic `POST /api/streams` route. Validates cwd, inserts and
-   * enriches the stream row, spawns the orchestrator, and broadcasts
-   * `streams_changed` on success. Caller controls rollback policy:
-   *   - rollbackOnSpawnFailure: true  → atomic (HTTP route UX): delete the
-   *     row on spawn failure so no orphan stream survives.
-   *   - rollbackOnSpawnFailure: false → preserve the row (LLM tool): the
-   *     agent can still see and act on the orphan.
-   *
-   * Inputs are assumed pre-normalized (name already prefix-stripped). The
-   * helper does NOT enqueue any bootstrap message — that's the caller's job.
-   */
   private async spawnStreamWithOrchestrator(opts: {
     name: string;
     cwd: string;
@@ -1281,22 +1173,12 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  /**
-   * Programmatic stream creation — no LLM in the loop, no user message.
-   * Atomic: on orchestrator spawn failure the stream row is rolled back so
-   * the UI never surfaces an orphan. When no name is supplied, generates
-   * `scratch-<6-hex>`. When no cwd is supplied, defaults to the configured
-   * projects directory. The new orchestrator sits in `waiting_for_user`
-   * with an empty queue until the user sends something.
-   */
   async createStreamProgrammatic(input?: {
     name?: string;
     cwd?: string;
   }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
     const { getStreamByName } = await import("./blackboard/query-streams.ts");
 
-    // Resolve name: caller-provided (after prefix-stripping) or auto-generated
-    // `scratch-<6-hex>`, regenerating on the rare collision.
     let name = input?.name ? stripStreamNamePrefix(input.name) : "";
     if (!name) {
       for (let i = 0; i < 5; i++) {
@@ -1335,13 +1217,6 @@ export class ControlSurfaceRuntime {
     const ws = getStreamById(this.blackboard, streamId);
     if (!ws) throw new Error("Stream not found");
 
-    // Allow reopen for:
-    //   - closed streams (normal reopen flow)
-    //   - open streams with an ended pi_session (legacy detectCloseStream destroyed
-    //     the orchestrator without closing the stream)
-    //   - open streams with a crashed pi_session (queue item error triggered
-    //     destroyOrchestrator with reason='crashed'; stream is intact but the
-    //     orchestrator process is gone and needs to be revived)
     const hasDeadPiSession =
       ws.status === "open" &&
       !!this.blackboard.get<{ pi_session_id: string }>(
@@ -1356,8 +1231,6 @@ export class ControlSurfaceRuntime {
       throw new Error("Stream is not closed and has no recoverable pi-session");
     }
 
-    // 1. Reopen closed streams. Recovery for already-open streams only revives
-    // the pi_session; it must not mutate repo_path/worktree_path ownership.
     if (ws.status === "closed") {
       reopenStream(this.blackboard, streamId);
     }
@@ -1370,7 +1243,6 @@ export class ControlSurfaceRuntime {
       }
     }
 
-    // 2. Revive the pi session: clear ended_at/end_reason, set status back to waiting_for_user
     const streamsRow = this.blackboard.get<{
       pi_session_id: string;
       session_file: string | null;
@@ -1397,7 +1269,6 @@ export class ControlSurfaceRuntime {
         )
         .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), streamsRow.pi_session_id);
 
-      // 3. Rehydrate the orchestrator in-memory
       this.sessionManager.rehydrateOrchestrator(
         streamId,
         ws.name,
@@ -1409,7 +1280,6 @@ export class ControlSurfaceRuntime {
       );
     }
 
-    // 4. Broadcast so frontend updates
     this.wsHub.broadcast({
       type: "streams_changed",
       reason: "reopened",
@@ -1423,23 +1293,6 @@ export class ControlSurfaceRuntime {
     return { ok: true, streamId };
   }
 
-  /**
-   * Prune conversation history at a specific session entry. The entry and all
-   * of its descendants (on the current leaf branch) become invisible to both
-   * the live agent and disk-based readers.
-   *
-   * Flow:
-   *  1. Resolve the managed pi session; activate if dormant.
-   *  2. Validate: entry must exist and be a user message.
-   *  3. `AgentSession.navigateTree(entryId)` moves the SessionManager leaf to
-   *     the target's parent and rebuilds `agent.state.messages`.
-   *  4. `SessionManager.appendCustomEntry("flitterbot:prune_anchor", ...)`
-   *     persists the new leaf position to the JSONL file. Custom entries are
-   *     ignored by `buildSessionContext()`, so they don't pollute LLM context,
-   *     but on process restart they become the leaf, keeping the prune
-   *     durable across restarts.
-   *  5. Broadcast `history_rewritten` so the UI invalidates cached history.
-   */
   async pruneStreamHistory(
     piSessionId: string,
     entryId: string,
@@ -1469,14 +1322,11 @@ export class ControlSurfaceRuntime {
       throw new Error(`Entry ${entryId} is not a user message (type=${target.type})`);
     }
 
-    // Move leaf to parent of user message; rebuilds agent.state.messages.
     const navResult = await session.navigateTree(entryId);
     if (navResult.cancelled) {
       throw new Error("navigateTree cancelled (extension veto)");
     }
 
-    // Persist new leaf position. Custom entries don't appear in LLM context but
-    // do become the leaf on reload.
     sessionManager.appendCustomEntry("flitterbot:prune_anchor", {
       prunedEntryId: entryId,
       prunedAt: new Date().toISOString(),
@@ -1548,10 +1398,6 @@ export class ControlSurfaceRuntime {
             cwd: string;
             skipUserMessage?: boolean;
           };
-          // Normalize: strip intent-signal prefixes (`i-`, `wr-`, `bug-`,
-          // `bs-`, `fix-`) once at the start. They communicate intent at the
-          // call site but shouldn't bloat downstream names (worktree dirs,
-          // branches, streams.name). Strip only when followed by more content.
           const name = stripStreamNamePrefix(suggestedName);
           const skipUserMessage = skipUserMessageParam === true;
           if (skipUserMessage && !agentMessage?.trim()) {
@@ -1566,7 +1412,6 @@ export class ControlSurfaceRuntime {
             };
           }
 
-          // cwd is required by the schema; validate it exists.
           if (!fs.existsSync(cwdParam)) {
             return {
               content: [
@@ -1584,9 +1429,6 @@ export class ControlSurfaceRuntime {
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
           this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
 
-          // Tool path: preserve partial-success semantics. If orchestrator
-          // spawn fails, keep the stream row so the agent can still surface
-          // the ID to the user and decide what to do.
           const spawn = await this.spawnStreamWithOrchestrator({
             name,
             cwd: effectiveCwd,
@@ -1617,7 +1459,6 @@ export class ControlSurfaceRuntime {
           const orchestrator = spawn.orchestrator;
 
           try {
-            // Pass through relevant context messages to the new stream
             const defaultSession = this.sessionManager.getDefault();
             const originalText = defaultSession?.queue.getCurrentItem()?.text;
             const currentUserText = originalText
@@ -1654,7 +1495,6 @@ export class ControlSurfaceRuntime {
                     .map((m) => m.content);
 
                   if (relevantTexts.length > 1) {
-                    // Ensure the current message is included (it may not be persisted yet)
                     if (!relevantTexts.includes(currentUserText)) {
                       relevantTexts.push(currentUserText);
                     }
@@ -1708,8 +1548,7 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
-                // Bootstrap prompt is agent-authored — do NOT coalesce with
-                // subsequent real user messages.
+                // agent-authored bootstrap prompt — sender "system" keeps it from coalescing with subsequent real user messages
                 sender: "system",
                 metadata: {
                   stream_id: ws.id,
@@ -1731,8 +1570,7 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
-                // Bootstrap prompt is agent-authored — do NOT coalesce with
-                // subsequent real user messages.
+                // agent-authored bootstrap prompt — sender "system" keeps it from coalescing with subsequent real user messages
                 sender: "system",
                 metadata: {
                   stream_id: ws.id,
@@ -1771,9 +1609,6 @@ export class ControlSurfaceRuntime {
               },
             };
           } catch (error) {
-            // Stream + orchestrator spawned successfully but the post-spawn
-            // prompt enqueue / context classification failed. Surface that
-            // distinctly from a spawn failure.
             return {
               content: [
                 {
@@ -1966,10 +1801,6 @@ export class ControlSurfaceRuntime {
             base_ref?: string;
             force?: boolean;
           };
-          // Resolve the orchestrator's cwd at execution time so the default
-          // base_ref tracks pi_sessions.cwd, not the repo_path arg. pi_sessions
-          // is the source of truth — works whether the orchestrator is live,
-          // dormant, or freshly activated.
           const orchestratorRow = this.blackboard.get<{ cwd: string | null }>(
             `SELECT cwd FROM pi_sessions
              WHERE stream_id = ? AND role = 'orchestrator'
@@ -2002,10 +1833,6 @@ export class ControlSurfaceRuntime {
           if (result.ok) {
             const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;
             if (worktreePiSessionId) {
-              // Invalidate display-path cache BEFORE the broadcast so the
-              // next tool event for this session resolves the new
-              // worktree_path. No-op when no entry exists yet (history
-              // route will build fresh from the updated DB row).
               this.sessionManager.toolDisplayCache.invalidatePiSession(worktreePiSessionId);
               this.wsHub.broadcast({
                 type: "worktree_changed",
@@ -2074,8 +1901,6 @@ export class ControlSurfaceRuntime {
             base_branch,
           );
           if (result.ok) {
-            // Flag for post-turn destruction — destroying mid-turn would prevent the
-            // tool result and final assistant message from reaching the websocket/sqlite.
             if (managed) {
               managed.pendingDestroy = true;
             }
@@ -2162,12 +1987,9 @@ export class ControlSurfaceRuntime {
         void this.refreshWhatsAppStatus();
       });
       this.whatsappStatusWatcher.on("error", () => {
-        // directory may not exist yet — watcher will be retried on next daemon start
         this.unwatchWhatsAppStatusSignal();
       });
-    } catch {
-      // directory doesn't exist yet — will be created when daemon starts
-    }
+    } catch {}
   }
 
   private unwatchWhatsAppStatusSignal(): void {
@@ -2215,13 +2037,10 @@ export class ControlSurfaceRuntime {
           if (session.tmuxSession) {
             try {
               await killTmuxSession(session.tmuxSession);
-            } catch {
-              // ignore
-            }
+            } catch {}
           }
           markSessionEnded(this.blackboard, session.sessionId, "idle_timeout");
         }
-        // Check all active sessions for stuck turns
         const defaultManaged = this.sessionManager.getDefault();
         const allManaged = [
           ...(defaultManaged ? [defaultManaged] : []),
@@ -2302,17 +2121,7 @@ export class ControlSurfaceRuntime {
       const targetPiSessionId =
         typeof payload.targetPiSessionId === "string" ? payload.targetPiSessionId : undefined;
 
-      // Generate server message ID immediately and ACK the client before classification
       const serverMessageId = crypto.randomUUID();
-      // TEMPORARILY DISABLED — message_ack ws event
-      // this.wsHub.send(client.id, {
-      //   type: "message_ack",
-      //   serverMessageId,
-      //   text: payload.text,
-      //   source: "web",
-      // });
-
-      // Skip router when message targets a specific pi session (direct tab input)
       let routerMeta: StreamRoutingMeta = {};
       if (targetPiSessionId) {
         routerMeta._targetSessionId = targetPiSessionId;
@@ -2360,9 +2169,6 @@ export class ControlSurfaceRuntime {
             typeof payload.clientMessageId === "string" ? payload.clientMessageId : undefined,
         });
 
-        // Mirror web user message to WhatsApp for complete conversation record.
-        // Truncate aggressively — user messages pasted from the web client can be
-        // very large (e.g. full document pastes) and must not exceed WhatsApp limits.
         const MAX_USER_WA_LENGTH = 30_000;
         try {
           const wsLabel = routerMeta.stream_name ? `*[${routerMeta.stream_name}]* ` : "";

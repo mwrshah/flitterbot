@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-/**
- * Flitterbot installer — Node.js rewrite of install.sh.
- * Standalone ESM script using only node:* built-in modules.
- *
- * Usage: node install.mjs [--dry-run] [--yes] [--with-scheduler] [--without-scheduler]
- */
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -17,9 +11,6 @@ import { execSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 const HOME = homedir();
 const FLITTERBOT_DIR = join(HOME, ".flitterbot");
 const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
@@ -40,9 +31,6 @@ const CURRENT_OS = platform() === "darwin" ? "Darwin" : platform() === "linux" ?
 
 let PROJECT_ROOT = "";
 
-// ---------------------------------------------------------------------------
-// CLI args
-// ---------------------------------------------------------------------------
 let DRY_RUN = false;
 let AUTO_YES = false;
 let INSTALL_SCHEDULER = false;
@@ -54,9 +42,6 @@ for (const arg of process.argv.slice(2)) {
   else if (arg === "--without-scheduler" || arg === "--skip-scheduler") INSTALL_SCHEDULER = false;
 }
 
-// ---------------------------------------------------------------------------
-// File lists
-// ---------------------------------------------------------------------------
 const TOP_LEVEL_FILES = ["uninstall.mjs", "VERSION"];
 
 const HOOK_SCRIPT = "hook-post.mjs";
@@ -75,9 +60,6 @@ const WHATSAPP_FILES = ["README.md", "config.json.example"];
 const WHATSAPP_EXEC_FILES = ["run-entry.js", "cli.js", "daemon.js"];
 const BUNDLED_SKILLS_DIR = "skills";
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
 function sha256Text(text) {
   return createHash("sha256").update(text).digest("hex");
 }
@@ -151,7 +133,6 @@ function diffText(before, after) {
     rmSync(tmpB, { force: true });
     return result;
   } catch (e) {
-    // diff exits 1 when files differ — output is in stdout
     try { rmSync(`/tmp/.flitterbot-diff-a.${process.pid}`, { force: true }); } catch {}
     try { rmSync(`/tmp/.flitterbot-diff-b.${process.pid}`, { force: true }); } catch {}
     return e.stdout || "";
@@ -208,9 +189,6 @@ function walkDir(dir, prefix = "") {
   return entries.sort();
 }
 
-// ---------------------------------------------------------------------------
-// Manifest operations — all JSON, no jq
-// ---------------------------------------------------------------------------
 function manifestInit() {
   mkdirSync(FLITTERBOT_DIR, { recursive: true });
   if (existsSync(MANIFEST)) {
@@ -249,9 +227,6 @@ function manifestDeleteTarget(targetKey) {
   writeJsonFile(MANIFEST, manifest, 0o600);
 }
 
-// ---------------------------------------------------------------------------
-// File resolution
-// ---------------------------------------------------------------------------
 function resolvePackagedRuntimeFile(rel) {
   const candidates = [
     PROJECT_ROOT && join(PROJECT_ROOT, "installer", rel),
@@ -294,9 +269,6 @@ function walkFiles(dir, prefix = "") {
   return entries.sort();
 }
 
-// ---------------------------------------------------------------------------
-// Runtime file deployment helpers
-// ---------------------------------------------------------------------------
 function copyRuntimeFile(src, dest, mode) {
   mkdirSync(dirname(dest), { recursive: true });
   if (src !== dest) copyFileSync(src, dest);
@@ -309,7 +281,6 @@ function writeRuntimeFile(dest, content, mode) {
   chmodSync(dest, mode);
 }
 
-// Change tracking
 let RUNTIME_CHANGES = "";
 
 function appendRuntimeChange(action, path) {
@@ -358,9 +329,6 @@ function recordRuntimeTreeTarget() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// systemd helpers
-// ---------------------------------------------------------------------------
 function systemctlUserAvailable() {
   try {
     execSync("systemctl --user show-environment", { stdio: "pipe" });
@@ -417,9 +385,6 @@ function applyLegacyCrontabText(afterText) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Preflight
-// ---------------------------------------------------------------------------
 function computeProjectRoot() {
   if (existsSync(join(SCRIPT_DIR, "..", "src")) && existsSync(join(SCRIPT_DIR, "..", "package.json"))) {
     PROJECT_ROOT = resolve(SCRIPT_DIR, "..");
@@ -483,9 +448,6 @@ function preflight() {
   info("");
 }
 
-// ---------------------------------------------------------------------------
-// Bootstrap config.json
-// ---------------------------------------------------------------------------
 async function bootstrapConfig() {
   const configPath = join(FLITTERBOT_DIR, "config.json");
   let configBefore = {};
@@ -507,7 +469,6 @@ async function bootstrapConfig() {
 
   let commandHint = configBefore.controlSurfaceCommand || "";
   if (commandHint) {
-    // Validate existing command — re-detect if the entry point file no longer exists
     const match = commandHint.match(/(?:node\S*\s+(?:--\S+\s+)*)(\S+\.(?:ts|js))$/);
     if (match && !existsSync(match[1])) commandHint = "";
   }
@@ -563,8 +524,6 @@ async function bootstrapConfig() {
     linearApiKey: "",
   };
 
-  // Defaults fill when a key is absent or null so config.json visibly records
-  // the values Flitterbot will use. Explicit "" / 0 / false are preserved.
   const configAfter = { ...configBefore };
   const setDefault = (key, value) => {
     if (configAfter[key] == null) configAfter[key] = value;
@@ -572,7 +531,6 @@ async function bootstrapConfig() {
 
   for (const [key, value] of Object.entries(STATIC_DEFAULTS)) setDefault(key, value);
 
-  // Dynamic defaults (depend on install context — not meaningful to diff):
   setDefault("controlSurfaceToken", token);
   setDefault("projectRoot", projectRoot);
   setDefault("sourceRoot", configAfter.projectRoot ?? projectRoot);
@@ -596,7 +554,6 @@ async function bootstrapConfig() {
 
   reportConfigOverrides(configAfter, STATIC_DEFAULTS);
 
-  // Always sync token to web/.env so the frontend can authenticate
   await syncWebEnv(configAfter);
 }
 
@@ -671,9 +628,6 @@ async function syncWebEnv(config) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// WhatsApp config bootstrap
-// ---------------------------------------------------------------------------
 async function promptString(promptText) {
   if (AUTO_YES || DRY_RUN) return "";
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -737,9 +691,6 @@ async function bootstrapWhatsappConfig() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Blackboard initialization
-// ---------------------------------------------------------------------------
 function readBlackboardSchemaVersion(schemaFile) {
   try {
     const schema = readFileSync(schemaFile, "utf8");
@@ -810,13 +761,9 @@ function initBlackboard() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Deploy runtime files
-// ---------------------------------------------------------------------------
 async function deployRuntimeFiles() {
   RUNTIME_CHANGES = "";
 
-  // Note changes for all file categories
   for (const file of TOP_LEVEL_FILES) {
     const src = resolvePackagedRuntimeFile(file);
     if (!src) continue;
@@ -953,9 +900,6 @@ async function deployRuntimeFiles() {
   recordRuntimeTreeTarget();
 }
 
-// ---------------------------------------------------------------------------
-// Install hooks into settings.json
-// ---------------------------------------------------------------------------
 async function installHooks() {
   let settingsBefore = {};
   let beforeHash = "null";
@@ -970,7 +914,6 @@ async function installHooks() {
     beforeHash = sha256File(SETTINGS);
   }
 
-  // Ensure hooks object exists
   let current = { ...settingsBefore };
   if (!current.hooks || typeof current.hooks !== "object") current.hooks = {};
 
@@ -981,7 +924,6 @@ async function installHooks() {
     });
   };
 
-  // Remove Flitterbot hooks from deprecated events
   let changes = false;
   const deprecatedEvents = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "SubagentStart", "SubagentStop"];
   for (const event of deprecatedEvents) {
@@ -997,7 +939,6 @@ async function installHooks() {
     }
   }
 
-  // Install/update current hook events
   const modifications = [];
   for (const { event, arg } of HOOKS) {
     const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg}`;
@@ -1024,7 +965,6 @@ async function installHooks() {
     });
   }
 
-  // Clean up empty hooks object
   if (Object.keys(current.hooks).length === 0) delete current.hooks;
 
   if (!changes && existsSync(SETTINGS)) {
@@ -1061,9 +1001,6 @@ async function installHooks() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scheduler: launchd (macOS)
-// ---------------------------------------------------------------------------
 async function installLaunchd() {
   if (CURRENT_OS !== "Darwin") return;
 
@@ -1077,7 +1014,6 @@ async function installLaunchd() {
   let beforeHash = "null";
   if (existsSync(PLIST_DEST)) beforeHash = sha256File(PLIST_DEST);
 
-  // Validate plist
   const tmpPlist = `/tmp/flitterbot-plist.${process.pid}`;
   writeFileSync(tmpPlist, plistContent);
   try {
@@ -1128,9 +1064,6 @@ async function installLaunchd() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scheduler: systemd (Linux)
-// ---------------------------------------------------------------------------
 async function installLinuxSystemd() {
   if (CURRENT_OS !== "Linux") return;
   if (!systemctlUserAvailable()) {
@@ -1250,9 +1183,6 @@ async function installScheduler() {
   await installLinuxSystemd();
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 async function main() {
   preflight();
   await deployRuntimeFiles();

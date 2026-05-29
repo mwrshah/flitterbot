@@ -41,7 +41,6 @@ export const SettingsDrawer = memo(function SettingsDrawer({
 
   return (
     <>
-      {/* Backdrop */}
       <button
         type="button"
         className="fixed inset-0 z-40 bg-black/50"
@@ -49,7 +48,6 @@ export const SettingsDrawer = memo(function SettingsDrawer({
         aria-label="Close settings"
       />
 
-      {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-50 flex flex-col shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-sm font-semibold">Settings</h2>
@@ -62,7 +60,6 @@ export const SettingsDrawer = memo(function SettingsDrawer({
         </div>
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
-          {/* Theme */}
           <section className="space-y-3">
             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Theme
@@ -85,7 +82,6 @@ export const SettingsDrawer = memo(function SettingsDrawer({
             </div>
           </section>
 
-          {/* Connection */}
           <section className="space-y-3">
             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Control Surface

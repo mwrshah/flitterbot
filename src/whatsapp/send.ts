@@ -1,11 +1,6 @@
 import type { SendWhatsAppRequest, SendWhatsAppResult } from "../contracts/index.ts";
 import { sendDaemonCommand } from "./ipc.ts";
 
-/**
- * Send a WhatsApp message via the daemon IPC.
- * Used by the CLI. The runtime calls sendDaemonCommand directly
- * because it needs access to the full DaemonResponse (e.g. daemon status).
- */
 export async function sendWhatsAppViaDaemon(
   request: SendWhatsAppRequest,
 ): Promise<SendWhatsAppResult> {

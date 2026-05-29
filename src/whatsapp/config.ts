@@ -66,9 +66,6 @@ function normalizePhoneNumber(value: string): string {
 }
 
 function toWhatsAppJid(value: string): string {
-  // Already-qualified JIDs (any @domain) pass through verbatim so config
-  // entries like `xxxxx@lid` or `xxxxx@g.us` are preserved. Bare numeric
-  // strings are normalized into phone-format JIDs.
   if (value.includes("@")) {
     return value;
   }
@@ -108,10 +105,6 @@ export function resolveAllowedJids(config = loadWhatsAppConfig()): string[] {
   return config.allowedJids.map(toWhatsAppJid);
 }
 
-/**
- * Returns the primary JID — the main recipient who receives web-mirrored
- * messages and serves as the default outbound target.
- */
 export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
   if (config.recipientJid) {
     return toWhatsAppJid(config.recipientJid);
@@ -122,7 +115,6 @@ export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
   );
 }
 
-/** Alias for resolveRecipientJid — the primary JID receives web-mirrored input and is the default reply target. */
 export const resolvePrimaryJid = resolveRecipientJid;
 
 export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string {

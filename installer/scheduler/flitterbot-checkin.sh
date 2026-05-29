@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# Flitterbot cron tick — ping the control surface if it's running.
-# If the surface is down, curl fails silently and we exit 0.
-# All decision logic lives in the control surface's POST /cron/tick endpoint.
 set -euo pipefail
 
 FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
 CONFIG_FILE="$FLITTERBOT_HOME/config.json"
 
-# Read token and connection details from config
 if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 0
 fi

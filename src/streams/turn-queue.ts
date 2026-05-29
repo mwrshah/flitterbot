@@ -5,12 +5,6 @@ export type QueueSource = MessageSource;
 export type QueueItem = {
   id: string;
   source: QueueSource;
-  /**
-   * Origin of this queue item.
-   *   "user"   — real user input via message-input (web/whatsapp).
-   *   "system" — hook, cron, agent enqueues, create_stream bootstrap prompts.
-   * Used by pump() to decide whether an item is eligible for coalescing.
-   */
   sender?: "user" | "system";
   text: string;
   metadata?: MessageMetadata;
@@ -21,20 +15,9 @@ export type QueueItem = {
   streamId?: string;
   streamName?: string;
   serverMessageId?: string;
-  /**
-   * Client-generated UUID for the optimistic UI bubble. Echoed back to the
-   * originating web client on the user-role `message_end` WS envelope so
-   * optimistic entries can be reconciled with their canonical server copy.
-   */
   clientMessageId?: string;
 };
 
-/**
- * A QueueItem is coalescable iff it originated from real user input via
- * message-input (web/whatsapp), is not a steer, and carries no attachments.
- * Non-user enqueues (hook, agent tool calls, cron, bootstrap prompts) break
- * the run and are delivered on their own.
- */
 export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.sender !== "user") return false;
   if (item.source !== "web" && item.source !== "whatsapp") return false;
@@ -43,16 +26,6 @@ export function isCoalescableUserInput(item: QueueItem): boolean {
   return true;
 }
 
-/**
- * Merge consecutive user-input items into a single delivery.
- *   - text:              joined with "\n"
- *   - metadata:          last-wins key merge + explicit `coalescedFrom` audit array
- *   - serverMessageId:   last in group (SDK stamps a single user entry; matches the
- *                        most recent optimistic UI bubble)
- *   - receivedAt/id:     first in group; id gets a `coalesced:` prefix for logs
- *   - webClientId:       last in group (for any correlation WS events on close)
- *   - streamId/Name:     first (all peers share stream — validated by caller)
- */
 export function coalesceUserItems(items: QueueItem[]): QueueItem {
   if (items.length === 0) throw new Error("coalesceUserItems: empty group");
   const first = items[0]!;
@@ -76,9 +49,6 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     streamId: first.streamId,
     streamName: first.streamName,
     serverMessageId: last.serverMessageId,
-    // Last in group (same rationale as serverMessageId — the SDK stamps a
-    // single user entry on delivery, which matches the most recent optimistic
-    // UI bubble).
     clientMessageId: last.clientMessageId,
   };
 }
@@ -109,7 +79,6 @@ export class TurnQueue {
       throw new Error("turn queue is stopped");
     }
 
-    // Steer messages bypass the queue and interrupt the current turn immediately
     if (item.deliveryMode === "steer" && this.processing) {
       void this.processItem(item).catch((error) => {
         this.onItemEnd?.(item, error);
@@ -133,14 +102,6 @@ export class TurnQueue {
     return this.currentItem;
   }
 
-  /**
-   * Return a shallow copy of items waiting to be processed (excludes the
-   * `currentItem`, which is mid-flight in the SDK and will surface via
-   * `message_end` shortly). Used by the streams-history endpoint to
-   * include pending user messages as `streaming: true` placeholders so a
-   * full page reload between submit and the SDK appending the entry
-   * doesn't make the user's message disappear from the agent timeline.
-   */
   getPendingItems(): QueueItem[] {
     return [...this.items];
   }
@@ -168,11 +129,6 @@ export class TurnQueue {
     this.processing = false;
   }
 
-  /**
-   * Pop the next delivery from the queue. When the head is a coalescable user
-   * input, greedily drains consecutive coalescable peers from the same stream
-   * into a single merged delivery. Non-user items are delivered one-by-one.
-   */
   private drainNext(): QueueItem {
     const head = this.items.shift()!;
     if (!isCoalescableUserInput(head)) return head;

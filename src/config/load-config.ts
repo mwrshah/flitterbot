@@ -12,12 +12,6 @@ export function isThinkingLevel(value: unknown): value is ThinkingLevel {
   return typeof value === "string" && (THINKING_LEVELS as readonly string[]).includes(value);
 }
 
-/**
- * A selectable model entry shown in the web UI model selector. `id` is the
- * stable UI/persistence identifier; `provider`+`modelId` are what the pi SDK
- * consumes under the hood. `thinkingLevel` optionally overrides the global
- * `defaultThinkingLevel` for this model.
- */
 export type ModelConfigEntry = {
   id: string;
   label: string;
@@ -99,11 +93,8 @@ export type FlitterbotConfig = {
   controlSurfaceHost: string;
   controlSurfacePort: number;
   controlSurfaceToken: string;
-  /** Selectable models exposed to the web UI. Always non-empty and defined in config.json. */
   models: ModelConfigEntry[];
-  /** Id of the default model (must match one of `models[].id` or be a provider/modelId pair). */
   defaultModel: string;
-  /** Global thinking level used for newly-created Pi sessions, unless a model overrides it. */
   defaultThinkingLevel: ThinkingLevel;
   piTransport: PiTransport;
   stallMinutes: number;
@@ -124,15 +115,10 @@ export type FlitterbotConfig = {
   wipeStreamsOnStart: boolean;
   whatsappEnabled: boolean;
   shortcuts: ShortcutBindingsConfig;
-  /** First queued instruction sent to the default agent when its session starts. */
   defaultAgentFirstMessage: string;
-  /** Footer appended to the first prompt delivered to every newly-created stream orchestrator. */
   newStreamFirstMessageFooter: string;
-  /** Deterministic skill root populated by the installer with bundled Flitterbot skills. */
   flitterbotSkillsDir: string;
-  /** Include tmux sub-agent orchestration instructions in orchestrator prompts. */
   tmuxEnabled: boolean;
-  /** Extra directories to load skills from after the bundled `~/.flitterbot/skills` directory. */
   extraSkillPaths: string[];
 };
 
@@ -143,9 +129,6 @@ export const SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER =
 const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
 const CONFIG_PATH = path.join(FLITTERBOT_DIR, "config.json");
-/** Absolute path to the user's ~/.flitterbot/config.json. Exported so helpers
- *  that mutate specific fields (e.g. the pin/unpin endpoint) can write back
- *  without duplicating the path-resolution logic. */
 export const FLITTERBOT_CONFIG_PATH = CONFIG_PATH;
 
 function expandHome(value: string): string {
@@ -264,11 +247,6 @@ function requirePiTransport(raw: RawConfigJson): PiTransport {
   );
 }
 
-/**
- * Expand `~`, resolve to absolute, and de-duplicate while preserving declared order.
- * `extraSkillPaths` is required in config.json; invalid entries fail startup instead
- * of being silently dropped.
- */
 function parseExtraSkillPaths(raw: RawConfigJson): string[] {
   const input = requireConfigArray(raw, "extraSkillPaths");
   const seen = new Set<string>();

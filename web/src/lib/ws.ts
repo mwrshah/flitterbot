@@ -5,28 +5,14 @@ type WsSubscriber = (message: WsMessage) => void;
 type ConnectionSubscriber = (state: ConnectionState) => void;
 type SessionSubscription = { piSessionId: string; eventTypes?: string[] };
 
-// ── Heartbeat config ──
 const HEARTBEAT_INTERVAL = 30_000;
 const HEARTBEAT_TIMEOUT = 10_000;
 
-// ── Reconnect config ──
 const BACKOFF_BASE = 1_000;
 const BACKOFF_MAX = 30_000;
 const BACKOFF_JITTER = 500;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
-/**
- * Valid state transitions:
- *   DISCONNECTED  → CONNECTING    (connect)
- *   CONNECTING    → CONNECTED     (socket open)
- *   CONNECTING    → DISCONNECTED  (socket error/close, or construction failure)
- *   CONNECTING    → STUB          (construction failure with stub fallback)
- *   CONNECTED     → RECONNECTING  (socket close, heartbeat timeout)
- *   RECONNECTING  → CONNECTING    (backoff timer fires)
- *   RECONNECTING  → DISCONNECTED  (circuit breaker, or manual disconnect)
- *   CONNECTED     → DISCONNECTED  (manual disconnect)
- *   *             → DISCONNECTED  (manual disconnect always allowed)
- */
 export class FlitterbotWsClient {
   private getSettings: () => ControlSurfaceSettings;
   private socket: WebSocket | null = null;
@@ -48,8 +34,6 @@ export class FlitterbotWsClient {
     return this._connectionState;
   }
 
-  // ── State machine ──
-
   private transition(to: ConnectionState) {
     const from = this._connectionState;
     if (from === to) return;
@@ -58,10 +42,7 @@ export class FlitterbotWsClient {
     for (const fn of this.connectionSubscribers) fn(to);
   }
 
-  // ── Public API: connect / disconnect / reconnect ──
-
   connect() {
-    // Guard: no-op if already connecting or connected
     if (this._connectionState === "connecting" || this._connectionState === "connected") {
       return;
     }
@@ -96,17 +77,12 @@ export class FlitterbotWsClient {
         const message = JSON.parse(event.data as string) as WsMessage;
         if ((message as { type: string }).type === "pong") return;
         for (const fn of this.subscribers) fn(message);
-      } catch {
-        // Ignore malformed messages
-      }
+      } catch {}
     };
 
     this.socket.onclose = () => {
-      // Clear stale reference — this socket is now CLOSED
       this.socket = null;
       this.stopHeartbeat();
-      // If we were CONNECTED, transition to RECONNECTING (not DISCONNECTED)
-      // If we were CONNECTING (never made it to open), go to DISCONNECTED and schedule
       if (this._connectionState === "connected") {
         this.scheduleReconnect();
       } else {
@@ -120,7 +96,6 @@ export class FlitterbotWsClient {
     };
   }
 
-  /** Manual disconnect — goes to DISCONNECTED, no auto-reconnect. */
   disconnect() {
     this.clearReconnectTimer();
     this.stopHeartbeat();
@@ -130,28 +105,21 @@ export class FlitterbotWsClient {
     this.transition("disconnected");
   }
 
-  /** Manual reconnect — resets backoff and immediately connects. */
   reconnect() {
     this.clearReconnectTimer();
     this.stopHeartbeat();
     this.unlistenVisibility();
     this.closeSocket();
     this.reconnectAttempt = 0;
-    // Force state to disconnected so connect() guard passes
-    this._connectionState = "disconnected";
+    this._connectionState = "disconnected"; // force state so connect() guard passes
     this.connect();
   }
-
-  // ── Socket cleanup ──
 
   private closeSocket() {
     const s = this.socket;
     if (!s) return;
-    // Dereference immediately so nothing else uses the stale socket
     this.socket = null;
-    // Use no-op handlers (not null) so the browser can still dispatch
-    // close/error events and complete the WebSocket close handshake.
-    // Nulling handlers prevents event dispatch, leaving sockets "Pending".
+    // No-op handlers (not null) keep the browser dispatching close/error events so the close handshake completes; nulling them leaves sockets "Pending"
     s.onclose = () => {};
     s.onerror = () => {};
     s.onmessage = null;
@@ -160,8 +128,6 @@ export class FlitterbotWsClient {
       s.close();
     }
   }
-
-  // ── Reconnect with exponential backoff + jitter ──
 
   private clearReconnectTimer() {
     if (this.reconnectTimer) {
@@ -173,7 +139,6 @@ export class FlitterbotWsClient {
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
 
-    // Circuit breaker: stop trying after maxAttempts
     if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
       console.warn(
         `[ws] circuit breaker: ${MAX_RECONNECT_ATTEMPTS} attempts exhausted, staying disconnected`,
@@ -193,13 +158,10 @@ export class FlitterbotWsClient {
     );
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      // Force state so connect() guard passes
-      this._connectionState = "disconnected";
+      this._connectionState = "disconnected"; // force state so connect() guard passes
       this.connect();
     }, delay);
   }
-
-  // ── Heartbeat ──
 
   private startHeartbeat() {
     this.stopHeartbeat();
@@ -235,8 +197,6 @@ export class FlitterbotWsClient {
     }
   }
 
-  // ── Visibility ──
-
   private listenVisibility() {
     if (typeof document === "undefined") return;
     this.unlistenVisibility();
@@ -266,16 +226,12 @@ export class FlitterbotWsClient {
     }
   }
 
-  // ── Messaging ──
-
   async sendMessage(
     text: string,
     deliveryMode: string,
     options?: {
       images?: Array<{ data: string; mimeType: string }>;
       targetPiSessionId?: string;
-      /** Client-generated UUID for the optimistic user message bubble. Echoed
-       *  back by the server on user-role `message_end` for cache reconcile. */
       clientMessageId?: string;
     },
   ): Promise<void> {

@@ -7,7 +7,6 @@ function getModifier(): string {
 
 const emptySubscribe = () => () => {};
 
-/** Returns 'Opt' on Mac, 'Alt' on other platforms. SSR-safe — returns "" on the server. */
 export function useModifierLabel(): string {
   return useSyncExternalStore(emptySubscribe, getModifier, () => "");
 }

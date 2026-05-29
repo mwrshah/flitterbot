@@ -19,16 +19,6 @@ type UseGlobalShortcutsOptions = {
   shortcutBindings?: ShortcutBindingsConfig;
 };
 
-/**
- * Global keyboard shortcuts.
- *
- * Supports:
- * - modifier combos like Alt+R / Ctrl+D
- * - multi-key sequences like g g and c t
- *
- * Bindings are resolved by action id so user overrides can come from config
- * without changing the matching logic.
- */
 export function useGlobalShortcuts({
   streamPaths = [],
   shortcutBindings,

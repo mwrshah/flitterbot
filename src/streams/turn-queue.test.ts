@@ -15,23 +15,6 @@ function mk(
   };
 }
 
-/**
- * Drive the queue with a "primer + burst" pattern that mirrors production
- * backpressure.
- *
- * Why: `enqueue()` starts pump() synchronously, so the very first item in an
- * empty queue is always drained alone before any follow-ups can pile up.
- * Coalescing only kicks in for items that arrive while a prior delivery is
- * in-flight — which in production is the common case (pi is busy on a turn
- * and user fires off a burst).
- *
- * The helper enqueues `primer` first and holds it inside process() on a gate.
- * While the primer is parked, `burst` is enqueued synchronously — so all of
- * those items are in the queue before pump() advances. Releasing the gate
- * lets pump() drain the burst, where coalescing actually happens.
- *
- * Returns deliveries in order: [primer, ...post-coalesce burst deliveries].
- */
 async function drainWithPrimer(primer: QueueItem, burst: QueueItem[]): Promise<QueueItem[]> {
   const delivered: QueueItem[] = [];
   let releasePrimer: (() => void) | undefined;
@@ -49,12 +32,9 @@ async function drainWithPrimer(primer: QueueItem, burst: QueueItem[]): Promise<Q
     },
   });
   queue.enqueue(primer);
-  // Yield once so pump() advances into processItem(primer) and parks on the gate.
   await Promise.resolve();
-  // Now seed the burst — pump is gated, so these all pile up in the queue.
   for (const it of burst) queue.enqueue(it);
   releasePrimer?.();
-  // Flush remaining microtasks so pump() drains the burst.
   for (let i = 0; i < 50; i++) {
     await Promise.resolve();
     if (!queue.isBusy() && queue.getDepth() === 0) break;
@@ -62,10 +42,6 @@ async function drainWithPrimer(primer: QueueItem, burst: QueueItem[]): Promise<Q
   return delivered;
 }
 
-/**
- * Convenience wrapper: drain without primer, accepting the reality that the
- * head of the queue is dispatched solo. Useful for single-item sanity checks.
- */
 async function drainSolo(items: QueueItem[]): Promise<QueueItem[]> {
   const delivered: QueueItem[] = [];
   const queue = new TurnQueue({
@@ -80,8 +56,6 @@ async function drainSolo(items: QueueItem[]): Promise<QueueItem[]> {
   }
   return delivered;
 }
-
-// --- Predicate unit tests ---
 
 describe("isCoalescableUserInput", () => {
   test("accepts web+user+no-images+no-steer", () => {
@@ -137,8 +111,6 @@ describe("isCoalescableUserInput", () => {
   });
 });
 
-// --- Coalesce builder unit tests ---
-
 describe("coalesceUserItems", () => {
   test("joins text with \\n and preserves order", () => {
     const merged = coalesceUserItems([
@@ -184,7 +156,7 @@ describe("coalesceUserItems", () => {
       }),
     ]);
     expect(merged.metadata?.stream_id).toBe("ws-1");
-    expect(merged.metadata?.foo).toBe("B"); // last wins
+    expect(merged.metadata?.foo).toBe("B");
     expect(merged.metadata?.bar).toBe("B");
     expect(merged.metadata?.coalescedFrom).toEqual(["a", "b"]);
   });
@@ -219,8 +191,6 @@ describe("coalesceUserItems", () => {
   });
 });
 
-// --- Pump integration tests ---
-
 describe("TurnQueue.pump coalescing", () => {
   test("single user message: unchanged payload, not wrapped", async () => {
     const delivered = await drainSolo([
@@ -240,7 +210,6 @@ describe("TurnQueue.pump coalescing", () => {
         mk({ id: "u3", text: "c", source: "web", sender: "user", serverMessageId: "sm-3" }),
       ],
     );
-    // [primer, coalesced(u1+u2+u3)]
     expect(delivered).toHaveLength(2);
     expect(delivered[1]!.text).toBe("a\nb\nc");
     expect(delivered[1]!.id).toBe("coalesced:u1+2");
@@ -258,7 +227,6 @@ describe("TurnQueue.pump coalescing", () => {
         mk({ id: "u3", text: "three", source: "web", sender: "user" }),
       ],
     );
-    // [primer, u1, a1, coalesced(u2+u3)]
     expect(delivered.map((d) => d.text)).toEqual(["prime", "one", "agent-note", "two\nthree"]);
     expect(delivered[3]!.id).toBe("coalesced:u2+1");
   });

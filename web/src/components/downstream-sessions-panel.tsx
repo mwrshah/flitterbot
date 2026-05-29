@@ -22,11 +22,6 @@ import {
 import type { DownstreamSessionItem, PiSessionStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
-/**
- * Pi-session status as a plain dot + label. Purely informational — not
- * interactive. The Recover action lives in the chat header button only.
- * Matches the dot+label pattern used by downstream session rows below.
- */
 function piStatusBanner(
   status: PiSessionStatus | undefined,
 ): { label: string; colorClass: string } | null {
@@ -49,9 +44,6 @@ function piStatusBanner(
     case "ended":
       return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
     case "crashed":
-      // Same /15 tinted-pill template as the other states, red hue for the
-      // semantic. Not the shadcn destructive variant — just the muted red
-      // tint that matches the pattern (emerald / lime / amber / zinc / red).
       return {
         label: "Crashed",
         colorClass: "bg-red-500/15 text-red-600 dark:text-red-400",
@@ -112,7 +104,6 @@ export function DownstreamSessionsPanel({
 
   const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
 
-  // Register stream copy handlers with higher priority than the root fallback.
   const tmuxShortcutTargetSessionId = data?.find((s) => s.tmuxSession)?.sessionId ?? null;
   const firstTmuxSession = data?.find((s) => s.tmuxSession)?.tmuxSession ?? null;
   const currentWorktreePath = worktree?.worktreePath ?? null;
@@ -217,10 +208,6 @@ export function DownstreamSessionsPanel({
     showDiffPanel,
   ]);
 
-  // Parse the unified diff into react-diff-view's file/hunk/change model.
-  // Inject the +/-/space prefix into each change's content so the sign is
-  // part of the selectable text (the library renders content as-is in the
-  // code cell and omits the prefix by design; it signals type via color).
   const diffFiles = useMemo<FileData[]>(() => {
     if (diffQuery.data?.mode !== "diff") return [];
     const files = parseDiff(diffQuery.data.diff);
@@ -250,7 +237,6 @@ export function DownstreamSessionsPanel({
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
-      {/* Header row: status banner + diff toggle */}
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
         {(() => {
           const banner = piStatusBanner(piSessionStatus);
@@ -297,7 +283,6 @@ export function DownstreamSessionsPanel({
       </div>
 
       {showDiff && hasWorktree ? (
-        /* Diff panel */
         <div data-scroll-container="diff" className="flex-1 overflow-y-auto">
           {diffQuery.isPending && (
             <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
@@ -349,7 +334,6 @@ export function DownstreamSessionsPanel({
           )}
         </div>
       ) : (
-        /* Default sessions + worktree panel */
         <div className="flex-1 overflow-y-auto">
           <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
             Active Sessions

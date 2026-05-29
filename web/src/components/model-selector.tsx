@@ -45,33 +45,13 @@ const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
 };
 
 export type ModelSelectorProps = {
-  /** Compact mode hides the label text in the trigger, showing only the chevron. */
   compact?: boolean;
   disabled?: boolean;
-  /**
-   * Pi-session whose model/thinking-level this selector mutates. Required.
-   * When the pi-session is the default agent, the backend additionally
-   * persists `config.defaultModel` / `defaultThinkingLevel` — callers don't
-   * need to special-case the default stream.
-   */
   piSessionId: string;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
 };
 
-/**
- * Dropdown that sits next to the composer's send button. Shows two sections:
- *
- *   1. *Pinned* — the curated shortlist from `config.models[]`.
- *   2. *All models* — the full pi SDK catalog, grouped by provider, with a
- *      type-to-filter search. Entries whose provider has no auth configured
- *      are rendered dimmed with a small badge.
- *
- * Selecting a model always hits `PUT /api/pi-sessions/:piSessionId/model`.
- * The default-vs-orchestrator distinction is detected server-side: when the
- * target pi-session is the default agent, the backend also updates the
- * `defaultModel` config so a restart picks up the choice.
- */
 export const ModelSelector = memo(function ModelSelector({
   compact,
   disabled,
@@ -83,8 +63,6 @@ export const ModelSelector = memo(function ModelSelector({
   const { data } = useQuery({
     queryKey: MODELS_QUERY_KEY,
     queryFn: () => apiClient.listModels(),
-    // Auth can change outside the web app (`pi /login`, env updates, token refresh).
-    // Keep the selector's badges/order tied to the control surface's current auth state.
     staleTime: 0,
   });
 
@@ -94,9 +72,6 @@ export const ModelSelector = memo(function ModelSelector({
   const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
   const activeModelId = selectedModelId ?? defaultModelId;
   const activeThinkingLevel = selectedThinkingLevel ?? defaultThinkingLevel;
-  // Include both the curated id AND the composite `provider/modelId` so an
-  // "All" entry shows its star whether it was pinned under its curated alias
-  // or its composite form.
   const pinnedIds = useMemo(() => {
     const set = new Set<string>();
     for (const m of pinned) {
@@ -111,9 +86,6 @@ export const ModelSelector = memo(function ModelSelector({
     mutationFn: ({ id, pin, label }: { id: string; pin: boolean; label?: string }) =>
       apiClient.pinModel(id, pin, label),
     onSuccess: (result, vars) => {
-      // The mutation response is the same derived model-list shape as GET, so
-      // the cache keeps the server invariant: pinned catalog entries are absent
-      // from `all` instead of being deduped again in the render path.
       updateModelsCache(queryClient, result);
       queryClient.invalidateQueries({ queryKey: MODELS_QUERY_KEY });
       toast.success(vars.pin ? "Pinned to config" : "Unpinned");
@@ -401,8 +373,6 @@ function ModelCommandItem({
   busy: boolean;
 }) {
   const available = model.available !== false;
-  // When pinned, the star turns into an unpin action; when not pinned, it's a
-  // pin action. Disabled for the last pinned entry (server enforces the same).
   const pinDisabled = busy || (isPinned && !canUnpin);
   const pinTitle = isPinned
     ? canUnpin
@@ -454,11 +424,6 @@ function ModelCommandItem({
   );
 }
 
-/** True when `stored` matches this catalog entry by either curated id or the
- *  composite `provider/modelId` form. Curated ids (e.g. `claude-opus-4-7`)
- *  and composite ids (e.g. `anthropic/claude-opus-4-7`) refer to the same
- *  underlying model; treating them as equivalent avoids mismatches when the
- *  user pins/unpins entries. */
 function matchesModelId(
   m: Pick<ModelListItem, "id" | "provider" | "modelId">,
   stored: string,

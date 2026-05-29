@@ -1,13 +1,3 @@
-/**
- * React wrapper for pi-web-ui's <message-list> Lit web component.
- *
- * Imperatively manages the Lit element lifecycle since custom elements
- * need property (not attribute) assignment for complex types like arrays.
- *
- * Exposes updateStreaming / clearStreaming via React 19's ref prop so ChatPanel
- * can push streaming deltas directly to the Lit component without React renders.
- */
-
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { memo, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -34,10 +24,7 @@ export type StreamsMessageListHandle = {
 type StreamsMessageListProps = {
   messages: AgentMessage[];
   onMessagesRendered?: () => void;
-  /** Called when a user message's “Delete (including me)” menu item is clicked. */
   onPruneRequested?: (entryId: string) => void;
-  /** When true, the Lit <message-list> suppresses the copy button on the
-   *  trailing turn — prevents premature copy while the agent is mid-turn. */
   isSessionBusy?: boolean;
   ref?: Ref<StreamsMessageListHandle>;
 };
@@ -63,9 +50,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     void (renderComplete ?? el.updateComplete).then(() => {
       if (elementRef.current !== el) return;
       flushActiveTools();
-      // Defer scroll until after the browser runs layout — updateComplete
-      // resolves when the parent Lit element finishes, but child components
-      // may still be rendering. rAF ensures scrollHeight reflects final DOM.
       requestAnimationFrame(() => {
         onMessagesRendered?.();
       });
@@ -117,9 +101,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     const el = elementRef.current as MessageListElement & Record<string, unknown>;
     flushActiveTools();
 
-    // Always assign. When Lit already committed these messages imperatively
-    // (message_end path), its shouldUpdate (_committedTotal) suppresses the
-    // redundant render.
     const renderToken = streamingPerf.beginCommittedLitRender();
     el.messages = messages;
     el.tools = EMPTY_TOOLS;
@@ -137,15 +118,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     };
   }, []);
 
-  // Listen for `prune-message` CustomEvents bubbled by <user-message> in the
-  // Lit subtree. Keep the listener on the React container so it survives even
-  // if the Lit element is rebuilt.
-  //
-  // `ready` is a dep because the container div is only rendered once the Lit
-  // runtime has loaded — before that the component returns a loading
-  // placeholder and containerRef.current is null. Without `ready` here, the
-  // effect runs at mount, bails out, and never re-runs after the container
-  // actually mounts, silently dropping every prune-message event.
   useEffect(() => {
     if (!ready) return;
     const container = containerRef.current;

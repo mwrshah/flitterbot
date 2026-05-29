@@ -83,11 +83,9 @@ function detectInstallCmd(dir: string): string | null {
 async function installDependencies(worktreePath: string): Promise<string[]> {
   const dirs: Array<{ dir: string; cmd: string }> = [];
 
-  // Check worktree root
   const rootCmd = detectInstallCmd(worktreePath);
   if (rootCmd) dirs.push({ dir: worktreePath, cmd: rootCmd });
 
-  // Check immediate subdirectories
   try {
     for (const entry of readdirSync(worktreePath)) {
       const full = path.join(worktreePath, entry);
@@ -100,9 +98,7 @@ async function installDependencies(worktreePath: string): Promise<string[]> {
       const cmd = detectInstallCmd(full);
       if (cmd) dirs.push({ dir: full, cmd });
     }
-  } catch {
-    // readdir failed — skip subdirectory scan
-  }
+  } catch {}
 
   if (dirs.length === 0) return [];
 
@@ -134,7 +130,7 @@ async function getGitIgnoredDirs(repoPath: string, absPaths: string[]): Promise<
     });
     return new Set(stdout.trim().split("\n").filter(Boolean));
   } catch {
-    // exit code 1 = nothing ignored, or git unavailable — skip nothing
+    // git check-ignore exits 1 when nothing is ignored — that's "skip nothing", not an error.
     return new Set();
   }
 }
@@ -161,9 +157,7 @@ async function findEnvFiles(
         } catch {}
       }
     }
-  } catch {
-    // readdir failed — skip
-  }
+  } catch {}
 
   if (candidateDirs.length > 0) {
     const ignored = await getGitIgnoredDirs(repoPath, candidateDirs);
@@ -197,15 +191,7 @@ async function copyEnvFiles(repoPath: string, worktreePath: string): Promise<str
   return results;
 }
 
-/**
- * Resolve the current branch of the orchestrator's working directory. Used as
- * the default base_ref when the caller omits one — we branch from whatever the
- * orchestrator itself is sitting on, not a hardcoded origin/main.
- *
- * Fails loudly on detached HEAD, non-git dirs, or git errors. Callers must
- * surface the error to the LLM so it can choose an explicit base_ref rather
- * than silently falling back.
- */
+// Default base_ref derives from the orchestrator's own current branch, never a hardcoded origin/main; it fails loudly so the caller can pick an explicit base_ref instead of silently falling back.
 async function resolveOrchestratorHeadBranch(cwd: string): Promise<string> {
   if (!existsSync(cwd)) {
     throw new Error(`Orchestrator cwd does not exist: ${cwd}`);
@@ -254,7 +240,6 @@ export async function executeCreateWorktree(
     };
   }
 
-  // Enhancement 2: Field-only updates — skip all git operations
   if (updateRepoPath !== undefined || updateWorktreePath !== undefined) {
     const newRepo = updateRepoPath ?? stream.repo_path ?? repoPath;
     const newWorktree = updateWorktreePath ?? stream.worktree_path ?? undefined;
@@ -267,7 +252,6 @@ export async function executeCreateWorktree(
     };
   }
 
-  // Guard against accidental worktree proliferation
   let cleanupMessage = "";
   if (stream.worktree_path && existsSync(stream.worktree_path)) {
     if (!force) {
@@ -283,9 +267,6 @@ export async function executeCreateWorktree(
     cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
-  // Resolve base_ref. Explicit caller value wins; otherwise derive from the
-  // orchestrator's own current branch. No silent fallback to origin/main —
-  // failures bubble up as tool errors so the orchestrator can decide what to do.
   let resolvedBaseRef: string;
   if (baseRef) {
     resolvedBaseRef = baseRef;
@@ -301,7 +282,6 @@ export async function executeCreateWorktree(
     }
   }
 
-  // Determine branch name: NNN-<slug> convention
   const slug = slugify(stream.name);
   let resolvedBranch: string;
   if (branchName) {
@@ -311,7 +291,6 @@ export async function executeCreateWorktree(
     resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
   }
 
-  // Validate baseRef is a real branch (not a SHA, tag, or nonexistent ref)
   const SHA_RE = /^[0-9a-f]{7,40}$/i;
   if (SHA_RE.test(resolvedBaseRef)) {
     return {
@@ -329,9 +308,7 @@ export async function executeCreateWorktree(
         message: `baseRef "${resolvedBaseRef}" is a tag, not a branch. Please provide a branch name.`,
       };
     }
-  } catch {
-    // git tag -l failed — skip tag check
-  }
+  } catch {}
   try {
     await exec(`git rev-parse --verify ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
   } catch {
@@ -344,15 +321,12 @@ export async function executeCreateWorktree(
 
   const normalizedBase = resolvedBaseRef.replace(/^origin\//, "");
 
-  // Check if branch already has a worktree
   try {
     const worktrees = await exec("git worktree list --porcelain", repoPath, 10_000);
     if (worktrees.includes(`branch refs/heads/${resolvedBranch}`)) {
-      // Already checked out — find the path
       const lines = worktrees.split("\n");
       for (let i = 0; i < lines.length; i++) {
         if (lines[i] === `branch refs/heads/${resolvedBranch}`) {
-          // worktree path is a few lines before (the "worktree <path>" line)
           for (let j = i; j >= 0; j--) {
             if (lines[j]!.startsWith("worktree ")) {
               const existingPath = lines[j]!.slice("worktree ".length);
@@ -369,44 +343,35 @@ export async function executeCreateWorktree(
         }
       }
     }
-  } catch {
-    // ignore — proceed to create
-  }
+  } catch {}
 
   try {
     const result = await createWorktree(repoPath, resolvedBranch, resolvedBaseRef);
 
-    // Ensure local tracking branch exists so close-stream can `git checkout <base>`
+    // Ensure the local tracking branch exists so close-stream can later `git checkout <base>`.
     if (normalizedBase !== "main") {
       try {
         await exec(`git rev-parse --verify ${JSON.stringify(normalizedBase)}`, repoPath, 5_000);
       } catch {
-        // Local branch doesn't exist — create it tracking the remote
         try {
           await exec(
             `git branch ${JSON.stringify(normalizedBase)} ${JSON.stringify(`origin/${normalizedBase}`)}`,
             repoPath,
             10_000,
           );
-        } catch {
-          // Best-effort — don't fail worktree creation over this
-        }
+        } catch {}
       }
     }
     enrichStream(blackboard, streamId, repoPath, result.worktreePath, normalizedBase);
 
-    // Best-effort dependency installation
     let installSummary = "";
     try {
       const installResults = await installDependencies(result.worktreePath);
       if (installResults.length > 0) {
         installSummary = `\nDeps: ${installResults.join(", ")}`;
       }
-    } catch {
-      // Never let install scanning fail the overall operation
-    }
+    } catch {}
 
-    // Best-effort .env file copy from source repo
     let envSummary = "";
     try {
       const envResults = await copyEnvFiles(repoPath, result.worktreePath);

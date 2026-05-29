@@ -98,10 +98,6 @@ export function getInboundMessageRejectionReason(
   if (!remoteJid) {
     return "missing_remote_jid";
   }
-  // Strict allowlist: every accepted JID must appear in `allowedJids`.
-  // The daemon seeds this set with the configured recipient + allowedJids
-  // entries + the account's own LID (from creds.update). To allow a new
-  // contact's LID, add it to `allowedJids` in ~/.flitterbot/whatsapp/config.json.
   const accepted = allowedJids ?? new Set([resolveRecipientJid()]);
   if (!accepted.has(remoteJid)) {
     return `unexpected_remote_jid:${remoteJid}`;
@@ -190,7 +186,6 @@ export async function persistInboundMessage(
   const waMessageId = message.key.id ?? undefined;
   const remoteJid = message.key.remoteJid ?? resolveRecipientJid();
 
-  // Extract body first — no DB needed for this check
   const body = extractConversationBody(message);
   if (!body) {
     logger.info(
@@ -200,7 +195,6 @@ export async function persistInboundMessage(
     return {};
   }
 
-  // Filter echoes and duplicates BEFORE forwarding to control surface
   try {
     if (shouldFilterRecentOutboundEcho(db, message)) {
       logger.info(
@@ -226,21 +220,14 @@ export async function persistInboundMessage(
       }
     }
   } catch (error) {
-    // DB failure during echo/dedup must not drop the message — this is a command channel.
-    // Continue to forward; at worst a duplicate reaches the control surface.
     logger.error(
       { err: error, waMessageId, remoteJid, bodyPreview: previewBody(body) },
       "failed echo/duplicate check — forwarding anyway (DB unavailable)",
     );
   }
 
-  // Forward to control surface only after echo/duplicate filtering
   await forwardInboundToControlSurface({ body, waMessageId, remoteJid });
 
-  // Persist to blackboard as a secondary concern.
-  // Known eventual-consistency gap: if forwarding succeeds but persist fails,
-  // the message reaches the orchestrator but has no DB record. Future dedup
-  // checks won't find it and context_ref resolution will have a hole.
   try {
     const quotedWaMessageId = extractQuotedWaMessageId(message);
     const contextRef = resolveInboundContextRef(db, {

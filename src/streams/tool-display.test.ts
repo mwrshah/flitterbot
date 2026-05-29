@@ -52,13 +52,10 @@ describe("formatWholePathValue", () => {
   });
 
   test("relative string containing worktree directory name stays unchanged", () => {
-    // "195-relative-tool-paths-doc" appears literally inside the worktree
-    // root — the value must not be mis-stripped because it is not absolute.
     expect(formatWholePathValue("195-relative-tool-paths-doc/x.ts", ctx)).toBeUndefined();
   });
 
   test("~/... that expands under worktree shows worktree-relative", () => {
-    // Pretend the worktree lives inside home for this case.
     const homeCtx: ToolDisplayContext = {
       worktreePath: `${HOME}/projects/wt`,
       cwd: `${HOME}/projects/wt/src`,
@@ -69,9 +66,6 @@ describe("formatWholePathValue", () => {
   });
 
   test("~ value that does not match any root keeps ~ spelling", () => {
-    // Home is /Users/munawarshah but worktree/cwd are elsewhere. The home
-    // fallback returns the same `~/...` string; the formatter then sees
-    // "no field change" and emits no displayArgs at the tool level.
     const result = formatWholePathValue("~/Documents/notes.md", {
       worktreePath: "/somewhere/else",
       cwd: "/somewhere/else/deep",
@@ -129,8 +123,6 @@ describe("formatBashCommand", () => {
   });
 
   test("does not use worktree root for bash command text", () => {
-    // A path that lives under worktree but NOT under cwd must stay absolute
-    // (we only consider cwd + home for bash).
     const outsideCwdInsideWt = `${WORKTREE}/docs/relative-tool-paths/FEATURE.md`;
     const out = formatBashCommand(`cat ${outsideCwdInsideWt}`, ctx);
     expect(out).toBeUndefined();
@@ -210,7 +202,6 @@ describe("enrichTimelineToolDisplays", () => {
     expect(out).not.toBe(items);
     expect(out[0]?.kind).toBe("tool");
     expect((out[0] as { displayArgs?: unknown }).displayArgs).toEqual({ path: "src/x.ts" });
-    // Canonical args unchanged.
     expect((out[0] as { args?: unknown }).args).toEqual({ path: `${WORKTREE}/src/x.ts` });
   });
 
@@ -264,8 +255,6 @@ describe("enrichTimelineToolDisplays", () => {
   });
 });
 
-/* ── Cache tests using a fake BlackboardDatabase ─────────────── */
-
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { createToolDisplayContextCache } from "./tool-display.ts";
 
@@ -305,13 +294,11 @@ describe("ToolDisplayContextCache", () => {
     const { db } = fakeBlackboard(rows);
     const cache = createToolDisplayContextCache(db);
 
-    // First access — no worktree, cwd-relative only.
     const out1 = cache.displayArgsForTool("pi-session-test", "read", {
       path: `${WORKTREE}/src/x.ts`,
     });
     expect(out1).toEqual({ path: "x.ts" });
 
-    // Update underlying data and invalidate. Next access rebuilds.
     rows.set("pi-session-test", { cwd: CWD, worktree_path: WORKTREE });
     cache.invalidatePiSession("pi-session-test");
 

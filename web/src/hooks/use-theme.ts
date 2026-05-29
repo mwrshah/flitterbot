@@ -25,7 +25,6 @@ export function useTheme() {
     applyTheme(theme);
   }, [theme]);
 
-  // Re-apply when system preference changes while in "system" mode
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {

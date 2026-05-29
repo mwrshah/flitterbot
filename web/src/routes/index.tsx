@@ -11,9 +11,7 @@ export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
     try {
       await context.queryClient.ensureQueryData(surfaceTimelineQueryOptions());
-    } catch {
-      // Leave cache unseeded; component falls back to empty array.
-    }
+    } catch {}
   },
   head: () => ({
     meta: [{ title: "Flitterbot" }],

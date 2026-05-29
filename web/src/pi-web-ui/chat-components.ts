@@ -10,12 +10,6 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { RenderableToolCall } from "~/lib/pi-web-ui-bridge";
 
-/**
- * Pick the display-projected arguments when the bridge layer attached
- * them, falling back to canonical `arguments`. Renderers MUST go through
- * this helper instead of reading `toolCall.arguments` directly so the
- * stream-relative path display stays in sync with the timeline contract.
- */
 function toolDisplayArguments(call: ToolCall): Record<string, unknown> {
   const renderable = call as RenderableToolCall;
   return renderable.displayArguments ?? call.arguments;
@@ -818,8 +812,6 @@ function renderWriteTool(
   const p = paramRecord(params);
   const content = String(p.content ?? "");
 
-  // Write creates a whole file, so render every content line as an insertion.
-  // Do not apply the read/tool preview truncation here: the content is the value.
   return html`
     <div class="space-y-2">
       ${renderEditDiffRows(writeRowsFromContent(content))}
@@ -977,11 +969,6 @@ function summarizeToolCall(
 
 export class UserMessage extends LitElement {
   @property({ type: Object }) message!: UserMessageWithAttachments | UserMessageType;
-  /**
-   * pi-sdk SessionManager entry id. When set, the message renders an ellipsis
-   * menu with a "Delete (including me)" action that dispatches a bubbling
-   * `prune-message` CustomEvent for React handlers higher up to consume.
-   */
   @property({ attribute: false }) entryId?: string;
 
   @state() private menuOpen = false;
@@ -1238,7 +1225,6 @@ export class AssistantMessage extends LitElement {
   @property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
   @property({ type: Boolean }) isStreaming = false;
   @property({ attribute: false }) onCostClick?: () => void;
-  /** Injected by MessageList for the last assistant message in a turn. When set, a copy button renders with this callback providing the aggregated turn text on click. When undefined, no copy button is shown. */
   @property({ attribute: false }) getCopyText?: () => string;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -1324,9 +1310,6 @@ export class MessageList extends LitElement {
   @property({ type: Array }) tools: AgentTool[] = [];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
   @property({ attribute: false }) onCostClick?: () => void;
-  /** When true, the trailing turn (assistant messages after the last user message)
-   *  must NOT receive a copy button — the turn is mid-flight and showing the copy
-   *  affordance prematurely would expose an incomplete capture. */
   @property({ type: Boolean }) isSessionBusy = false;
 
   private _streamingEl: AssistantMessage | null = null;
@@ -1334,11 +1317,7 @@ export class MessageList extends LitElement {
   private _pendingToolResultCommits = new Map<string, ToolResultMessageType>();
   private _toolMessageEls = new Map<string, ToolMessageElement>();
 
-  /** Cached render items from the last render or imperative commit. */
   private _cachedRenderItems: Array<{ key: string; template: TemplateResult }> | null = null;
-  /** When > 0, the Lit component has imperatively committed messages up to this
-   *  total count. The next React-driven `messages` property update that doesn't
-   *  exceed this count will be suppressed (shouldUpdate returns false). */
   private _committedTotal = 0;
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -1351,10 +1330,6 @@ export class MessageList extends LitElement {
   }
 
   override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
-    // When isSessionBusy flips, the trailing-turn copy-button gate must be
-    // re-evaluated. Drop the imperative-commit cache so the next render runs
-    // buildRenderItems fresh — otherwise the cached items keep their old
-    // getCopyText bindings and the button never (dis)appears.
     if (changedProperties.has("isSessionBusy")) {
       this._committedTotal = 0;
       this._cachedRenderItems = null;
@@ -1366,9 +1341,6 @@ export class MessageList extends LitElement {
       changedProperties.size === 1
     ) {
       const newLength = (this.messages as RenderMessage[]).length;
-      // History shrank — only possible after a server-side rewrite (e.g. prune).
-      // Drop committed state and allow a full render so the old DOM is thrown
-      // away and the new (shorter) list renders correctly.
       if (newLength < this._committedTotal) {
         streamingUiDebug(
           "[debug][message-list] shouldUpdate FALLTHROUGH: history shrank (messages.length=%d, committedTotal=%d) — full render",
@@ -1379,9 +1351,6 @@ export class MessageList extends LitElement {
         this._cachedRenderItems = null;
         return true;
       }
-      // React catch-up: the messages property was set with the same data we
-      // already rendered imperatively. Accept the new property value (Lit has
-      // already assigned it) but skip the expensive render cycle.
       if (newLength === this._committedTotal) {
         streamingUiDebug(
           "[debug][message-list] shouldUpdate SUPPRESSED: React catch-up render skipped (messages.length=%d, committedTotal=%d)",
@@ -1392,8 +1361,6 @@ export class MessageList extends LitElement {
         this._cachedRenderItems = null;
         return false;
       }
-      // More messages than committed means a later canonical event landed
-      // before React caught up — allow a full render.
       streamingUiDebug(
         "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
         newLength,
@@ -1410,12 +1377,6 @@ export class MessageList extends LitElement {
     this.syncToolMessageTargets();
   }
 
-  /**
-   * Imperatively update the streaming assistant-message element.
-   * Creates the element on first call, appends it after the repeat() container.
-   * isThinkingStreaming controls whether the ThinkingBlock renders expanded with
-   * the shimmer animation (true = thinking in progress, false = thinking done).
-   */
   updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): Promise<unknown> {
     const domWriteToken = streamingPerf.beginStreamingDomWrite();
     if (!this._streamingEl) {
@@ -1440,15 +1401,9 @@ export class MessageList extends LitElement {
     });
   }
 
-  /**
-   * Hide the streaming element with a brief delay so the completed message
-   * from the next Lit render cycle can take its place without a flash.
-   */
   clearStreaming(): void {
     const el = this._streamingEl;
     if (!el) return;
-    // Delay hiding until after the next frame so React/Lit can commit the
-    // completed message into the repeat() list first.
     requestAnimationFrame(() => {
       el.style.display = "none";
     });
@@ -1479,13 +1434,7 @@ export class MessageList extends LitElement {
     this._activeToolStates.clear();
   }
 
-  /**
-   * Imperatively commit messages from message_end without rebuilding the
-   * entire render item list. Hides the streaming overlay and appends only
-   * the new items, then schedules a Lit update using the cached list.
-   */
   commitStreaming(messages: AgentMessage[]): void {
-    // Hide streaming overlay immediately (no rAF delay — committed content replaces it)
     if (this._streamingEl) {
       this._streamingEl.style.display = "none";
     }
@@ -1493,7 +1442,6 @@ export class MessageList extends LitElement {
     const newItems = this.buildRenderItemsForCommit(messages);
     if (!newItems.length) return;
 
-    // Cache current items if this is the first imperative commit since the last full render
     if (!this._cachedRenderItems) {
       this._cachedRenderItems = this.buildRenderItems();
     }
@@ -1536,10 +1484,6 @@ export class MessageList extends LitElement {
     return true;
   }
 
-  /**
-   * Build render items for a small set of committed AgentMessages (from message_end).
-   * Uses the same key scheme as buildRenderItems so repeat() recognises them.
-   */
   private buildRenderItemsForCommit(
     messages: AgentMessage[],
   ): Array<{ key: string; template: TemplateResult }> {
@@ -1562,8 +1506,6 @@ export class MessageList extends LitElement {
           template: html`<user-message .message=${msg} .entryId=${entryId}></user-message>`,
         });
       } else if (role === "assistant") {
-        // Imperative commit appends to the trailing turn. While busy, that turn
-        // must not surface a copy button — mirrors the buildRenderItems gate.
         const getCopyText = this.isSessionBusy
           ? undefined
           : () => MessageList.getAssistantPlainText(msg as AssistantMessageType);
@@ -1672,7 +1614,6 @@ export class MessageList extends LitElement {
     this.applyActiveToolStates();
   }
 
-  /** Extract plain text from an assistant message's content chunks. */
   private static getAssistantPlainText(msg: AssistantMessageType): string {
     const parts: string[] = [];
     for (const chunk of msg.content || []) {
@@ -1681,7 +1622,6 @@ export class MessageList extends LitElement {
     return parts.join("\n");
   }
 
-  /** Walk backwards from the given message to collect all assistant text in this turn. */
   private getTurnCopyText(fromMsg: AssistantMessageType): string {
     const idx = this.messages.indexOf(fromMsg);
     const texts: string[] = [];
@@ -1713,12 +1653,6 @@ export class MessageList extends LitElement {
       }
     }
 
-    // Pre-pass: identify which assistant messages are last in their turn
-    // (turn = assistant messages between user messages). Only these show the copy button.
-    //
-    // While the session is busy, the trailing turn is mid-flight — skip the
-    // final add so its last assistant gets no copy button. Closed turns
-    // (those followed by a later user message) still get one.
     const lastAssistantInTurn = new Set<AssistantMessageType>();
     let lastAssistant: AssistantMessageType | null = null;
     for (const msg of this.messages) {
@@ -1786,7 +1720,6 @@ export class MessageList extends LitElement {
         "[debug][message-list] render: using cached render items (count=%d)",
         items.length,
       );
-      // Keep cache alive while committed data hasn't been reconciled with React yet
       if (this._committedTotal === 0) {
         this._cachedRenderItems = null;
       }

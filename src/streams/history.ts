@@ -221,7 +221,7 @@ function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[
 
     if (isAssistantMsg) {
       lastAssistantIdx = i;
-      continue; // defer — only emit the last one per turn
+      continue;
     }
 
     if (isUserMsg && lastAssistantIdx >= 0) {
@@ -232,7 +232,6 @@ function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[
     result.push(item);
   }
 
-  // Flush trailing assistant message (last turn with no following user message)
   if (lastAssistantIdx >= 0) {
     result.push(items[lastAssistantIdx]!);
   }
@@ -240,10 +239,6 @@ function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[
   return result;
 }
 
-/**
- * Strip everything except user messages and the final surfaced assistant message per turn.
- * This mirrors the WhatsApp / InputSurface live path: no tools, no system messages.
- */
 function stripThinkingFromMessage(item: ChatTimelineItem): ChatTimelineItem {
   if (item.kind !== "message" || item.role !== "assistant") return item;
   const msg = item as ChatTimelineMessage;
@@ -269,19 +264,6 @@ function shapeHistoryItems(
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
-/**
- * Walk a list of SessionEntry objects (already ordered root→leaf) and build
- * timeline items keyed by the SDK's persistent entry.id. The same id is
- * what pi-subscribe broadcasts on live `message_end` (read back via
- * sessionManager.getLeafId() once the SDK has appended the entry), so the
- * cache identity is stable across live streaming and disk reload — no
- * parallel ordinal counter to keep in sync. The id also doubles as the
- * prune target since `navigateTree(entryId)` accepts it directly.
- *
- * Non-message entries (thinking_level_change, model_change, compaction,
- * custom, label, session_info, branch_summary) are skipped here — the chat
- * timeline only renders conversational content.
- */
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const items: ChatTimelineItem[] = [];
   for (const entry of entries) {
@@ -293,11 +275,6 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   return items;
 }
 
-/**
- * Build history from a live AgentSession's SessionManager, walking the current
- * leaf's branch path (root → leaf). Entries not on the current branch (e.g.
- * pruned siblings) are excluded.
- */
 export function readStreamsHistoryFromSession(
   piSessionId: string,
   sessionManager: SessionManager,
@@ -313,12 +290,6 @@ export function readStreamsHistoryFromSession(
   };
 }
 
-/**
- * Build history from an on-disk session JSONL file. Resolves the leaf (last
- * entry in the file) and walks back to root via parentId pointers, emitting
- * only entries on the active branch. This mirrors SessionManager's leaf
- * resolution and ensures pruned branches are invisible to dormant readers.
- */
 export function readStreamsHistory(
   piSessionId: string,
   sessionFile: string,
@@ -351,7 +322,6 @@ export function readStreamsHistory(
   }
 
   const fileEntries = parseSessionEntries(raw);
-  // Strip header; keep only SessionEntry (non-"session" types).
   const entries: SessionEntry[] = [];
   const byId = new Map<string, SessionEntry>();
   for (const fe of fileEntries) {
@@ -364,8 +334,6 @@ export function readStreamsHistory(
     return { piSessionId, sessionFile, items: [] };
   }
 
-  // Leaf = last entry in file (matches SessionManager._buildIndex behaviour).
-  // Walk leaf → root collecting the active branch path.
   const leaf = entries[entries.length - 1]!;
   const path: SessionEntry[] = [];
   let current: SessionEntry | undefined = leaf;

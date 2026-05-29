@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Shared hook dispatcher — reads Claude Code hook payload from stdin,
- * enriches it with FLITTERBOT_* env vars, POSTs to the control surface.
- *
- * Usage: echo '{"session_id":"..."}' | node hook-post.mjs <event-slug>
- *   e.g. node hook-post.mjs session-start
- */
 
 import { readFileSync, appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { join } from "node:path";

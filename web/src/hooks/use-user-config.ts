@@ -35,10 +35,6 @@ export function useUserConfig() {
   return { config, setConfig };
 }
 
-/**
- * Parse a stored panel layout string back to a Layout object, or return the fallback.
- * Layout is { [panelId: string]: number }.
- */
 export function parsePanelLayout(
   config: Record<string, string>,
   key: string,

@@ -55,8 +55,6 @@ function isRegisteredWorktree(repoPath: string, worktreePath: string): boolean {
 }
 
 export function shouldReconcileWorktreeOnRecovery(status: StreamStatus): boolean {
-  // Recovery of an already-open stream is a lifecycle repair for the pi_session.
-  // It must not mutate the stream's topology fields (repo_path/worktree_path).
   return status === "closed";
 }
 

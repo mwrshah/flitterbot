@@ -34,30 +34,25 @@ export function handleCronTickRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  // Gate 1: Pi not ready
   const defaultPi = runtime.sessionManager.getDefault();
   if (!defaultPi) {
     return skip(res, "pi_ended");
   }
 
-  // Gate 2: Pi active (already processing a turn)
   const snapshot = defaultPi.state.getSnapshot();
   if (snapshot.busy) {
     return skip(res, "pi_active");
   }
 
-  // Gate 3: Pi not ended/crashed
   if (!defaultPi.runtime?.session) {
     return skip(res, "pi_ended");
   }
 
-  // Gate 4: WhatsApp connected
   const status = runtime.getStatus();
   if (status.whatsapp.status !== "connected") {
     return skip(res, "whatsapp_disconnected");
   }
 
-  // Gate 5: No active circuit breakers
   const activeFlags = getActiveHealthFlags(runtime.blackboard);
   if (activeFlags.length > 0) {
     return skip(
@@ -67,7 +62,6 @@ export function handleCronTickRoute(
     );
   }
 
-  // Gate 6: Check for stale sessions (already marked by maintenance loop) and enqueue appropriate prompt
   const staleSessions = getStaleSessions(runtime.blackboard);
 
   if (staleSessions.length > 0) {
@@ -86,7 +80,6 @@ export function handleCronTickRoute(
     return sendJson(res, 200, body);
   }
 
-  // Check if there are any working sessions (not stale, actively working)
   const workingSessions = runtime.blackboard
     .prepare("SELECT COUNT(*) AS count FROM sessions WHERE status = 'working'")
     .get() as CountRow;
@@ -94,7 +87,6 @@ export function handleCronTickRoute(
     return skip(res, "no_actionable_state");
   }
 
-  // All idle/ended — enqueue idle-work prompt
   runtime.enqueue({ text: IDLE_PROMPT, source: "cron" });
   const body: CronTickResponse = { ok: true, action: "enqueued", reason: "idle_check" };
   return sendJson(res, 200, body);

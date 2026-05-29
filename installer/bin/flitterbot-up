@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
-# shellcheck source=/dev/null
 source "$FLITTERBOT_HOME/scripts/runtime-common.sh"
 
 COMMAND="${1:-start}"
@@ -255,7 +254,6 @@ list_control_surface_pids() {
   local root=""
   root=$(project_root)
 
-  # Build candidate patterns that identify a control-surface process
   local -a patterns=("src/server.ts")
   if [[ -n "$root" ]]; then
     patterns+=("$root/src/server.ts")
@@ -289,7 +287,6 @@ kill_orphan_control_surfaces() {
     kill -TERM "$pid" 2>/dev/null || true
   done <<< "$orphans"
 
-  # Wait briefly then SIGKILL any survivors
   sleep 2
   orphans=$(list_control_surface_pids "$exclude_pid")
   [[ -z "$orphans" ]] && return 0
@@ -354,7 +351,6 @@ stop_runtime() {
     fi
   fi
 
-  # Kill any orphaned control-surface processes from previous starts
   kill_orphan_control_surfaces
 
   rm -f "$PID_FILE" "$STATE_FILE"

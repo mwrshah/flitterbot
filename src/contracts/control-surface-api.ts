@@ -125,49 +125,30 @@ export interface MessageRequest {
   targetPiSessionId?: string;
 }
 
-/**
- * Entry in `GET /api/models` response. Used for both curated `pinned` entries
- * (from `config.models[]`) and enumerated `all` entries (unpinned entries from
- * the pi SDK catalog). `id` is the stable value the UI persists — either the user's
- * chosen curated id, or the composite `provider/modelId` for catalog entries.
- */
 export interface ModelListItem {
   id: string;
   label: string;
   provider: string;
   modelId: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  /** Whether the model exposes provider-side reasoning/thinking controls. */
   reasoning?: boolean;
-  /** Whether the model accepts the xhigh thinking level. */
   supportsXhigh?: boolean;
-  /** Pi SDK's display name for the model (e.g. "Claude Opus 4.7"). Omitted for curated entries where `label` is already user-authored. */
   name?: string;
-  /** Context window in tokens, when known from the pi SDK catalog. */
   contextWindow?: number;
-  /** Whether the provider's auth (API key / OAuth subscription token / env var) is present. False entries are surfaced with a visual badge so the user can see why a selection might fail before sending. */
   available?: boolean;
-  /** Auth class used by the model selector for ordering and badges. */
   authKind?: "subscription" | "api_key" | "none";
 }
 
 export interface ModelsListResponse {
-  /** Curated favorites from `config.models[]`. Rendered at the top of the selector. */
   pinned: ModelListItem[];
-  /** Unpinned pi SDK catalog entries, grouped by provider on the client. */
   all: ModelListItem[];
-  /** Id of the default model — matches either a `pinned.id` or an `all.id`. */
   defaultModel: string;
-  /** Global thinking level used when new Pi sessions are created. */
   defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
 export interface ModelsPinRequest {
-  /** Id to pin/unpin — either a curated id or a composite `provider/modelId`. */
   id: string;
-  /** `true` adds to `config.models[]`; `false` removes. Idempotent. */
   pin: boolean;
-  /** Optional user-authored label when pinning a catalog entry. Defaults to the pi SDK model's `name`. */
   label?: string;
 }
 
@@ -292,7 +273,7 @@ export interface SkillsListResponse {
 export interface DirectoryCompletionItem {
   name: string;
   kind: "directory" | "file";
-  path: string; // relative to CWD, e.g. "src/routes/"
+  path: string;
   insertText: string;
 }
 

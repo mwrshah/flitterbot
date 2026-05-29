@@ -25,15 +25,12 @@ describe("timelineToAgentMessages — display args", () => {
     ];
 
     const out = timelineToAgentMessages(timeline);
-    // [assistant]
     expect(out).toHaveLength(1);
     const assistant = out[0] as { role: string; content: unknown[] };
     expect(assistant.role).toBe("assistant");
     const toolCall = assistant.content[assistant.content.length - 1] as RenderableToolCall;
     expect(toolCall.type).toBe("toolCall");
-    // Canonical arguments preserved.
     expect(toolCall.arguments).toEqual({ path: "/repo-worktrees/x/src/a.ts" });
-    // Display projection attached as a separate field.
     expect(toolCall.displayArguments).toEqual({ path: "src/a.ts" });
   });
 

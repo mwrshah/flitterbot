@@ -54,13 +54,6 @@ function readSavedScrollState(): SavedScrollState | null {
   }
 }
 
-// Char-length heuristic for whether a row's content will probably overflow the
-// clamp on first render. Used to seed EntryRow's `overflowing` state so the
-// Read-more button is present in the very first DOM commit — which keeps the
-// row's measured height stable across the useLayoutEffect that does the DOM-
-// truth check. False positives self-correct via that effect; the goal is just
-// to make the steady state the starting state for the common case (long agent
-// responses), so virtual-core's snapshot-restore sizes match reality.
 const LIKELY_OVERFLOWS_CHAR_THRESHOLD = 1200;
 
 type SurfaceEntry = {
@@ -117,8 +110,6 @@ function formatTime(iso: string): string {
     return "";
   }
 }
-
-/* ── Subcomponents ── */
 
 function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?: string }) {
   const queryClient = useQueryClient();
@@ -210,7 +201,6 @@ function EntryRow({
     () => entry.content.length > LIKELY_OVERFLOWS_CHAR_THRESHOLD,
   );
 
-  // DOM-truth overflow check: scrollHeight reflects the real rendered content.
   useLayoutEffect(() => {
     const node = contentRef.current;
     if (!node) return;
@@ -269,8 +259,6 @@ function EntryRow({
   );
 }
 
-/* ── Main Component ── */
-
 export function Surface() {
   const { sendMessage } = rootApi.useRouteContext();
   const { config, setConfig } = useUserConfig();
@@ -285,15 +273,9 @@ export function Surface() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Read sessionStorage once before useVirtualizer reads initial* options.
-  // Lazy ref so the read happens exactly once per mount.
   const savedRef = useRef<SavedScrollState | null | undefined>(undefined);
   if (savedRef.current === undefined) savedRef.current = readSavedScrollState();
 
-  // Expanded state lives here (not inside EntryRow) so we can derive
-  // "is the last entry expanded" and feed it into the virtualizer options.
-  // Seeded from sessionStorage so navigating away and back preserves which
-  // rows the user had expanded.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(savedRef.current?.expandedIds ?? []),
   );
@@ -308,9 +290,6 @@ export function Surface() {
   const lastEntryId = entries[entries.length - 1]?.id;
   const isLastExpanded = lastEntryId !== undefined && expandedIds.has(lastEntryId);
 
-  // Mirror expandedIds into a ref so the unmount-time persistence effect can
-  // read the latest value without taking expandedIds as a dependency (which
-  // would re-fire the cleanup on every toggle).
   const expandedIdsRef = useRef(expandedIds);
   useEffect(() => {
     expandedIdsRef.current = expandedIds;
@@ -323,34 +302,18 @@ export function Surface() {
     overscan: 6,
     gap: ROW_GAP,
     getItemKey: (index) => entries[index]?.id ?? index,
-    // anchorTo='end' + followOnAppend pin the viewport to the bottom when the
-    // last message grows during streaming AND when new entries arrive while
-    // the user is within scrollEndThreshold of the bottom. Both flip off when
-    // the user has Read-more'd the last entry — otherwise clicking it would
-    // yank the viewport down to the bottom of the now-tall row. When a newer
-    // message arrives, isLastExpanded becomes false again (the expanded entry
-    // is no longer the last) and end-anchoring resumes for the new tail.
     anchorTo: isLastExpanded ? "start" : "end",
     followOnAppend: !isLastExpanded,
     scrollEndThreshold: 32,
-    // Seed from the persisted snapshot. Items in the cache keep their measured
-    // sizes; missing items (entries appended while we were away) fall back to
-    // estimateSize and get re-measured on scroll. The cache is consumed once.
     initialMeasurementsCache: savedRef.current?.snapshot ?? [],
     initialOffset: savedRef.current?.offset,
   });
 
-  // Fresh-mount landing: scroll to bottom only when we had no saved position.
-  // When restored, initialOffset already put us where we left off — jumping to
-  // the end would defeat the point. anchorTo='end' + followOnAppend handle
-  // live updates either way.
   useLayoutEffect(() => {
     if (savedRef.current) return;
     virtualizer.scrollToEnd();
   }, [virtualizer]);
 
-  // Persist on unmount. Skip if nothing was measured — an empty snapshot would
-  // overwrite a real saved state with garbage on a fast nav-away.
   useEffect(() => {
     return () => {
       const snapshot = virtualizer.takeSnapshot();
@@ -367,8 +330,6 @@ export function Surface() {
   }, [virtualizer]);
 
   const items = virtualizer.getVirtualItems();
-
-  /* ── Input handlers ── */
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -393,8 +354,6 @@ export function Surface() {
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
-  // Snapshot pending images at submit time — MessageInput memoizes its onSubmit
-  // closure, so reading from state directly would see the initial empty array.
   const pendingImagesRef = useRef(pendingImages);
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
@@ -405,10 +364,6 @@ export function Surface() {
       const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
       if (!text && !images?.length) return;
 
-      // Jump to the bottom on submit so the user sees their own message land
-      // and the response stream in. Independent of anchorTo — even if they
-      // were scrolled up reading history, sending is an explicit intent to
-      // re-engage with the live tail.
       virtualizer.scrollToEnd();
 
       setIsSending(true);
@@ -458,7 +413,6 @@ export function Surface() {
             ref={scrollRef}
             data-scroll-container="main"
             className="h-full overflow-auto px-6 py-4"
-            // overflow-anchor: none — browser anchoring fights virtualizer re-measures.
             style={{ contain: "strict", overflowAnchor: "none" }}
           >
             {entries.length === 0 ? (

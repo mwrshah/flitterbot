@@ -63,7 +63,6 @@ export type StreamInfo = {
   name: string | null;
   repoPath: string | null;
   worktreePath: string | null;
-  /** Actual git branch checked out in the worktree (resolved server-side). Null if no worktree or detached HEAD. */
   branch: string | null;
   baseBranch: string | null;
   cwd: string | null;

@@ -117,7 +117,6 @@ export const Sidebar = memo(function Sidebar() {
     if (stream.status === "closed") closedStreams.push(stream);
   }
 
-  // Build shortcut index: default gets 1 (if present), then open streams with piSessionId
   let nextShortcut = 1;
   const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
   const streamShortcuts = new Map<string, number>();
@@ -137,7 +136,6 @@ export const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      {/* Navigation */}
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
@@ -153,7 +151,6 @@ export const Sidebar = memo(function Sidebar() {
         />
       </nav>
 
-      {/* Streams */}
       {(defaultPiSessionId || allStreams.length > 0) && (
         <div className="pl-4 pr-3.5 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
           {(defaultPiSessionId || openStreams.length > 0) && (
@@ -269,7 +266,6 @@ export const Sidebar = memo(function Sidebar() {
         </div>
       )}
 
-      {/* Spacer */}
       {!defaultPiSessionId && allStreams.length === 0 && <div className="flex-1" />}
     </aside>
   );

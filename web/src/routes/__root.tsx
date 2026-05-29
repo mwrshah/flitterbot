@@ -38,8 +38,6 @@ export const Route = createRootRouteWithContext<{
     await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
       context.queryClient.ensureQueryData(userConfigQueryOptions()).catch(() => ({})),
-      // Warm the `/`-picker skills list once at app boot. Cwd-independent, 5min
-      // staleTime — every MessageInput reads from this cache instantly.
       context.queryClient.ensureQueryData(skillsQueryOptions(context.apiClient)).catch(() => []),
     ]);
   },
@@ -84,8 +82,6 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
-/** Select only the fields RootComponent reads — excludes volatile `uptime`
- *  so status polls that only change uptime don't trigger re-renders. */
 function useShortcutStatus(apiClient: FlitterbotApiClient) {
   const { data } = useQuery({
     ...statusQueryOptions(apiClient),

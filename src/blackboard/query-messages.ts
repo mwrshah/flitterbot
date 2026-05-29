@@ -160,10 +160,6 @@ export function getRecentDefaultConversation(
   return rows;
 }
 
-/**
- * Returns surfaced messages (web/whatsapp inbound + stream_outbound) for the input
- * surface, scoped to a set of active pi_session_ids.
- */
 export function getInputSurfaceHistory(
   db: BlackboardDatabase,
   piSessionIds: string[],

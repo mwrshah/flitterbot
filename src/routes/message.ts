@@ -30,8 +30,6 @@ export async function handleMessageRoute(
   const deliveryMode: DeliveryMode = body.deliveryMode === "steer" ? "steer" : "followUp";
   const formatted = formatInboundMessage(body.text, source, body.metadata);
 
-  // Only web and whatsapp sources reach this handler (normalizeSource guarantees this).
-  // Direct-targeted session (web UI tab input) — skip router
   let streamMeta: StreamRoutingMeta = {};
   if (body.targetPiSessionId) {
     streamMeta._targetSessionId = body.targetPiSessionId;

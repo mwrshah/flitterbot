@@ -1,10 +1,6 @@
 import type { HealthFlagRow } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 
-/**
- * Set a health flag (circuit breaker). Upserts — re-setting an existing flag
- * updates the reason, timestamp, and TTL.
- */
 export function setHealthFlag(
   db: BlackboardDatabase,
   flag: string,
@@ -26,9 +22,6 @@ export function setHealthFlag(
   ).run(flag, reason, expiresAt);
 }
 
-/**
- * Get all active (unexpired, uncleared) health flags.
- */
 export function getActiveHealthFlags(db: BlackboardDatabase): HealthFlagRow[] {
   return db.all<HealthFlagRow>(
     `SELECT * FROM health_flags
@@ -37,18 +30,12 @@ export function getActiveHealthFlags(db: BlackboardDatabase): HealthFlagRow[] {
   );
 }
 
-/**
- * Clear a specific health flag by name.
- */
 export function clearHealthFlag(db: BlackboardDatabase, flag: string): void {
   db.prepare(
     `UPDATE health_flags SET cleared_at = datetime('now') WHERE flag = ? AND cleared_at IS NULL`,
   ).run(flag);
 }
 
-/**
- * Clear all health flags. Used on control surface startup for a clean slate.
- */
 export function clearAllHealthFlags(db: BlackboardDatabase): void {
   db.prepare(`UPDATE health_flags SET cleared_at = datetime('now') WHERE cleared_at IS NULL`).run();
 }

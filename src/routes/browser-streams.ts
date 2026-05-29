@@ -25,9 +25,6 @@ async function readSessionHistory(
 
   let items: ChatTimelineItem[];
 
-  // Prefer the live SessionManager when the session is active — getBranch()
-  // returns entries on the current leaf's path, so pruned branches are
-  // correctly excluded.
   const session = managed.runtime?.session;
   if (session && session.sessionId === snapshot.piSessionId) {
     const body = readStreamsHistoryFromSession(
@@ -50,8 +47,6 @@ async function readSessionHistory(
     return [];
   }
 
-  // When a turn is in progress, suppress the trailing assistant message —
-  // it's an intermediate response that will change once tool calls finish.
   if (historyMode === "input" && snapshot.busy && items.length > 0) {
     const last = items[items.length - 1]!;
     if (last.kind === "message" && last.role === "assistant") {
@@ -91,16 +86,13 @@ async function handleBrowserStreamsHistoryRouteInner(
   historyMode: "input" | "agent",
   piSessionId: string | null,
 ) {
-  // Surface with no specific session — read from the messages table
   if (historyMode === "input" && !piSessionId) {
-    // Collect all relevant pi_session_ids: default + active orchestrators + recently-closed streams
     const piSessionIds: string[] = [];
     const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
     if (defaultPiSessionId) piSessionIds.push(defaultPiSessionId);
     for (const orch of runtime.sessionManager.listOrchestrators()) {
       if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
-    // Include closed streams (7d window) — look up their pi_session_ids
     const closedStreams = listRecentlyClosedStreams(
       runtime.blackboard,
       RECENTLY_CLOSED_WINDOW_HOURS,
@@ -127,13 +119,11 @@ async function handleBrowserStreamsHistoryRouteInner(
     return sendJson(response, 200, body);
   }
 
-  // Specific session or agent mode — existing single-session path
   const targetSession = piSessionId
     ? runtime.sessionManager.getByPiSessionId(piSessionId)
     : runtime.sessionManager.getDefault();
 
   if (!targetSession) {
-    // Session not in memory — fall back to reading history from disk (e.g. closed streams)
     if (piSessionId) {
       const row = runtime.blackboard
         .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
@@ -151,7 +141,6 @@ async function handleBrowserStreamsHistoryRouteInner(
           };
           return sendJson(response, 200, body);
         }
-        // DB row exists but file missing or empty — stale session from a previous runtime
         console.warn(
           "streams-history: session in DB but no history on disk (piSessionId=%s, file=%s)",
           piSessionId,
@@ -176,9 +165,6 @@ async function handleBrowserStreamsHistoryRouteInner(
     }
   }
   const snapshot = targetSession.state.getSnapshot();
-  // One enrichment pass for both live and disk-derived items. Live
-  // tool events already carry displayArgs via pi-subscribe; the helper
-  // skips items that already have displayArgs set.
   if (snapshot.piSessionId) {
     const formatter = runtime.sessionManager.toolDisplayCache.formatterForPiSession(
       snapshot.piSessionId,

@@ -8,10 +8,6 @@ import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompts } from "../prompts/classifier.ts";
 import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
 
-/**
- * Messages that unambiguously target the default agent — skip LLM classification.
- * Covers: explicit stream creation requests, /new-stream commands, and legacy "help me do" asks.
- */
 const DEFAULT_AGENT_PATTERNS = [
   /^\s*\/new-stream\b/i,
   /^\s*(new|create|launch|start|open)\s+stream/i,
@@ -34,14 +30,12 @@ export async function classifyMessage(
   defaultPiSessionId?: string,
   logClassifierPrompt?: (message: string) => void,
 ): Promise<ClassificationResult> {
-  // Fast-path: messages that clearly target the default agent skip LLM
   if (shouldShortCircuitToDefault(message)) {
     console.log("[router] short-circuit to default agent: %s", message.slice(0, 120));
     return { stream: null, action: "none" };
   }
 
   const streams = listOpenStreams(db);
-  // Nothing to classify against — skip the Groq call entirely.
   if (streams.length === 0) {
     console.log("[router] short-circuit: no open streams, routing to default");
     return { stream: null, action: "none" };
@@ -76,7 +70,6 @@ export async function classifyMessage(
     return { stream: null, action: "none" };
   }
 
-  // Try to match existing open stream
   if (result.stream_id) {
     const existing = streams.find((ws) => ws.id === result.stream_id);
     if (existing) {
@@ -91,11 +84,9 @@ export async function classifyMessage(
       "[router] classification: stream_name=none stream_id=%s (unknown stream)",
       result.stream_id,
     );
-    // LLM returned an id that doesn't exist — fall through to default
   } else {
     console.log("[router] classification: stream_name=none stream_id=none");
   }
 
-  // No match — default agent will handle (and may create a stream via tool)
   return { stream: null, action: "none" };
 }

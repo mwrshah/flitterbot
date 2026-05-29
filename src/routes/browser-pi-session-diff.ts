@@ -103,7 +103,6 @@ export async function handleBrowserPiSessionDiffRoute(
     maxBuffer: 5 * 1024 * 1024,
   };
 
-  // Find the fork point from the stream's base branch
   const baseBranch = ws.base_branch ?? "main";
   let base: string;
   try {
@@ -129,7 +128,6 @@ export async function handleBrowserPiSessionDiffRoute(
   }
 
   try {
-    // Preflight: cheap --stat to check size
     let stat: string;
     try {
       const { stdout } = await execFileAsync(
@@ -162,7 +160,6 @@ export async function handleBrowserPiSessionDiffRoute(
       });
     }
 
-    // Full diff
     let diff: string;
     try {
       const { stdout } = await execFileAsync("git", ["diff", base], preparedDiffIndex.execOpts);

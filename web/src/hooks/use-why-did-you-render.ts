@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 
-// ── Types ──
-
 type ChangeKind = "REF_ONLY" | "VALUE";
 
 interface ChangeSummary {
@@ -22,8 +20,6 @@ declare global {
   }
 }
 
-// ── Change classification ──
-
 function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
@@ -34,22 +30,18 @@ function formatPrimitive(v: unknown): string {
 }
 
 function classifyChange(prev: unknown, next: unknown): ChangeSummary {
-  // null/undefined transitions
   if (prev == null || next == null) {
     return { kind: "VALUE", detail: `${formatPrimitive(prev)}→${formatPrimitive(next)}` };
   }
 
-  // Primitives (number, string, boolean, bigint, symbol)
   if (typeof prev !== "object" && typeof prev !== "function") {
     return { kind: "VALUE", detail: `${formatPrimitive(prev)}→${formatPrimitive(next)}` };
   }
 
-  // Functions — always ref-only
   if (typeof prev === "function" || typeof next === "function") {
     return { kind: "REF_ONLY", detail: "fn" };
   }
 
-  // Sets
   if (prev instanceof Set && next instanceof Set) {
     if (prev.size !== next.size) {
       return { kind: "VALUE", detail: `Set(${prev.size}→${next.size})` };
@@ -60,7 +52,6 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
     return { kind: "REF_ONLY", detail: `Set(${prev.size}) identical` };
   }
 
-  // Arrays
   if (Array.isArray(prev) && Array.isArray(next)) {
     const pLen = prev.length;
     const nLen = next.length;
@@ -70,7 +61,7 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
     for (let i = 0; i < minLen; i++) {
       if (!Object.is(prev[i], next[i])) {
         changed.push(i);
-        if (changed.length > 5) break; // cap for perf
+        if (changed.length > 5) break;
       }
     }
 
@@ -91,7 +82,6 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
     return { kind: "VALUE", detail: `Array${lenPart} ${idxStr}` };
   }
 
-  // Plain objects
   if (typeof prev === "object" && typeof next === "object") {
     const prevObj = prev as Record<string, unknown>;
     const nextObj = next as Record<string, unknown>;
@@ -122,11 +112,8 @@ function classifyChange(prev: unknown, next: unknown): ChangeSummary {
     return { kind: "VALUE", detail: parts.join(", ") };
   }
 
-  // Fallback
   return { kind: "VALUE", detail: "changed" };
 }
-
-// ── Config reader ──
 
 function getConfig(): WdyrConfig {
   return (typeof window !== "undefined" && window.__WDYR_CONFIG) || {};
@@ -139,8 +126,6 @@ function shouldLog(componentName: string, kind: ChangeKind): boolean {
   if (cfg.onlyRefChanges && kind !== "REF_ONLY") return false;
   return true;
 }
-
-// ── Hook implementation ──
 
 function useWhyDidYouRenderImpl(
   componentName: string,
@@ -163,9 +148,7 @@ function useWhyDidYouRenderImpl(
           try {
             const preview = JSON.stringify(trackedValues[key]);
             line += ` | ${truncate(preview, 80)}`;
-          } catch {
-            // non-serializable — skip preview
-          }
+          } catch {}
         }
         console.log(line);
       }

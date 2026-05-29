@@ -99,31 +99,17 @@ type PiSessionSubscriptionEvent =
     };
 
 type SubscribablePiSession = {
-  /** Pi SDK session ID — equals piSessionId in the database */
   sessionId: string;
   messages: Array<unknown>;
   subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
-  /**
-   * SDK's SessionManager. Used to read the just-appended entry id at
-   * `message_end` time (the SDK calls `appendMessage(event.message)`
-   * synchronously *after* notifying our listener, so we defer the WS
-   * broadcast via queueMicrotask and then read `getLeafId()` to obtain
-   * the canonical, persistent id for the message).
-   */
   sessionManager: { getLeafId: () => string | null };
 };
 
-/**
- * Returns true if a tool_execution_update partial result contains actual data
- * worth forwarding. Filters out empty shells like { content: [] }.
- */
 function hasPartialContent(partial: unknown): boolean {
   if (partial == null) return false;
-  if (typeof partial !== "object") return true; // primitive value — meaningful
+  if (typeof partial !== "object") return true;
   const r = partial as Record<string, unknown>;
-  // { content: [...] } shape — only meaningful if the array is non-empty
   if ("content" in r) return Array.isArray(r.content) && r.content.length > 0;
-  // Any other object with at least one key is considered meaningful
   return Object.keys(r).length > 0;
 }
 
@@ -173,11 +159,6 @@ type ExtractedToolCall = {
   displayArgs?: unknown;
 };
 
-/**
- * Extract structured blocks (text + thinking) and tool calls from a message's
- * content array. Returns the display text, blocks array, and any tool calls.
- * Thinking-only messages return empty text but non-empty blocks.
- */
 function extractMessageBlocks(message: unknown): {
   text: string | undefined;
   blocks: MessageBlock[];
@@ -221,9 +202,6 @@ function extractMessageBlocks(message: unknown): {
     return { text, blocks, toolCalls };
   }
 
-  // Fall back to scalar text fields for non-content-array message shapes.
-  // errorMessage is intentionally excluded — it's an SDK-internal diagnostic string
-  // (e.g. "Request was aborted.") not intended for display.
   const directText = [record.text, record.message].find(
     (value): value is string => typeof value === "string" && value.trim().length > 0,
   );
@@ -264,41 +242,20 @@ export function subscribeToPiSession(
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
 ): () => void {
-  // Transient streaming-correlation key (T1). Lives only between an
-  // assistant `message_start` and its `message_end`, used to tag the
-  // `text_delta`/`thinking_delta` WS events so the streaming-store can
-  // attribute them to the in-flight bubble. The SDK doesn't expose a
-  // persistent id at message_start time — entry.id is only assigned later
-  // when `appendMessage` runs (after `message_end`) — so we mint a local
-  // counter-based key here. It never leaks into the canonical timeline
-  // `id` field; that's the SDK's `entry.id` (T2 key), read via
-  // `sessionManager.getLeafId()` after the entry has been appended.
+  // transient streaming key for one message_start/message_end window; the timeline persists the SDK entry.id (getLeafId()) instead
   let streamingKeyCounter = session.messages.length;
   let currentStreamingMessageId: string | null = null;
 
-  // Tracks the last assistant message in the current agent run.
-  // Reset on agent_start; used on agent_end to re-broadcast as final + stream_surfaced.
   let lastAssistantMessage: ChatTimelineMessage | null = null;
-
-  // True when at least one assistant message_end fired in the current agent run.
-  // Reset on agent_start; checked on agent_end to detect aborted runs.
   let messageEndFired = false;
 
   return session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
-    // FR-3: Update last_event_at only on turn/agent boundary events (not per-delta).
-    // Post-turn status transitions (waiting_for_user/waiting_for_sessions) are handled
-    // by runtime.transitionPiAfterTurn(), not the event subscriber.
 
     switch (event.type) {
       case "message_start": {
         const role = extractMessageRole(event.message);
         if (role === "assistant") {
-          // Mint a transient streaming key for text_delta/thinking_delta
-          // attribution. This is NOT the canonical message id — that's the
-          // SDK's entry.id, only known once `appendMessage` has run after
-          // `message_end`. Counter-based to keep WS payloads small; clients
-          // treat it as opaque.
           currentStreamingMessageId = `streaming-${streamingKeyCounter}`;
           streamingKeyCounter += 1;
         }
@@ -347,8 +304,6 @@ export function subscribeToPiSession(
           };
           broadcast(wsHub, payload);
         } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
-          // Extract toolName and toolUseId from the partial message's content block.
-          // At content_block_start the SDK populates id + name but not arguments.
           let toolName: string | undefined;
           let toolUseId: string | undefined;
           const msg = event.message as
@@ -368,21 +323,13 @@ export function subscribeToPiSession(
           };
           broadcast(wsHub, payload);
         }
-        // toolcall_delta (input_json_delta) intentionally suppressed —
-        // tool args arrive via tool_execution_start instead.
         break;
       }
       case "message_end": {
         const anyRole = extractAnyMessageRole(event.message);
         if (!anyRole) break;
 
-        // Capture stable references inside the case body — the broadcast
-        // is deferred to a microtask so the SDK has a chance to call
-        // `sessionManager.appendMessage(event.message)` (which it does
-        // synchronously *after* notifying our listener). Once that runs,
-        // `sessionManager.getLeafId()` returns the canonical entry.id, the
-        // same id that's serialised to the JSONL session file and read back
-        // on history reload — single persistent identity across live + disk.
+        // defer to microtask so the SDK's appendMessage runs first, making getLeafId() available
         const capturedMessage = event.message;
         const capturedTimestamp = extractTimestamp(event.message, now);
         const capturedRole = anyRole;
@@ -412,7 +359,6 @@ export function subscribeToPiSession(
         const role =
           capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
         const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
-        // Allow thinking-only messages (content empty but blocks non-empty) through.
         if (!role || (!content && blocks.length === 0)) break;
 
         const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
@@ -423,10 +369,6 @@ export function subscribeToPiSession(
         const capturedClientMessageId = currentItem?.clientMessageId;
         const capturedHasThinking = blocks.some((b) => b.type === "thinking");
         const capturedBlocks = capturedHasThinking ? blocks : undefined;
-        // Stamp displayArgs on each extracted tool call from the active
-        // session formatter. O(1) per call on a warm cache; one SQL
-        // lookup per pi-session lifetime (invalidated on worktree
-        // mutation). The canonical `args` is untouched.
         const enrichedToolCalls: ExtractedToolCall[] = toolCalls.map((tc) => {
           const display = toolDisplayCache.displayArgsForTool(
             session.sessionId,
@@ -457,8 +399,6 @@ export function subscribeToPiSession(
           }
 
           if (role === "assistant") {
-            // Broadcast immediately with intermediate flag so the session view gets it live.
-            // The final correction (without intermediate) happens on agent_end.
             const payload: MessageEndWebSocketEvent = {
               type: "message_end",
               piSessionId: session.sessionId,
@@ -473,10 +413,6 @@ export function subscribeToPiSession(
               type: "message_end",
               piSessionId: session.sessionId,
               message: timelineMessage,
-              // Echo the originating client's optimistic-bubble id so the web
-              // client can swap its optimistic entry for this canonical one.
-              // Only present on user-role message_end; absent for WhatsApp/cron
-              // origins that don't carry one.
               ...(capturedClientMessageId ? { clientMessageId: capturedClientMessageId } : {}),
             };
             broadcast(wsHub, payload);
@@ -519,8 +455,6 @@ export function subscribeToPiSession(
         break;
       }
       case "tool_execution_update": {
-        // Only forward if the partial result has actual content — skip empty shells
-        // like { content: [] } that carry no useful information.
         if (!hasPartialContent(event.partialResult)) break;
         const payload: ToolExecutionUpdateWebSocketEvent = {
           type: "tool_execution_update",
@@ -557,9 +491,6 @@ export function subscribeToPiSession(
         break;
       case "agent_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
-        // NOTE: assistant messages are NOT surfaced here. runtime.ts broadcasts
-        // stream_surfaced AFTER persistOutboundMessage so the serverMessageId is
-        // set and the Surface timeline can dedup against DB records on refetch.
         broadcast(wsHub, {
           type: "agent_end",
           piSessionId: session.sessionId,

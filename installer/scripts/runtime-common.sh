@@ -44,9 +44,6 @@ append_log() {
   printf '[%s] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$level" "$message" >> "$path"
 }
 
-# Read a value from config.json using Node.js.
-# Usage: config_value '.controlSurfaceHost' '127.0.0.1'
-# The leading dot is optional and stripped automatically.
 config_value() {
   local key="${1#.}"
   local fallback="$2"
@@ -117,7 +114,6 @@ curl_status_json() {
   curl --silent --show-error --max-time 2 --connect-timeout 1 "http://${host}:${port}/status"
 }
 
-# Check if JSON body has .ok == true using Node.js
 status_is_ok() {
   local body="$1"
   if [[ -z "$body" ]]; then
@@ -130,7 +126,6 @@ status_is_ok() {
   " "$body" 2>/dev/null
 }
 
-# Check if JSON body indicates an active streams session
 status_has_active_stream() {
   local body="$1"
   if ! status_is_ok "$body"; then

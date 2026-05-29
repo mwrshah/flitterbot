@@ -33,16 +33,11 @@ export const Route = createFileRoute("/streams/$piSessionId")({
       redirectToBestStream(status);
     }
 
-    // Sessions and worktree are non-blocking — kick off prefetches so they're
-    // in cache when DownstreamSessionsPanel mounts, but don't hold up navigation.
     void context.queryClient.prefetchQuery(
       streamsDownstreamSessionsQueryOptions(params.piSessionId),
     );
     void context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId));
 
-    // Seed from cache when available so route transitions stay instant.
-    // The component query revalidates in the background on mount, giving us
-    // stale-while-revalidate behavior instead of trusting cached history forever.
     const history = await context.queryClient
       .ensureQueryData(streamsHistoryQueryOptions(params.piSessionId))
       .catch((error: unknown) => {
@@ -86,10 +81,6 @@ function PiSessionRoute() {
     const previousDefaultPiSessionId = previousDefaultPiSessionIdRef.current;
     if (defaultPiSessionId) previousDefaultPiSessionIdRef.current = defaultPiSessionId;
 
-    // Follow the default session only when this route is still pointing at the
-    // previous default session. Manual navigation to a work stream must not be
-    // pulled back to the default stream just because this component was once on
-    // the default route.
     if (!previousDefaultPiSessionId || !defaultPiSessionId) return;
     if (piSessionId !== previousDefaultPiSessionId || piSessionId === defaultPiSessionId) return;
     navigate({
@@ -100,11 +91,6 @@ function PiSessionRoute() {
   }, [defaultPiSessionId, navigate, piSessionId]);
 
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
-  // Recovery kind drives which button (if any) renders in the chat header:
-  //   - 'closed'  → stream itself was closed; show "Reopen"
-  //   - 'dead'    → stream is open but its orchestrator pi-session ended or
-  //                 crashed; show "Recover"
-  //   - undefined → nothing to recover
   const recoveryKind: "closed" | "dead" | undefined = isDefaultSession
     ? undefined
     : stream?.status === "closed"

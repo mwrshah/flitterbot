@@ -50,9 +50,6 @@ type ChatPanelProps = {
   streamHasWorktree?: boolean;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
-  /** Recovery action to offer in the header, if any:
-   *  - 'closed' → stream is closed; offer "Reopen"
-   *  - 'dead'   → stream is open but pi-session ended/crashed; offer "Recover" */
   recoveryKind?: "closed" | "dead";
 };
 
@@ -136,8 +133,6 @@ export function ChatPanel({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
-  // Single endpoint handles both reopen (closed stream) and recover (dead
-  // pi-session). Label and icon differ but the server flow is identical.
   const recoverMutation = useMutation({
     mutationFn: () => apiClient.reopenStream(streamId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
@@ -227,10 +222,6 @@ export function ChatPanel({
     streamingPerf.endScroll(scrollToken);
   }, [isAtBottomRef, scrollToBottom]);
 
-  // Wire streaming deltas from the streaming store to the Lit web component.
-  // We drive scroll explicitly here instead of using MutationObserver /
-  // ResizeObserver so streaming updates do not create an observer-driven
-  // scroll feedback loop.
   useEffect(() => {
     streamingStore.onStreamingDelta(
       piSessionId,
@@ -269,8 +260,6 @@ export function ChatPanel({
       },
     );
 
-    // Wire imperative commit: message_end pushes converted AgentMessages
-    // directly to the Lit component, bypassing the React render cycle.
     streamingStore.onCommit(piSessionId, (agentMessages) => {
       messageListRef.current?.commitStreaming(agentMessages);
     });
@@ -318,7 +307,6 @@ export function ChatPanel({
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Ref for stable handleSubmit closure
   const pendingImagesRef = useRef(pendingImages);
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
@@ -351,22 +339,10 @@ export function ChatPanel({
         return;
       }
 
-      // The submit intent makes this session busy immediately from the UI's
-      // point of view. Waiting for the websocket status echo leaves one render
-      // where the draft is blank but the session is still "idle", so the empty
-      // composer hover actions briefly reappear. The websocket/server status
-      // remains authoritative; on send failure the catch below reverts via
-      // invalidate.
       queryClient.setQueryData<StatusResponse>(["status"], (status) =>
         markPiSessionBusy(status, piSessionId),
       );
 
-      // Optimistic insert: append a user-message entry to the agent timeline
-      // *before* the WS round-trip, so the feed grows immediately and the
-      // scroll-to-bottom driven by the messages-changed React path lands on
-      // the real new bottom. The server echoes this id back on user-role
-      // `message_end`; the ws-query-bridge swaps the optimistic entry for
-      // the canonical one in-place (no duplicate, no ordering flip).
       const now = new Date().toISOString();
       const optimistic: ChatTimelineMessage = {
         id: clientMessageId,
@@ -379,8 +355,6 @@ export function ChatPanel({
       };
       const cacheKey = ["streams-history", piSessionId, "agent"] as const;
       queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [...(old ?? []), optimistic]);
-      // Re-pin and scroll immediately. The Lit render that follows will grow
-      // scrollHeight; handleMessagesRendered then lands on the real bottom.
       engageAndScroll();
 
       setIsSending(true);
@@ -389,8 +363,6 @@ export function ChatPanel({
         await onSendMessage(displayText, { images, clientMessageId });
         setPendingImages([]);
       } catch (error) {
-        // Rollback the optimistic entry — the send failed, so the message
-        // will never be echoed back. Leaving it in cache would ghost-commit.
         queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) =>
           (old ?? []).filter((item) => item.id !== clientMessageId),
         );
@@ -404,13 +376,10 @@ export function ChatPanel({
     [appendBusyQueuedText, engageAndScroll, isSessionBusy, onSendMessage, piSessionId, queryClient],
   );
 
-  // Recover/Reopen is only meaningful when we have a streamId to act on.
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
 
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
     if (!streamId) {
-      // No streamId means we're on the default-stream view; offer the
-      // session-clear shortcut that's only meaningful for the default agent.
       return [
         {
           id: "clear-session",
@@ -448,7 +417,6 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header bar */}
       <div className="flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="text-sm font-semibold text-foreground truncate">
@@ -475,7 +443,6 @@ export function ChatPanel({
           setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
         }
       >
-        {/* Message area */}
         <Panel id="feed" defaultSize="85%" minSize="20%">
           <div className="relative h-full">
             <div
