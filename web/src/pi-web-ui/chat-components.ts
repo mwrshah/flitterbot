@@ -949,39 +949,29 @@ function summarizeToolCall(
 
   const p = paramRecord(params);
   const name = toolName.toLowerCase();
+  const title = `${toolName} ${state}`;
 
   if (name === "bash") {
-    const command = String(p.command ?? "");
-    return {
-      title: toolName,
-      subtitle: command ? `${state} • ${command}` : state,
-    };
+    return { title, subtitle: String(p.command ?? "") };
   }
 
   if (name === "edit" || name === "write" || name === "read") {
-    const filePath = toolPathParam(p);
-    return { title: toolName, subtitle: filePath ? `${state} • ${filePath}` : state };
+    return { title, subtitle: toolPathParam(p) };
   }
 
   if (name === "grep") {
-    const pattern = String(p.pattern ?? "");
-    return { title: toolName, subtitle: pattern ? `${state} • ${pattern}` : state };
+    return { title, subtitle: String(p.pattern ?? "") };
   }
 
   if (name === "ls" || name === "glob") {
-    const path = String(p.path ?? p.pattern ?? p.directory ?? ".");
-    return { title: toolName, subtitle: `${state} • ${path}` };
+    return { title, subtitle: String(p.path ?? p.pattern ?? p.directory ?? ".") };
   }
 
   if (name === "send_to_user") {
-    const text = String(p.text ?? p.message ?? "");
-    return { title: "Notify User", subtitle: text ? `${state} • ${text}` : state };
+    return { title: `Notify User ${state}`, subtitle: String(p.text ?? p.message ?? "") };
   }
 
-  return {
-    title: toolName,
-    subtitle: state,
-  };
+  return { title, subtitle: "" };
 }
 
 export class UserMessage extends LitElement {
