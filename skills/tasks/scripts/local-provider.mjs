@@ -313,7 +313,11 @@ async function propagateInboundTaskChanges(store, idx, syncContext) {
       if (provider.system === sourceProvider) continue;
       const beforeLink = getExternalLink(task, provider.system);
       const patch = { ...cloneTaskRecord(task), project, externalLinks: task.externalLinks.map(cloneExternalLink) };
-      await provider.updateTask({ store, idx, task: baseline, patch, force: true });
+      try {
+        await provider.updateTask({ store, idx, task: baseline, patch, force: true });
+      } catch (error) {
+        throw new Error(formatOutboundPropagationError(error, { task, baseline, project, sourceProvider, targetProvider: provider.system }));
+      }
       const afterLink = getExternalLink({ externalLinks: patch.externalLinks }, provider.system);
       task.externalLinks = patch.externalLinks;
       if (!beforeLink && !afterLink) outbound[provider.system].skipped++;
@@ -373,6 +377,23 @@ function cleanupCompletedTasks(store, input) {
     return updatedAt >= cutoff;
   });
   return { removedTasks: before - store.tasks.length, retentionDays };
+}
+
+function formatOutboundPropagationError(error, { task, baseline, project, sourceProvider, targetProvider }) {
+  const taskLabel = task.description ? `"${task.description}"` : task.id;
+  const changes = describeTaskChanges(baseline, task);
+  const detail = changes.length ? ` Changes: ${changes.join(", ")}.` : "";
+  return `Failed to propagate ${sourceProvider} inbound change for task ${taskLabel} (${task.id}) in project "${project.name}" to ${targetProvider}.${detail} Cause: ${error?.message ?? String(error)}`;
+}
+
+function describeTaskChanges(before, after) {
+  const changes = [];
+  if (before.status !== after.status) changes.push(`status ${before.status} -> ${after.status}`);
+  if (before.description !== after.description) changes.push(`description ${JSON.stringify(before.description)} -> ${JSON.stringify(after.description)}`);
+  if ((before.details ?? null) !== (after.details ?? null)) changes.push("details changed");
+  if (before.dueAt !== after.dueAt) changes.push(`dueAt ${before.dueAt} -> ${after.dueAt}`);
+  if (before.projectId !== after.projectId) changes.push(`projectId ${before.projectId} -> ${after.projectId}`);
+  return changes;
 }
 
 function formatPeriodicSyncAndCleanupMessage({ todoist, linear, outbound, cleanup }) {
