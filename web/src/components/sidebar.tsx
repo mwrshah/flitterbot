@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
-import { LuPin } from "react-icons/lu";
+import { LuPin, LuPinOff } from "react-icons/lu";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
@@ -331,7 +331,19 @@ export const Sidebar = memo(function Sidebar() {
                         }
                       />
                       {ws.pinned && (
-                        <LuPin className="ml-2 hidden size-3 shrink-0 text-sidebar-foreground/20 group-hover:block" />
+                        <button
+                          type="button"
+                          aria-label="Unpin stream"
+                          className="group/pin ml-2 mr-1 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                          }}
+                        >
+                          <LuPin className="size-3 group-hover/pin:hidden" />
+                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                        </button>
                       )}
                     </Link>
                   ) : null,
