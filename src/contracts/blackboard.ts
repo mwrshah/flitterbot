@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 20;
+export const BLACKBOARD_SCHEMA_VERSION = 21;
 
 export type MessageMetadata = {
   router_action?: string;
@@ -89,6 +89,7 @@ export interface StreamRow {
   created_at: string;
   closed_at: string | null;
   base_branch: string | null;
+  pinned: number | boolean;
 }
 
 export interface ClaudeSessionRow {
@@ -203,7 +204,8 @@ CREATE TABLE IF NOT EXISTS streams (
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     closed_at TEXT,
-    base_branch TEXT
+    base_branch TEXT,
+    pinned BOOLEAN NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

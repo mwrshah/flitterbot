@@ -130,6 +130,7 @@ export type StreamSummary = {
   id: string;
   name: string;
   status: "open" | "closed";
+  pinned: boolean;
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;

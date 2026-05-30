@@ -171,7 +171,7 @@ export interface StreamSurfacedWebSocketEvent {
 
 export interface StreamsChangedWebSocketEvent {
   type: "streams_changed";
-  reason: "created" | "closed" | "reopened";
+  reason: "created" | "closed" | "reopened" | "pinned";
   streamId: string;
   streamName?: string;
 }

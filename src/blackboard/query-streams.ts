@@ -3,7 +3,9 @@ import type { PiSessionStatus, StreamRow } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
 export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
-  return db.all<StreamRow>("SELECT * FROM streams WHERE status = 'open' ORDER BY created_at DESC");
+  return db.all<StreamRow>(
+    "SELECT * FROM streams WHERE status = 'open' ORDER BY pinned DESC, created_at DESC",
+  );
 }
 
 export function getStreamById(db: BlackboardDatabase, id: string): StreamRow | null {
@@ -14,6 +16,15 @@ export function getStreamById(db: BlackboardDatabase, id: string): StreamRow | n
 export function getStreamByName(db: BlackboardDatabase, name: string): StreamRow | null {
   const row = db.get<StreamRow>("SELECT * FROM streams WHERE name = ? COLLATE NOCASE", name);
   return row ?? null;
+}
+
+export function setStreamPinned(
+  db: BlackboardDatabase,
+  streamId: string,
+  pinned: boolean,
+): StreamRow | null {
+  db.prepare("UPDATE streams SET pinned = ? WHERE id = ?").run(pinned ? 1 : 0, streamId);
+  return getStreamById(db, streamId);
 }
 
 export function insertStream(db: BlackboardDatabase, name: string): StreamRow {
@@ -133,7 +144,7 @@ export function listRecentlyClosedStreams(
     `SELECT * FROM streams
 			 WHERE status = 'closed'
 			   AND datetime(closed_at) >= datetime('now', '-' || ? || ' hours')
-			 ORDER BY closed_at DESC`,
+			 ORDER BY pinned DESC, closed_at DESC`,
     withinHours,
   );
 }

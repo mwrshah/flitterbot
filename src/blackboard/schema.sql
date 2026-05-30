@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS streams (
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     closed_at TEXT,
-    base_branch TEXT
+    base_branch TEXT,
+    pinned BOOLEAN NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

@@ -1,10 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { memo } from "react";
+import { LuPin } from "react-icons/lu";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
 import { ShortcutHint } from "~/components/common/kbd";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "~/components/ui/context-menu";
 import { useModifierLabel } from "~/hooks/platform";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -69,6 +76,27 @@ function NavItem({
   );
 }
 
+function StreamContextMenu({
+  stream,
+  disabled,
+  onTogglePinned,
+}: {
+  stream: StreamSummary;
+  disabled: boolean;
+  onTogglePinned: () => void;
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger className="truncate flex-1">{stream.name}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem disabled={disabled} onClick={onTogglePinned}>
+          {stream.pinned ? "Unpin stream" : "Pin stream"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
 const icons = {
   surface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="size-4">
@@ -89,6 +117,19 @@ export const Sidebar = memo(function Sidebar() {
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
+  });
+
+  const pinStreamMutation = useMutation({
+    mutationFn: ({ streamId, pinned }: { streamId: string; pinned: boolean }) =>
+      apiClient.setStreamPinned(streamId, pinned),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to update stream pin: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
   });
 
   const createStreamMutation = useMutation({
@@ -201,7 +242,7 @@ export const Sidebar = memo(function Sidebar() {
                       to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId }}
                       className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                        "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                         currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
@@ -213,23 +254,49 @@ export const Sidebar = memo(function Sidebar() {
                           piStatusDotClass(ws.piSessionStatus),
                         )}
                       />
-                      <span className="truncate flex-1">{ws.name}</span>
+                      <StreamContextMenu
+                        stream={ws}
+                        disabled={pinStreamMutation.isPending}
+                        onTogglePinned={() =>
+                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                        }
+                      />
                       {streamShortcuts.has(ws.id) && (
                         <ShortcutHint
                           label={String(streamShortcuts.get(ws.id))}
-                          className="shrink-0 ml-2 text-sidebar-foreground/30"
+                          className={cn(
+                            "shrink-0 ml-2 text-sidebar-foreground/30",
+                            ws.pinned && "group-hover:hidden",
+                          )}
                           kbdSize="compact"
                           kbdTone="sidebar"
+                        />
+                      )}
+                      {ws.pinned && (
+                        <LuPin
+                          className={cn(
+                            "shrink-0 ml-2 hidden size-3 text-sidebar-foreground/30 group-hover:block",
+                            !streamShortcuts.has(ws.id) && "ml-auto",
+                          )}
                         />
                       )}
                     </Link>
                   ) : (
                     <div
                       key={ws.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40"
+                      className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40"
                     >
                       <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
-                      <span className="truncate flex-1">{ws.name}</span>
+                      <StreamContextMenu
+                        stream={ws}
+                        disabled={pinStreamMutation.isPending}
+                        onTogglePinned={() =>
+                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                        }
+                      />
+                      {ws.pinned && (
+                        <LuPin className="ml-auto hidden size-3 shrink-0 text-sidebar-foreground/20 group-hover:block" />
+                      )}
                     </div>
                   ),
                 )}
@@ -250,13 +317,22 @@ export const Sidebar = memo(function Sidebar() {
                       to="/streams/$piSessionId"
                       params={{ piSessionId: ws.piSessionId }}
                       className={cn(
-                        "flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
+                        "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                         currentPiSessionId === ws.piSessionId
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
                       )}
                     >
-                      <span className="truncate">{ws.name}</span>
+                      <StreamContextMenu
+                        stream={ws}
+                        disabled={pinStreamMutation.isPending}
+                        onTogglePinned={() =>
+                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                        }
+                      />
+                      {ws.pinned && (
+                        <LuPin className="ml-2 hidden size-3 shrink-0 text-sidebar-foreground/20 group-hover:block" />
+                      )}
                     </Link>
                   ) : null,
                 )}

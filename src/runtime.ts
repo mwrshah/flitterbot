@@ -32,6 +32,7 @@ import {
   listRecentlyClosedStreams,
   RECENTLY_CLOSED_WINDOW_HOURS,
   resetAllStreams,
+  setStreamPinned,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
@@ -840,6 +841,7 @@ export class ControlSurfaceRuntime {
             id: ws.id,
             name: ws.name,
             status: "open" as const,
+            pinned: Boolean(ws.pinned),
             repoPath: ws.repo_path ?? undefined,
             worktreePath: ws.worktree_path ?? undefined,
             piSessionId,
@@ -857,6 +859,7 @@ export class ControlSurfaceRuntime {
           id: ws.id,
           name: ws.name,
           status: "closed" as const,
+          pinned: Boolean(ws.pinned),
           closedAt: ws.closed_at ?? undefined,
           repoPath: ws.repo_path ?? undefined,
           worktreePath: ws.worktree_path ?? undefined,
@@ -871,6 +874,23 @@ export class ControlSurfaceRuntime {
       ],
       shortcuts: this.config.shortcuts,
     };
+  }
+
+  setStreamPinned(
+    streamId: string,
+    pinned: boolean,
+  ): { ok: true; streamId: string; pinned: boolean } {
+    const stream = setStreamPinned(this.blackboard, streamId, pinned);
+    if (!stream) {
+      throw new Error(`Stream not found: ${streamId}`);
+    }
+    this.wsHub.broadcast({
+      type: "streams_changed",
+      reason: "pinned",
+      streamId,
+      streamName: stream.name,
+    });
+    return { ok: true, streamId, pinned: Boolean(stream.pinned) };
   }
 
   getSessionList(): SessionListItem[] {

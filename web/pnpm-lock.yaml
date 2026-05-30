@@ -71,6 +71,9 @@ importers:
       react-dom:
         specifier: ^19.2.6
         version: 19.2.6(react@19.2.6)
+      react-icons:
+        specifier: ^5.6.0
+        version: 5.6.0(react@19.2.6)
       react-resizable-panels:
         specifier: ^4.11.0
         version: 4.11.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -2445,6 +2448,11 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  react-icons@5.6.0:
+    resolution: {integrity: sha512-RH93p5ki6LfOiIt0UtDyNg/cee+HLVR6cHHtW3wALfo+eOHTp8RnU2kRkI6E+H19zMIs03DyxUG/GfZMOGvmiA==}
+    peerDependencies:
+      react: '*'
 
   react-remove-scroll-bar@2.3.8:
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
@@ -5408,6 +5416,10 @@ snapshots:
       '@react-grab/cli': 0.1.37
       bippy: 0.5.41(react@19.2.6)
     optionalDependencies:
+      react: 19.2.6
+
+  react-icons@5.6.0(react@19.2.6):
+    dependencies:
       react: 19.2.6
 
   react-remove-scroll-bar@2.3.8(@types/react@19.2.15)(react@19.2.6):

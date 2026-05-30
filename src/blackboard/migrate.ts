@@ -816,6 +816,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 20) {
     applyV20Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 21) {
+    applyV21Migration(db);
   }
 
   return getSchemaVersion(db);
@@ -1177,6 +1182,19 @@ function applyV20Migration(db: DatabaseSync): void {
   try {
     db.exec("ALTER TABLE streams ADD COLUMN base_branch TEXT;");
     db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (20);");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function applyV21Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec("ALTER TABLE streams ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT 0;");
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (21);");
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");
