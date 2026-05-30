@@ -302,7 +302,7 @@ export function createTaskActions({ storePath, configPath }) {
 
 async function propagateInboundTaskChanges(store, idx, syncContext) {
   const providers = configuredProviders(CONFIG_PATH, providerDeps());
-  const outbound = Object.fromEntries(providers.map((provider) => [provider.system, { created: 0, updated: 0, skipped: 0 }]));
+  const outbound = Object.fromEntries(providers.map((provider) => [provider.system, { created: 0, updated: 0 }]));
   for (const [recordId, sourceProvider] of syncContext.changedByProvider) {
     const task = idx.tasksById.get(recordId);
     if (!task) continue;
@@ -320,10 +320,12 @@ async function propagateInboundTaskChanges(store, idx, syncContext) {
       }
       const afterLink = getExternalLink({ externalLinks: patch.externalLinks }, provider.system);
       task.externalLinks = patch.externalLinks;
-      if (!beforeLink && !afterLink) outbound[provider.system].skipped++;
-      else if (!beforeLink && afterLink) outbound[provider.system].created++;
-      else outbound[provider.system].updated++;
       indexTaskExternalLinks(idx, task);
+      // No mapping before or after means this task was never a sync candidate for the
+      // target provider (e.g. a Todoist-only Inbox task and Linear), so it is not a skip.
+      if (!beforeLink && !afterLink) continue;
+      if (afterLink && !beforeLink) outbound[provider.system].created++;
+      else outbound[provider.system].updated++;
     }
   }
   return outbound;
@@ -346,7 +348,9 @@ function createSyncContext(store) {
 }
 
 function shouldApplyInbound(syncContext, record, remoteUpdatedAt, provider) {
-  const baselineUpdatedAt = syncContext?.baselineUpdatedAt.get(record.id) ?? record.updatedAt;
+  const link = getExternalLink(record, provider);
+  const remoteBaseline = link?.remoteUpdatedAt;
+  const baselineUpdatedAt = remoteBaseline ?? syncContext?.baselineUpdatedAt.get(record.id) ?? record.updatedAt;
   if (!remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) return false;
   const priorProvider = syncContext?.changedByProvider.get(record.id);
   if (priorProvider && priorProvider !== provider) return false;
@@ -414,7 +418,7 @@ function formatProviderSyncLine(providerName, result, outwardStats) {
 
 function formatOutwardStats(stats) {
   if (!stats) return "outward not run";
-  return `${stats.created} created outward, ${stats.updated} updated outward, ${stats.skipped} skipped outward`;
+  return `${stats.created} created outward, ${stats.updated} updated outward`;
 }
 
 function todoistInwardTotals(inbound) {

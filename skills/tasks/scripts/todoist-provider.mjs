@@ -98,7 +98,7 @@ export function createTodoistProvider(config, deps) {
         return;
       }
       const remote = await todoist.getProject(todoistLinkId(link));
-      assertTodoistNotAhead(project, remote.updated_at, `Todoist project "${project.name}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
+      assertTodoistNotAhead(link, project, remote.updated_at, `Todoist project "${project.name}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
       if (patch.name && deps.normalizeName(patch.name) !== deps.normalizeName(project.name)) await todoist.updateProject(remote.id, { name: patch.name });
       if (patch.archived === true && project.archived !== true) await todoist.archiveProject(remote.id);
       if (patch.archived === false && project.archived === true) await todoist.unarchiveProject(remote.id);
@@ -132,7 +132,7 @@ export function createTodoistProvider(config, deps) {
       }
 
       const remote = await todoist.getTask(todoistLinkId(link));
-      if (!force) assertTodoistNotAhead(task, remote.updated_at, `Todoist task "${task.description}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
+      if (!force) assertTodoistNotAhead(link, task, remote.updated_at, `Todoist task "${task.description}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
 
       const remoteRecurring = remote.due?.is_recurring === true;
       if (patch.status === "done" && task.status !== "done" && remoteRecurring) {
@@ -247,8 +247,9 @@ async function ensureTodoistProject(todoist, store, idx, project, deps) {
   return remote;
 }
 
-function assertTodoistNotAhead(localRecord, remoteUpdatedAt, message) {
-  if (remoteNewerThanLocal(remoteUpdatedAt, localRecord.updatedAt)) throw new Error(message);
+function assertTodoistNotAhead(link, localRecord, remoteUpdatedAt, message) {
+  const baselineUpdatedAt = link?.remoteUpdatedAt ?? localRecord.updatedAt;
+  if (remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) throw new Error(message);
 }
 
 function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
@@ -342,6 +343,7 @@ function todoistProjectLink(project) {
   return {
     system: TODOIST_SYSTEM,
     projectId: project.id,
+    remoteUpdatedAt: project.updated_at,
   };
 }
 
@@ -350,6 +352,7 @@ function todoistTaskLink(task) {
     system: TODOIST_SYSTEM,
     taskId: task.id,
     url: task.url,
+    remoteUpdatedAt: task.updated_at ?? task.completed_at,
   };
 }
 

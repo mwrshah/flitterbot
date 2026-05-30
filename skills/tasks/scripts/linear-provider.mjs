@@ -91,7 +91,7 @@ export function createLinearProvider(config, deps) {
       }
 
       const remote = await client.getIssue(linearIssueId(existingLink));
-      if (!force) assertLinearNotAhead(task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
+      if (!force) assertLinearNotAhead(existingLink, task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
       const states = await statesForTeam(client, teamStateCache, remote.team.id);
       const update = {
         title: patch.description,
@@ -263,8 +263,9 @@ function stateByType(states, type) {
   return states.find((state) => state.type === type);
 }
 
-function assertLinearNotAhead(localRecord, remoteUpdatedAt, message) {
-  if (remoteNewerThanLocal(remoteUpdatedAt, localRecord.updatedAt)) throw new Error(message);
+function assertLinearNotAhead(link, localRecord, remoteUpdatedAt, message) {
+  const baselineUpdatedAt = link?.remoteUpdatedAt ?? localRecord.updatedAt;
+  if (remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) throw new Error(message);
 }
 
 function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
@@ -284,6 +285,7 @@ function linearIssueLink(issue) {
     system: LINEAR_SYSTEM,
     issueId: issue.id,
     url: issue.url,
+    remoteUpdatedAt: issue.updatedAt,
   };
 }
 
