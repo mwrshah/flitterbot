@@ -73,6 +73,7 @@ import {
 } from "./streams/worktree-link.ts";
 import { fireAndForgetPeriodicTaskSync } from "./tasks/periodic-sync.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
+import { resolveRecipientJid } from "./whatsapp/config.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
 import {
@@ -213,6 +214,7 @@ export class ControlSurfaceRuntime {
     if (openStreams.length > 0) {
       this.log(`rehydrated ${openStreams.length} orchestrator(s) for open streams`);
     }
+    this.bootstrapMissingStreamWhatsAppOwners(openStreams);
 
     await this.ensureWhatsAppDaemon();
     await this.refreshWhatsAppStatus();
@@ -1006,6 +1008,7 @@ export class ControlSurfaceRuntime {
     if (!session) throw new Error("pi session not initialized");
 
     const piSessionId = session.sessionId;
+    const itemRemoteJid = extractRemoteJid(item.metadata);
 
     this.log(
       `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""} text=${item.text.slice(0, 80)}...`,
@@ -1105,10 +1108,7 @@ export class ControlSurfaceRuntime {
           command: "send",
           text: waText,
           contextRef: undefined,
-          remoteJid:
-            item.source === "whatsapp"
-              ? (item.metadata?.remote_jid as string | undefined)
-              : undefined,
+          remoteJid: managed.role === "orchestrator" ? managed.whatsappRemoteJid : itemRemoteJid,
         });
       } catch (error) {
         this.log(
@@ -1367,6 +1367,81 @@ export class ControlSurfaceRuntime {
     return { ok: true, piSessionId, messageCount: newCount };
   }
 
+  private bootstrapMissingStreamWhatsAppOwners(streams: ReturnType<typeof listOpenStreams>): void {
+    if (!this.whatsappEnabled || streams.length === 0) return;
+
+    let defaultRemoteJid: string;
+    try {
+      defaultRemoteJid = resolveRecipientJid();
+    } catch (error) {
+      this.log(
+        `stream WhatsApp owner bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+
+    let bootstrapped = 0;
+    for (const stream of streams) {
+      const managed = this.sessionManager.getByStream(stream.id);
+      if (managed?.whatsappRemoteJid) continue;
+
+      const existingOwner = this.blackboard.get<{ id: string }>(
+        `SELECT id
+         FROM messages
+         WHERE stream_id = ?
+           AND metadata LIKE '%"stream_owner_remote_jid"%'
+         ORDER BY datetime(created_at) DESC
+         LIMIT 1`,
+        stream.id,
+      );
+      if (existingOwner) continue;
+
+      if (managed) {
+        managed.whatsappRemoteJid = defaultRemoteJid;
+      }
+      const piSessionId = managed?.piSessionId ?? getActivePiSessionId(this.blackboard, stream.id);
+      this.persistStreamWhatsAppOwner(
+        stream.id,
+        stream.name,
+        piSessionId,
+        defaultRemoteJid,
+        "WhatsApp stream owner bootstrapped to default recipient.",
+      );
+      bootstrapped += 1;
+    }
+
+    if (bootstrapped > 0) {
+      this.log(`bootstrapped WhatsApp owner for ${bootstrapped} existing stream(s)`);
+    }
+  }
+
+  private persistStreamWhatsAppOwner(
+    streamId: string,
+    streamName: string,
+    piSessionId: string | undefined,
+    remoteJid: string,
+    content = "WhatsApp stream owner set.",
+  ): void {
+    try {
+      persistInboundMessage(this.blackboard, {
+        source: "agent",
+        content,
+        sender: "system",
+        streamId,
+        piSessionId,
+        metadata: {
+          stream_id: streamId,
+          stream_name: streamName,
+          stream_owner_remote_jid: remoteJid,
+        },
+      });
+    } catch (error) {
+      this.log(
+        `stream WhatsApp owner persist failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     streamId?: string,
@@ -1480,7 +1555,19 @@ export class ControlSurfaceRuntime {
 
           try {
             const defaultSession = this.sessionManager.getDefault();
-            const originalText = defaultSession?.queue.getCurrentItem()?.text;
+            const currentItem = defaultSession?.queue.getCurrentItem();
+            const originalText = currentItem?.text;
+            const inheritedReplyMetadata = whatsappReplyMetadataFrom(currentItem);
+            const inheritedRemoteJid = extractRemoteJid(inheritedReplyMetadata);
+            if (inheritedRemoteJid) {
+              orchestrator.whatsappRemoteJid = inheritedRemoteJid;
+              this.persistStreamWhatsAppOwner(
+                ws.id,
+                ws.name,
+                orchestrator.piSessionId,
+                inheritedRemoteJid,
+              );
+            }
             const currentUserText = originalText
               ? stripInjectedDatetimeBlocks(originalText)
               : undefined;
@@ -1573,6 +1660,7 @@ export class ControlSurfaceRuntime {
                 metadata: {
                   stream_id: ws.id,
                   stream_name: ws.name,
+                  ...inheritedReplyMetadata,
                 },
                 receivedAt: new Date().toISOString(),
               });
@@ -1595,6 +1683,7 @@ export class ControlSurfaceRuntime {
                 metadata: {
                   stream_id: ws.id,
                   stream_name: ws.name,
+                  ...inheritedReplyMetadata,
                 },
                 receivedAt: new Date().toISOString(),
               });
@@ -2080,10 +2169,19 @@ export class ControlSurfaceRuntime {
                 `Turn stuck for ${ageSeconds}s (${label})`,
                 30,
               );
+              const remoteJid =
+                managed.role === "orchestrator"
+                  ? managed.whatsappRemoteJid
+                  : extractRemoteJid(snapshot.currentItem?.metadata);
+              if (!remoteJid) {
+                this.log(`stuck-turn WhatsApp alert skipped: no WhatsApp reply target (${label})`);
+                continue;
+              }
               this.sendWhatsAppCommand({
                 command: "send",
                 text: `⚠️ Stuck turn detected: ${label} — stuck for ${Math.round(age / 60_000)}min. Cron paused via circuit breaker (30min TTL).`,
                 contextRef: undefined,
+                remoteJid,
               }).catch((err) => {
                 this.log(
                   `stuck-turn WhatsApp alert failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -2270,6 +2368,24 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     lastAssistantText ? `Last output: "${lastAssistantText}"` : undefined,
   ].filter(Boolean);
   return lines.join("\n");
+}
+
+function metadataString(metadata: MessageMetadata | undefined, key: string): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function extractRemoteJid(metadata?: MessageMetadata): string | undefined {
+  return metadataString(metadata, "remote_jid");
+}
+
+function whatsappReplyMetadataFrom(item?: QueueItem): MessageMetadata {
+  const remoteJid = extractRemoteJid(item?.metadata);
+  const contextRef = metadataString(item?.metadata, "context_ref");
+  return {
+    ...(remoteJid ? { remote_jid: remoteJid } : {}),
+    ...(contextRef ? { context_ref: contextRef } : {}),
+  };
 }
 
 function pickString(payload: Record<string, unknown>, keys: string[]): string | undefined {

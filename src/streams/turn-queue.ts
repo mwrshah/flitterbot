@@ -26,6 +26,15 @@ export function isCoalescableUserInput(item: QueueItem): boolean {
   return true;
 }
 
+function queueItemRemoteJid(item: QueueItem): string | undefined {
+  const value = item.metadata?.remote_jid;
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function hasSameReplyTarget(a: QueueItem, b: QueueItem): boolean {
+  return (queueItemRemoteJid(a) ?? null) === (queueItemRemoteJid(b) ?? null);
+}
+
 export function coalesceUserItems(items: QueueItem[]): QueueItem {
   if (items.length === 0) throw new Error("coalesceUserItems: empty group");
   const first = items[0]!;
@@ -137,6 +146,7 @@ export class TurnQueue {
       const next = this.items[0]!;
       if (!isCoalescableUserInput(next)) break;
       if ((next.streamId ?? null) !== (head.streamId ?? null)) break;
+      if (!hasSameReplyTarget(head, next)) break;
       group.push(this.items.shift()!);
     }
     return group.length === 1 ? head : coalesceUserItems(group);

@@ -10,7 +10,7 @@ import {
 } from "../blackboard/pi-sessions.ts";
 import { getStreamById } from "../blackboard/query-streams.ts";
 import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
-import type { ApiError } from "../contracts/blackboard.ts";
+import type { ApiError, MessageMetadata } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createFlitterbotAgent } from "./create-agent.ts";
@@ -40,6 +40,7 @@ export interface ManagedPiSession {
   unsubscribe: () => void;
   pendingDestroy?: boolean;
   lastSurfacedAssistantMessage?: ChatTimelineMessage;
+  whatsappRemoteJid?: string;
 }
 
 export type ProcessQueueItemCallback = (
@@ -229,6 +230,7 @@ export class PiSessionManager {
         thinkingLevel: this.config.defaultThinkingLevel,
       },
       unsubscribe: () => {},
+      whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
     };
 
     const processCallback = this.processCallback;
@@ -533,6 +535,31 @@ export class PiSessionManager {
     }
   }
 
+  private findLatestWhatsAppRemoteJid(streamId: string | null): string | undefined {
+    if (!streamId) return undefined;
+    const rows = this.blackboard.all<{ metadata: string | null }>(
+      `SELECT metadata
+       FROM messages
+       WHERE stream_id = ?
+         AND metadata IS NOT NULL
+       ORDER BY datetime(created_at) DESC
+       LIMIT 100`,
+      streamId,
+    );
+
+    for (const row of rows) {
+      if (!row.metadata) continue;
+      try {
+        const metadata = JSON.parse(row.metadata) as MessageMetadata;
+        const remoteJid = metadata.stream_owner_remote_jid;
+        if (typeof remoteJid === "string" && remoteJid.trim()) {
+          return remoteJid;
+        }
+      } catch {}
+    }
+    return undefined;
+  }
+
   private buildManagedSession(
     created: {
       runtime: AgentSessionRuntime;
@@ -560,6 +587,7 @@ export class PiSessionManager {
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
       unsubscribe: null!,
+      whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
     };
 
     const processCallback = this.processCallback;

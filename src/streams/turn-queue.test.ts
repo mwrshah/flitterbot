@@ -289,7 +289,7 @@ describe("TurnQueue.pump coalescing", () => {
     expect(delivered.map((d) => d.text)).toEqual(["prime", "a", "b"]);
   });
 
-  test("user-web and user-whatsapp mix: coalesce (both are user-input channels)", async () => {
+  test("user-web and user-whatsapp mix without reply target: coalesce", async () => {
     const delivered = await drainWithPrimer(
       mk({ id: "prime", text: "prime", source: "hook", sender: "system" }),
       [
@@ -299,6 +299,54 @@ describe("TurnQueue.pump coalescing", () => {
     );
     expect(delivered).toHaveLength(2);
     expect(delivered[1]!.text).toBe("web-msg\nwa-msg");
+  });
+
+  test("different WhatsApp reply targets break the run", async () => {
+    const delivered = await drainWithPrimer(
+      mk({ id: "prime", text: "prime", source: "hook", sender: "system" }),
+      [
+        mk({
+          id: "u1",
+          text: "jid-a-msg",
+          source: "whatsapp",
+          sender: "user",
+          metadata: { remote_jid: "jid-a" },
+        }),
+        mk({
+          id: "u2",
+          text: "jid-b-msg",
+          source: "whatsapp",
+          sender: "user",
+          metadata: { remote_jid: "jid-b" },
+        }),
+      ],
+    );
+    expect(delivered.map((d) => d.text)).toEqual(["prime", "jid-a-msg", "jid-b-msg"]);
+  });
+
+  test("matching WhatsApp reply target can coalesce", async () => {
+    const delivered = await drainWithPrimer(
+      mk({ id: "prime", text: "prime", source: "hook", sender: "system" }),
+      [
+        mk({
+          id: "u1",
+          text: "first",
+          source: "whatsapp",
+          sender: "user",
+          metadata: { remote_jid: "jid-a" },
+        }),
+        mk({
+          id: "u2",
+          text: "second",
+          source: "whatsapp",
+          sender: "user",
+          metadata: { remote_jid: "jid-a" },
+        }),
+      ],
+    );
+    expect(delivered).toHaveLength(2);
+    expect(delivered[1]!.text).toBe("first\nsecond");
+    expect(delivered[1]!.metadata?.remote_jid).toBe("jid-a");
   });
 
   test("ws-init bootstrap (source=web, sender=system) does NOT coalesce with user follow-up", async () => {
