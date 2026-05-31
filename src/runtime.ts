@@ -31,7 +31,7 @@ import {
   listOpenStreams,
   listRecentlyClosedStreams,
   RECENTLY_CLOSED_WINDOW_HOURS,
-  resetAllStreams,
+  resetClosedStreams,
   setStreamPinned,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
@@ -162,9 +162,9 @@ export class ControlSurfaceRuntime {
     this.ensurePidFile();
 
     if (this.config.wipeStreamsOnStart) {
-      const closed = resetAllStreams(this.blackboard);
+      const closed = resetClosedStreams(this.blackboard);
       if (closed > 0)
-        this.log(`wiped ${closed} open stream(s) on startup (wipeStreamsOnStart=true)`);
+        this.log(`wiped ${closed} closed stream(s) on startup (wipeStreamsOnStart=true)`);
     }
 
     const resumeDefaultSessionFile =
