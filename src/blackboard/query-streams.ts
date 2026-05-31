@@ -110,9 +110,9 @@ export function deleteStream(db: BlackboardDatabase, streamId: string): void {
   db.prepare("DELETE FROM streams WHERE id = ?").run(streamId);
 }
 
-export function resetAllStreams(db: BlackboardDatabase): number {
-  const count = db.get<CountRow>("SELECT COUNT(*) as count FROM streams");
-  db.prepare("DELETE FROM streams").run();
+export function resetClosedStreams(db: BlackboardDatabase): number {
+  const count = db.get<CountRow>("SELECT COUNT(*) as count FROM streams WHERE status = 'closed'");
+  db.prepare("DELETE FROM streams WHERE status = 'closed'").run();
   return count?.count ?? 0;
 }
 
