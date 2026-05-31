@@ -273,12 +273,22 @@ export const Sidebar = memo(function Sidebar() {
                         />
                       )}
                       {ws.pinned && (
-                        <LuPin
+                        <button
+                          type="button"
+                          aria-label="Unpin stream"
                           className={cn(
-                            "shrink-0 ml-2 hidden size-3 text-sidebar-foreground/30 group-hover:block",
+                            "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex",
                             !streamShortcuts.has(ws.id) && "ml-auto",
                           )}
-                        />
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                          }}
+                        >
+                          <LuPin className="size-3 group-hover/pin:hidden" />
+                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                        </button>
                       )}
                     </Link>
                   ) : (
@@ -295,7 +305,17 @@ export const Sidebar = memo(function Sidebar() {
                         }
                       />
                       {ws.pinned && (
-                        <LuPin className="ml-auto hidden size-3 shrink-0 text-sidebar-foreground/20 group-hover:block" />
+                        <button
+                          type="button"
+                          aria-label="Unpin stream"
+                          className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex"
+                          onClick={() => {
+                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                          }}
+                        >
+                          <LuPin className="size-3 group-hover/pin:hidden" />
+                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                        </button>
                       )}
                     </div>
                   ),
@@ -334,7 +354,7 @@ export const Sidebar = memo(function Sidebar() {
                         <button
                           type="button"
                           aria-label="Unpin stream"
-                          className="group/pin ml-2 mr-1 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
+                          className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
