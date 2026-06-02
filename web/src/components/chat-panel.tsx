@@ -486,6 +486,7 @@ export function ChatPanel({
                 </DialogClose>
                 <Button
                   variant="destructive"
+                  autoFocus
                   onClick={confirmPrune}
                   disabled={pruneMutation.isPending}
                 >
