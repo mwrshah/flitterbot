@@ -32,6 +32,7 @@ import {
   listRecentlyClosedStreams,
   RECENTLY_CLOSED_WINDOW_HOURS,
   resetClosedStreams,
+  setStreamName,
   setStreamPinned,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
@@ -893,6 +894,24 @@ export class ControlSurfaceRuntime {
       streamName: stream.name,
     });
     return { ok: true, streamId, pinned: Boolean(stream.pinned) };
+  }
+
+  setStreamName(streamId: string, name: string): { ok: true; streamId: string; name: string } {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new Error("name must not be empty");
+    }
+    const stream = setStreamName(this.blackboard, streamId, trimmed);
+    if (!stream) {
+      throw new Error(`Stream not found: ${streamId}`);
+    }
+    this.wsHub.broadcast({
+      type: "streams_changed",
+      reason: "renamed",
+      streamId,
+      streamName: stream.name,
+    });
+    return { ok: true, streamId, name: stream.name };
   }
 
   getSessionList(): SessionListItem[] {

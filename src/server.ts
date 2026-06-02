@@ -41,6 +41,7 @@ import {
 } from "./routes/pi-session-model.ts";
 import { handlePinStreamRoute } from "./routes/pin-stream.ts";
 import { handlePruneStreamHistoryRoute } from "./routes/prune-stream-history.ts";
+import { handleRenameStreamRoute } from "./routes/rename-stream.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleStatusRoute } from "./routes/status.ts";
@@ -289,6 +290,15 @@ async function routeRequest(
     segments[3] === "pin"
   ) {
     return handlePinStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "PUT" &&
+    segments[0] === "api" &&
+    segments[1] === "streams" &&
+    segments[2] &&
+    segments[3] === "name"
+  ) {
+    return handleRenameStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "api" && segments[1] === "streams" && !segments[2]) {
     return handleCreateStreamRoute(runtime, req, res);

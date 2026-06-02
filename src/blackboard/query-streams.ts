@@ -27,6 +27,15 @@ export function setStreamPinned(
   return getStreamById(db, streamId);
 }
 
+export function setStreamName(
+  db: BlackboardDatabase,
+  streamId: string,
+  name: string,
+): StreamRow | null {
+  db.prepare("UPDATE streams SET name = ? WHERE id = ?").run(name, streamId);
+  return getStreamById(db, streamId);
+}
+
 export function insertStream(db: BlackboardDatabase, name: string): StreamRow {
   const id = crypto.randomUUID();
   db.prepare("INSERT INTO streams (id, name) VALUES (?, ?)").run(id, name);

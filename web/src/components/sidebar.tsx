@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { LuPin, LuPinOff } from "react-icons/lu";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
@@ -80,15 +80,82 @@ function StreamContextMenu({
   stream,
   disabled,
   onTogglePinned,
+  onRename,
 }: {
   stream: StreamSummary;
   disabled: boolean;
   onTogglePinned: () => void;
+  onRename: (name: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(stream.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== stream.name) {
+      onRename(trimmed);
+    } else {
+      setValue(stream.name);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            inputRef.current?.blur();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setValue(stream.name);
+            setEditing(false);
+          }
+        }}
+        onClick={(e) => e.preventDefault()}
+        className="flex-1 min-w-0 bg-transparent outline-none border-b border-sidebar-foreground/30"
+      />
+    );
+  }
+
   return (
     <ContextMenu>
-      <ContextMenuTrigger className="truncate flex-1">{stream.name}</ContextMenuTrigger>
+      <ContextMenuTrigger
+        className="truncate flex-1"
+        onClick={(e) => {
+          if (e.detail > 1) e.preventDefault();
+        }}
+        onDoubleClick={(e) => {
+          e.preventDefault();
+          setValue(stream.name);
+          setEditing(true);
+        }}
+      >
+        {stream.name}
+      </ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem
+          onClick={() => {
+            setValue(stream.name);
+            setEditing(true);
+          }}
+        >
+          Rename stream
+        </ContextMenuItem>
         <ContextMenuItem disabled={disabled} onClick={onTogglePinned}>
           {stream.pinned ? "Unpin stream" : "Pin stream"}
         </ContextMenuItem>
@@ -128,6 +195,19 @@ export const Sidebar = memo(function Sidebar() {
     onError: (error) => {
       toast.error(
         `Failed to update stream pin: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  });
+
+  const renameStreamMutation = useMutation({
+    mutationFn: ({ streamId, name }: { streamId: string; name: string }) =>
+      apiClient.setStreamName(streamId, name),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to rename stream: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });
@@ -260,6 +340,7 @@ export const Sidebar = memo(function Sidebar() {
                         onTogglePinned={() =>
                           pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                         }
+                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
                       />
                       {streamShortcuts.has(ws.id) && (
                         <ShortcutHint
@@ -303,6 +384,7 @@ export const Sidebar = memo(function Sidebar() {
                         onTogglePinned={() =>
                           pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                         }
+                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
                       />
                       {ws.pinned && (
                         <button
@@ -349,6 +431,7 @@ export const Sidebar = memo(function Sidebar() {
                         onTogglePinned={() =>
                           pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                         }
+                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
                       />
                       {ws.pinned && (
                         <button

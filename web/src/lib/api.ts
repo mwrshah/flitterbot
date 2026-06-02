@@ -85,6 +85,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ pinned }),
       }),
 
+    setStreamName: (streamId: string, name: string) =>
+      request<{ ok: true; streamId: string; name: string }>(`/api/streams/${streamId}/name`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      }),
+
     createStream: (body?: { name?: string; cwd?: string }) =>
       request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
         "/api/streams",
