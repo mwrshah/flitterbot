@@ -79,6 +79,11 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),
 
+    closeStream: (streamId: string) =>
+      request<{ ok: true; streamId: string; message: string }>(`/api/streams/${streamId}/close`, {
+        method: "POST",
+      }),
+
     setStreamPinned: (streamId: string, pinned: boolean) =>
       request<{ ok: true; streamId: string; pinned: boolean }>(`/api/streams/${streamId}/pin`, {
         method: "PUT",

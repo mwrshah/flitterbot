@@ -914,6 +914,38 @@ export class ControlSurfaceRuntime {
     return { ok: true, streamId, name: stream.name };
   }
 
+  async closeStreamNoop(
+    streamId: string,
+  ): Promise<{ ok: true; streamId: string; message: string }> {
+    const managed = this.sessionManager.getByStream(streamId);
+    const piSessionId =
+      managed?.piSessionId ??
+      getActivePiSessionId(this.blackboard, streamId) ??
+      getLatestPiSessionId(this.blackboard, streamId);
+    if (!piSessionId) {
+      throw new Error(`No pi session found for stream ${streamId}`);
+    }
+    const result = await executeCloseStream(
+      this.blackboard,
+      piSessionId,
+      streamId,
+      "noop",
+      "closing: noop close from context menu",
+    );
+    if (!result.ok) {
+      throw new Error(result.message);
+    }
+    if (managed) {
+      managed.pendingDestroy = true;
+    }
+    this.wsHub.broadcast({
+      type: "streams_changed",
+      reason: "closed",
+      streamId,
+    });
+    return { ok: true, streamId, message: result.message };
+  }
+
   getSessionList(): SessionListItem[] {
     return listSessions(this.blackboard);
   }

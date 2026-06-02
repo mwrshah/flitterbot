@@ -81,24 +81,35 @@ function StreamContextMenu({
   disabled,
   onTogglePinned,
   onRename,
+  onClose,
 }: {
   stream: StreamSummary;
   disabled: boolean;
   onTogglePinned: () => void;
   onRename: (name: string) => void;
+  onClose?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(stream.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Base UI restores focus to the trigger when the context menu closes, which
+  // blurs the freshly-mounted input. Defer focusing past that restore and
+  // ignore any blur fired before the input is genuinely ready.
+  const readyRef = useRef(false);
 
   useEffect(() => {
-    if (editing) {
+    if (!editing) return;
+    readyRef.current = false;
+    const raf = requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
-    }
+      readyRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [editing]);
 
   const commit = () => {
+    if (!readyRef.current) return;
     setEditing(false);
     const trimmed = value.trim();
     if (trimmed && trimmed !== stream.name) {
@@ -127,7 +138,7 @@ function StreamContextMenu({
           }
         }}
         onClick={(e) => e.preventDefault()}
-        className="flex-1 min-w-0 bg-transparent outline-none border-b border-sidebar-foreground/30"
+        className="flex-1 min-w-0 select-text bg-transparent outline-none border-b border-sidebar-foreground/30"
       />
     );
   }
@@ -159,6 +170,11 @@ function StreamContextMenu({
         <ContextMenuItem disabled={disabled} onClick={onTogglePinned}>
           {stream.pinned ? "Unpin stream" : "Pin stream"}
         </ContextMenuItem>
+        {onClose && (
+          <ContextMenuItem disabled={disabled} onClick={onClose}>
+            Close stream
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -212,6 +228,18 @@ export const Sidebar = memo(function Sidebar() {
     },
   });
 
+  const closeStreamMutation = useMutation({
+    mutationFn: (streamId: string) => apiClient.closeStream(streamId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to close stream: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  });
+
   const createStreamMutation = useMutation({
     mutationFn: () => apiClient.createStream(),
     onSuccess: async (stream) => {
@@ -256,7 +284,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
+    <aside className="flex flex-col h-full select-none bg-sidebar border-r border-sidebar-border">
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
@@ -341,6 +369,7 @@ export const Sidebar = memo(function Sidebar() {
                           pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                         }
                         onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                        onClose={() => closeStreamMutation.mutate(ws.id)}
                       />
                       {streamShortcuts.has(ws.id) && (
                         <ShortcutHint
@@ -385,6 +414,7 @@ export const Sidebar = memo(function Sidebar() {
                           pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                         }
                         onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                        onClose={() => closeStreamMutation.mutate(ws.id)}
                       />
                       {ws.pinned && (
                         <button
