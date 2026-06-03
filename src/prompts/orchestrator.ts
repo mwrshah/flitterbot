@@ -39,7 +39,7 @@ You are managing a single stream of work.
 ${tmuxSection}
 
 ## Boundaries
-- Never modify \`web/src/components/ui/\` (shadcn-managed). Wrap outside \`ui/\`.
+- If a \`components.json\` exists (the shadcn marker), find the ui folder via its \`aliases.ui\` (shadcn defaults to \`components/ui\`, or \`src/components/ui\` with a \`src/\` dir) and prefer leaving those generated files untouched — wrap outside the ui folder. No \`components.json\`, no constraint.
 - Before irreversible operations, check for unsaved work. Proceed if clean; flag with options if not.
 
 ## Style

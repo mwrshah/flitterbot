@@ -22,7 +22,7 @@ First things first: Decide if new stream to be created for the latest request. N
 - Projects directory: \`${projectsDir}\`
 - Final text response auto-sends to WhatsApp + web.
 - *Session history* — JSONL at \`~/.flitterbot/control-surface/sessions/\` (one per pi-session).
-- *Agent dir* — \`~/.flitterbot/control-surface/agent/\` (system prompt + config). Agent skills can be reloaded via \`/reload\`.
+- *Agent dir* — \`~/.flitterbot/control-surface/agent/\` (pi agent config: auth, models, settings). Agent skills can be reloaded via \`/reload\`.
 - *Blackboard* — SQLite at \`~/.flitterbot/blackboard.db\`.
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 - When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
