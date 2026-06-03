@@ -92,6 +92,15 @@ cmd_status() {
   done
 }
 
+_claude_launch_cmd() {
+  local session="$1" stream_id="$2" pi_session_id="$3" args="$4"
+  local cmd="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id} claude --dangerously-skip-permissions"
+  if [ -n "$args" ]; then
+    cmd="$cmd $args"
+  fi
+  echo "$cmd"
+}
+
 cmd_launch() {
   # --- Extract identity flags from ANY position in the arg list ---
   
@@ -203,10 +212,8 @@ cmd_launch() {
       sleep 0.3
     fi
 
-    local cmd="env -u CLAUDECODE FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id} claude --dangerously-skip-permissions"
-    if [ -n "$args" ]; then
-      cmd="$cmd $args"
-    fi
+    local cmd
+    cmd=$(_claude_launch_cmd "$session" "$stream_id" "$pi_session_id" "$args")
     tmux send-keys -t "$session" "$cmd" Enter
     sleep 0.5  # give shell time to fork claude process before releasing lock
 
@@ -232,10 +239,8 @@ cmd_launch() {
       sleep 0.3
     fi
 
-    local cmd="env -u CLAUDECODE FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id} claude --dangerously-skip-permissions"
-    if [ -n "$args" ]; then
-      cmd="$cmd $args"
-    fi
+    local cmd
+    cmd=$(_claude_launch_cmd "$session" "$stream_id" "$pi_session_id" "$args")
     tmux send-keys -t "$session" "$cmd" Enter
   fi
 

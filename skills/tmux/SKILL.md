@@ -24,7 +24,7 @@ All commands run via `/bin/bash scripts/sessions.sh <command>` relative to the s
 
 ### Rules
 
-1. **Launch Claude with `sessions.sh launch`** — never raw tmux. The script sets required env vars (`AUTONOMA_AGENT_MANAGED=1` etc.). Without them, stop hooks won't fire. If launch fails, report the error.
+1. **Launch Claude with `sessions.sh launch`** — never raw tmux. The script sets required env vars (`FLITTERBOT_AGENT_MANAGED=1` etc.). Without them, stop hooks won't fire. If launch fails, report the error.
 
 2. **Send prompts with `message`, not `send`.** `message` verifies Claude started inferring and retries if needed. Use `send` only for raw keystrokes (bare Enter to accept a prompt, typing a shell command).
 
