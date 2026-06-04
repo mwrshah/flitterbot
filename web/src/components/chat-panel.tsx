@@ -151,6 +151,7 @@ export function ChatPanel({
   const [busyQueuedText, setBusyQueuedText] = useState("");
   const busyQueuedTextRef = useRef("");
   const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
+  const pendingPostedScrollClientMessageIdsRef = useRef<Set<string>>(new Set());
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
   const agentMessages = useAgentMessages(timeline);
 
@@ -180,23 +181,41 @@ export function ChatPanel({
     });
   }, []);
 
+  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
+    initialScrollWhen: agentMessages.length > 0,
+    initialScrollKey: piSessionId,
+  });
+
   useEffect(() => {
     clearBusyQueuedText();
   }, [clearBusyQueuedText, piSessionId]);
 
   useEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
-    if (!busyQueuedText || !clientMessageId) return;
+    const pendingScrollIds = pendingPostedScrollClientMessageIdsRef.current;
+    let shouldScrollToPostedMessage = false;
 
     for (const item of timeline) {
       if (item.kind !== "message") continue;
       const message = item as ChatTimelineMessage;
-      if (message.role === "user" && message.clientMessageId === clientMessageId) {
+      if (message.role !== "user" || !message.clientMessageId) continue;
+
+      if (busyQueuedText && message.clientMessageId === clientMessageId) {
         clearBusyQueuedText();
-        return;
+      }
+      if (pendingScrollIds.delete(message.clientMessageId)) {
+        shouldScrollToPostedMessage = true;
       }
     }
-  }, [busyQueuedText, clearBusyQueuedText, timeline]);
+
+    if (shouldScrollToPostedMessage) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          engageAndScroll();
+        });
+      });
+    }
+  }, [busyQueuedText, clearBusyQueuedText, engageAndScroll, timeline]);
 
   const handlePruneRequested = useCallback((entryId: string) => {
     setPruneTarget(entryId);
@@ -209,11 +228,6 @@ export function ChatPanel({
       onSettled: () => setPruneTarget(null),
     });
   }, [pruneTarget, pruneMutation]);
-
-  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
-    initialScrollWhen: agentMessages.length > 0,
-    initialScrollKey: piSessionId,
-  });
 
   const handleMessagesRendered = useCallback(() => {
     if (!isAtBottomRef.current) return;
@@ -318,6 +332,7 @@ export function ChatPanel({
       if (!text && !images?.length) return;
 
       const clientMessageId = crypto.randomUUID();
+      pendingPostedScrollClientMessageIdsRef.current.add(clientMessageId);
       const displayText = text || "(image)";
       const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
 
@@ -331,6 +346,7 @@ export function ChatPanel({
           appendBusyQueuedText(displayText);
           setPendingImages([]);
         } catch (error) {
+          pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
           toast.error("Failed to queue message");
           console.error("handleSubmit queue failed:", error);
         } finally {
@@ -363,6 +379,7 @@ export function ChatPanel({
         await onSendMessage(displayText, { images, clientMessageId });
         setPendingImages([]);
       } catch (error) {
+        pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
         queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) =>
           (old ?? []).filter((item) => item.id !== clientMessageId),
         );
