@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-const BOTTOM_THRESHOLD = 8;
+const BOTTOM_THRESHOLD = 120;
 
 export function useStickToBottom({
   initialScrollWhen = false,
