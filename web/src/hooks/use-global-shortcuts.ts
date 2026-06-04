@@ -12,6 +12,7 @@ import {
   setShortcutBindingOverrides,
 } from "~/lib/global-shortcuts";
 import type { ShortcutBindingsConfig } from "~/lib/types";
+import { useCreateStream } from "./use-create-stream";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 
 type UseGlobalShortcutsOptions = {
@@ -24,6 +25,7 @@ export function useGlobalShortcuts({
   shortcutBindings,
 }: UseGlobalShortcutsOptions = {}) {
   const navigate = useNavigate();
+  const createStreamMutation = useCreateStream();
   useLastStreamPath();
 
   const navigateHome = useEffectEvent(() => {
@@ -40,6 +42,12 @@ export function useGlobalShortcuts({
     const to = streamPaths[slot - 1];
     if (!to) return false;
     navigate({ to });
+    return true;
+  });
+
+  const createStream = useEffectEvent(() => {
+    if (createStreamMutation.isPending) return false;
+    createStreamMutation.mutate();
     return true;
   });
 
@@ -121,6 +129,7 @@ export function useGlobalShortcuts({
     const cleanupHandlers = registerShortcutHandlers([
       { actionId: SHORTCUT_ACTIONS.navSurface, handler: () => navigateHome() },
       { actionId: SHORTCUT_ACTIONS.navLastStream, handler: () => navigateLastStream() },
+      { actionId: SHORTCUT_ACTIONS.streamCreate, handler: () => createStream() },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageDown, handler: () => scrollByPage("half-down") },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageUp, handler: () => scrollByPage("half-up") },
       { actionId: SHORTCUT_ACTIONS.scrollFullPageDown, handler: () => scrollByPage("full-down") },
