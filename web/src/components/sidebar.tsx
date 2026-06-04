@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { memo, useEffect, useRef, useState } from "react";
 import { LuPin, LuPinOff } from "react-icons/lu";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import { useModifierLabel } from "~/hooks/platform";
+import { useCreateStream } from "~/hooks/use-create-stream";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { SHORTCUT_ACTIONS, useShortcutBindingLabel } from "~/lib/global-shortcuts";
@@ -194,7 +195,6 @@ export const Sidebar = memo(function Sidebar() {
   useWhyDidYouRender("Sidebar", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const statusQuery = useQuery({
@@ -240,21 +240,7 @@ export const Sidebar = memo(function Sidebar() {
     },
   });
 
-  const createStreamMutation = useMutation({
-    mutationFn: () => apiClient.createStream(),
-    onSuccess: async (stream) => {
-      await queryClient.invalidateQueries({ queryKey: ["status"] });
-      await navigate({
-        to: "/streams/$piSessionId",
-        params: { piSessionId: stream.piSessionId },
-      });
-    },
-    onError: (error) => {
-      toast.error(
-        `Failed to create stream: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    },
-  });
+  const createStreamMutation = useCreateStream();
 
   const status = statusQuery.data;
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
@@ -280,6 +266,9 @@ export const Sidebar = memo(function Sidebar() {
     altLabel: mod,
   });
   const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
+    altLabel: mod,
+  });
+  const newStreamShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCreate, {
     altLabel: mod,
   });
 
@@ -313,6 +302,9 @@ export const Sidebar = memo(function Sidebar() {
                   onClick={() => createStreamMutation.mutate()}
                   disabled={createStreamMutation.isPending}
                   aria-label="New stream"
+                  title={
+                    newStreamShortcutHint ? `New stream (${newStreamShortcutHint})` : "New stream"
+                  }
                   className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   +

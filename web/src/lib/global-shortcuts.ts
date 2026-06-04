@@ -135,6 +135,7 @@ let bindingOverrides: ShortcutBindingsConfig = {};
 export const SHORTCUT_ACTIONS = {
   navSurface: "nav.surface",
   navLastStream: "nav.last-stream",
+  streamCreate: "stream.create",
   scrollHalfPageDown: "scroll.half-page-down",
   scrollHalfPageUp: "scroll.half-page-up",
   scrollFullPageDown: "scroll.full-page-down",
@@ -670,6 +671,9 @@ function registerBuiltInShortcutDefinitions() {
       { spec: "Alt+KeyT", when: "always" },
       { spec: "t", when: "no-input-focus" },
     ],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.streamCreate, {
+    defaultBindings: [{ spec: "Alt+KeyN", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageDown, {
     defaultBindings: [
