@@ -196,6 +196,10 @@ export function getMessageInputButtonShortcutActionId(slot: number) {
   return `message-input.button.slot.${slot}`;
 }
 
+export function getTmuxAttachShortcutActionId(tmuxSession: string) {
+  return `stream.copy-tmux-attach.${tmuxSession}`;
+}
+
 export function setShortcutBindingOverrides(next: ShortcutBindingsConfig | null | undefined) {
   bindingOverrides = next ?? {};
   parsedBindingsCache.clear();
@@ -268,13 +272,20 @@ export function handleRegisteredShortcutKeyDown(event: KeyboardEvent) {
             priority: getHighestHandlerPriority(progress.actionId),
           })),
         );
-        sequenceProgress = [];
-        if (!chosen) return false;
-        if (dispatchShortcutAction(chosen.actionId, event)) {
-          event.preventDefault();
-          return true;
+        const highestIncompletePriority = Math.max(
+          ...continued
+            .filter((progress) => progress.nextStepIndex + 1 < progress.binding.steps.length)
+            .map((progress) => getHighestHandlerPriority(progress.actionId)),
+          Number.NEGATIVE_INFINITY,
+        );
+        if (chosen && chosen.priority >= highestIncompletePriority) {
+          sequenceProgress = [];
+          if (dispatchShortcutAction(chosen.actionId, event)) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
         }
-        return false;
       }
 
       sequenceProgress = continued.map((progress) => ({
@@ -659,6 +670,12 @@ function formatCodeLabel(code: string) {
   }
 }
 
+function getTmuxSessionNames() {
+  const singles = Array.from({ length: 26 }, (_, index) => String.fromCharCode(97 + index));
+  const doubles = Array.from({ length: 24 }, (_, index) => `a${String.fromCharCode(97 + index)}`);
+  return [...singles, ...doubles];
+}
+
 function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.navSurface, {
     defaultBindings: [
@@ -711,6 +728,11 @@ function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyTmuxAttach, {
     defaultBindings: [{ spec: "c a", when: "no-input-focus" }],
   });
+  for (const tmuxSession of getTmuxSessionNames()) {
+    defineShortcutAction(getTmuxAttachShortcutActionId(tmuxSession), {
+      defaultBindings: [{ spec: `c ${tmuxSession.split("").join(" ")}`, when: "no-input-focus" }],
+    });
+  }
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyWorktreePath, {
     defaultBindings: [{ spec: "c w", when: "no-input-focus" }],
   });

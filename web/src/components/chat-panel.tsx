@@ -5,6 +5,7 @@ import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
 import { CopyableCode } from "~/components/common/copyable-code";
+import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import {
@@ -17,11 +18,17 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
+import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { streamingUiDebug } from "~/lib/debug-log";
+import {
+  registerShortcutHandlers,
+  SHORTCUT_ACTIONS,
+  useShortcutBindingLabel,
+} from "~/lib/global-shortcuts";
 import { streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -127,6 +134,11 @@ export function ChatPanel({
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
+  const cwdAbsolute = worktree?.cwdAbsolute ?? null;
+  const worktreeCopy = useCopyToClipboard(600);
+  const worktreeShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
+    "c then w";
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
@@ -189,6 +201,20 @@ export function ChatPanel({
   useEffect(() => {
     clearBusyQueuedText();
   }, [clearBusyQueuedText, piSessionId]);
+
+  useEffect(() => {
+    return registerShortcutHandlers([
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath,
+        priority: 20,
+        handler: () => {
+          if (!cwdAbsolute) return false;
+          void worktreeCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"));
+          return true;
+        },
+      },
+    ]);
+  }, [cwdAbsolute, worktreeCopy.copy]);
 
   useEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
@@ -439,14 +465,23 @@ export function ChatPanel({
           <h1 className="text-sm font-semibold text-foreground truncate">
             {streamName ?? "flitterbot"}
           </h1>
-          {worktree?.cwd && worktree.cwdAbsolute && (
+          {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
-              <CopyableCode
-                text={worktree.cwdAbsolute}
-                displayText={worktree.cwd}
-                className="text-muted-foreground"
-              />
+              <span className="flex items-center gap-1 min-w-0">
+                <CopyableCode
+                  text={cwdAbsolute}
+                  displayText={worktree.cwd}
+                  copied={worktreeCopy.copied}
+                  onCopy={() => worktreeCopy.copy(cwdAbsolute)}
+                  className="text-muted-foreground"
+                />
+                {worktreeCopy.copied ? (
+                  <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                ) : (
+                  <ShortcutHint label={worktreeShortcutLabel} />
+                )}
+              </span>
             </>
           )}
         </div>
