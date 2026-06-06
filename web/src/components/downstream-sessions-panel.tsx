@@ -85,8 +85,8 @@ function sessionDescription(session: DownstreamSessionItem): string {
 }
 
 function tmuxShortcutHintLabel(tmuxSession: string): string {
-  if (tmuxSession.length === 1) return `c then ${tmuxSession}`;
-  return ["c", ...tmuxSession.split("")].join("+");
+  if (tmuxSession.length === 1) return `t then ${tmuxSession}`;
+  return ["t", ...tmuxSession.split("")].join("+");
 }
 
 function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {

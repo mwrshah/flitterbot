@@ -110,6 +110,11 @@ export function useGlobalShortcuts({
     return true;
   });
 
+  const copyCurrentDirectoryFallback = useEffectEvent(() => {
+    toast.error("No current directory available");
+    return true;
+  });
+
   const copyBranchFallback = useEffectEvent(() => {
     toast.error("No branch available");
     return true;
@@ -141,6 +146,10 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.composerFocus, handler: () => focusComposer() },
       { actionId: SHORTCUT_ACTIONS.streamCopyTmuxAttach, handler: () => copyTmuxFallback() },
       { actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath, handler: () => copyWorktreeFallback() },
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyCurrentDirectory,
+        handler: () => copyCurrentDirectoryFallback(),
+      },
       { actionId: SHORTCUT_ACTIONS.streamCopyBranch, handler: () => copyBranchFallback() },
       {
         actionId: SHORTCUT_ACTIONS.streamCopyTargetBranch,

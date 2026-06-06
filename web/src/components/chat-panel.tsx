@@ -135,10 +135,10 @@ export function ChatPanel({
   const messageListRef = useRef<StreamsMessageListHandle>(null);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
-  const worktreeCopy = useCopyToClipboard(600);
-  const worktreeShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
-    "c then w";
+  const cwdCopy = useCopyToClipboard(600);
+  const cwdShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyCurrentDirectory, { compact: true }) ||
+    "c then d";
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
@@ -205,16 +205,16 @@ export function ChatPanel({
   useEffect(() => {
     return registerShortcutHandlers([
       {
-        actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath,
+        actionId: SHORTCUT_ACTIONS.streamCopyCurrentDirectory,
         priority: 20,
         handler: () => {
           if (!cwdAbsolute) return false;
-          void worktreeCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"));
+          void cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
     ]);
-  }, [cwdAbsolute, worktreeCopy.copy]);
+  }, [cwdAbsolute, cwdCopy.copy]);
 
   useEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
@@ -472,14 +472,14 @@ export function ChatPanel({
                 <CopyableCode
                   text={cwdAbsolute}
                   displayText={worktree.cwd}
-                  copied={worktreeCopy.copied}
-                  onCopy={() => worktreeCopy.copy(cwdAbsolute)}
+                  copied={cwdCopy.copied}
+                  onCopy={() => cwdCopy.copy(cwdAbsolute)}
                   className="text-muted-foreground"
                 />
-                {worktreeCopy.copied ? (
+                {cwdCopy.copied ? (
                   <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
                 ) : (
-                  <ShortcutHint label={worktreeShortcutLabel} />
+                  <ShortcutHint label={cwdShortcutLabel} />
                 )}
               </span>
             </>

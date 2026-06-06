@@ -145,6 +145,7 @@ export const SHORTCUT_ACTIONS = {
   composerFocus: "composer.focus",
   streamCopyTmuxAttach: "stream.copy-tmux-attach",
   streamCopyWorktreePath: "stream.copy-worktree-path",
+  streamCopyCurrentDirectory: "stream.copy-current-directory",
   streamCopyBranch: "stream.copy-branch",
   streamCopyTargetBranch: "stream.copy-target-branch",
   scrollSmallDown: "scroll.small-down",
@@ -726,15 +727,18 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [{ spec: "i", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyTmuxAttach, {
-    defaultBindings: [{ spec: "c a", when: "no-input-focus" }],
+    defaultBindings: [{ spec: "t a", when: "no-input-focus" }],
   });
   for (const tmuxSession of getTmuxSessionNames()) {
     defineShortcutAction(getTmuxAttachShortcutActionId(tmuxSession), {
-      defaultBindings: [{ spec: `c ${tmuxSession.split("").join(" ")}`, when: "no-input-focus" }],
+      defaultBindings: [{ spec: `t ${tmuxSession.split("").join(" ")}`, when: "no-input-focus" }],
     });
   }
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyWorktreePath, {
     defaultBindings: [{ spec: "c w", when: "no-input-focus" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.streamCopyCurrentDirectory, {
+    defaultBindings: [{ spec: "c d", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyBranch, {
     defaultBindings: [{ spec: "c b", when: "no-input-focus" }],
