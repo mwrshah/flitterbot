@@ -679,16 +679,10 @@ function getTmuxSessionNames() {
 
 function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.navSurface, {
-    defaultBindings: [
-      { spec: "Alt+KeyR", when: "always" },
-      { spec: "r", when: "no-input-focus" },
-    ],
+    defaultBindings: [{ spec: "Alt+KeyR", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.navLastStream, {
-    defaultBindings: [
-      { spec: "Alt+KeyT", when: "always" },
-      { spec: "t", when: "no-input-focus" },
-    ],
+    defaultBindings: [{ spec: "Alt+KeyT", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCreate, {
     defaultBindings: [{ spec: "Alt+KeyN", when: "always" }],
