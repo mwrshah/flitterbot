@@ -157,7 +157,7 @@ function CwdPicker({
   return (
     <div
       ref={pickerRef}
-      className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg"
+      className="absolute left-0 top-full z-50 mt-1 w-[min(36rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg"
     >
       <Command
         shouldFilter={false}
@@ -183,7 +183,7 @@ function CwdPicker({
             →
           </button>
         </div>
-        <CommandList className="max-h-48 overflow-y-auto p-1">
+        <CommandList className="max-h-80 overflow-y-auto p-1">
           {items.length === 0 && (
             <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
               No matching paths
