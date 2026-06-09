@@ -229,7 +229,9 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    this.enqueueDefaultAgentFirstMessage("startup");
+    if (!resumeDefaultSessionFile) {
+      this.enqueueDefaultAgentFirstMessage("startup");
+    }
   }
 
   async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {
