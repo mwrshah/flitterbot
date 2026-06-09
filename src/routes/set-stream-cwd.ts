@@ -33,6 +33,7 @@ export async function handleSetStreamCwdRoute(
     return sendJson(res, 200, result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    runtime.log(`set-stream-cwd failed stream=${streamId} cwd=${body.cwd}: ${message}`);
     return sendJson(res, 400, { ok: false, error: message });
   }
 }

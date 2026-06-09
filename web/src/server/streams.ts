@@ -17,11 +17,41 @@ async function streamsRequest(path: string, init?: RequestInit): Promise<unknown
 
   try {
     const res = await fetch(url, { ...init, headers, signal: controller.signal });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) throw await responseError(res, path);
     return res.json();
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function responseError(res: Response, path: string): Promise<Error> {
+  const body = await res.text().catch(() => "");
+  const message = extractErrorMessage(body) ?? `${res.status} ${res.statusText}`;
+
+  console.error("flitterbot streams request failed", {
+    path,
+    status: res.status,
+    statusText: res.statusText,
+    body,
+  });
+
+  return new Error(message);
+}
+
+function extractErrorMessage(body: string): string | null {
+  if (!body.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (typeof parsed === "object" && parsed && "error" in parsed) {
+      const error = (parsed as { error?: unknown }).error;
+      if (typeof error === "string" && error.trim()) return error;
+    }
+  } catch {
+    return body;
+  }
+
+  return body;
 }
 
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
