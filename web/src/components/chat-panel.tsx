@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
@@ -91,6 +99,7 @@ function dirFromPath(path: string, name: string): string {
 }
 
 function CwdPicker({
+  pickerRef,
   open,
   value,
   items,
@@ -100,6 +109,7 @@ function CwdPicker({
   onCommit,
   onEscape,
 }: {
+  pickerRef?: RefObject<HTMLDivElement | null>;
   open: boolean;
   value: string;
   items: DirectoryCompletionItem[];
@@ -133,38 +143,41 @@ function CwdPicker({
         onEscape();
         return;
       }
-      if (event.key === "Enter" && /\s$/.test(value)) {
+      if (event.key === "Enter" && (/\s$/.test(value) || (items.length === 0 && value !== "@"))) {
         event.preventDefault();
         event.stopPropagation();
         onCommit();
       }
     },
-    [onCommit, onEscape, value],
+    [items.length, onCommit, onEscape, value],
   );
 
   if (!open) return null;
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg">
+    <div
+      ref={pickerRef}
+      className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg"
+    >
       <Command
         shouldFilter={false}
         loop
         onKeyDownCapture={handleKeyDown}
         className="rounded-md border-0 shadow-none"
       >
-        <div className="flex w-full items-center gap-1 [&_[data-slot=command-input-wrapper]]:min-w-0 [&_[data-slot=command-input-wrapper]]:flex-1">
+        <div className="relative w-full [&_[data-slot=command-input-wrapper]]:min-w-0 [&_[data-slot=input-group-addon]]:hidden">
           <CommandInput
             autoFocus
             value={value}
             onValueChange={handleValueChange}
             placeholder="@../project/"
-            className="font-mono text-xs"
+            className="pr-10 font-mono text-xs"
           />
           <button
             type="button"
             onClick={onCommit}
             disabled={pending}
-            className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             title="switch cwd to this path"
           >
             →
@@ -269,6 +282,8 @@ export function ChatPanel({
     "c then d";
   const [cwdPickerOpen, setCwdPickerOpen] = useState(false);
   const [cwdPickerValue, setCwdPickerValue] = useState("@");
+  const cwdPickerAnchorRef = useRef<HTMLSpanElement>(null);
+  const cwdPickerRef = useRef<HTMLDivElement>(null);
   const cwdPickerQuery = cwdPickerValue.replace(/^@/, "").trimStart();
   const { data: cwdPickerResult } = useQuery(
     directoryCompletionsQueryOptions(cwdPickerQuery, cwdPickerOpen, { directoriesOnly: true }),
@@ -309,6 +324,23 @@ export function ChatPanel({
     setCwdPickerValue("@");
     setCwdPickerOpen(true);
   }, []);
+
+  useEffect(() => {
+    if (!cwdPickerOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (cwdPickerAnchorRef.current?.contains(target) || cwdPickerRef.current?.contains(target)) {
+        return;
+      }
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setCwdPickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [cwdPickerOpen]);
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
@@ -638,7 +670,7 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
-              <span className="relative flex items-center gap-1 min-w-0">
+              <span ref={cwdPickerAnchorRef} className="relative flex items-center gap-1 min-w-0">
                 <button
                   type="button"
                   onClick={streamId ? openCwdPicker : undefined}
@@ -649,6 +681,7 @@ export function ChatPanel({
                   <span>{worktree.cwd}</span>
                 </button>
                 <CwdPicker
+                  pickerRef={cwdPickerRef}
                   open={cwdPickerOpen}
                   value={cwdPickerValue}
                   items={cwdPickerItems}

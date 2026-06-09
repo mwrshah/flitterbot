@@ -35,10 +35,11 @@ A `PathPicker` (the same component used by the message composer) anchored under 
 
 - **Click a row** → drill in (insert `@.../`, list children). Never commits.
 - **Enter** on a highlighted directory → drill in.
+- **Enter** when the current drilled directory has no child directories → commit the path currently in the input as the new cwd.
 - **Space then Enter** → commit the path currently in the input as the new cwd.
-- **Right-arrow affordance** (single control at the end of the top input) → commit the current input path.
+- **Right-arrow affordance** (single control visually inside the right edge of the top input) → commit the current input path. The real input reserves right-side padding so typed text never renders beneath the arrow.
 
-Commit changes the stream's cwd; drill only navigates.
+Commit changes the stream's cwd; drill only navigates. Clicking outside the open picker blurs the active field and dismisses the picker without committing.
 
 ## Backend: directories-only listing
 
