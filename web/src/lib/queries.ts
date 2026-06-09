@@ -144,14 +144,15 @@ export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
 export function directoryCompletionsQueryOptions(
   query: string,
   enabled: boolean,
-  opts?: { streamId?: string },
+  opts?: { streamId?: string; directoriesOnly?: boolean },
 ) {
   const streamId = opts?.streamId;
+  const directoriesOnly = opts?.directoriesOnly ?? false;
   return {
-    queryKey: ["directory-completions", query, streamId ?? ""] as const,
+    queryKey: ["directory-completions", query, streamId ?? "", directoriesOnly] as const,
     queryFn: (): Promise<DirectoryCompletionsResult> =>
       fetchDirectoryCompletions({
-        data: { query, streamId },
+        data: { query, streamId, directoriesOnly },
       }),
     enabled,
     placeholderData: keepPreviousData,

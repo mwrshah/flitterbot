@@ -285,7 +285,7 @@ export type WsMessage =
     }
   | {
       type: "streams_changed";
-      reason: "created" | "closed" | "reopened";
+      reason: "created" | "closed" | "reopened" | "pinned" | "renamed" | "cwd_changed";
       streamId: string;
       streamName?: string;
     }

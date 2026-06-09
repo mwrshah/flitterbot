@@ -13,5 +13,6 @@ export { handleMessageRoute } from "./message.ts";
 export { handlePiSessionInterruptRoute } from "./pi-session-interrupt.ts";
 export { handlePiSessionModelRoute } from "./pi-session-model.ts";
 export { handleRuntimeWhatsAppRoute } from "./runtime-whatsapp.ts";
+export { handleSetStreamCwdRoute } from "./set-stream-cwd.ts";
 export { handleStatusRoute } from "./status.ts";
 export { handleStopRoute } from "./stop.ts";

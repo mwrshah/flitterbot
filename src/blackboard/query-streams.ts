@@ -62,6 +62,14 @@ export function enrichStream(
   }
 }
 
+export function updateStreamRepoPath(
+  db: BlackboardDatabase,
+  streamId: string,
+  repoPath: string,
+): void {
+  db.prepare(`UPDATE streams SET repo_path = ? WHERE id = ?`).run(repoPath, streamId);
+}
+
 export function getActivePiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
   const row = db.get<{ pi_session_id: string }>(
     `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,

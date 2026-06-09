@@ -48,6 +48,21 @@ export type ProcessQueueItemCallback = (
   item: QueueItem,
 ) => Promise<void>;
 
+function rewriteSessionHeaderCwd(sessionFile: string, cwd: string): string | undefined {
+  const content = fs.readFileSync(sessionFile, "utf8");
+  const lines = content.split("\n");
+  const headerLine = lines[0];
+  if (!headerLine?.trim()) throw new Error(`Session file has no header: ${sessionFile}`);
+  const header = JSON.parse(headerLine) as Record<string, unknown>;
+  if (header.type !== "session")
+    throw new Error(`Session file header is not a session: ${sessionFile}`);
+  const previousCwd = typeof header.cwd === "string" ? header.cwd : undefined;
+  header.cwd = cwd;
+  lines[0] = JSON.stringify(header);
+  fs.writeFileSync(sessionFile, lines.join("\n"));
+  return previousCwd;
+}
+
 export class PiSessionManager {
   private defaultSession?: ManagedPiSession;
   private readonly orchestrators = new Map<string, ManagedPiSession>();
@@ -372,6 +387,66 @@ export class PiSessionManager {
     this.byPiSessionId.delete(managed.piSessionId);
     this.toolDisplayCache.deletePiSession(managed.piSessionId);
     this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
+  }
+
+  async switchOrchestratorCwd(streamId: string, cwd: string): Promise<ManagedPiSession> {
+    const managed = this.orchestrators.get(streamId);
+    if (!managed) throw new Error("No orchestrator session for stream");
+    if (managed.role !== "orchestrator")
+      throw new Error("cwd switch is only supported for streams");
+    if (!managed.runtime) throw new Error("Cannot switch cwd for a dormant orchestrator");
+    if (managed.state.getSnapshot().busy)
+      throw new Error("Cannot switch cwd while session is busy");
+
+    const sessionFile = managed.runtime.session.sessionFile;
+    if (!sessionFile) throw new Error("Cannot switch cwd for a session without a session file");
+    if (!fs.existsSync(sessionFile)) throw new Error(`Session file does not exist: ${sessionFile}`);
+
+    const previousCwd = rewriteSessionHeaderCwd(sessionFile, cwd);
+
+    try {
+      const switchResult = await managed.runtime.switchSession(sessionFile);
+      if (switchResult.cancelled) {
+        if (previousCwd !== undefined) rewriteSessionHeaderCwd(sessionFile, previousCwd);
+        throw new Error("cwd switch cancelled by session hook");
+      }
+    } catch (error) {
+      if (previousCwd !== undefined) rewriteSessionHeaderCwd(sessionFile, previousCwd);
+      throw error;
+    }
+
+    const session = managed.runtime.session;
+    managed.piSessionId = session.sessionId;
+    managed.state.initialize(session.sessionId, session.sessionFile, session.messages.length);
+    managed.modelInfo = {
+      provider: session.model?.provider ?? managed.modelInfo.provider,
+      id: session.model?.id ?? managed.modelInfo.id,
+      entryId: managed.modelInfo.entryId,
+      thinkingLevel: session.thinkingLevel,
+    };
+
+    try {
+      managed.unsubscribe();
+    } catch {}
+    managed.unsubscribe = subscribeToPiSession(
+      session,
+      managed.state,
+      this.blackboard,
+      this.wsHub,
+      this.toolDisplayCache,
+      managed.streamId,
+      managed.streamName,
+      (lastAssistantMessage) => {
+        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
+        if (managed.pendingDestroy && managed.streamId) {
+          this.destroyOrchestrator(managed.streamId, "close_stream");
+        }
+      },
+    );
+
+    this.toolDisplayCache.invalidatePiSession(managed.piSessionId);
+    this.log(`switched cwd for stream "${managed.streamName}" (${streamId}) to ${cwd}`);
+    return managed;
   }
 
   async resetDefault(): Promise<void> {

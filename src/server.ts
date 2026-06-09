@@ -45,6 +45,7 @@ import { handlePruneStreamHistoryRoute } from "./routes/prune-stream-history.ts"
 import { handleRenameStreamRoute } from "./routes/rename-stream.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
 import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
+import { handleSetStreamCwdRoute } from "./routes/set-stream-cwd.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
 import { ControlSurfaceRuntime } from "./runtime.ts";
@@ -309,6 +310,15 @@ async function routeRequest(
     segments[3] === "name"
   ) {
     return handleRenameStreamRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "POST" &&
+    segments[0] === "api" &&
+    segments[1] === "streams" &&
+    segments[2] &&
+    segments[3] === "cwd"
+  ) {
+    return handleSetStreamCwdRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "api" && segments[1] === "streams" && !segments[2]) {
     return handleCreateStreamRoute(runtime, req, res);

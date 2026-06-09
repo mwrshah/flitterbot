@@ -11,12 +11,20 @@ export type DirectoryCompletionsResult = {
 };
 
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
-  .inputValidator((input: { query: string; piSessionId?: string; streamId?: string }) => input)
+  .inputValidator(
+    (input: {
+      query: string;
+      piSessionId?: string;
+      streamId?: string;
+      directoriesOnly?: boolean;
+    }) => input,
+  )
   .handler(async ({ data }): Promise<DirectoryCompletionsResult> => {
     const params = new URLSearchParams([
       ["query", data.query],
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
       ...(data.streamId ? [["streamId", data.streamId] as [string, string]] : []),
+      ...(data.directoriesOnly ? [["directoriesOnly", "true"] as [string, string]] : []),
     ]);
 
     const url = `${BASE_URL.replace(/\/$/, "")}/api/directory-completions?${params}`;

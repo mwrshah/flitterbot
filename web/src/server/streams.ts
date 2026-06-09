@@ -4,18 +4,19 @@ import type { ChatTimelineItem, DownstreamSessionItem } from "~/lib/types";
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
 
-async function streamsRequest(path: string): Promise<unknown> {
+async function streamsRequest(path: string, init?: RequestInit): Promise<unknown> {
   const url = `${BASE_URL.replace(/\/$/, "")}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+    ...(init?.headers as Record<string, string> | undefined),
   };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
 
   try {
-    const res = await fetch(url, { headers, signal: controller.signal });
+    const res = await fetch(url, { ...init, headers, signal: controller.signal });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
   } finally {
@@ -68,6 +69,17 @@ export type StreamInfo = {
   cwd: string | null;
   cwdAbsolute: string | null;
 };
+
+export const setStreamCwd = createServerFn({ method: "POST" })
+  .inputValidator((input: { streamId: string; cwd: string }) => input)
+  .handler(
+    async ({ data }): Promise<{ ok: true; streamId: string; cwd: string; piSessionId: string }> => {
+      return (await streamsRequest(`/api/streams/${encodeURIComponent(data.streamId)}/cwd`, {
+        method: "POST",
+        body: JSON.stringify({ cwd: data.cwd }),
+      })) as { ok: true; streamId: string; cwd: string; piSessionId: string };
+    },
+  );
 
 export const fetchStreamsWorktree = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId: string }) => input)

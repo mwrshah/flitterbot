@@ -25,11 +25,12 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const rawQuery = url.searchParams.get("query") ?? "";
   const streamId = url.searchParams.get("streamId");
+  const directoriesOnly = url.searchParams.get("directoriesOnly") === "true";
   const baseCwd = await resolveBaseCwd(runtime, streamId);
-  const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery);
+  const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery, directoriesOnly);
 
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
-  if (!resolution?.repoRoot || !resolution.searchTerm) {
+  if (directoriesOnly || !resolution?.repoRoot || !resolution.searchTerm) {
     runtime.log(
       `[@] directory query="${rawQuery}" cwd=${baseCwd} → ${directoryItems.length} items`,
     );
@@ -124,6 +125,7 @@ function isUnder(child: string, parent: string): boolean {
 async function listDirectoryCompletionItems(
   cwd: string,
   pathParam: string,
+  directoriesOnly = false,
 ): Promise<DirectoryCompletionItem[]> {
   const isAbsolute = pathParam.startsWith("/");
   const isTilde = pathParam.startsWith("~");
@@ -175,7 +177,7 @@ async function listDirectoryCompletionItems(
     return a.entry.name.localeCompare(b.entry.name);
   };
   const dirs = filtered.filter((t) => t.entry.isDirectory()).sort(cmp);
-  const files = filtered.filter((t) => !t.entry.isDirectory()).sort(cmp);
+  const files = directoriesOnly ? [] : filtered.filter((t) => !t.entry.isDirectory()).sort(cmp);
 
   const sorted = [...dirs, ...files].slice(0, MAX_ITEMS).map((t) => t.entry);
   const displayPrefix = isTilde

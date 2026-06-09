@@ -30,15 +30,21 @@ function createFixture(): string {
   return root;
 }
 
-async function fetchCompletions(cwd: string, query: string): Promise<string[]> {
+async function fetchCompletions(
+  cwd: string,
+  query: string,
+  opts?: { directoriesOnly?: boolean },
+): Promise<string[]> {
   const runtime = {
     log: () => {},
     blackboard: undefined,
     config: { projectsDir: cwd },
     sessionManager: { getDefault: () => ({}) },
   } as unknown as ControlSurfaceRuntime;
+  const params = new URLSearchParams({ query });
+  if (opts?.directoriesOnly) params.set("directoriesOnly", "true");
   const req = {
-    url: `/api/directory-completions?query=${encodeURIComponent(query)}`,
+    url: `/api/directory-completions?${params}`,
   } as http.IncomingMessage;
   let body = "";
   const res = {
@@ -69,6 +75,20 @@ describe("browser directory completions", () => {
       expect(paths).not.toContain(".env.d/");
       expect(paths).not.toContain(".git/");
       expect(paths).not.toContain(".github/");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("can return directories only", async () => {
+    const root = createFixture();
+    try {
+      const paths = await fetchCompletions(root, "", { directoriesOnly: true });
+
+      expect(paths).toContain("src/");
+      expect(paths).toContain("node_modules/");
+      expect(paths).not.toContain("README.md");
+      expect(paths).not.toContain(".gitignore");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

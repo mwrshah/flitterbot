@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import type http from "node:http";
 import type net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { type AssistantMessage, getModel, type TextContent } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
@@ -28,12 +29,14 @@ import {
   getActivePiSessionId,
   getLatestPiSessionId,
   getPiSessionStatus,
+  getStreamById,
   listOpenStreams,
   listRecentlyClosedStreams,
   RECENTLY_CLOSED_WINDOW_HOURS,
   resetClosedStreams,
   setStreamName,
   setStreamPinned,
+  updateStreamRepoPath,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
@@ -1280,6 +1283,69 @@ export class ControlSurfaceRuntime {
       streamName: result.streamName,
       piSessionId: result.orchestrator.piSessionId,
     };
+  }
+
+  async setStreamCwd(
+    streamId: string,
+    cwdInput: string,
+  ): Promise<{ ok: true; streamId: string; cwd: string; piSessionId: string }> {
+    const cwd = this.resolveStreamCwdInput(cwdInput);
+    const stat = fs.statSync(cwd, { throwIfNoEntry: false });
+    if (!stat?.isDirectory())
+      throw new Error(`cwd path "${cwd}" does not exist or is not a directory`);
+
+    const ws = getStreamById(this.blackboard, streamId);
+    if (!ws) throw new Error("Stream not found");
+    if (ws.status !== "open") throw new Error("Stream is not open");
+
+    const managed = this.sessionManager.getByStream(streamId);
+    if (!managed) throw new Error("No orchestrator session for stream");
+    if (managed.state.getSnapshot().busy)
+      throw new Error("Cannot switch cwd while session is busy");
+
+    const switched = await this.sessionManager.switchOrchestratorCwd(streamId, cwd);
+    updateStreamRepoPath(this.blackboard, streamId, cwd);
+    this.blackboard
+      .prepare(
+        `UPDATE pi_sessions
+         SET cwd = ?, last_event_at = ?
+         WHERE pi_session_id = ?`,
+      )
+      .run(cwd, new Date().toISOString(), switched.piSessionId);
+
+    this.wsHub.broadcast({
+      type: "streams_changed",
+      reason: "cwd_changed",
+      streamId,
+      streamName: ws.name,
+    });
+    this.wsHub.broadcast({
+      type: "worktree_changed",
+      piSessionId: switched.piSessionId,
+      streamId,
+    });
+    this.wsHub.broadcast({
+      type: "status_changed",
+      subsystem: "pi_session",
+      timestamp: new Date().toISOString(),
+    });
+    this.log(`stream cwd switched "${ws.name}" (${streamId}) → ${cwd}`);
+    return { ok: true, streamId, cwd, piSessionId: switched.piSessionId };
+  }
+
+  private resolveStreamCwdInput(input: string): string {
+    const raw = input.trim().replace(/^@/, "");
+    if (!raw) return path.resolve(this.config.projectsDir);
+    const expanded = raw.startsWith("~")
+      ? path.resolve(os.homedir(), raw === "~" ? "." : raw.slice(2))
+      : path.isAbsolute(raw)
+        ? path.resolve(raw)
+        : path.resolve(this.config.projectsDir, raw);
+    const rel = path.relative(os.homedir(), expanded);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error("cwd must stay under the home directory");
+    }
+    return expanded;
   }
 
   async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {

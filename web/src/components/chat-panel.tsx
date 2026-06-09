@@ -1,13 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
-import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
 import {
   Dialog,
   DialogClose,
@@ -29,16 +35,18 @@ import {
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
-import { streamsWorktreeQueryOptions } from "~/lib/queries";
+import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  DirectoryCompletionItem,
   ImageAttachment,
   StatusResponse,
   ThinkingLevel,
 } from "~/lib/types";
+import { setStreamCwd } from "~/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
@@ -71,6 +79,96 @@ function QueuedBusyOverlay({ text }: { text: string }) {
           {text}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CwdPicker({
+  open,
+  value,
+  items,
+  pending,
+  onValueChange,
+  onDrill,
+  onCommit,
+  onEscape,
+}: {
+  open: boolean;
+  value: string;
+  items: DirectoryCompletionItem[];
+  pending: boolean;
+  onValueChange: (value: string) => void;
+  onDrill: (item: DirectoryCompletionItem) => void;
+  onCommit: () => void;
+  onEscape: () => void;
+}) {
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onEscape();
+        return;
+      }
+      if (event.key === "Enter" && /\s$/.test(value)) {
+        event.preventDefault();
+        event.stopPropagation();
+        onCommit();
+      }
+    },
+    [onCommit, onEscape, value],
+  );
+
+  if (!open) return null;
+
+  return (
+    <div className="absolute left-0 top-full z-50 mt-1 w-[min(32rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg">
+      <Command
+        shouldFilter={false}
+        loop
+        onKeyDownCapture={handleKeyDown}
+        className="rounded-md border-0 shadow-none"
+      >
+        <div className="flex items-center gap-1">
+          <CommandInput
+            autoFocus
+            value={value}
+            onValueChange={onValueChange}
+            placeholder="@../project/"
+            className="font-mono text-xs"
+          />
+          <button
+            type="button"
+            onClick={onCommit}
+            disabled={pending}
+            className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            title="switch cwd to this path"
+          >
+            →
+          </button>
+        </div>
+        <CommandList className="max-h-56 overflow-y-auto p-1">
+          {items.length === 0 && (
+            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
+              No subdirectories
+            </CommandEmpty>
+          )}
+          {items.map((item) => (
+            <CommandItem
+              key={item.path}
+              value={item.path}
+              onSelect={() => onDrill(item)}
+              className="cursor-pointer rounded-md px-3 py-1.5 text-sm data-[selected=true]:bg-muted [&>svg]:hidden"
+            >
+              <span className="shrink-0">📁</span>
+              <span className="truncate font-mono text-xs">{item.name}</span>
+              <span className="ml-auto truncate text-xs text-muted-foreground">
+                {item.insertText}
+              </span>
+            </CommandItem>
+          ))}
+        </CommandList>
+      </Command>
     </div>
   );
 }
@@ -139,6 +237,48 @@ export function ChatPanel({
   const cwdShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyCurrentDirectory, { compact: true }) ||
     "c then d";
+  const [cwdPickerOpen, setCwdPickerOpen] = useState(false);
+  const [cwdPickerValue, setCwdPickerValue] = useState("@");
+  const cwdPickerQuery = cwdPickerValue.replace(/^@/, "").trimStart();
+  const { data: cwdPickerResult } = useQuery(
+    directoryCompletionsQueryOptions(cwdPickerQuery, cwdPickerOpen, { directoriesOnly: true }),
+  );
+  const cwdPickerItems = cwdPickerResult?.items ?? [];
+
+  const switchCwdMutation = useMutation({
+    mutationFn: (cwd: string) => {
+      if (!streamId) throw new Error("No stream selected");
+      return setStreamCwd({ data: { streamId, cwd } });
+    },
+    onSuccess: async () => {
+      toast.success("cwd switched");
+      setCwdPickerOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["streams-worktree", piSessionId] }),
+        queryClient.invalidateQueries({ queryKey: ["status"] }),
+        queryClient.invalidateQueries({ queryKey: ["directory-completions"] }),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to switch cwd: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  });
+
+  const commitCwdPicker = useCallback(() => {
+    const value = cwdPickerValue.replace(/^@/, "").trim();
+    switchCwdMutation.mutate(value);
+  }, [cwdPickerValue, switchCwdMutation.mutate]);
+
+  const drillCwdPicker = useCallback((item: DirectoryCompletionItem) => {
+    setCwdPickerValue(`@${item.insertText}`);
+  }, []);
+
+  const openCwdPicker = useCallback(() => {
+    setCwdPickerValue("@");
+    setCwdPickerOpen(true);
+  }, []);
 
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
@@ -468,13 +608,25 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
-              <span className="flex items-center gap-1 min-w-0">
-                <CopyableCode
-                  text={cwdAbsolute}
-                  displayText={worktree.cwd}
-                  copied={cwdCopy.copied}
-                  onCopy={() => cwdCopy.copy(cwdAbsolute)}
-                  className="text-muted-foreground"
+              <span className="relative flex items-center gap-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={streamId ? openCwdPicker : undefined}
+                  disabled={!streamId}
+                  className="inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-muted/60"
+                  title={streamId ? `switch cwd from ${cwdAbsolute}` : cwdAbsolute}
+                >
+                  <span>{worktree.cwd}</span>
+                </button>
+                <CwdPicker
+                  open={cwdPickerOpen}
+                  value={cwdPickerValue}
+                  items={cwdPickerItems}
+                  pending={switchCwdMutation.isPending}
+                  onValueChange={setCwdPickerValue}
+                  onDrill={drillCwdPicker}
+                  onCommit={commitCwdPicker}
+                  onEscape={() => setCwdPickerOpen(false)}
                 />
                 {cwdCopy.copied ? (
                   <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
