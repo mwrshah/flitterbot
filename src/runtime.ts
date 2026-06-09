@@ -1302,6 +1302,13 @@ export class ControlSurfaceRuntime {
     if (!managed) throw new Error("No orchestrator session for stream");
     if (managed.state.getSnapshot().busy)
       throw new Error("Cannot switch cwd while session is busy");
+    if (!managed.runtime) {
+      this.log(`activating dormant orchestrator for cwd switch stream=${streamId}`);
+      await this.sessionManager.activateOrchestrator(
+        managed,
+        this.createCustomTools("orchestrator", streamId),
+      );
+    }
 
     const switched = await this.sessionManager.switchOrchestratorCwd(streamId, cwd);
     updateStreamRepoPath(this.blackboard, streamId, cwd);
