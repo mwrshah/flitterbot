@@ -5,6 +5,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -119,20 +120,20 @@ function CwdPicker({
   onCommit: () => void;
   onEscape: () => void;
 }) {
-  const collapseAndBlur = useCallback(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    onEscape();
-  }, [onEscape]);
+  const [selectedValue, setSelectedValue] = useState("");
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    setSelectedValue(items[0]?.path ?? "");
+    const list = pickerRef?.current?.querySelector<HTMLElement>("[cmdk-list-sizer]")?.parentElement;
+    if (list) list.scrollTop = 0;
+  }, [open, items, pickerRef]);
 
   const handleValueChange = useCallback(
     (nextValue: string) => {
-      if (!nextValue) {
-        collapseAndBlur();
-        return;
-      }
-      onValueChange(nextValue);
+      onValueChange(`@${nextValue.replace(/^@+/, "")}`);
     },
-    [collapseAndBlur, onValueChange],
+    [onValueChange],
   );
 
   const handleKeyDown = useCallback(
@@ -162,6 +163,8 @@ function CwdPicker({
       <Command
         shouldFilter={false}
         loop
+        value={selectedValue}
+        onValueChange={setSelectedValue}
         onKeyDownCapture={handleKeyDown}
         className="rounded-md border-0 shadow-none"
       >
