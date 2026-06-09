@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
+  type CSSProperties,
   type KeyboardEvent,
   type RefObject,
   useCallback,
@@ -101,6 +102,7 @@ function dirFromPath(path: string, name: string): string {
 
 function CwdPicker({
   pickerRef,
+  pickerStyle,
   open,
   value,
   items,
@@ -111,6 +113,7 @@ function CwdPicker({
   onEscape,
 }: {
   pickerRef?: RefObject<HTMLDivElement | null>;
+  pickerStyle?: CSSProperties;
   open: boolean;
   value: string;
   items: DirectoryCompletionItem[];
@@ -158,7 +161,8 @@ function CwdPicker({
   return (
     <div
       ref={pickerRef}
-      className="absolute left-0 top-full z-50 mt-1 w-[min(36rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg"
+      style={pickerStyle}
+      className="absolute top-full z-50 mt-1 rounded-lg border border-border bg-background p-1 shadow-lg"
     >
       <Command
         shouldFilter={false}
@@ -285,8 +289,10 @@ export function ChatPanel({
     "c then d";
   const [cwdPickerOpen, setCwdPickerOpen] = useState(false);
   const [cwdPickerValue, setCwdPickerValue] = useState("@");
+  const cwdPickerHeaderRef = useRef<HTMLDivElement>(null);
   const cwdPickerAnchorRef = useRef<HTMLSpanElement>(null);
   const cwdPickerRef = useRef<HTMLDivElement>(null);
+  const [cwdPickerStyle, setCwdPickerStyle] = useState<CSSProperties>();
   const cwdPickerQuery = cwdPickerValue.replace(/^@/, "").trimStart();
   const { data: cwdPickerResult } = useQuery(
     directoryCompletionsQueryOptions(cwdPickerQuery, cwdPickerOpen, { directoriesOnly: true }),
@@ -327,6 +333,35 @@ export function ChatPanel({
     setCwdPickerValue("@");
     setCwdPickerOpen(true);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!cwdPickerOpen) return;
+
+    const updatePickerStyle = () => {
+      const header = cwdPickerHeaderRef.current;
+      const anchor = cwdPickerAnchorRef.current;
+      if (!header || !anchor) return;
+
+      const headerRect = header.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      const maxWidth = Math.min(36 * 16, headerRect.width);
+      const anchorLeft = anchorRect.left - headerRect.left;
+      const left = Math.max(0, Math.min(anchorLeft, headerRect.width - maxWidth));
+
+      setCwdPickerStyle({ left, width: maxWidth });
+    };
+
+    updatePickerStyle();
+
+    const header = cwdPickerHeaderRef.current;
+    const resizeObserver = new ResizeObserver(updatePickerStyle);
+    if (header) resizeObserver.observe(header);
+    window.addEventListener("resize", updatePickerStyle);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updatePickerStyle);
+    };
+  }, [cwdPickerOpen]);
 
   useEffect(() => {
     if (!cwdPickerOpen) return;
@@ -665,7 +700,10 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3">
+      <div
+        ref={cwdPickerHeaderRef}
+        className="relative flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3"
+      >
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="text-sm font-semibold text-foreground truncate">
             {streamName ?? "flitterbot"}
@@ -683,17 +721,6 @@ export function ChatPanel({
                 >
                   <span>{worktree.cwd}</span>
                 </button>
-                <CwdPicker
-                  pickerRef={cwdPickerRef}
-                  open={cwdPickerOpen}
-                  value={cwdPickerValue}
-                  items={cwdPickerItems}
-                  pending={switchCwdMutation.isPending}
-                  onValueChange={setCwdPickerValue}
-                  onDrill={drillCwdPicker}
-                  onCommit={commitCwdPicker}
-                  onEscape={() => setCwdPickerOpen(false)}
-                />
                 {cwdCopy.copied ? (
                   <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
                 ) : (
@@ -703,6 +730,18 @@ export function ChatPanel({
             </>
           )}
         </div>
+        <CwdPicker
+          pickerRef={cwdPickerRef}
+          pickerStyle={cwdPickerStyle}
+          open={cwdPickerOpen}
+          value={cwdPickerValue}
+          items={cwdPickerItems}
+          pending={switchCwdMutation.isPending}
+          onValueChange={setCwdPickerValue}
+          onDrill={drillCwdPicker}
+          onCommit={commitCwdPicker}
+          onEscape={() => setCwdPickerOpen(false)}
+        />
       </div>
 
       <PanelGroup
