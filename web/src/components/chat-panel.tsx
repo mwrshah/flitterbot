@@ -83,6 +83,13 @@ function QueuedBusyOverlay({ text }: { text: string }) {
   );
 }
 
+function dirFromPath(path: string, name: string): string {
+  const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
+  if (cleanPath.endsWith(`/${name}`)) return cleanPath.slice(0, -(name.length + 1));
+  if (cleanPath === name) return "";
+  return cleanPath;
+}
+
 function CwdPicker({
   open,
   value,
@@ -102,6 +109,22 @@ function CwdPicker({
   onCommit: () => void;
   onEscape: () => void;
 }) {
+  const collapseAndBlur = useCallback(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    onEscape();
+  }, [onEscape]);
+
+  const handleValueChange = useCallback(
+    (nextValue: string) => {
+      if (!nextValue) {
+        collapseAndBlur();
+        return;
+      }
+      onValueChange(nextValue);
+    },
+    [collapseAndBlur, onValueChange],
+  );
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === "Escape") {
@@ -122,18 +145,18 @@ function CwdPicker({
   if (!open) return null;
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-1 w-[min(32rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg">
+    <div className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,calc(100vw-3rem))] rounded-lg border border-border bg-background p-1 shadow-lg">
       <Command
         shouldFilter={false}
         loop
         onKeyDownCapture={handleKeyDown}
         className="rounded-md border-0 shadow-none"
       >
-        <div className="flex items-center gap-1">
+        <div className="flex w-full items-center gap-1 [&_[data-slot=command-input-wrapper]]:min-w-0 [&_[data-slot=command-input-wrapper]]:flex-1">
           <CommandInput
             autoFocus
             value={value}
-            onValueChange={onValueChange}
+            onValueChange={handleValueChange}
             placeholder="@../project/"
             className="font-mono text-xs"
           />
@@ -147,26 +170,33 @@ function CwdPicker({
             →
           </button>
         </div>
-        <CommandList className="max-h-56 overflow-y-auto p-1">
+        <CommandList className="max-h-48 overflow-y-auto p-1">
           {items.length === 0 && (
             <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
-              No subdirectories
+              No matching paths
             </CommandEmpty>
           )}
-          {items.map((item) => (
-            <CommandItem
-              key={item.path}
-              value={item.path}
-              onSelect={() => onDrill(item)}
-              className="cursor-pointer rounded-md px-3 py-1.5 text-sm data-[selected=true]:bg-muted [&>svg]:hidden"
-            >
-              <span className="shrink-0">📁</span>
-              <span className="truncate font-mono text-xs">{item.name}</span>
-              <span className="ml-auto truncate text-xs text-muted-foreground">
-                {item.insertText}
-              </span>
-            </CommandItem>
-          ))}
+          {items.map((item) => {
+            const dir = dirFromPath(item.path, item.name);
+            return (
+              <CommandItem
+                key={item.path}
+                value={item.path}
+                onSelect={() => onDrill(item)}
+                className="!flex !flex-col !items-start gap-0 rounded-md px-3 py-1.5 text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
+              >
+                <span className="flex items-baseline gap-2 min-w-0">
+                  <span className="shrink-0">📁</span>
+                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
+                </span>
+                {dir && (
+                  <span className="max-w-full truncate pl-[calc(1em+0.5rem)] text-xs text-muted-foreground">
+                    {dir}
+                  </span>
+                )}
+              </CommandItem>
+            );
+          })}
         </CommandList>
       </Command>
     </div>
