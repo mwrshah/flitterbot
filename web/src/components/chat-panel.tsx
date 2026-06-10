@@ -344,11 +344,11 @@ export function ChatPanel({
 
       const headerRect = header.getBoundingClientRect();
       const anchorRect = anchor.getBoundingClientRect();
-      const maxWidth = Math.min(36 * 16, headerRect.width);
+      const width = Math.min(28 * 16, headerRect.width);
       const anchorLeft = anchorRect.left - headerRect.left;
-      const left = Math.max(0, Math.min(anchorLeft, headerRect.width - maxWidth));
+      const left = Math.max(0, Math.min(anchorLeft, headerRect.width - width));
 
-      setCwdPickerStyle({ left, width: maxWidth });
+      setCwdPickerStyle({ left, width });
     };
 
     updatePickerStyle();
