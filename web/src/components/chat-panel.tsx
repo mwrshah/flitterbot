@@ -678,7 +678,6 @@ export function ChatPanel({
     }
     if (streamHasWorktree) {
       const buttons: MessageInputHoverButton[] = [
-        { id: "compact-session", label: "compact session", insertText: "/compact " },
         { id: "close-merge", label: "close (merge)", insertText: "ship it" },
         {
           id: "close-no-git-ops",
@@ -693,15 +692,16 @@ export function ChatPanel({
           insertText: `Pls commit all changes in ${worktree.worktreePath}, then merge the current worktree branch ${worktree.branch} (using bash tool) into branch "${worktree.baseBranch}".`,
         });
       }
+      buttons.push({ id: "compact-session", label: "compact session", insertText: "/compact " });
       return buttons;
     }
     return [
-      { id: "compact-session", label: "compact session", insertText: "/compact " },
       {
         id: "close-stream",
         label: "close stream",
         insertText: "close stream with the no-op option",
       },
+      { id: "compact-session", label: "compact session", insertText: "/compact " },
     ];
   }, [streamHasWorktree, streamId, worktree?.baseBranch, worktree?.branch, worktree?.worktreePath]);
 
