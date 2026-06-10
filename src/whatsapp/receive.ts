@@ -13,7 +13,7 @@ import {
   resolveInboundContextRef,
 } from "../blackboard/write-whatsapp.ts";
 import { loadConfig } from "../config/load-config.ts";
-import { resolveRecipientJid } from "./config.ts";
+import { resolveUserForJid } from "./config.ts";
 
 const logger = pino({ level: process.env.FLITTERBOT_WA_LOG_LEVEL ?? "info" });
 const OUTBOUND_ECHO_WINDOW_MS = 5_000;
@@ -92,13 +92,17 @@ function extractQuotedWaMessageId(message: WAMessage): string | undefined {
 
 export function getInboundMessageRejectionReason(
   message: WAMessage,
-  allowedJids?: Set<string>,
+  acceptedInboundJids?: Set<string>,
 ): string | undefined {
+  if (message.key.fromMe) {
+    return undefined;
+  }
+
   const remoteJid = message.key.remoteJid;
   if (!remoteJid) {
     return "missing_remote_jid";
   }
-  const accepted = allowedJids ?? new Set([resolveRecipientJid()]);
+  const accepted = acceptedInboundJids ?? new Set(resolveUserForJid(remoteJid) ? [remoteJid] : []);
   if (!accepted.has(remoteJid)) {
     return `unexpected_remote_jid:${remoteJid}`;
   }
@@ -132,6 +136,7 @@ async function forwardInboundToControlSurface(input: {
           wa_message_id: input.waMessageId,
           context_ref: input.contextRef,
           remote_jid: input.remoteJid,
+          whatsapp_user_id: resolveUserForJid(input.remoteJid)?.userId,
         },
       }),
     });
@@ -184,7 +189,8 @@ export async function persistInboundMessage(
   message: WAMessage,
 ): Promise<{ body?: string; contextRef?: string; rowId?: number }> {
   const waMessageId = message.key.id ?? undefined;
-  const remoteJid = message.key.remoteJid ?? resolveRecipientJid();
+  const remoteJid = message.key.remoteJid ?? "";
+  const whatsappUserId = resolveUserForJid(remoteJid)?.userId;
 
   const body = extractConversationBody(message);
   if (!body) {
@@ -241,6 +247,7 @@ export async function persistInboundMessage(
         rowId: row.id,
         waMessageId,
         remoteJid: row.remote_jid,
+        whatsappUserId,
         contextRef,
         quotedWaMessageId,
         bodyPreview: previewBody(body),

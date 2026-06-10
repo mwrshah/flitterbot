@@ -30,9 +30,11 @@ import {
   getLatestPiSessionId,
   getPiSessionStatus,
   getStreamById,
+  getStreamByName,
   listOpenStreams,
   listRecentlyClosedStreams,
   RECENTLY_CLOSED_WINDOW_HOURS,
+  reopenStream as reopenStreamRow,
   resetClosedStreams,
   setStreamName,
   setStreamPinned,
@@ -77,7 +79,7 @@ import {
 } from "./streams/worktree-link.ts";
 import { fireAndForgetPeriodicTaskSync } from "./tasks/periodic-sync.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
-import { resolveRecipientJid } from "./whatsapp/config.ts";
+import { loadWhatsAppConfig } from "./whatsapp/config.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
 import {
@@ -218,7 +220,7 @@ export class ControlSurfaceRuntime {
     if (openStreams.length > 0) {
       this.log(`rehydrated ${openStreams.length} orchestrator(s) for open streams`);
     }
-    this.bootstrapMissingStreamWhatsAppOwners(openStreams);
+    await this.ensureWhatsAppUserDefaultStreams();
 
     await this.ensureWhatsAppDaemon();
     await this.refreshWhatsAppStatus();
@@ -1044,8 +1046,7 @@ export class ControlSurfaceRuntime {
 
     const streamId = meta?.stream_id as string | undefined;
     if (streamId && meta?.router_action === "matched") {
-      const existing = this.sessionManager.getByStream(streamId);
-      if (existing) return existing;
+      return this.sessionManager.getByStream(streamId);
     }
 
     return this.sessionManager.getDefault();
@@ -1160,11 +1161,15 @@ export class ControlSurfaceRuntime {
           : surfaceText;
 
       try {
+        const targetUserId =
+          managed.role === "orchestrator"
+            ? whatsappUserIdFromStreamName(managed.streamName)
+            : metadataString(item.metadata, "whatsapp_user_id");
         await this.sendWhatsAppCommand({
           command: "send",
           text: waText,
           contextRef: undefined,
-          remoteJid: managed.role === "orchestrator" ? managed.whatsappRemoteJid : itemRemoteJid,
+          ...(targetUserId ? { targetUserId } : { remoteJid: itemRemoteJid }),
         });
       } catch (error) {
         this.log(
@@ -1493,51 +1498,37 @@ export class ControlSurfaceRuntime {
     return { ok: true, piSessionId, messageCount: newCount };
   }
 
-  private bootstrapMissingStreamWhatsAppOwners(streams: ReturnType<typeof listOpenStreams>): void {
-    if (!this.whatsappEnabled || streams.length === 0) return;
+  private async ensureWhatsAppUserDefaultStreams(): Promise<void> {
+    if (!this.whatsappEnabled) return;
 
-    let defaultRemoteJid: string;
-    try {
-      defaultRemoteJid = resolveRecipientJid();
-    } catch (error) {
-      this.log(
-        `stream WhatsApp owner bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
+    const config = loadWhatsAppConfig();
+    for (const userId of Object.keys(config.users)) {
+      const streamName = `flitterbot: ${userId}`;
+      let stream = getStreamByName(this.blackboard, streamName);
 
-    let bootstrapped = 0;
-    for (const stream of streams) {
-      const managed = this.sessionManager.getByStream(stream.id);
-      if (managed?.whatsappRemoteJid) continue;
-
-      const existingOwner = this.blackboard.get<{ id: string }>(
-        `SELECT id
-         FROM messages
-         WHERE stream_id = ?
-           AND metadata LIKE '%"stream_owner_remote_jid"%'
-         ORDER BY datetime(created_at) DESC
-         LIMIT 1`,
-        stream.id,
-      );
-      if (existingOwner) continue;
-
-      if (managed) {
-        managed.whatsappRemoteJid = defaultRemoteJid;
+      if (stream?.status === "closed") {
+        stream = reopenStreamRow(this.blackboard, stream.id);
+        if (stream) {
+          this.log(`reopened WhatsApp default stream for user "${userId}" (${stream.id})`);
+        }
       }
-      const piSessionId = managed?.piSessionId ?? getActivePiSessionId(this.blackboard, stream.id);
-      this.persistStreamWhatsAppOwner(
+
+      if (!stream) {
+        const created = await this.createStreamProgrammatic({ name: streamName });
+        this.log(`created WhatsApp default stream for user "${userId}" (${created.streamId})`);
+        continue;
+      }
+
+      const managed = this.sessionManager.getByStream(stream.id);
+      if (managed) continue;
+
+      this.log(`creating missing WhatsApp default orchestrator for user "${userId}"`);
+      await this.sessionManager.createOrchestrator(
         stream.id,
         stream.name,
-        piSessionId,
-        defaultRemoteJid,
-        "WhatsApp stream owner bootstrapped to default recipient.",
+        stream.repo_path ?? undefined,
+        this.createCustomTools("orchestrator", stream.id),
       );
-      bootstrapped += 1;
-    }
-
-    if (bootstrapped > 0) {
-      this.log(`bootstrapped WhatsApp owner for ${bootstrapped} existing stream(s)`);
     }
   }
 
@@ -2295,11 +2286,12 @@ export class ControlSurfaceRuntime {
                 `Turn stuck for ${ageSeconds}s (${label})`,
                 30,
               );
-              const remoteJid =
+              const targetUserId =
                 managed.role === "orchestrator"
-                  ? managed.whatsappRemoteJid
-                  : extractRemoteJid(snapshot.currentItem?.metadata);
-              if (!remoteJid) {
+                  ? whatsappUserIdFromStreamName(managed.streamName)
+                  : metadataString(snapshot.currentItem?.metadata, "whatsapp_user_id");
+              const remoteJid = extractRemoteJid(snapshot.currentItem?.metadata);
+              if (!targetUserId && !remoteJid) {
                 this.log(`stuck-turn WhatsApp alert skipped: no WhatsApp reply target (${label})`);
                 continue;
               }
@@ -2307,7 +2299,7 @@ export class ControlSurfaceRuntime {
                 command: "send",
                 text: `⚠️ Stuck turn detected: ${label} — stuck for ${Math.round(age / 60_000)}min. Cron paused via circuit breaker (30min TTL).`,
                 contextRef: undefined,
-                remoteJid,
+                ...(targetUserId ? { targetUserId } : { remoteJid }),
               }).catch((err) => {
                 this.log(
                   `stuck-turn WhatsApp alert failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -2499,6 +2491,11 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
 function metadataString(metadata: MessageMetadata | undefined, key: string): string | undefined {
   const value = metadata?.[key];
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function whatsappUserIdFromStreamName(streamName: string | null | undefined): string | undefined {
+  const prefix = "flitterbot: ";
+  return streamName?.startsWith(prefix) ? streamName.slice(prefix.length).trim() : undefined;
 }
 
 function extractRemoteJid(metadata?: MessageMetadata): string | undefined {

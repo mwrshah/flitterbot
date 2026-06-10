@@ -9,6 +9,7 @@ export async function sendWhatsAppViaDaemon(
     text: request.text,
     contextRef: request.contextRef,
     remoteJid: request.remoteJid,
+    targetUserId: request.targetUserId,
   });
 
   return {
