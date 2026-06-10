@@ -111,6 +111,19 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ piSessionId, entryId }),
       }),
 
+    compactPiSession: (piSessionId: string, customInstructions?: string) =>
+      request<{
+        ok: true;
+        piSessionId: string;
+        messageCount: number;
+        summary: string;
+        firstKeptEntryId: string;
+        tokensBefore: number;
+      }>("/api/streams/compact", {
+        method: "POST",
+        body: JSON.stringify({ piSessionId, customInstructions }),
+      }),
+
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
     listModels: () => request<ModelsListResponse>("/api/models"),

@@ -59,11 +59,11 @@ describe("buildClassificationPrompts", () => {
     expect(prompts.userPrompt).not.toContain("[web]");
   });
 
-  test("documents default routing for clear and reload commands", () => {
+  test("documents default routing for built-in session commands", () => {
     const prompts = buildClassificationPrompts("/clear", [stream()], new Map());
 
     expect(prompts.systemPrompt).toContain(
-      "If the user message is exactly /clear or /reload, return stream_id: null",
+      "If the user message is exactly /clear, /reload, or /compact",
     );
   });
 

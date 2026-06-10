@@ -669,10 +669,16 @@ export function ChatPanel({
           label: "clear session",
           insertText: "/clear ",
         },
+        {
+          id: "compact-session",
+          label: "compact session",
+          insertText: "/compact ",
+        },
       ];
     }
     if (streamHasWorktree) {
       const buttons: MessageInputHoverButton[] = [
+        { id: "compact-session", label: "compact session", insertText: "/compact " },
         { id: "close-merge", label: "close (merge)", insertText: "ship it" },
         {
           id: "close-no-git-ops",
@@ -690,6 +696,7 @@ export function ChatPanel({
       return buttons;
     }
     return [
+      { id: "compact-session", label: "compact session", insertText: "/compact " },
       {
         id: "close-stream",
         label: "close stream",
