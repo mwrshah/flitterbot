@@ -33,12 +33,14 @@ function createRuntime(worktreePath: string): ControlSurfaceRuntime {
   const stream: StreamRow = {
     id: "stream-1",
     name: "feature",
+    type: "work",
     repo_path: worktreePath,
     worktree_path: worktreePath,
     base_branch: "main",
     status: "open",
     created_at: "2026-01-01 00:00:00",
     closed_at: null,
+    pinned: false,
   };
   const blackboard = {
     get: () => stream,

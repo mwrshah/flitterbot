@@ -3,7 +3,7 @@ import {
   getRecentConversationByWorkstream,
   getRecentDefaultConversation,
 } from "../blackboard/query-messages.ts";
-import { getLatestStreamCreatedAt, listOpenStreams } from "../blackboard/query-streams.ts";
+import { getLatestStreamCreatedAt, listOpenWorkStreams } from "../blackboard/query-streams.ts";
 import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompts } from "../prompts/classifier.ts";
 import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
@@ -35,7 +35,7 @@ export async function classifyMessage(
     return { stream: null, action: "none" };
   }
 
-  const streams = listOpenStreams(db);
+  const streams = listOpenWorkStreams(db);
   if (streams.length === 0) {
     console.log("[router] short-circuit: no open streams, routing to default");
     return { stream: null, action: "none" };

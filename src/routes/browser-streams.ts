@@ -90,7 +90,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     const piSessionIds: string[] = [];
     const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
     if (defaultPiSessionId) piSessionIds.push(defaultPiSessionId);
-    for (const orch of runtime.sessionManager.listOrchestrators()) {
+    for (const orch of runtime.sessionManager.listStreamSessions()) {
       if (orch.piSessionId) piSessionIds.push(orch.piSessionId);
     }
     const closedStreams = listRecentlyClosedStreams(

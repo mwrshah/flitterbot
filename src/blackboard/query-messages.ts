@@ -189,7 +189,7 @@ export function getRecentConversationByWorkstream(
               m.content, m.source, m.created_at, m.direction, m.sender,
               ROW_NUMBER() OVER (PARTITION BY m.stream_id ORDER BY m.created_at DESC) AS rn
        FROM messages m
-       JOIN streams w ON w.id = m.stream_id AND w.status = 'open'
+       JOIN streams w ON w.id = m.stream_id AND w.status = 'open' AND w.type = 'work'
        WHERE (m.source IN ('web', 'whatsapp') AND m.direction = 'inbound' AND m.sender = 'user')
           OR (m.source = 'stream_outbound' AND m.direction = 'outbound')
      )

@@ -38,6 +38,7 @@ import {
   resetClosedStreams,
   setStreamName,
   setStreamPinned,
+  setStreamType,
   updateStreamRepoPath,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
@@ -202,7 +203,7 @@ export class ControlSurfaceRuntime {
       );
 
       if (streamsRow) {
-        this.sessionManager.rehydrateOrchestrator(
+        this.sessionManager.rehydrateStreamSession(
           ws.id,
           ws.name,
           streamsRow.pi_session_id,
@@ -213,12 +214,12 @@ export class ControlSurfaceRuntime {
         );
       } else {
         this.log(
-          `skipping orchestrator spawn for open stream "${ws.name}" (${ws.id}) — no alive pi_session; awaiting explicit Recover`,
+          `skipping stream session spawn for open stream "${ws.name}" (${ws.id}) — no alive pi_session; awaiting explicit Recover`,
         );
       }
     }
     if (openStreams.length > 0) {
-      this.log(`rehydrated ${openStreams.length} orchestrator(s) for open streams`);
+      this.log(`rehydrated ${openStreams.length} stream session(s) for open streams`);
     }
     await this.ensureWhatsAppUserDefaultStreams();
 
@@ -655,10 +656,10 @@ export class ControlSurfaceRuntime {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
 
-    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
-      await this.sessionManager.activateOrchestrator(
+    if (!managed.runtime && managed.role !== "default" && managed.streamId) {
+      await this.sessionManager.activateStreamSession(
         managed,
-        this.createCustomTools("orchestrator", managed.streamId),
+        this.createStreamSessionTools(managed.streamId),
       );
     }
 
@@ -748,10 +749,10 @@ export class ControlSurfaceRuntime {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
 
-    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
-      await this.sessionManager.activateOrchestrator(
+    if (!managed.runtime && managed.role !== "default" && managed.streamId) {
+      await this.sessionManager.activateStreamSession(
         managed,
-        this.createCustomTools("orchestrator", managed.streamId),
+        this.createStreamSessionTools(managed.streamId),
       );
     }
 
@@ -805,7 +806,7 @@ export class ControlSurfaceRuntime {
     const whatsapp = this.getWhatsAppStatusSnapshot();
     const blackboardStatus = pingBlackboard(this.blackboard) ? "ok" : "error";
 
-    const orchestratorStatuses = this.sessionManager.listOrchestrators().map((o) => {
+    const orchestratorStatuses = this.sessionManager.listStreamSessions().map((o) => {
       const snap = o.state.getSnapshot();
       return {
         piSessionId: o.piSessionId,
@@ -871,6 +872,7 @@ export class ControlSurfaceRuntime {
           return {
             id: ws.id,
             name: ws.name,
+            type: ws.type,
             status: "open" as const,
             pinned: Boolean(ws.pinned),
             repoPath: ws.repo_path ?? undefined,
@@ -889,6 +891,7 @@ export class ControlSurfaceRuntime {
         ...closedStreams.map(({ stream: ws, piSessionId }) => ({
           id: ws.id,
           name: ws.name,
+          type: ws.type,
           status: "closed" as const,
           pinned: Boolean(ws.pinned),
           closedAt: ws.closed_at ?? undefined,
@@ -1074,11 +1077,11 @@ export class ControlSurfaceRuntime {
   }
 
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
-    if (!managed.runtime && managed.role === "orchestrator" && managed.streamId) {
-      this.log(`activating dormant orchestrator for stream ${managed.streamId}`);
-      await this.sessionManager.activateOrchestrator(
+    if (!managed.runtime && managed.role !== "default" && managed.streamId) {
+      this.log(`activating dormant stream session for stream ${managed.streamId}`);
+      await this.sessionManager.activateStreamSession(
         managed,
-        this.createCustomTools("orchestrator", managed.streamId),
+        this.createStreamSessionTools(managed.streamId),
       );
     }
 
@@ -1170,10 +1173,7 @@ export class ControlSurfaceRuntime {
         this.wsHub.broadcast(surfacedPayload);
       }
 
-      const surfaceText =
-        managed.role === "orchestrator" && managed.streamName
-          ? `*[${managed.streamName}]* ${finalText}`
-          : finalText;
+      const surfaceText = managed.streamName ? `*[${managed.streamName}]* ${finalText}` : finalText;
 
       const MAX_WHATSAPP_LENGTH = 60_000;
       const waText =
@@ -1182,10 +1182,9 @@ export class ControlSurfaceRuntime {
           : surfaceText;
 
       try {
-        const targetUserId =
-          managed.role === "orchestrator"
-            ? whatsappUserIdFromStreamName(managed.streamName)
-            : metadataString(item.metadata, "whatsapp_user_id");
+        const targetUserId = managed.streamId
+          ? whatsappUserIdFromStreamName(managed.streamName)
+          : metadataString(item.metadata, "whatsapp_user_id");
         await this.sendWhatsAppCommand({
           command: "send",
           text: waText,
@@ -1220,12 +1219,13 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  private async spawnStreamWithOrchestrator(opts: {
+  private async spawnStreamWithSession(opts: {
     name: string;
     cwd: string;
+    type?: "work" | "defaultStream";
     rollbackOnSpawnFailure: boolean;
   }): Promise<
-    | { ok: true; streamId: string; streamName: string; orchestrator: ManagedPiSession }
+    | { ok: true; streamId: string; streamName: string; managed: ManagedPiSession }
     | { ok: false; streamId: string | null; streamName: string; spawnError: Error }
   > {
     const { insertStream, enrichStream, deleteStream } = await import(
@@ -1236,40 +1236,48 @@ export class ControlSurfaceRuntime {
       throw new Error(`cwd path "${opts.cwd}" does not exist`);
     }
 
-    const ws = insertStream(this.blackboard, opts.name);
+    const ws = insertStream(this.blackboard, opts.name, opts.type ?? "work");
     enrichStream(this.blackboard, ws.id, opts.cwd);
 
     try {
-      const orchestrator = await this.sessionManager.createOrchestrator(
-        ws.id,
-        ws.name,
-        opts.cwd,
-        this.createCustomTools("orchestrator", ws.id),
-      );
+      const managed =
+        opts.type === "defaultStream"
+          ? await this.sessionManager.createDefaultStream(
+              ws.id,
+              ws.name,
+              opts.cwd,
+              this.createCustomTools("default", ws.id),
+            )
+          : await this.sessionManager.createOrchestrator(
+              ws.id,
+              ws.name,
+              opts.cwd,
+              this.createCustomTools("orchestrator", ws.id),
+            );
       this.wsHub.broadcast({
         type: "streams_changed",
         reason: "created",
         streamId: ws.id,
         streamName: ws.name,
       });
-      return { ok: true, streamId: ws.id, streamName: ws.name, orchestrator };
+      return { ok: true, streamId: ws.id, streamName: ws.name, managed };
     } catch (error) {
       const spawnError = error instanceof Error ? error : new Error(String(error));
       if (opts.rollbackOnSpawnFailure) {
         try {
           deleteStream(this.blackboard, ws.id);
           this.log(
-            `orchestrator spawn failed for "${ws.name}" (${ws.id}); rolled back stream row: ${spawnError.message}`,
+            `${opts.type ?? "work"} stream session spawn failed for "${ws.name}" (${ws.id}); rolled back stream row: ${spawnError.message}`,
           );
         } catch (cleanupError) {
           this.log(
-            `orchestrator spawn failed and rollback failed for "${ws.name}" (${ws.id}): spawn=${spawnError.message} cleanup=${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+            `${opts.type ?? "work"} stream session spawn failed and rollback failed for "${ws.name}" (${ws.id}): spawn=${spawnError.message} cleanup=${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
           );
         }
         return { ok: false, streamId: null, streamName: ws.name, spawnError };
       }
       this.log(
-        `orchestrator spawn failed for "${ws.name}" (${ws.id}); leaving orphan stream row for caller: ${spawnError.message}`,
+        `${opts.type ?? "work"} stream session spawn failed for "${ws.name}" (${ws.id}); leaving orphan stream row for caller: ${spawnError.message}`,
       );
       return { ok: false, streamId: ws.id, streamName: ws.name, spawnError };
     }
@@ -1296,7 +1304,7 @@ export class ControlSurfaceRuntime {
     const effectiveCwd = input?.cwd ?? this.config.projectsDir;
     this.log(`programmatic stream create requested name="${name}" cwd=${effectiveCwd}`);
 
-    const result = await this.spawnStreamWithOrchestrator({
+    const result = await this.spawnStreamWithSession({
       name,
       cwd: effectiveCwd,
       rollbackOnSpawnFailure: true,
@@ -1309,7 +1317,7 @@ export class ControlSurfaceRuntime {
       ok: true,
       streamId: result.streamId,
       streamName: result.streamName,
-      piSessionId: result.orchestrator.piSessionId,
+      piSessionId: result.managed.piSessionId,
     };
   }
 
@@ -1330,15 +1338,17 @@ export class ControlSurfaceRuntime {
     if (!managed) throw new Error("No orchestrator session for stream");
     if (managed.state.getSnapshot().busy)
       throw new Error("Cannot switch cwd while session is busy");
+    if (managed.role !== "orchestrator")
+      throw new Error("cwd switch is only supported for work streams");
     if (!managed.runtime) {
       this.log(`activating dormant orchestrator for cwd switch stream=${streamId}`);
-      await this.sessionManager.activateOrchestrator(
+      await this.sessionManager.activateStreamSession(
         managed,
         this.createCustomTools("orchestrator", streamId),
       );
     }
 
-    const switched = await this.sessionManager.switchOrchestratorCwd(streamId, cwd);
+    const switched = await this.sessionManager.switchStreamCwd(streamId, cwd);
     updateStreamRepoPath(this.blackboard, streamId, cwd);
     this.blackboard
       .prepare(
@@ -1441,7 +1451,7 @@ export class ControlSurfaceRuntime {
         )
         .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), streamsRow.pi_session_id);
 
-      this.sessionManager.rehydrateOrchestrator(
+      this.sessionManager.rehydrateStreamSession(
         streamId,
         ws.name,
         streamsRow.pi_session_id,
@@ -1492,11 +1502,11 @@ export class ControlSurfaceRuntime {
     if (!managed) throw new Error("Pi session not found");
 
     if (!managed.runtime) {
-      if (managed.role === "orchestrator" && managed.streamId) {
-        this.log(`activating dormant orchestrator for compact stream=${managed.streamId}`);
-        await this.sessionManager.activateOrchestrator(
+      if (managed.role !== "default" && managed.streamId) {
+        this.log(`activating dormant stream session for compact stream=${managed.streamId}`);
+        await this.sessionManager.activateStreamSession(
           managed,
-          this.createCustomTools("orchestrator", managed.streamId),
+          this.createStreamSessionTools(managed.streamId),
         );
       } else {
         throw new Error("Pi session is not active and cannot be activated for compact");
@@ -1539,11 +1549,11 @@ export class ControlSurfaceRuntime {
     if (!managed) throw new Error("Pi session not found");
 
     if (!managed.runtime) {
-      if (managed.role === "orchestrator" && managed.streamId) {
-        this.log(`activating dormant orchestrator for prune stream=${managed.streamId}`);
-        await this.sessionManager.activateOrchestrator(
+      if (managed.role !== "default" && managed.streamId) {
+        this.log(`activating dormant stream session for prune stream=${managed.streamId}`);
+        await this.sessionManager.activateStreamSession(
           managed,
-          this.createCustomTools("orchestrator", managed.streamId),
+          this.createStreamSessionTools(managed.streamId),
         );
       } else {
         throw new Error("Pi session is not active and cannot be activated for prune");
@@ -1603,22 +1613,69 @@ export class ControlSurfaceRuntime {
       }
 
       if (!stream) {
-        const created = await this.createStreamProgrammatic({ name: streamName });
+        const created = await this.createWhatsAppDefaultStream(streamName);
         this.log(`created WhatsApp default stream for user "${userId}" (${created.streamId})`);
         continue;
+      }
+
+      if (stream.type !== "defaultStream") {
+        stream = setStreamType(this.blackboard, stream.id, "defaultStream") ?? stream;
       }
 
       const managed = this.sessionManager.getByStream(stream.id);
       if (managed) continue;
 
-      this.log(`creating missing WhatsApp default orchestrator for user "${userId}"`);
-      await this.sessionManager.createOrchestrator(
+      this.log(`creating missing WhatsApp default stream session for user "${userId}"`);
+      await this.sessionManager.createDefaultStream(
         stream.id,
         stream.name,
-        stream.repo_path ?? undefined,
-        this.createCustomTools("orchestrator", stream.id),
+        stream.repo_path ?? this.config.projectsDir,
+        this.createCustomTools("default", stream.id),
       );
     }
+  }
+
+  private async createWhatsAppDefaultStream(
+    streamName: string,
+  ): Promise<{ streamId: string; streamName: string; piSessionId: string }> {
+    const spawn = await this.spawnStreamWithSession({
+      name: streamName,
+      cwd: this.config.projectsDir,
+      type: "defaultStream",
+      rollbackOnSpawnFailure: true,
+    });
+    if (!spawn.ok) throw spawn.spawnError;
+    this.enqueueDefaultStreamFirstMessage(spawn.managed);
+    return {
+      streamId: spawn.streamId,
+      streamName: spawn.streamName,
+      piSessionId: spawn.managed.piSessionId,
+    };
+  }
+
+  private enqueueDefaultStreamFirstMessage(managed: ManagedPiSession): void {
+    const text = this.config.defaultAgentFirstMessage.trim();
+    if (!text || !managed.streamId) return;
+    managed.queue.enqueue({
+      id: `default-stream-init-${managed.streamId}`,
+      text,
+      source: "init",
+      sender: "system",
+      metadata: {
+        stream_id: managed.streamId,
+        stream_name: managed.streamName ?? undefined,
+        via: "defaultStream",
+      },
+      receivedAt: new Date().toISOString(),
+    });
+  }
+
+  private createStreamSessionTools(streamId: string): CustomToolDefinition[] {
+    const stream = getStreamById(this.blackboard, streamId);
+    return this.createCustomTools(
+      stream?.type === "defaultStream" ? "default" : "orchestrator",
+      streamId,
+    );
   }
 
   private persistStreamWhatsAppOwner(
@@ -1730,7 +1787,7 @@ export class ControlSurfaceRuntime {
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
           this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
 
-          const spawn = await this.spawnStreamWithOrchestrator({
+          const spawn = await this.spawnStreamWithSession({
             name,
             cwd: effectiveCwd,
             rollbackOnSpawnFailure: false,
@@ -1757,11 +1814,13 @@ export class ControlSurfaceRuntime {
           }
 
           const ws = { id: spawn.streamId, name: spawn.streamName };
-          const orchestrator = spawn.orchestrator;
+          const orchestrator = spawn.managed;
 
           try {
-            const defaultSession = this.sessionManager.getDefault();
-            const currentItem = defaultSession?.queue.getCurrentItem();
+            const sourceSession = streamId
+              ? this.sessionManager.getByStream(streamId)
+              : this.sessionManager.getDefault();
+            const currentItem = sourceSession?.queue.getCurrentItem();
             const originalText = currentItem?.text;
             const inheritedReplyMetadata = whatsappReplyMetadataFrom(currentItem);
             const inheritedRemoteJid = extractRemoteJid(inheritedReplyMetadata);
@@ -1795,7 +1854,7 @@ export class ControlSurfaceRuntime {
                 const boundary = getPreviousStreamCreatedAt(this.blackboard, ws.id);
                 const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
 
-                if (apiKey && recentMessages.length > 1) {
+                if (role === "default" && apiKey && recentMessages.length > 1) {
                   const relevance = await classifyContextRelevance(
                     recentMessages,
                     ws.name,
@@ -2359,7 +2418,7 @@ export class ControlSurfaceRuntime {
         const defaultManaged = this.sessionManager.getDefault();
         const allManaged = [
           ...(defaultManaged ? [defaultManaged] : []),
-          ...this.sessionManager.listOrchestrators(),
+          ...this.sessionManager.listStreamSessions(),
         ];
         for (const managed of allManaged) {
           const snapshot = managed.state.getSnapshot();
@@ -2375,10 +2434,9 @@ export class ControlSurfaceRuntime {
                 `Turn stuck for ${ageSeconds}s (${label})`,
                 30,
               );
-              const targetUserId =
-                managed.role === "orchestrator"
-                  ? whatsappUserIdFromStreamName(managed.streamName)
-                  : metadataString(snapshot.currentItem?.metadata, "whatsapp_user_id");
+              const targetUserId = managed.streamId
+                ? whatsappUserIdFromStreamName(managed.streamName)
+                : metadataString(snapshot.currentItem?.metadata, "whatsapp_user_id");
               const remoteJid = extractRemoteJid(snapshot.currentItem?.metadata);
               if (!targetUserId && !remoteJid) {
                 this.log(`stuck-turn WhatsApp alert skipped: no WhatsApp reply target (${label})`);

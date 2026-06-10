@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 21;
+export const BLACKBOARD_SCHEMA_VERSION = 22;
 
 export type MessageMetadata = {
   router_action?: string;
@@ -62,6 +62,7 @@ export type PiSessionStatus =
   | "ended"
   | "crashed";
 export type StreamStatus = "open" | "closed";
+export type StreamType = "work" | "defaultStream";
 export type WhatsAppMessageDirection = "inbound" | "outbound";
 export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "failed";
 export type PendingActionKind =
@@ -83,6 +84,7 @@ export const ROUTE_EVENT_TO_HOOK_EVENT: Record<HookRouteEventName, HookEventName
 export interface StreamRow {
   id: string;
   name: string;
+  type: StreamType;
   repo_path: string | null;
   worktree_path: string | null;
   status: StreamStatus;
@@ -199,6 +201,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 CREATE TABLE IF NOT EXISTS streams (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream')),
     repo_path TEXT,
     worktree_path TEXT,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),

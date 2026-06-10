@@ -1,10 +1,16 @@
 import crypto from "node:crypto";
-import type { PiSessionStatus, StreamRow } from "../contracts/index.ts";
+import type { PiSessionStatus, StreamRow, StreamType } from "../contracts/index.ts";
 import type { BlackboardDatabase, CountRow } from "./db.ts";
 
 export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
   return db.all<StreamRow>(
     "SELECT * FROM streams WHERE status = 'open' ORDER BY pinned DESC, created_at DESC",
+  );
+}
+
+export function listOpenWorkStreams(db: BlackboardDatabase): StreamRow[] {
+  return db.all<StreamRow>(
+    "SELECT * FROM streams WHERE status = 'open' AND type = 'work' ORDER BY pinned DESC, created_at DESC",
   );
 }
 
@@ -36,10 +42,23 @@ export function setStreamName(
   return getStreamById(db, streamId);
 }
 
-export function insertStream(db: BlackboardDatabase, name: string): StreamRow {
+export function insertStream(
+  db: BlackboardDatabase,
+  name: string,
+  type: StreamType = "work",
+): StreamRow {
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO streams (id, name) VALUES (?, ?)").run(id, name);
+  db.prepare("INSERT INTO streams (id, name, type) VALUES (?, ?, ?)").run(id, name, type);
   return getStreamById(db, id)!;
+}
+
+export function setStreamType(
+  db: BlackboardDatabase,
+  streamId: string,
+  type: StreamType,
+): StreamRow | null {
+  db.prepare("UPDATE streams SET type = ? WHERE id = ?").run(type, streamId);
+  return getStreamById(db, streamId);
 }
 
 export function enrichStream(
@@ -138,7 +157,7 @@ export function getPreviousStreamCreatedAt(
   excludeId: string,
 ): string | undefined {
   const row = db.get<{ created_at: string }>(
-    `SELECT datetime(created_at) as created_at FROM streams WHERE id != ? ORDER BY created_at DESC LIMIT 1`,
+    `SELECT datetime(created_at) as created_at FROM streams WHERE id != ? AND type = 'work' ORDER BY created_at DESC LIMIT 1`,
     excludeId,
   );
   return row?.created_at;
@@ -146,7 +165,7 @@ export function getPreviousStreamCreatedAt(
 
 export function getLatestStreamCreatedAt(db: BlackboardDatabase): string | undefined {
   const row = db.get<{ created_at: string }>(
-    `SELECT datetime(created_at) as created_at FROM streams ORDER BY created_at DESC LIMIT 1`,
+    `SELECT datetime(created_at) as created_at FROM streams WHERE type = 'work' ORDER BY created_at DESC LIMIT 1`,
   );
   return row?.created_at;
 }

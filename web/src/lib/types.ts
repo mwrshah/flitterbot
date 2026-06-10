@@ -129,6 +129,7 @@ export type PiSessionStatus =
 export type StreamSummary = {
   id: string;
   name: string;
+  type: "work" | "defaultStream";
   status: "open" | "closed";
   pinned: boolean;
   closedAt?: string;

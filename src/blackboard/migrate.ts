@@ -821,6 +821,11 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 21) {
     applyV21Migration(db);
+    version = getSchemaVersion(db);
+  }
+
+  if (version < 22) {
+    applyV22Migration(db);
   }
 
   return getSchemaVersion(db);
@@ -1195,6 +1200,22 @@ function applyV21Migration(db: DatabaseSync): void {
   try {
     db.exec("ALTER TABLE streams ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT 0;");
     db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (21);");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function applyV22Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    db.exec(
+      "ALTER TABLE streams ADD COLUMN type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream'));",
+    );
+    db.exec("UPDATE streams SET type = 'defaultStream' WHERE name LIKE 'flitterbot:%';");
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (22);");
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");

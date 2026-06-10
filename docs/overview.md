@@ -99,17 +99,19 @@ Endpoints: `POST /message`, `/hook/:event`, `/cron/tick`, `/stop`, `/sessions/:i
 
 ### Pi Agents
 
-Two roles with tailored system prompts and role-gated tools:
+Stream-backed roles with tailored system prompts and role-gated tools:
 
-**Default** — always-on triage. Delegates engineering work via `create_stream` (spawns orchestrator, passes relevant user context unless explicitly skipped for batch creation); sends messages to orchestrators via `enqueue_message`. Cannot write code.
+**Default** — real always-on triage session. Created first at startup via `PiSessionManager.createDefault()` → `createFlitterbotAgent({ role: "default" })` → `buildDefaultAgentPrompt(...)`. Delegates engineering work via `create_stream` (spawns orchestrator, passes relevant user context unless explicitly skipped for batch creation); sends messages to orchestrators via `enqueue_message`. Cannot write code.
 
-**Orchestrators** — ephemeral, one per stream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_stream` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
+**Default streams** — per non-default WhatsApp user streams (`streams.type = "defaultStream"`). They use the same default-agent prompt and tools as the real default session, and new default streams are seeded with `defaultAgentFirstMessage`.
+
+**Orchestrators** — ephemeral work sessions, one per work stream. Manage Claude Code sessions. Tools: `create_worktree` (Git Town first, raw git fallback), `close_stream` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
 
 Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
 
 Delivery: `followUp` (queue append) or `steer` (bypass queue, interrupt via `streamingBehavior: "steer"`; two-layer bypass at runtime and TurnQueue level).
 
-On startup: creates default agent, rehydrates orchestrators for open workstreams as dormant shells (`session: null`). Live SDK agents created lazily on first incoming message via `activateOrchestrator()`. Crashed orchestrators excluded from rehydration and replaced with fresh ones. Closed workstreams can be reopened — flips status back to `open`, revives the pi_session, rehydrates the orchestrator.
+On startup: creates the real default agent first, rehydrates open stream sessions as dormant shells (`session: null`), then ensures every non-default WhatsApp user has an open default stream. Live SDK agents are created lazily on first incoming message via `activateStreamSession()`, deriving the prompt/tool set from `streams.type`. Crashed stream sessions are excluded from rehydration and replaced with fresh ones. Closed workstreams can be reopened — flips status back to `open`, revives the pi_session, rehydrates the stream session.
 
 ### Blackboard (SQLite)
 

@@ -7,12 +7,14 @@ function stream(overrides: Partial<StreamRow> = {}): StreamRow {
   return {
     id: "stream-1",
     name: "test-stream",
+    type: "work",
     repo_path: null,
     worktree_path: null,
     status: "open",
     created_at: "2026-05-03T07:00:00Z",
     closed_at: null,
     base_branch: null,
+    pinned: false,
     ...overrides,
   };
 }

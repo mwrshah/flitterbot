@@ -61,12 +61,14 @@ describe("executeCreateWorktree", () => {
       const state = fakeDb({
         id: "stream-1",
         name: "feature",
+        type: "work",
         repo_path: repo,
         worktree_path: null,
         status: "open",
         created_at: "2026-01-01 00:00:00",
         closed_at: null,
         base_branch: null,
+        pinned: false,
       });
 
       const result = await executeCreateWorktree(

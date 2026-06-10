@@ -65,7 +65,7 @@ function rewriteSessionHeaderCwd(sessionFile: string, cwd: string): string | und
 
 export class PiSessionManager {
   private defaultSession?: ManagedPiSession;
-  private readonly orchestrators = new Map<string, ManagedPiSession>();
+  private readonly streamSessions = new Map<string, ManagedPiSession>();
   private readonly byPiSessionId = new Map<string, ManagedPiSession>();
   private readonly config: FlitterbotConfig;
   private readonly blackboard: BlackboardDatabase;
@@ -100,15 +100,15 @@ export class PiSessionManager {
   }
 
   getByStream(streamId: string): ManagedPiSession | undefined {
-    return this.orchestrators.get(streamId);
+    return this.streamSessions.get(streamId);
   }
 
   getByPiSessionId(piSessionId: string): ManagedPiSession | undefined {
     return this.byPiSessionId.get(piSessionId);
   }
 
-  listOrchestrators(): ManagedPiSession[] {
-    return Array.from(this.orchestrators.values());
+  listStreamSessions(): ManagedPiSession[] {
+    return Array.from(this.streamSessions.values());
   }
 
   async createDefault(
@@ -163,22 +163,39 @@ export class PiSessionManager {
     repoPath?: string,
     customTools?: unknown[],
   ): Promise<ManagedPiSession> {
-    const existing = this.orchestrators.get(streamId);
-    if (existing) return existing;
+    return this.createStreamSession("orchestrator", streamId, streamName, repoPath, customTools);
+  }
 
-    const orchestratorContext = {
-      streamName,
-      streamId,
-      repoPath,
-    };
+  async createDefaultStream(
+    streamId: string,
+    streamName: string,
+    repoPath?: string,
+    customTools?: unknown[],
+  ): Promise<ManagedPiSession> {
+    return this.createStreamSession("default", streamId, streamName, repoPath, customTools);
+  }
+
+  private async createStreamSession(
+    agentRole: "default" | "orchestrator",
+    streamId: string,
+    streamName: string,
+    repoPath?: string,
+    customTools?: unknown[],
+  ): Promise<ManagedPiSession> {
+    const existing = this.streamSessions.get(streamId);
+    if (existing) return existing;
 
     const created = await createFlitterbotAgent({
       config: this.config,
       customTools: customTools ?? [],
-      role: "orchestrator",
-      orchestratorContext,
+      role: agentRole,
+      ...(agentRole === "orchestrator"
+        ? {
+            orchestratorContext: { streamName, streamId, repoPath },
+            tmuxEnabled: this.config.tmuxEnabled,
+          }
+        : {}),
       cwd: repoPath,
-      tmuxEnabled: this.config.tmuxEnabled,
     });
 
     const session = created.runtime.session;
@@ -201,17 +218,17 @@ export class PiSessionManager {
       thinkingLevel: created.modelInfo.thinkingLevel,
       startedAt: new Date().toISOString(),
       lastEventAt: new Date().toISOString(),
-      streamId: streamId,
+      streamId,
     });
 
-    this.orchestrators.set(streamId, managed);
+    this.streamSessions.set(streamId, managed);
     this.byPiSessionId.set(managed.piSessionId, managed);
-    this.log(`orchestrator created for stream "${streamName}" (${streamId})`);
-    this.logResourceInfo("orchestrator", created.resourceInfo);
+    this.log(`${agentRole} agent created for stream "${streamName}" (${streamId})`);
+    this.logResourceInfo(agentRole, created.resourceInfo);
     return managed;
   }
 
-  rehydrateOrchestrator(
+  rehydrateStreamSession(
     streamId: string,
     streamName: string,
     piSessionId: string,
@@ -220,7 +237,7 @@ export class PiSessionManager {
     modelProvider: string | null,
     modelId: string | null,
   ): ManagedPiSession {
-    const existing = this.orchestrators.get(streamId);
+    const existing = this.streamSessions.get(streamId);
     if (existing) return existing;
 
     const state = new PiSessionState();
@@ -248,50 +265,10 @@ export class PiSessionManager {
       whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
     };
 
-    const processCallback = this.processCallback;
-    managed.queue = new TurnQueue({
-      process: (item) => processCallback(managed, item),
-      onItemStart: (item) => {
-        state.setBusy(true, item);
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi",
-          timestamp: new Date().toISOString(),
-        });
-        this.wsHub.broadcast({
-          type: "queue_item_start",
-          item,
-          piSessionId: managed.piSessionId,
-          streamId,
-        });
-      },
-      onItemEnd: (item, error) => {
-        state.setBusy(false);
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi",
-          timestamp: new Date().toISOString(),
-        });
-        if (error) {
-          const apiErr = error instanceof Error ? (error as ApiError) : undefined;
-          const detail = apiErr
-            ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
-            : String(error);
-          this.log(`queue item ${item.id} failed (orchestrator stream=${streamId}): ${detail}`);
-          this.destroyOrchestrator(streamId, "crashed");
-        }
-        this.wsHub.broadcast({
-          type: "queue_item_end",
-          itemId: item.id,
-          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
-          piSessionId: managed.piSessionId,
-          streamId,
-        });
-      },
-    });
+    this.attachQueue(managed, state, streamId);
 
     upsertPiSession(this.blackboard, {
-      piSessionId: piSessionId,
+      piSessionId,
       role: "orchestrator",
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
@@ -300,69 +277,60 @@ export class PiSessionManager {
       cwd: repoPath ?? this.config.projectsDir,
       startedAt: createdAt,
       lastEventAt: new Date().toISOString(),
-      streamId: streamId,
+      streamId,
     });
 
-    this.orchestrators.set(streamId, managed);
+    this.streamSessions.set(streamId, managed);
     this.byPiSessionId.set(piSessionId, managed);
     this.log(
-      `rehydrated dormant orchestrator for stream "${streamName}" (${streamId}) piSessionId=${piSessionId}`,
+      `rehydrated dormant stream session for "${streamName}" (${streamId}) piSessionId=${piSessionId}`,
     );
     return managed;
   }
 
-  async activateOrchestrator(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
+  async activateStreamSession(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
     if (managed.runtime) return;
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
+    if (managed.role === "default") throw new Error("Default session is not stream-backed");
 
     const snapshot = managed.state.getSnapshot();
     const sessionFile = snapshot.sessionFile;
     const stream = getStreamById(this.blackboard, managed.streamId);
     const repoPath = stream?.repo_path ?? undefined;
+    const agentRole = stream?.type === "defaultStream" ? "default" : "orchestrator";
 
     const created = await createFlitterbotAgent({
       config: this.config,
       customTools: customTools ?? [],
-      role: "orchestrator",
-      orchestratorContext: {
-        streamName: managed.streamName ?? managed.streamId,
-        streamId: managed.streamId,
-        repoPath,
-      },
+      role: agentRole,
+      ...(agentRole === "orchestrator"
+        ? {
+            orchestratorContext: {
+              streamName: managed.streamName ?? managed.streamId,
+              streamId: managed.streamId,
+              repoPath,
+            },
+            tmuxEnabled: this.config.tmuxEnabled,
+          }
+        : {}),
       cwd: repoPath,
       resumeSessionFile: sessionFile && fs.existsSync(sessionFile) ? sessionFile : undefined,
-      tmuxEnabled: this.config.tmuxEnabled,
     });
 
     const session = created.runtime.session;
     managed.runtime = created.runtime;
     managed.modelInfo = created.modelInfo;
-    managed.unsubscribe = subscribeToPiSession(
-      session,
-      managed.state,
-      this.blackboard,
-      this.wsHub,
-      this.toolDisplayCache,
-      managed.streamId,
-      managed.streamName,
-      (lastAssistantMessage) => {
-        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
-        if (managed.pendingDestroy && managed.streamId) {
-          this.destroyOrchestrator(managed.streamId, "close_stream");
-        }
-      },
-    );
-
+    managed.unsubscribe = this.subscribeManagedSession(managed, session, managed.state);
     managed.state.initialize(session.sessionId, session.sessionFile, session.messages.length);
 
     this.log(
-      `activated dormant orchestrator for stream "${managed.streamName}" (${managed.streamId})`,
+      `activated dormant ${agentRole} agent for stream "${managed.streamName}" (${managed.streamId})`,
     );
-    this.logResourceInfo("orchestrator", created.resourceInfo);
+    this.logResourceInfo(agentRole, created.resourceInfo);
   }
 
-  destroyOrchestrator(streamId: string, reason: string): void {
-    const managed = this.orchestrators.get(streamId);
+  destroyStreamSession(streamId: string, reason: string): void {
+    const managed = this.streamSessions.get(streamId);
     if (!managed) return;
 
     managed.queue.stop();
@@ -383,18 +351,20 @@ export class PiSessionManager {
       });
     }
 
-    this.orchestrators.delete(streamId);
+    this.streamSessions.delete(streamId);
     this.byPiSessionId.delete(managed.piSessionId);
     this.toolDisplayCache.deletePiSession(managed.piSessionId);
-    this.log(`orchestrator destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`);
+    this.log(
+      `${managed.role} destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`,
+    );
   }
 
-  async switchOrchestratorCwd(streamId: string, cwd: string): Promise<ManagedPiSession> {
-    const managed = this.orchestrators.get(streamId);
-    if (!managed) throw new Error("No orchestrator session for stream");
+  async switchStreamCwd(streamId: string, cwd: string): Promise<ManagedPiSession> {
+    const managed = this.streamSessions.get(streamId);
+    if (!managed) throw new Error("No stream session for stream");
     if (managed.role !== "orchestrator")
       throw new Error("cwd switch is only supported for streams");
-    if (!managed.runtime) throw new Error("Cannot switch cwd for a dormant orchestrator");
+    if (!managed.runtime) throw new Error("Cannot switch cwd for a dormant stream session");
     if (managed.state.getSnapshot().busy)
       throw new Error("Cannot switch cwd while session is busy");
 
@@ -439,7 +409,7 @@ export class PiSessionManager {
       (lastAssistantMessage) => {
         managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
-          this.destroyOrchestrator(managed.streamId, "close_stream");
+          this.destroyStreamSession(managed.streamId, "close_stream");
         }
       },
     );
@@ -557,8 +527,8 @@ export class PiSessionManager {
   }
 
   disposeAll(): void {
-    for (const [streamId] of this.orchestrators) {
-      this.destroyOrchestrator(streamId, "shutdown");
+    for (const [streamId] of this.streamSessions) {
+      this.destroyStreamSession(streamId, "shutdown");
     }
 
     if (this.defaultSession) {
@@ -635,36 +605,11 @@ export class PiSessionManager {
     return undefined;
   }
 
-  private buildManagedSession(
-    created: {
-      runtime: AgentSessionRuntime;
-      modelInfo: {
-        provider: string;
-        id: string;
-        entryId: string;
-        thinkingLevel: ThinkingLevel;
-      };
-    },
+  private attachQueue(
+    managed: ManagedPiSession,
     state: PiSessionState,
-    role: "default" | "orchestrator",
     streamId: string | null,
-    streamName: string | null,
-  ): ManagedPiSession {
-    const session = created.runtime.session;
-    const managed: ManagedPiSession = {
-      runtime: created.runtime,
-      queue: null!,
-      state,
-      role,
-      streamId,
-      streamName,
-      piSessionId: session.sessionId,
-      createdAt: new Date().toISOString(),
-      modelInfo: created.modelInfo,
-      unsubscribe: null!,
-      whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
-    };
-
+  ): void {
     const processCallback = this.processCallback;
     managed.queue = new TurnQueue({
       process: (item) => processCallback(managed, item),
@@ -696,10 +641,10 @@ export class PiSessionManager {
             ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
             : String(error);
           this.log(
-            `queue item ${item.id} failed (${role}${streamId ? ` stream=${streamId}` : ""}): ${detail}`,
+            `queue item ${item.id} failed (${managed.role}${streamId ? ` stream=${streamId}` : ""}): ${detail}`,
           );
-          if (role === "orchestrator" && streamId) {
-            this.destroyOrchestrator(streamId, "crashed");
+          if (managed.role !== "default" && streamId) {
+            this.destroyStreamSession(streamId, "crashed");
           }
         }
         this.wsHub.broadcast({
@@ -711,22 +656,62 @@ export class PiSessionManager {
         });
       },
     });
+  }
 
-    managed.unsubscribe = subscribeToPiSession(
+  private subscribeManagedSession(
+    managed: ManagedPiSession,
+    session: AgentSessionRuntime["session"],
+    state: PiSessionState,
+  ): () => void {
+    return subscribeToPiSession(
       session,
       state,
       this.blackboard,
       this.wsHub,
       this.toolDisplayCache,
-      streamId,
-      streamName,
+      managed.streamId,
+      managed.streamName,
       (lastAssistantMessage) => {
         managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
-          this.destroyOrchestrator(managed.streamId, "close_stream");
+          this.destroyStreamSession(managed.streamId, "close_stream");
         }
       },
     );
+  }
+
+  private buildManagedSession(
+    created: {
+      runtime: AgentSessionRuntime;
+      modelInfo: {
+        provider: string;
+        id: string;
+        entryId: string;
+        thinkingLevel: ThinkingLevel;
+      };
+    },
+    state: PiSessionState,
+    role: "default" | "orchestrator",
+    streamId: string | null,
+    streamName: string | null,
+  ): ManagedPiSession {
+    const session = created.runtime.session;
+    const managed: ManagedPiSession = {
+      runtime: created.runtime,
+      queue: null!,
+      state,
+      role,
+      streamId,
+      streamName,
+      piSessionId: session.sessionId,
+      createdAt: new Date().toISOString(),
+      modelInfo: created.modelInfo,
+      unsubscribe: null!,
+      whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
+    };
+
+    this.attachQueue(managed, state, streamId);
+    managed.unsubscribe = this.subscribeManagedSession(managed, session, state);
 
     return managed;
   }
