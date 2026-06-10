@@ -414,4 +414,9 @@ export const CONTROL_SURFACE_ENDPOINTS = {
     path: "/api/streams/prune",
     auth: "bearer",
   },
+  streamsCompact: {
+    method: "POST",
+    path: "/api/streams/compact",
+    auth: "bearer",
+  },
 } as const;

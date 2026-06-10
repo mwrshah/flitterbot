@@ -272,7 +272,11 @@ export class ControlSurfaceRuntime {
 
   enqueue(
     input: EnqueueInput,
-  ): { ok: true; item: QueueItem } | { ok: true; cleared: true } | { ok: true; reloaded: true } {
+  ):
+    | { ok: true; item: QueueItem }
+    | { ok: true; cleared: true }
+    | { ok: true; reloaded: true }
+    | { ok: true; compacted: true } {
     input.text = input.text.trim();
 
     if (
@@ -311,6 +315,23 @@ export class ControlSurfaceRuntime {
         }
       })();
       return { ok: true, reloaded: true };
+    }
+
+    if (input.text === "/compact" || input.text.startsWith("/compact ")) {
+      const customInstructions = input.text.startsWith("/compact ")
+        ? input.text.slice("/compact ".length).trim()
+        : undefined;
+      const piSessionId = this.resolveCompactTargetPiSessionId(input.metadata);
+      this.log(`/compact: compacting session ${piSessionId ?? "<none>"}`);
+      void (async () => {
+        try {
+          if (!piSessionId) throw new Error("No pi session available to compact");
+          await this.compactPiSession(piSessionId, customInstructions);
+        } catch (error) {
+          this.log(`/compact failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      })();
+      return { ok: true, compacted: true };
     }
 
     const images = input.images?.map((img) => ({
@@ -1437,6 +1458,72 @@ export class ControlSurfaceRuntime {
       ws.status === "closed" ? "reopened closed stream" : "recovered dead pi-session for stream";
     this.log(`${reopenReason} "${ws.name}" (${streamId})`);
     return { ok: true, streamId };
+  }
+
+  private resolveCompactTargetPiSessionId(
+    metadata: MessageMetadata | undefined,
+  ): string | undefined {
+    if (typeof metadata?._targetSessionId === "string" && metadata._targetSessionId.trim()) {
+      return metadata._targetSessionId;
+    }
+    if (typeof metadata?.stream_id === "string" && metadata.stream_id.trim()) {
+      return this.sessionManager.getByStream(metadata.stream_id)?.piSessionId;
+    }
+    return this.sessionManager.getDefault()?.piSessionId;
+  }
+
+  async compactPiSession(
+    piSessionId: string,
+    customInstructions?: string,
+  ): Promise<{
+    ok: true;
+    piSessionId: string;
+    messageCount: number;
+    summary: string;
+    firstKeptEntryId: string;
+    tokensBefore: number;
+  }> {
+    const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (!managed) throw new Error("Pi session not found");
+
+    if (!managed.runtime) {
+      if (managed.role === "orchestrator" && managed.streamId) {
+        this.log(`activating dormant orchestrator for compact stream=${managed.streamId}`);
+        await this.sessionManager.activateOrchestrator(
+          managed,
+          this.createCustomTools("orchestrator", managed.streamId),
+        );
+      } else {
+        throw new Error("Pi session is not active and cannot be activated for compact");
+      }
+    }
+
+    const session = managed.runtime?.session;
+    if (!session) throw new Error("Pi session failed to activate");
+    if (session.isCompacting) throw new Error("Pi session is already compacting");
+    if (managed.state.getSnapshot().busy) throw new Error("Pi session is busy");
+
+    const result = await session.compact(customInstructions?.trim() || undefined);
+    const newCount = session.messages.length;
+    managed.state.noteEvent(newCount);
+
+    this.wsHub.broadcast({
+      type: "history_rewritten",
+      piSessionId,
+      reason: "compact",
+    });
+
+    this.log(
+      `compacted pi session ${piSessionId} at entry ${result.firstKeptEntryId} (${result.tokensBefore} tokens before; messages now ${newCount})`,
+    );
+    return {
+      ok: true,
+      piSessionId,
+      messageCount: newCount,
+      summary: result.summary,
+      firstKeptEntryId: result.firstKeptEntryId,
+      tokensBefore: result.tokensBefore,
+    };
   }
 
   async pruneStreamHistory(

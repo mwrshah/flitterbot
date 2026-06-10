@@ -15,6 +15,12 @@ export const INTERNAL_COMMANDS: SkillListItem[] = [
     disableModelInvocation: true,
     kind: "command",
   },
+  {
+    name: "compact",
+    description: "Compact the current Pi session context",
+    disableModelInvocation: true,
+    kind: "command",
+  },
 ];
 
 const NEW_STREAM_COMMAND: SkillListItem = {

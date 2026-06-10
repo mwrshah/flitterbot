@@ -308,5 +308,5 @@ export type WsMessage =
       source: "web";
     }
   | { type: "resources_reloaded" }
-  | { type: "history_rewritten"; piSessionId: string; reason: "prune" }
+  | { type: "history_rewritten"; piSessionId: string; reason: "prune" | "compact" }
   | { type: "error"; message: string };
