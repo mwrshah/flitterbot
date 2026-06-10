@@ -11,6 +11,7 @@ import type {
   StreamRoutingMeta,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
+import { loadWhatsAppConfig } from "../whatsapp/config.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
 export async function handleMessageRoute(
@@ -67,9 +68,15 @@ async function routeMessage(
 ): Promise<{ metadata: StreamRoutingMeta } | null> {
   if (source === "whatsapp") {
     const whatsappUserId =
-      typeof metadata?.whatsapp_user_id === "string" ? metadata.whatsapp_user_id : "";
+      typeof metadata?.whatsapp_user_id === "string" ? metadata.whatsapp_user_id.trim() : "";
     if (!whatsappUserId) {
       throw new Error("WhatsApp message accepted without whatsapp_user_id metadata");
+    }
+
+    const whatsappConfig = loadWhatsAppConfig();
+    if (whatsappConfig.defaultUser === whatsappUserId) {
+      runtime.log(`router: matched WhatsApp default user "${whatsappUserId}" to default agent`);
+      return { metadata: { router_action: "default" } };
     }
 
     const userDefaultStream = getStreamByName(runtime.blackboard, `flitterbot: ${whatsappUserId}`);

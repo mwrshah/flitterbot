@@ -1590,6 +1590,8 @@ export class ControlSurfaceRuntime {
 
     const config = loadWhatsAppConfig();
     for (const userId of Object.keys(config.users)) {
+      if (config.defaultUser === userId) continue;
+
       const streamName = `flitterbot: ${userId}`;
       let stream = getStreamByName(this.blackboard, streamName);
 
