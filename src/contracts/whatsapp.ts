@@ -7,7 +7,6 @@ export interface WhatsAppDaemonRuntimeStatus {
   ok: boolean;
   pid: number;
   status: WhatsAppConnectionStatus;
-  recipientJid?: string;
   managedByControlSurface?: boolean;
   socketPath: string;
   authPath: string;
@@ -23,6 +22,7 @@ export interface SendWhatsAppRequest {
   text: string;
   contextRef?: string;
   remoteJid?: string;
+  targetUserId?: string;
 }
 
 export interface SendWhatsAppResult {
@@ -49,6 +49,7 @@ export type DaemonCommand =
       text: string;
       contextRef?: string;
       remoteJid?: string;
+      targetUserId?: string;
       pendingAction?: PendingActionRequest;
     };
 

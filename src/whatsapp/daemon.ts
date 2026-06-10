@@ -36,9 +36,9 @@ import {
 import {
   ensureWhatsAppHome,
   loadWhatsAppConfig,
-  resolveAllowedJids,
+  resolveAcceptedInboundJids,
+  resolveBroadcastJidsForUser,
   resolvePairingPhoneNumber,
-  resolveRecipientJid,
 } from "./config.ts";
 import { createIpcServer } from "./ipc.ts";
 import {
@@ -116,18 +116,10 @@ class WhatsAppDaemon {
   }
 
   private snapshot(): WhatsAppDaemonStatus {
-    let recipientJid: string | undefined;
-    try {
-      recipientJid = resolveRecipientJid();
-    } catch {
-      recipientJid = undefined;
-    }
-
     return {
       ok: true,
       pid: process.pid,
       status: this.status,
-      recipientJid,
       socketPath: getWhatsAppSocketPath(),
       authPath: getWhatsAppAuthDir(),
       startedAt: this.startedAt,
@@ -160,6 +152,7 @@ class WhatsAppDaemon {
           command.contextRef,
           command.pendingAction,
           command.remoteJid,
+          command.targetUserId,
         );
       default:
         return {
@@ -176,7 +169,6 @@ class WhatsAppDaemon {
     }
 
     const config = loadWhatsAppConfig();
-    const recipientJid = resolveRecipientJid(config);
     this.status = this.reconnectAttempt > 0 ? "reconnecting" : "connecting";
     this.lastError = undefined;
 
@@ -206,20 +198,19 @@ class WhatsAppDaemon {
       syncFullHistory: false,
     });
 
-    const allowedJids = new Set<string>([recipientJid, ...resolveAllowedJids(config)]);
-    const rebuildAllowedJids = () => {
-      const lidRaw = state.creds.me?.lid;
-      if (lidRaw) {
-        allowedJids.add(lidRaw.replace(/:\d+@/, "@"));
-      }
-      logger.info({ allowedJids: [...allowedJids] }, "accepted inbound JIDs");
+    const acceptedInboundJids = new Set<string>(resolveAcceptedInboundJids(config));
+    const rebuildAcceptedInboundJids = () => {
+      logger.info(
+        { acceptedInboundJids: [...acceptedInboundJids] },
+        "accepted inbound WhatsApp JIDs",
+      );
     };
-    rebuildAllowedJids();
+    rebuildAcceptedInboundJids();
 
     this.socket.ev.on("creds.update", async () => {
       await saveCreds();
       backupAuthState();
-      rebuildAllowedJids();
+      rebuildAcceptedInboundJids();
     });
 
     this.socket.ev.on("connection.update", async (update) => {
@@ -233,7 +224,7 @@ class WhatsAppDaemon {
       }
 
       for (const message of upsert.messages) {
-        const rejectionReason = getInboundMessageRejectionReason(message, allowedJids);
+        const rejectionReason = getInboundMessageRejectionReason(message, acceptedInboundJids);
         if (rejectionReason) {
           logger.warn(
             {
@@ -244,7 +235,7 @@ class WhatsAppDaemon {
               pushName: message.pushName,
               fromMe: message.key.fromMe,
               rejectionReason,
-              hint: "add remoteJid to allowedJids in ~/.flitterbot/whatsapp/config.json if intended",
+              hint: "add remoteJid under users.<name> in ~/.flitterbot/whatsapp/config.json if intended; allowed inbound JIDs are computed from users",
             },
             "rejected inbound WhatsApp message \u2014 not in allowlist",
           );
@@ -379,6 +370,7 @@ class WhatsAppDaemon {
     contextRef?: string,
     pendingAction?: PendingActionRequest,
     targetJid?: string,
+    targetUserId?: string,
   ): Promise<DaemonResponse> {
     if (this.status === "auth_required" || this.status === "logged_out") {
       return {
@@ -399,73 +391,91 @@ class WhatsAppDaemon {
     }
 
     const config = loadWhatsAppConfig();
-    const remoteJid = targetJid ?? resolveRecipientJid(config);
+    const remoteJids = targetJid
+      ? [targetJid]
+      : targetUserId
+        ? resolveBroadcastJidsForUser(targetUserId, config)
+        : [];
 
-    const pending = createOutboundPendingMessage(this.db, {
-      waMessageId: null,
-      remoteJid,
-      body: text,
-      contextRef: contextRef ?? null,
-    });
-
-    let resolvedContextRef = contextRef ?? pending.context_ref ?? undefined;
-    if (pendingAction) {
-      const action = createPendingAction(this.db, {
-        channel: "whatsapp",
-        contextRef: resolvedContextRef,
-        kind: pendingAction.kind,
-        promptText: pendingAction.promptText,
-        relatedSessionId: pendingAction.relatedSessionId,
-        relatedTodoistTaskId: pendingAction.relatedTodoistTaskId,
-      });
-      resolvedContextRef = action.context_ref ?? action.action_id;
-      if (resolvedContextRef !== pending.context_ref) {
-        this.db
-          .prepare("UPDATE whatsapp_messages SET context_ref = ? WHERE id = ?")
-          .run(resolvedContextRef, pending.id);
-      }
-    }
-
-    const sendOnce = async (): Promise<{ id?: string }> => {
-      await this.socket?.sendPresenceUpdate("composing", remoteJid);
-      await delay(config.typingDelayMs);
-      const result = await this.socket?.sendMessage(remoteJid, { text });
-      await this.socket?.sendPresenceUpdate("paused", remoteJid);
-      return { id: result?.key.id ?? undefined };
-    };
-
-    try {
-      let result = await sendOnce();
-      if (!result.id) {
-        await delay(500);
-        result = await sendOnce();
-      }
-
-      if (!result.id) {
-        throw new Error("WhatsApp send did not return a message id");
-      }
-
-      markWhatsAppMessageSent(this.db, pending.id, result.id);
-      return {
-        ok: true,
-        status: "sent",
-        messageId: result.id,
-        rowId: pending.id,
-        contextRef: resolvedContextRef,
-        daemon: this.snapshot(),
-      };
-    } catch (error) {
-      const message = formatError(error);
-      markWhatsAppMessageFailed(this.db, pending.id, message);
+    if (remoteJids.length === 0) {
       return {
         ok: false,
         status: "failed",
-        error: message,
-        rowId: pending.id,
-        contextRef: resolvedContextRef,
+        error: "Missing WhatsApp target: send requires remoteJid or targetUserId.",
         daemon: this.snapshot(),
       };
     }
+
+    let firstRowId: number | undefined;
+    let firstMessageId: string | undefined;
+    let firstContextRef: string | undefined;
+    const errors: string[] = [];
+
+    for (const remoteJid of remoteJids) {
+      const pending = createOutboundPendingMessage(this.db, {
+        waMessageId: null,
+        remoteJid,
+        body: text,
+        contextRef: contextRef ?? null,
+      });
+      firstRowId ??= pending.id;
+
+      let resolvedContextRef = contextRef ?? pending.context_ref ?? undefined;
+      if (pendingAction) {
+        const action = createPendingAction(this.db, {
+          channel: "whatsapp",
+          contextRef: resolvedContextRef,
+          kind: pendingAction.kind,
+          promptText: pendingAction.promptText,
+          relatedSessionId: pendingAction.relatedSessionId,
+          relatedTodoistTaskId: pendingAction.relatedTodoistTaskId,
+        });
+        resolvedContextRef = action.context_ref ?? action.action_id;
+        if (resolvedContextRef !== pending.context_ref) {
+          this.db
+            .prepare("UPDATE whatsapp_messages SET context_ref = ? WHERE id = ?")
+            .run(resolvedContextRef, pending.id);
+        }
+      }
+      firstContextRef ??= resolvedContextRef;
+
+      const sendOnce = async (): Promise<{ id?: string }> => {
+        await this.socket?.sendPresenceUpdate("composing", remoteJid);
+        await delay(config.typingDelayMs);
+        const result = await this.socket?.sendMessage(remoteJid, { text });
+        await this.socket?.sendPresenceUpdate("paused", remoteJid);
+        return { id: result?.key.id ?? undefined };
+      };
+
+      try {
+        let result = await sendOnce();
+        if (!result.id) {
+          await delay(500);
+          result = await sendOnce();
+        }
+
+        if (!result.id) {
+          throw new Error("WhatsApp send did not return a message id");
+        }
+
+        firstMessageId ??= result.id;
+        markWhatsAppMessageSent(this.db, pending.id, result.id);
+      } catch (error) {
+        const message = formatError(error);
+        errors.push(`${remoteJid}: ${message}`);
+        markWhatsAppMessageFailed(this.db, pending.id, message);
+      }
+    }
+
+    return {
+      ok: errors.length === 0,
+      status: errors.length === 0 ? "sent" : "failed",
+      ...(errors.length > 0 ? { error: errors.join("; ") } : {}),
+      messageId: firstMessageId,
+      rowId: firstRowId,
+      contextRef: firstContextRef,
+      daemon: this.snapshot(),
+    };
   }
 
   async stop(): Promise<void> {

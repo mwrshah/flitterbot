@@ -666,16 +666,19 @@ async function bootstrapWhatsappConfig() {
   }
 
   const after = { ...before };
+  delete after.recipientJid;
+  delete after.allowedJids;
   if (after.pairingPhoneNumber === undefined) {
     const entered = await promptWhatsappPhone(
       "WhatsApp phone number for pairing (digits with country code, blank to skip for now): ",
     );
     if (entered) after.pairingPhoneNumber = entered;
   }
-  if (after.recipientJid === undefined && after.pairingPhoneNumber) {
-    after.recipientJid = after.pairingPhoneNumber;
+  if (!after.users || typeof after.users !== "object" || Array.isArray(after.users)) after.users = {};
+  if (typeof after.defaultUser !== "string" || !after.defaultUser.trim()) {
+    const [firstUser] = Object.keys(after.users);
+    if (firstUser) after.defaultUser = firstUser;
   }
-  if (after.allowedJids === undefined) after.allowedJids = [];
   if (after.typingDelayMs === undefined) after.typingDelayMs = 800;
 
   if (canonicalJson(before) === canonicalJson(after)) return;

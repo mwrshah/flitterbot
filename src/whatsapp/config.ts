@@ -2,25 +2,27 @@ import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { getWhatsAppConfigPath, getWhatsAppHome } from "./paths.ts";
 
-type WhatsAppConfig = {
-  recipientJid?: string;
-  allowedJids: string[];
+export type WhatsAppUsersConfig = Record<string, string[]>;
+
+export type WhatsAppConfig = {
+  defaultUser?: string;
+  users: WhatsAppUsersConfig;
   pairingPhoneNumber?: string;
   typingDelayMs: number;
   daemonStartupTimeoutMs: number;
 };
 
 type WhatsAppConfigJson = {
-  recipientJid?: string;
-  allowedJids?: string[];
+  defaultUser?: string;
+  users?: Record<string, unknown>;
   pairingPhoneNumber?: string;
   typingDelayMs?: number;
   daemonStartupTimeoutMs?: number;
 };
 
 const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
-  recipientJid: undefined,
-  allowedJids: [],
+  defaultUser: undefined,
+  users: {},
   pairingPhoneNumber: undefined,
   typingDelayMs: 800,
   daemonStartupTimeoutMs: 8000,
@@ -56,6 +58,31 @@ function readPositiveInt(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
+function readJidList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string" && v.trim() !== "")
+    : [];
+}
+
+function readUsers(value: unknown): WhatsAppUsersConfig {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const users: WhatsAppUsersConfig = {};
+  for (const [userId, jids] of Object.entries(value)) {
+    const cleaned = readJidList(jids).map(toWhatsAppJid);
+    if (cleaned.length > 0) {
+      users[userId] = unique(cleaned);
+    }
+  }
+  return users;
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
 function normalizePhoneNumber(value: string): string {
   const normalized = value.replace(/[^\d]/g, "");
   if (!normalized) {
@@ -84,14 +111,9 @@ export function loadWhatsAppConfig(configPath = getWhatsAppConfigPath()): WhatsA
   ensureWhatsAppHome();
   const raw = readJsonObject(configPath);
 
-  const recipientJid = readString(raw.recipientJid);
-  const allowedJids = Array.isArray(raw.allowedJids)
-    ? raw.allowedJids.filter((v): v is string => typeof v === "string" && v.trim() !== "")
-    : [];
-
   return {
-    recipientJid,
-    allowedJids,
+    defaultUser: readString(raw.defaultUser),
+    users: readUsers(raw.users),
     pairingPhoneNumber: readString(raw.pairingPhoneNumber),
     typingDelayMs: readPositiveInt(raw.typingDelayMs, DEFAULT_WHATSAPP_CONFIG.typingDelayMs),
     daemonStartupTimeoutMs: readPositiveInt(
@@ -101,29 +123,56 @@ export function loadWhatsAppConfig(configPath = getWhatsAppConfigPath()): WhatsA
   };
 }
 
-export function resolveAllowedJids(config = loadWhatsAppConfig()): string[] {
-  return config.allowedJids.map(toWhatsAppJid);
+function resolveSelfJid(config: WhatsAppConfig): string | undefined {
+  return config.pairingPhoneNumber ? toWhatsAppJid(config.pairingPhoneNumber) : undefined;
 }
 
-export function resolveRecipientJid(config = loadWhatsAppConfig()): string {
-  if (config.recipientJid) {
-    return toWhatsAppJid(config.recipientJid);
+export function resolveAcceptedInboundJids(config = loadWhatsAppConfig()): string[] {
+  const selfJid = config.defaultUser ? resolveSelfJid(config) : undefined;
+  return unique([...Object.values(config.users).flat(), ...(selfJid ? [selfJid] : [])]);
+}
+
+export function resolveUserForJid(
+  remoteJid: string,
+  config = loadWhatsAppConfig(),
+): { userId: string; jids: string[] } | undefined {
+  const normalized = toWhatsAppJid(remoteJid);
+  const selfJid = resolveSelfJid(config);
+  if (config.defaultUser && normalized === selfJid) {
+    return { userId: config.defaultUser, jids: config.users[config.defaultUser] ?? [] };
   }
 
-  throw new Error(
-    `Missing recipient configuration. Set recipientJid in ${path.join(getWhatsAppHome(), "config.json")}.`,
-  );
+  for (const [userId, jids] of Object.entries(config.users)) {
+    if (jids.includes(normalized)) {
+      return { userId, jids };
+    }
+  }
+  return undefined;
 }
 
-export const resolvePrimaryJid = resolveRecipientJid;
+export function resolveBroadcastJidsForUser(
+  userId: string,
+  config = loadWhatsAppConfig(),
+): string[] {
+  const jids = config.users[userId];
+  if (!jids?.length) {
+    throw new Error(`Unknown WhatsApp user: ${userId}`);
+  }
+
+  const phoneJids = jids.filter((jid) => jid.endsWith("@s.whatsapp.net"));
+  if (phoneJids.length === 0) {
+    throw new Error(`WhatsApp user ${userId} has no phone-number JID for outbound broadcast`);
+  }
+
+  return unique(phoneJids);
+}
 
 export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string {
-  const value = config.pairingPhoneNumber ?? config.recipientJid;
-  if (!value) {
+  if (!config.pairingPhoneNumber) {
     throw new Error(
-      "Missing pairing phone number. Set pairingPhoneNumber in ~/.flitterbot/whatsapp/config.json.",
+      `Missing pairing phone number. Set pairingPhoneNumber in ${path.join(getWhatsAppHome(), "config.json")}.`,
     );
   }
 
-  return normalizePhoneNumber(value.replace(/@s\.whatsapp\.net$/, ""));
+  return normalizePhoneNumber(config.pairingPhoneNumber.replace(/@s\.whatsapp\.net$/, ""));
 }

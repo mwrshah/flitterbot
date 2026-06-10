@@ -1,6 +1,8 @@
 {
-  "recipientJid": "",
-  "allowedJids": [],
+  "defaultUser": "owner",
+  "users": {
+    "owner": []
+  },
   "pairingPhoneNumber": "",
   "typingDelayMs": 800
 }
