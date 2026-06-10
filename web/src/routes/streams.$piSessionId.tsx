@@ -91,6 +91,25 @@ function PiSessionRoute() {
   }, [defaultPiSessionId, navigate, piSessionId]);
 
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
+  const previousStreamIdRef = useRef<string | undefined>(stream?.id);
+
+  useEffect(() => {
+    if (stream?.id) previousStreamIdRef.current = stream.id;
+  }, [stream?.id]);
+
+  useEffect(() => {
+    if (isDefaultSession || stream || !status) return;
+    const replacementPiSessionId = previousStreamIdRef.current
+      ? status.streams?.find((ws) => ws.id === previousStreamIdRef.current)?.piSessionId
+      : undefined;
+    if (!replacementPiSessionId || replacementPiSessionId === piSessionId) return;
+    navigate({
+      to: "/streams/$piSessionId",
+      params: { piSessionId: replacementPiSessionId },
+      replace: true,
+    });
+  }, [isDefaultSession, navigate, piSessionId, status, stream]);
+
   const recoveryKind: "closed" | "dead" | undefined = isDefaultSession
     ? undefined
     : stream?.status === "closed"
@@ -103,6 +122,7 @@ function PiSessionRoute() {
   const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
     piSessionId,
     history,
+    isDefaultSession ? undefined : stream?.type,
   );
 
   return (
@@ -120,7 +140,8 @@ function PiSessionRoute() {
           onSendMessage={onSendMessage}
           streamId={isDefaultSession ? undefined : stream?.id}
           streamName={isDefaultSession ? "flitterbot" : stream?.name}
-          streamHasWorktree={!isDefaultSession && !!stream?.worktreePath}
+          streamType={isDefaultSession ? "defaultStream" : stream?.type}
+          streamHasWorktree={!isDefaultSession && stream?.type === "work" && !!stream?.worktreePath}
           selectedModelId={selectedModel?.id}
           selectedThinkingLevel={selectedModel?.thinkingLevel}
           recoveryKind={recoveryKind}

@@ -54,6 +54,7 @@ import type {
   DirectoryCompletionItem,
   ImageAttachment,
   StatusResponse,
+  StreamSummary,
   ThinkingLevel,
 } from "~/lib/types";
 import { setStreamCwd } from "~/server/streams";
@@ -72,6 +73,7 @@ type ChatPanelProps = {
   ) => Promise<void>;
   streamId?: string;
   streamName?: string;
+  streamType?: StreamSummary["type"];
   streamHasWorktree?: boolean;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
@@ -263,6 +265,7 @@ export function ChatPanel({
   onSendMessage,
   streamId,
   streamName,
+  streamType,
   streamHasWorktree = false,
   selectedModelId,
   selectedThinkingLevel,
@@ -662,7 +665,7 @@ export function ChatPanel({
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
 
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
-    if (!streamId) {
+    if (!streamId || streamType === "defaultStream") {
       return [
         {
           id: "clear-session",
@@ -676,15 +679,23 @@ export function ChatPanel({
         },
       ];
     }
+
+    const buttons: MessageInputHoverButton[] = [
+      streamHasWorktree
+        ? { id: "close-merge", label: "close (merge)", insertText: "ship it" }
+        : {
+            id: "close-stream",
+            label: "close stream",
+            insertText: "close stream with the no-op option",
+          },
+    ];
+
     if (streamHasWorktree) {
-      const buttons: MessageInputHoverButton[] = [
-        { id: "close-merge", label: "close (merge)", insertText: "ship it" },
-        {
-          id: "close-no-git-ops",
-          label: "close (no git ops)",
-          insertText: "close stream with the no-op option",
-        },
-      ];
+      buttons.push({
+        id: "close-no-git-ops",
+        label: "close (no git ops)",
+        insertText: "close stream with the no-op option",
+      });
       if (worktree?.worktreePath && worktree.branch && worktree.baseBranch) {
         buttons.push({
           id: "merge-base-branch",
@@ -692,18 +703,18 @@ export function ChatPanel({
           insertText: `Pls commit all changes in ${worktree.worktreePath}, then merge the current worktree branch ${worktree.branch} (using bash tool) into branch "${worktree.baseBranch}".`,
         });
       }
-      buttons.push({ id: "compact-session", label: "compact session", insertText: "/compact " });
-      return buttons;
     }
-    return [
-      {
-        id: "close-stream",
-        label: "close stream",
-        insertText: "close stream with the no-op option",
-      },
-      { id: "compact-session", label: "compact session", insertText: "/compact " },
-    ];
-  }, [streamHasWorktree, streamId, worktree?.baseBranch, worktree?.branch, worktree?.worktreePath]);
+
+    buttons.push({ id: "compact-session", label: "compact session", insertText: "/compact " });
+    return buttons;
+  }, [
+    streamHasWorktree,
+    streamId,
+    streamType,
+    worktree?.baseBranch,
+    worktree?.branch,
+    worktree?.worktreePath,
+  ]);
 
   return (
     <div className="flex flex-col h-full">
@@ -832,7 +843,9 @@ export function ChatPanel({
             recoveryKind={effectiveRecoveryKind}
             onRecover={() => recoverMutation.mutate()}
             hoverButtons={inputHoverButtons}
-            internalCommandScope={streamId ? "work-stream" : "default-stream"}
+            internalCommandScope={
+              !streamId || streamType === "defaultStream" ? "default-stream" : "work-stream"
+            }
             isRecoverPending={recoverMutation.isPending}
           />
         </Panel>

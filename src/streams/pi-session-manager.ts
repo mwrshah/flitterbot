@@ -420,102 +420,95 @@ export class PiSessionManager {
   }
 
   async resetDefault(): Promise<void> {
-    const old = this.defaultSession;
-    if (!old?.runtime) {
+    const managed = this.defaultSession;
+    if (!managed?.runtime) {
       throw new Error("No active default session to reset");
     }
 
-    const oldPiSessionId = old.piSessionId;
+    const { oldPiSessionId, newPiSessionId } = await this.resetManagedSession(managed, {
+      role: "default",
+      cwd: this.config.projectsDir,
+    });
 
-    old.queue.stop();
+    this.log(`default session reset: ${oldPiSessionId} → ${newPiSessionId}`);
+  }
+
+  async resetStreamSession(streamId: string): Promise<void> {
+    const managed = this.streamSessions.get(streamId);
+    if (!managed?.runtime) {
+      throw new Error("No active stream session to reset");
+    }
+
+    const current = this.blackboard.get<{ cwd: string | null }>(
+      "SELECT cwd FROM pi_sessions WHERE pi_session_id = ?",
+      managed.piSessionId,
+    );
+    const stream = getStreamById(this.blackboard, streamId);
+    const { oldPiSessionId, newPiSessionId } = await this.resetManagedSession(managed, {
+      role: "orchestrator",
+      cwd: current?.cwd ?? stream?.repo_path ?? this.config.projectsDir,
+      streamId,
+    });
+
+    this.log(
+      `stream session reset for "${managed.streamName}" (${streamId}): ${oldPiSessionId} → ${newPiSessionId}`,
+    );
+  }
+
+  private async resetManagedSession(
+    managed: ManagedPiSession,
+    opts: { role: string; cwd: string; streamId?: string },
+  ): Promise<{ oldPiSessionId: string; newPiSessionId: string }> {
+    if (!managed.runtime) throw new Error("No active pi session to reset");
+
+    const oldPiSessionId = managed.piSessionId;
+
+    managed.queue.stop();
     try {
-      old.unsubscribe();
+      managed.unsubscribe();
     } catch {}
 
     endPiSession(this.blackboard, oldPiSessionId, "ended", "clear", new Date().toISOString());
     this.toolDisplayCache.deletePiSession(oldPiSessionId);
 
-    await old.runtime.newSession();
+    await managed.runtime.newSession();
 
-    const newSession = old.runtime.session;
+    const newSession = managed.runtime.session;
     const newPiSessionId = newSession.sessionId;
     const newSessionFile = newSession.sessionFile;
 
-    old.state.initialize(newPiSessionId, newSessionFile, newSession.messages.length);
-
-    old.piSessionId = newPiSessionId;
+    managed.state.initialize(newPiSessionId, newSessionFile, newSession.messages.length);
+    managed.piSessionId = newPiSessionId;
+    managed.modelInfo = {
+      provider: newSession.model?.provider ?? managed.modelInfo.provider,
+      id: newSession.model?.id ?? managed.modelInfo.id,
+      entryId: managed.modelInfo.entryId,
+      thinkingLevel: newSession.thinkingLevel,
+    };
 
     upsertPiSession(this.blackboard, {
       piSessionId: newPiSessionId,
-      role: "default",
+      role: opts.role,
       status: "waiting_for_user",
       runtimeInstanceId: this.runtimeInstanceId,
       pid: process.pid,
       sessionFile: newSessionFile,
-      cwd: this.config.projectsDir,
+      cwd: opts.cwd,
       agentDir: this.config.controlSurfaceAgentDir,
-      modelProvider: old.modelInfo.provider,
-      modelId: old.modelInfo.id,
-      thinkingLevel: old.modelInfo.thinkingLevel,
-      startedAt: new Date(this.startedAt).toISOString(),
+      modelProvider: managed.modelInfo.provider,
+      modelId: managed.modelInfo.id,
+      thinkingLevel: managed.modelInfo.thinkingLevel,
+      startedAt: new Date().toISOString(),
       lastEventAt: new Date().toISOString(),
+      streamId: opts.streamId,
     });
 
     this.byPiSessionId.delete(oldPiSessionId);
-    this.byPiSessionId.set(newPiSessionId, old);
+    this.byPiSessionId.set(newPiSessionId, managed);
 
-    const processCallback = this.processCallback;
-    old.queue = new TurnQueue({
-      process: (item) => processCallback(old, item),
-      onItemStart: (item) => {
-        old.state.setBusy(true, item);
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi",
-          timestamp: new Date().toISOString(),
-        });
-        this.wsHub.broadcast({
-          type: "queue_item_start",
-          item,
-          piSessionId: old.piSessionId,
-        });
-      },
-      onItemEnd: (item, error) => {
-        old.state.setBusy(false);
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi",
-          timestamp: new Date().toISOString(),
-        });
-        if (error) {
-          const apiErr = error instanceof Error ? (error as ApiError) : undefined;
-          const detail = apiErr
-            ? `${apiErr.message}${apiErr.status ? ` [status=${apiErr.status}]` : ""}${apiErr.body ? ` body=${JSON.stringify(apiErr.body).slice(0, 200)}` : ""}`
-            : String(error);
-          this.log(`queue item ${item.id} failed (default): ${detail}`);
-        }
-        this.wsHub.broadcast({
-          type: "queue_item_end",
-          itemId: item.id,
-          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
-          piSessionId: old.piSessionId,
-        });
-      },
-    });
-
+    this.attachQueue(managed, managed.state, opts.streamId ?? null);
     this.toolDisplayCache.invalidatePiSession(newPiSessionId);
-    old.unsubscribe = subscribeToPiSession(
-      newSession,
-      old.state,
-      this.blackboard,
-      this.wsHub,
-      this.toolDisplayCache,
-      null,
-      null,
-      (lastAssistantMessage) => {
-        old.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
-      },
-    );
+    managed.unsubscribe = this.subscribeManagedSession(managed, newSession, managed.state);
 
     this.wsHub.broadcast({
       type: "status_changed",
@@ -523,7 +516,7 @@ export class PiSessionManager {
       timestamp: new Date().toISOString(),
     });
 
-    this.log(`default session reset: ${oldPiSessionId} → ${newPiSessionId}`);
+    return { oldPiSessionId, newPiSessionId };
   }
 
   disposeAll(): void {

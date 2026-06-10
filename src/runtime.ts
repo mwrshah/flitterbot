@@ -282,24 +282,50 @@ export class ControlSurfaceRuntime {
     | { ok: true; compacted: true } {
     input.text = input.text.trim();
 
-    if (
-      input.text === "/clear" &&
-      !input.metadata?.stream_id &&
-      !input.metadata?._targetSessionId
-    ) {
-      this.log("/clear: resetting default session");
-      void this.sessionManager
-        .resetDefault()
-        .then(() => {
-          fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
-          this.enqueueDefaultAgentFirstMessage("clear");
-        })
-        .catch((error) => {
-          this.log(
-            `/clear reset failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
-      return { ok: true, cleared: true };
+    if (input.text === "/clear") {
+      const targetSessionId = (input.metadata?._targetSessionId as string | undefined)?.trim();
+      const target = targetSessionId
+        ? this.sessionManager.getByPiSessionId(targetSessionId)
+        : undefined;
+      const targetStreamId = target?.streamId ?? undefined;
+      const targetStream = targetStreamId ? getStreamById(this.blackboard, targetStreamId) : null;
+
+      if (targetSessionId && target && targetStreamId && targetStream?.type === "defaultStream") {
+        this.log(`/clear: resetting default stream session ${targetSessionId}`);
+        void (async () => {
+          try {
+            if (!target.runtime) {
+              await this.sessionManager.activateStreamSession(
+                target,
+                this.createStreamSessionTools(targetStreamId),
+              );
+            }
+            await this.sessionManager.resetStreamSession(targetStreamId);
+            this.enqueueDefaultStreamFirstMessage(target);
+          } catch (error) {
+            this.log(
+              `/clear default stream reset failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        })();
+        return { ok: true, cleared: true };
+      }
+
+      if (!input.metadata?.stream_id && !targetSessionId) {
+        this.log("/clear: resetting default session");
+        void this.sessionManager
+          .resetDefault()
+          .then(() => {
+            fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
+            this.enqueueDefaultAgentFirstMessage("clear");
+          })
+          .catch((error) => {
+            this.log(
+              `/clear reset failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          });
+        return { ok: true, cleared: true };
+      }
     }
 
     if (
