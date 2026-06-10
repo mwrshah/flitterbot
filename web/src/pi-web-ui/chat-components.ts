@@ -97,6 +97,18 @@ function iconSvg(iconNode: unknown, size: "sm" | "md" = "md", className = ""): s
   return el.outerHTML;
 }
 
+const COPY_SUCCESS_VISIBLE_MS = 1500;
+const HEADER_COPY_BUTTON_CLASS =
+  "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground/70 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted data-[copied=true]:cursor-default data-[copied=true]:text-muted-foreground/50 data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-muted-foreground/50";
+
+function copyButtonLabel(copied: boolean, idleLabel: string): string {
+  return copied ? i18n("Copied") : idleLabel;
+}
+
+function copyButtonIcon(copied: boolean): string {
+  return iconSvg(copied ? Check : Copy, "sm");
+}
+
 function encodeUtf8Base64(value: string): string {
   return btoa(unescape(encodeURIComponent(value)));
 }
@@ -283,7 +295,7 @@ export class MessageCopyButton extends LitElement {
       this.copied = true;
       setTimeout(() => {
         this.copied = false;
-      }, 1500);
+      }, COPY_SUCCESS_VISIBLE_MS);
     } catch (error) {
       console.error("Failed to copy message", error);
     }
@@ -293,12 +305,15 @@ export class MessageCopyButton extends LitElement {
     if (!this.getText || this.targetIsSingleLine) return nothing;
     return html`
       <button
+        type="button"
         @click=${this.copy}
         data-copied=${this.copied ? "true" : "false"}
-        class="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/40 opacity-60 transition-opacity cursor-pointer data-[copied=false]:hover:text-muted-foreground data-[copied=false]:hover:opacity-100 data-[copied=true]:opacity-100 data-[copied=true]:cursor-default"
-        title="${i18n("Copy message")}"
+        class="absolute bottom-1.5 right-1.5 rounded p-1 text-muted-foreground/40 opacity-60 transition-opacity cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-muted-foreground data-[copied=false]:hover:opacity-100 data-[copied=true]:opacity-100 data-[copied=true]:cursor-default data-[copied=true]:text-muted-foreground/50"
+        title=${copyButtonLabel(this.copied, i18n("Copy message"))}
+        aria-label=${copyButtonLabel(this.copied, i18n("Copy message"))}
+        aria-live="polite"
       >
-        ${unsafeHTML(iconSvg(this.copied ? Check : Copy, "sm"))}
+        ${unsafeHTML(copyButtonIcon(this.copied))}
       </button>
     `;
   }
@@ -367,7 +382,7 @@ export class CodeBlock extends LitElement {
       this.copied = true;
       setTimeout(() => {
         this.copied = false;
-      }, 1500);
+      }, COPY_SUCCESS_VISIBLE_MS);
     } catch (error) {
       console.error("Failed to copy code", error);
     }
@@ -386,12 +401,15 @@ export class CodeBlock extends LitElement {
         <div class="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border">
           <span class="text-xs text-muted-foreground font-mono">${displayLanguage}</span>
           <button
+            type="button"
             @click=${this.copy}
             data-copied=${this.copied ? "true" : "false"}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground data-[copied=true]:text-emerald-500 transition-colors"
-            title="${i18n("Copy code")}"
+            class=${HEADER_COPY_BUTTON_CLASS}
+            title=${copyButtonLabel(this.copied, i18n("Copy code"))}
+            aria-label=${copyButtonLabel(this.copied, i18n("Copy code"))}
+            aria-live="polite"
           >
-            ${unsafeHTML(iconSvg(Copy, "sm"))}
+            ${unsafeHTML(copyButtonIcon(this.copied))}
           </button>
         </div>
         <div class="overflow-auto max-h-96">
@@ -426,7 +444,7 @@ export class ConsoleBlock extends LitElement {
       this.copied = true;
       setTimeout(() => {
         this.copied = false;
-      }, 1500);
+      }, COPY_SUCCESS_VISIBLE_MS);
     } catch (error) {
       console.error("Copy failed", error);
     }
@@ -447,12 +465,15 @@ export class ConsoleBlock extends LitElement {
         <div class="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border">
           <span class="text-xs text-muted-foreground font-mono">${i18n("console")}</span>
           <button
+            type="button"
             @click=${this.copy}
             data-copied=${this.copied ? "true" : "false"}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground data-[copied=true]:text-emerald-500 transition-colors"
-            title="${i18n("Copy output")}"
+            class=${HEADER_COPY_BUTTON_CLASS}
+            title=${copyButtonLabel(this.copied, i18n("Copy output"))}
+            aria-label=${copyButtonLabel(this.copied, i18n("Copy output"))}
+            aria-live="polite"
           >
-            ${unsafeHTML(iconSvg(Copy, "sm"))}
+            ${unsafeHTML(copyButtonIcon(this.copied))}
           </button>
         </div>
         <div class="console-scroll overflow-auto max-h-64">
