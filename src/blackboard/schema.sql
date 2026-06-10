@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 CREATE TABLE IF NOT EXISTS streams (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream')),
     repo_path TEXT,
     worktree_path TEXT,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),

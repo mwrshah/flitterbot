@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BLACKBOARD_SCHEMA_SQL, BLACKBOARD_SCHEMA_VERSION } from "../contracts/index.ts";
 
 type MigrationTableRow = { name: string };
+type MigrationColumnRow = { name: string };
 type MigrationVersionRow = { version: number };
 type MigrationCountRow = { count: number };
 
@@ -12,6 +13,11 @@ function hasTable(db: DatabaseSync, tableName: string): boolean {
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
     .get(tableName) as MigrationTableRow | undefined;
   return Boolean(row?.name);
+}
+
+function hasColumn(db: DatabaseSync, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as MigrationColumnRow[];
+  return rows.some((row) => row.name === columnName);
 }
 
 function getSchemaVersion(db: DatabaseSync): number {
@@ -828,7 +834,24 @@ export function migrateBlackboard(db: DatabaseSync): number {
     applyV22Migration(db);
   }
 
+  ensureCurrentSchemaInvariants(db);
   return getSchemaVersion(db);
+}
+
+function ensureCurrentSchemaInvariants(db: DatabaseSync): void {
+  if (!hasTable(db, "streams")) {
+    return;
+  }
+
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    ensureStreamsTypeColumn(db);
+    db.exec("UPDATE streams SET type = 'defaultStream' WHERE name LIKE 'flitterbot:%';");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
 }
 
 function applyV16Migration(db: DatabaseSync): void {
@@ -1211,9 +1234,7 @@ function applyV22Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    db.exec(
-      "ALTER TABLE streams ADD COLUMN type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream'));",
-    );
+    ensureStreamsTypeColumn(db);
     db.exec("UPDATE streams SET type = 'defaultStream' WHERE name LIKE 'flitterbot:%';");
     db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (22);");
     db.exec("COMMIT;");
@@ -1221,4 +1242,13 @@ function applyV22Migration(db: DatabaseSync): void {
     db.exec("ROLLBACK;");
     throw error;
   }
+}
+
+function ensureStreamsTypeColumn(db: DatabaseSync): void {
+  if (hasColumn(db, "streams", "type")) {
+    return;
+  }
+  db.exec(
+    "ALTER TABLE streams ADD COLUMN type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream'));",
+  );
 }
