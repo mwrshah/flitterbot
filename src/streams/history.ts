@@ -267,6 +267,21 @@ function shapeHistoryItems(
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const items: ChatTimelineItem[] = [];
   for (const entry of entries) {
+    if (entry.type === "compaction") {
+      const record = asRecord(entry);
+      const summary = firstText(record.summary);
+      if (summary?.trim()) {
+        items.push({
+          id: entry.id,
+          kind: "message",
+          role: "user",
+          content: summary,
+          compaction: true,
+          createdAt: isoTimestamp(record.timestamp, entry.timestamp),
+        });
+      }
+      continue;
+    }
     if (entry.type !== "message") continue;
     const messageRecord = asRecord(entry.message);
     const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);

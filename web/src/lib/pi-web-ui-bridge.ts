@@ -72,7 +72,8 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         timestamp: new Date(item.createdAt).getTime(),
         source,
         _entryId: item.id,
-      } as AgentMessage & { source: MessageSource; _entryId?: string });
+        ...(item.compaction ? { _compaction: true } : {}),
+      } as AgentMessage & { source: MessageSource; _entryId?: string; _compaction?: boolean });
       continue;
     }
 

@@ -1048,9 +1048,21 @@ export class UserMessage extends LitElement {
 
     const plainText = textContent?.text || "";
     const canPrune = Boolean(this.entryId);
+    const isCompaction = Boolean(
+      (this.message as unknown as { _compaction?: boolean })._compaction,
+    );
 
     return html`
-      <div class="flex justify-start ml-2 mr-4 mt-8 mb-2 group/user-message">
+      ${
+        isCompaction
+          ? html`<div class="flex items-center gap-2 mx-4 mt-8 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              <hr class="flex-1 border-t border-border" />
+              <span>${i18n("Context compacted")}</span>
+              <hr class="flex-1 border-t border-border" />
+            </div>`
+          : nothing
+      }
+      <div class="flex justify-start ml-2 mr-4 ${isCompaction ? "mt-1" : "mt-8"} mb-2 group/user-message">
         <div class="relative">
           <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
