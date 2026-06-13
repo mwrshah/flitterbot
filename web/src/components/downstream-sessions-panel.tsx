@@ -451,6 +451,56 @@ export function DownstreamSessionsPanel({
                   )}
                 </span>
               </div>
+
+              {((worktree?.copyPaths?.length ?? 0) > 0 ||
+                (worktree?.postCreate?.length ?? 0) > 0 ||
+                !!worktree?.configuredBaseRef) && (
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
+                    Bootstrap Config
+                  </p>
+                  {worktree?.configuredBaseRef && (
+                    <div className="pl-2 py-0.5">
+                      <span className="text-[10px] text-muted-foreground/70">baseRef</span>
+                      <p className="mt-0.5 text-xs text-muted-foreground font-mono truncate">
+                        {worktree.configuredBaseRef}
+                      </p>
+                    </div>
+                  )}
+                  {(worktree?.copyPaths?.length ?? 0) > 0 && (
+                    <div className="pl-2 py-0.5">
+                      <span className="text-[10px] text-muted-foreground/70">copyPaths</span>
+                      <ul className="mt-0.5 flex flex-col gap-0.5">
+                        {worktree?.copyPaths?.map((p) => (
+                          <li
+                            key={p}
+                            className="text-xs text-muted-foreground font-mono truncate"
+                            title={p}
+                          >
+                            {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(worktree?.postCreate?.length ?? 0) > 0 && (
+                    <div className="pl-2 py-0.5">
+                      <span className="text-[10px] text-muted-foreground/70">postCreate</span>
+                      <ul className="mt-0.5 flex flex-col gap-0.5">
+                        {worktree?.postCreate?.map((c) => (
+                          <li
+                            key={c}
+                            className="text-xs text-muted-foreground font-mono truncate"
+                            title={c}
+                          >
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

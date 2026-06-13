@@ -1,9 +1,15 @@
 import { exec as cpExec } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { enrichStream, getStreamById } from "../blackboard/query-streams.ts";
+import {
+  buildDiscoveryAdvisory,
+  isConfigured,
+  readWorktreeConfig,
+  type WorktreeBootstrapConfig,
+} from "../streams/worktree-config.ts";
 
 const execPromise = promisify(cpExec);
 
@@ -65,151 +71,75 @@ async function createWorktree(
   return { worktreePath };
 }
 
-const INSTALL_RULES: Array<{ files: string[]; cmd: string }> = [
-  { files: ["pyproject.toml"], cmd: "uv sync" },
-  { files: ["pnpm-lock.yaml"], cmd: "pnpm install" },
-  { files: ["bun.lockb", "bun.lock"], cmd: "bun install" },
-];
-
-function detectInstallCmd(dir: string): string | null {
-  for (const rule of INSTALL_RULES) {
-    if (rule.files.some((f) => existsSync(path.join(dir, f)))) {
-      return rule.cmd;
-    }
-  }
-  return null;
-}
-
-async function installDependencies(worktreePath: string): Promise<string[]> {
-  const dirs: Array<{ dir: string; cmd: string }> = [];
-
-  const rootCmd = detectInstallCmd(worktreePath);
-  if (rootCmd) dirs.push({ dir: worktreePath, cmd: rootCmd });
-
-  try {
-    for (const entry of readdirSync(worktreePath)) {
-      const full = path.join(worktreePath, entry);
-      try {
-        if (!statSync(full).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      if (entry.startsWith(".") || entry === "node_modules") continue;
-      const cmd = detectInstallCmd(full);
-      if (cmd) dirs.push({ dir: full, cmd });
-    }
-  } catch {}
-
-  if (dirs.length === 0) return [];
-
-  const results = await Promise.all(
-    dirs.map(async ({ dir, cmd }) => {
-      const label = dir === worktreePath ? "/" : path.basename(dir);
-      try {
-        await exec(cmd, dir, 120_000);
-        return `${cmd} in ${label} (ok)`;
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return `${cmd} in ${label} (failed: ${msg})`;
-      }
-    }),
-  );
-  return results;
-}
-
-const ENV_NAMES = new Set([".env", ".env.local"]);
-const ALWAYS_SKIP = new Set(["node_modules", ".git", "__pycache__"]);
-
-async function getGitIgnoredDirs(repoPath: string, absPaths: string[]): Promise<Set<string>> {
-  if (absPaths.length === 0) return new Set();
-  try {
-    const args = absPaths.map((p) => JSON.stringify(p)).join(" ");
-    const { stdout } = await execPromise(`git check-ignore ${args}`, {
-      cwd: repoPath,
-      timeout: 5_000,
-    });
-    return new Set(stdout.trim().split("\n").filter(Boolean));
-  } catch {
-    // git check-ignore exits 1 when nothing is ignored — that's "skip nothing", not an error.
-    return new Set();
-  }
-}
-
-async function findEnvFiles(
-  repoPath: string,
-  dir: string,
-  maxDepth: number,
-  depth = 0,
-): Promise<string[]> {
-  if (depth > maxDepth) return [];
+// Copy each configured path (file or dir) from the main repo into the worktree. Runs BEFORE
+// postCreate hooks so install/build steps see the env/secret files they need.
+function runCopyPaths(repoPath: string, worktreePath: string, copyPaths: string[]): string[] {
   const results: string[] = [];
-  const candidateDirs: string[] = [];
-  try {
-    for (const entry of readdirSync(dir)) {
-      const full = path.join(dir, entry);
-      if (ENV_NAMES.has(entry)) {
-        try {
-          if (statSync(full).isFile()) results.push(full);
-        } catch {}
-      } else if (depth < maxDepth && !entry.startsWith(".") && !ALWAYS_SKIP.has(entry)) {
-        try {
-          if (statSync(full).isDirectory()) candidateDirs.push(full);
-        } catch {}
-      }
+  for (const rel of copyPaths) {
+    const src = path.resolve(repoPath, rel);
+    const dest = path.resolve(worktreePath, rel);
+    if (!src.startsWith(repoPath) || !dest.startsWith(worktreePath)) {
+      results.push(`${rel} (skipped: escapes repo)`);
+      continue;
     }
-  } catch {}
-
-  if (candidateDirs.length > 0) {
-    const ignored = await getGitIgnoredDirs(repoPath, candidateDirs);
-    for (const subdir of candidateDirs) {
-      if (!ignored.has(subdir)) {
-        results.push(...(await findEnvFiles(repoPath, subdir, maxDepth, depth + 1)));
-      }
+    if (!existsSync(src)) {
+      results.push(`${rel} (skipped: not found in main repo)`);
+      continue;
     }
-  }
-
-  return results;
-}
-
-async function copyEnvFiles(repoPath: string, worktreePath: string): Promise<string[]> {
-  const envFiles = await findEnvFiles(repoPath, repoPath, 3);
-  if (envFiles.length === 0) return [];
-
-  const results: string[] = [];
-  for (const srcFile of envFiles) {
-    const relPath = path.relative(repoPath, srcFile);
-    const destFile = path.join(worktreePath, relPath);
     try {
-      mkdirSync(path.dirname(destFile), { recursive: true });
-      copyFileSync(srcFile, destFile);
-      results.push(relPath);
+      mkdirSync(path.dirname(dest), { recursive: true });
+      cpSync(src, dest, { recursive: true });
+      results.push(`${rel} (ok)`);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      results.push(`${relPath} (failed: ${msg})`);
+      results.push(`${rel} (failed: ${msg})`);
     }
   }
   return results;
 }
 
-// Default base_ref derives from the orchestrator's own current branch, never a hardcoded origin/main; it fails loudly so the caller can pick an explicit base_ref instead of silently falling back.
-async function resolveOrchestratorHeadBranch(cwd: string): Promise<string> {
-  if (!existsSync(cwd)) {
-    throw new Error(`Orchestrator cwd does not exist: ${cwd}`);
+// Run postCreate hooks sequentially in declared order (ordering matters: install before build),
+// each with cwd = worktree root. Best-effort: a failing hook never fails worktree creation.
+async function runPostCreate(worktreePath: string, postCreate: string[]): Promise<string[]> {
+  const results: string[] = [];
+  for (const cmd of postCreate) {
+    try {
+      await exec(cmd, worktreePath, 300_000);
+      results.push(`${cmd} (ok)`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      results.push(`${cmd} (failed: ${msg})`);
+    }
   }
-  let raw: string;
+  return results;
+}
+
+function runBootstrap(
+  repoPath: string,
+  worktreePath: string,
+  config: WorktreeBootstrapConfig,
+): Promise<string> {
+  const copyResults = runCopyPaths(repoPath, worktreePath, config.copyPaths);
+  return runPostCreate(worktreePath, config.postCreate).then((hookResults) => {
+    const parts: string[] = [];
+    if (copyResults.length > 0) parts.push(`\nCopied: ${copyResults.join(", ")}`);
+    if (hookResults.length > 0) parts.push(`\npostCreate: ${hookResults.join(", ")}`);
+    return parts.join("");
+  });
+}
+
+// Resolve the checked-out branch at a path, or null if the path is missing, not a repo, or on a
+// detached HEAD. Never throws — base_ref resolution tries cwd then repo_path and only fails if both
+// come back null, so the caller stays in control of the fallback chain.
+async function tryHeadBranch(dir: string): Promise<string | null> {
+  if (!existsSync(dir)) return null;
+  let branch: string;
   try {
-    raw = await exec("git rev-parse --abbrev-ref HEAD", cwd, 5_000);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to resolve HEAD branch of orchestrator cwd ${cwd}: ${msg}`);
+    branch = (await exec("git rev-parse --abbrev-ref HEAD", dir, 5_000)).trim();
+  } catch {
+    return null;
   }
-  const branch = raw.trim();
-  if (!branch) {
-    throw new Error(`Orchestrator cwd ${cwd} returned empty HEAD branch`);
-  }
-  if (branch === "HEAD") {
-    throw new Error(`Orchestrator cwd ${cwd} is on a detached HEAD — pass an explicit base_ref`);
-  }
+  if (!branch || branch === "HEAD") return null;
   return branch;
 }
 
@@ -217,12 +147,9 @@ export async function executeCreateWorktree(
   blackboard: BlackboardDatabase,
   streamId: string,
   orchestratorCwd: string,
-  repoPath: string,
-  branchName?: string,
-  updateRepoPath?: string,
-  updateWorktreePath?: string,
   baseRef?: string,
   force = false,
+  discovery = false,
 ): Promise<CreateWorktreeResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
@@ -240,15 +167,27 @@ export async function executeCreateWorktree(
     };
   }
 
-  if (updateRepoPath !== undefined || updateWorktreePath !== undefined) {
-    const newRepo = updateRepoPath ?? stream.repo_path ?? repoPath;
-    const newWorktree = updateWorktreePath ?? stream.worktree_path ?? undefined;
-    enrichStream(blackboard, streamId, newRepo, newWorktree);
+  // repo_path is derived only from the orchestrator cwd. If the cwd is not inside the repo the
+  // user wants, they should change cwd and call create_worktree again.
+  let repoPath: string;
+  try {
+    repoPath = await exec("git rev-parse --show-toplevel", orchestratorCwd, 5_000);
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      streamId,
+      message: `Could not resolve repo_path: orchestrator cwd ${orchestratorCwd} is not inside a git repo (${error instanceof Error ? error.message : String(error)}). Change cwd to a path inside the target repo, then call create_worktree again.`,
+    };
+  }
+
+  // Discovery dry-run: surface bootstrap-config options for the repo WITHOUT creating a worktree,
+  // regardless of whether a [flitterbot] config already exists.
+  if (discovery) {
+    const config = await readWorktreeConfig(repoPath);
     return {
       ok: true,
       streamId,
-      worktreePath: newWorktree,
-      message: `Updated stream fields (repo_path=${newRepo}, worktree_path=${newWorktree ?? "null"})`,
+      message: await buildDiscoveryAdvisory(repoPath, config, "discovery"),
     };
   }
 
@@ -267,29 +206,40 @@ export async function executeCreateWorktree(
     cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
+  // Read the [flitterbot] config once and reuse it for base-ref resolution + bootstrap.
+  const config = await readWorktreeConfig(repoPath);
+
+  // base_ref priority: explicit arg > flitterbot.baseRef config > orchestrator cwd's checked-out
+  // HEAD > repo_path's checked-out HEAD. The cwd default is usually right (a worktree-based
+  // orchestrator forks off its own worktree branch), but it's implicit, so we emit an advisory
+  // whenever a checked-out HEAD is used so the user can pin a base via config if desired.
   let resolvedBaseRef: string;
+  let baseRefNote = "";
   if (baseRef) {
     resolvedBaseRef = baseRef;
+    baseRefNote = `\nBase: '${resolvedBaseRef}' (explicit base_ref).`;
+  } else if (config.baseRef) {
+    resolvedBaseRef = config.baseRef;
+    baseRefNote = `\nBase: '${resolvedBaseRef}' (from flitterbot.baseRef config).`;
   } else {
-    try {
-      resolvedBaseRef = await resolveOrchestratorHeadBranch(orchestratorCwd);
-    } catch (error: unknown) {
+    const cwdBranch = await tryHeadBranch(orchestratorCwd);
+    const repoBranch = cwdBranch ? null : await tryHeadBranch(repoPath);
+    const fallback = cwdBranch ?? repoBranch;
+    if (!fallback) {
       return {
         ok: false,
         streamId,
-        message: error instanceof Error ? error.message : String(error),
+        message: `Could not resolve a fork base: orchestrator cwd (${orchestratorCwd}) and repo (${repoPath}) have no checked-out branch (missing, not a repo, or detached HEAD). Pass base_ref explicitly or set git config flitterbot.baseRef.`,
       };
     }
+    resolvedBaseRef = fallback;
+    const source = cwdBranch ? "orchestrator cwd's checked-out HEAD" : "repo's checked-out HEAD";
+    baseRefNote = `\nBase: '${resolvedBaseRef}' (default = ${source}; not configured). To pin the fork base from inside this repo/worktree, run: git config flitterbot.baseRef <branch-or-origin/branch>`;
   }
 
   const slug = slugify(stream.name);
-  let resolvedBranch: string;
-  if (branchName) {
-    resolvedBranch = branchName;
-  } else {
-    const nextNum = (await getHighestBranchNumber(repoPath)) + 1;
-    resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
-  }
+  const nextNum = (await getHighestBranchNumber(repoPath)) + 1;
+  const resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
 
   const SHA_RE = /^[0-9a-f]{7,40}$/i;
   if (SHA_RE.test(resolvedBaseRef)) {
@@ -364,22 +314,17 @@ export async function executeCreateWorktree(
     }
     enrichStream(blackboard, streamId, repoPath, result.worktreePath, normalizedBase);
 
-    let installSummary = "";
+    let bootstrapSummary = "";
     try {
-      const installResults = await installDependencies(result.worktreePath);
-      if (installResults.length > 0) {
-        installSummary = `\nDeps: ${installResults.join(", ")}`;
-      }
-    } catch {}
-
-    let envSummary = "";
-    try {
-      const envResults = await copyEnvFiles(repoPath, result.worktreePath);
-      if (envResults.length > 0) {
-        envSummary = `\nEnv: copied ${envResults.join(", ")}`;
+      if (isConfigured(config)) {
+        bootstrapSummary = await runBootstrap(repoPath, result.worktreePath, config);
+      } else {
+        // Unconfigured: skip all bootstrap and hand the agent a setup advisory so it can
+        // persist a [flitterbot] recipe into .git/config for future creates.
+        bootstrapSummary = `\n\n${await buildDiscoveryAdvisory(repoPath, config, "unconfigured")}`;
       }
     } catch (error: unknown) {
-      envSummary = `\nEnv: copy failed — ${error instanceof Error ? error.message : String(error)}`;
+      bootstrapSummary = `\nBootstrap error: ${error instanceof Error ? error.message : String(error)}`;
     }
 
     return {
@@ -387,7 +332,7 @@ export async function executeCreateWorktree(
       streamId,
       worktreePath: result.worktreePath,
       branchName: resolvedBranch,
-      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${installSummary}${envSummary}`,
+      message: `${cleanupMessage}Worktree created at ${result.worktreePath} on branch ${resolvedBranch}${baseRefNote}${bootstrapSummary}`,
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
