@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
+import { readWorktreeConfig } from "../streams/worktree-config.ts";
 import { sendJson } from "./_shared.ts";
 
 const execPromise = promisify(cpExec);
@@ -40,6 +41,9 @@ export async function handleBrowserPiSessionStreamRoute(
   const cwdAbsolute = piSession?.cwd ?? null;
   const cwd = cwdAbsolute ? relativizeCwd(cwdAbsolute, runtime.config.projectsDir) : null;
   const branch = ws?.worktree_path ? await resolveWorktreeBranch(ws.worktree_path) : null;
+  const config = ws?.repo_path
+    ? await readWorktreeConfig(ws.repo_path)
+    : { copyPaths: [], postCreate: [], baseRef: null };
   return sendJson(response, 200, {
     streamId: ws?.id ?? null,
     name: ws?.name ?? null,
@@ -49,6 +53,9 @@ export async function handleBrowserPiSessionStreamRoute(
     baseBranch: ws?.base_branch ?? null,
     cwd,
     cwdAbsolute,
+    copyPaths: config.copyPaths,
+    postCreate: config.postCreate,
+    configuredBaseRef: config.baseRef,
   });
 }
 

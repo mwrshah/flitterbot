@@ -2148,59 +2148,46 @@ export class ControlSurfaceRuntime {
         name: "create_worktree",
         label: "Create Git Worktree",
         description:
-          "Create an isolated git worktree for a stream. Sets up a new branch and records repo_path + worktree_path + base_branch on the stream. base_ref defaults to the orchestrator's own current branch (resolved from pi_sessions.cwd via `git rev-parse --abbrev-ref HEAD`) — NOT hardcoded to origin/main. Pass base_ref explicitly to override (e.g. 'main', 'develop'). SHAs/tags not accepted. Branch name auto-generates as NNN-<stream-slug> when omitted. Typically one worktree per stream. ALWAYS pass the main repo root as `repo_path` — never a worktree path (the tool resolves sibling directories via path.resolve(repoPath, '..', ...)). If your own cwd is itself a worktree, resolve the main repo first with `git worktree list --porcelain | head -1 | sed 's/^worktree //'`.",
+          "Create an isolated git worktree for the current stream. The stream and repo are implicit: the tool is bound to the current stream, and the repo is resolved from the orchestrator cwd via `git rev-parse --show-toplevel`. If cwd is not inside the intended repo, change cwd first and call again. Call with NO arguments for the common case: branch auto-generates as NNN-<stream-slug>, and the fork base resolves by priority: explicit base_ref > `flitterbot.baseRef` in the repo's .git/config > the orchestrator cwd's checked-out HEAD > the repo_path checked-out HEAD. Pass base_ref only to override (e.g. 'main', 'develop'); SHAs/tags not accepted. Pass force:true only when an existing worktree should be delinked and recreated. For a no-side-effect preview of bootstrap setup, pass discovery:true. After a real create the tool bootstraps from a `[flitterbot]` section in the repo's LOCAL .git/config (uncommitted): `copyPath` multivars (files/dirs copied main→worktree, run first) then `postCreate` multivars (ordered shell strings run with cwd=worktree root, best-effort). When the repo has no such config, it copies/installs NOTHING and returns a setup advisory listing discovered env files + caching package ecosystems so you can persist a recipe via `git config --add flitterbot.copyPath/postCreate`.",
 
         parameters: {
           type: "object",
           properties: {
-            stream_id: { type: "string", description: "ID of the stream" },
-            repo_path: { type: "string", description: "Absolute path to the project repository" },
-            branch_name: {
-              type: "string",
-              description: "Branch name (optional, defaults to NNN-<slug>)",
-            },
-            update_repo_path: {
-              type: "string",
-              description:
-                "Update only the repo_path field without creating a worktree. Skips all git operations.",
-            },
-            update_worktree_path: {
-              type: "string",
-              description:
-                "Update only the worktree_path field without creating a worktree. Skips all git operations.",
-            },
             base_ref: {
               type: "string",
               description:
-                "Git ref to branch from. Optional — when omitted, resolves to the orchestrator's own current branch (from its pi-session cwd). Pass explicitly to override (e.g. 'main', 'develop', 'origin/release-2026'). Does NOT accept SHAs or tags.",
+                "Optional branch to fork from. When omitted, resolves by priority: `flitterbot.baseRef` config > orchestrator cwd's checked-out HEAD > repo's checked-out HEAD. Pass to override (e.g. 'main', 'develop', 'origin/release-2026'). Does NOT accept SHAs or tags.",
             },
             force: {
               type: "boolean",
               description:
                 "Create a new worktree even if stream already has one (existing worktree is delinked but left on disk)",
             },
+            discovery: {
+              type: "boolean",
+              description:
+                "Dry-run: do NOT create a worktree. Scan the repo (depth-5 find) and return a setup advisory — current [flitterbot] config, discovered env/secret files, and caching vs non-caching package ecosystems — so you can author copyPath/postCreate config. Works whether or not the repo is already configured.",
+            },
           },
-          required: ["stream_id", "repo_path"],
+          required: [],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const {
-            stream_id,
-            repo_path,
-            branch_name,
-            update_repo_path,
-            update_worktree_path,
-            base_ref,
-            force,
-          } = params as {
-            stream_id: string;
-            repo_path: string;
-            branch_name?: string;
-            update_repo_path?: string;
-            update_worktree_path?: string;
+          const { base_ref, force, discovery } = params as {
             base_ref?: string;
             force?: boolean;
+            discovery?: boolean;
           };
+          // stream_id is ambient: this tool is constructed bound to the orchestrator's stream.
+          if (!streamId) {
+            return {
+              content: [
+                { type: "text", text: "Error: create_worktree is only available on a stream." },
+              ],
+              details: { ok: false },
+            };
+          }
+          const stream_id = streamId;
           const orchestratorRow = this.blackboard.get<{ cwd: string | null }>(
             `SELECT cwd FROM pi_sessions
              WHERE stream_id = ? AND role = 'orchestrator'
@@ -2213,7 +2200,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Error: no orchestrator pi_session found for stream ${stream_id} — cannot resolve base_ref default.`,
+                  text: `Error: no orchestrator pi_session found for stream ${stream_id} — cannot resolve repo_path / base_ref defaults.`,
                 },
               ],
               details: { ok: false, streamId: stream_id },
@@ -2223,12 +2210,9 @@ export class ControlSurfaceRuntime {
             this.blackboard,
             stream_id,
             orchestratorCwd,
-            repo_path,
-            branch_name,
-            update_repo_path,
-            update_worktree_path,
             base_ref,
             force,
+            discovery,
           );
           if (result.ok) {
             const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;

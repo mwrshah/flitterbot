@@ -98,6 +98,9 @@ export type StreamInfo = {
   baseBranch: string | null;
   cwd: string | null;
   cwdAbsolute: string | null;
+  copyPaths: string[];
+  postCreate: string[];
+  configuredBaseRef: string | null;
 };
 
 export const setStreamCwd = createServerFn({ method: "POST" })
