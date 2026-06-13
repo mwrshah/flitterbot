@@ -14,6 +14,7 @@ import {
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
+import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
@@ -734,11 +735,20 @@ export function ChatPanel({
                   type="button"
                   onClick={streamId ? openCwdPicker : undefined}
                   disabled={!streamId}
-                  className="inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-muted/60"
+                  className="shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                   title={streamId ? `switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
-                  <span>{worktree.cwd}</span>
+                  [cwd]:
                 </button>
+                <CopyableCode
+                  text={cwdAbsolute}
+                  displayText={worktree.cwd}
+                  copied={cwdCopy.copied}
+                  onCopy={() =>
+                    cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"))
+                  }
+                  className="text-muted-foreground"
+                />
                 {cwdCopy.copied ? (
                   <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
                 ) : (
