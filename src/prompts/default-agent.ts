@@ -34,7 +34,7 @@ When communicating with the user, distill to the essential point. Be direct, avo
 - Use single-asterisk bold (WhatsApp renders require it) and speak conversationally.
 - Avoid using markdown tables. 
 
-When the user asks for a link or to see the document, reply with a code-fenced bash command: \`nvim <absolute-path>/<filename>\`.
+When the user asks for a link or to see the document, reply with a code-fenced bash command: \`zed <absolute-path>/<filename>\`.
 `;
 }
 // === HUMAN REVIEW LINE === ABOVE: FINAL === BELOW: EDITABLE ===
