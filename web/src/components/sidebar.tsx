@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
+import { PinIcon, PinOffIcon } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
-import { LuPin, LuPinOff } from "react-icons/lu";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
@@ -388,8 +388,8 @@ export const Sidebar = memo(function Sidebar() {
                             pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
                           }}
                         >
-                          <LuPin className="size-3 group-hover/pin:hidden" />
-                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                          <PinIcon className="size-3 group-hover/pin:hidden" />
+                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
                         </button>
                       )}
                     </Link>
@@ -417,8 +417,8 @@ export const Sidebar = memo(function Sidebar() {
                             pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
                           }}
                         >
-                          <LuPin className="size-3 group-hover/pin:hidden" />
-                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                          <PinIcon className="size-3 group-hover/pin:hidden" />
+                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
                         </button>
                       )}
                     </div>
@@ -466,8 +466,8 @@ export const Sidebar = memo(function Sidebar() {
                             pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
                           }}
                         >
-                          <LuPin className="size-3 group-hover/pin:hidden" />
-                          <LuPinOff className="hidden size-3 group-hover/pin:block" />
+                          <PinIcon className="size-3 group-hover/pin:hidden" />
+                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
                         </button>
                       )}
                     </Link>
