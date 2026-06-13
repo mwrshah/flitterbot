@@ -128,6 +128,16 @@ function runBootstrap(
   });
 }
 
+async function resolveMainWorktreePath(repoPath: string): Promise<string> {
+  const output = await exec("git worktree list --porcelain", repoPath, 10_000);
+  const firstWorktree = output
+    .split("\n")
+    .find((line) => line.startsWith("worktree "))
+    ?.slice("worktree ".length)
+    .trim();
+  return firstWorktree || repoPath;
+}
+
 // Resolve the checked-out branch at a path, or null if the path is missing, not a repo, or on a
 // detached HEAD. Never throws — base_ref resolution tries cwd then repo_path and only fails if both
 // come back null, so the caller stays in control of the fallback chain.
@@ -167,11 +177,13 @@ export async function executeCreateWorktree(
     };
   }
 
-  // repo_path is derived only from the orchestrator cwd. If the cwd is not inside the repo the
-  // user wants, they should change cwd and call create_worktree again.
+  // Resolve the current worktree from cwd, then anchor created worktrees on the repo's main
+  // worktree so launching from an existing linked worktree does not nest another -worktrees dir.
+  let currentWorktreePath: string;
   let repoPath: string;
   try {
-    repoPath = await exec("git rev-parse --show-toplevel", orchestratorCwd, 5_000);
+    currentWorktreePath = await exec("git rev-parse --show-toplevel", orchestratorCwd, 5_000);
+    repoPath = await resolveMainWorktreePath(currentWorktreePath);
   } catch (error: unknown) {
     return {
       ok: false,

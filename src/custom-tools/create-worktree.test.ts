@@ -50,7 +50,48 @@ function createRepo(): { root: string; repo: string } {
   return { root, repo };
 }
 
+function addOrigin(root: string, repo: string): void {
+  const origin = path.join(root, "origin.git");
+  execFileSync("git", ["init", "--bare", origin], { stdio: "ignore" });
+  execFileSync("git", ["remote", "add", "origin", origin], { cwd: repo });
+  execFileSync("git", ["push", "-u", "origin", "main"], { cwd: repo, stdio: "ignore" });
+}
+
 describe("executeCreateWorktree", () => {
+  test("creates sibling worktree from main checkout when launched inside an existing worktree", async () => {
+    const { root, repo } = createRepo();
+    addOrigin(root, repo);
+    const existingWorktree = path.join(root, "repo-worktrees", "001-existing");
+    try {
+      execFileSync("git", ["worktree", "add", existingWorktree, "-b", "001-existing"], {
+        cwd: repo,
+        stdio: "ignore",
+      });
+      const state = fakeDb({
+        id: "stream-1",
+        name: "Feature Work",
+        type: "work",
+        repo_path: null,
+        worktree_path: null,
+        status: "open",
+        created_at: "2026-01-01 00:00:00",
+        closed_at: null,
+        base_branch: null,
+        pinned: false,
+      });
+
+      const result = await executeCreateWorktree(state.db, "stream-1", existingWorktree, "main");
+
+      const realRoot = fs.realpathSync(root);
+      expect(result.ok).toBe(true);
+      expect(result.worktreePath).toBe(path.join(realRoot, "repo-worktrees", "002-feature-work"));
+      expect(state.getStream().repo_path).toBe(path.join(realRoot, "repo"));
+      expect(state.getStream().worktree_path).toBe(result.worktreePath);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("discovery mode resolves repo from orchestrator cwd without creating a worktree", async () => {
     const { root, repo } = createRepo();
     try {
