@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { FolderPenIcon } from "lucide-react";
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -730,15 +731,15 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
-              <span ref={cwdPickerAnchorRef} className="relative flex items-center gap-1 min-w-0">
+              <span ref={cwdPickerAnchorRef} className="relative flex items-center min-w-0 gap-1">
                 <button
                   type="button"
                   onClick={streamId ? openCwdPicker : undefined}
                   disabled={!streamId}
-                  className="shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                  className="inline-flex shrink-0 items-center gap-1 px-1 py-0.5 rounded text-xs text-muted-foreground transition-colors bg-muted/60 hover:bg-muted hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                   title={streamId ? `switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
-                  [cwd]:
+                  <FolderPenIcon className="size-3.5" aria-hidden="true" />
                 </button>
                 <CopyableCode
                   text={cwdAbsolute}
@@ -750,9 +751,9 @@ export function ChatPanel({
                   className="text-muted-foreground"
                 />
                 {cwdCopy.copied ? (
-                  <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                  <span className="text-muted-foreground/50 text-[10px] ml-1">Copied!</span>
                 ) : (
-                  <ShortcutHint label={cwdShortcutLabel} />
+                  <ShortcutHint label={cwdShortcutLabel} className="ml-1" />
                 )}
               </span>
             </>
