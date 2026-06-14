@@ -44,7 +44,7 @@ function KbdGroup({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
 
 export function ShortcutHint({
   label,
-  actionText = "Copied",
+  actionText,
   actionActive = false,
   className,
   kbdClassName,
@@ -64,15 +64,16 @@ export function ShortcutHint({
     const trimmed = step.trim();
     if (trimmed) steps.push(trimmed);
   }
+  const showAction = Boolean(actionText);
 
   return (
     <span className={cn("inline-grid items-center whitespace-nowrap", className)} {...props}>
       <span
         className={cn(
           "col-start-1 row-start-1 inline-flex items-center gap-1",
-          actionActive && "invisible pointer-events-none",
+          showAction && actionActive && "invisible pointer-events-none",
         )}
-        aria-hidden={actionActive}
+        aria-hidden={showAction && actionActive}
       >
         {steps.map((step, index) => (
           <span key={step} className="inline-flex items-center gap-1">
@@ -87,15 +88,17 @@ export function ShortcutHint({
           </span>
         ))}
       </span>
-      <span
-        className={cn(
-          "col-start-1 row-start-1 inline-flex items-center text-[10px] text-muted-foreground/50",
-          !actionActive && "invisible pointer-events-none",
-        )}
-        aria-hidden={!actionActive}
-      >
-        {actionText}
-      </span>
+      {showAction && (
+        <span
+          className={cn(
+            "col-start-1 row-start-1 inline-flex items-center text-[10px] text-muted-foreground/50",
+            !actionActive && "invisible pointer-events-none",
+          )}
+          aria-hidden={!actionActive}
+        >
+          {actionText}
+        </span>
+      )}
     </span>
   );
 }
