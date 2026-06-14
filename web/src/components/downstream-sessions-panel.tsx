@@ -34,12 +34,12 @@ function piStatusBanner(
       };
     case "waiting_for_sessions":
       return {
-        label: "Waiting for sessions",
+        label: "Supervising",
         colorClass: "bg-lime-500/15 text-lime-600 dark:text-lime-400",
       };
     case "waiting_for_user":
       return {
-        label: "Waiting for user",
+        label: "Idle",
         colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
       };
     case "ended":
