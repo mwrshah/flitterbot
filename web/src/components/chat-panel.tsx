@@ -750,11 +750,12 @@ export function ChatPanel({
                   }
                   className="text-muted-foreground"
                 />
-                {cwdCopy.copied ? (
-                  <span className="text-muted-foreground/50 text-[10px] ml-1">Copied!</span>
-                ) : (
-                  <ShortcutHint label={cwdShortcutLabel} className="ml-1" />
-                )}
+                <ShortcutHint
+                  label={cwdShortcutLabel}
+                  actionActive={cwdCopy.copied}
+                  actionText="Copied"
+                  className="ml-1"
+                />
               </span>
             </>
           )}

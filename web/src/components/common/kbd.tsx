@@ -44,6 +44,8 @@ function KbdGroup({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
 
 export function ShortcutHint({
   label,
+  actionText = "Copied",
+  actionActive = false,
   className,
   kbdClassName,
   kbdSize = "default",
@@ -51,6 +53,8 @@ export function ShortcutHint({
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
+  actionText?: string;
+  actionActive?: boolean;
   kbdClassName?: string;
   kbdSize?: KbdSize;
   kbdTone?: KbdTone;
@@ -62,19 +66,36 @@ export function ShortcutHint({
   }
 
   return (
-    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap", className)} {...props}>
-      {steps.map((step, index) => (
-        <span key={step} className="inline-flex items-center gap-1">
-          {index > 0 && <span className="text-[10px] text-muted-foreground/45">then</span>}
-          <KbdGroup>
-            {step.split("+").map((key) => (
-              <Kbd key={key} size={kbdSize} tone={kbdTone} className={kbdClassName}>
-                {key}
-              </Kbd>
-            ))}
-          </KbdGroup>
-        </span>
-      ))}
+    <span className={cn("inline-grid items-center whitespace-nowrap", className)} {...props}>
+      <span
+        className={cn(
+          "col-start-1 row-start-1 inline-flex items-center gap-1",
+          actionActive && "invisible pointer-events-none",
+        )}
+        aria-hidden={actionActive}
+      >
+        {steps.map((step, index) => (
+          <span key={step} className="inline-flex items-center gap-1">
+            {index > 0 && <span className="text-[10px] text-muted-foreground/45">then</span>}
+            <KbdGroup>
+              {step.split("+").map((key) => (
+                <Kbd key={key} size={kbdSize} tone={kbdTone} className={kbdClassName}>
+                  {key}
+                </Kbd>
+              ))}
+            </KbdGroup>
+          </span>
+        ))}
+      </span>
+      <span
+        className={cn(
+          "col-start-1 row-start-1 inline-flex items-center text-[10px] text-muted-foreground/50",
+          !actionActive && "invisible pointer-events-none",
+        )}
+        aria-hidden={!actionActive}
+      >
+        {actionText}
+      </span>
     </span>
   );
 }
