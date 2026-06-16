@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useRouterState } from "@tanstack/react-router";
 import { PinIcon, PinOffIcon } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import logoBlack from "~/assets/flitterbot_logo_black_small.png";
 import logoWhite from "~/assets/flitterbot_logo_white_small.png";
@@ -83,12 +83,14 @@ function StreamContextMenu({
   onTogglePinned,
   onRename,
   onClose,
+  renderTrigger,
 }: {
   stream: StreamSummary;
   disabled: boolean;
   onTogglePinned: () => void;
   onRename: (name: string) => void;
   onClose?: () => void;
+  renderTrigger: (label: ReactNode) => ReactElement;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(stream.name);
@@ -120,34 +122,34 @@ function StreamContextMenu({
     }
   };
 
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Enter") {
-            e.preventDefault();
-            inputRef.current?.blur();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            setValue(stream.name);
-            setEditing(false);
-          }
-        }}
-        onClick={(e) => e.preventDefault()}
-        className="flex-1 min-w-0 select-text bg-transparent outline-none border-b border-sidebar-foreground/30"
-      />
-    );
-  }
+  const label = editing ? (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          inputRef.current?.blur();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setValue(stream.name);
+          setEditing(false);
+        }
+      }}
+      onClick={(e) => e.preventDefault()}
+      className="flex-1 min-w-0 select-text bg-transparent outline-none border-b border-sidebar-foreground/30"
+    />
+  ) : (
+    <span className="truncate flex-1">{stream.name}</span>
+  );
 
   return (
     <ContextMenu>
       <ContextMenuTrigger
-        className="truncate flex-1"
+        render={renderTrigger(label)}
         onClick={(e) => {
           if (e.detail > 1) e.preventDefault();
         }}
@@ -156,9 +158,7 @@ function StreamContextMenu({
           setValue(stream.name);
           setEditing(true);
         }}
-      >
-        {stream.name}
-      </ContextMenuTrigger>
+      />
       <ContextMenuContent>
         <ContextMenuItem
           onClick={() => {
@@ -273,7 +273,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex flex-col h-full select-none bg-sidebar border-r border-sidebar-border">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden select-none bg-sidebar border-r border-sidebar-border">
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
@@ -290,25 +290,31 @@ export const Sidebar = memo(function Sidebar() {
       </nav>
 
       {(defaultPiSessionId || allStreams.length > 0) && (
-        <div className="pl-4 pr-3.5 py-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
+        <div className="pl-3 pr-2 pt-1 pb-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
           {(defaultPiSessionId || openStreams.length > 0) && (
             <>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/40 font-medium">
+              <div className="flex items-center justify-between mb-2 ml-2">
+                <p className="text-[10px] pt-2  uppercase tracking-wider text-sidebar-foreground/40 font-medium">
                   Active streams
                 </p>
-                <button
-                  type="button"
-                  onClick={() => createStreamMutation.mutate()}
-                  disabled={createStreamMutation.isPending}
-                  aria-label="New stream"
-                  title={
-                    newStreamShortcutHint ? `New stream (${newStreamShortcutHint})` : "New stream"
-                  }
-                  className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm leading-none disabled:opacity-40 disabled:cursor-not-allowed"
+                <div
+                  className="group px-2 pt-2 pb-1 pl-4"
+                  onClick={() => {
+                    if (!createStreamMutation.isPending) createStreamMutation.mutate();
+                  }}
                 >
-                  +
-                </button>
+                  <button
+                    type="button"
+                    disabled={createStreamMutation.isPending}
+                    aria-label="New stream"
+                    title={
+                      newStreamShortcutHint ? `New stream (${newStreamShortcutHint})` : "New stream"
+                    }
+                    className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 group-hover:text-sidebar-foreground group-hover:bg-sidebar-accent/50 transition-colors text-sm leading-none disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <div className="space-y-1">
                 {defaultPiSessionId && (
@@ -335,95 +341,101 @@ export const Sidebar = memo(function Sidebar() {
                     )}
                   </Link>
                 )}
-                {openStreams.map((ws) =>
-                  ws.piSessionId ? (
-                    <Link
+                {openStreams.map((ws) => {
+                  const piSessionId = ws.piSessionId;
+
+                  return piSessionId ? (
+                    <StreamContextMenu
                       key={ws.id}
-                      to="/streams/$piSessionId"
-                      params={{ piSessionId: ws.piSessionId }}
-                      className={cn(
-                        "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                        currentPiSessionId === ws.piSessionId
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "shrink-0 size-2 rounded-full",
-                          piStatusDotClass(ws.piSessionStatus),
-                        )}
-                      />
-                      <StreamContextMenu
-                        stream={ws}
-                        disabled={pinStreamMutation.isPending}
-                        onTogglePinned={() =>
-                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
-                        }
-                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
-                        onClose={() => closeStreamMutation.mutate(ws.id)}
-                      />
-                      {streamShortcuts.has(ws.id) && (
-                        <ShortcutHint
-                          label={String(streamShortcuts.get(ws.id))}
+                      stream={ws}
+                      disabled={pinStreamMutation.isPending}
+                      onTogglePinned={() =>
+                        pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                      }
+                      onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      onClose={() => closeStreamMutation.mutate(ws.id)}
+                      renderTrigger={(label) => (
+                        <Link
+                          to="/streams/$piSessionId"
+                          params={{ piSessionId }}
                           className={cn(
-                            "shrink-0 ml-2 text-sidebar-foreground/30",
-                            ws.pinned && "group-hover:hidden",
+                            "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                            currentPiSessionId === piSessionId
+                              ? "bg-accent text-accent-foreground font-medium"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                           )}
-                          kbdSize="compact"
-                          kbdTone="sidebar"
-                        />
-                      )}
-                      {ws.pinned && (
-                        <button
-                          type="button"
-                          aria-label="Unpin stream"
-                          className={cn(
-                            "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex",
-                            !streamShortcuts.has(ws.id) && "ml-auto",
-                          )}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
-                          }}
                         >
-                          <PinIcon className="size-3 group-hover/pin:hidden" />
-                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-                        </button>
+                          <span
+                            className={cn(
+                              "shrink-0 size-2 rounded-full",
+                              piStatusDotClass(ws.piSessionStatus),
+                            )}
+                          />
+                          {label}
+                          {streamShortcuts.has(ws.id) && (
+                            <ShortcutHint
+                              label={String(streamShortcuts.get(ws.id))}
+                              className={cn(
+                                "shrink-0 ml-2 text-sidebar-foreground/30",
+                                ws.pinned && "group-hover:hidden",
+                              )}
+                              kbdSize="compact"
+                              kbdTone="sidebar"
+                            />
+                          )}
+                          {ws.pinned && (
+                            <button
+                              type="button"
+                              aria-label="Unpin stream"
+                              className={cn(
+                                "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex",
+                                !streamShortcuts.has(ws.id) && "ml-auto",
+                              )}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                              }}
+                            >
+                              <PinIcon className="size-3 group-hover/pin:hidden" />
+                              <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+                            </button>
+                          )}
+                        </Link>
                       )}
-                    </Link>
+                    />
                   ) : (
-                    <div
+                    <StreamContextMenu
                       key={ws.id}
-                      className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40"
-                    >
-                      <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
-                      <StreamContextMenu
-                        stream={ws}
-                        disabled={pinStreamMutation.isPending}
-                        onTogglePinned={() =>
-                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
-                        }
-                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
-                        onClose={() => closeStreamMutation.mutate(ws.id)}
-                      />
-                      {ws.pinned && (
-                        <button
-                          type="button"
-                          aria-label="Unpin stream"
-                          className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex"
-                          onClick={() => {
-                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
-                          }}
-                        >
-                          <PinIcon className="size-3 group-hover/pin:hidden" />
-                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-                        </button>
+                      stream={ws}
+                      disabled={pinStreamMutation.isPending}
+                      onTogglePinned={() =>
+                        pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                      }
+                      onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      onClose={() => closeStreamMutation.mutate(ws.id)}
+                      renderTrigger={(label) => (
+                        <div className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40">
+                          <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
+                          {label}
+                          {ws.pinned && (
+                            <button
+                              type="button"
+                              aria-label="Unpin stream"
+                              className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex"
+                              onClick={() => {
+                                pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                              }}
+                            >
+                              <PinIcon className="size-3 group-hover/pin:hidden" />
+                              <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  ),
-                )}
+                    />
+                  );
+                })}
               </div>
             </>
           )}
@@ -434,45 +446,50 @@ export const Sidebar = memo(function Sidebar() {
                 Recently closed
               </p>
               <div className="space-y-1">
-                {closedStreams.map((ws) =>
-                  ws.piSessionId ? (
-                    <Link
+                {closedStreams.map((ws) => {
+                  const piSessionId = ws.piSessionId;
+
+                  return piSessionId ? (
+                    <StreamContextMenu
                       key={ws.id}
-                      to="/streams/$piSessionId"
-                      params={{ piSessionId: ws.piSessionId }}
-                      className={cn(
-                        "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
-                        currentPiSessionId === ws.piSessionId
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
-                      )}
-                    >
-                      <StreamContextMenu
-                        stream={ws}
-                        disabled={pinStreamMutation.isPending}
-                        onTogglePinned={() =>
-                          pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
-                        }
-                        onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
-                      />
-                      {ws.pinned && (
-                        <button
-                          type="button"
-                          aria-label="Unpin stream"
-                          className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
-                          }}
+                      stream={ws}
+                      disabled={pinStreamMutation.isPending}
+                      onTogglePinned={() =>
+                        pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
+                      }
+                      onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      renderTrigger={(label) => (
+                        <Link
+                          to="/streams/$piSessionId"
+                          params={{ piSessionId }}
+                          className={cn(
+                            "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
+                            currentPiSessionId === piSessionId
+                              ? "bg-accent text-accent-foreground font-medium"
+                              : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
+                          )}
                         >
-                          <PinIcon className="size-3 group-hover/pin:hidden" />
-                          <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-                        </button>
+                          {label}
+                          {ws.pinned && (
+                            <button
+                              type="button"
+                              aria-label="Unpin stream"
+                              className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
+                              }}
+                            >
+                              <PinIcon className="size-3 group-hover/pin:hidden" />
+                              <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+                            </button>
+                          )}
+                        </Link>
                       )}
-                    </Link>
-                  ) : null,
-                )}
+                    />
+                  ) : null;
+                })}
               </div>
             </div>
           )}
