@@ -48,6 +48,43 @@ export async function readWorktreeConfig(repoPath: string): Promise<WorktreeBoot
   return { copyPaths, postCreate, baseRef };
 }
 
+export async function resolveGitRoot(cwd: string | null | undefined): Promise<string | null> {
+  if (!cwd) return null;
+  try {
+    const { stdout } = await execPromise("git rev-parse --show-toplevel", {
+      cwd,
+      timeout: 5_000,
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveMainRepoPath(cwd: string | null | undefined): Promise<string | null> {
+  if (!cwd) return null;
+  try {
+    const { stdout } = await execPromise("git rev-parse --path-format=absolute --git-common-dir", {
+      cwd,
+      timeout: 5_000,
+    });
+    const commonGitDir = stdout.trim();
+    if (!commonGitDir) return null;
+    return path.dirname(commonGitDir);
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveBootstrapConfigSource(
+  cwd: string | null | undefined,
+  worktreePath: string | null | undefined,
+): Promise<string | null> {
+  const cwdGitRoot = await resolveGitRoot(cwd);
+  if (cwdGitRoot) return cwdGitRoot;
+  return resolveMainRepoPath(worktreePath);
+}
+
 export function isConfigured(config: WorktreeBootstrapConfig): boolean {
   return config.copyPaths.length > 0 || config.postCreate.length > 0;
 }
