@@ -80,6 +80,8 @@ describe("executeCreateWorktree", () => {
         pinned: false,
       });
 
+      execFileSync("git", ["config", "--add", "flitterbot.postCreate", "true"], { cwd: repo });
+
       const result = await executeCreateWorktree(state.db, "stream-1", existingWorktree, "main");
 
       const realRoot = fs.realpathSync(root);
@@ -87,6 +89,80 @@ describe("executeCreateWorktree", () => {
       expect(result.worktreePath).toBe(path.join(realRoot, "repo-worktrees", "002-feature-work"));
       expect(state.getStream().repo_path).toBe(path.join(realRoot, "repo"));
       expect(state.getStream().worktree_path).toBe(result.worktreePath);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("unconfigured repo short-circuits to actionable discovery without creating a worktree", async () => {
+    const { root, repo } = createRepo();
+    try {
+      const state = fakeDb({
+        id: "stream-1",
+        name: "feature",
+        type: "work",
+        repo_path: null,
+        worktree_path: null,
+        status: "open",
+        created_at: "2026-01-01 00:00:00",
+        closed_at: null,
+        base_branch: null,
+        pinned: false,
+      });
+
+      fs.writeFileSync(path.join(repo, ".env.local"), "SECRET=1\n");
+      fs.writeFileSync(path.join(repo, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+
+      const result = await executeCreateWorktree(state.db, "stream-1", repo, "main");
+
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("NO worktree was created");
+      expect(result.message).toContain(
+        "First explore the repo context to suggest candidates for post-create hooks",
+      );
+      expect(result.message).toContain("3. Ask the user what the baseRef should be.");
+      expect(result.message).toContain(".env.local");
+      expect(result.message).toContain("pnpm install");
+      expect(state.getStream().worktree_path).toBe(null);
+      expect(fs.existsSync(path.join(root, "repo-worktrees"))).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("non-git cwd short-circuits to actionable discovery", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "flit-cwt-nongit-"));
+    try {
+      const state = fakeDb({
+        id: "stream-1",
+        name: "feature",
+        type: "work",
+        repo_path: null,
+        worktree_path: null,
+        status: "open",
+        created_at: "2026-01-01 00:00:00",
+        closed_at: null,
+        base_branch: null,
+        pinned: false,
+      });
+      fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n");
+      fs.writeFileSync(path.join(root, "package-lock.json"), "{}\n");
+
+      const result = await executeCreateWorktree(state.db, "stream-1", root);
+
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("is not inside a git repo");
+      expect(result.message).toContain("NO worktree was created");
+      expect(result.message).toContain("first identify the intended repository");
+      expect(result.message).toContain(
+        "Retry create_worktree from inside the intended git repository",
+      );
+      expect(result.message).not.toContain("Current [flitterbot] config: NONE");
+      expect(result.message).not.toContain("Discovered env/secret files");
+      expect(result.message).not.toContain(".env");
+      expect(result.message).not.toContain("npm at /");
+      expect(result.message).not.toContain("3. Ask the user what the baseRef should be.");
+      expect(state.getStream().worktree_path).toBe(null);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

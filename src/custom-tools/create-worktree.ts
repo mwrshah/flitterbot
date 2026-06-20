@@ -21,6 +21,19 @@ type CreateWorktreeResult = {
   message: string;
 };
 
+const UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS = [
+  "Action needed before creating a worktree:",
+  "1. First explore the repo context to suggest candidates for post-create hooks. Use the discovery output below as a starting point: env/secret files are candidates for flitterbot.copyPath, and package ecosystems are candidates for flitterbot.postCreate.",
+  "2. Suggest options to the user. Say which env files were turned up, which post-create hooks look appropriate, and ask the user what their decision is on the worktree configuration.",
+  "3. Ask the user what the baseRef should be.",
+].join("\n");
+
+const NON_GIT_WORKTREE_AGENT_INSTRUCTIONS = [
+  "Action needed before creating a worktree:",
+  "1. This cwd is not inside a git repo, so first identify the intended repository or ask the user which repo/cwd to use.",
+  "2. Retry create_worktree from inside the intended git repository.",
+].join("\n");
+
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
@@ -188,7 +201,10 @@ export async function executeCreateWorktree(
     return {
       ok: false,
       streamId,
-      message: `Could not resolve repo_path: orchestrator cwd ${orchestratorCwd} is not inside a git repo (${error instanceof Error ? error.message : String(error)}). Change cwd to a path inside the target repo, then call create_worktree again.`,
+      message: [
+        `Could not resolve repo_path: orchestrator cwd ${orchestratorCwd} is not inside a git repo (${error instanceof Error ? error.message : String(error)}). NO worktree was created.`,
+        NON_GIT_WORKTREE_AGENT_INSTRUCTIONS,
+      ].join("\n\n"),
     };
   }
 
@@ -220,6 +236,18 @@ export async function executeCreateWorktree(
 
   // Read the [flitterbot] config once and reuse it for base-ref resolution + bootstrap.
   const config = await readWorktreeConfig(repoPath);
+
+  if (!isConfigured(config)) {
+    return {
+      ok: false,
+      streamId,
+      message: [
+        "No [flitterbot] worktree bootstrap config found in this repo's .git/config. NO worktree was created.",
+        UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS,
+        await buildDiscoveryAdvisory(repoPath, config, "discovery"),
+      ].join("\n\n"),
+    };
+  }
 
   // base_ref priority: explicit arg > flitterbot.baseRef config > orchestrator cwd's checked-out
   // HEAD > repo_path's checked-out HEAD. The cwd default is usually right (a worktree-based

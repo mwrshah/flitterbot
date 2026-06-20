@@ -276,7 +276,7 @@ export async function buildDiscoveryAdvisory(
   }
 
   lines.push(
-    "Explore the repo + README, then persist a config so future worktree creates bootstrap automatically. Re-run create_worktree (or run the recipe manually) once configured.",
+    "Next step for the agent: explore the repo + README/package scripts to validate whether the env files above are complete and which postCreate hooks are appropriate. Then suggest concrete baseRef/copyPath/postCreate options to the user and ask what configuration they want persisted before creating the worktree.",
   );
   return lines.join("\n");
 }
