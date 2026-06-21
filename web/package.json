@@ -60,9 +60,6 @@
     ],
     "project": [
       "src/**/*.{ts,tsx}"
-    ],
-    "ignore": [
-      "src/**/*.test.{ts,tsx}"
     ]
   }
 }

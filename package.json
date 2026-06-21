@@ -56,7 +56,6 @@
       "src/**/*.ts"
     ],
     "ignore": [
-      "src/**/*.test.ts",
       "src/**/index.ts"
     ]
   }
