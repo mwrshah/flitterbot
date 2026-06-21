@@ -58,6 +58,7 @@ const SCHEDULER_FILES = ["flitterbot-checkin.sh", "com.flitterbot.scheduler.plis
 const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
 const WHATSAPP_FILES = ["README.md", "config.json.example"];
 const WHATSAPP_EXEC_FILES = ["run-entry.js", "cli.js", "daemon.js"];
+const CONTROL_SURFACE_AGENT_FILES = ["AGENTS.md"];
 const BUNDLED_SKILLS_DIR = "skills";
 
 function sha256Text(text) {
@@ -295,6 +296,10 @@ function noteRuntimeFile(src, dest) {
   if (sha256File(src) !== sha256File(dest)) appendRuntimeChange("update", dest);
 }
 
+function noteRuntimeFileIfMissing(_src, dest) {
+  if (!existsSync(dest)) appendRuntimeChange("create", dest);
+}
+
 function noteTextFile(dest, content) {
   if (!existsSync(dest)) {
     appendRuntimeChange("create", dest);
@@ -404,6 +409,7 @@ function prepareDirectories() {
     join(FLITTERBOT_DIR, "bin"),
     ...(INSTALL_SCHEDULER ? [join(FLITTERBOT_DIR, "scheduler")] : []),
     join(FLITTERBOT_DIR, "control-surface"),
+    join(FLITTERBOT_DIR, "control-surface", "agent"),
     join(FLITTERBOT_DIR, "hooks"),
     join(FLITTERBOT_DIR, "logs"),
     join(FLITTERBOT_DIR, "scripts"),
@@ -520,6 +526,7 @@ async function bootstrapConfig() {
     newStreamFirstMessageFooter: DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER,
     tmuxEnabled: true,
     extraSkillPaths: [],
+    learningsNotePath: "~/.flitterbot/data/learnings.md",
     todoistApiKey: "",
     linearApiKey: "",
   };
@@ -816,6 +823,12 @@ async function deployRuntimeFiles() {
     noteRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file));
   }
 
+  for (const file of CONTROL_SURFACE_AGENT_FILES) {
+    const src = resolvePackagedRuntimeFile(`agent/${file}`);
+    if (!src) continue;
+    noteRuntimeFileIfMissing(src, join(FLITTERBOT_DIR, "control-surface", "agent", file));
+  }
+
   const skillsSrcDir = resolvePackagedRepoDir(BUNDLED_SKILLS_DIR);
   const bundledSkillFiles = skillsSrcDir ? walkFiles(skillsSrcDir) : [];
   for (const file of bundledSkillFiles) {
@@ -882,6 +895,13 @@ async function deployRuntimeFiles() {
           const src = resolvePackagedRuntimeFile(`whatsapp/${file}`);
           if (!src) continue;
           copyRuntimeFile(src, join(FLITTERBOT_DIR, "whatsapp", file), 0o755);
+        }
+
+        for (const file of CONTROL_SURFACE_AGENT_FILES) {
+          const src = resolvePackagedRuntimeFile(`agent/${file}`);
+          const dest = join(FLITTERBOT_DIR, "control-surface", "agent", file);
+          if (!src || existsSync(dest)) continue;
+          copyRuntimeFile(src, dest, 0o644);
         }
 
         for (const file of bundledSkillFiles) {

@@ -31,8 +31,9 @@ Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. T
 - `newStreamFirstMessageFooter` — footer appended to the first prompt sent to every new stream orchestrator.
 - `tmuxEnabled` — include tmux sub-agent orchestration instructions in orchestrator prompts.
 - `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
+- `learningsNotePath` — Markdown document used by the bundled `learnings` skill.
 
-Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
+Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Flitterbot agent instructions load from `~/.flitterbot/control-surface/agent/AGENTS.md`; the installer creates this file if missing and leaves user edits intact. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
 
 ## Commands
 

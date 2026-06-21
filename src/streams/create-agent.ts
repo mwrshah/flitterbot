@@ -94,21 +94,6 @@ export async function createFlitterbotAgent(
     }
   }
 
-  const userAgentsMdPath = path.join(HOME, ".agents", "AGENTS.md");
-  let userAgentsMdEntry: { path: string; content: string } | null = null;
-  try {
-    if (fs.existsSync(userAgentsMdPath)) {
-      userAgentsMdEntry = {
-        path: userAgentsMdPath,
-        content: fs.readFileSync(userAgentsMdPath, "utf-8"),
-      };
-    }
-  } catch (err) {
-    skillPathWarnings.push(
-      `failed to read ${userAgentsMdPath}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-
   const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
   const modelEntry = shouldLetSessionRestoreModel
     ? undefined
@@ -148,14 +133,6 @@ export async function createFlitterbotAgent(
       resourceLoaderOptions: {
         additionalSkillPaths,
         appendSystemPromptOverride: (base) => [...base, promptRef.value],
-        agentsFilesOverride: (baseAgents) => {
-          if (!userAgentsMdEntry) return baseAgents;
-          const already = baseAgents.agentsFiles.some((f) => f.path === userAgentsMdEntry?.path);
-          if (already) return baseAgents;
-          return {
-            agentsFiles: [userAgentsMdEntry, ...baseAgents.agentsFiles],
-          };
-        },
       },
     });
 

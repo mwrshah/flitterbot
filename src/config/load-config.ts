@@ -48,6 +48,7 @@ type RawConfigJson = {
   newStreamFirstMessageFooter?: unknown;
   tmuxEnabled?: unknown;
   extraSkillPaths?: unknown;
+  learningsNotePath?: unknown;
   todoistApiKey?: unknown;
   linearApiKey?: unknown;
 };
@@ -80,6 +81,7 @@ const ACCEPTED_CONFIG_KEYS = [
   "newStreamFirstMessageFooter",
   "tmuxEnabled",
   "extraSkillPaths",
+  "learningsNotePath",
   "todoistApiKey",
   "linearApiKey",
 ] as const satisfies readonly (keyof RawConfigJson)[];
@@ -120,6 +122,7 @@ export type FlitterbotConfig = {
   flitterbotSkillsDir: string;
   tmuxEnabled: boolean;
   extraSkillPaths: string[];
+  learningsNotePath: string;
 };
 
 export const TMUX_SKILL_DIRECTIVE = "/skill:tmux";
@@ -373,6 +376,7 @@ export function loadConfig(): FlitterbotConfig {
     flitterbotSkillsDir: path.join(FLITTERBOT_DIR, "skills"),
     tmuxEnabled: requireConfigBoolean(raw, "tmuxEnabled"),
     extraSkillPaths: parseExtraSkillPaths(raw),
+    learningsNotePath: expandHome(requireConfigString(raw, "learningsNotePath")),
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
@@ -390,6 +394,7 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(config.flitterbotSkillsDir);
   ensureDir(path.join(FLITTERBOT_DIR, "data", "tasks"));
   ensureDir(path.join(FLITTERBOT_DIR, "data", "notes"));
+  ensureDir(path.dirname(config.learningsNotePath));
   ensureDir(path.dirname(logPath));
   ensureDir(path.dirname(config.blackboardPath));
   ensureDir(path.dirname(config.whatsappSocketPath));
