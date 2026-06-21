@@ -94,6 +94,21 @@ export async function createFlitterbotAgent(
     }
   }
 
+  const homeAgentsMdPath = path.join(HOME, ".agents", "AGENTS.md");
+  let homeAgentsMdEntry: { path: string; content: string } | null = null;
+  try {
+    if (fs.existsSync(homeAgentsMdPath)) {
+      homeAgentsMdEntry = {
+        path: homeAgentsMdPath,
+        content: fs.readFileSync(homeAgentsMdPath, "utf-8"),
+      };
+    }
+  } catch (err) {
+    skillPathWarnings.push(
+      `failed to read ${homeAgentsMdPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
   const modelEntry = shouldLetSessionRestoreModel
     ? undefined
@@ -133,6 +148,14 @@ export async function createFlitterbotAgent(
       resourceLoaderOptions: {
         additionalSkillPaths,
         appendSystemPromptOverride: (base) => [...base, promptRef.value],
+        agentsFilesOverride: (baseAgents) => {
+          if (!homeAgentsMdEntry) return baseAgents;
+          const already = baseAgents.agentsFiles.some((f) => f.path === homeAgentsMdEntry?.path);
+          if (already) return baseAgents;
+          return {
+            agentsFiles: [homeAgentsMdEntry, ...baseAgents.agentsFiles],
+          };
+        },
       },
     });
 
