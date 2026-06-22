@@ -273,11 +273,6 @@
     color: var(--muted-foreground);
   }
 
-  [data-sonner-toast] [data-close-button] {
-    background: var(--muted);
-    border-color: var(--border);
-    color: var(--foreground);
-  }
 
   [data-sonner-toast][data-type="error"] {
     background: var(--destructive) !important;

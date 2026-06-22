@@ -159,7 +159,6 @@ function RootDocument({
         <Toaster
           theme={resolvedTheme}
           duration={4000}
-          closeButton
           toastOptions={{
             style: {
               background: "var(--background)",
