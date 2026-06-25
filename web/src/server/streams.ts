@@ -93,6 +93,7 @@ export type StreamInfo = {
   streamId: string | null;
   name: string | null;
   repoPath: string | null;
+  repo: string | null;
   worktreePath: string | null;
   branch: string | null;
   baseBranch: string | null;

@@ -144,11 +144,14 @@ export function DownstreamSessionsPanel({
   const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
 
   const currentWorktreePath = worktree?.worktreePath ?? null;
+  const currentRepoPath = worktree?.repoPath ?? null;
   const currentBranch = worktree?.branch ?? null;
   const targetBranch = worktree?.baseBranch ?? (hasWorktree ? "main" : null);
   const worktreeShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
     "c then w";
+  const repoShortcutLabel =
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyRepoPath, { compact: true }) || "c then r";
   const branchShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyBranch, { compact: true }) || "c then b";
   const targetBranchShortcutLabel =
@@ -158,6 +161,7 @@ export function DownstreamSessionsPanel({
   const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff);
 
   const worktreeCopy = useCopyToClipboard(600);
+  const repoCopy = useCopyToClipboard(600);
   const branchCopy = useCopyToClipboard(600);
   const baseBranchCopy = useCopyToClipboard(600);
 
@@ -181,6 +185,15 @@ export function DownstreamSessionsPanel({
         handler: () => {
           if (!currentWorktreePath) return false;
           void worktreeCopy.copy(currentWorktreePath).catch(() => toast.error("Failed to copy"));
+          return true;
+        },
+      },
+      {
+        actionId: SHORTCUT_ACTIONS.streamCopyRepoPath,
+        priority: 10,
+        handler: () => {
+          if (!currentRepoPath) return false;
+          void repoCopy.copy(currentRepoPath).catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
@@ -220,9 +233,11 @@ export function DownstreamSessionsPanel({
     ]);
   }, [
     currentWorktreePath,
+    currentRepoPath,
     currentBranch,
     targetBranch,
     worktreeCopy.copy,
+    repoCopy.copy,
     branchCopy.copy,
     baseBranchCopy.copy,
     hasWorktree,
@@ -406,6 +421,22 @@ export function DownstreamSessionsPanel({
                 Active Worktree
               </p>
               <div className="flex flex-col gap-0.5 py-1.5">
+                <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                  Repo:{" "}
+                  {currentRepoPath && (
+                    <CopyableCode
+                      text={currentRepoPath}
+                      displayText={worktree.repo ?? currentRepoPath}
+                      copied={repoCopy.copied}
+                      onCopy={() => repoCopy.copy(currentRepoPath)}
+                    />
+                  )}
+                  {repoCopy.copied ? (
+                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                  ) : (
+                    <ShortcutHint label={repoShortcutLabel} />
+                  )}
+                </span>
                 <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                   Branch:{" "}
                   <CopyableCode

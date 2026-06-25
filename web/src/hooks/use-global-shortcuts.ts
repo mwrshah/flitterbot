@@ -110,6 +110,11 @@ export function useGlobalShortcuts({
     return true;
   });
 
+  const copyRepoFallback = useEffectEvent(() => {
+    toast.error("No repo path available");
+    return true;
+  });
+
   const copyCurrentDirectoryFallback = useEffectEvent(() => {
     toast.error("No current directory available");
     return true;
@@ -146,6 +151,7 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.composerFocus, handler: () => focusComposer() },
       { actionId: SHORTCUT_ACTIONS.streamCopyTmuxAttach, handler: () => copyTmuxFallback() },
       { actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath, handler: () => copyWorktreeFallback() },
+      { actionId: SHORTCUT_ACTIONS.streamCopyRepoPath, handler: () => copyRepoFallback() },
       {
         actionId: SHORTCUT_ACTIONS.streamCopyCurrentDirectory,
         handler: () => copyCurrentDirectoryFallback(),
