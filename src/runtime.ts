@@ -290,8 +290,8 @@ export class ControlSurfaceRuntime {
       const targetStreamId = target?.streamId ?? undefined;
       const targetStream = targetStreamId ? getStreamById(this.blackboard, targetStreamId) : null;
 
-      if (targetSessionId && target && targetStreamId && targetStream?.type === "defaultStream") {
-        this.log(`/clear: resetting default stream session ${targetSessionId}`);
+      if (targetSessionId && target && targetStreamId && targetStream) {
+        this.log(`/clear: resetting ${targetStream.type} stream session ${targetSessionId}`);
         void (async () => {
           try {
             if (!target.runtime) {
@@ -301,10 +301,12 @@ export class ControlSurfaceRuntime {
               );
             }
             await this.sessionManager.resetStreamSession(targetStreamId);
-            this.enqueueDefaultStreamFirstMessage(target);
+            if (targetStream.type === "defaultStream") {
+              this.enqueueDefaultStreamFirstMessage(target);
+            }
           } catch (error) {
             this.log(
-              `/clear default stream reset failed: ${error instanceof Error ? error.message : String(error)}`,
+              `/clear stream reset failed: ${error instanceof Error ? error.message : String(error)}`,
             );
           }
         })();
