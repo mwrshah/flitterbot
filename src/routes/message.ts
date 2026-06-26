@@ -100,13 +100,7 @@ async function routeMessage(
     const apiKey = resolveGroqApiKey();
     if (!apiKey) return null;
     const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
-    const result = await classifyMessage(
-      rawText,
-      runtime.blackboard,
-      apiKey,
-      defaultPiSessionId,
-      runtime.log.bind(runtime),
-    );
+    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultPiSessionId);
     const meta: StreamRoutingMeta = {
       router_action: result.action,
     };

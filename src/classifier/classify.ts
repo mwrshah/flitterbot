@@ -28,7 +28,6 @@ export async function classifyMessage(
   db: BlackboardDatabase,
   apiKey: string,
   defaultPiSessionId?: string,
-  logClassifierPrompt?: (message: string) => void,
 ): Promise<ClassificationResult> {
   if (shouldShortCircuitToDefault(message)) {
     console.log("[router] short-circuit to default agent: %s", message.slice(0, 120));
@@ -57,9 +56,6 @@ export async function classifyMessage(
     streams.length,
     message.slice(0, 120),
   );
-  logClassifierPrompt?.(`[router classifier] system prompt\n${prompts.systemPrompt}`);
-  logClassifierPrompt?.(`[router classifier] user prompt\n${prompts.userPrompt}`);
-
   let result: ClassifyResult;
   try {
     result = await callGroqClassify(apiKey, prompts);

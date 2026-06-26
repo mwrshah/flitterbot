@@ -2537,7 +2537,6 @@ export class ControlSurfaceRuntime {
             this.blackboard,
             apiKey,
             defaultPiSessionId,
-            this.log.bind(this),
           );
           routerMeta = { router_action: result.action };
           if (result.stream) {
