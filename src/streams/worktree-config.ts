@@ -146,7 +146,7 @@ const ALL_MARKERS = [
 ];
 
 export type DiscoveredEcosystem = {
-  dir: string; // relative to repo root, "" for root
+  dir: string;
   manager: string;
   cmd: string;
   caching: boolean;

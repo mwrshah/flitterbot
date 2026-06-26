@@ -763,9 +763,7 @@ function editResultDiffText(result: ToolResultMessageType | undefined): string {
     const record = paramRecord(parsed);
     const diff = record.diff;
     if (typeof diff === "string" && diff.trim()) return diff;
-  } catch {
-    // Non-JSON tool output is the ordinary success/error text, not a structured diff.
-  }
+  } catch {}
 
   return "";
 }
