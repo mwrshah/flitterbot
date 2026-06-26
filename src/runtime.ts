@@ -313,7 +313,11 @@ export class ControlSurfaceRuntime {
         return { ok: true, cleared: true };
       }
 
-      if (!input.metadata?.stream_id && !targetSessionId) {
+      const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
+      const targetsDefaultSession =
+        (!input.metadata?.stream_id && !targetSessionId) ||
+        (!!targetSessionId && targetSessionId === defaultPiSessionId);
+      if (targetsDefaultSession) {
         this.log("/clear: resetting default session");
         void this.sessionManager
           .resetDefault()
