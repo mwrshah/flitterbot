@@ -1,5 +1,5 @@
 import type http from "node:http";
-import { getStreamByName } from "../blackboard/query-streams.ts";
+import { getActivePiSessionId, getStreamByName } from "../blackboard/query-streams.ts";
 import { classifyMessage } from "../classifier/classify.ts";
 import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type {
@@ -66,6 +66,13 @@ async function routeMessage(
   source: MessageSource,
   metadata?: MessageMetadata,
 ): Promise<{ metadata: StreamRoutingMeta } | null> {
+  // Resolve the owner the sender maps to, plus the fallback target + default-conversation session
+  // used to hydrate the classifier. Owner (defaultUser) falls back to the global default session;
+  // every other WhatsApp user falls back to their own `flitterbot: <userId>` default stream.
+  let ownerUser: string | undefined;
+  let fallback: StreamRoutingMeta = { router_action: "default" };
+  let defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
+
   if (source === "whatsapp") {
     const whatsappUserId =
       typeof metadata?.whatsapp_user_id === "string" ? metadata.whatsapp_user_id.trim() : "";
@@ -74,51 +81,55 @@ async function routeMessage(
     }
 
     const whatsappConfig = loadWhatsAppConfig();
-    if (whatsappConfig.defaultUser === whatsappUserId) {
-      runtime.log(`router: matched WhatsApp default user "${whatsappUserId}" to default agent`);
-      return { metadata: { router_action: "default" } };
-    }
+    ownerUser = whatsappUserId;
 
-    const userDefaultStream = getStreamByName(runtime.blackboard, `flitterbot: ${whatsappUserId}`);
-    if (!userDefaultStream || userDefaultStream.status !== "open") {
-      throw new Error(`Missing open default stream for WhatsApp user: ${whatsappUserId}`);
-    }
-
-    runtime.log(
-      `router: matched WhatsApp user "${whatsappUserId}" to stream "${userDefaultStream.name}" (${userDefaultStream.id.slice(0, 8)})`,
-    );
-    return {
-      metadata: {
+    if (whatsappConfig.defaultUser !== whatsappUserId) {
+      const userDefaultStream = getStreamByName(
+        runtime.blackboard,
+        `flitterbot: ${whatsappUserId}`,
+      );
+      if (!userDefaultStream || userDefaultStream.status !== "open") {
+        throw new Error(`Missing open default stream for WhatsApp user: ${whatsappUserId}`);
+      }
+      fallback = {
         router_action: "matched",
         stream_id: userDefaultStream.id,
         stream_name: userDefaultStream.name,
-      },
-    };
+      };
+      defaultPiSessionId =
+        getActivePiSessionId(runtime.blackboard, userDefaultStream.id) ?? defaultPiSessionId;
+    }
   }
 
   try {
     const apiKey = resolveGroqApiKey();
-    if (!apiKey) return null;
-    const defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;
-    const result = await classifyMessage(rawText, runtime.blackboard, apiKey, defaultPiSessionId);
-    const meta: StreamRoutingMeta = {
-      router_action: result.action,
-    };
-    if (result.stream) {
-      meta.stream_id = result.stream.id;
-      meta.stream_name = result.stream.name;
-    }
-    runtime.log(
-      result.stream
-        ? `router: matched stream "${result.stream.name}" (${result.stream.id.slice(0, 8)})`
-        : "router: no stream match",
+    if (!apiKey) return { metadata: fallback };
+    const result = await classifyMessage(
+      rawText,
+      runtime.blackboard,
+      apiKey,
+      defaultPiSessionId,
+      ownerUser,
     );
-    return { metadata: meta };
+    if (result.stream) {
+      runtime.log(
+        `router: matched stream "${result.stream.name}" (${result.stream.id.slice(0, 8)})`,
+      );
+      return {
+        metadata: {
+          router_action: "matched",
+          stream_id: result.stream.id,
+          stream_name: result.stream.name,
+        },
+      };
+    }
+    runtime.log("router: no stream match, routing to fallback");
+    return { metadata: fallback };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[router] classification failed:", msg);
     runtime.log(`router: classification failed — ${msg}`);
-    return null;
+    return { metadata: fallback };
   }
 }
 

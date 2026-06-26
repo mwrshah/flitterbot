@@ -92,6 +92,7 @@ export interface StreamRow {
   closed_at: string | null;
   base_branch: string | null;
   pinned: number | boolean;
+  stream_user: string | null;
 }
 
 export interface ClaudeSessionRow {
@@ -208,7 +209,8 @@ CREATE TABLE IF NOT EXISTS streams (
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     closed_at TEXT,
     base_branch TEXT,
-    pinned BOOLEAN NOT NULL DEFAULT 0
+    pinned BOOLEAN NOT NULL DEFAULT 0,
+    stream_user TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -254,7 +256,8 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     ended_at DATETIME,
     end_reason TEXT,
     stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
-    last_datetime_reported_at DATETIME
+    last_datetime_reported_at DATETIME,
+    session_user TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);

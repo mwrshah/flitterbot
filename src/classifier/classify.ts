@@ -71,20 +71,21 @@ export async function classifyMessage(
   db: BlackboardDatabase,
   apiKey: string,
   defaultPiSessionId?: string,
+  ownerUser?: string,
 ): Promise<ClassificationResult> {
   if (shouldShortCircuitToDefault(message)) {
     console.log("[router] short-circuit to default agent: %s", message.slice(0, 120));
     return { stream: null, action: "none" };
   }
 
-  const streams = listOpenWorkStreams(db);
+  const streams = listOpenWorkStreams(db, ownerUser);
   if (streams.length === 0) {
     console.log("[router] short-circuit: no open streams, routing to default");
     return { stream: null, action: "none" };
   }
 
   const recentConversation = getRecentConversationByWorkstream(db, 4);
-  const defaultBoundary = getLatestStreamCreatedAt(db);
+  const defaultBoundary = getLatestStreamCreatedAt(db, ownerUser);
   const defaultConversation = defaultPiSessionId
     ? getRecentDefaultConversation(db, defaultPiSessionId, 4, defaultBoundary)
     : [];

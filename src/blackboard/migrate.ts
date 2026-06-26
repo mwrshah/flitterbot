@@ -834,6 +834,9 @@ export function migrateBlackboard(db: DatabaseSync): number {
   if (version < 22) {
     applyV22Migration(db);
   }
+  if (version < 23) {
+    applyV23Migration(db);
+  }
 
   ensureCurrentSchemaInvariants(db);
   return getSchemaVersion(db);
@@ -1252,4 +1255,30 @@ function ensureStreamsTypeColumn(db: DatabaseSync): void {
   db.exec(
     "ALTER TABLE streams ADD COLUMN type TEXT NOT NULL DEFAULT 'work' CHECK (type IN ('work', 'defaultStream'));",
   );
+}
+
+function applyV23Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    if (!hasColumn(db, "streams", "stream_user")) {
+      db.exec("ALTER TABLE streams ADD COLUMN stream_user TEXT;");
+    }
+    if (!hasColumn(db, "pi_sessions", "session_user")) {
+      db.exec("ALTER TABLE pi_sessions ADD COLUMN session_user TEXT;");
+    }
+    // Backfill owner for per-user default streams from their `flitterbot: <userId>` name.
+    db.exec(
+      "UPDATE streams SET stream_user = TRIM(SUBSTR(name, LENGTH('flitterbot: ') + 1)) WHERE name LIKE 'flitterbot: %' AND stream_user IS NULL;",
+    );
+    // Trickle owner down to each stream's pi_sessions (1:1 stream↔session).
+    db.exec(
+      "UPDATE pi_sessions SET session_user = (SELECT stream_user FROM streams WHERE streams.id = pi_sessions.stream_id) WHERE session_user IS NULL AND stream_id IS NOT NULL;",
+    );
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (23);");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
 }

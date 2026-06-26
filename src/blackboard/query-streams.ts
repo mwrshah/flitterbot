@@ -8,7 +8,13 @@ export function listOpenStreams(db: BlackboardDatabase): StreamRow[] {
   );
 }
 
-export function listOpenWorkStreams(db: BlackboardDatabase): StreamRow[] {
+export function listOpenWorkStreams(db: BlackboardDatabase, streamUser?: string): StreamRow[] {
+  if (streamUser) {
+    return db.all<StreamRow>(
+      "SELECT * FROM streams WHERE status = 'open' AND type = 'work' AND stream_user = ? ORDER BY pinned DESC, created_at DESC",
+      streamUser,
+    );
+  }
   return db.all<StreamRow>(
     "SELECT * FROM streams WHERE status = 'open' AND type = 'work' ORDER BY pinned DESC, created_at DESC",
   );
@@ -46,9 +52,15 @@ export function insertStream(
   db: BlackboardDatabase,
   name: string,
   type: StreamType = "work",
+  streamUser?: string,
 ): StreamRow {
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO streams (id, name, type) VALUES (?, ?, ?)").run(id, name, type);
+  db.prepare("INSERT INTO streams (id, name, type, stream_user) VALUES (?, ?, ?, ?)").run(
+    id,
+    name,
+    type,
+    streamUser ?? null,
+  );
   return getStreamById(db, id)!;
 }
 
@@ -163,7 +175,17 @@ export function getPreviousStreamCreatedAt(
   return row?.created_at;
 }
 
-export function getLatestStreamCreatedAt(db: BlackboardDatabase): string | undefined {
+export function getLatestStreamCreatedAt(
+  db: BlackboardDatabase,
+  streamUser?: string,
+): string | undefined {
+  if (streamUser) {
+    const row = db.get<{ created_at: string }>(
+      `SELECT datetime(created_at) as created_at FROM streams WHERE type = 'work' AND stream_user = ? ORDER BY created_at DESC LIMIT 1`,
+      streamUser,
+    );
+    return row?.created_at;
+  }
   const row = db.get<{ created_at: string }>(
     `SELECT datetime(created_at) as created_at FROM streams WHERE type = 'work' ORDER BY created_at DESC LIMIT 1`,
   );

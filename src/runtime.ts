@@ -170,6 +170,23 @@ export class ControlSurfaceRuntime {
   async start(): Promise<void> {
     this.ensurePidFile();
 
+    // Legacy work streams predate per-user ownership; in a single-user history they were all the
+    // owner's, so adopt unowned work streams to the configured default user for owner-scoped routing.
+    const defaultUser = loadWhatsAppConfig().defaultUser;
+    if (defaultUser) {
+      const adopted = this.blackboard
+        .prepare("UPDATE streams SET stream_user = ? WHERE type = 'work' AND stream_user IS NULL")
+        .run(defaultUser);
+      if (adopted.changes > 0) {
+        this.blackboard
+          .prepare(
+            "UPDATE pi_sessions SET session_user = ? WHERE session_user IS NULL AND stream_id IN (SELECT id FROM streams WHERE stream_user = ?)",
+          )
+          .run(defaultUser, defaultUser);
+        this.log(`adopted ${adopted.changes} legacy work stream(s) to owner "${defaultUser}"`);
+      }
+    }
+
     if (this.config.wipeStreamsOnStart) {
       const closed = resetClosedStreams(this.blackboard);
       if (closed > 0)
@@ -1257,6 +1274,7 @@ export class ControlSurfaceRuntime {
     name: string;
     cwd: string;
     type?: "work" | "defaultStream";
+    streamUser?: string;
     rollbackOnSpawnFailure: boolean;
   }): Promise<
     | { ok: true; streamId: string; streamName: string; managed: ManagedPiSession }
@@ -1270,7 +1288,7 @@ export class ControlSurfaceRuntime {
       throw new Error(`cwd path "${opts.cwd}" does not exist`);
     }
 
-    const ws = insertStream(this.blackboard, opts.name, opts.type ?? "work");
+    const ws = insertStream(this.blackboard, opts.name, opts.type ?? "work", opts.streamUser);
     enrichStream(this.blackboard, ws.id, opts.cwd);
 
     try {
@@ -1647,13 +1665,18 @@ export class ControlSurfaceRuntime {
       }
 
       if (!stream) {
-        const created = await this.createWhatsAppDefaultStream(streamName);
+        const created = await this.createWhatsAppDefaultStream(streamName, userId);
         this.log(`created WhatsApp default stream for user "${userId}" (${created.streamId})`);
         continue;
       }
 
       if (stream.type !== "defaultStream") {
         stream = setStreamType(this.blackboard, stream.id, "defaultStream") ?? stream;
+      }
+      if (!stream.stream_user) {
+        this.blackboard
+          .prepare("UPDATE streams SET stream_user = ? WHERE id = ?")
+          .run(userId, stream.id);
       }
 
       const managed = this.sessionManager.getByStream(stream.id);
@@ -1671,11 +1694,13 @@ export class ControlSurfaceRuntime {
 
   private async createWhatsAppDefaultStream(
     streamName: string,
+    streamUser: string,
   ): Promise<{ streamId: string; streamName: string; piSessionId: string }> {
     const spawn = await this.spawnStreamWithSession({
       name: streamName,
       cwd: this.config.projectsDir,
       type: "defaultStream",
+      streamUser,
       rollbackOnSpawnFailure: true,
     });
     if (!spawn.ok) throw spawn.spawnError;
@@ -1821,9 +1846,15 @@ export class ControlSurfaceRuntime {
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
           this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
 
+          // Owner trickles from the creating default stream (per-user) or the global default session (owner).
+          const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
+          const streamUser =
+            parentStream?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
+
           const spawn = await this.spawnStreamWithSession({
             name,
             cwd: effectiveCwd,
+            streamUser,
             rollbackOnSpawnFailure: false,
           });
 
@@ -2542,6 +2573,7 @@ export class ControlSurfaceRuntime {
             this.blackboard,
             apiKey,
             defaultPiSessionId,
+            loadWhatsAppConfig().defaultUser ?? undefined,
           );
           routerMeta = { router_action: result.action };
           if (result.stream) {

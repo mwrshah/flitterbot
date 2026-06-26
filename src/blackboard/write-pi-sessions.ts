@@ -22,6 +22,13 @@ type PiSessionRecord = {
 };
 
 export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
+  // session_user trickles 1:1 from the owning stream — single source of truth is streams.stream_user.
+  const sessionUser = session.stream_id
+    ? (db.get<{ stream_user: string | null }>(
+        "SELECT stream_user FROM streams WHERE id = ?",
+        session.stream_id,
+      )?.stream_user ?? null)
+    : null;
   db.prepare(
     `INSERT INTO pi_sessions (
        pi_session_id,
@@ -41,8 +48,9 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        ended_at,
        end_reason,
        stream_id,
+       session_user,
        last_datetime_reported_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(pi_session_id) DO UPDATE SET
        role = excluded.role,
        status = excluded.status,
@@ -60,6 +68,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        ended_at = COALESCE(excluded.ended_at, pi_sessions.ended_at),
        end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
        stream_id = COALESCE(excluded.stream_id, pi_sessions.stream_id),
+       session_user = COALESCE(excluded.session_user, pi_sessions.session_user),
        last_datetime_reported_at = COALESCE(pi_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)`,
   ).run(
     session.pi_session_id,
@@ -79,6 +88,7 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
     session.ended_at ?? null,
     session.end_reason ?? null,
     session.stream_id ?? null,
+    sessionUser,
     session.started_at,
   );
 }
