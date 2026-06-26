@@ -19,6 +19,7 @@ export type InsertMessageInput = {
   createdAt?: string;
 };
 
+// ponytail: centralize this timestamp helper; the same trim-millis logic exists across blackboard writers.
 function timestamp(value?: string): string {
   return value ?? new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }

@@ -53,6 +53,7 @@ type RawConfigJson = {
   linearApiKey?: unknown;
 };
 
+// ponytail: this accepted-key list duplicates RawConfigJson; derive it from a schema object if config keeps growing.
 const ACCEPTED_CONFIG_KEYS = [
   "controlSurfaceHost",
   "controlSurfacePort",

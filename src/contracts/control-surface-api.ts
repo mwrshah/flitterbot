@@ -216,6 +216,7 @@ export interface SessionDetailResponse {
   tmux?: TmuxSessionInspection | null;
 }
 
+// ponytail: delete these deprecated aliases once callers use ChatTimeline* directly.
 /** @deprecated Use ChatTimelineMessage from timeline.ts */
 export type StreamsHistoryMessageItem = ChatTimelineMessage;
 /** @deprecated Use ChatTimelineTool from timeline.ts */

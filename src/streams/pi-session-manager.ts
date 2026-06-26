@@ -20,6 +20,7 @@ import { subscribeToPiSession } from "./pi-subscribe.ts";
 import { createToolDisplayContextCache, type ToolDisplayContextCache } from "./tool-display.ts";
 import { type QueueItem, TurnQueue } from "./turn-queue.ts";
 
+// ponytail: remove this pass-through export and import from format-stream-prompt.ts directly.
 export { formatStreamPrompt };
 
 export interface ManagedPiSession {

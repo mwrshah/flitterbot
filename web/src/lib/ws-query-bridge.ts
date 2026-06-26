@@ -138,6 +138,7 @@ function appendTimelineItem(
   });
 }
 
+// ponytail: replace this long event switch with a handler map keyed by message.type.
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;

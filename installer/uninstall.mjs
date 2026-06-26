@@ -76,6 +76,7 @@ function atomicWrite(path, content) {
   renameSync(tmp, path);
 }
 
+// ponytail: this installer JSON/log/diff helper set duplicates install.mjs; extract shared code.
 function readJsonFile(path) {
   const raw = readFileSync(path, "utf8").trim();
   return raw ? JSON.parse(raw) : {};

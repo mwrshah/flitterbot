@@ -181,6 +181,7 @@ export async function sendEscapeToTmuxSession(sessionName: string): Promise<void
   await runTmux(["send-keys", "-t", getPrimaryTarget(sessionName), "Escape"]);
 }
 
+// ponytail: collapse fixed sleeps/polling into one explicit tmux state wait helper.
 async function sendInterruptPair(sessionName: string): Promise<void> {
   const target = getPrimaryTarget(sessionName);
   await runTmux(["send-keys", "-t", target, "Escape"]);

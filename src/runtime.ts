@@ -91,6 +91,7 @@ import {
 } from "./whatsapp/process.ts";
 import { type WebSocketClient, WebSocketHub } from "./ws/hub.ts";
 
+// ponytail: prefer the SDK's tool definition type here instead of maintaining a local mirror.
 type CustomToolDefinition = {
   name: string;
   label: string;
@@ -119,6 +120,7 @@ type EnqueueInput = {
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
 
+// ponytail: this god object mixes server lifecycle, routing, streams, WhatsApp, tools, and queues; split by domain when touching it.
 export class ControlSurfaceRuntime {
   readonly config: FlitterbotConfig;
   readonly blackboard: BlackboardDatabase;

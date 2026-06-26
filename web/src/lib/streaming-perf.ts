@@ -1,3 +1,4 @@
+// ponytail: browser Performance tooling can replace this bespoke streaming profiler.
 type SpanKind =
   | "deltaToCallback"
   | "streamingDomWrite"

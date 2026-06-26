@@ -15,6 +15,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+// ponytail: use crypto.randomUUID() unless short human-facing IDs are essential.
 function compactId() {
   return Array.from(crypto.randomBytes(ID_LENGTH), (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join("");
 }
@@ -38,6 +39,7 @@ function readStore() {
   }
 }
 
+// ponytail: simplify migration backup/signature machinery if only the current JSON shape matters.
 function writeStore(store) {
   if (store[MIGRATION_NEEDED]) backupStoreBeforeMigration();
   const normalized = normalizeStore({ ...store, updatedAt: nowIso() });

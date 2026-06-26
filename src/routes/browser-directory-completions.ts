@@ -17,6 +17,7 @@ import { sendJson } from "./_shared.ts";
 
 const MAX_ITEMS = 15;
 
+// ponytail: split direct directory listing and fuzzy repo search; this route currently does both.
 export async function handleBrowserDirectoryCompletionsRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,

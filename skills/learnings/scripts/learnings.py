@@ -42,6 +42,7 @@ def expand_home(value: str) -> Path:
     return Path(value)
 
 
+# ponytail: recall.py duplicates config parsing and entry parsing; share a tiny module.
 def resolve_note_path() -> Path:
     config_path = expand_home(os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json"))
     if not config_path.exists():
@@ -60,8 +61,6 @@ def resolve_note_path() -> Path:
 
 NOTE = resolve_note_path()
 
-
-# ---------- parsing ----------------------------------------------------------
 
 def read_lines() -> list[str]:
     return NOTE.read_text().split("\n") if NOTE.exists() else []
@@ -86,8 +85,6 @@ def extract_prefix(body: str) -> str | None:
     return m.group(1) if m else None
 
 
-# ---------- minting ----------------------------------------------------------
-
 def mint_code() -> str:
     used = existing_codes()
     if len(used) >= len(ALPHABET) ** 2:
@@ -98,8 +95,6 @@ def mint_code() -> str:
             return code
     raise RuntimeError("could not mint a fresh code (random exhaustion)")
 
-
-# ---------- regrouping ------------------------------------------------------
 
 def regroup(lines: list[str]) -> list[str]:
     """Cluster `- ` bullets by their 2-char code, preserving first-seen order.
@@ -126,8 +121,6 @@ def regroup(lines: list[str]) -> list[str]:
         lines[pos] = bullet
     return lines
 
-
-# ---------- subcommands -----------------------------------------------------
 
 def cmd_codes(_: argparse.Namespace) -> int:
     entries = parse_entries()
@@ -213,8 +206,6 @@ def cmd_add(args: argparse.Namespace) -> int:
     print(f"added — {where}: {new_line}")
     return 0
 
-
-# ---------- entry -----------------------------------------------------------
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Manage the configured learnings note.")

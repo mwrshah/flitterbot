@@ -24,6 +24,7 @@ function dirFromPath(path: string, name: string): string {
 const DIR_FONT = '400 12px "Geist Variable", ui-sans-serif, system-ui, sans-serif';
 const DIR_LINE_HEIGHT = 16;
 
+// ponytail: prefer CSS truncation before measuring text with a layout dependency.
 function measureTextWidth(text: string, font: string): number {
   const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
   const result = layoutWithLines(prepared, 9999, DIR_LINE_HEIGHT);

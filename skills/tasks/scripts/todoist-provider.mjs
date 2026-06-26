@@ -260,6 +260,7 @@ function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
   return remote > local + 1000;
 }
 
+// ponytail: this mini REST client/paginator is only worth keeping if Todoist stays a first-class integration.
 function todoistClient(apiKey) {
   async function request(method, pathName, body) {
     const response = await fetch(`${TODOIST_API}${pathName}`, {

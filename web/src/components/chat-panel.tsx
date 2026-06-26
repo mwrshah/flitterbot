@@ -104,6 +104,7 @@ function dirFromPath(path: string, name: string): string {
   return cleanPath;
 }
 
+// ponytail: this duplicates PathPicker/Command picker behavior; consolidate to one path-picker component.
 function CwdPicker({
   pickerRef,
   pickerStyle,
@@ -227,6 +228,7 @@ function CwdPicker({
   );
 }
 
+// ponytail: prefer invalidating status over hand-patching this nested status cache shape.
 function markPiSessionBusy(
   status: StatusResponse | undefined,
   piSessionId: string,

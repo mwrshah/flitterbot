@@ -34,6 +34,7 @@ const NON_GIT_WORKTREE_AGENT_INSTRUCTIONS = [
   "2. Retry create_worktree from inside the intended git repository.",
 ].join("\n");
 
+// ponytail: share the git exec helper with close-stream instead of carrying another shell-string wrapper.
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();

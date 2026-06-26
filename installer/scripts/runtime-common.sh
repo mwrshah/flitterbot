@@ -44,6 +44,7 @@ append_log() {
   printf '[%s] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$level" "$message" >> "$path"
 }
 
+# ponytail: repeated node -e JSON reads across shell scripts could be one small config CLI/helper.
 config_value() {
   local key="${1#.}"
   local fallback="$2"

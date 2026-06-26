@@ -1,3 +1,4 @@
+// ponytail: collapse this debug toggle layer to direct DEV-only console calls or remove it.
 const STREAMING_UI_DEBUG_STORAGE_KEY = "flitterbot:debug:streaming-ui";
 const STREAMING_UI_DEBUG_GLOBAL_KEY = "__FLITTERBOT_DEBUG_STREAMING_UI";
 

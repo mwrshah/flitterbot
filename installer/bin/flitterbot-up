@@ -80,6 +80,7 @@ pid_from_file() {
   fi
 }
 
+# ponytail: runtime state reads spawn node for one field; a pid-only state file would remove JSON parsing here.
 pid_from_state_file() {
   if [[ -f "$STATE_FILE" ]]; then
     node -e "
@@ -249,6 +250,7 @@ wait_for_status_down() {
   return 1
 }
 
+# ponytail: process discovery by grepping ps output is brittle; prefer pid/state ownership when possible.
 list_control_surface_pids() {
   local exclude_pid="${1:-}"
   local root=""

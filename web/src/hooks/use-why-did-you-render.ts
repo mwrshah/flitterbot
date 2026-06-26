@@ -1,3 +1,4 @@
+// ponytail: delete this custom render debugger and use React DevTools Profiler when needed.
 import { useEffect, useRef } from "react";
 
 type ChangeKind = "REF_ONLY" | "VALUE";

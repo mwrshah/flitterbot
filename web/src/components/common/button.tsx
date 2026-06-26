@@ -2,6 +2,7 @@ import type * as React from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { cn } from "~/lib/utils";
 
+// ponytail: merge this homegrown button with components/ui/button so the app has one button system.
 type ButtonVariant = "default" | "secondary" | "ghost" | "destructive" | "outline";
 type ButtonSize = "default" | "sm" | "icon" | "icon-sm";
 

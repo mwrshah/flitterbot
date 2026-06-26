@@ -60,6 +60,7 @@ function applyFullSchema(db: DatabaseSync): void {
   db.exec(BLACKBOARD_SCHEMA_SQL);
 }
 
+// ponytail: prune old migration branches when legacy DB compatibility is no longer needed.
 function applyLegacyUpgrade(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");

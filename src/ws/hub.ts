@@ -22,6 +22,7 @@ type WebSocketMessageHandler = (
   data: ControlSurfaceWebSocketClientEvent | unknown,
 ) => void | Promise<void>;
 
+// ponytail: this hand-rolls WebSocket framing; replacing with a tiny maintained server library would delete protocol code.
 export class WebSocketHub {
   private readonly clients = new Map<string, WebSocketClient>();
   private readonly onMessage?: WebSocketMessageHandler;

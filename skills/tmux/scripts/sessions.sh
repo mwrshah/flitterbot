@@ -115,7 +115,6 @@ cmd_launch() {
     esac
   done
 
-  # Remaining positional args: session, dir, args (Claude CLI flags)
   local session="" dir="" args=""
   if [[ ${#remaining[@]} -gt 0 ]]; then
     if is_valid_session "${remaining[0]}"; then
@@ -123,7 +122,6 @@ cmd_launch() {
       dir="${remaining[1]:-}"
       args="${remaining[2]:-}"
     else
-      # First arg is not a session letter — treat as dir
       dir="${remaining[0]}"
       args="${remaining[1]:-}"
     fi
@@ -145,7 +143,6 @@ cmd_launch() {
         rm -rf "$LOCK_DIR"
       fi
     done
-    # Write PID for stale lock detection
     echo $$ > "$LOCK_DIR/pid"
   }
 
@@ -154,7 +151,6 @@ cmd_launch() {
   }
 
   if [ -z "$session" ]; then
-    # Auto-select: need exclusive lock to prevent races
     _lock_acquire
 
     for s in $SESSIONS; do
@@ -219,7 +215,6 @@ cmd_launch() {
 
     _lock_release  # claude process is now starting, session no longer free
   else
-    # Explicit session specified — no lock needed
     if ! session_exists "$session"; then
       tmux new-session -d -s "$session"
       echo "Created session $session"
@@ -230,7 +225,6 @@ cmd_launch() {
       return 1
     fi
 
-    # Clear any garbage on the prompt
     tmux send-keys -t "$session" C-c
     sleep 0.2
 
@@ -244,12 +238,10 @@ cmd_launch() {
     tmux send-keys -t "$session" "$cmd" Enter
   fi
 
-  # Wait for Claude to actually start (poll up to ~15s)
   local launch_attempt
   for launch_attempt in $(seq 1 15); do
     sleep 1
     if has_claude "$session"; then
-      # Claude process exists — now wait for it to become IDLE (ready for input)
       local ready_attempt
       for ready_attempt in $(seq 1 16); do
         local ui_state
@@ -352,7 +344,6 @@ cmd_message() {
     return 1
   fi
 
-  # Guard: don't send to a session that's already inferring
   local pre_state
   pre_state=$(_pane_ui_state "$session")
   if [ "$pre_state" = "INFERRING" ]; then
@@ -405,6 +396,7 @@ cmd_session_id() {
   fi
 }
 
+# ponytail: this duplicates TypeScript tmux UI detection; keep one implementation or generate one from the other.
 _pane_ui_state() {
   local session="$1"
   if ! has_claude "$session"; then

@@ -1,3 +1,4 @@
+// ponytail: if shortcuts stay static, replace this parser/sequence engine with direct keydown mappings.
 import { useSyncExternalStore } from "react";
 import type { ShortcutBindingsConfig } from "./types";
 

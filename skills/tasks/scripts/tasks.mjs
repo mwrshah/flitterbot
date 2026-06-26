@@ -11,6 +11,7 @@ const STORE_PATH = process.env.FLITTERBOT_TASKS_FILE || DEFAULT_STORE_PATH;
 const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || path.join(os.homedir(), ".flitterbot", "config.json");
 const actionImplementations = createTaskActions({ storePath: STORE_PATH, configPath: CONFIG_PATH });
 
+// ponytail: this contract blob duplicates skill docs; keep task API shape in one place.
 export const TASK_DATA_MODELS = deepFreeze({
   Project: {
     description: "A local task project. A task may only be connected to one project.",
@@ -191,6 +192,7 @@ export const TASK_CONTRACTS = deepFreeze({
 
 assertContractCoverage();
 
+// ponytail: these action wrappers only delegate; execute({ action, ...input }) can be the one API.
 export async function list_projects(input = {}) {
   return actionImplementations.list_projects(input);
 }

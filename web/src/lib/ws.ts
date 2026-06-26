@@ -163,6 +163,7 @@ export class FlitterbotWsClient {
     }, delay);
   }
 
+  // ponytail: visibility ping duplicates heartbeat timeout logic; collapse to one ping/watchdog helper.
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {

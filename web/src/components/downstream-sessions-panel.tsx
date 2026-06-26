@@ -89,6 +89,7 @@ function tmuxShortcutHintLabel(tmuxSession: string): string {
   return ["t", ...tmuxSession.split("")].join("+");
 }
 
+// ponytail: extract one copy-with-shortcut row; worktree/repo/branch/tmux copy blocks repeat below.
 function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {
   const tmuxCopy = useCopyToClipboard(600);
   const actionId = getTmuxAttachShortcutActionId(tmuxSession);

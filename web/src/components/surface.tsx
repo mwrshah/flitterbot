@@ -152,6 +152,7 @@ function ImageStack({ images }: { images: ImageAttachment[] }) {
   );
 }
 
+// ponytail: reuse the common clipboard hook/component instead of another local copy button.
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -331,6 +332,7 @@ export function Surface() {
 
   const items = virtualizer.getVirtualItems();
 
+  // ponytail: share image-file-to-base64 handling with ChatPanel/MessageInput.
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;

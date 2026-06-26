@@ -130,6 +130,7 @@ export type DiffResult =
   | { mode: "diff"; diff: string }
   | { mode: "summary"; stat: string; files: number; insertions: number; deletions: number };
 
+// ponytail: route this through streamsRequest so timeout/auth/error handling has one implementation.
 export const fetchStreamsDiff = createServerFn({ method: "GET" })
   .inputValidator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<DiffResult | null> => {

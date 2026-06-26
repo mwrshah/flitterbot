@@ -264,6 +264,7 @@ function shapeHistoryItems(
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
+// ponytail: if the pi SDK exposes normalized timeline events, replace this local transcript reshaper.
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const items: ChatTimelineItem[] = [];
   for (const entry of entries) {

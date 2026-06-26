@@ -21,6 +21,7 @@ type CloseStreamResult = {
   resolvedBaseBranch?: string | null;
 };
 
+// ponytail: share this git exec helper with create-worktree and prefer execFile args for quoting.
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
@@ -114,9 +115,7 @@ async function mergeToTarget(
 ): Promise<MergeResult> {
   try {
     await exec("git fetch origin", repoPath);
-  } catch {
-    // Non-fatal — continue with local state
-  }
+  } catch {}
 
   if (await isBranchAncestorOf(repoPath, branch, targetBranch)) {
     return { ok: true, mergedAt: repoPath };
@@ -143,9 +142,7 @@ async function mergeToTarget(
 
   try {
     await exec(`git pull origin ${targetBranch} --ff-only`, mergeCwd);
-  } catch {
-    // Non-fatal — continue with local state
-  }
+  } catch {}
 
   try {
     // git's default merge message — the model-authored commit_message goes to the in-flight auto-commit, not the merge commit.

@@ -219,6 +219,7 @@ function isSingleLineHeightElement(element: HTMLElement): boolean {
   return contentHeight <= resolveLineHeight(style) + SINGLE_LINE_BUBBLE_TOLERANCE_PX;
 }
 
+// ponytail: prefer shared React copy UI before maintaining separate Lit copy-button behavior.
 export class MessageCopyButton extends LitElement {
   @property({ attribute: false }) getText: (() => string) | undefined;
   @state() private copied = false;
@@ -323,6 +324,7 @@ if (!customElements.get("message-copy-button")) {
   customElements.define("message-copy-button", MessageCopyButton);
 }
 
+// ponytail: this custom markdown/code-block pipeline overlaps MarkdownContent; consolidate rendering paths.
 export class MarkdownBlock extends LitElement {
   @property() content = "";
   @property({ type: Boolean }) isThinking = false;
