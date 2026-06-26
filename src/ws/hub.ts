@@ -100,7 +100,6 @@ export class WebSocketHub {
       if (client.subscriptions.size === 0) continue;
       const filter = client.subscriptions.get("*") ?? client.subscriptions.get(piSessionId);
       if (filter === undefined) continue;
-      // null filter = all event types; Set filter = only matching types
       if (filter === null || filter.has(eventType)) {
         this.safeWrite(client, frame);
       }

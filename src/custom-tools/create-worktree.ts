@@ -235,7 +235,6 @@ export async function executeCreateWorktree(
     cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
-  // Read the [flitterbot] config once and reuse it for base-ref resolution + bootstrap.
   const config = await readWorktreeConfig(repoPath);
 
   if (!isConfigured(config)) {
@@ -339,7 +338,6 @@ export async function executeCreateWorktree(
   try {
     const result = await createWorktree(repoPath, resolvedBranch, resolvedBaseRef);
 
-    // Ensure the local tracking branch exists so close-stream can later `git checkout <base>`.
     if (normalizedBase !== "main") {
       try {
         await exec(`git rev-parse --verify ${JSON.stringify(normalizedBase)}`, repoPath, 5_000);

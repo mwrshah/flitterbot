@@ -212,7 +212,6 @@
 }
 
 @layer components {
-  /* Markdown rendered by the React chat surface. */
   .markdown-body {
     line-height: 1.65;
   }
@@ -268,7 +267,6 @@
   }
 
 
-  /* Sonner toast token bridge. */
   [data-sonner-toast] [data-description] {
     color: var(--muted-foreground);
   }

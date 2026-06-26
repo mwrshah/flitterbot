@@ -7,7 +7,6 @@ const execPromise = promisify(cpExec);
 export type WorktreeBootstrapConfig = {
   copyPaths: string[];
   postCreate: string[];
-  // Single value: the branch new worktrees fork from. Overrides the HEAD-parse default.
   baseRef: string | null;
 };
 
@@ -89,12 +88,8 @@ export function isConfigured(config: WorktreeBootstrapConfig): boolean {
   return config.copyPaths.length > 0 || config.postCreate.length > 0;
 }
 
-// ---- Discovery helpers (seed the advisory shown when a repo is unconfigured / discovery mode) ----
-
-// Committed templates we never want to copy as secrets.
 const ENV_TEMPLATE = /\.(example|sample|template|dist)$/i;
 
-// Heavy dirs pruned from the scan so depth-5 `find` stays fast and noise-free.
 const PRUNE_DIRS = [
   "node_modules",
   ".git",
@@ -133,7 +128,6 @@ const CACHING_RULES: Array<{ marker: string; manager: string; cmd: string }> = [
 // yarn is split: berry (.yarnrc.yml, PnP/global cache) caches, classic (.yarn-only lockfile) refetches.
 const YARN_BERRY = { manager: "yarn (berry)", cmd: "yarn install" };
 
-// Managers without a reusable cross-worktree cache — flag so the agent asks the user to migrate.
 const NONCACHING_RULES: Array<{ marker: string; manager: string }> = [
   { marker: "package-lock.json", manager: "npm" },
   { marker: "yarn.lock", manager: "yarn (classic)" },

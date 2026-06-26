@@ -24,7 +24,6 @@ export function getOrCreate(repoRoot: string): FileFinder {
 
   const existing = instances.get(normalized);
   if (existing && !existing.isDestroyed) {
-    // Refresh insertion order so the map acts as a simple LRU cache.
     instances.delete(normalized);
     instances.set(normalized, existing);
     return existing;

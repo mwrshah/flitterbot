@@ -32,7 +32,6 @@ export type ChatTimelineMessage = {
   streamName?: string;
   streaming?: boolean;
   intermediate?: boolean;
-  /** True when this message is a surfaced compaction summary (rendered with a rule above it). */
   compaction?: boolean;
   serverMessageId?: string;
   clientMessageId?: string;

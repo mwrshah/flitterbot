@@ -80,7 +80,6 @@ export interface MessageEndWebSocketEvent {
   type: "message_end";
   piSessionId?: string;
   message: ChatTimelineMessage;
-  /** `displayArgs` is a UI-only projection — never feed it back into tool execution. */
   toolCalls?: Array<{
     toolUseId: string;
     toolName: string;

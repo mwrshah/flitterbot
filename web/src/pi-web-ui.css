@@ -16,7 +16,6 @@
 }
 
 @layer components {
-  /* Keywords */
   .hljs-doctag,
   .hljs-keyword,
   .hljs-meta .hljs-keyword,
@@ -27,7 +26,6 @@
      color: var(--syntax-keyword);
   }
 
-  /* Entity (functions, classes) */
   .hljs-title,
   .hljs-title.class_,
   .hljs-title.class_.inherited__,
@@ -35,7 +33,6 @@
      color: var(--syntax-entity);
   }
 
-  /* Constants */
   .hljs-attr,
   .hljs-attribute,
   .hljs-literal,
@@ -49,27 +46,23 @@
      color: var(--syntax-constant);
   }
 
-  /* Strings */
   .hljs-regexp,
   .hljs-string,
   .hljs-meta .hljs-string {
      color: var(--syntax-string);
   }
 
-  /* Built-in variables */
   .hljs-built_in,
   .hljs-symbol {
      color: var(--syntax-variable);
   }
 
-  /* Comments */
   .hljs-comment,
   .hljs-code,
   .hljs-formula {
      color: var(--syntax-comment);
   }
 
-  /* Tags */
   .hljs-name,
   .hljs-quote,
   .hljs-selector-tag,
@@ -77,47 +70,38 @@
      color: var(--syntax-tag);
   }
 
-  /* Default text */
   .hljs-subst {
      color: var(--foreground);
   }
 
-  /* Section headings */
   .hljs-section {
      color: var(--syntax-heading);
      font-weight: bold;
   }
 
-  /* Bullets */
   .hljs-bullet {
      color: var(--syntax-list);
   }
 
-  /* Emphasis */
   .hljs-emphasis {
      color: var(--foreground);
      font-style: italic;
   }
 
-  /* Strong */
   .hljs-strong {
      color: var(--foreground);
      font-weight: bold;
   }
 
-  /* Additions */
   .hljs-addition {
      color: var(--syntax-addition-fg);
      background-color: var(--syntax-addition-bg);
   }
 
-  /* Deletions */
   .hljs-deletion {
      color: var(--syntax-deletion-fg);
      background-color: var(--syntax-deletion-bg);
   }
-
-  /* Markdown content styles using Tailwind utilities */
 
   .markdown-content h1 {
      @apply text-2xl font-semibold mt-5 mb-2;
@@ -171,13 +155,11 @@
      @apply leading-relaxed;
   }
 
-  /* Nested lists should have less top margin */
   .markdown-content li > ul,
   .markdown-content li > ol {
      @apply mt-1.5 mb-0;
   }
 
-  /* Paragraphs in lists need proper spacing */
   .markdown-content li > p {
      @apply mb-1.5;
   }
@@ -222,7 +204,6 @@
      @apply border-0 border-t border-border my-8;
   }
 
-  /* Collapsed tool calls */
   .tool-disclosure {
     overflow: hidden;
   }
@@ -236,7 +217,6 @@
   }
 
 
-  /* User message with fancy pill styling */
   .user-message-container {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
@@ -246,7 +226,6 @@
     max-width: 100%;
   }
 
-  /* Command palette: ensure selected item has visible highlight */
   [data-slot="command-item"][data-selected="true"] {
     background-color: var(--accent);
   }

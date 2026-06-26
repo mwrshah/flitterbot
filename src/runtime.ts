@@ -2186,7 +2186,6 @@ export class ControlSurfaceRuntime {
             force?: boolean;
             discovery?: boolean;
           };
-          // stream_id is ambient: this tool is constructed bound to the orchestrator's stream.
           if (!streamId) {
             return {
               content: [
