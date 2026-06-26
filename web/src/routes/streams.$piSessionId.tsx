@@ -122,7 +122,6 @@ function PiSessionRoute() {
   const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
     piSessionId,
     history,
-    isDefaultSession ? undefined : stream?.type,
   );
 
   return (

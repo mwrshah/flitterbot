@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { statusQueryOptions, streamsHistoryQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ImageAttachment, StreamSummary } from "~/lib/types";
+import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
@@ -12,11 +12,7 @@ export type SendUserMessageOptions = {
 
 const rootApi = getRouteApi("__root__");
 
-export function useStreamsChat(
-  piSessionId: string | undefined,
-  loaderHistory: ChatTimelineItem[],
-  streamType?: StreamSummary["type"],
-) {
+export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
   const { data: timeline = [] } = useQuery({
@@ -38,10 +34,7 @@ export function useStreamsChat(
   const onSendMessage = useCallback(
     (text: string, options?: SendUserMessageOptions) => {
       const trimmed = text.trim();
-      const targetsDefault =
-        trimmed === "/reload" ||
-        trimmed.startsWith("/new-stream") ||
-        (trimmed === "/clear" && streamType !== "defaultStream");
+      const targetsDefault = trimmed === "/reload" || trimmed.startsWith("/new-stream");
       const target = targetsDefault ? undefined : piSessionId;
       return sendMessage(text, {
         images: options?.images,
@@ -49,7 +42,7 @@ export function useStreamsChat(
         clientMessageId: options?.clientMessageId,
       });
     },
-    [sendMessage, piSessionId, streamType],
+    [sendMessage, piSessionId],
   );
 
   return {
