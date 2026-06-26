@@ -18,6 +18,49 @@ function shouldShortCircuitToDefault(message: string): boolean {
   return DEFAULT_AGENT_PATTERNS.some((p) => p.test(message));
 }
 
+function indent(text: string, pad = "    "): string {
+  return text
+    .split("\n")
+    .map((line) => `${pad}${line}`)
+    .join("\n");
+}
+
+function logClassifierPrompt(prompts: { systemPrompt: string; userPrompt: string }): void {
+  const bar = "━".repeat(72);
+  console.log(
+    [
+      `\n┏${bar}`,
+      `┃ [router] CLASSIFIER PROMPT`,
+      `┣${bar}`,
+      `┃ SYSTEM PROMPT:`,
+      indent(prompts.systemPrompt),
+      `┣${bar}`,
+      `┃ USER PROMPT (what the classifier was fed):`,
+      indent(prompts.userPrompt),
+      `┗${bar}\n`,
+    ].join("\n"),
+  );
+}
+
+function logClassifierResult(result: ClassifyResult, matched: StreamRow | null): void {
+  const bar = "━".repeat(72);
+  const outcome = matched
+    ? `MATCHED → stream_name="${matched.name}" stream_id=${matched.id}`
+    : result.stream_id
+      ? `NO MATCH → model returned unknown stream_id=${result.stream_id}`
+      : `NO MATCH → routing to default agent (stream_id=null)`;
+  console.log(
+    [
+      `\n┏${bar}`,
+      `┃ [router] CLASSIFIER RESULT`,
+      `┣${bar}`,
+      `┃ ${outcome}`,
+      `┃ reasoning: ${result.reasoning || "(none)"}`,
+      `┗${bar}\n`,
+    ].join("\n"),
+  );
+}
+
 export type ClassificationResult = {
   stream: StreamRow | null;
   action: "matched" | "none";
@@ -56,6 +99,7 @@ export async function classifyMessage(
     streams.length,
     message.slice(0, 120),
   );
+  logClassifierPrompt(prompts);
   let result: ClassifyResult;
   try {
     result = await callGroqClassify(apiKey, prompts);
@@ -66,22 +110,12 @@ export async function classifyMessage(
     return { stream: null, action: "none" };
   }
 
-  if (result.stream_id) {
-    const existing = streams.find((ws) => ws.id === result.stream_id);
-    if (existing) {
-      console.log(
-        '[router] classification: stream_name="%s" stream_id=%s',
-        existing.name,
-        existing.id,
-      );
-      return { stream: existing, action: "matched" };
-    }
-    console.log(
-      "[router] classification: stream_name=none stream_id=%s (unknown stream)",
-      result.stream_id,
-    );
-  } else {
-    console.log("[router] classification: stream_name=none stream_id=none");
+  const matched = result.stream_id
+    ? (streams.find((ws) => ws.id === result.stream_id) ?? null)
+    : null;
+  logClassifierResult(result, matched);
+  if (matched) {
+    return { stream: matched, action: "matched" };
   }
 
   return { stream: null, action: "none" };
