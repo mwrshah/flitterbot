@@ -9,9 +9,11 @@ export type ClassifierPrompts = {
   userPrompt: string;
 };
 
-function formatStreamLine(ws: StreamRow, label?: string): string {
-  const suffix = label ? ` ${label}` : "";
-  return `- id: "${ws.id}", name: "${ws.name}"${suffix}${ws.repo_path ? `, repo: ${ws.repo_path}` : ""}`;
+function formatStreamHeader(ws: StreamRow, label?: string): string {
+  const marker = label ? ` ${label}` : "";
+  const lines = [`\n### Stream: ${ws.name}${marker}`, `- stream_id: "${ws.id}"`];
+  if (ws.repo_path) lines.push(`    repo: ${ws.repo_path}`);
+  return lines.join("\n");
 }
 
 function relativeTime(iso: string): string {
@@ -58,7 +60,7 @@ function formatStreamWithConversation(
   isLastAgentResponse: boolean,
 ): string {
   const marker = isLastAgentResponse ? " ← last agent response" : "";
-  const header = formatStreamLine(ws, marker || undefined);
+  const header = formatStreamHeader(ws, marker || undefined);
   if (!snippets || snippets.length === 0) return header;
 
   const messageLines = snippets.map((s) => {
