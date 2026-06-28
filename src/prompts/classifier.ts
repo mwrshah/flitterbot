@@ -11,7 +11,7 @@ export type ClassifierPrompts = {
 
 function formatStreamHeader(ws: StreamRow, label?: string): string {
   const marker = label ? ` ${label}` : "";
-  const lines = [`\n### Stream: ${ws.name}${marker}`, `- stream_id: "${ws.id}"`];
+  const lines = [`\n### Name: ${ws.name}${marker}`, `- stream_id: "${ws.id}"`];
   if (ws.repo_path) lines.push(`    repo: ${ws.repo_path}`);
   return lines.join("\n");
 }
