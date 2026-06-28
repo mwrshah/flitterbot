@@ -58,7 +58,20 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["status"] as const,
-    queryFn: (): Promise<StatusResponse> => apiClient.getStatus(),
+    queryFn: async (): Promise<StatusResponse> => {
+      try {
+        return await apiClient.getStatus();
+      } catch {
+        return {
+          source: "offline",
+          uptime: 0,
+          blackboard: "",
+          whatsapp: { status: "disconnected" },
+          streams: [],
+          shortcuts: {},
+        };
+      }
+    },
     staleTime: 3_000,
   };
 }
@@ -114,7 +127,13 @@ export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
 export function userConfigQueryOptions() {
   return {
     queryKey: ["user-config"] as const,
-    queryFn: () => fetchUserConfig(),
+    queryFn: async () => {
+      try {
+        return await fetchUserConfig();
+      } catch {
+        return {};
+      }
+    },
     staleTime: 30_000,
   };
 }
@@ -133,8 +152,12 @@ export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["skills"] as const,
     queryFn: async (): Promise<SkillListItem[]> => {
-      const res = await apiClient.listSkills();
-      return [...INTERNAL_COMMANDS, ...res.items];
+      try {
+        const res = await apiClient.listSkills();
+        return [...INTERNAL_COMMANDS, ...res.items];
+      } catch {
+        return INTERNAL_COMMANDS;
+      }
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
