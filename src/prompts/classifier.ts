@@ -80,22 +80,21 @@ function formatDefaultConversation(snippets: DefaultConversationSnippet[]): stri
     .join("\n");
 }
 
-export const ROUTER_CLASSIFIER_SYSTEM_PROMPT = `You are a message router for a software development assistant.
+export const ROUTER_CLASSIFIER_SYSTEM_PROMPT = `Decide whether to send the user's message to an existing open stream or to the default agent.
 
-Decide whether the user's message belongs to an existing open stream, or whether it should go to the default agent.
+Return stream_id: null when the default agent should handle it. Otherwise return the matching stream id.
+
+You will be shown the last few messages in each open stream and in the default agent conversation. Recent conversation snippets are shown newest first, in reverse chronological order.
 
 Rules:
-1. Recent conversation snippets are shown newest first.
-2. If the message clearly relates to an existing open stream, return its id.
-3. If the message does not match any open stream, return stream_id: null. The default agent will handle it.
-4. Use the recent conversation snippets to understand context. Short/ambiguous user replies ("yes", "sure", "do it") almost certainly respond to the stream OR default agent conversation with the most recent agent message. Check both the stream marked "← last agent response" and the default agent conversation to decide.
-5. If the user appears to be continuing the default agent conversation (e.g. replying to something the default agent said), return stream_id: null.
-6. Brainstorm streams are open-ended ideation sessions for a repo. If the user's message is general brainstorming, ideation, or exploratory discussion about a repo that has an open brainstorm stream, route to that brainstorm stream. Exception: if there is a different stream for the same repo that covers a specific issue the message clearly relates to, route to that specific stream instead. Specific beats general.
-7. If the user asks to create a new stream, start new work, or requests something that doesn't belong to any existing stream, return stream_id: null. Only the default agent can create streams.
-8. If the user message is exactly /clear, /reload, or /compact (including /compact with instructions), return stream_id: null so it goes to the default agent.
-9. When in doubt, return stream_id: null — prefer routing to the default agent over a wrong match.
+1. If the user names a stream directly, route to that stream.
+2. Route to an open stream only when the message is substantively connected to that stream's specific task or discussion. A repo match is not enough. If the conversation snippets are about the same topic, or the user appears to be continuing the conversation happening in an open stream, choose that stream. A different task in the same repo should go to the default agent so it can start new work.
+3. Short replies like "yes", "sure", or "do it" usually answer the most recent agent message. Check both open streams and the default agent conversation, then choose the best match.
+4. If the user asks to start new work, create a new stream, or do something that does not belong to an existing stream, return stream_id: null.
+5. If the message is exactly /clear, /reload, or /compact, including /compact with instructions, return stream_id: null.
+6. When unsure, return stream_id: null to fall back to the default agent.
 
-Respond with ONLY a JSON object containing two fields: stream_id and reasoning. No other text or explanation.`;
+Respond with ONLY a JSON object containing stream_id and reasoning.`;
 
 export function buildClassificationPrompts(
   message: string,
