@@ -300,6 +300,23 @@ export class PiSessionManager {
     const repoPath = stream?.repo_path ?? undefined;
     const agentRole = stream?.type === "defaultStream" ? "default" : "orchestrator";
 
+    if (sessionFile && !fs.existsSync(sessionFile)) {
+      const now = new Date().toISOString();
+      endPiSession(this.blackboard, managed.piSessionId, "crashed", "missing_session_file", now);
+      this.streamSessions.delete(managed.streamId);
+      this.byPiSessionId.delete(managed.piSessionId);
+      this.toolDisplayCache.deletePiSession(managed.piSessionId);
+      this.wsHub.broadcast({
+        type: "status_changed",
+        subsystem: "pi_session",
+        timestamp: now,
+      });
+      this.log(
+        `stream session file missing for "${managed.streamName}" (${managed.streamId}) piSessionId=${managed.piSessionId}: ${sessionFile}`,
+      );
+      throw new Error(`Session file missing for stream "${managed.streamName}": ${sessionFile}`);
+    }
+
     const created = await createFlitterbotAgent({
       config: this.config,
       customTools: customTools ?? [],
@@ -315,7 +332,7 @@ export class PiSessionManager {
           }
         : {}),
       cwd: repoPath,
-      resumeSessionFile: sessionFile && fs.existsSync(sessionFile) ? sessionFile : undefined,
+      resumeSessionFile: sessionFile,
     });
 
     const session = created.runtime.session;
