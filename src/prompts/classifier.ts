@@ -87,7 +87,7 @@ Return stream_id: null when the default agent should handle it. Otherwise return
 You will be shown the last few messages in each open stream and in the default agent conversation. Recent conversation snippets are shown newest first, in reverse chronological order.
 
 Rules:
-1. If the user names a stream directly, route to that stream.
+1. If the user references the name (what is value of "### Name:") in their message: you should route to that stream. e.g. "Hey flitty" when referencing: "### Name: flitty (a.k.a flits, flitter)"
 2. Route to an open stream only when the message is substantively connected to that stream's specific task or discussion. A repo match is not enough. If the conversation snippets are about the same topic, or the user appears to be continuing the conversation happening in an open stream, choose that stream. A different task in the same repo should go to the default agent so it can start new work.
 3. Short replies like "yes", "sure", or "do it" usually answer the most recent agent message. Check both open streams and the default agent conversation, then choose the best match.
 4. If the user asks to start new work, create a new stream, or do something that does not belong to an existing stream, return stream_id: null.
