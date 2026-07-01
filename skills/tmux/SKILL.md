@@ -31,6 +31,7 @@ All commands run via `/bin/bash scripts/sessions.sh <command>` relative to the s
 3. **Always use auto-select for launch** — do NOT specify a session letter. Let the script pick a free session. The output line `Launched in session X (ready)` tells you which session was assigned — parse it to know where to send subsequent `message`/`send`/`read` commands.
 
 4. **Never sleep or poll to wait for a session to finish.** Rely on the user prompting you again or a hook callback delivering the completion notification.
+5. If a stopped tmux-launched Claude Code session says it launched or is waiting on a downstream/background agent/workflow (keywords like “running in the background”, “Dynamic Workflow”, or “background agent”), do nothing; let it finish and expect another stop hook with its result.
 
 ### Commands
 
