@@ -66,8 +66,8 @@ import type {
   StreamSurfacedWebSocketEvent,
 } from "./contracts/index.ts";
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
-import { executeCreateWorktree } from "./custom-tools/create-worktree.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
+import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { stripInjectedDatetimeBlocks } from "./streams/format-stream-prompt.ts";
@@ -2184,43 +2184,50 @@ export class ControlSurfaceRuntime {
 
     if (role === "orchestrator") {
       tools.push({
-        name: "create_worktree",
-        label: "Create Git Worktree",
+        name: "set_up_worktree",
+        label: "Set Up Worktree",
         description:
-          "Create an isolated git worktree for the current stream. The stream and repo are implicit: the tool is bound to the current stream, and the repo is resolved from the orchestrator cwd, then anchored on the repo's main worktree. If cwd is not inside the intended repo, change cwd first and call again. Call with NO arguments for the common case: branch auto-generates as NNN-<stream-slug>, and the fork base resolves by priority: explicit base_ref > `flitterbot.baseRef` in the repo's .git/config > the orchestrator cwd's checked-out HEAD > the repo_path checked-out HEAD. Pass base_ref only to override (e.g. 'main', 'develop'); SHAs/tags not accepted. Pass force:true only when an existing worktree should be delinked and recreated. For a no-side-effect preview of bootstrap setup, pass discovery:true. After a real create the tool bootstraps from a `[flitterbot]` section in the repo's LOCAL .git/config (uncommitted): `copyPath` multivars (files/dirs copied main→worktree, run first) then `postCreate` multivars (ordered shell strings run with cwd=worktree root, best-effort). When the repo has no such config, it copies/installs NOTHING and returns a setup advisory listing discovered env files + caching package ecosystems so you can persist a recipe via `git config --add flitterbot.copyPath/postCreate`.",
+          "Inspect or apply the current stream's git worktree setup. mode is required. mode:'inspect' accepts no other args and reports the current repo, stream worktree, [flitterbot] config, resolved create base, planned create path, and discovery advisory when config is missing. mode:'apply' creates a new worktree when path is omitted, or attaches an existing worktree when path is provided. Applying requires [flitterbot] bootstrap config; if config is missing, no worktree is created and the agent should run inspect. base_ref chooses the create base, or updates only the recorded merge target when the stream already has a worktree; it never rebases/resets/moves the checkout. Attaching with path requires base_ref so the merge target is explicit. force:true means delink the current stream worktree association and mint a fresh new worktree; force cannot be combined with path. Stream and repo are ambient: the tool is bound to the current stream, and repo is resolved from the orchestrator cwd then anchored on the repo's main worktree.",
 
         parameters: {
           type: "object",
           properties: {
+            mode: {
+              type: "string",
+              enum: ["inspect", "apply"],
+              description:
+                "Required. inspect reports config/discovery and makes no changes; apply creates, attaches, or retargets the stream worktree.",
+            },
+            path: {
+              type: "string",
+              description:
+                "Existing git worktree path to attach. Only valid with mode:'apply', and base_ref is required with path.",
+            },
             base_ref: {
               type: "string",
               description:
-                "Optional branch to fork from. When omitted, resolves by priority: `flitterbot.baseRef` config > orchestrator cwd's checked-out HEAD > repo's checked-out HEAD. Pass to override (e.g. 'main', 'develop', 'origin/release-2026'). Does NOT accept SHAs or tags.",
+                "Branch to fork from for create, or recorded merge target for an existing/attached worktree. Does NOT accept SHAs or tags.",
             },
             force: {
               type: "boolean",
               description:
-                "Create a new worktree even if stream already has one (existing worktree is delinked but left on disk)",
-            },
-            discovery: {
-              type: "boolean",
-              description:
-                "Dry-run: do NOT create a worktree. Scan the repo (depth-5 find) and return a setup advisory — current [flitterbot] config, discovered env/secret files, and caching vs non-caching package ecosystems — so you can author copyPath/postCreate config. Works whether or not the repo is already configured.",
+                "Only valid with mode:'apply' and no path. Delink the current stream worktree association and mint a fresh new worktree; old worktree is left on disk.",
             },
           },
-          required: [],
+          required: ["mode"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { base_ref, force, discovery } = params as {
+          const { mode, path, base_ref, force } = params as {
+            mode: "inspect" | "apply";
+            path?: string;
             base_ref?: string;
             force?: boolean;
-            discovery?: boolean;
           };
           if (!streamId) {
             return {
               content: [
-                { type: "text", text: "Error: create_worktree is only available on a stream." },
+                { type: "text", text: "Error: set_up_worktree is only available on a stream." },
               ],
               details: { ok: false },
             };
@@ -2244,13 +2251,14 @@ export class ControlSurfaceRuntime {
               details: { ok: false, streamId: stream_id },
             };
           }
-          const result = await executeCreateWorktree(
+          const result = await executeSetUpWorktree(
             this.blackboard,
             stream_id,
             orchestratorCwd,
+            mode,
             base_ref,
             force,
-            discovery,
+            path,
           );
           if (result.ok) {
             const worktreePiSessionId = this.sessionManager.getByStream(stream_id)?.piSessionId;

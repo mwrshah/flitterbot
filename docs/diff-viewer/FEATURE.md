@@ -1,25 +1,26 @@
 # Diff Viewer
 
-Show the git diff of a stream's worktree against main, rendered in the web UI on demand.
+Show the git diff of a stream's worktree against the stream's recorded base branch, rendered in the web UI on demand.
 
 ## Behavior
 
 - Site banner already shows the active worktree and stream status (top-right, `justify-between gap-1`)
 - Add a depressable "Diff" button next to the stream status
 - Button is *enabled* only when the stream has a `worktree_path` set
-- On click: fetch `git diff main` from the worktree directory, render it in an expandable panel (overlay/drawer below the banner)
+- On click: fetch `git diff <base_branch>` from the worktree directory, render it in an expandable panel (overlay/drawer below the banner)
 - On second click (or close): collapse the panel
 
 ## Architecture
 
 ```
-[Click "Diff"] → GET /api/streams/:id/diff → backend runs `git diff main` in worktree_path → returns unified diff string → frontend renders with diff2html
+[Click "Diff"] → GET /api/streams/:id/diff → backend runs `git diff <base_branch>` in worktree_path → returns unified diff string → frontend renders with diff2html
 ```
 
 ### Backend
 - New endpoint: `GET /api/streams/:id/diff`
-- Reads `worktree_path` from the stream record
-- Runs `git diff main` (or `git diff main...HEAD`) in that directory
+- Reads `worktree_path` and `base_branch` from the stream record
+- Runs `git diff <base_branch>` (or `git diff <base_branch>...HEAD`) in that directory
+- If `base_branch` is missing, fall back to `main` only as a display/diff default; `set_up_worktree` should normally record the real merge target.
 - Returns raw unified diff text (plain text response, not JSON)
 - If no worktree or empty diff, return 204
 

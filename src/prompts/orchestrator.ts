@@ -28,7 +28,7 @@ You are managing a single stream of work.
 
 ## RULES
 
-- Create a worktree before non-trivial code changes. See the \`create_worktree\` tool description.
+- Set up a worktree before non-trivial code changes. See the \`set_up_worktree\` tool description.
 - Fan reads out in parallel and parallelize downstream work.
 - Call \`close_stream\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. If the user says "merge with main" / "rebase" they are asking to skip the tool, its a git request — run them directly, do not close.
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).

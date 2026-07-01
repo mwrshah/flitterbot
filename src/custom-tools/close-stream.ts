@@ -21,7 +21,7 @@ type CloseStreamResult = {
   resolvedBaseBranch?: string | null;
 };
 
-// ponytail: share this git exec helper with create-worktree and prefer execFile args for quoting.
+// ponytail: share this git exec helper with set-up-worktree and prefer execFile args for quoting.
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
@@ -239,14 +239,14 @@ export async function executeCloseStream(
         ok: false,
         streamId,
         message:
-          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use create_worktree with update_worktree_path for an existing worktree, or create one fresh) and try again, or call close_stream with mode:noop to close without merging.",
+          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use set_up_worktree with mode:apply, path, and base_ref for an existing worktree, or mode:apply to create one fresh) and try again, or call close_stream with mode:noop to close without merging.",
       };
     }
     if (!fs.existsSync(worktreePath)) {
       return {
         ok: false,
         streamId,
-        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via create_worktree update_worktree_path) and try again, or call close_stream with mode:noop to close without merging.`,
+        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via set_up_worktree with mode:apply, path, and base_ref) and try again, or call close_stream with mode:noop to close without merging.`,
       };
     }
 

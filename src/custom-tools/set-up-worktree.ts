@@ -4,16 +4,20 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { enrichStream, getStreamById } from "../blackboard/query-streams.ts";
+import type { StreamRow } from "../contracts/index.ts";
 import {
   buildDiscoveryAdvisory,
   isConfigured,
   readWorktreeConfig,
   type WorktreeBootstrapConfig,
 } from "../streams/worktree-config.ts";
+import { checkWorktreeLink } from "../streams/worktree-link.ts";
 
 const execPromise = promisify(cpExec);
 
-type CreateWorktreeResult = {
+type SetUpWorktreeMode = "inspect" | "apply";
+
+type SetUpWorktreeResult = {
   ok: boolean;
   streamId: string;
   worktreePath?: string;
@@ -22,16 +26,17 @@ type CreateWorktreeResult = {
 };
 
 const UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS = [
-  "Action needed before creating a worktree:",
+  "Action needed before setting up a worktree:",
   "1. First explore the repo context to suggest candidates for post-create hooks. Use the discovery output below as a starting point: env/secret files are candidates for flitterbot.copyPath, and package ecosystems are candidates for flitterbot.postCreate.",
   "2. Suggest options to the user. Say which env files were turned up, which post-create hooks look appropriate, and ask the user what their decision is on the worktree configuration.",
   "3. Ask the user what the baseRef should be.",
+  "4. Persist the user's chosen recipe with git config flitterbot.baseRef and repeated git config --add flitterbot.copyPath/postCreate, then retry set_up_worktree with mode:apply.",
 ].join("\n");
 
 const NON_GIT_WORKTREE_AGENT_INSTRUCTIONS = [
-  "Action needed before creating a worktree:",
+  "Action needed before setting up a worktree:",
   "1. This cwd is not inside a git repo, so first identify the intended repository or ask the user which repo/cwd to use.",
-  "2. Retry create_worktree from inside the intended git repository.",
+  "2. Retry set_up_worktree from inside the intended git repository.",
 ].join("\n");
 
 // ponytail: share the git exec helper with close-stream instead of carrying another shell-string wrapper.
@@ -167,14 +172,125 @@ async function tryHeadBranch(dir: string): Promise<string | null> {
   return branch;
 }
 
-export async function executeCreateWorktree(
+async function resolveBaseRef(
+  repoPath: string,
+  orchestratorCwd: string,
+  config: WorktreeBootstrapConfig,
+  baseRef?: string,
+): Promise<
+  | { ok: true; resolvedBaseRef: string; normalizedBase: string; note: string }
+  | { ok: false; message: string }
+> {
+  let resolvedBaseRef: string;
+  let note = "";
+  if (baseRef) {
+    resolvedBaseRef = baseRef;
+    note = `\nBase: '${resolvedBaseRef}' (explicit base_ref).`;
+  } else if (config.baseRef) {
+    resolvedBaseRef = config.baseRef;
+    note = `\nBase: '${resolvedBaseRef}' (from flitterbot.baseRef config).`;
+  } else {
+    const cwdBranch = await tryHeadBranch(orchestratorCwd);
+    const repoBranch = cwdBranch ? null : await tryHeadBranch(repoPath);
+    const fallback = cwdBranch ?? repoBranch;
+    if (!fallback) {
+      return {
+        ok: false,
+        message: `Could not resolve a fork base: orchestrator cwd (${orchestratorCwd}) and repo (${repoPath}) have no checked-out branch (missing, not a repo, or detached HEAD). Pass base_ref explicitly or set git config flitterbot.baseRef.`,
+      };
+    }
+    resolvedBaseRef = fallback;
+    const source = cwdBranch ? "orchestrator cwd's checked-out HEAD" : "repo's checked-out HEAD";
+    note = `\nBase: '${resolvedBaseRef}' (default = ${source}; not configured). To pin the fork base from inside this repo/worktree, run: git config flitterbot.baseRef <branch-or-origin/branch>`;
+  }
+
+  const SHA_RE = /^[0-9a-f]{7,40}$/i;
+  if (SHA_RE.test(resolvedBaseRef)) {
+    return {
+      ok: false,
+      message: `baseRef "${resolvedBaseRef}" looks like a commit SHA. Please provide a branch name (e.g. "main" or "origin/develop").`,
+    };
+  }
+  try {
+    const isTag = await exec(`git tag -l ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
+    if (isTag)
+      return {
+        ok: false,
+        message: `baseRef "${resolvedBaseRef}" is a tag, not a branch. Please provide a branch name.`,
+      };
+  } catch {}
+  try {
+    await exec(`git rev-parse --verify ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
+  } catch {
+    return {
+      ok: false,
+      message: `baseRef "${resolvedBaseRef}" does not resolve to a known branch. Check the name and try again.`,
+    };
+  }
+
+  return {
+    ok: true,
+    resolvedBaseRef,
+    normalizedBase: resolvedBaseRef.replace(/^origin\//, ""),
+    note,
+  };
+}
+
+async function buildInspectMessage(
+  repoPath: string,
+  stream: StreamRow,
+  config: WorktreeBootstrapConfig,
+  orchestratorCwd: string,
+): Promise<string> {
+  const configLines = [
+    `Inspect: set_up_worktree`,
+    `Repo: ${repoPath}`,
+    `Stream worktree: ${stream.worktree_path ?? "none"}`,
+    `Recorded base_ref: ${stream.base_branch ?? "none"}`,
+    `Configured baseRef: ${config.baseRef ?? "none"}`,
+    `copyPath: ${config.copyPaths.join(", ") || "none"}`,
+    `postCreate: ${config.postCreate.join("; ") || "none"}`,
+  ];
+
+  const base = await resolveBaseRef(repoPath, orchestratorCwd, config);
+  if (base.ok) configLines.push(`Resolved create base_ref: ${base.normalizedBase}`);
+
+  if (isConfigured(config)) {
+    const slug = slugify(stream.name);
+    const nextNum = (await getHighestBranchNumber(repoPath)) + 1;
+    const branch = `${String(nextNum).padStart(3, "0")}-${slug}`;
+    const worktreePath = path.resolve(
+      repoPath,
+      "..",
+      `${path.basename(repoPath)}-worktrees`,
+      branch,
+    );
+    configLines.push(
+      `Apply with no path would ${stream.worktree_path && existsSync(stream.worktree_path) ? "refuse because the stream already has a worktree" : "create a new worktree"}.`,
+      `Planned branch: ${branch}`,
+      `Planned path: ${worktreePath}`,
+    );
+    return configLines.join("\n");
+  }
+
+  return [
+    ...configLines,
+    "",
+    "No [flitterbot] worktree bootstrap config found. No worktree can be applied until config exists.",
+    UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS,
+    await buildDiscoveryAdvisory(repoPath, config, "discovery"),
+  ].join("\n\n");
+}
+
+export async function executeSetUpWorktree(
   blackboard: BlackboardDatabase,
   streamId: string,
   orchestratorCwd: string,
+  mode: SetUpWorktreeMode,
   baseRef?: string,
   force = false,
-  discovery = false,
-): Promise<CreateWorktreeResult> {
+  targetPath?: string,
+): Promise<SetUpWorktreeResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
     return {
@@ -209,25 +325,106 @@ export async function executeCreateWorktree(
     };
   }
 
-  // Discovery dry-run: surface bootstrap-config options for the repo WITHOUT creating a worktree,
-  // regardless of whether a [flitterbot] config already exists.
-  if (discovery) {
-    const config = await readWorktreeConfig(repoPath);
+  if (mode !== "inspect" && mode !== "apply") {
+    return { ok: false, streamId, message: `mode is required and must be "inspect" or "apply".` };
+  }
+
+  const config = await readWorktreeConfig(repoPath);
+
+  if (mode === "inspect") {
+    if (baseRef || force || targetPath) {
+      return {
+        ok: false,
+        streamId,
+        message: `set_up_worktree inspect does not accept path/base_ref/force. Run set_up_worktree with mode:"inspect" only.`,
+      };
+    }
     return {
       ok: true,
       streamId,
-      message: await buildDiscoveryAdvisory(repoPath, config, "discovery"),
+      worktreePath: stream.worktree_path ?? undefined,
+      message: await buildInspectMessage(repoPath, stream, config, orchestratorCwd),
+    };
+  }
+
+  if (!isConfigured(config)) {
+    return {
+      ok: false,
+      streamId,
+      message: [
+        "No [flitterbot] worktree bootstrap config found in this repo's .git/config. No changes made.",
+        UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS,
+        await buildDiscoveryAdvisory(repoPath, config, "discovery"),
+      ].join("\n\n"),
+    };
+  }
+
+  if (force && targetPath) {
+    return {
+      ok: false,
+      streamId,
+      message: `force:true means mint a fresh worktree; path means attach an existing worktree. Pass one or the other, not both.`,
+    };
+  }
+
+  if (targetPath && !baseRef) {
+    return {
+      ok: false,
+      streamId,
+      message: `Attaching an existing worktree requires base_ref so the stream's merge target is explicit. No changes made.`,
+    };
+  }
+
+  const base = await resolveBaseRef(repoPath, orchestratorCwd, config, baseRef);
+  if (!base.ok) return { ok: false, streamId, message: base.message };
+  const { resolvedBaseRef, normalizedBase, note: baseRefNote } = base;
+
+  if (targetPath) {
+    const attachPath = path.resolve(orchestratorCwd, targetPath);
+    if (stream.worktree_path && existsSync(stream.worktree_path)) {
+      const current = path.resolve(stream.worktree_path);
+      if (current !== attachPath) {
+        return {
+          ok: false,
+          streamId,
+          message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. Refusing to replace it with ${attachPath}.`,
+        };
+      }
+    }
+    const check = checkWorktreeLink(attachPath, repoPath);
+    if (!check.ok)
+      return {
+        ok: false,
+        streamId,
+        message: `Cannot attach worktree ${attachPath}: ${check.reason}. No changes made.`,
+      };
+    enrichStream(blackboard, streamId, repoPath, attachPath, normalizedBase);
+    return {
+      ok: true,
+      streamId,
+      worktreePath: attachPath,
+      branchName: check.branch,
+      message: `Attached worktree ${attachPath} on branch ${check.branch}. Base branch recorded as ${normalizedBase}.`,
     };
   }
 
   let cleanupMessage = "";
   if (stream.worktree_path && existsSync(stream.worktree_path)) {
-    if (!force) {
+    if (baseRef && !force) {
+      enrichStream(blackboard, streamId, repoPath, stream.worktree_path, normalizedBase);
       return {
         ok: true,
         streamId,
         worktreePath: stream.worktree_path,
-        message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. Call create_worktree with force=true to delink it and create a new one (old worktree left on disk for cleanup).`,
+        message: `Updated stream '${stream.name}' base branch to ${normalizedBase}. Worktree checkout was not changed.`,
+      };
+    }
+    if (!force) {
+      return {
+        ok: false,
+        streamId,
+        worktreePath: stream.worktree_path,
+        message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. No changes made. Pass force:true to mint a fresh worktree, or pass base_ref to update only the recorded merge target.`,
       };
     }
     cleanupMessage = `Old worktree delinked at ${stream.worktree_path} (left on disk). `;
@@ -235,81 +432,9 @@ export async function executeCreateWorktree(
     cleanupMessage = `Old worktree left at ${stream.worktree_path} (switched from ${stream.repo_path}). `;
   }
 
-  const config = await readWorktreeConfig(repoPath);
-
-  if (!isConfigured(config)) {
-    return {
-      ok: false,
-      streamId,
-      message: [
-        "No [flitterbot] worktree bootstrap config found in this repo's .git/config. NO worktree was created.",
-        UNCONFIGURED_WORKTREE_AGENT_INSTRUCTIONS,
-        await buildDiscoveryAdvisory(repoPath, config, "discovery"),
-      ].join("\n\n"),
-    };
-  }
-
-  // base_ref priority: explicit arg > flitterbot.baseRef config > orchestrator cwd's checked-out
-  // HEAD > repo_path's checked-out HEAD. The cwd default is usually right (a worktree-based
-  // orchestrator forks off its own worktree branch), but it's implicit, so we emit an advisory
-  // whenever a checked-out HEAD is used so the user can pin a base via config if desired.
-  let resolvedBaseRef: string;
-  let baseRefNote = "";
-  if (baseRef) {
-    resolvedBaseRef = baseRef;
-    baseRefNote = `\nBase: '${resolvedBaseRef}' (explicit base_ref).`;
-  } else if (config.baseRef) {
-    resolvedBaseRef = config.baseRef;
-    baseRefNote = `\nBase: '${resolvedBaseRef}' (from flitterbot.baseRef config).`;
-  } else {
-    const cwdBranch = await tryHeadBranch(orchestratorCwd);
-    const repoBranch = cwdBranch ? null : await tryHeadBranch(repoPath);
-    const fallback = cwdBranch ?? repoBranch;
-    if (!fallback) {
-      return {
-        ok: false,
-        streamId,
-        message: `Could not resolve a fork base: orchestrator cwd (${orchestratorCwd}) and repo (${repoPath}) have no checked-out branch (missing, not a repo, or detached HEAD). Pass base_ref explicitly or set git config flitterbot.baseRef.`,
-      };
-    }
-    resolvedBaseRef = fallback;
-    const source = cwdBranch ? "orchestrator cwd's checked-out HEAD" : "repo's checked-out HEAD";
-    baseRefNote = `\nBase: '${resolvedBaseRef}' (default = ${source}; not configured). To pin the fork base from inside this repo/worktree, run: git config flitterbot.baseRef <branch-or-origin/branch>`;
-  }
-
   const slug = slugify(stream.name);
   const nextNum = (await getHighestBranchNumber(repoPath)) + 1;
   const resolvedBranch = `${String(nextNum).padStart(3, "0")}-${slug}`;
-
-  const SHA_RE = /^[0-9a-f]{7,40}$/i;
-  if (SHA_RE.test(resolvedBaseRef)) {
-    return {
-      ok: false,
-      streamId,
-      message: `baseRef "${resolvedBaseRef}" looks like a commit SHA. Please provide a branch name (e.g. "main" or "origin/develop").`,
-    };
-  }
-  try {
-    const isTag = await exec(`git tag -l ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
-    if (isTag) {
-      return {
-        ok: false,
-        streamId,
-        message: `baseRef "${resolvedBaseRef}" is a tag, not a branch. Please provide a branch name.`,
-      };
-    }
-  } catch {}
-  try {
-    await exec(`git rev-parse --verify ${JSON.stringify(resolvedBaseRef)}`, repoPath, 5_000);
-  } catch {
-    return {
-      ok: false,
-      streamId,
-      message: `baseRef "${resolvedBaseRef}" does not resolve to a known branch. Check the name and try again.`,
-    };
-  }
-
-  const normalizedBase = resolvedBaseRef.replace(/^origin\//, "");
 
   try {
     const worktrees = await exec("git worktree list --porcelain", repoPath, 10_000);
@@ -355,13 +480,7 @@ export async function executeCreateWorktree(
 
     let bootstrapSummary = "";
     try {
-      if (isConfigured(config)) {
-        bootstrapSummary = await runBootstrap(repoPath, result.worktreePath, config);
-      } else {
-        // Unconfigured: skip all bootstrap and hand the agent a setup advisory so it can
-        // persist a [flitterbot] recipe into .git/config for future creates.
-        bootstrapSummary = `\n\n${await buildDiscoveryAdvisory(repoPath, config, "unconfigured")}`;
-      }
+      bootstrapSummary = await runBootstrap(repoPath, result.worktreePath, config);
     } catch (error: unknown) {
       bootstrapSummary = `\nBootstrap error: ${error instanceof Error ? error.message : String(error)}`;
     }

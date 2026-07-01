@@ -90,7 +90,7 @@ Blackboard context
         │
         ▼
 ToolDisplayContextCache keyed by piSessionId
-        │  invalidated on worktree_changed / create_worktree success
+        │  invalidated on worktree_changed / set_up_worktree success
         ▼
 ToolPathFormatter per pi session
         │
@@ -174,11 +174,11 @@ Lifecycle:
 
 1. First format request for a `piSessionId`: query `pi_sessions LEFT JOIN streams`, build a formatter, store it in the map.
 2. Subsequent tool events for that session: reuse the cached formatter via map lookup only.
-3. Successful `create_worktree` / `update_worktree_path`: find the active pi session for the stream, call `toolDisplayCache.invalidatePiSession(piSessionId)`, then broadcast `worktree_changed`.
+3. Successful `set_up_worktree`: find the active pi session for the stream, call `toolDisplayCache.invalidatePiSession(piSessionId)`, then broadcast `worktree_changed`.
 4. Next tool event or history request for that `piSessionId`: cache miss rebuilds from the updated `streams.worktree_path`.
 5. Session end / close / manager removal: call `toolDisplayCache.deletePiSession(piSessionId)` so long-lived runtimes do not accumulate stale entries.
 
-`runtime.ts` already broadcasts `worktree_changed` after `create_worktree` succeeds for the stream's active pi session. Use the same point to invalidate the backend display cache before the broadcast. If there is no active pi session for that stream, no live cache entry needs invalidation; the next history request for the pi session will build from the database.
+`runtime.ts` already broadcasts `worktree_changed` after `set_up_worktree` succeeds for the stream's active pi session. Use the same point to invalidate the backend display cache before the broadcast. If there is no active pi session for that stream, no live cache entry needs invalidation; the next history request for the pi session will build from the database.
 
 The important invariant: creating or updating a stream worktree during an active pi session changes subsequent displayed tool paths without requiring process restart and without per-event SQLite work.
 
@@ -254,7 +254,7 @@ If the vendor `AssistantMessage["content"]` type makes this awkward, define the 
 - `src/streams/tool-display.ts` (create) — display context lookup/cache, path formatter, tool/key map, timeline enrichment helper.
 - `src/streams/pi-subscribe.ts` (modify) — reuse a per-session formatter for `message_end.toolCalls` and `tool_execution_start`.
 - `src/routes/browser-streams.ts` (modify) — apply one tail-end history enrichment pass for live and disk session history.
-- `src/runtime.ts` (modify) — invalidate display context cache on successful `create_worktree` / `worktree_changed` path.
+- `src/runtime.ts` (modify) — invalidate display context cache on successful `set_up_worktree` / `worktree_changed` path.
 - `src/contracts/timeline.ts` (modify) — add `ChatTimelineTool.displayArgs` with canonical-vs-display invariant.
 - `src/contracts/websocket.ts` (modify) — add WS display args for tool calls and tool execution start.
 - `web/src/lib/types.ts` (modify) — mirror WS display args on the frontend union.
