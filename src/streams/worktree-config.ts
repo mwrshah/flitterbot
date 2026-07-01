@@ -110,7 +110,11 @@ const PRUNE_DIRS = [
 // reuses already-fetched packages instead of refetching from the network. Resolved per-dir in
 // priority order — lockfiles disambiguate which tool actually owns a pyproject.toml/yarn.lock.
 const CACHING_RULES: Array<{ marker: string; manager: string; cmd: string }> = [
-  { marker: "pnpm-lock.yaml", manager: "pnpm", cmd: "pnpm install" },
+  {
+    marker: "pnpm-lock.yaml",
+    manager: "pnpm",
+    cmd: "pnpm install && pnpm approve-builds --all && pnpm install",
+  },
   { marker: "bun.lock", manager: "bun", cmd: "bun install" },
   { marker: "bun.lockb", manager: "bun", cmd: "bun install" },
   { marker: "uv.lock", manager: "uv", cmd: "uv sync" },
@@ -268,6 +272,7 @@ export async function buildDiscoveryAdvisory(
     "Bootstrap principles:",
     "  • Prefer package managers that cache deps globally (pnpm, bun, uv, poetry, pdm, cargo, go, maven, gradle, bundler, composer, yarn-berry) so each new worktree reuses the cache instead of refetching from the network.",
     "  • For workspace monorepos a single root install usually covers all packages; for MIXED-ecosystem monorepos add one postCreate per subdir/tool.",
+    "  • When configuring pnpm, run pnpm install first to discover pending build scripts, then pnpm approve-builds --all, then pnpm install again so approved scripts run in the new worktree.",
     "  • Copy every gitignored env/secret the app needs to run (.env, .env.local, credentials, certs).",
     "  • If a package dir only has a non-caching manager (npm/yarn-classic/pip), stop and ask the user to adopt a caching one (pnpm/uv/bun) before configuring postCreate.",
     "",

@@ -43,12 +43,12 @@ All live in the repo's local `.git/config`:
 	copyPath = klair-api/.env
 	copyPath = klair-api/credentials.json
 	copyPath = .scratch/certs
-	postCreate = (cd klair-client && pnpm install)
+	postCreate = (cd klair-client && pnpm install && pnpm approve-builds --all && pnpm install)
 	postCreate = (cd klair-api && uv sync)
 ```
 
 - `flitterbot.copyPath` (multivar) — a file or directory copied from the main repo into the worktree at the same relative path. Recursive for dirs. Runs first. Path-escape guarded (must stay within repo→worktree).
-- `flitterbot.postCreate` (multivar) — an arbitrary shell string executed with `cwd` = worktree root. Each command carries its own subdir entry, e.g. `(cd agent-runner && npm install)`. This is what makes mixed-ecosystem monorepos work: one hook per tool/dir, where a single root install cannot suffice.
+- `flitterbot.postCreate` (multivar) — an arbitrary shell string executed with `cwd` = worktree root. Each command carries its own subdir entry, e.g. `(cd agent-runner && npm install)`. This is what makes mixed-ecosystem monorepos work: one hook per tool/dir, where a single root install cannot suffice. For pnpm hooks, run `pnpm install`, then `pnpm approve-builds --all`, then `pnpm install` again so approved build scripts run.
 - `flitterbot.baseRef` (single value) — the branch new worktrees fork from. Supports local branches (`main`) and remote-tracking refs (`origin/main`). Overrides the implicit HEAD-parse default. Optional.
 
 Set them from inside the repo/worktree:
@@ -155,7 +155,7 @@ export function buildDiscoveryAdvisory(
 
 - `readWorktreeConfig` runs `git config --get-all flitterbot.copyPath` / `.postCreate` (exit 1 = absent = empty, not error).
 - `discoverRepo` shells one pruned `find -maxdepth 5`, splits results into env files (template-filtered) and per-dir marker sets, resolves each dir to an ecosystem.
-- Ecosystem resolution priority order: pnpm, bun, uv, poetry, pdm, cargo, go, maven, gradle, bundler, composer (caching); yarn-berry (`.yarnrc.yml`+`yarn.lock`) caching; npm, yarn-classic, pip, pipenv (non-caching); bare `pyproject.toml` → suggest uv.
+- Ecosystem resolution priority order: pnpm (`pnpm install && pnpm approve-builds --all && pnpm install`), bun, uv, poetry, pdm, cargo, go, maven, gradle, bundler, composer (caching); yarn-berry (`.yarnrc.yml`+`yarn.lock`) caching; npm, yarn-classic, pip, pipenv (non-caching); bare `pyproject.toml` → suggest uv.
 - `buildDiscoveryAdvisory` shared by both unconfigured-auto and explicit discovery; the discovery variant also echoes current config.
 
 ### create_worktree integration
