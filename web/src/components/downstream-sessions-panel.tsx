@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
+import { Button } from "~/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -321,55 +323,69 @@ export function DownstreamSessionsPanel({
       </div>
 
       {showDiff && hasWorktree ? (
-        <div data-scroll-container="diff" className="flex-1 overflow-y-auto">
-          {diffQuery.isPending && (
-            <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
-          )}
-          {diffQuery.isError && (
-            <p className="px-4 py-3 text-xs text-destructive">Failed to load diff.</p>
-          )}
-          {diffQuery.isSuccess && !diffQuery.data && (
-            <p className="px-4 py-3 text-xs text-muted-foreground">
-              No changes against {worktree?.baseBranch ?? "main"}.
-            </p>
-          )}
-          {diffQuery.isSuccess && diffQuery.data?.mode === "summary" && (
-            <>
-              <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                Diff too large ({diffQuery.data.files} files,{" "}
-                {diffQuery.data.insertions.toLocaleString()}+ /{" "}
-                {diffQuery.data.deletions.toLocaleString()}&minus;), showing summary only
-              </div>
-              <pre className="px-4 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
-                {diffQuery.data.stat}
-              </pre>
-            </>
-          )}
-          {diffQuery.isSuccess && diffQuery.data?.mode === "diff" && (
-            <div className="diff-viewer-panel text-xs">
-              {diffFiles.map((file) => {
-                const path = file.newPath || file.oldPath || "(unknown)";
-                const key = `${file.oldRevision}-${file.newRevision}-${path}`;
-                return (
-                  <div key={key} className="mb-3 last:mb-0">
-                    <div className="sticky top-0 z-10 px-3 py-1 text-[11px] font-mono text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm truncate">
-                      {path}
+        <div className="relative flex-1 min-h-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="absolute right-3 top-2 z-30 rounded-md bg-background/95 shadow-sm backdrop-blur-sm"
+            aria-label="Refresh diff"
+            title="Refresh diff"
+            disabled={diffQuery.isFetching}
+            onClick={() => void diffQuery.refetch()}
+          >
+            <RotateCcwIcon className={cn("size-3.5", diffQuery.isFetching && "animate-spin")} />
+          </Button>
+          <div data-scroll-container="diff" className="h-full overflow-y-auto">
+            {diffQuery.isPending && (
+              <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
+            )}
+            {diffQuery.isError && (
+              <p className="px-4 py-3 text-xs text-destructive">Failed to load diff.</p>
+            )}
+            {diffQuery.isSuccess && !diffQuery.data && (
+              <p className="px-4 py-3 text-xs text-muted-foreground">
+                No changes against {worktree?.baseBranch ?? "main"}.
+              </p>
+            )}
+            {diffQuery.isSuccess && diffQuery.data?.mode === "summary" && (
+              <>
+                <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  Diff too large ({diffQuery.data.files} files,{" "}
+                  {diffQuery.data.insertions.toLocaleString()}+ /{" "}
+                  {diffQuery.data.deletions.toLocaleString()}&minus;), showing summary only
+                </div>
+                <pre className="px-4 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
+                  {diffQuery.data.stat}
+                </pre>
+              </>
+            )}
+            {diffQuery.isSuccess && diffQuery.data?.mode === "diff" && (
+              <div className="diff-viewer-panel text-xs">
+                {diffFiles.map((file) => {
+                  const path = file.newPath || file.oldPath || "(unknown)";
+                  const key = `${file.oldRevision}-${file.newRevision}-${path}`;
+                  return (
+                    <div key={key} className="mb-3 last:mb-0">
+                      <div className="sticky top-0 z-10 px-3 py-1 text-[11px] font-mono text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm truncate">
+                        {path}
+                      </div>
+                      <Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
+                        {(hunks: HunkData[]) =>
+                          hunks.map((hunk: HunkData) => (
+                            <Hunk
+                              key={`${hunk.oldStart},${hunk.oldLines} ${hunk.newStart},${hunk.newLines}`}
+                              hunk={hunk}
+                            />
+                          ))
+                        }
+                      </Diff>
                     </div>
-                    <Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
-                      {(hunks: HunkData[]) =>
-                        hunks.map((hunk: HunkData) => (
-                          <Hunk
-                            key={`${hunk.oldStart},${hunk.oldLines} ${hunk.newStart},${hunk.newLines}`}
-                            hunk={hunk}
-                          />
-                        ))
-                      }
-                    </Diff>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
