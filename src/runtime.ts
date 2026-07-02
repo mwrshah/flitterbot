@@ -4,7 +4,8 @@ import type http from "node:http";
 import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { type AssistantMessage, getModel, type TextContent } from "@earendil-works/pi-ai";
+import type { AssistantMessage, KnownProvider, TextContent } from "@earendil-works/pi-ai";
+import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {
@@ -737,9 +738,9 @@ export class ControlSurfaceRuntime {
       return this.toPiSessionModelInfo(managed.modelInfo);
     }
 
-    const model = getModel(
-      modelEntry.provider as Parameters<typeof getModel>[0],
-      modelEntry.modelId as Parameters<typeof getModel>[1],
+    const model = getBuiltinModel(
+      modelEntry.provider as KnownProvider,
+      modelEntry.modelId as never,
     );
     if (!model) {
       throw new Error(

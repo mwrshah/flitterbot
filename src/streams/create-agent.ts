@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getModel } from "@earendil-works/pi-ai";
+import type { KnownProvider } from "@earendil-works/pi-ai";
+import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
@@ -114,10 +115,7 @@ export async function createFlitterbotAgent(
     ? undefined
     : resolveModelEntry(config, options.modelId);
   const model = modelEntry
-    ? getModel(
-        modelEntry.provider as Parameters<typeof getModel>[0],
-        modelEntry.modelId as Parameters<typeof getModel>[1],
-      )
+    ? getBuiltinModel(modelEntry.provider as KnownProvider, modelEntry.modelId as never)
     : undefined;
   if (modelEntry && !model) {
     throw new Error(

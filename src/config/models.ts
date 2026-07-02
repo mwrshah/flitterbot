@@ -1,4 +1,5 @@
-import { getModel } from "@earendil-works/pi-ai";
+import type { KnownProvider } from "@earendil-works/pi-ai";
+import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { FlitterbotConfig, ModelConfigEntry } from "./load-config.ts";
 
 export function resolveModelEntry(config: FlitterbotConfig, modelId?: string): ModelConfigEntry {
@@ -25,10 +26,7 @@ function resolveCompositeId(compositeId: string): ModelConfigEntry | null {
   if (slashIdx <= 0 || slashIdx === compositeId.length - 1) return null;
   const provider = compositeId.slice(0, slashIdx);
   const rawModelId = compositeId.slice(slashIdx + 1);
-  const model = getModel(
-    provider as Parameters<typeof getModel>[0],
-    rawModelId as Parameters<typeof getModel>[1],
-  );
+  const model = getBuiltinModel(provider as KnownProvider, rawModelId as never);
   if (!model) return null;
   return {
     id: compositeId,

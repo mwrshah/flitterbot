@@ -1,10 +1,15 @@
 import type http from "node:http";
 import {
-  getModel,
-  getModels,
-  getProviders,
+  type Api,
   getSupportedThinkingLevels,
+  type KnownProvider,
+  type Model,
 } from "@earendil-works/pi-ai";
+import {
+  getBuiltinModel,
+  getBuiltinModels,
+  getBuiltinProviders,
+} from "@earendil-works/pi-ai/providers/all";
 import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
@@ -95,9 +100,9 @@ export async function buildModelsListResponse(
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
 
-  for (const provider of getProviders()) {
+  for (const provider of getBuiltinProviders()) {
     const authKind = availabilityByProvider.get(provider) ?? "none";
-    for (const model of getModels(provider)) {
+    for (const model of getBuiltinModels(provider)) {
       if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
       all.push({
         id: `${provider}/${model.id}`,
@@ -134,10 +139,7 @@ function buildPinnedModelItem(
   entry: ModelConfigEntry,
   availabilityByProvider: Map<string, ModelListItem["authKind"]>,
 ): ModelListItem {
-  const catalogModel = getModel(
-    entry.provider as Parameters<typeof getModel>[0],
-    entry.modelId as Parameters<typeof getModel>[1],
-  );
+  const catalogModel = getBuiltinModel(entry.provider as KnownProvider, entry.modelId as never);
   const authKind = availabilityByProvider.get(entry.provider) ?? "none";
   return {
     id: entry.id,
@@ -151,7 +153,7 @@ function buildPinnedModelItem(
   };
 }
 
-function modelThinkingCapabilities(model: NonNullable<ReturnType<typeof getModel>>) {
+function modelThinkingCapabilities(model: Model<Api>) {
   return {
     reasoning: Boolean(model.reasoning),
     supportsXhigh: getSupportedThinkingLevels(model).includes("xhigh"),
@@ -163,7 +165,7 @@ async function resolveProviderAvailability(
 ): Promise<Map<string, ModelListItem["authKind"]>> {
   const authStorage = createPiAuthStorage(runtime.config.controlSurfaceAgentDir);
   const providers = new Set([
-    ...getProviders(),
+    ...getBuiltinProviders(),
     ...runtime.config.models.map((model) => model.provider),
   ]);
   const entries = await Promise.all(
@@ -193,10 +195,7 @@ function buildEntryFromId(
   if (slashIdx <= 0 || slashIdx === id.length - 1) return null;
   const provider = id.slice(0, slashIdx);
   const rawModelId = id.slice(slashIdx + 1);
-  const model = getModel(
-    provider as Parameters<typeof getModel>[0],
-    rawModelId as Parameters<typeof getModel>[1],
-  );
+  const model = getBuiltinModel(provider as KnownProvider, rawModelId as never);
   if (!model) return null;
 
   return {
