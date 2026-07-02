@@ -134,6 +134,7 @@ export function DownstreamSessionsPanel({
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
+  const [diffRefreshNudged, setDiffRefreshNudged] = useState(false);
 
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
@@ -327,14 +328,25 @@ export function DownstreamSessionsPanel({
           <Button
             type="button"
             variant="outline"
-            size="icon-sm"
-            className="absolute right-3 top-2 z-30 rounded-md bg-background/95 shadow-sm backdrop-blur-sm"
+            size="icon-xs"
+            className="absolute right-3 top-[-0.3125rem] z-30 rounded-md bg-background/95 shadow-sm backdrop-blur-sm active:not-aria-[haspopup]:translate-y-0"
             aria-label="Refresh diff"
             title="Refresh diff"
-            disabled={diffQuery.isFetching}
-            onClick={() => void diffQuery.refetch()}
+            aria-disabled={diffQuery.isFetching}
+            onClick={() => {
+              if (diffQuery.isFetching) return;
+              setDiffRefreshNudged(true);
+              void diffQuery.refetch();
+            }}
           >
-            <RotateCcwIcon className={cn("size-3.5", diffQuery.isFetching && "animate-spin")} />
+            <RotateCcwIcon
+              className={cn(
+                "size-3 transition-transform duration-150",
+                diffRefreshNudged && "-rotate-45",
+                diffQuery.isFetching && !diffRefreshNudged && "animate-spin",
+              )}
+              onTransitionEnd={() => setDiffRefreshNudged(false)}
+            />
           </Button>
           <div data-scroll-container="diff" className="h-full overflow-y-auto">
             {diffQuery.isPending && (
