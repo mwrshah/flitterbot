@@ -12,7 +12,7 @@ Components register handlers via `registerShortcutHandler(actionId, handler, { p
 
 **Combo** — single-step with modifiers: `Alt+KeyR`, `Ctrl+KeyD`. Matched on every keydown.
 
-**Sequential** — multi-step sequences: `g g`, `c t`. After the first step matches, a 500ms timeout window opens for the next step. Repeating keys (`event.repeat`) cannot start or continue sequences.
+**Sequential** — multi-step sequences: `g g`, `c t`. After the first step matches, a 750ms timeout window opens for the next step. Repeating keys (`event.repeat`) cannot start or continue sequences.
 
 **Availability modes:**
 - `always` — fires even when an input/textarea is focused (modifier combos)

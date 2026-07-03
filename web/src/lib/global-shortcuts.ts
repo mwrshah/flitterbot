@@ -62,7 +62,7 @@ function nonEmptyParts(parts: string[]): string[] {
   return result;
 }
 
-const DEFAULT_SEQUENCE_TIMEOUT_MS = 500;
+const DEFAULT_SEQUENCE_TIMEOUT_MS = 750;
 const STREAM_SLOT_DIGIT_CODES = [
   "Digit1",
   "Digit2",
