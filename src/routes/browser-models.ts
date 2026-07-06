@@ -5,11 +5,7 @@ import {
   type KnownProvider,
   type Model,
 } from "@earendil-works/pi-ai";
-import {
-  getBuiltinModel,
-  getBuiltinModels,
-  getBuiltinProviders,
-} from "@earendil-works/pi-ai/providers/all";
+import { getModel, getModels, getProviders } from "@earendil-works/pi-ai/compat";
 import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
@@ -100,9 +96,9 @@ export async function buildModelsListResponse(
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
 
-  for (const provider of getBuiltinProviders()) {
+  for (const provider of getProviders()) {
     const authKind = availabilityByProvider.get(provider) ?? "none";
-    for (const model of getBuiltinModels(provider)) {
+    for (const model of getModels(provider)) {
       if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
       all.push({
         id: `${provider}/${model.id}`,
@@ -139,7 +135,7 @@ function buildPinnedModelItem(
   entry: ModelConfigEntry,
   availabilityByProvider: Map<string, ModelListItem["authKind"]>,
 ): ModelListItem {
-  const catalogModel = getBuiltinModel(entry.provider as KnownProvider, entry.modelId as never);
+  const catalogModel = getModel(entry.provider as KnownProvider, entry.modelId as never);
   const authKind = availabilityByProvider.get(entry.provider) ?? "none";
   return {
     id: entry.id,
@@ -165,7 +161,7 @@ async function resolveProviderAvailability(
 ): Promise<Map<string, ModelListItem["authKind"]>> {
   const authStorage = createPiAuthStorage(runtime.config.controlSurfaceAgentDir);
   const providers = new Set([
-    ...getBuiltinProviders(),
+    ...getProviders(),
     ...runtime.config.models.map((model) => model.provider),
   ]);
   const entries = await Promise.all(
@@ -195,7 +191,7 @@ function buildEntryFromId(
   if (slashIdx <= 0 || slashIdx === id.length - 1) return null;
   const provider = id.slice(0, slashIdx);
   const rawModelId = id.slice(slashIdx + 1);
-  const model = getBuiltinModel(provider as KnownProvider, rawModelId as never);
+  const model = getModel(provider as KnownProvider, rawModelId as never);
   if (!model) return null;
 
   return {
