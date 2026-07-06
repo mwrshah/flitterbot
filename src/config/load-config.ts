@@ -2,6 +2,8 @@ import "dotenv/config";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { KnownProvider } from "@earendil-works/pi-ai";
+import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -296,6 +298,12 @@ function parseModels(raw: RawConfigJson): ModelConfigEntry[] {
     if (typeof modelId !== "string" || !modelId.trim()) {
       throw new Error(`Invalid models[${index}].modelId: expected non-empty string`);
     }
+    const catalogModel = getBuiltinModel(provider as KnownProvider, modelId as never);
+    if (!catalogModel) {
+      throw new Error(
+        `Invalid models[${index}]: unknown pi-ai catalog model provider="${provider}" modelId="${modelId}"`,
+      );
+    }
 
     const parsed: ModelConfigEntry = { id, label, provider, modelId };
     if (model.thinkingLevel !== undefined) {
@@ -313,10 +321,14 @@ function parseModels(raw: RawConfigJson): ModelConfigEntry[] {
 function resolveDefaultModel(raw: RawConfigJson, models: ModelConfigEntry[]): string {
   const configured = requireConfigString(raw, "defaultModel");
   if (models.some((m) => m.id === configured)) return configured;
-  const [provider, modelId] = configured.split("/", 2);
-  if (provider && modelId) return configured;
+  const slashIdx = configured.indexOf("/");
+  if (slashIdx > 0 && slashIdx < configured.length - 1) {
+    const provider = configured.slice(0, slashIdx);
+    const modelId = configured.slice(slashIdx + 1);
+    if (getBuiltinModel(provider as KnownProvider, modelId as never)) return configured;
+  }
   throw new Error(
-    `Invalid defaultModel "${configured}": expected a models[].id or provider/modelId pair`,
+    `Invalid defaultModel "${configured}": expected a models[].id or valid provider/modelId pair`,
   );
 }
 
