@@ -489,10 +489,10 @@ async function bootstrapConfig() {
 
   const DEFAULT_MODELS = [
     {
-      id: "anthropic/claude-opus-4-7",
-      label: "Claude Opus 4.7",
+      id: "anthropic/claude-opus-4-8",
+      label: "Claude Opus 4.8",
       provider: "anthropic",
-      modelId: "claude-opus-4-7",
+      modelId: "claude-opus-4-8",
     },
     {
       id: "openai-codex/gpt-5.5",
