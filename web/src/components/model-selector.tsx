@@ -33,7 +33,7 @@ import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
-const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
+export const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   off: "off",

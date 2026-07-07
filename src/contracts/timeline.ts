@@ -20,6 +20,16 @@ export type ImageAttachment = {
   mimeType: string;
 };
 
+/** Per-turn token usage carried on an assistant message, read straight from the pi session file. */
+export type TokenUsage = {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  reasoning?: number;
+  totalTokens: number;
+};
+
 export type ChatTimelineMessage = {
   id: string;
   kind: "message";
@@ -35,6 +45,8 @@ export type ChatTimelineMessage = {
   compaction?: boolean;
   serverMessageId?: string;
   clientMessageId?: string;
+  /** Cumulative context usage snapshot at this assistant turn (from the pi session file). */
+  usage?: TokenUsage;
   createdAt: string;
 };
 
