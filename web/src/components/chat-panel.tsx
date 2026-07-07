@@ -485,6 +485,18 @@ export function ChatPanel({
     },
   });
 
+  const forkMutation = useMutation({
+    mutationFn: (entryId: string) => apiClient.forkStream(piSessionId, entryId),
+    onSuccess: (result) => {
+      toast.success(`Forked into new stream: ${result.streamName}`);
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to fork stream: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  });
+
   const clearBusyQueuedText = useCallback(() => {
     busyQueuedTextRef.current = "";
     busyQueuedClearClientMessageIdRef.current = null;
@@ -552,6 +564,13 @@ export function ChatPanel({
   const handlePruneRequested = useCallback((entryId: string) => {
     setPruneTarget(entryId);
   }, []);
+
+  const handleForkRequested = useCallback(
+    (entryId: string) => {
+      forkMutation.mutate(entryId);
+    },
+    [forkMutation],
+  );
 
   const confirmPrune = useCallback(() => {
     const entryId = pruneTarget;
@@ -856,6 +875,7 @@ export function ChatPanel({
                 messages={agentMessages}
                 onMessagesRendered={handleMessagesRendered}
                 onPruneRequested={handlePruneRequested}
+                onForkRequested={handleForkRequested}
                 isSessionBusy={isSessionBusy}
               />
             </div>

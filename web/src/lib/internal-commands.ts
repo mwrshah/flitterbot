@@ -21,6 +21,12 @@ export const INTERNAL_COMMANDS: SkillListItem[] = [
     disableModelInvocation: true,
     kind: "command",
   },
+  {
+    name: "fork",
+    description: "Clone this session into a new stream",
+    disableModelInvocation: true,
+    kind: "command",
+  },
 ];
 
 const NEW_STREAM_COMMAND: SkillListItem = {

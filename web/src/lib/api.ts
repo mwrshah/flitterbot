@@ -111,6 +111,15 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ piSessionId, entryId }),
       }),
 
+    forkStream: (piSessionId: string, entryId?: string) =>
+      request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
+        "/api/streams/fork",
+        {
+          method: "POST",
+          body: JSON.stringify({ piSessionId, ...(entryId ? { entryId } : {}) }),
+        },
+      ),
+
     compactPiSession: (piSessionId: string, customInstructions?: string) =>
       request<{
         ok: true;

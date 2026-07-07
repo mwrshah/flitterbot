@@ -7,6 +7,7 @@ import path from "node:path";
 import type { AssistantMessage, KnownProvider, TextContent } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {
   getLastDatetimeReportedAt,
@@ -299,7 +300,8 @@ export class ControlSurfaceRuntime {
     | { ok: true; item: QueueItem }
     | { ok: true; cleared: true }
     | { ok: true; reloaded: true }
-    | { ok: true; compacted: true } {
+    | { ok: true; compacted: true }
+    | { ok: true; forked: true } {
     input.text = input.text.trim();
 
     if (input.text === "/clear") {
@@ -387,6 +389,22 @@ export class ControlSurfaceRuntime {
         }
       })();
       return { ok: true, compacted: true };
+    }
+
+    if (input.text === "/fork") {
+      const piSessionId = this.resolveCompactTargetPiSessionId(input.metadata);
+      this.log(`/fork: forking session ${piSessionId ?? "<none>"}`);
+      void (async () => {
+        try {
+          if (!piSessionId) throw new Error("No pi session available to fork");
+          await this.forkStream(piSessionId);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`/fork failed: ${message}`);
+          this.wsHub.broadcast({ type: "error", message: `Fork failed: ${message}` });
+        }
+      })();
+      return { ok: true, forked: true };
     }
 
     const images = input.images?.map((img) => ({
@@ -1276,6 +1294,10 @@ export class ControlSurfaceRuntime {
     cwd: string;
     type?: "work" | "defaultStream";
     streamUser?: string;
+    repoPath?: string;
+    worktreePath?: string;
+    baseBranch?: string;
+    resumeSessionFile?: string;
     rollbackOnSpawnFailure: boolean;
   }): Promise<
     | { ok: true; streamId: string; streamName: string; managed: ManagedPiSession }
@@ -1290,7 +1312,13 @@ export class ControlSurfaceRuntime {
     }
 
     const ws = insertStream(this.blackboard, opts.name, opts.type ?? "work", opts.streamUser);
-    enrichStream(this.blackboard, ws.id, opts.cwd);
+    enrichStream(
+      this.blackboard,
+      ws.id,
+      opts.repoPath ?? opts.cwd,
+      opts.worktreePath,
+      opts.baseBranch,
+    );
 
     try {
       const managed =
@@ -1306,6 +1334,7 @@ export class ControlSurfaceRuntime {
               ws.name,
               opts.cwd,
               this.createCustomTools("orchestrator", ws.id),
+              opts.resumeSessionFile,
             );
       this.wsHub.broadcast({
         type: "streams_changed",
@@ -1646,6 +1675,81 @@ export class ControlSurfaceRuntime {
       `pruned history for pi session ${piSessionId} at entry ${entryId} (messages now ${newCount})`,
     );
     return { ok: true, piSessionId, messageCount: newCount };
+  }
+
+  async forkStream(
+    sourcePiSessionId: string,
+    entryId?: string,
+  ): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
+    const managed = this.sessionManager.getByPiSessionId(sourcePiSessionId);
+    if (!managed) throw new Error("Pi session not found");
+
+    const sourceStream = managed.streamId ? getStreamById(this.blackboard, managed.streamId) : null;
+    const row = this.blackboard.get<{ session_file: string | null; cwd: string | null }>(
+      "SELECT session_file, cwd FROM pi_sessions WHERE pi_session_id = ?",
+      sourcePiSessionId,
+    );
+    const sourceFile = managed.state.getSnapshot().sessionFile ?? row?.session_file ?? undefined;
+    if (!sourceFile || !fs.existsSync(sourceFile)) {
+      throw new Error("Source session file not found");
+    }
+
+    // Fork reads the on-disk transcript into a fresh SessionManager: createBranchedSession
+    // mutates the manager it runs on, so it must never touch the live session's manager.
+    const forkManager = SessionManager.open(sourceFile, this.config.controlSurfaceSessionsDir);
+    let leafId: string | null;
+    if (entryId) {
+      const target = forkManager.getEntry(entryId);
+      if (!target) throw new Error(`Session entry ${entryId} not found`);
+      if (target.type !== "message" || target.message.role !== "user") {
+        throw new Error(`Entry ${entryId} is not a user message (type=${target.type})`);
+      }
+      leafId = target.parentId;
+    } else {
+      leafId = forkManager.getLeafId();
+    }
+    if (!leafId) throw new Error("Nothing to fork before the target message");
+
+    const forkedFile = forkManager.createBranchedSession(leafId);
+    if (!forkedFile) throw new Error("Failed to create forked session");
+    // createBranchedSession defers the file write when the branch has no assistant message
+    // (its throwaway manager never flushes), leaving forkedFile as a path that was never written.
+    if (!fs.existsSync(forkedFile)) {
+      throw new Error("Nothing to fork: the selected branch has no completed turns yet");
+    }
+
+    const baseName = stripStreamNamePrefix(
+      sourceStream?.name ?? managed.streamName ?? "flitterbot",
+    );
+    let name = `${baseName}-fork`;
+    for (let i = 2; getStreamByName(this.blackboard, name); i++) {
+      name = `${baseName}-fork-${i}`;
+    }
+
+    // Copy the stream as-is: same repo_path, worktree_path, base_branch, and agent cwd.
+    // This intentionally shares the source worktree/branch, breaking the 1:1 stream-to-worktree
+    // invariant -- both forks act on the same checkout until the user diverges them.
+    const cwd = row?.cwd ?? sourceStream?.repo_path ?? this.config.projectsDir;
+    const result = await this.spawnStreamWithSession({
+      name,
+      cwd,
+      repoPath: sourceStream?.repo_path ?? cwd,
+      ...(sourceStream?.worktree_path ? { worktreePath: sourceStream.worktree_path } : {}),
+      ...(sourceStream?.base_branch ? { baseBranch: sourceStream.base_branch } : {}),
+      resumeSessionFile: forkedFile,
+      rollbackOnSpawnFailure: true,
+    });
+    if (!result.ok) throw result.spawnError;
+
+    this.log(
+      `forked session "${sourceStream?.name ?? managed.streamId ?? "default"}" \u2192 "${result.streamName}" (${result.streamId})`,
+    );
+    return {
+      ok: true,
+      streamId: result.streamId,
+      streamName: result.streamName,
+      piSessionId: result.managed.piSessionId,
+    };
   }
 
   private async ensureWhatsAppUserDefaultStreams(): Promise<void> {

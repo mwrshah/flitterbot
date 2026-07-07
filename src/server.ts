@@ -34,6 +34,7 @@ import { handleCompactPiSessionRoute } from "./routes/compact-pi-session.ts";
 import { handleCreateStreamRoute } from "./routes/create-stream.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
+import { handleForkStreamRoute } from "./routes/fork-stream.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
 import { handleMessageRoute } from "./routes/message.ts";
 import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
@@ -332,6 +333,15 @@ async function routeRequest(
     !segments[3]
   ) {
     return handlePruneStreamHistoryRoute(runtime, req, res);
+  }
+  if (
+    method === "POST" &&
+    segments[0] === "api" &&
+    segments[1] === "streams" &&
+    segments[2] === "fork" &&
+    !segments[3]
+  ) {
+    return handleForkStreamRoute(runtime, req, res);
   }
   if (
     method === "POST" &&

@@ -163,8 +163,16 @@ export class PiSessionManager {
     streamName: string,
     repoPath?: string,
     customTools?: unknown[],
+    resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
-    return this.createStreamSession("orchestrator", streamId, streamName, repoPath, customTools);
+    return this.createStreamSession(
+      "orchestrator",
+      streamId,
+      streamName,
+      repoPath,
+      customTools,
+      resumeSessionFile,
+    );
   }
 
   async createDefaultStream(
@@ -182,6 +190,7 @@ export class PiSessionManager {
     streamName: string,
     repoPath?: string,
     customTools?: unknown[],
+    resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
     const existing = this.streamSessions.get(streamId);
     if (existing) return existing;
@@ -197,6 +206,7 @@ export class PiSessionManager {
           }
         : {}),
       cwd: repoPath,
+      ...(resumeSessionFile ? { resumeSessionFile } : {}),
     });
 
     const session = created.runtime.session;

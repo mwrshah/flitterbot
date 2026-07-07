@@ -1034,6 +1034,19 @@ export class UserMessage extends LitElement {
     );
   };
 
+  private _requestFork = (ev: MouseEvent): void => {
+    ev.stopPropagation();
+    this.menuOpen = false;
+    if (!this.entryId) return;
+    this.dispatchEvent(
+      new CustomEvent("fork-message", {
+        detail: { entryId: this.entryId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
   override render() {
     if (!this.message?.content) return nothing;
 
@@ -1105,6 +1118,13 @@ export class UserMessage extends LitElement {
                 role="menu"
                 class="absolute top-7 right-1 z-20 min-w-[13rem] rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1 text-xs"
               >
+                <button
+                  role="menuitem"
+                  @click=${this._requestFork}
+                  class="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                >
+                  ${i18n("Fork above this message")}
+                </button>
                 <button
                   role="menuitem"
                   @click=${this._requestPrune}

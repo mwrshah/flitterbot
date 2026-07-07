@@ -9,6 +9,7 @@ export { handleCompactPiSessionRoute } from "./compact-pi-session.ts";
 export { handleCreateStreamRoute } from "./create-stream.ts";
 export { handleCronTickRoute } from "./cron-tick.ts";
 export { handleDirectSessionMessageRoute } from "./direct-session-message.ts";
+export { handleForkStreamRoute } from "./fork-stream.ts";
 export { handleHookRoute } from "./hooks.ts";
 export { handleMessageRoute } from "./message.ts";
 export { handlePiSessionInterruptRoute } from "./pi-session-interrupt.ts";

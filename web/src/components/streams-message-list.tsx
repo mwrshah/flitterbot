@@ -25,6 +25,7 @@ type StreamsMessageListProps = {
   messages: AgentMessage[];
   onMessagesRendered?: () => void;
   onPruneRequested?: (entryId: string) => void;
+  onForkRequested?: (entryId: string) => void;
   isSessionBusy?: boolean;
   ref?: Ref<StreamsMessageListHandle>;
 };
@@ -33,6 +34,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   messages,
   onMessagesRendered,
   onPruneRequested,
+  onForkRequested,
   isSessionBusy = false,
   ref,
 }: StreamsMessageListProps) {
@@ -133,6 +135,22 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       container.removeEventListener("prune-message", handler);
     };
   }, [ready, onPruneRequested]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ entryId?: string }>).detail;
+      const entryId = detail?.entryId;
+      if (!entryId) return;
+      onForkRequested?.(entryId);
+    };
+    container.addEventListener("fork-message", handler);
+    return () => {
+      container.removeEventListener("fork-message", handler);
+    };
+  }, [ready, onForkRequested]);
 
   useImperativeHandle(ref, () => ({
     updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {
