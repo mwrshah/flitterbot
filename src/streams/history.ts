@@ -11,7 +11,25 @@ import type {
   ImageAttachment,
   JsonValue,
   StreamsHistoryResponse,
+  TokenUsage,
 } from "../contracts/index.ts";
+
+export function parseUsage(value: unknown): TokenUsage | undefined {
+  const record = asRecord(value);
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  if (Object.keys(record).length === 0) return undefined;
+  const usage: TokenUsage = {
+    input: num(record.input),
+    output: num(record.output),
+    cacheRead: num(record.cacheRead),
+    cacheWrite: num(record.cacheWrite),
+    totalTokens: num(record.totalTokens),
+  };
+  if (typeof record.reasoning === "number" && Number.isFinite(record.reasoning)) {
+    usage.reasoning = record.reasoning;
+  }
+  return usage;
+}
 
 type StreamsHistoryMode = "agent" | "input";
 
@@ -55,6 +73,7 @@ function pushMessage(
   createdAt: string,
   blocks?: StreamsHistoryMessageBlock[],
   images?: ImageAttachment[],
+  usage?: TokenUsage,
 ): void {
   const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
@@ -80,6 +99,9 @@ function pushMessage(
   if (images && images.length > 0) {
     item.images = images;
   }
+  if (usage) {
+    item.usage = usage;
+  }
   items.push(item);
 }
 
@@ -89,10 +111,11 @@ function parseMessageContent(
   role: "user" | "assistant" | "system",
   createdAt: string,
   content: unknown,
+  usage?: TokenUsage,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, messageId, role, text, createdAt);
+    if (text) pushMessage(items, messageId, role, text, createdAt, undefined, undefined, usage);
     return;
   }
 
@@ -114,7 +137,7 @@ function parseMessageContent(
     const contentText = messageBlocks
       .map((block) => (block.type === "text" ? block.text : block.thinking))
       .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images);
+    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images, usage);
     messageBlocks.length = 0;
   };
 
@@ -171,7 +194,8 @@ function parseMessageRecord(
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content);
+    const usage = role === "assistant" ? parseUsage(messageRecord.usage) : undefined;
+    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, usage);
     return;
   }
 

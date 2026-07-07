@@ -4,6 +4,7 @@ import { FolderPenIcon } from "lucide-react";
 import {
   type CSSProperties,
   type KeyboardEvent,
+  memo,
   type RefObject,
   useCallback,
   useEffect,
@@ -19,6 +20,7 @@ import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
+import { MODELS_QUERY_KEY } from "~/components/model-selector";
 import {
   Command,
   CommandEmpty,
@@ -64,6 +66,64 @@ import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-mes
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
+
+const rootApi = getRouteApi("__root__");
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${n}`;
+}
+
+/**
+ * Live context-usage ticker. Reads the last assistant message's cumulative token usage
+ * straight from the timeline (sourced from the pi session file / live message_end events),
+ * and the model's context window from the models query. Shows "—" until the next turn
+ * reports usage (e.g. right after a compaction).
+ */
+const ContextTicker = memo(function ContextTicker({
+  timeline,
+  selectedModelId,
+}: {
+  timeline: ChatTimelineItem[];
+  selectedModelId?: string;
+}) {
+  const { apiClient } = rootApi.useRouteContext();
+  const { data: models } = useQuery({
+    queryKey: MODELS_QUERY_KEY,
+    queryFn: () => apiClient.listModels(),
+    staleTime: 0,
+  });
+
+  const usedTokens = useMemo(() => {
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      const item = timeline[i];
+      if (item?.kind === "message" && item.role === "assistant" && item.usage) {
+        return item.usage.totalTokens;
+      }
+    }
+    return null;
+  }, [timeline]);
+
+  const contextWindow = useMemo(() => {
+    if (!selectedModelId || !models) return undefined;
+    const all = [...(models.pinned ?? []), ...(models.all ?? [])];
+    const match = all.find(
+      (m) => m.id === selectedModelId || `${m.provider}/${m.modelId}` === selectedModelId,
+    );
+    return match?.contextWindow;
+  }, [models, selectedModelId]);
+
+  const used = usedTokens != null ? formatTokens(usedTokens) : "—";
+  const total = contextWindow ? formatTokens(contextWindow) : null;
+
+  return (
+    <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+      context: {used}
+      {total ? `/${total}` : ""} tokens
+    </span>
+  );
+});
 
 type ChatPanelProps = {
   piSessionId: string;
@@ -284,7 +344,6 @@ export function ChatPanel({
   });
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
-  const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
@@ -762,6 +821,7 @@ export function ChatPanel({
             </>
           )}
         </div>
+        <ContextTicker timeline={timeline} selectedModelId={selectedModelId} />
         <CwdPicker
           pickerRef={cwdPickerRef}
           pickerStyle={cwdPickerStyle}

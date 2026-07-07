@@ -15,7 +15,7 @@ import type {
   TurnEndWebSocketEvent,
 } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
-import { toolResultMessageToTimelineItem } from "./history.ts";
+import { parseUsage, toolResultMessageToTimelineItem } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 import type { ToolDisplayContextCache } from "./tool-display.ts";
 
@@ -399,6 +399,10 @@ export function subscribeToPiSession(
           }
 
           if (role === "assistant") {
+            const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
+            if (usage) {
+              timelineMessage.usage = usage;
+            }
             const payload: MessageEndWebSocketEvent = {
               type: "message_end",
               piSessionId: session.sessionId,
