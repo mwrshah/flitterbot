@@ -49,6 +49,7 @@ import {
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
+import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
@@ -685,6 +686,17 @@ export function ChatPanel({
       const clientMessageId = crypto.randomUUID();
       pendingPostedScrollClientMessageIdsRef.current.add(clientMessageId);
       const displayText = text || "(image)";
+      const internalCommandScope =
+        !streamId || streamType === "defaultStream" ? "default-stream" : "work-stream";
+      const trimmedText = displayText.trim();
+      const textWithoutWhitespace = displayText.replace(/\s+/g, "");
+      const shouldSeedOptimisticMessage = !getInternalCommandsForScope(internalCommandScope).some(
+        ({ name }) =>
+          trimmedText === name ||
+          trimmedText === `/${name}` ||
+          textWithoutWhitespace === name ||
+          textWithoutWhitespace === `/${name}`,
+      );
       const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
 
       if (queueBehindBusy) {
@@ -710,19 +722,24 @@ export function ChatPanel({
         markPiSessionBusy(status, piSessionId),
       );
 
-      const now = new Date().toISOString();
-      const optimistic: ChatTimelineMessage = {
-        id: clientMessageId,
-        kind: "message",
-        role: "user",
-        content: displayText,
-        source: "web",
-        createdAt: now,
-        ...(images?.length ? { images } : {}),
-      };
       const cacheKey = ["streams-history", piSessionId, "agent"] as const;
-      queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [...(old ?? []), optimistic]);
-      engageAndScroll();
+      if (shouldSeedOptimisticMessage) {
+        const now = new Date().toISOString();
+        const optimistic: ChatTimelineMessage = {
+          id: clientMessageId,
+          kind: "message",
+          role: "user",
+          content: displayText,
+          source: "web",
+          createdAt: now,
+          ...(images?.length ? { images } : {}),
+        };
+        queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [
+          ...(old ?? []),
+          optimistic,
+        ]);
+        engageAndScroll();
+      }
 
       setIsSending(true);
 
@@ -741,7 +758,16 @@ export function ChatPanel({
         setIsSending(false);
       }
     },
-    [appendBusyQueuedText, engageAndScroll, isSessionBusy, onSendMessage, piSessionId, queryClient],
+    [
+      appendBusyQueuedText,
+      engageAndScroll,
+      isSessionBusy,
+      onSendMessage,
+      piSessionId,
+      queryClient,
+      streamId,
+      streamType,
+    ],
   );
 
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
