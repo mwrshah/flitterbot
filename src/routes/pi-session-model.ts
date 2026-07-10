@@ -43,7 +43,7 @@ export async function handlePiSessionThinkingLevelRoute(
   if (!isThinkingLevel(body.level)) {
     return sendJson(res, 400, {
       ok: false,
-      error: "level must be one of: off, minimal, low, medium, high, xhigh",
+      error: "level must be one of: off, minimal, low, medium, high, xhigh, max",
     });
   }
 

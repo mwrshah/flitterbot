@@ -6,7 +6,7 @@ import type { KnownProvider } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 export type PiTransport = "sse" | "websocket" | "websocket-cached" | "auto";
 

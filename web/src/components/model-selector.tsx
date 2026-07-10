@@ -34,7 +34,15 @@ import { cn } from "~/lib/utils";
 const rootApi = getRouteApi("__root__");
 
 export const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
-const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const THINKING_LEVELS: ThinkingLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
 const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   off: "off",
   minimal: "min",
@@ -42,6 +50,7 @@ const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   medium: "med",
   high: "high",
   xhigh: "xhigh",
+  max: "max",
 };
 
 export type ModelSelectorProps = {
@@ -520,9 +529,9 @@ function extractVersionParts(model: ModelListItem): number[] {
 function getAvailableThinkingLevels(model: ModelListItem | undefined): ThinkingLevel[] {
   if (!model) return THINKING_LEVELS;
   if (!model.reasoning) return ["off"];
-  return model.supportsXhigh
-    ? THINKING_LEVELS
-    : THINKING_LEVELS.filter((level) => level !== "xhigh");
+  return THINKING_LEVELS.filter(
+    (level) => (level !== "xhigh" || model.supportsXhigh) && (level !== "max" || model.supportsMax),
+  );
 }
 
 function updateModelsCache(queryClient: QueryClient, result: ModelsMutationResponse): void {

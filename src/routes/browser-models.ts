@@ -157,6 +157,7 @@ function modelThinkingCapabilities(model: Model<Api>) {
   return {
     reasoning: Boolean(model.reasoning),
     supportsXhigh: getSupportedThinkingLevels(model).includes("xhigh"),
+    supportsMax: getSupportedThinkingLevels(model).includes("max"),
   };
 }
 

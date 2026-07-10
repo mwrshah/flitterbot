@@ -183,7 +183,7 @@ export type SkillsListResponse = {
   items: SkillListItem[];
 };
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export type ModelListItem = {
   id: string;
@@ -193,6 +193,7 @@ export type ModelListItem = {
   thinkingLevel?: ThinkingLevel;
   reasoning?: boolean;
   supportsXhigh?: boolean;
+  supportsMax?: boolean;
   name?: string;
   contextWindow?: number;
   available?: boolean;

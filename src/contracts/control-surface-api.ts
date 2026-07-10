@@ -39,7 +39,7 @@ export interface PiSessionModelInfo {
   id: string;
   provider: string;
   modelId: string;
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface PiSessionRuntimeStatus {
@@ -132,9 +132,10 @@ export interface ModelListItem {
   label: string;
   provider: string;
   modelId: string;
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   reasoning?: boolean;
   supportsXhigh?: boolean;
+  supportsMax?: boolean;
   name?: string;
   contextWindow?: number;
   available?: boolean;
@@ -145,7 +146,7 @@ export interface ModelsListResponse {
   pinned: ModelListItem[];
   all: ModelListItem[];
   defaultModel: string;
-  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface ModelsPinRequest {
@@ -159,7 +160,7 @@ export interface ModelsDefaultRequest {
 }
 
 export interface ModelsThinkingLevelRequest {
-  level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface ModelsMutationResponse extends ModelsListResponse {
