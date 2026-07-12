@@ -2,7 +2,7 @@
   "name": "flitterbot",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.1.1",
+  "packageManager": "pnpm@11.12.0",
   "scripts": {
     "prepare": "lefthook install",
     "control-surface": "node --experimental-strip-types src/server.ts",
@@ -15,10 +15,10 @@
     "up:latest": "pnpm update $(jq -r '(.dependencies // {}) + (.devDependencies // {}) | to_entries[] | select(.value == \"latest\") | .key' package.json)"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
-    "@types/node": "^25.6.2",
-    "knip": "^6.12.2",
-    "lefthook": "^2.1.6",
+    "@biomejs/biome": "^2.5.3",
+    "@types/node": "^25.9.5",
+    "knip": "^6.26.0",
+    "lefthook": "^2.1.10",
     "typescript": "^6.0.3"
   },
   "pnpm": {
@@ -37,10 +37,10 @@
     }
   },
   "dependencies": {
-    "@ff-labs/fff-node": "^0.7.2",
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
-    "@whiskeysockets/baileys": "^7.0.0-rc10",
+    "@ff-labs/fff-node": "^0.7.2",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
     "dotenv": "^17.4.2",
     "openai": "latest",
     "pino": "^10.3.1",

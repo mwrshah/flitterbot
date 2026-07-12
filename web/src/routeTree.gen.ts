@@ -65,11 +65,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/streams'
-    | '/runtime'
-    | '/streams/$piSessionId'
-    | '/streams/'
+    '/' | '/streams' | '/runtime' | '/streams/$piSessionId' | '/streams/'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/runtime' | '/streams/$piSessionId' | '/streams'
   id:
