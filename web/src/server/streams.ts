@@ -55,7 +55,7 @@ function extractErrorMessage(body: string): string | null {
 }
 
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
+  .validator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
   .handler(async ({ data }): Promise<ChatTimelineItem[]> => {
     const qs = new URLSearchParams([
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
@@ -77,7 +77,7 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
   });
 
 export const fetchDownstreamSessions = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId: string }) => input)
+  .validator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<DownstreamSessionItem[]> => {
     const path = `/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/sessions`;
     try {
@@ -105,7 +105,7 @@ export type StreamInfo = {
 };
 
 export const setStreamCwd = createServerFn({ method: "POST" })
-  .inputValidator((input: { streamId: string; cwd: string }) => input)
+  .validator((input: { streamId: string; cwd: string }) => input)
   .handler(
     async ({ data }): Promise<{ ok: true; streamId: string; cwd: string; piSessionId: string }> => {
       return (await streamsRequest(`/api/streams/${encodeURIComponent(data.streamId)}/cwd`, {
@@ -116,7 +116,7 @@ export const setStreamCwd = createServerFn({ method: "POST" })
   );
 
 export const fetchStreamsWorktree = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId: string }) => input)
+  .validator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<StreamInfo | null> => {
     const path = `/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/stream`;
     try {
@@ -132,7 +132,7 @@ export type DiffResult =
 
 // ponytail: route this through streamsRequest so timeout/auth/error handling has one implementation.
 export const fetchStreamsDiff = createServerFn({ method: "GET" })
-  .inputValidator((input: { piSessionId: string }) => input)
+  .validator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<DiffResult | null> => {
     const url = `${BASE_URL.replace(/\/$/, "")}/api/pi-sessions/${encodeURIComponent(data.piSessionId)}/diff`;
     const headers: Record<string, string> = {

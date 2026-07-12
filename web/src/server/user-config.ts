@@ -21,7 +21,7 @@ export const fetchUserConfig = createServerFn({ method: "GET" }).handler(
 );
 
 export const saveUserConfig = createServerFn({ method: "POST" })
-  .inputValidator((input: { config: Record<string, string> }) => input)
+  .validator((input: { config: Record<string, string> }) => input)
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const url = `${BASE_URL.replace(/\/$/, "")}/api/user-config/default_user`;
     const res = await fetch(url, {

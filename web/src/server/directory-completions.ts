@@ -11,7 +11,7 @@ export type DirectoryCompletionsResult = {
 };
 
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
-  .inputValidator(
+  .validator(
     (input: {
       query: string;
       piSessionId?: string;
