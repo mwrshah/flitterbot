@@ -1065,17 +1065,33 @@ export class UserMessage extends LitElement {
       (this.message as unknown as { _compaction?: boolean })._compaction,
     );
 
+    if (isCompaction) {
+      return html`
+        <section class="mx-4 mt-8 mb-2 text-muted-foreground" aria-label=${i18n("Context compaction boundary")}>
+          <div class="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+            <hr class="flex-1 border-t border-border" />
+            <span>${i18n("Older messages no longer in model context")}</span>
+            <hr class="flex-1 border-t border-border" />
+          </div>
+          <details class="my-3 rounded-lg border border-border bg-muted/20">
+            <summary class="min-h-11 cursor-pointer touch-manipulation px-3 py-2 text-sm font-medium text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+              ${i18n("Context compacted")}
+            </summary>
+            <div class="break-words border-t border-border px-3 py-3 text-sm text-foreground">
+              <span style="white-space: pre-wrap;">${textContent?.text ?? ""}</span>
+            </div>
+          </details>
+          <div class="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+            <hr class="flex-1 border-t border-border" />
+            <span>${i18n("Recent messages retained verbatim")}</span>
+            <hr class="flex-1 border-t border-border" />
+          </div>
+        </section>
+      `;
+    }
+
     return html`
-      ${
-        isCompaction
-          ? html`<div class="flex items-center gap-2 mx-4 mt-8 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
-              <hr class="flex-1 border-t border-border" />
-              <span>${i18n("Context compacted")}</span>
-              <hr class="flex-1 border-t border-border" />
-            </div>`
-          : nothing
-      }
-      <div class="flex justify-start ml-2 mr-4 ${isCompaction ? "mt-1" : "mt-8"} mb-2 group/user-message">
+      <div class="flex justify-start ml-2 mr-4 mt-8 mb-2 group/user-message">
         <div class="relative">
           <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}

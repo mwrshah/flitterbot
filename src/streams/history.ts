@@ -290,8 +290,26 @@ function shapeHistoryItems(
 
 // ponytail: if the pi SDK exposes normalized timeline events, replace this local transcript reshaper.
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
-  const items: ChatTimelineItem[] = [];
+  const entryIds = new Set(entries.map((entry) => entry.id));
+  const compactionsByFirstKeptId = new Map<string, SessionEntry[]>();
   for (const entry of entries) {
+    if (entry.type !== "compaction" || !entryIds.has(entry.firstKeptEntryId)) continue;
+    const compactions = compactionsByFirstKeptId.get(entry.firstKeptEntryId) ?? [];
+    compactions.push(entry);
+    compactionsByFirstKeptId.set(entry.firstKeptEntryId, compactions);
+  }
+
+  const orderedEntries: SessionEntry[] = [];
+  for (const entry of entries) {
+    const compactions = compactionsByFirstKeptId.get(entry.id);
+    if (compactions) orderedEntries.push(...compactions);
+    if (entry.type !== "compaction" || !entryIds.has(entry.firstKeptEntryId)) {
+      orderedEntries.push(entry);
+    }
+  }
+
+  const items: ChatTimelineItem[] = [];
+  for (const entry of orderedEntries) {
     if (entry.type === "compaction") {
       const record = asRecord(entry);
       const summary = firstText(record.summary);
