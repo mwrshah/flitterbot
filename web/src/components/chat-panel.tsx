@@ -43,6 +43,7 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
+import { latestMeasuredContextTokens } from "~/lib/context-usage";
 import { streamingUiDebug } from "~/lib/debug-log";
 import {
   registerShortcutHandlers,
@@ -96,15 +97,7 @@ const ContextTicker = memo(function ContextTicker({
     staleTime: 0,
   });
 
-  const usedTokens = useMemo(() => {
-    for (let i = timeline.length - 1; i >= 0; i--) {
-      const item = timeline[i];
-      if (item?.kind === "message" && item.role === "assistant" && item.usage) {
-        return item.usage.totalTokens;
-      }
-    }
-    return null;
-  }, [timeline]);
+  const usedTokens = useMemo(() => latestMeasuredContextTokens(timeline), [timeline]);
 
   const contextWindow = useMemo(() => {
     if (!selectedModelId || !models) return undefined;
