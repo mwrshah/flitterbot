@@ -104,7 +104,7 @@ function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | un
     for (const s of status?.streams ?? []) {
       if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
     }
-    return paths.slice(0, 9);
+    return paths;
   }, [status?.piAgent, status?.streams]);
 }
 

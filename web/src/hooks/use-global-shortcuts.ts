@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent } from "react";
 import { toast } from "sonner";
 import {
@@ -11,6 +11,7 @@ import {
   setActiveScrollContainer,
   setShortcutBindingOverrides,
 } from "~/lib/global-shortcuts";
+import { getAdjacentStreamPath } from "~/lib/stream-route-targets";
 import type { ShortcutBindingsConfig } from "~/lib/types";
 import { useCreateStream } from "./use-create-stream";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
@@ -25,6 +26,7 @@ export function useGlobalShortcuts({
   shortcutBindings,
 }: UseGlobalShortcutsOptions = {}) {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const createStreamMutation = useCreateStream();
   useLastStreamPath();
 
@@ -40,6 +42,13 @@ export function useGlobalShortcuts({
 
   const navigateStreamSlot = useEffectEvent((slot: number) => {
     const to = streamPaths[slot - 1];
+    if (!to) return false;
+    navigate({ to });
+    return true;
+  });
+
+  const navigateAdjacentStream = useEffectEvent((direction: 1 | -1) => {
+    const to = getAdjacentStreamPath(streamPaths, pathname, direction);
     if (!to) return false;
     navigate({ to });
     return true;
@@ -139,6 +148,8 @@ export function useGlobalShortcuts({
     const cleanupHandlers = registerShortcutHandlers([
       { actionId: SHORTCUT_ACTIONS.navSurface, handler: () => navigateHome() },
       { actionId: SHORTCUT_ACTIONS.navLastStream, handler: () => navigateLastStream() },
+      { actionId: SHORTCUT_ACTIONS.navStreamNext, handler: () => navigateAdjacentStream(1) },
+      { actionId: SHORTCUT_ACTIONS.navStreamPrevious, handler: () => navigateAdjacentStream(-1) },
       { actionId: SHORTCUT_ACTIONS.streamCreate, handler: () => createStream() },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageDown, handler: () => scrollByPage("half-down") },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageUp, handler: () => scrollByPage("half-up") },
