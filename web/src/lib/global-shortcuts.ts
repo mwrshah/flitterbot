@@ -689,10 +689,10 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [{ spec: "Alt+KeyT", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.navStreamNext, {
-    defaultBindings: [{ spec: "Alt+ArrowDown", when: "no-input-focus" }],
+    defaultBindings: [{ spec: "Alt+ArrowDown", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.navStreamPrevious, {
-    defaultBindings: [{ spec: "Alt+ArrowUp", when: "no-input-focus" }],
+    defaultBindings: [{ spec: "Alt+ArrowUp", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCreate, {
     defaultBindings: [{ spec: "Alt+KeyN", when: "always" }],
