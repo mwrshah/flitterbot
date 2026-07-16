@@ -133,6 +133,7 @@ export class ControlSurfaceRuntime {
   server?: http.Server;
   private stopping = false;
   private maintenanceTimer?: NodeJS.Timeout;
+  private readonly sessionReloads = new Map<string, Promise<void>>();
   private whatsappStatusWatcher?: fs.FSWatcher;
   private whatsappStatusCache: {
     status: ControlSurfaceWhatsAppStatus;
@@ -356,21 +357,10 @@ export class ControlSurfaceRuntime {
       }
     }
 
-    if (
-      input.text === "/reload" &&
-      !input.metadata?.stream_id &&
-      !input.metadata?._targetSessionId
-    ) {
-      const managed = this.sessionManager.getDefault();
-      this.log(`/reload: reloading session ${managed?.piSessionId ?? "<none>"}`);
-      void (async () => {
-        try {
-          await managed?.runtime?.session?.reload();
-          this.wsHub.broadcast({ type: "resources_reloaded" });
-        } catch (error) {
-          this.log(`/reload failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      })();
+    if (input.text === "/reload") {
+      void this.reloadIdleSessions().catch((error) => {
+        this.log(`/reload failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
       return { ok: true, reloaded: true };
     }
 
@@ -1147,6 +1137,8 @@ export class ControlSurfaceRuntime {
   }
 
   private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
+    await this.sessionReloads.get(managed.piSessionId);
+
     if (!managed.runtime && managed.role !== "default" && managed.streamId) {
       this.log(`activating dormant stream session for stream ${managed.streamId}`);
       await this.sessionManager.activateStreamSession(
@@ -1555,6 +1547,57 @@ export class ControlSurfaceRuntime {
       ws.status === "closed" ? "reopened closed stream" : "recovered dead pi-session for stream";
     this.log(`${reopenReason} "${ws.name}" (${streamId})`);
     return { ok: true, streamId };
+  }
+
+  private async reloadIdleSessions(): Promise<void> {
+    const defaultSession = this.sessionManager.getDefault();
+    const sessions = [
+      ...(defaultSession ? [defaultSession] : []),
+      ...this.sessionManager.listStreamSessions(),
+    ];
+    let reloaded = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const managed of sessions) {
+      const piSessionId = managed.piSessionId;
+      const session = managed.runtime?.session;
+      const label = managed.streamName ?? managed.role;
+      if (
+        !session ||
+        this.sessionReloads.has(piSessionId) ||
+        managed.queue.isBusy() ||
+        session.isStreaming ||
+        session.isCompacting
+      ) {
+        skipped++;
+        this.log(`/reload: skipped busy or dormant session ${managed.piSessionId} (${label})`);
+        continue;
+      }
+
+      const reload = (async () => {
+        await Promise.resolve();
+        await session.reload();
+      })();
+      const gate = reload.catch(() => {});
+      this.sessionReloads.set(piSessionId, gate);
+      try {
+        await reload;
+        reloaded++;
+      } catch (error) {
+        failed++;
+        this.log(
+          `/reload: session ${piSessionId} (${label}) failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        if (this.sessionReloads.get(piSessionId) === gate) {
+          this.sessionReloads.delete(piSessionId);
+        }
+      }
+    }
+
+    this.log(`/reload: reloaded ${reloaded}, skipped ${skipped}, failed ${failed}`);
+    if (reloaded > 0) this.wsHub.broadcast({ type: "resources_reloaded" });
   }
 
   private resolveCompactTargetPiSessionId(
