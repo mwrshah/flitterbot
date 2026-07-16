@@ -1,10 +1,5 @@
 import type { ClaudeSessionStatus } from "./blackboard.ts";
-import type {
-  ChatTimelineItem,
-  ChatTimelineMessage,
-  ChatTimelineTool,
-  MessageSource,
-} from "./timeline.ts";
+import type { ChatTimelineItem, MessageSource } from "./timeline.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
@@ -73,8 +68,6 @@ export interface ClaudeSessionListItem {
   lastEventAt: string;
   lastToolStartedAt: string | null;
 }
-
-export type ClaudeSessionDetail = ClaudeSessionListItem;
 
 export interface PiOrchestratorStatus {
   piSessionId: string;
@@ -213,17 +206,9 @@ export interface DownstreamSessionsListResponse {
 }
 
 export interface SessionDetailResponse {
-  session: ClaudeSessionDetail;
+  session: ClaudeSessionListItem;
   tmux?: TmuxSessionInspection | null;
 }
-
-// ponytail: delete these deprecated aliases once callers use ChatTimeline* directly.
-/** @deprecated Use ChatTimelineMessage from timeline.ts */
-export type StreamsHistoryMessageItem = ChatTimelineMessage;
-/** @deprecated Use ChatTimelineTool from timeline.ts */
-export type StreamsHistoryToolItem = ChatTimelineTool;
-/** @deprecated Use ChatTimelineItem from timeline.ts */
-export type StreamsHistoryItem = ChatTimelineItem;
 
 export interface StreamsHistoryResponse {
   piSessionId: string | null;

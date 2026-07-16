@@ -3,7 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   readFileSync, writeFileSync, mkdirSync, existsSync, statSync, copyFileSync,
-  chmodSync, renameSync, rmSync, readdirSync, unlinkSync,
+  chmodSync, renameSync, rmSync, readdirSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { homedir, platform } from "node:os";
@@ -16,7 +16,6 @@ const FLITTERBOT_DIR = join(HOME, ".flitterbot");
 const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
 const SETTINGS = join(HOME, ".claude", "settings.json");
 const PLIST_DEST = join(HOME, "Library", "LaunchAgents", "com.flitterbot.scheduler.plist");
-const PLIST_LABEL = "com.flitterbot.scheduler";
 const SYSTEMD_USER_DIR = join(HOME, ".config", "systemd", "user");
 const SYSTEMD_SERVICE_NAME = "flitterbot-scheduler.service";
 const SYSTEMD_TIMER_NAME = "flitterbot-scheduler.timer";
