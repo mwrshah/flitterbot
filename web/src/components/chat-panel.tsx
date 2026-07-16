@@ -20,7 +20,6 @@ import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
-import { MODELS_QUERY_KEY } from "~/components/model-selector";
 import {
   Command,
   CommandEmpty,
@@ -43,7 +42,7 @@ import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
-import { latestMeasuredContextTokens } from "~/lib/context-usage";
+import { latestMeasuredContextUsage } from "~/lib/context-usage";
 import { streamingUiDebug } from "~/lib/debug-log";
 import {
   registerShortcutHandlers,
@@ -78,43 +77,21 @@ function formatTokens(n: number): string {
 }
 
 /**
- * Live context-usage ticker. Reads the last assistant message's cumulative token usage
- * straight from the timeline (sourced from the pi session file / live message_end events),
- * and the model's context window from the models query. Shows "—" until the next turn
- * reports usage (e.g. right after a compaction).
+ * Reads the latest request's cache and context usage from the timeline. Shows "—" until
+ * the next turn reports usage, such as immediately after compaction.
  */
-const ContextTicker = memo(function ContextTicker({
-  timeline,
-  selectedModelId,
-}: {
-  timeline: ChatTimelineItem[];
-  selectedModelId?: string;
-}) {
-  const { apiClient } = rootApi.useRouteContext();
-  const { data: models } = useQuery({
-    queryKey: MODELS_QUERY_KEY,
-    queryFn: () => apiClient.listModels(),
-    staleTime: 0,
-  });
-
-  const usedTokens = useMemo(() => latestMeasuredContextTokens(timeline), [timeline]);
-
-  const contextWindow = useMemo(() => {
-    if (!selectedModelId || !models) return undefined;
-    const all = [...(models.pinned ?? []), ...(models.all ?? [])];
-    const match = all.find(
-      (m) => m.id === selectedModelId || `${m.provider}/${m.modelId}` === selectedModelId,
-    );
-    return match?.contextWindow;
-  }, [models, selectedModelId]);
-
-  const used = usedTokens != null ? formatTokens(usedTokens) : "—";
-  const total = contextWindow ? formatTokens(contextWindow) : null;
+const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: ChatTimelineItem[] }) {
+  const usage = useMemo(() => latestMeasuredContextUsage(timeline), [timeline]);
+  const cacheWrite = usage ? formatTokens(usage.cacheWrite) : "—";
+  const cacheRead = usage ? formatTokens(usage.cacheRead) : "—";
+  const contextTokens = usage ? formatTokens(usage.totalTokens) : "—";
 
   return (
-    <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-      context: {used}
-      {total ? `/${total}` : ""} tokens
+    <span
+      className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums"
+      title="Latest request. Pi reports cache reads and writes, but not cache misses, age, or expiry time."
+    >
+      cache write: {cacheWrite} tokens · cache reuse: {cacheRead}/{contextTokens} tokens
     </span>
   );
 });
@@ -859,7 +836,7 @@ export function ChatPanel({
             </>
           )}
         </div>
-        <ContextTicker timeline={timeline} selectedModelId={selectedModelId} />
+        <ContextTicker timeline={timeline} />
         <CwdPicker
           pickerRef={cwdPickerRef}
           pickerStyle={cwdPickerStyle}

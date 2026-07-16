@@ -1,6 +1,8 @@
-import type { ChatTimelineItem } from "./types";
+import type { ChatTimelineItem, ChatTimelineMessage } from "./types";
 
-export function latestMeasuredContextTokens(timeline: ChatTimelineItem[]): number | null {
+export function latestMeasuredContextUsage(
+  timeline: ChatTimelineItem[],
+): NonNullable<ChatTimelineMessage["usage"]> | null {
   let latestCompactionAt = Number.NEGATIVE_INFINITY;
   for (const item of timeline) {
     if (item.kind === "message" && item.compaction) {
@@ -16,7 +18,7 @@ export function latestMeasuredContextTokens(timeline: ChatTimelineItem[]): numbe
       item.usage &&
       Date.parse(item.createdAt) > latestCompactionAt
     ) {
-      return item.usage.totalTokens;
+      return item.usage;
     }
   }
   return null;

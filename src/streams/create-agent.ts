@@ -23,6 +23,9 @@ type OrchestratorInput = Omit<OrchestratorContext, "piSessionId" | "cwd">;
 
 const HOME = os.homedir();
 
+// Pi's coding-agent layer does not expose cacheRetention, so use its documented provider setting.
+process.env.PI_CACHE_RETENTION = "long";
+
 type StreamsRole = "default" | "orchestrator";
 
 type CreateFlitterbotAgentOptions = {
