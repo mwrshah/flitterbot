@@ -329,7 +329,14 @@ export const Sidebar = memo(function Sidebar() {
                         : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                     )}
                   >
-                    <span className="shrink-0 size-2 rounded-full bg-sidebar-foreground/25" />
+                    <span
+                      className={cn(
+                        "shrink-0 size-2 rounded-full",
+                        status?.piAgent?.default?.busy
+                          ? "bg-emerald-500"
+                          : "bg-sidebar-foreground/25",
+                      )}
+                    />
                     <span className="truncate flex-1">flitterbot</span>
                     {defaultShortcut && (
                       <ShortcutHint
