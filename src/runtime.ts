@@ -46,7 +46,7 @@ import {
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type FlitterbotConfig, loadConfig, type ThinkingLevel } from "./config/load-config.ts";
-import { resolveModelEntry } from "./config/models.ts";
+import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
 import type {
   ClaudeHookPayload,
@@ -659,20 +659,13 @@ export class ControlSurfaceRuntime {
     return { ok: true };
   }
 
-  private resolveModelEntryId(provider: string, modelId: string): string {
-    return (
-      this.config.models.find((entry) => entry.provider === provider && entry.modelId === modelId)
-        ?.id ?? `${provider}/${modelId}`
-    );
-  }
-
   private toPiSessionModelInfo(modelInfo: {
     provider: string;
     id: string;
     thinkingLevel?: PiSessionModelInfo["thinkingLevel"];
   }): PiSessionModelInfo {
     return {
-      id: this.resolveModelEntryId(modelInfo.provider, modelInfo.id),
+      id: resolveModelEntryId(this.config, modelInfo.provider, modelInfo.id),
       provider: modelInfo.provider,
       modelId: modelInfo.id,
       thinkingLevel: modelInfo.thinkingLevel,
@@ -701,7 +694,7 @@ export class ControlSurfaceRuntime {
     for (const row of rows) {
       if (!row.model_provider || !row.model_id) continue;
       models.set(row.pi_session_id, {
-        id: this.resolveModelEntryId(row.model_provider, row.model_id),
+        id: resolveModelEntryId(this.config, row.model_provider, row.model_id),
         provider: row.model_provider,
         modelId: row.model_id,
         thinkingLevel: row.thinking_level ?? undefined,
@@ -765,7 +758,7 @@ export class ControlSurfaceRuntime {
     managed.modelInfo = {
       provider: currentModel.provider,
       id: currentModel.id,
-      entryId: this.resolveModelEntryId(currentModel.provider, currentModel.id),
+      entryId: resolveModelEntryId(this.config, currentModel.provider, currentModel.id),
       thinkingLevel: session.thinkingLevel,
     };
     updatePiSessionModelMirror(
@@ -833,7 +826,7 @@ export class ControlSurfaceRuntime {
     managed.modelInfo = {
       provider: currentModel.provider,
       id: currentModel.id,
-      entryId: this.resolveModelEntryId(currentModel.provider, currentModel.id),
+      entryId: resolveModelEntryId(this.config, currentModel.provider, currentModel.id),
       thinkingLevel: currentThinkingLevel,
     };
     updatePiSessionModelMirror(

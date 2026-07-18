@@ -2,6 +2,17 @@ import type { KnownProvider } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { FlitterbotConfig, ModelConfigEntry } from "./load-config.ts";
 
+export function resolveModelEntryId(
+  config: FlitterbotConfig,
+  provider: string,
+  modelId: string,
+): string {
+  return (
+    config.models.find((entry) => entry.provider === provider && entry.modelId === modelId)?.id ??
+    `${provider}/${modelId}`
+  );
+}
+
 export function resolveModelEntry(config: FlitterbotConfig, modelId?: string): ModelConfigEntry {
   if (modelId) {
     const curated = config.models.find((m) => m.id === modelId);

@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
@@ -122,7 +121,7 @@ export class PiSessionManager {
       config: this.config,
       customTools,
       role: "default",
-      ...(resumeSessionFile ? { resumeSessionFile } : {}),
+      resumeSessionFile,
     });
 
     const session = created.runtime.session;
@@ -154,7 +153,7 @@ export class PiSessionManager {
 
     this.defaultSession = managed;
     this.byPiSessionId.set(managed.piSessionId, managed);
-    this.logResourceInfo("default", created.resourceInfo);
+    this.logResourceMessages("default", created.resourceMessages);
     return managed;
   }
 
@@ -199,14 +198,10 @@ export class PiSessionManager {
       config: this.config,
       customTools: customTools ?? [],
       role: agentRole,
-      ...(agentRole === "orchestrator"
-        ? {
-            orchestratorContext: { streamName, streamId, repoPath },
-            tmuxEnabled: this.config.tmuxEnabled,
-          }
-        : {}),
+      orchestratorContext:
+        agentRole === "orchestrator" ? { streamName, streamId, repoPath } : undefined,
       cwd: repoPath,
-      ...(resumeSessionFile ? { resumeSessionFile } : {}),
+      resumeSessionFile,
     });
 
     const session = created.runtime.session;
@@ -235,7 +230,7 @@ export class PiSessionManager {
     this.streamSessions.set(streamId, managed);
     this.byPiSessionId.set(managed.piSessionId, managed);
     this.log(`${agentRole} agent created for stream "${streamName}" (${streamId})`);
-    this.logResourceInfo(agentRole, created.resourceInfo);
+    this.logResourceMessages(agentRole, created.resourceMessages);
     return managed;
   }
 
@@ -331,16 +326,14 @@ export class PiSessionManager {
       config: this.config,
       customTools: customTools ?? [],
       role: agentRole,
-      ...(agentRole === "orchestrator"
-        ? {
-            orchestratorContext: {
+      orchestratorContext:
+        agentRole === "orchestrator"
+          ? {
               streamName: managed.streamName ?? managed.streamId,
               streamId: managed.streamId,
               repoPath,
-            },
-            tmuxEnabled: this.config.tmuxEnabled,
-          }
-        : {}),
+            }
+          : undefined,
       cwd: repoPath,
       resumeSessionFile: sessionFile,
     });
@@ -354,7 +347,7 @@ export class PiSessionManager {
     this.log(
       `activated dormant ${agentRole} agent for stream "${managed.streamName}" (${managed.streamId})`,
     );
-    this.logResourceInfo(agentRole, created.resourceInfo);
+    this.logResourceMessages(agentRole, created.resourceMessages);
   }
 
   destroyStreamSession(streamId: string, reason: string): void {
@@ -583,22 +576,8 @@ export class PiSessionManager {
     return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage, footer);
   }
 
-  private logResourceInfo(
-    role: string,
-    info: { skillNames: string[]; agentsFilePaths: string[]; skillMessages?: string[] },
-  ): void {
-    const { skillNames, agentsFilePaths, skillMessages } = info;
-    if (skillNames.length > 0) {
-      this.log(`pi-agent (${role}): loaded ${skillNames.length} skills: ${skillNames.join(", ")}`);
-    } else {
-      this.log(`pi-agent (${role}): no skills loaded`);
-    }
-    for (const message of skillMessages ?? []) {
-      this.log(`pi-agent (${role}): ${message}`);
-    }
-    for (const filePath of agentsFilePaths) {
-      this.log(`pi-agent (${role}): loaded ${path.basename(filePath)} from ${filePath}`);
-    }
+  private logResourceMessages(role: string, messages: string[]): void {
+    for (const message of messages) this.log(`pi-agent (${role}): ${message}`);
   }
 
   private findLatestWhatsAppRemoteJid(streamId: string | null): string | undefined {
@@ -702,15 +681,7 @@ export class PiSessionManager {
   }
 
   private buildManagedSession(
-    created: {
-      runtime: AgentSessionRuntime;
-      modelInfo: {
-        provider: string;
-        id: string;
-        entryId: string;
-        thinkingLevel: ThinkingLevel;
-      };
-    },
+    created: Awaited<ReturnType<typeof createFlitterbotAgent>>,
     state: PiSessionState,
     role: "default" | "orchestrator",
     streamId: string | null,

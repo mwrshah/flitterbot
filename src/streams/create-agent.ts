@@ -5,7 +5,6 @@ import type { KnownProvider } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
-  type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -13,8 +12,8 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
-import { resolveModelEntry } from "../config/models.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
+import { resolveModelEntry, resolveModelEntryId } from "../config/models.ts";
 import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
@@ -31,47 +30,19 @@ type StreamsRole = "default" | "orchestrator";
 type CreateFlitterbotAgentOptions = {
   config: FlitterbotConfig;
   customTools: unknown[];
-  role?: StreamsRole;
+  role: StreamsRole;
   orchestratorContext?: OrchestratorInput;
   resumeSessionFile?: string;
   cwd?: string;
-  modelId?: string;
-  tmuxEnabled?: boolean;
 };
 
-export type CreateFlitterbotAgentResult = {
-  runtime: AgentSessionRuntime;
-  modelInfo: {
-    provider: string;
-    id: string;
-    entryId: string;
-    thinkingLevel: ThinkingLevel;
-  };
-  resourceInfo: {
-    skillNames: string[];
-    agentsFilePaths: string[];
-    skillMessages: string[];
-  };
-};
-
-export async function createFlitterbotAgent(
-  options: CreateFlitterbotAgentOptions,
-): Promise<CreateFlitterbotAgentResult> {
-  const {
-    config,
-    customTools,
-    role = "default",
-    orchestratorContext,
-    resumeSessionFile,
-    cwd,
-  } = options;
+export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
+  const { config, customTools, role, orchestratorContext, resumeSessionFile, cwd } = options;
   const workingDir = cwd ?? config.projectsDir;
 
   const sessionManager = resumeSessionFile
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
-
-  const promptRef = { value: "" };
 
   const authStorage = createPiAuthStorage(config.controlSurfaceAgentDir);
   const agentDir = config.controlSurfaceAgentDir;
@@ -115,10 +86,7 @@ export async function createFlitterbotAgent(
     );
   }
 
-  const shouldLetSessionRestoreModel = Boolean(resumeSessionFile) && !options.modelId;
-  const modelEntry = shouldLetSessionRestoreModel
-    ? undefined
-    : resolveModelEntry(config, options.modelId);
+  const modelEntry = resumeSessionFile ? undefined : resolveModelEntry(config);
   const model = modelEntry
     ? getBuiltinModel(modelEntry.provider as KnownProvider, modelEntry.modelId as never)
     : undefined;
@@ -127,20 +95,23 @@ export async function createFlitterbotAgent(
       `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
     );
   }
-  const effectiveThinkingLevel: ThinkingLevel | undefined = modelEntry
+  const effectiveThinkingLevel = modelEntry
     ? (modelEntry.thinkingLevel ?? config.defaultThinkingLevel)
     : undefined;
 
   const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
-    const factoryPiSessionId = factoryOpts.sessionManager.getSessionId();
-    promptRef.value = resolveSystemPrompt(
-      role,
-      factoryPiSessionId,
-      factoryOpts.cwd,
-      orchestratorContext,
-      config.projectsDir,
-      options.tmuxEnabled ?? false,
-    );
+    const piSessionId = factoryOpts.sessionManager.getSessionId();
+    const systemPrompt =
+      role === "orchestrator"
+        ? buildOrchestratorPrompt(
+            {
+              ...requireOrchestratorContext(orchestratorContext),
+              piSessionId,
+              cwd: factoryOpts.cwd,
+            },
+            { tmux: config.tmuxEnabled },
+          )
+        : buildDefaultAgentPrompt(piSessionId, config.projectsDir);
 
     const services = await createAgentSessionServices({
       cwd: factoryOpts.cwd,
@@ -150,7 +121,7 @@ export async function createFlitterbotAgent(
       modelRegistry,
       resourceLoaderOptions: {
         additionalSkillPaths,
-        appendSystemPromptOverride: (base) => [...base, promptRef.value],
+        appendSystemPromptOverride: (base) => [...base, systemPrompt],
         agentsFilesOverride: (baseAgents) => {
           if (!homeAgentsMdEntry) return baseAgents;
           const already = baseAgents.agentsFiles.some((f) => f.path === homeAgentsMdEntry?.path);
@@ -183,59 +154,39 @@ export async function createFlitterbotAgent(
   const resourceLoader = runtime.services.resourceLoader;
   const { skills, diagnostics: skillDiagnostics } = resourceLoader.getSkills();
   const { agentsFiles } = resourceLoader.getAgentsFiles();
-  const skillNames = skills.map((s) => s.name);
-  const agentsFilePaths = agentsFiles.map((f) => f.path);
-  const skillMessages: string[] = [...skillPathWarnings];
-  for (const d of skillDiagnostics) {
-    if (d.type === "collision" && d.collision) {
-      skillMessages.push(
-        `skill name collision: "${d.collision.name}" — keeping ${d.collision.winnerPath}, ignoring ${d.collision.loserPath}`,
-      );
-    } else if (d.type === "warning" || d.type === "error") {
-      skillMessages.push(`skill ${d.type}: ${d.message}${d.path ? ` (${d.path})` : ""}`);
-    }
-  }
+  const resourceMessages = [
+    skills.length > 0
+      ? `loaded ${skills.length} skills: ${skills.map((skill) => skill.name).join(", ")}`
+      : "no skills loaded",
+    ...skillPathWarnings,
+    ...skillDiagnostics.flatMap((diagnostic) => {
+      if (diagnostic.type === "collision" && diagnostic.collision) {
+        return `skill name collision: "${diagnostic.collision.name}" — keeping ${diagnostic.collision.winnerPath}, ignoring ${diagnostic.collision.loserPath}`;
+      }
+      return diagnostic.type === "warning" || diagnostic.type === "error"
+        ? `skill ${diagnostic.type}: ${diagnostic.message}${diagnostic.path ? ` (${diagnostic.path})` : ""}`
+        : [];
+    }),
+    ...agentsFiles.map((file) => `loaded ${path.basename(file.path)} from ${file.path}`),
+  ];
 
   const currentModel = runtime.session.model;
   if (!currentModel) {
     throw new Error("Pi session started without a resolved model");
   }
-  const currentThinkingLevel = runtime.session.thinkingLevel;
-
   return {
     runtime,
     modelInfo: {
       provider: currentModel.provider,
       id: currentModel.id,
       entryId: resolveModelEntryId(config, currentModel.provider, currentModel.id),
-      thinkingLevel: currentThinkingLevel,
+      thinkingLevel: runtime.session.thinkingLevel,
     },
-    resourceInfo: {
-      skillNames,
-      agentsFilePaths,
-      skillMessages,
-    },
+    resourceMessages,
   };
 }
 
-function resolveModelEntryId(config: FlitterbotConfig, provider: string, modelId: string): string {
-  return (
-    config.models.find((entry) => entry.provider === provider && entry.modelId === modelId)?.id ??
-    `${provider}/${modelId}`
-  );
-}
-
-function resolveSystemPrompt(
-  role: StreamsRole,
-  piSessionId: string,
-  cwd: string,
-  ctx?: OrchestratorInput,
-  projectsDir?: string,
-  tmuxEnabled = false,
-): string {
-  if (role === "orchestrator") {
-    if (!ctx) throw new Error("orchestratorContext is required for orchestrator role");
-    return buildOrchestratorPrompt({ ...ctx, piSessionId, cwd }, { tmux: tmuxEnabled });
-  }
-  return buildDefaultAgentPrompt(piSessionId, projectsDir ?? cwd);
+function requireOrchestratorContext(context?: OrchestratorInput): OrchestratorInput {
+  if (!context) throw new Error("orchestratorContext is required for orchestrator role");
+  return context;
 }
