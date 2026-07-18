@@ -55,19 +55,19 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     path.join(HOME, ".claude", "skills"),
     path.join(HOME, ".agents", "skills"),
   ];
-  const skillPathWarnings: string[] = [];
+  const resourceMessages: string[] = [];
   const additionalSkillPaths: string[] = [];
   if (fs.existsSync(config.flitterbotSkillsDir)) {
     additionalSkillPaths.push(config.flitterbotSkillsDir);
   } else {
-    skillPathWarnings.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
+    resourceMessages.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
   }
   additionalSkillPaths.push(...builtInSkillPaths.filter((entry) => fs.existsSync(entry)));
   for (const entry of config.extraSkillPaths) {
     if (fs.existsSync(entry)) {
       additionalSkillPaths.push(entry);
     } else {
-      skillPathWarnings.push(`extraSkillPaths: missing directory skipped: ${entry}`);
+      resourceMessages.push(`extraSkillPaths: missing directory skipped: ${entry}`);
     }
   }
 
@@ -81,7 +81,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
       };
     }
   } catch (err) {
-    skillPathWarnings.push(
+    resourceMessages.push(
       `failed to read ${homeAgentsMdPath}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
@@ -154,11 +154,10 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   const resourceLoader = runtime.services.resourceLoader;
   const { skills, diagnostics: skillDiagnostics } = resourceLoader.getSkills();
   const { agentsFiles } = resourceLoader.getAgentsFiles();
-  const resourceMessages = [
+  resourceMessages.push(
     skills.length > 0
       ? `loaded ${skills.length} skills: ${skills.map((skill) => skill.name).join(", ")}`
       : "no skills loaded",
-    ...skillPathWarnings,
     ...skillDiagnostics.flatMap((diagnostic) => {
       if (diagnostic.type === "collision" && diagnostic.collision) {
         return `skill name collision: "${diagnostic.collision.name}" — keeping ${diagnostic.collision.winnerPath}, ignoring ${diagnostic.collision.loserPath}`;
@@ -168,7 +167,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
         : [];
     }),
     ...agentsFiles.map((file) => `loaded ${path.basename(file.path)} from ${file.path}`),
-  ];
+  );
 
   const currentModel = runtime.session.model;
   if (!currentModel) {
