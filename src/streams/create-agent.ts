@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import type { KnownProvider } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   type CreateAgentSessionRuntimeFactory,
   createAgentSessionFromServices,
@@ -17,6 +16,7 @@ import { resolveModelEntry, resolveModelEntryId } from "../config/models.ts";
 import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
+import { createFlitterbotExtension, type FlitterbotTool } from "./flitterbot-extension.ts";
 
 type OrchestratorInput = Omit<OrchestratorContext, "piSessionId" | "cwd">;
 
@@ -29,7 +29,7 @@ type StreamsRole = "default" | "orchestrator";
 
 type CreateFlitterbotAgentOptions = {
   config: FlitterbotConfig;
-  customTools: unknown[];
+  customTools: FlitterbotTool[];
   role: StreamsRole;
   orchestratorContext?: OrchestratorInput;
   resumeSessionFile?: string;
@@ -44,17 +44,14 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
 
-  const authStorage = createPiAuthStorage(config.controlSurfaceAgentDir);
-  const agentDir = config.controlSurfaceAgentDir;
-  const modelRegistry = createPiModelRegistry(authStorage, agentDir);
+  const authStorage = createPiAuthStorage();
+  const agentDir = config.piAgentDir;
+  const modelRegistry = createPiModelRegistry(authStorage);
   const settingsManager = SettingsManager.inMemory({
     compaction: { keepRecentTokens: 12_000 },
   });
   settingsManager.setTransport(config.piTransport);
-  const builtInSkillPaths = [
-    path.join(HOME, ".claude", "skills"),
-    path.join(HOME, ".agents", "skills"),
-  ];
+  const builtInSkillPaths = [path.join(HOME, ".claude", "skills")];
   const resourceMessages: string[] = [];
   const additionalSkillPaths: string[] = [];
   if (fs.existsSync(config.flitterbotSkillsDir)) {
@@ -69,21 +66,6 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     } else {
       resourceMessages.push(`extraSkillPaths: missing directory skipped: ${entry}`);
     }
-  }
-
-  const homeAgentsMdPath = path.join(HOME, ".agents", "AGENTS.md");
-  let homeAgentsMdEntry: { path: string; content: string } | null = null;
-  try {
-    if (fs.existsSync(homeAgentsMdPath)) {
-      homeAgentsMdEntry = {
-        path: homeAgentsMdPath,
-        content: fs.readFileSync(homeAgentsMdPath, "utf-8"),
-      };
-    }
-  } catch (err) {
-    resourceMessages.push(
-      `failed to read ${homeAgentsMdPath}: ${err instanceof Error ? err.message : String(err)}`,
-    );
   }
 
   const modelEntry = resumeSessionFile ? undefined : resolveModelEntry(config);
@@ -101,7 +83,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
 
   const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
     const piSessionId = factoryOpts.sessionManager.getSessionId();
-    const systemPrompt =
+    const rolePrompt =
       role === "orchestrator"
         ? buildOrchestratorPrompt(
             {
@@ -113,6 +95,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
           )
         : buildDefaultAgentPrompt(piSessionId, config.projectsDir);
 
+    const memory = readMemory(config.memoryPath);
     const services = await createAgentSessionServices({
       cwd: factoryOpts.cwd,
       agentDir: factoryOpts.agentDir,
@@ -120,16 +103,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
       settingsManager,
       modelRegistry,
       resourceLoaderOptions: {
-        additionalSkillPaths,
-        appendSystemPromptOverride: (base) => [...base, systemPrompt],
-        agentsFilesOverride: (baseAgents) => {
-          if (!homeAgentsMdEntry) return baseAgents;
-          const already = baseAgents.agentsFiles.some((f) => f.path === homeAgentsMdEntry?.path);
-          if (already) return baseAgents;
-          return {
-            agentsFiles: [homeAgentsMdEntry, ...baseAgents.agentsFiles],
-          };
-        },
+        extensionFactories: [createFlitterbotExtension(customTools, additionalSkillPaths)],
+        appendSystemPromptOverride: (base) => [rolePrompt, ...(memory ? [memory] : []), ...base],
       },
     });
 
@@ -139,7 +114,6 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
       sessionStartEvent: factoryOpts.sessionStartEvent,
       ...(model ? { model } : {}),
       ...(effectiveThinkingLevel ? { thinkingLevel: effectiveThinkingLevel } : {}),
-      customTools: customTools as ToolDefinition[],
     });
 
     return { ...result, services, diagnostics: services.diagnostics };
@@ -150,6 +124,12 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     agentDir,
     sessionManager,
   });
+
+  const bindExtensions = async (session: typeof runtime.session) => {
+    await session.bindExtensions({ mode: "print" });
+  };
+  runtime.setRebindSession(bindExtensions);
+  await bindExtensions(runtime.session);
 
   const resourceLoader = runtime.services.resourceLoader;
   const { skills, diagnostics: skillDiagnostics } = resourceLoader.getSkills();
@@ -183,6 +163,16 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     },
     resourceMessages,
   };
+}
+
+function readMemory(memoryPath: string): string {
+  try {
+    return fs.readFileSync(memoryPath, "utf8").trim();
+  } catch (error) {
+    throw new Error(
+      `Unable to read Flitterbot memory at ${memoryPath}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 function requireOrchestratorContext(context?: OrchestratorInput): OrchestratorInput {

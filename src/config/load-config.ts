@@ -113,7 +113,8 @@ export type FlitterbotConfig = {
   claudeCliCommand: string;
   controlSurfaceDir: string;
   controlSurfaceSessionsDir: string;
-  controlSurfaceAgentDir: string;
+  piAgentDir: string;
+  memoryPath: string;
   controlSurfacePidPath: string;
   controlSurfaceLogPath: string;
   projectsDir: string;
@@ -357,7 +358,8 @@ export function loadConfig(): FlitterbotConfig {
   const raw = readRequiredJsonFile(CONFIG_PATH);
   const controlSurfaceDir = path.join(FLITTERBOT_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
-  const agentDir = path.join(controlSurfaceDir, "agent");
+  const piAgentDir = path.join(os.homedir(), ".agents");
+  const memoryPath = path.join(FLITTERBOT_DIR, "data", "MEMORY.md");
   const pidPath = path.join(controlSurfaceDir, "server.pid");
   const logPath = path.join(FLITTERBOT_DIR, "logs", "control-surface.log");
 
@@ -393,7 +395,8 @@ export function loadConfig(): FlitterbotConfig {
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
-    controlSurfaceAgentDir: agentDir,
+    piAgentDir,
+    memoryPath,
     controlSurfacePidPath: pidPath,
     controlSurfaceLogPath: logPath,
   };
@@ -403,8 +406,9 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(config.projectsDir);
   ensureDir(controlSurfaceDir);
   ensureDir(sessionsDir);
-  ensureDir(agentDir);
+  ensureDir(piAgentDir);
   ensureDir(config.flitterbotSkillsDir);
+  ensureDir(path.dirname(config.memoryPath));
   ensureDir(path.join(FLITTERBOT_DIR, "data", "tasks"));
   ensureDir(path.join(FLITTERBOT_DIR, "data", "notes"));
   ensureDir(path.dirname(config.learningsNotePath));

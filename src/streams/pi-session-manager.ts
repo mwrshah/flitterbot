@@ -13,6 +13,7 @@ import type { ApiError, MessageMetadata } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createFlitterbotAgent } from "./create-agent.ts";
+import type { FlitterbotTool } from "./flitterbot-extension.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
 import { PiSessionState } from "./pi-session-state.ts";
 import { subscribeToPiSession } from "./pi-subscribe.ts";
@@ -112,7 +113,7 @@ export class PiSessionManager {
   }
 
   async createDefault(
-    customTools: unknown[],
+    customTools: FlitterbotTool[],
     resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
@@ -138,7 +139,7 @@ export class PiSessionManager {
       pid: process.pid,
       sessionFile: session.sessionFile,
       cwd: this.config.projectsDir,
-      agentDir: this.config.controlSurfaceAgentDir,
+      agentDir: this.config.piAgentDir,
       modelProvider: created.modelInfo.provider,
       modelId: created.modelInfo.id,
       thinkingLevel: created.modelInfo.thinkingLevel,
@@ -161,7 +162,7 @@ export class PiSessionManager {
     streamId: string,
     streamName: string,
     repoPath?: string,
-    customTools?: unknown[],
+    customTools?: FlitterbotTool[],
     resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
     return this.createStreamSession(
@@ -178,7 +179,7 @@ export class PiSessionManager {
     streamId: string,
     streamName: string,
     repoPath?: string,
-    customTools?: unknown[],
+    customTools?: FlitterbotTool[],
   ): Promise<ManagedPiSession> {
     return this.createStreamSession("default", streamId, streamName, repoPath, customTools);
   }
@@ -188,7 +189,7 @@ export class PiSessionManager {
     streamId: string,
     streamName: string,
     repoPath?: string,
-    customTools?: unknown[],
+    customTools?: FlitterbotTool[],
     resumeSessionFile?: string,
   ): Promise<ManagedPiSession> {
     const existing = this.streamSessions.get(streamId);
@@ -218,7 +219,7 @@ export class PiSessionManager {
       pid: process.pid,
       sessionFile: session.sessionFile,
       cwd: repoPath ?? this.config.projectsDir,
-      agentDir: this.config.controlSurfaceAgentDir,
+      agentDir: this.config.piAgentDir,
       modelProvider: created.modelInfo.provider,
       modelId: created.modelInfo.id,
       thinkingLevel: created.modelInfo.thinkingLevel,
@@ -294,7 +295,10 @@ export class PiSessionManager {
     return managed;
   }
 
-  async activateStreamSession(managed: ManagedPiSession, customTools?: unknown[]): Promise<void> {
+  async activateStreamSession(
+    managed: ManagedPiSession,
+    customTools?: FlitterbotTool[],
+  ): Promise<void> {
     if (managed.runtime) return;
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
     if (managed.role === "default") throw new Error("Default session is not stream-backed");
@@ -515,7 +519,7 @@ export class PiSessionManager {
       pid: process.pid,
       sessionFile: newSessionFile,
       cwd: opts.cwd,
-      agentDir: this.config.controlSurfaceAgentDir,
+      agentDir: this.config.piAgentDir,
       modelProvider: managed.modelInfo.provider,
       modelId: managed.modelInfo.id,
       thinkingLevel: managed.modelInfo.thinkingLevel,

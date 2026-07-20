@@ -33,7 +33,7 @@ Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. T
 - `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
 - `learningsNotePath` — Markdown document used by the bundled `learnings` skill.
 
-Skills load from `~/.claude/skills`, `~/.agents/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. Flitterbot agent instructions load from `~/.flitterbot/control-surface/agent/AGENTS.md`; the installer creates this file if missing and leaves user edits intact. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
+Pi uses `~/.agents` as its agent directory, loading its global instructions, skills, extensions, prompts, and themes natively. Flitterbot additionally loads skills from `~/.claude/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. The installer seeds the always-loaded memory index at `~/.flitterbot/data/MEMORY.md` without overwriting user edits; the full learnings document remains independently configured by `learningsNotePath`. Pi auth and custom models live at `~/.pi/agent`. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
 
 ## Commands
 

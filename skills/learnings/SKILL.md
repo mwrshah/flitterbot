@@ -63,7 +63,7 @@ Let `$SKILL_DIR` be the directory the skill loader's "References are relative to
      python3 $SKILL_DIR/scripts/learnings.py add --new "situation: body"
      ```
 
-7. *(Conditionally) Wire up the new code in the Flitterbot agent catalog* (only when step 6 used `--new`). The script prints the freshly-minted 2-char code — it now needs a one-line registration inside the `must-fetch-user-preferences` rule of `~/.flitterbot/control-surface/agent/AGENTS.md`. Use the installed recall script path in that entry: `python3 ~/.flitterbot/skills/learnings/scripts/recall.py show CC`. Catalog text is also trigger-only.
+7. *(Conditionally) Wire up the new code in the Flitterbot agent catalog* (only when step 6 used `--new`). The script prints the freshly-minted 2-char code — it now needs a one-line registration inside the `must-fetch-user-preferences` rule of `~/.flitterbot/data/MEMORY.md`. Use the installed recall script path in that entry: `python3 ~/.flitterbot/skills/learnings/scripts/recall.py show CC`. Catalog text is also trigger-only.
 
 8. *Report* the line added and whether it joined an existing group or started a new one. The script prints this for the learnings note directly; if step 7 ran, also mention the catalog entry that was wired up.
 

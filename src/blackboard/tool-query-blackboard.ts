@@ -1,3 +1,4 @@
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "./db.ts";
 
 const MODES: Record<string, string> = {
@@ -139,19 +140,7 @@ function executeQuery(
   return db.prepare(query).all() as Array<Record<string, unknown>>;
 }
 
-export interface QueryBlackboardTool {
-  name: string;
-  label: string;
-  description: string;
-  parameters: Record<string, unknown>;
-  execute: (
-    toolCallId: string,
-    params: Record<string, unknown>,
-  ) => Promise<{
-    content: Array<{ type: string; text: string }>;
-    details?: unknown;
-  }>;
-}
+export type QueryBlackboardTool = ToolDefinition;
 
 export function createQueryBlackboardTool(db: BlackboardDatabase): QueryBlackboardTool {
   return {

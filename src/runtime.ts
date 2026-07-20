@@ -71,6 +71,7 @@ import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
+import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { stripInjectedDatetimeBlocks } from "./streams/format-stream-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
@@ -92,22 +93,6 @@ import {
   waitForDaemonReady,
 } from "./whatsapp/process.ts";
 import { type WebSocketClient, WebSocketHub } from "./ws/hub.ts";
-
-// ponytail: prefer the SDK's tool definition type here instead of maintaining a local mirror.
-type CustomToolDefinition = {
-  name: string;
-  label: string;
-  description: string;
-  parameters: Record<string, unknown>;
-  execute: (
-    toolCallId: string,
-    params: Record<string, unknown>,
-    ...rest: unknown[]
-  ) => Promise<{
-    content: Array<{ type: string; text: string }>;
-    details?: unknown;
-  }>;
-};
 
 type EnqueueInput = {
   text: string;
@@ -1870,7 +1855,7 @@ export class ControlSurfaceRuntime {
     });
   }
 
-  private createStreamSessionTools(streamId: string): CustomToolDefinition[] {
+  private createStreamSessionTools(streamId: string): FlitterbotTool[] {
     const stream = getStreamById(this.blackboard, streamId);
     return this.createCustomTools(
       stream?.type === "defaultStream" ? "default" : "orchestrator",
@@ -1908,8 +1893,8 @@ export class ControlSurfaceRuntime {
   createCustomTools(
     role: "orchestrator" | "default" = "default",
     streamId?: string,
-  ): CustomToolDefinition[] {
-    const tools: CustomToolDefinition[] = [createQueryBlackboardTool(this.blackboard)];
+  ): FlitterbotTool[] {
+    const tools: FlitterbotTool[] = [createQueryBlackboardTool(this.blackboard)];
 
     if (role === "default") {
       tools.push({
