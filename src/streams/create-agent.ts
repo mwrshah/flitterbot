@@ -48,7 +48,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   const agentDir = config.piAgentDir;
   const modelRegistry = createPiModelRegistry(authStorage);
   const settingsManager = SettingsManager.inMemory({
-    compaction: { keepRecentTokens: 12_000 },
+    compaction: { keepRecentTokens: 30_000 },
   });
   settingsManager.setTransport(config.piTransport);
   const builtInSkillPaths = [path.join(HOME, ".claude", "skills")];
