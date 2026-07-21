@@ -1,15 +1,6 @@
 import type http from "node:http";
-import {
-  type Api,
-  getSupportedThinkingLevels,
-  type KnownProvider,
-  type Model,
-} from "@earendil-works/pi-ai";
-import {
-  getBuiltinModel,
-  getBuiltinModels,
-  getBuiltinProviders,
-} from "@earendil-works/pi-ai/providers/all";
+import { type Api, getSupportedThinkingLevels, type Model } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { ModelConfigEntry } from "../config/load-config.ts";
 import { persistModelsToConfigFile } from "../config/persist-models.ts";
 import type {
@@ -17,7 +8,7 @@ import type {
   ModelsListResponse,
   ModelsMutationResponse,
 } from "../contracts/index.ts";
-import { createPiAuthStorage } from "../pi-auth.ts";
+import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -54,7 +45,12 @@ export async function handleBrowserModelsPinRoute(
     if (current.some((m) => m.id === id)) {
       return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
-    const entry = buildEntryFromId(id, userLabel, current);
+    const entry = buildEntryFromId(
+      id,
+      userLabel,
+      current,
+      createPiModelRegistry(createPiAuthStorage()),
+    );
     if (!entry) {
       return sendJson(res, 400, {
         ok: false,
@@ -93,29 +89,16 @@ export async function handleBrowserModelsPinRoute(
 export async function buildModelsListResponse(
   runtime: ControlSurfaceRuntime,
 ): Promise<ModelsListResponse> {
-  const availabilityByProvider = await resolveProviderAvailability(runtime);
-  const pinned = runtime.config.models.map((entry) =>
-    buildPinnedModelItem(entry, availabilityByProvider),
-  );
+  // ModelRegistry is the single source of truth: built-in catalog merged with
+  // any custom providers/models declared in ~/.pi/agent/models.json.
+  const registry = createPiModelRegistry(createPiAuthStorage());
+  const pinned = runtime.config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
 
-  for (const provider of getBuiltinProviders()) {
-    const authKind = availabilityByProvider.get(provider) ?? "none";
-    for (const model of getBuiltinModels(provider)) {
-      if (pinnedCatalogKeys.has(`${provider}/${model.id}`)) continue;
-      all.push({
-        id: `${provider}/${model.id}`,
-        label: model.name,
-        provider,
-        modelId: model.id,
-        name: model.name,
-        contextWindow: model.contextWindow,
-        ...modelThinkingCapabilities(model),
-        available: authKind !== "none",
-        authKind,
-      });
-    }
+  for (const model of registry.getAll()) {
+    if (pinnedCatalogKeys.has(`${model.provider}/${model.id}`)) continue;
+    all.push(buildCatalogModelItem(model, registry));
   }
 
   return {
@@ -135,12 +118,24 @@ export async function buildModelsMutationResponse(
   };
 }
 
-function buildPinnedModelItem(
-  entry: ModelConfigEntry,
-  availabilityByProvider: Map<string, ModelListItem["authKind"]>,
-): ModelListItem {
-  const catalogModel = getBuiltinModel(entry.provider as KnownProvider, entry.modelId as never);
-  const authKind = availabilityByProvider.get(entry.provider) ?? "none";
+function buildCatalogModelItem(model: Model<Api>, registry: ModelRegistry): ModelListItem {
+  const authKind = resolveAuthKind(registry, model);
+  return {
+    id: `${model.provider}/${model.id}`,
+    label: model.name,
+    provider: model.provider,
+    modelId: model.id,
+    name: model.name,
+    contextWindow: model.contextWindow,
+    ...modelThinkingCapabilities(model),
+    available: authKind !== "none",
+    authKind,
+  };
+}
+
+function buildPinnedModelItem(entry: ModelConfigEntry, registry: ModelRegistry): ModelListItem {
+  const catalogModel = registry.find(entry.provider, entry.modelId);
+  const authKind = catalogModel ? resolveAuthKind(registry, catalogModel) : "none";
   return {
     id: entry.id,
     label: entry.label,
@@ -153,6 +148,11 @@ function buildPinnedModelItem(
   };
 }
 
+function resolveAuthKind(registry: ModelRegistry, model: Model<Api>): ModelListItem["authKind"] {
+  if (!registry.hasConfiguredAuth(model)) return "none";
+  return registry.isUsingOAuth(model) ? "subscription" : "api_key";
+}
+
 function modelThinkingCapabilities(model: Model<Api>) {
   return {
     reasoning: Boolean(model.reasoning),
@@ -161,33 +161,11 @@ function modelThinkingCapabilities(model: Model<Api>) {
   };
 }
 
-async function resolveProviderAvailability(
-  runtime: ControlSurfaceRuntime,
-): Promise<Map<string, ModelListItem["authKind"]>> {
-  const authStorage = createPiAuthStorage();
-  const providers = new Set([
-    ...getBuiltinProviders(),
-    ...runtime.config.models.map((model) => model.provider),
-  ]);
-  const entries = await Promise.all(
-    [...providers].map(async (provider) => {
-      const apiKey = await authStorage.getApiKey(provider);
-      const credential = authStorage.get(provider);
-      const authKind: ModelListItem["authKind"] = apiKey
-        ? credential?.type === "oauth"
-          ? "subscription"
-          : "api_key"
-        : "none";
-      return [provider, authKind] as const;
-    }),
-  );
-  return new Map(entries);
-}
-
 function buildEntryFromId(
   id: string,
   userLabel: string,
   existing: ModelConfigEntry[],
+  registry: ModelRegistry,
 ): ModelConfigEntry | null {
   const existingMatch = existing.find((m) => m.id === id);
   if (existingMatch) return existingMatch;
@@ -196,7 +174,7 @@ function buildEntryFromId(
   if (slashIdx <= 0 || slashIdx === id.length - 1) return null;
   const provider = id.slice(0, slashIdx);
   const rawModelId = id.slice(slashIdx + 1);
-  const model = getBuiltinModel(provider as KnownProvider, rawModelId as never);
+  const model = registry.find(provider, rawModelId);
   if (!model) return null;
 
   return {

@@ -4,8 +4,7 @@ import type http from "node:http";
 import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import type { AssistantMessage, KnownProvider, TextContent } from "@earendil-works/pi-ai";
-import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
+import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
@@ -724,13 +723,11 @@ export class ControlSurfaceRuntime {
       return this.toPiSessionModelInfo(managed.modelInfo);
     }
 
-    const model = getBuiltinModel(
-      modelEntry.provider as KnownProvider,
-      modelEntry.modelId as never,
-    );
+    const model = session.modelRegistry.find(modelEntry.provider, modelEntry.modelId);
     if (!model) {
       throw new Error(
-        `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId}`,
+        `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId}. ` +
+          `Not in the built-in catalog or ~/.pi/agent/models.json.`,
       );
     }
 

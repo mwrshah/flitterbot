@@ -1,5 +1,3 @@
-import type { KnownProvider } from "@earendil-works/pi-ai";
-import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import type { FlitterbotConfig, ModelConfigEntry } from "./load-config.ts";
 
 export function resolveModelEntryId(
@@ -17,10 +15,10 @@ export function resolveModelEntry(config: FlitterbotConfig, modelId?: string): M
   if (modelId) {
     const curated = config.models.find((m) => m.id === modelId);
     if (curated) return curated;
-    const fromCatalog = resolveCompositeId(modelId);
-    if (fromCatalog) return fromCatalog;
+    const fromComposite = resolveCompositeId(modelId);
+    if (fromComposite) return fromComposite;
     throw new Error(
-      `Unknown model id "${modelId}" — not in config.models and not a valid provider/modelId pair in the pi SDK catalog`,
+      `Unknown model id "${modelId}" — not in config.models and not a "provider/modelId" pair`,
     );
   }
   const fallback =
@@ -28,21 +26,24 @@ export function resolveModelEntry(config: FlitterbotConfig, modelId?: string): M
     resolveCompositeId(config.defaultModel);
   if (fallback) return fallback;
   throw new Error(
-    `Config invariant violated: defaultModel "${config.defaultModel}" is neither in models[] nor a valid provider/modelId pair`,
+    `Config invariant violated: defaultModel "${config.defaultModel}" is neither in models[] nor a "provider/modelId" pair`,
   );
 }
 
+// Split a composite "provider/modelId" id into a config entry. The first slash
+// separates provider from modelId, so multi-segment model slugs like
+// "truefoundry/claude-group/claude-sonnet-4-6" resolve to provider="truefoundry".
+// Existence is validated later against the Pi ModelRegistry (built-in catalog +
+// ~/.pi/agent/models.json), not here.
 function resolveCompositeId(compositeId: string): ModelConfigEntry | null {
   const slashIdx = compositeId.indexOf("/");
   if (slashIdx <= 0 || slashIdx === compositeId.length - 1) return null;
   const provider = compositeId.slice(0, slashIdx);
-  const rawModelId = compositeId.slice(slashIdx + 1);
-  const model = getBuiltinModel(provider as KnownProvider, rawModelId as never);
-  if (!model) return null;
+  const modelId = compositeId.slice(slashIdx + 1);
   return {
     id: compositeId,
-    label: `${model.name} (${provider})`,
+    label: compositeId,
     provider,
-    modelId: rawModelId,
+    modelId,
   };
 }
