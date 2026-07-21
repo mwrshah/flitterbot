@@ -2,7 +2,7 @@
   "name": "flitterbot",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.12.0",
+  "packageManager": "pnpm@11.13.1",
   "scripts": {
     "prepare": "lefthook install",
     "control-surface": "node --experimental-strip-types src/server.ts",
