@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { KnownProvider } from "@earendil-works/pi-ai";
-import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import {
   type CreateAgentSessionRuntimeFactory,
   createAgentSessionFromServices,
@@ -70,11 +68,12 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
 
   const modelEntry = resumeSessionFile ? undefined : resolveModelEntry(config);
   const model = modelEntry
-    ? getBuiltinModel(modelEntry.provider as KnownProvider, modelEntry.modelId as never)
+    ? modelRegistry.find(modelEntry.provider, modelEntry.modelId)
     : undefined;
   if (modelEntry && !model) {
     throw new Error(
-      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id})`,
+      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id}). ` +
+        `Not in the built-in catalog or ~/.pi/agent/models.json.`,
     );
   }
   const effectiveThinkingLevel = modelEntry
