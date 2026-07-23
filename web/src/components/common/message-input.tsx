@@ -822,6 +822,8 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
+      if (event.key === "Enter" && event.shiftKey && closeActivePicker()) return;
+
       const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
       if (skillPickerVisible && slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
         event.preventDefault();
