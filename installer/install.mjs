@@ -2,8 +2,8 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import {
-  readFileSync, writeFileSync, mkdirSync, existsSync, statSync, copyFileSync,
-  chmodSync, renameSync, rmSync, readdirSync,
+  readFileSync, writeFileSync, mkdirSync, existsSync, statSync, lstatSync, copyFileSync,
+  chmodSync, renameSync, rmSync, readdirSync, constants,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { homedir, platform } from "node:os";
@@ -278,6 +278,40 @@ function copyRuntimeFile(src, dest, mode) {
   chmodSync(dest, mode);
 }
 
+function seedDestinationExists(dest) {
+  let entry;
+  try {
+    entry = lstatSync(dest);
+  } catch (e) {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  }
+  if (entry.isSymbolicLink()) {
+    try {
+      statSync(dest);
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        throw new Error(`Refusing to seed data file over dangling symlink: ${dest}`);
+      }
+      throw e;
+    }
+  }
+  return true;
+}
+
+function copySeedFileIfAbsent(src, dest, mode) {
+  mkdirSync(dirname(dest), { recursive: true });
+  if (seedDestinationExists(dest)) return;
+  try {
+    copyFileSync(src, dest, constants.COPYFILE_EXCL);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    if (seedDestinationExists(dest)) return;
+    throw e;
+  }
+  chmodSync(dest, mode);
+}
+
 function writeRuntimeFile(dest, content, mode) {
   mkdirSync(dirname(dest), { recursive: true });
   atomicWrite(dest, content);
@@ -299,7 +333,7 @@ function noteRuntimeFile(src, dest) {
 }
 
 function noteRuntimeFileIfMissing(_src, dest) {
-  if (!existsSync(dest)) appendRuntimeChange("create", dest);
+  if (!seedDestinationExists(dest)) appendRuntimeChange("create", dest);
 }
 
 function noteTextFile(dest, content) {
@@ -901,8 +935,7 @@ async function deployRuntimeFiles() {
         for (const file of DATA_FILES) {
           const src = resolvePackagedRuntimeFile(`data/${file}`);
           const dest = join(FLITTERBOT_DIR, "data", file);
-          if (!src || existsSync(dest)) continue;
-          copyRuntimeFile(src, dest, 0o644);
+          if (src) copySeedFileIfAbsent(src, dest, 0o644);
         }
 
         for (const file of bundledSkillFiles) {
