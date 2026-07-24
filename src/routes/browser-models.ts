@@ -8,7 +8,7 @@ import type {
   ModelsListResponse,
   ModelsMutationResponse,
 } from "../contracts/index.ts";
-import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
+import { createPiModelRegistry, createPiModelRuntime } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -49,7 +49,7 @@ export async function handleBrowserModelsPinRoute(
       id,
       userLabel,
       current,
-      createPiModelRegistry(createPiAuthStorage()),
+      createPiModelRegistry(await createPiModelRuntime()),
     );
     if (!entry) {
       return sendJson(res, 400, {
@@ -91,7 +91,7 @@ export async function buildModelsListResponse(
 ): Promise<ModelsListResponse> {
   // ModelRegistry is the single source of truth: built-in catalog merged with
   // any custom providers/models declared in ~/.pi/agent/models.json.
-  const registry = createPiModelRegistry(createPiAuthStorage());
+  const registry = createPiModelRegistry(await createPiModelRuntime());
   const pinned = runtime.config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];

@@ -11,7 +11,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { FlitterbotConfig } from "../config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "../config/models.ts";
-import { createPiAuthStorage, createPiModelRegistry } from "../pi-auth.ts";
+import { createPiModelRuntime } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
 import { buildDefaultAgentPrompt, buildOrchestratorPrompt } from "../prompts/index.ts";
 import { createFlitterbotExtension, type FlitterbotTool } from "./flitterbot-extension.ts";
@@ -42,9 +42,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
 
-  const authStorage = createPiAuthStorage();
   const agentDir = config.piAgentDir;
-  const modelRegistry = createPiModelRegistry(authStorage);
+  const modelRuntime = await createPiModelRuntime();
   const settingsManager = SettingsManager.inMemory({
     compaction: { keepRecentTokens: 30_000 },
   });
@@ -68,7 +67,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
 
   const modelEntry = resumeSessionFile ? undefined : resolveModelEntry(config);
   const model = modelEntry
-    ? modelRegistry.find(modelEntry.provider, modelEntry.modelId)
+    ? modelRuntime.getModel(modelEntry.provider, modelEntry.modelId)
     : undefined;
   if (modelEntry && !model) {
     throw new Error(
@@ -98,9 +97,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     const services = await createAgentSessionServices({
       cwd: factoryOpts.cwd,
       agentDir: factoryOpts.agentDir,
-      authStorage,
       settingsManager,
-      modelRegistry,
+      modelRuntime,
       resourceLoaderOptions: {
         extensionFactories: [createFlitterbotExtension(customTools, additionalSkillPaths)],
         appendSystemPromptOverride: (base) => [rolePrompt, ...(memory ? [memory] : []), ...base],

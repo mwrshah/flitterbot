@@ -15,9 +15,9 @@
     "up:latest": "pnpm update $(jq -r '(.dependencies // {}) + (.devDependencies // {}) | to_entries[] | select(.value == \"latest\") | .key' package.json)"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.3",
+    "@biomejs/biome": "^2.5.5",
     "@types/node": "^25.9.5",
-    "knip": "^6.26.0",
+    "knip": "^6.29.0",
     "lefthook": "^2.1.10",
     "typescript": "^6.0.3"
   },

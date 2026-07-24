@@ -724,7 +724,7 @@ export class ControlSurfaceRuntime {
       return this.toPiSessionModelInfo(managed.modelInfo);
     }
 
-    const model = session.modelRegistry.find(modelEntry.provider, modelEntry.modelId);
+    const model = session.modelRuntime.getModel(modelEntry.provider, modelEntry.modelId);
     if (!model) {
       throw new Error(
         `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId}. ` +

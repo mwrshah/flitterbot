@@ -49,11 +49,11 @@ Let `$SKILL_DIR` be the directory the skill loader's "References are relative to
    python3 $SKILL_DIR/scripts/recall.py show CC
    ```
 
-4. *Escape clause*: if the candidate learning duplicates or trivially restates an existing entry under that code, skip — don't record. Report what it overlapped with and stop.
+4. *Reconcile*: skip duplicates. When the candidate overlaps an entry, replace it with a similarly concise instruction that incorporates the useful detail without contradiction. If the user's intent is unclear, ask before writing.
 
 5. *Compose* the situation label + body. Keep both short and faithful to the user's intent. The situation label is a tiny recall trigger, stating the situation in which to invoke, not the answer. Put the content in the body after the colon.
 
-6. *Append*:
+6. *Write*: if Step 4 reconciled an existing entry, edit that bullet in place and skip the append commands. Otherwise append:
    - *Reuse an existing code* — pass the explicit prefix:
      ```bash
      python3 $SKILL_DIR/scripts/learnings.py add "CC-situation: body"
