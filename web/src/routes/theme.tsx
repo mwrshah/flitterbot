@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Check, CircleAlert, Info, Monitor, Moon, Sun } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import { Button } from "~/components/common/button";
-import { useTheme } from "~/hooks/use-theme";
-import { cn } from "~/lib/utils";
+import { type Theme, useTheme } from "~/hooks/use-theme";
 
 export const Route = createFileRoute("/theme")({
   head: () => ({
@@ -11,138 +10,104 @@ export const Route = createFileRoute("/theme")({
   component: ThemeReferencePage,
 });
 
-type ThemeColor = {
+type ThemeToken = {
   name: string;
   role: string;
 };
 
-const surfaceColors: ThemeColor[] = [
-  { name: "background", role: "App canvas" },
-  { name: "card", role: "Raised content surface" },
-  { name: "popover", role: "Menus and floating surfaces" },
-  { name: "primary", role: "Primary actions and strong selection" },
-  { name: "secondary", role: "Secondary controls" },
-  { name: "muted", role: "Subtle fills and highlights" },
-  { name: "accent", role: "Hover, highlight, and selected items" },
-  { name: "destructive", role: "Errors and destructive actions" },
-];
-
-const textColors: ThemeColor[] = [
-  { name: "foreground", role: "Normal text" },
-  { name: "card-foreground", role: "Text on cards" },
-  { name: "popover-foreground", role: "Text on popovers" },
-  { name: "primary-foreground", role: "Text on primary fills" },
-  { name: "secondary-foreground", role: "Text on secondary fills" },
-  { name: "muted-foreground", role: "Secondary and muted text" },
-  { name: "accent-foreground", role: "Text on accent fills" },
-  { name: "destructive-foreground", role: "Text on destructive fills" },
-];
-
-const borderColors: ThemeColor[] = [
-  { name: "border", role: "Dividers and normal borders" },
-  { name: "input", role: "Form-control borders and fills" },
-  { name: "ring", role: "Keyboard focus rings" },
-];
-
-const sidebarColors: ThemeColor[] = [
-  { name: "sidebar", role: "Sidebar canvas" },
-  { name: "sidebar-foreground", role: "Sidebar text" },
-  { name: "sidebar-primary", role: "Sidebar primary action" },
-  { name: "sidebar-primary-foreground", role: "Text on sidebar primary" },
-  { name: "sidebar-accent", role: "Sidebar hover and highlight" },
-  { name: "sidebar-accent-foreground", role: "Text on sidebar accent" },
-  { name: "sidebar-border", role: "Sidebar borders" },
-  { name: "sidebar-ring", role: "Sidebar focus rings" },
-];
-
-const stateRecipes = [
+const tokenFamilies: Array<{
+  name: string;
+  description: string;
+  tokens: ThemeToken[];
+}> = [
   {
-    name: "Base surface",
-    classes: "bg-background text-foreground border-border",
-    className: "bg-background text-foreground border-border",
+    name: "Background",
+    description: "Page canvas and full-width regions.",
+    tokens: [
+      { name: "background", role: "Application canvas" },
+      { name: "background-muted", role: "Quiet regions and hover" },
+      { name: "background-selected", role: "Persistent selection" },
+      { name: "background-pop", role: "Exceptional emphasis" },
+    ],
   },
   {
-    name: "Subtle surface",
-    classes: "bg-muted text-muted-foreground border-border",
-    className: "bg-muted text-muted-foreground border-border",
+    name: "Card",
+    description: "Bounded, raised, floating, or grouped content.",
+    tokens: [
+      { name: "card", role: "Default bounded surface" },
+      { name: "card-muted", role: "Quiet card and hover" },
+      { name: "card-selected", role: "Selected card" },
+      { name: "card-pop", role: "High-emphasis card" },
+    ],
   },
   {
-    name: "Hover / highlight",
-    classes: "hover:bg-accent hover:text-accent-foreground",
-    className:
-      "bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground",
+    name: "Text",
+    description: "Readable hierarchy without opacity-based tiers.",
+    tokens: [
+      { name: "text", role: "Default foreground" },
+      { name: "text-muted", role: "Receding information" },
+      { name: "text-pop", role: "Expressive emphasis" },
+      { name: "text-contrast", role: "Text on pop surfaces" },
+      { name: "text-contrast-muted", role: "Muted text on pop surfaces" },
+    ],
   },
   {
-    name: "Selected item / tab",
-    classes: "bg-accent text-accent-foreground",
-    className: "bg-accent text-accent-foreground border-border",
-  },
-  {
-    name: "Primary selection",
-    classes: "bg-primary text-primary-foreground",
-    className: "bg-primary text-primary-foreground border-primary",
-  },
-  {
-    name: "Keyboard focus",
-    classes: "border-ring ring-3 ring-ring/50",
-    className: "bg-background text-foreground border-ring ring-3 ring-ring/50",
+    name: "Border",
+    description: "Structure, quiet separation, and strong focus.",
+    tokens: [
+      { name: "border", role: "Default structure" },
+      { name: "border-muted", role: "Subtle separation" },
+      { name: "border-pop", role: "Focus and emphasis" },
+    ],
   },
 ];
 
-function Code({ children }: { children: ReactNode }) {
+const utilities = ["bg", "text", "border", "ring", "fill", "stroke"];
+const themeOptions: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+function Code({ children, contrast = false }: { children: ReactNode; contrast?: boolean }) {
   return (
-    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+    <code
+      className={
+        contrast
+          ? "rounded bg-black/10 px-1.5 py-0.5 font-mono text-[11px] text-text-contrast-muted"
+          : "rounded bg-background-muted px-1.5 py-0.5 font-mono text-[11px] text-text-muted"
+      }
+    >
       {children}
     </code>
   );
 }
 
-function TokenCard({ token }: { token: ThemeColor }) {
+function TokenCard({ token }: { token: ThemeToken }) {
   const variable = `--${token.name}`;
   const swatchStyle = { backgroundColor: `var(${variable})` } as CSSProperties;
 
   return (
-    <article className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
-      <div className="h-16 border-b border-border" style={swatchStyle} />
-      <div className="space-y-3 p-3">
+    <article className="overflow-hidden rounded-xl border border-border-muted bg-card text-text shadow-sm">
+      <div
+        className="h-24 border-b border-border-muted"
+        style={swatchStyle}
+        aria-label={`${variable} color swatch`}
+      />
+      <div className="space-y-3 p-4">
         <div>
-          <h3 className="font-mono text-sm font-medium text-foreground">{token.name}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">{token.role}</p>
+          <h3 className="font-mono text-sm font-semibold text-text">{token.name}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">{token.role}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Code>bg-{token.name}</Code>
-          <Code>text-{token.name}</Code>
-          <Code>border-{token.name}</Code>
-          <Code>fill-{token.name}</Code>
-          <Code>stroke-{token.name}</Code>
+          {utilities.map((utility) => (
+            <Code key={utility}>
+              {utility}-{token.name}
+            </Code>
+          ))}
         </div>
-        <p className="font-mono text-[10px] text-muted-foreground/70">var({variable})</p>
       </div>
     </article>
-  );
-}
-
-function TokenSection({
-  title,
-  description,
-  tokens,
-}: {
-  title: string;
-  description: string;
-  tokens: ThemeColor[];
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {tokens.map((token) => (
-          <TokenCard key={token.name} token={token} />
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -150,90 +115,171 @@ function ThemeReferencePage() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <main className="h-full overflow-auto bg-background text-foreground">
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
-        <header className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Tailwind v4 · active theme: {resolvedTheme}
+    <main className="alternate-theme h-full overflow-auto bg-background text-text">
+      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
+        <header className="grid gap-8 border-b border-border-muted pb-10 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="max-w-3xl">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-text-pop">
+              Candidate 01 · {resolvedTheme}
             </p>
-            <h1 className="mt-1 text-2xl font-semibold text-foreground">Theme token reference</h1>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Live swatches from <Code>web/src/styles.css</Code>. Each semantic color supports
-              background, text, border, SVG fill, and SVG stroke utilities; append opacity such as
-              <Code> /50</Code> where needed.
+            <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-text sm:text-5xl">
+              Graphite &amp; Signal
+            </h1>
+            <p className="mt-4 max-w-2xl text-pretty text-base leading-7 text-text-muted">
+              A compact semantic color system for Flitterbot. Warm neutral surfaces keep long
+              sessions calm; amber is reserved for focus, exceptional emphasis, and moments that
+              need a clear signal.
             </p>
           </div>
+
           <div
-            className="flex gap-1 rounded-lg border border-border bg-muted/50 p-1"
-            aria-label="Theme"
+            className="flex w-fit gap-1 rounded-xl border border-border-muted bg-card p-1 shadow-sm"
+            aria-label="Theme appearance"
           >
-            {(["light", "dark", "system"] as const).map((option) => (
-              <Button
-                key={option}
-                size="sm"
-                variant={theme === option ? "default" : "ghost"}
-                onClick={() => setTheme(option)}
-                className="capitalize"
-              >
-                {option}
-              </Button>
-            ))}
+            {themeOptions.map(({ value, label, icon: Icon }) => {
+              const selected = theme === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setTheme(value)}
+                  className={
+                    selected
+                      ? "flex min-h-10 items-center gap-2 rounded-lg bg-background-selected px-3 text-sm font-medium text-text outline-none ring-border-pop focus-visible:ring-2"
+                      : "flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-text-muted outline-none hover:bg-background-muted hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
+                  }
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </header>
 
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Interaction recipes</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              State conventions currently composed from the master tokens. Hover the hover sample.
+        <section className="py-10" aria-labelledby="recipes-heading">
+          <div className="mb-5 max-w-2xl">
+            <h2 id="recipes-heading" className="text-xl font-semibold text-text">
+              Interaction recipes
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-text-muted">
+              Approved combinations keep routine states quiet and reserve pop for explicit focus or
+              exceptional emphasis.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {stateRecipes.map((recipe) => (
-              <div
-                key={recipe.name}
-                className={cn(
-                  "flex min-h-24 flex-col justify-between rounded-lg border p-3 transition-colors",
-                  recipe.className,
-                )}
-              >
-                <span className="text-sm font-medium">{recipe.name}</span>
-                <code className="mt-4 font-mono text-[10px] opacity-75">{recipe.classes}</code>
-              </div>
-            ))}
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
+              className="min-h-32 rounded-xl border border-border bg-card p-4 text-left outline-none hover:bg-card-muted focus-visible:ring-2 focus-visible:ring-border-pop"
+            >
+              <span className="block text-sm font-semibold text-text">Default → hover</span>
+              <span className="mt-2 block text-xs leading-5 text-text-muted">
+                Muted surfaces acknowledge an interaction without competing with content.
+              </span>
+              <span className="mt-5 block font-mono text-[10px] text-text-muted">
+                hover:bg-card-muted
+              </span>
+            </button>
+
+            <div className="min-h-32 rounded-xl border border-border bg-card-selected p-4">
+              <span className="flex items-center gap-2 text-sm font-semibold text-text">
+                <Check className="size-4" aria-hidden="true" /> Selected
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-text-muted">
+                A calm persistent state for streams, tabs, and navigation.
+              </span>
+              <span className="mt-5 block font-mono text-[10px] text-text-muted">
+                bg-card-selected
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="min-h-32 rounded-xl border border-border bg-card p-4 text-left outline-none ring-border-pop focus-visible:ring-2"
+            >
+              <span className="block text-sm font-semibold text-text">Keyboard focus</span>
+              <span className="mt-2 block text-xs leading-5 text-text-muted">
+                Press Tab to inspect the high-contrast focus boundary.
+              </span>
+              <span className="mt-5 block font-mono text-[10px] text-text-muted">
+                focus-visible:ring-border-pop
+              </span>
+            </button>
+
+            <div className="min-h-32 rounded-xl border border-border-pop bg-background-pop p-4 text-text-contrast">
+              <span className="block text-sm font-semibold">Pop</span>
+              <span className="mt-2 block text-xs leading-5 text-text-contrast-muted">
+                Visually expensive. Use for one exceptional point, never routine selection.
+              </span>
+              <span className="mt-5 block font-mono text-[10px] text-text-contrast-muted">
+                bg-background-pop text-text-contrast
+              </span>
+            </div>
           </div>
         </section>
 
-        <TokenSection
-          title="Surface fills"
-          description="Canvas, container, control, state, and destructive fills."
-          tokens={surfaceColors}
-        />
-        <TokenSection
-          title="Text colors"
-          description="Foreground pairs intended to sit on their matching fills."
-          tokens={textColors}
-        />
-        <TokenSection
-          title="Borders and focus"
-          description="The current schema has one general border, one input color, and one focus color."
-          tokens={borderColors}
-        />
-        <TokenSection
-          title="Sidebar"
-          description="A separate surface family for sidebar contrast and interaction states."
-          tokens={sidebarColors}
-        />
+        <div className="space-y-12 border-t border-border-muted pt-10">
+          {tokenFamilies.map((family) => (
+            <section key={family.name} aria-labelledby={`${family.name.toLowerCase()}-heading`}>
+              <div className="mb-5">
+                <h2
+                  id={`${family.name.toLowerCase()}-heading`}
+                  className="text-xl font-semibold text-text"
+                >
+                  {family.name}
+                </h2>
+                <p className="mt-1 text-sm text-text-muted">{family.description}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {family.tokens.map((token) => (
+                  <TokenCard key={token.name} token={token} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
 
-        <section className="rounded-lg border border-border bg-muted/40 p-4">
-          <h2 className="text-sm font-semibold text-foreground">Schema gaps</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            There are no dedicated semantic tokens for selected, hover, success, warning, info,
-            subtly accented text, or strong/subtle borders. Those states currently reuse accent,
-            muted, primary, opacity modifiers, or raw Tailwind palette colors.
-          </p>
+        <section className="mt-12 grid overflow-hidden rounded-2xl border border-border-muted bg-card lg:grid-cols-2">
+          <div className="p-6 sm:p-8">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-text-pop">
+              Governance
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-text">One vocabulary, reviewed here</h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-text-muted">
+              Feature code uses these semantic utilities instead of raw palette shades, arbitrary
+              values, or literal colors. New roles enter the theme here before they enter the app.
+            </p>
+          </div>
+          <div className="grid gap-3 border-t border-border-muted bg-card-muted p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-card p-3">
+              <Info className="mt-0.5 size-4 shrink-0 text-text-pop" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-text">
+                  Status stays outside the core palette
+                </p>
+                <p className="mt-1 text-xs leading-5 text-text-muted">
+                  Icons and labels carry meaning; dedicated status colors can be registered later.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-card p-3 opacity-55">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-text">Disabled is a state, not a color</p>
+                <p className="mt-1 text-xs leading-5 text-text-muted">
+                  Preserve the semantic pairing and reduce the whole control’s prominence.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
+
+        <footer className="mt-10 border-t border-border-muted pt-6 text-xs leading-5 text-text-muted">
+          Live source: <Code>web/src/alternate-theme.css</Code>. Every token exposes background,
+          text, border, ring, fill, and stroke utilities.
+        </footer>
       </div>
     </main>
   );

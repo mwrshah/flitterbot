@@ -1,0 +1,76 @@
+/*
+ * Candidate semantic color system. Scope it to .alternate-theme until the
+ * reference is approved and application surfaces are migrated.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-muted: var(--background-muted);
+  --color-background-selected: var(--background-selected);
+  --color-background-pop: var(--background-pop);
+
+  --color-card: var(--card);
+  --color-card-muted: var(--card-muted);
+  --color-card-selected: var(--card-selected);
+  --color-card-pop: var(--card-pop);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-pop: var(--text-pop);
+  --color-text-contrast: var(--text-contrast);
+  --color-text-contrast-muted: var(--text-contrast-muted);
+
+  --color-border: var(--border);
+  --color-border-muted: var(--border-muted);
+  --color-border-pop: var(--border-pop);
+}
+
+@source inline("{bg,text,border,ring,fill,stroke}-{background,background-muted,background-selected,background-pop,card,card-muted,card-selected,card-pop,text,text-muted,text-pop,text-contrast,text-contrast-muted,border,border-muted,border-pop}");
+
+.alternate-theme {
+  color-scheme: light;
+
+  --background: oklch(0.975 0.008 80);
+  --background-muted: oklch(0.945 0.014 80);
+  --background-selected: oklch(0.91 0.035 80);
+  --background-pop: oklch(0.79 0.17 78);
+
+  --card: oklch(0.995 0.004 80);
+  --card-muted: oklch(0.96 0.012 80);
+  --card-selected: oklch(0.925 0.03 80);
+  --card-pop: oklch(0.735 0.165 70);
+
+  --text: oklch(0.235 0.025 255);
+  --text-muted: oklch(0.49 0.025 255);
+  --text-pop: oklch(0.5 0.145 55);
+  --text-contrast: oklch(0.19 0.03 255);
+  --text-contrast-muted: oklch(0.35 0.035 255);
+
+  --border: oklch(0.78 0.025 75);
+  --border-muted: oklch(0.875 0.018 75);
+  --border-pop: oklch(0.61 0.16 62);
+}
+
+.dark .alternate-theme {
+  color-scheme: dark;
+
+  --background: oklch(0.165 0.018 255);
+  --background-muted: oklch(0.205 0.02 255);
+  --background-selected: oklch(0.27 0.035 70);
+  --background-pop: oklch(0.76 0.16 76);
+
+  --card: oklch(0.205 0.02 255);
+  --card-muted: oklch(0.245 0.022 255);
+  --card-selected: oklch(0.305 0.04 70);
+  --card-pop: oklch(0.69 0.16 67);
+
+  --text: oklch(0.94 0.012 80);
+  --text-muted: oklch(0.705 0.02 80);
+  --text-pop: oklch(0.82 0.14 78);
+  --text-contrast: oklch(0.18 0.03 255);
+  --text-contrast-muted: oklch(0.34 0.035 255);
+
+  --border: oklch(0.38 0.025 255);
+  --border-muted: oklch(0.3 0.022 255);
+  --border-pop: oklch(0.72 0.15 75);
+}
