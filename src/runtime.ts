@@ -2766,7 +2766,7 @@ function extractFinalAssistantMessage(
   if (!session.messages.length) return undefined;
   for (let i = session.messages.length - 1; i >= 0; i--) {
     const msg = session.messages[i];
-    if (!msg || msg.role !== "assistant") continue;
+    if (msg?.role !== "assistant") continue;
     const assistantMsg = msg as AssistantMessage;
     const messageId = assistantMsg.responseId?.trim() || undefined;
     const textParts = assistantMsg.content

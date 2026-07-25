@@ -35,7 +35,7 @@ export async function sendMessageToClaudeSession(
     return { ok: false, reason: "tmux_session_missing", uiState: "MISSING" };
   }
 
-  if (!before.pane || before.pane.currentCommand !== "claude") {
+  if (before.pane?.currentCommand !== "claude") {
     return { ok: false, reason: "no_live_claude", uiState: before.pane?.uiState ?? "NO_CLAUDE" };
   }
 

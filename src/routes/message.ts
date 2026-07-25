@@ -88,7 +88,7 @@ async function routeMessage(
         runtime.blackboard,
         `flitterbot: ${whatsappUserId}`,
       );
-      if (!userDefaultStream || userDefaultStream.status !== "open") {
+      if (userDefaultStream?.status !== "open") {
         throw new Error(`Missing open default stream for WhatsApp user: ${whatsappUserId}`);
       }
       fallback = {
