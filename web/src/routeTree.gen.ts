@@ -9,21 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RuntimeRouteImport } from './routes/runtime'
 import { Route as ThemeRouteImport } from './routes/theme'
+import { Route as RuntimeRouteImport } from './routes/runtime'
 import { Route as StreamsRouteRouteImport } from './routes/streams.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamsIndexRouteImport } from './routes/streams.index'
 import { Route as StreamsPiSessionIdRouteImport } from './routes/streams.$piSessionId'
 
-const RuntimeRoute = RuntimeRouteImport.update({
-  id: '/runtime',
-  path: '/runtime',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ThemeRoute = ThemeRouteImport.update({
   id: '/theme',
   path: '/theme',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RuntimeRoute = RuntimeRouteImport.update({
+  id: '/runtime',
+  path: '/runtime',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StreamsRouteRoute = StreamsRouteRouteImport.update({
@@ -74,7 +74,12 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/streams' | '/runtime' | '/theme' | '/streams/$piSessionId' | '/streams/'
+    | '/'
+    | '/streams'
+    | '/runtime'
+    | '/theme'
+    | '/streams/$piSessionId'
+    | '/streams/'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/runtime' | '/theme' | '/streams/$piSessionId' | '/streams'
   id:
@@ -96,18 +101,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/runtime': {
-      id: '/runtime'
-      path: '/runtime'
-      fullPath: '/runtime'
-      preLoaderRoute: typeof RuntimeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/theme': {
       id: '/theme'
       path: '/theme'
       fullPath: '/theme'
       preLoaderRoute: typeof ThemeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runtime': {
+      id: '/runtime'
+      path: '/runtime'
+      fullPath: '/runtime'
+      preLoaderRoute: typeof RuntimeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/streams': {
