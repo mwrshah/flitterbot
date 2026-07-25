@@ -1,5 +1,7 @@
 import type http from "node:http";
 
+export class InvalidJsonBodyError extends Error {}
+
 export async function readJsonBody<T = unknown>(req: http.IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -7,7 +9,12 @@ export async function readJsonBody<T = unknown>(req: http.IncomingMessage): Prom
   }
   if (chunks.length === 0) return {} as T;
   const raw = Buffer.concat(chunks).toString("utf8").trim();
-  return raw ? (JSON.parse(raw) as T) : ({} as T);
+  if (!raw) return {} as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new InvalidJsonBodyError("Invalid JSON body");
+  }
 }
 
 export function sendJson(res: http.ServerResponse, statusCode: number, body: unknown): void {

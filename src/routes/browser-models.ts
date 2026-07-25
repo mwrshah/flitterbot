@@ -8,7 +8,7 @@ import type {
   ModelsListResponse,
   ModelsMutationResponse,
 } from "../contracts/index.ts";
-import { createPiModelRegistry, createPiModelRuntime } from "../pi-auth.ts";
+import { createPiModelRegistry } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -45,12 +45,7 @@ export async function handleBrowserModelsPinRoute(
     if (current.some((m) => m.id === id)) {
       return sendJson(res, 200, await buildModelsMutationResponse(runtime));
     }
-    const entry = buildEntryFromId(
-      id,
-      userLabel,
-      current,
-      createPiModelRegistry(await createPiModelRuntime()),
-    );
+    const entry = buildEntryFromId(id, userLabel, current, await getModelRegistry(runtime));
     if (!entry) {
       return sendJson(res, 400, {
         ok: false,
@@ -90,8 +85,8 @@ export async function buildModelsListResponse(
   runtime: ControlSurfaceRuntime,
 ): Promise<ModelsListResponse> {
   // ModelRegistry is the single source of truth: built-in catalog merged with
-  // any custom providers/models declared in ~/.pi/agent/models.json.
-  const registry = createPiModelRegistry(await createPiModelRuntime());
+  // any custom providers/models declared in ~/.flitterbot/control-surface/agent/models.json.
+  const registry = await getModelRegistry(runtime);
   const pinned = runtime.config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
@@ -116,6 +111,10 @@ export async function buildModelsMutationResponse(
     ok: true,
     ...(await buildModelsListResponse(runtime)),
   };
+}
+
+async function getModelRegistry(runtime: ControlSurfaceRuntime): Promise<ModelRegistry> {
+  return createPiModelRegistry(await runtime.resolveModelRuntime());
 }
 
 function buildCatalogModelItem(model: Model<Api>, registry: ModelRegistry): ModelListItem {

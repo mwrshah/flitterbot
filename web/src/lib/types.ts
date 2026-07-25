@@ -224,6 +224,65 @@ export type DirectoryCompletionsResponse = {
   query: string;
 };
 
+export type AuthMethodType = "oauth" | "api_key";
+
+export type AuthProviderMethod = {
+  type: AuthMethodType;
+  name: string;
+  loginLabel?: string;
+};
+
+export type AuthProvider = {
+  id: string;
+  name: string;
+  methods: AuthProviderMethod[];
+  credentialType?: AuthMethodType;
+};
+
+export type AuthFlowStatus = "running" | "succeeded" | "failed" | "cancelled";
+
+export type AuthPromptType = "text" | "secret" | "select" | "manual_code";
+
+export type AuthPromptOption = {
+  id: string;
+  label: string;
+  description?: string;
+};
+
+export type AuthPrompt = {
+  id: string;
+  type: AuthPromptType;
+  message: string;
+  placeholder?: string;
+  options?: AuthPromptOption[];
+};
+
+export type AuthEvent =
+  | { type: "info"; message: string; links?: readonly { url: string; label?: string }[] }
+  | { type: "auth_url"; url: string; instructions?: string }
+  | {
+      type: "device_code";
+      userCode: string;
+      verificationUri: string;
+      intervalSeconds?: number;
+      expiresInSeconds?: number;
+    }
+  | { type: "progress"; message: string };
+
+export type AuthFlowSnapshot = {
+  id: string;
+  status: AuthFlowStatus;
+  providerId: string;
+  authType: AuthMethodType;
+  events: AuthEvent[];
+  prompt?: AuthPrompt;
+  error?: string;
+};
+
+export type AuthProvidersResponse = {
+  providers: AuthProvider[];
+};
+
 export type WsMessage =
   | { type: "connected"; clientId: string }
   | { type: "queue_item_start"; item: { id: string; source: string }; piSessionId?: string }

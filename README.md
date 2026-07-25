@@ -23,7 +23,7 @@ Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 
 ## Config
 
-`.env`: `GROQ_API_KEY` required (classifier); `ANTHROPIC_API_KEY` optional (falls back to Pi OAuth via `pi` → `/login`).
+`.env`: `GROQ_API_KEY` required for classification. Model-provider credentials are configured from *Settings → Accounts & Model providers* in the Flitterbot web UI, or supplied through provider environment variables such as `ANTHROPIC_API_KEY`.
 
 Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. The user-facing prompt knobs are:
 
@@ -33,7 +33,7 @@ Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. T
 - `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
 - `learningsNotePath` — Markdown document used by the bundled `learnings` skill.
 
-Pi uses `~/.agents` as its agent directory, loading its global instructions, skills, extensions, prompts, and themes natively. Flitterbot additionally loads skills from `~/.claude/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. The installer seeds the always-loaded memory index at `~/.flitterbot/data/MEMORY.md` without overwriting user edits; the full learnings document remains independently configured by `learningsNotePath`. Pi auth and custom models live at `~/.pi/agent`. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
+Flitterbot uses `~/.agents` as its agent resource directory, loading global instructions, skills, extensions, prompts, and themes through the bundled Pi SDK. It additionally loads skills from `~/.claude/skills`, bundled `~/.flitterbot/skills`, then `extraSkillPaths`. The installer seeds the always-loaded memory index at `~/.flitterbot/data/MEMORY.md` without overwriting user edits; the full learnings document remains independently configured by `learningsNotePath`. Provider credentials, custom models, and the dynamic model catalog cache live at `~/.flitterbot/control-surface/agent`. Tasks are managed through Flitterbot's bundled task API at `~/.flitterbot/data/tasks`; local notes live under `~/.flitterbot/data/notes`.
 
 ## Commands
 

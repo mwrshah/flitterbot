@@ -34,7 +34,7 @@ export function resolveModelEntry(config: FlitterbotConfig, modelId?: string): M
 // separates provider from modelId, so multi-segment model slugs like
 // "truefoundry/claude-group/claude-sonnet-4-6" resolve to provider="truefoundry".
 // Existence is validated later against the Pi ModelRegistry (built-in catalog +
-// ~/.pi/agent/models.json), not here.
+// ~/.flitterbot/control-surface/agent/models.json), not here.
 function resolveCompositeId(compositeId: string): ModelConfigEntry | null {
   const slashIdx = compositeId.indexOf("/");
   if (slashIdx <= 0 || slashIdx === compositeId.length - 1) return null;

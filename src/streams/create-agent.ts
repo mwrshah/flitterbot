@@ -43,7 +43,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
 
   const agentDir = config.piAgentDir;
-  const modelRuntime = await createPiModelRuntime();
+  const modelRuntime = await createPiModelRuntime(config.controlSurfaceAgentDir);
   const settingsManager = SettingsManager.inMemory({
     compaction: { keepRecentTokens: 30_000 },
   });
@@ -72,7 +72,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   if (modelEntry && !model) {
     throw new Error(
       `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id}). ` +
-        `Not in the built-in catalog or ~/.pi/agent/models.json.`,
+        `Not in the built-in catalog or ~/.flitterbot/control-surface/agent/models.json.`,
     );
   }
   const effectiveThinkingLevel = modelEntry

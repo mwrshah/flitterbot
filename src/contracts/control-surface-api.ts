@@ -272,6 +272,55 @@ export interface DirectoryCompletionsResponse {
   query: string;
 }
 
+export type ProviderAuthType = "oauth" | "api_key";
+
+export interface AuthProviderMethod {
+  type: ProviderAuthType;
+  name: string;
+  loginLabel?: string;
+}
+
+export interface AuthProvider {
+  id: string;
+  name: string;
+  methods: AuthProviderMethod[];
+  credentialType?: ProviderAuthType;
+}
+
+export interface AuthProvidersResponse {
+  providers: AuthProvider[];
+}
+
+export type AuthFlowEvent =
+  | { type: "info"; message: string; links?: readonly { url: string; label?: string }[] }
+  | { type: "auth_url"; url: string; instructions?: string }
+  | {
+      type: "device_code";
+      userCode: string;
+      verificationUri: string;
+      intervalSeconds?: number;
+      expiresInSeconds?: number;
+    }
+  | { type: "progress"; message: string };
+
+export interface AuthFlowPrompt {
+  id: string;
+  type: "text" | "secret" | "select" | "manual_code";
+  message: string;
+  placeholder?: string;
+  options?: readonly { id: string; label: string; description?: string }[];
+}
+
+export interface AuthFlowSnapshot {
+  id: string;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  providerId: string;
+  authType: ProviderAuthType;
+  events: AuthFlowEvent[];
+  prompt?: AuthFlowPrompt;
+  error?: string;
+}
+
 export interface StopResponse {
   ok: boolean;
   message: string;

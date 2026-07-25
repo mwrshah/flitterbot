@@ -1,4 +1,7 @@
 import type {
+  AuthFlowSnapshot,
+  AuthMethodType,
+  AuthProvidersResponse,
   DirectMessageResponse,
   DirectoryCompletionsResponse,
   ModelsListResponse,
@@ -160,6 +163,33 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       if (piSessionId) params.set("piSessionId", piSessionId);
       return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
     },
+
+    listAuthProviders: () => request<AuthProvidersResponse>("/api/auth/providers"),
+
+    startAuthLogin: (providerId: string, authType: AuthMethodType) =>
+      request<AuthFlowSnapshot>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ providerId, authType }),
+      }),
+
+    getAuthFlow: (flowId: string) =>
+      request<AuthFlowSnapshot>(`/api/auth/flows/${encodeURIComponent(flowId)}`),
+
+    respondAuthFlow: (flowId: string, promptId: string, value: string) =>
+      request<AuthFlowSnapshot>(`/api/auth/flows/${encodeURIComponent(flowId)}/respond`, {
+        method: "POST",
+        body: JSON.stringify({ promptId, value }),
+      }),
+
+    cancelAuthFlow: (flowId: string) =>
+      request<AuthFlowSnapshot>(`/api/auth/flows/${encodeURIComponent(flowId)}`, {
+        method: "DELETE",
+      }),
+
+    logoutAuthProvider: (providerId: string) =>
+      request<{ ok: true }>(`/api/auth/providers/${encodeURIComponent(providerId)}`, {
+        method: "DELETE",
+      }),
 
     getUserConfig: (userId: string) =>
       request<{ config: Record<string, string> }>(`/api/user-config/${userId}`),
