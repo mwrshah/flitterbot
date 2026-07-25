@@ -192,17 +192,22 @@ export function getLatestStreamCreatedAt(
   return row?.created_at;
 }
 
-export const RECENTLY_CLOSED_WINDOW_HOURS = 24 * 7;
+export const CLOSED_STREAM_LOOKBACK_HOURS = 24 * 7;
 
-export function listRecentlyClosedStreams(
+export function listClosedStreams(
   db: BlackboardDatabase,
   withinHours: number,
+  includePinnedBeyondLookback: boolean,
 ): StreamRow[] {
   return db.all<StreamRow>(
     `SELECT * FROM streams
 			 WHERE status = 'closed'
-			   AND datetime(closed_at) >= datetime('now', '-' || ? || ' hours')
+			   AND (
+			     (? = 1 AND pinned = 1)
+			     OR datetime(closed_at) >= datetime('now', '-' || ? || ' hours')
+			   )
 			 ORDER BY pinned DESC, closed_at DESC`,
+    includePinnedBeyondLookback ? 1 : 0,
     withinHours,
   );
 }

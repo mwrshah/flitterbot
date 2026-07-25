@@ -27,14 +27,14 @@ import {
   updateSessionStop,
 } from "./blackboard/query-sessions.ts";
 import {
+  CLOSED_STREAM_LOOKBACK_HOURS,
   getActivePiSessionId,
   getLatestPiSessionId,
   getPiSessionStatus,
   getStreamById,
   getStreamByName,
+  listClosedStreams,
   listOpenStreams,
-  listRecentlyClosedStreams,
-  RECENTLY_CLOSED_WINDOW_HOURS,
   reopenStream as reopenStreamRow,
   resetClosedStreams,
   setStreamName,
@@ -857,9 +857,10 @@ export class ControlSurfaceRuntime {
       stream,
       piSessionId: getActivePiSessionId(this.blackboard, stream.id),
     }));
-    const closedStreams = listRecentlyClosedStreams(
+    const closedStreams = listClosedStreams(
       this.blackboard,
-      RECENTLY_CLOSED_WINDOW_HOURS,
+      CLOSED_STREAM_LOOKBACK_HOURS,
+      true,
     ).map((stream) => ({
       stream,
       piSessionId: getLatestPiSessionId(this.blackboard, stream.id),

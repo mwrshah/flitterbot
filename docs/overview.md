@@ -25,7 +25,7 @@ Default agent creates streams via `create_stream` — inserts a SQLite row, spaw
 
 The orchestrator enriches the stream (repo, git worktree via `set_up_worktree`), launches Claude Code sessions in tmux, and coordinates waves through prompt-based delegation. On completion, `close_stream` merges to the confirmed base branch, pushes when permitted by the close flow, closes the row, and the runtime destroys the orchestrator.
 
-Soft-deleted: `status` flips to `closed` with `closed_at`. Recently closed streams (7d) are stored for status reporting and reopening via API.
+Soft-deleted: `status` flips to `closed` with `closed_at`. Closed streams remain visible in the sidebar for 7 days, while pinned streams remain visible there regardless of age. Aggregated Surface history retains the 7-day cutoff.
 
 ### Claude Code Feedback Loop
 
@@ -231,7 +231,7 @@ Installer → Blackboard → WhatsApp Channel ──┐
 
 ### Workstreams
 
-`open` (active, optional repo/worktree) · `closed` (soft-deleted with `closed_at`; retained 7d for status reporting and reopening).
+`open` (active, optional repo/worktree) · `closed` (soft-deleted with `closed_at`; visible for 7d, or indefinitely while pinned, for status reporting and reopening).
 
 ## Design Principles
 
