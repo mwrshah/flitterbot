@@ -38,6 +38,7 @@ import {
 } from "~/components/ui/dialog";
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -51,6 +52,7 @@ import {
 } from "~/lib/global-shortcuts";
 import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
+import type { StreamRecoveryKind } from "~/lib/stream-recovery";
 import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
@@ -110,7 +112,7 @@ type ChatPanelProps = {
   streamHasWorktree?: boolean;
   selectedModelId?: string;
   selectedThinkingLevel?: ThinkingLevel;
-  recoveryKind?: "closed" | "dead";
+  recoveryKind?: StreamRecoveryKind;
 };
 
 function QueuedBusyOverlay({ text }: { text: string }) {
@@ -422,17 +424,7 @@ export function ChatPanel({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
   });
 
-  const recoverMutation = useMutation({
-    mutationFn: () => apiClient.reopenStream(streamId!),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
-    onError: (error) => {
-      toast.error(
-        `Failed to ${recoveryKind === "dead" ? "recover" : "reopen"}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    },
-  });
+  const recoverMutation = useReopenStream();
 
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
@@ -931,7 +923,11 @@ export function ChatPanel({
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}
             recoveryKind={effectiveRecoveryKind}
-            onRecover={() => recoverMutation.mutate()}
+            onRecover={() => {
+              if (streamId && effectiveRecoveryKind) {
+                recoverMutation.mutate({ streamId, recoveryKind: effectiveRecoveryKind });
+              }
+            }}
             hoverButtons={inputHoverButtons}
             internalCommandScope={
               !streamId || streamType === "defaultStream" ? "default-stream" : "work-stream"

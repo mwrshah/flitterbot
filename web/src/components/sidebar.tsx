@@ -15,9 +15,11 @@ import {
 import { useModifierLabel } from "~/hooks/platform";
 import { useCreateStream } from "~/hooks/use-create-stream";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
+import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { SHORTCUT_ACTIONS, useShortcutBindingLabel } from "~/lib/global-shortcuts";
 import { statusQueryOptions } from "~/lib/queries";
+import { getStreamRecoveryKind } from "~/lib/stream-recovery";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -82,6 +84,7 @@ function StreamContextMenu({
   disabled,
   onTogglePinned,
   onRename,
+  onReopen,
   onClose,
   renderTrigger,
 }: {
@@ -89,6 +92,7 @@ function StreamContextMenu({
   disabled: boolean;
   onTogglePinned: () => void;
   onRename: (name: string) => void;
+  onReopen?: () => void;
   onClose?: () => void;
   renderTrigger: (label: ReactNode) => ReactElement;
 }) {
@@ -171,6 +175,11 @@ function StreamContextMenu({
         <ContextMenuItem disabled={disabled} onClick={onTogglePinned}>
           {stream.pinned ? "Unpin stream" : "Pin stream"}
         </ContextMenuItem>
+        {onReopen && (
+          <ContextMenuItem disabled={disabled} onClick={onReopen}>
+            Reopen stream
+          </ContextMenuItem>
+        )}
         {onClose && (
           <ContextMenuItem disabled={disabled} onClick={onClose}>
             Close stream
@@ -241,6 +250,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   const createStreamMutation = useCreateStream();
+  const reopenStreamMutation = useReopenStream();
 
   const status = statusQuery.data;
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
@@ -350,16 +360,21 @@ export const Sidebar = memo(function Sidebar() {
                 )}
                 {openStreams.map((ws) => {
                   const piSessionId = ws.piSessionId;
+                  const recoveryKind = getStreamRecoveryKind(ws);
+                  const onReopen = recoveryKind
+                    ? () => reopenStreamMutation.mutate({ streamId: ws.id, recoveryKind })
+                    : undefined;
 
                   return piSessionId ? (
                     <StreamContextMenu
                       key={ws.id}
                       stream={ws}
-                      disabled={pinStreamMutation.isPending}
+                      disabled={pinStreamMutation.isPending || reopenStreamMutation.isPending}
                       onTogglePinned={() =>
                         pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                       }
                       onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      onReopen={onReopen}
                       onClose={() => closeStreamMutation.mutate(ws.id)}
                       renderTrigger={(label) => (
                         <Link
@@ -415,11 +430,12 @@ export const Sidebar = memo(function Sidebar() {
                     <StreamContextMenu
                       key={ws.id}
                       stream={ws}
-                      disabled={pinStreamMutation.isPending}
+                      disabled={pinStreamMutation.isPending || reopenStreamMutation.isPending}
                       onTogglePinned={() =>
                         pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                       }
                       onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      onReopen={onReopen}
                       onClose={() => closeStreamMutation.mutate(ws.id)}
                       renderTrigger={(label) => (
                         <div className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40">
@@ -455,16 +471,21 @@ export const Sidebar = memo(function Sidebar() {
               <div className="space-y-1">
                 {closedStreams.map((ws) => {
                   const piSessionId = ws.piSessionId;
+                  const recoveryKind = getStreamRecoveryKind(ws);
+                  const onReopen = recoveryKind
+                    ? () => reopenStreamMutation.mutate({ streamId: ws.id, recoveryKind })
+                    : undefined;
 
                   return piSessionId ? (
                     <StreamContextMenu
                       key={ws.id}
                       stream={ws}
-                      disabled={pinStreamMutation.isPending}
+                      disabled={pinStreamMutation.isPending || reopenStreamMutation.isPending}
                       onTogglePinned={() =>
                         pinStreamMutation.mutate({ streamId: ws.id, pinned: !ws.pinned })
                       }
                       onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
+                      onReopen={onReopen}
                       renderTrigger={(label) => (
                         <Link
                           to="/streams/$piSessionId"

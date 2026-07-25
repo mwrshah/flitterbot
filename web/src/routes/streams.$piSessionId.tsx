@@ -20,6 +20,7 @@ import {
   streamsHistoryQueryOptions,
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
+import { getStreamRecoveryKind } from "~/lib/stream-recovery";
 import { getBestStreamPiSessionId, isKnownStreamPiSession } from "~/lib/stream-route-targets";
 import type { StatusResponse } from "~/lib/types";
 
@@ -110,13 +111,7 @@ function PiSessionRoute() {
     });
   }, [isDefaultSession, navigate, piSessionId, status, stream]);
 
-  const recoveryKind: "closed" | "dead" | undefined = isDefaultSession
-    ? undefined
-    : stream?.status === "closed"
-      ? "closed"
-      : stream?.piSessionStatus === "ended" || stream?.piSessionStatus === "crashed"
-        ? "dead"
-        : undefined;
+  const recoveryKind = isDefaultSession ? undefined : getStreamRecoveryKind(stream);
   const selectedModel = isDefaultSession ? status?.piAgent?.default?.model : stream?.model;
 
   const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
