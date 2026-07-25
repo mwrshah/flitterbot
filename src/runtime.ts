@@ -5,8 +5,9 @@ import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { ProviderAuthManager } from "./auth/provider-auth.ts";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
 import {
   getLastDatetimeReportedAt,
@@ -69,6 +70,7 @@ import type {
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
+import { createPiModelRuntime } from "./pi-auth.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
 import { nextForkName } from "./streams/fork-name.ts";
@@ -115,6 +117,7 @@ export class ControlSurfaceRuntime {
   readonly startedAt = Date.now();
   readonly wsHub: WebSocketHub;
   readonly sessionManager: PiSessionManager;
+  readonly providerAuth: ProviderAuthManager;
   server?: http.Server;
   private stopping = false;
   private maintenanceTimer?: NodeJS.Timeout;
@@ -149,14 +152,25 @@ export class ControlSurfaceRuntime {
       this.processQueueItem.bind(this),
       this.log.bind(this),
     );
+    this.providerAuth = new ProviderAuthManager(() => this.resolveModelRuntime());
   }
 
   attachServer(server: http.Server): void {
     this.server = server;
   }
 
+  async resolveModelRuntime(): Promise<ModelRuntime> {
+    return (
+      this.sessionManager.getDefault()?.runtime?.services.modelRuntime ??
+      createPiModelRuntime(this.config.controlSurfaceAgentDir)
+    );
+  }
+
   async start(): Promise<void> {
     this.ensurePidFile();
+    await createPiModelRuntime(this.config.controlSurfaceAgentDir, {
+      allowModelNetwork: true,
+    });
 
     // Legacy work streams predate per-user ownership; in a single-user history they were all the
     // owner's, so adopt unowned work streams to the configured default user for owner-scoped routing.
@@ -250,6 +264,7 @@ export class ControlSurfaceRuntime {
     this.log(`runtime stopping: ${reason}`);
     if (this.maintenanceTimer) clearInterval(this.maintenanceTimer);
     this.unwatchWhatsAppStatusSignal();
+    this.providerAuth.stop();
     this.sessionManager.disposeAll();
     try {
       await this.stopWhatsAppDaemon();
@@ -728,7 +743,7 @@ export class ControlSurfaceRuntime {
     if (!model) {
       throw new Error(
         `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId}. ` +
-          `Not in the built-in catalog or ~/.pi/agent/models.json.`,
+          `Not in the built-in catalog or ~/.flitterbot/control-surface/agent/models.json.`,
       );
     }
 

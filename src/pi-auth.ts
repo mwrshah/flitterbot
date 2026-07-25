@@ -1,13 +1,15 @@
-import os from "node:os";
 import path from "node:path";
 import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
-const PI_AGENT_DIR = path.join(os.homedir(), ".pi", "agent");
-
-export function createPiModelRuntime(): Promise<ModelRuntime> {
+export function createPiModelRuntime(
+  agentDir: string,
+  options?: { allowModelNetwork?: boolean },
+): Promise<ModelRuntime> {
   return ModelRuntime.create({
-    authPath: path.join(PI_AGENT_DIR, "auth.json"),
-    modelsPath: path.join(PI_AGENT_DIR, "models.json"),
+    authPath: path.join(agentDir, "auth.json"),
+    modelsPath: path.join(agentDir, "models.json"),
+    modelsStorePath: path.join(agentDir, "models-store.json"),
+    allowModelNetwork: options?.allowModelNetwork,
   });
 }
 

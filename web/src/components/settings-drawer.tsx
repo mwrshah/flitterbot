@@ -1,5 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useEffect } from "react";
+import { AuthProvidersSection } from "~/components/auth-providers-section";
 import { Button } from "~/components/common/button";
 import { Input } from "~/components/common/input";
 import { useTheme } from "~/hooks/use-theme";
@@ -52,7 +53,9 @@ export const SettingsDrawer = memo(function SettingsDrawer({
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-sm font-semibold">Settings</h2>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close settings"
             className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none"
           >
             &times;
@@ -68,6 +71,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               {themeOptions.map((opt) => (
                 <button
                   key={opt.value}
+                  type="button"
                   onClick={() => setTheme(opt.value)}
                   className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     theme === opt.value
@@ -123,6 +127,8 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               <span className="text-xs">Use stub fallback when localhost unavailable</span>
             </label>
           </section>
+
+          <AuthProvidersSection />
         </div>
 
         <div className="px-5 py-4 border-t border-border">

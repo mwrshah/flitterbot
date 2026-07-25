@@ -12,7 +12,7 @@ import {
   type HookRouteEventName,
   ROUTE_EVENT_TO_HOOK_EVENT,
 } from "./contracts/index.ts";
-import { sendJson } from "./routes/_shared.ts";
+import { InvalidJsonBodyError, sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
 import { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./routes/browser-models.ts";
 import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
@@ -43,6 +43,14 @@ import {
   handlePiSessionThinkingLevelRoute,
 } from "./routes/pi-session-model.ts";
 import { handlePinStreamRoute } from "./routes/pin-stream.ts";
+import {
+  handleAuthFlowCancelRoute,
+  handleAuthFlowResponseRoute,
+  handleAuthFlowRoute,
+  handleAuthLoginRoute,
+  handleAuthLogoutRoute,
+  handleAuthProvidersRoute,
+} from "./routes/provider-auth.ts";
 import { handlePruneStreamHistoryRoute } from "./routes/prune-stream-history.ts";
 import { handleRenameStreamRoute } from "./routes/rename-stream.ts";
 import { handleReopenStreamRoute } from "./routes/reopen-stream.ts";
@@ -109,6 +117,10 @@ function createServer(runtime: ControlSurfaceRuntime): http.Server {
     try {
       await routeRequest(runtime, req, res);
     } catch (error) {
+      if (error instanceof InvalidJsonBodyError) {
+        sendJson(res, 400, { ok: false, error: error.message });
+        return;
+      }
       runtime.log(`unhandled route error: ${errorDetail(error)}`);
       sendJson(res, 500, { ok: false, error: errorMessage(error) });
     }
@@ -124,7 +136,7 @@ function createServer(runtime: ControlSurfaceRuntime): http.Server {
 
 function applyCorsHeaders(res: http.ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 }
 
@@ -140,6 +152,35 @@ async function routeRequest(
   );
   const pathname = url.pathname;
   const segments = pathname.split("/").filter(Boolean);
+
+  if (method === "GET" && pathname === "/api/auth/providers") {
+    return handleAuthProvidersRoute(runtime, req, res);
+  }
+  if (method === "POST" && pathname === "/api/auth/login") {
+    return handleAuthLoginRoute(runtime, req, res);
+  }
+  if (segments[0] === "api" && segments[1] === "auth" && segments[2] === "flows" && segments[3]) {
+    const flowId = decodeURIComponent(segments[3]);
+    if (method === "GET" && !segments[4]) {
+      return handleAuthFlowRoute(runtime, req, res, flowId);
+    }
+    if (method === "POST" && segments[4] === "respond" && !segments[5]) {
+      return handleAuthFlowResponseRoute(runtime, req, res, flowId);
+    }
+    if (method === "DELETE" && !segments[4]) {
+      return handleAuthFlowCancelRoute(runtime, req, res, flowId);
+    }
+  }
+  if (
+    method === "DELETE" &&
+    segments[0] === "api" &&
+    segments[1] === "auth" &&
+    segments[2] === "providers" &&
+    segments[3] &&
+    !segments[4]
+  ) {
+    return handleAuthLogoutRoute(runtime, req, res, decodeURIComponent(segments[3]));
+  }
 
   if (
     method === CONTROL_SURFACE_ENDPOINTS.status.method &&
