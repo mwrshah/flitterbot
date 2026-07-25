@@ -127,12 +127,12 @@ function ThemeReferencePage() {
               Candidate 01 · {resolvedTheme}
             </p>
             <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-text sm:text-5xl">
-              Graphite &amp; Signal
+              Eggshell &amp; Signal
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-base leading-7 text-text-muted">
-              A compact semantic color system for Flitterbot. Slate-neutral surfaces stay close to
-              the existing interface; a translucent amber signal distinguishes user-owned content
-              without turning it into a solid color block.
+              A compact semantic color system for Flitterbot. A subtle eggshell canvas and white
+              cards stay close to the existing interface; a translucent amber signal distinguishes
+              user-owned content without turning it into a solid color block.
             </p>
           </div>
 
