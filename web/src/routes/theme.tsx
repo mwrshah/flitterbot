@@ -27,7 +27,7 @@ const tokenFamilies: Array<{
       { name: "background", role: "Application canvas" },
       { name: "background-muted", role: "Quiet regions and hover" },
       { name: "background-selected", role: "Persistent selection" },
-      { name: "background-pop", role: "Exceptional emphasis" },
+      { name: "background-pop", role: "Distinctive user-owned region" },
     ],
   },
   {
@@ -37,7 +37,7 @@ const tokenFamilies: Array<{
       { name: "card", role: "Default bounded surface" },
       { name: "card-muted", role: "Quiet card and hover" },
       { name: "card-selected", role: "Selected card" },
-      { name: "card-pop", role: "High-emphasis card" },
+      { name: "card-pop", role: "User message and pop card" },
     ],
   },
   {
@@ -47,8 +47,8 @@ const tokenFamilies: Array<{
       { name: "text", role: "Default foreground" },
       { name: "text-muted", role: "Receding information" },
       { name: "text-pop", role: "Expressive emphasis" },
-      { name: "text-contrast", role: "Text on pop surfaces" },
-      { name: "text-contrast-muted", role: "Muted text on pop surfaces" },
+      { name: "text-contrast", role: "Text on strongly contrasting surfaces" },
+      { name: "text-contrast-muted", role: "Muted text on contrasting surfaces" },
     ],
   },
   {
@@ -85,7 +85,11 @@ function Code({ children, contrast = false }: { children: ReactNode; contrast?: 
 
 function TokenCard({ token }: { token: ThemeToken }) {
   const variable = `--${token.name}`;
-  const swatchStyle = { backgroundColor: `var(${variable})` } as CSSProperties;
+  const isPopSurface = token.name === "background-pop" || token.name === "card-pop";
+  const swatchStyle = {
+    backgroundColor: `var(${variable})`,
+    backgroundImage: isPopSurface ? `var(${variable}-image)` : undefined,
+  } as CSSProperties;
 
   return (
     <article className="overflow-hidden rounded-xl border border-border-muted bg-card text-text shadow-sm">
@@ -126,9 +130,9 @@ function ThemeReferencePage() {
               Graphite &amp; Signal
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-base leading-7 text-text-muted">
-              A compact semantic color system for Flitterbot. Warm neutral surfaces keep long
-              sessions calm; amber is reserved for focus, exceptional emphasis, and moments that
-              need a clear signal.
+              A compact semantic color system for Flitterbot. Slate-neutral surfaces stay close to
+              the existing interface; a translucent amber signal distinguishes user-owned content
+              without turning it into a solid color block.
             </p>
           </div>
 
@@ -164,8 +168,8 @@ function ThemeReferencePage() {
               Interaction recipes
             </h2>
             <p className="mt-1 text-sm leading-6 text-text-muted">
-              Approved combinations keep routine states quiet and reserve pop for explicit focus or
-              exceptional emphasis.
+              Approved combinations keep routine states quiet and use pop to distinguish
+              identity-bearing surfaces such as user messages.
             </p>
           </div>
 
@@ -208,13 +212,13 @@ function ThemeReferencePage() {
               </span>
             </button>
 
-            <div className="min-h-32 rounded-xl border border-border-pop bg-background-pop p-4 text-text-contrast">
-              <span className="block text-sm font-semibold">Pop</span>
-              <span className="mt-2 block text-xs leading-5 text-text-contrast-muted">
-                Visually expensive. Use for one exceptional point, never routine selection.
+            <div className="min-h-32 rounded-xl border border-border-pop bg-card-pop p-4 text-text">
+              <span className="block text-xs font-medium text-text-muted">You</span>
+              <span className="mt-2 block text-sm leading-5">
+                Make the user’s message distinct without turning it into a solid color block.
               </span>
-              <span className="mt-5 block font-mono text-[10px] text-text-contrast-muted">
-                bg-background-pop text-text-contrast
+              <span className="mt-5 block font-mono text-[10px] text-text-muted">
+                bg-card-pop border-border-pop
               </span>
             </div>
           </div>

@@ -30,42 +30,59 @@
 .alternate-theme {
   color-scheme: light;
 
-  --background: oklch(0.975 0.008 80);
-  --background-muted: oklch(0.945 0.014 80);
-  --background-selected: oklch(0.91 0.035 80);
-  --background-pop: oklch(0.79 0.17 78);
+  --background: oklch(0.985 0.005 255);
+  --background-muted: oklch(0.955 0.008 255);
+  --background-selected: oklch(0.925 0.012 255);
+  --background-pop: transparent;
+  --background-pop-image: linear-gradient(
+    135deg,
+    rgba(217, 79, 0, 0.12),
+    rgba(255, 107, 0, 0.12),
+    rgba(212, 165, 0, 0.12)
+  );
 
-  --card: oklch(0.995 0.004 80);
-  --card-muted: oklch(0.96 0.012 80);
-  --card-selected: oklch(0.925 0.03 80);
-  --card-pop: oklch(0.735 0.165 70);
+  --card: oklch(1 0 0);
+  --card-muted: oklch(0.97 0.006 255);
+  --card-selected: oklch(0.94 0.012 255);
+  --card-pop: transparent;
+  --card-pop-image: var(--background-pop-image);
 
-  --text: oklch(0.235 0.025 255);
-  --text-muted: oklch(0.49 0.025 255);
+  --text: oklch(0.205 0.015 255);
+  --text-muted: oklch(0.5 0.018 255);
   --text-pop: oklch(0.5 0.145 55);
   --text-contrast: oklch(0.19 0.03 255);
   --text-contrast-muted: oklch(0.35 0.035 255);
 
-  --border: oklch(0.78 0.025 75);
-  --border-muted: oklch(0.875 0.018 75);
-  --border-pop: oklch(0.61 0.16 62);
+  --border: oklch(0.84 0.012 255);
+  --border-muted: oklch(0.91 0.008 255);
+  --border-pop: rgba(255, 107, 0, 0.25);
+}
+
+.alternate-theme .bg-background-pop {
+  background-image: var(--background-pop-image);
+}
+
+.alternate-theme .bg-card-pop {
+  background-image: var(--card-pop-image);
 }
 
 .dark .alternate-theme {
   color-scheme: dark;
 
-  --background: oklch(0.165 0.018 255);
-  --background-muted: oklch(0.205 0.02 255);
-  --background-selected: oklch(0.27 0.035 70);
+  --background: oklch(0.155 0.015 255);
+  --background-muted: oklch(0.205 0.018 255);
+  --background-selected: oklch(0.27 0.025 255);
   --background-pop: oklch(0.76 0.16 76);
+  --background-pop-image: none;
 
-  --card: oklch(0.205 0.02 255);
-  --card-muted: oklch(0.245 0.022 255);
-  --card-selected: oklch(0.305 0.04 70);
+  --card: oklch(0.195 0.016 255);
+  --card-muted: oklch(0.235 0.018 255);
+  --card-selected: oklch(0.29 0.025 255);
   --card-pop: oklch(0.69 0.16 67);
+  --card-pop-image: none;
 
-  --text: oklch(0.94 0.012 80);
-  --text-muted: oklch(0.705 0.02 80);
+  --text: oklch(0.95 0.008 255);
+  --text-muted: oklch(0.705 0.015 255);
   --text-pop: oklch(0.82 0.14 78);
   --text-contrast: oklch(0.18 0.03 255);
   --text-contrast-muted: oklch(0.34 0.035 255);
