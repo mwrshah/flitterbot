@@ -46,6 +46,8 @@ export function ShortcutHint({
   label,
   actionText,
   actionActive = false,
+  actionOnHover = false,
+  actionKeycap = false,
   className,
   kbdClassName,
   kbdSize = "default",
@@ -55,6 +57,8 @@ export function ShortcutHint({
   label: string;
   actionText?: string;
   actionActive?: boolean;
+  actionOnHover?: boolean;
+  actionKeycap?: boolean;
   kbdClassName?: string;
   kbdSize?: KbdSize;
   kbdTone?: KbdTone;
@@ -72,6 +76,7 @@ export function ShortcutHint({
         className={cn(
           "col-start-1 row-start-1 inline-flex items-center gap-1",
           showAction && actionActive && "invisible pointer-events-none",
+          showAction && actionOnHover && "group-hover:invisible group-focus-visible:invisible",
         )}
         aria-hidden={showAction && actionActive}
       >
@@ -93,10 +98,17 @@ export function ShortcutHint({
           className={cn(
             "col-start-1 row-start-1 inline-flex items-center text-[10px] text-muted-foreground/50",
             !actionActive && "invisible pointer-events-none",
+            actionOnHover && "group-hover:visible group-focus-visible:visible",
           )}
-          aria-hidden={!actionActive}
+          aria-hidden={actionOnHover || !actionActive}
         >
-          {actionText}
+          {actionKeycap ? (
+            <Kbd size={kbdSize} tone={kbdTone} className={kbdClassName}>
+              {actionText}
+            </Kbd>
+          ) : (
+            actionText
+          )}
         </span>
       )}
     </span>

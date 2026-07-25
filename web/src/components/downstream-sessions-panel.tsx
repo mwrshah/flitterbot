@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
-import { Button } from "~/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -134,7 +132,6 @@ export function DownstreamSessionsPanel({
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
-  const [diffRefreshNudged, setDiffRefreshNudged] = useState(false);
 
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
@@ -180,6 +177,11 @@ export function DownstreamSessionsPanel({
     setActiveScrollContainer("diff");
     setPanelView("diff");
   }, []);
+
+  const reloadDiff = useCallback(() => {
+    if (diffQuery.isFetching) return;
+    void diffQuery.refetch();
+  }, [diffQuery.isFetching, diffQuery.refetch]);
 
   useEffect(() => {
     return registerShortcutHandlers([
@@ -230,6 +232,7 @@ export function DownstreamSessionsPanel({
         actionId: SHORTCUT_ACTIONS.panelViewDiff,
         handler: () => {
           if (!hasWorktree) return false;
+          if (showDiff) reloadDiff();
           showDiffPanel();
           return true;
         },
@@ -245,8 +248,10 @@ export function DownstreamSessionsPanel({
     branchCopy.copy,
     baseBranchCopy.copy,
     hasWorktree,
+    showDiff,
     showInfoPanel,
     showDiffPanel,
+    reloadDiff,
   ]);
 
   const diffFiles = useMemo<FileData[]>(() => {
@@ -313,11 +318,22 @@ export function DownstreamSessionsPanel({
           <ToggleGroupItem
             value="diff"
             disabled={!hasWorktree}
-            className="text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            title={showDiff ? "Reload diff" : undefined}
+            onClick={() => {
+              if (showDiff) reloadDiff();
+            }}
+            className="group text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
           >
             Diff
             {diffShortcutLabel && (
-              <ShortcutHint label={diffShortcutLabel} className="ml-1" kbdSize="compact" />
+              <ShortcutHint
+                label={diffShortcutLabel}
+                actionText="RELOAD"
+                actionOnHover={showDiff}
+                actionKeycap
+                className="ml-1"
+                kbdSize="compact"
+              />
             )}
           </ToggleGroupItem>
         </ToggleGroup>
@@ -325,29 +341,6 @@ export function DownstreamSessionsPanel({
 
       {showDiff && hasWorktree ? (
         <div className="relative flex-1 min-h-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-xs"
-            className="absolute right-3 top-[-0.3125rem] z-30 rounded-md bg-background/95 shadow-sm backdrop-blur-sm active:not-aria-[haspopup]:translate-y-0"
-            aria-label="Refresh diff"
-            title="Refresh diff"
-            aria-disabled={diffQuery.isFetching}
-            onClick={() => {
-              if (diffQuery.isFetching) return;
-              setDiffRefreshNudged(true);
-              void diffQuery.refetch();
-            }}
-          >
-            <RotateCcwIcon
-              className={cn(
-                "size-3 transition-transform duration-150",
-                diffRefreshNudged && "-rotate-45",
-                diffQuery.isFetching && !diffRefreshNudged && "animate-spin",
-              )}
-              onTransitionEnd={() => setDiffRefreshNudged(false)}
-            />
-          </Button>
           <div data-scroll-container="diff" className="h-full overflow-y-auto">
             {diffQuery.isPending && (
               <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
