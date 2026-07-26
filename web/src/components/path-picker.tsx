@@ -121,7 +121,7 @@ export const PathPicker = memo(function PathPicker({
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
           {items.length === 0 && (
-            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
+            <CommandEmpty className="px-3 py-2 text-sm text-text-muted">
               No matching paths
             </CommandEmpty>
           )}
@@ -133,16 +133,16 @@ export const PathPicker = memo(function PathPicker({
                 key={item.path}
                 value={item.path}
                 onSelect={() => onSelect(item)}
-                className="!flex !flex-col !items-start gap-0 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
+                className="!flex !flex-col !items-start gap-0 rounded-md px-3 py-1.5 text-sm cursor-pointer data-selected:bg-background-hover [&>svg]:!hidden"
               >
                 <span className="flex items-baseline gap-2">
                   <span className="shrink-0">
                     {item.kind === "directory" ? "\u{1F4C1}" : "\u{1F4C4}"}
                   </span>
-                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
+                  <span className="shrink-0 font-mono text-xs text-text">{item.name}</span>
                 </span>
                 {displayDir && (
-                  <span className="text-xs text-muted-foreground pl-[calc(1em+0.5rem)]">
+                  <span className="pl-[calc(1em+0.5rem)] text-xs text-text-muted">
                     {displayDir}
                   </span>
                 )}

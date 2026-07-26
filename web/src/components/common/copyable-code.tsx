@@ -23,13 +23,13 @@ export function CopyableCode({
       type="button"
       onClick={() => (isControlled ? onCopy() : internal.copy(text))}
       className={cn(
-        "inline-block max-w-full truncate rounded bg-muted/60 px-1.5 py-0.5 text-left text-xs transition-colors hover:bg-muted",
+        "inline-block max-w-full truncate rounded bg-background-muted px-1.5 py-0.5 text-left text-xs text-text transition-colors hover:bg-background-hover",
         className,
       )}
       title={`copy \`${text}\``}
     >
       {!isControlled && isCopied ? (
-        <span className="text-muted-foreground">Copied!</span>
+        <span className="text-text-muted">Copied!</span>
       ) : (
         <span>{displayText ?? text}</span>
       )}

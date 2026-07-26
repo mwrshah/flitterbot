@@ -81,7 +81,7 @@ export const SkillPicker = memo(function SkillPicker({
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">
           {items.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">No matching skills</div>
+            <div className="px-3 py-2 text-sm text-text-muted">No matching skills</div>
           ) : (
             items.map((skill) => {
               const isCommand = skill.kind === "command";
@@ -90,18 +90,18 @@ export const SkillPicker = memo(function SkillPicker({
                   key={skill.name}
                   value={skill.name}
                   onSelect={() => onSelect(skill)}
-                  className="flex items-baseline gap-2 px-3 py-1.5 rounded-md text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
+                  className="flex items-baseline gap-2 rounded-md px-3 py-1.5 text-sm cursor-pointer data-selected:bg-background-hover [&>svg]:!hidden"
                 >
                   <span
-                    className={`font-mono text-xs shrink-0 ${isCommand ? "text-primary font-semibold" : "text-foreground"}`}
+                    className={`shrink-0 font-mono text-xs ${isCommand ? "font-semibold text-text-pop" : "text-text"}`}
                   >
                     /{skill.name}
                   </span>
-                  <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
+                  <span className="min-w-0 flex-1 truncate text-xs text-text-muted">
                     {skill.description}
                   </span>
                   <span
-                    className={`text-[10px] uppercase tracking-wide shrink-0 ${isCommand ? "text-primary" : "text-muted-foreground/60"}`}
+                    className={`shrink-0 text-[10px] uppercase tracking-wide ${isCommand ? "text-text-pop" : "text-text-muted"}`}
                   >
                     {isCommand ? "Command" : "Skill"}
                   </span>

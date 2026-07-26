@@ -67,19 +67,6 @@ function statusDotColor(status: DownstreamSessionItem["status"]): string {
   }
 }
 
-function statusLabel(status: DownstreamSessionItem["status"]): string {
-  switch (status) {
-    case "working":
-      return "working";
-    case "idle":
-      return "idle";
-    case "stale":
-      return "stale";
-    case "ended":
-      return "ended";
-  }
-}
-
 function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.streamName ?? "no stream";
 }
@@ -115,7 +102,7 @@ function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {
     <>
       <CopyableCode text={command} copied={tmuxCopy.copied} onCopy={() => tmuxCopy.copy(command)} />
       {tmuxCopy.copied ? (
-        <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+        <span className="text-text-muted text-[10px]">Copied!</span>
       ) : (
         <ShortcutHint label={shortcutLabel || tmuxShortcutHintLabel(tmuxSession)} />
       )}
@@ -271,11 +258,11 @@ export function DownstreamSessionsPanel({
   if (!piSessionId) {
     return (
       <div className="flex flex-col h-full border-l border-border bg-background">
-        <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+        <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-text-muted font-medium">
           Active Sessions
         </p>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-xs text-muted-foreground">Waiting for session…</p>
+          <p className="text-xs text-text-muted">Waiting for session…</p>
         </div>
       </div>
     );
@@ -308,7 +295,7 @@ export function DownstreamSessionsPanel({
         >
           <ToggleGroupItem
             value="info"
-            className="text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            className="text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
           >
             Info
             {infoShortcutLabel && (
@@ -322,7 +309,7 @@ export function DownstreamSessionsPanel({
             onClick={() => {
               if (showDiff) reloadDiff();
             }}
-            className="group text-sm aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            className="group text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
           >
             Diff
             {diffShortcutLabel && (
@@ -343,13 +330,13 @@ export function DownstreamSessionsPanel({
         <div className="relative flex-1 min-h-0">
           <div data-scroll-container="diff" className="h-full overflow-y-auto">
             {diffQuery.isPending && (
-              <p className="px-4 py-3 text-[11px] text-muted-foreground">Loading diff…</p>
+              <p className="px-4 py-3 text-[11px] text-text-muted">Loading diff…</p>
             )}
             {diffQuery.isError && (
-              <p className="px-4 py-3 text-xs text-destructive">Failed to load diff.</p>
+              <p className="px-4 py-3 text-xs text-status-crashed">Failed to load diff.</p>
             )}
             {diffQuery.isSuccess && !diffQuery.data && (
-              <p className="px-4 py-3 text-xs text-muted-foreground">
+              <p className="px-4 py-3 text-xs text-text-muted">
                 No changes against {worktree?.baseBranch ?? "main"}.
               </p>
             )}
@@ -360,7 +347,7 @@ export function DownstreamSessionsPanel({
                   {diffQuery.data.insertions.toLocaleString()}+ /{" "}
                   {diffQuery.data.deletions.toLocaleString()}&minus;), showing summary only
                 </div>
-                <pre className="px-4 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
+                <pre className="px-4 py-2 text-xs text-text-muted whitespace-pre-wrap font-mono overflow-x-auto">
                   {diffQuery.data.stat}
                 </pre>
               </>
@@ -372,7 +359,7 @@ export function DownstreamSessionsPanel({
                   const key = `${file.oldRevision}-${file.newRevision}-${path}`;
                   return (
                     <div key={key} className="mb-3 last:mb-0">
-                      <div className="sticky top-0 z-10 px-3 py-1 text-[11px] font-mono text-muted-foreground border-b border-border bg-background/95 backdrop-blur-sm truncate">
+                      <div className="sticky top-0 z-10 px-3 py-1 text-[11px] font-mono text-text-muted border-b border-border bg-background truncate">
                         {path}
                       </div>
                       <Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
@@ -394,17 +381,15 @@ export function DownstreamSessionsPanel({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-text-muted font-medium">
             Active Sessions
           </p>
-          {isPending && (
-            <p className="px-4 py-3 text-xs text-muted-foreground">Loading sessions…</p>
-          )}
+          {isPending && <p className="px-4 py-3 text-xs text-text-muted">Loading sessions…</p>}
           {isError && (
-            <p className="px-4 py-3 text-xs text-destructive">Failed to load sessions.</p>
+            <p className="px-4 py-3 text-xs text-status-crashed">Failed to load sessions.</p>
           )}
           {data && data.length === 0 && (
-            <p className="px-4 py-3 text-xs text-muted-foreground">No active sessions</p>
+            <p className="px-4 py-3 text-xs text-text-muted">No active sessions</p>
           )}
           {data && data.length > 0 && (
             <ul className="divide-y divide-border">
@@ -416,20 +401,21 @@ export function DownstreamSessionsPanel({
                         "shrink-0 h-2 w-2 rounded-full",
                         statusDotColor(session.status),
                       )}
-                      title={statusLabel(session.status)}
+                      aria-hidden
                     />
-                    <span className="truncate font-mono text-xs text-foreground">
+                    <span className="truncate font-mono text-xs text-text">
                       {session.sessionId.slice(0, 8)}
                     </span>
+                    <span className="text-[10px] text-text-muted">{session.status}</span>
                   </div>
 
                   {session.tmuxSession && (
-                    <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                    <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
                       tmux: <ActiveSessionTmuxCopy tmuxSession={session.tmuxSession} />
                     </span>
                   )}
 
-                  <span className="pl-2 text-xs text-muted-foreground truncate">
+                  <span className="pl-2 text-xs text-text-muted truncate">
                     cwd: {sessionDescription(session)}
                   </span>
                 </li>
@@ -439,11 +425,11 @@ export function DownstreamSessionsPanel({
 
           {worktree?.worktreePath && (
             <div className="px-4 py-3 border-t border-border">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2">
                 Active Worktree
               </p>
               <div className="flex flex-col gap-0.5 py-1.5">
-                <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                <span className="pl-2 truncate text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Repo:{" "}
                   {currentRepoPath && (
                     <CopyableCode
@@ -454,12 +440,12 @@ export function DownstreamSessionsPanel({
                     />
                   )}
                   {repoCopy.copied ? (
-                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                    <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
                     <ShortcutHint label={repoShortcutLabel} />
                   )}
                 </span>
-                <span className="pl-2 truncate text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                <span className="pl-2 truncate text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Branch:{" "}
                   <CopyableCode
                     text={currentBranch ?? ""}
@@ -467,12 +453,12 @@ export function DownstreamSessionsPanel({
                     onCopy={() => currentBranch && branchCopy.copy(currentBranch)}
                   />
                   {branchCopy.copied ? (
-                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                    <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
                     <ShortcutHint label={branchShortcutLabel} />
                   )}
                 </span>
-                <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Merge Target:{" "}
                   <CopyableCode
                     text={targetBranch ?? ""}
@@ -480,12 +466,12 @@ export function DownstreamSessionsPanel({
                     onCopy={() => targetBranch && baseBranchCopy.copy(targetBranch)}
                   />
                   {baseBranchCopy.copied ? (
-                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                    <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
                     <ShortcutHint label={targetBranchShortcutLabel} />
                   )}
                 </span>
-                <span className="pl-2 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Worktree:{" "}
                   <CopyableCode
                     text={worktree.worktreePath ?? ""}
@@ -498,7 +484,7 @@ export function DownstreamSessionsPanel({
                     onCopy={() => worktreeCopy.copy(worktree.worktreePath ?? "")}
                   />
                   {worktreeCopy.copied ? (
-                    <span className="text-muted-foreground/50 text-[10px]">Copied!</span>
+                    <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
                     <ShortcutHint label={worktreeShortcutLabel} />
                   )}
@@ -511,27 +497,23 @@ export function DownstreamSessionsPanel({
             (worktree?.postCreate?.length ?? 0) > 0 ||
             !!worktree?.configuredBaseRef) && (
             <div className="px-4 py-3 border-t border-border">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-1">
                 Bootstrap Config
               </p>
               {worktree?.configuredBaseRef && (
                 <div className="pl-2 py-0.5">
-                  <span className="text-[10px] text-muted-foreground/70">baseRef</span>
-                  <p className="mt-0.5 text-xs text-muted-foreground font-mono truncate">
+                  <span className="text-[10px] text-text-muted">baseRef</span>
+                  <p className="mt-0.5 text-xs text-text-muted font-mono truncate">
                     {worktree.configuredBaseRef}
                   </p>
                 </div>
               )}
               {(worktree?.copyPaths?.length ?? 0) > 0 && (
                 <div className="pl-2 py-0.5">
-                  <span className="text-[10px] text-muted-foreground/70">copyPaths</span>
+                  <span className="text-[10px] text-text-muted">copyPaths</span>
                   <ul className="mt-0.5 flex flex-col gap-0.5">
                     {worktree?.copyPaths?.map((p) => (
-                      <li
-                        key={p}
-                        className="text-xs text-muted-foreground font-mono truncate"
-                        title={p}
-                      >
+                      <li key={p} className="text-xs text-text-muted font-mono truncate" title={p}>
                         {p}
                       </li>
                     ))}
@@ -540,14 +522,10 @@ export function DownstreamSessionsPanel({
               )}
               {(worktree?.postCreate?.length ?? 0) > 0 && (
                 <div className="pl-2 py-0.5">
-                  <span className="text-[10px] text-muted-foreground/70">postCreate</span>
+                  <span className="text-[10px] text-text-muted">postCreate</span>
                   <ul className="mt-0.5 flex flex-col gap-0.5">
                     {worktree?.postCreate?.map((c) => (
-                      <li
-                        key={c}
-                        className="text-xs text-muted-foreground font-mono truncate"
-                        title={c}
-                      >
+                      <li key={c} className="text-xs text-text-muted font-mono truncate" title={c}>
                         {c}
                       </li>
                     ))}

@@ -20,10 +20,8 @@ function MetaItem({ label, value, mono }: { label: string; value: string; mono?:
 
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
-        {label}
-      </p>
-      <p className={`text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</p>
+      <p className="mb-0.5 text-[10px] text-text-muted uppercase tracking-wider">{label}</p>
+      <p className={`text-sm text-text ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</p>
     </div>
   );
 }
@@ -43,13 +41,13 @@ function RuntimePage() {
   return (
     <div className="flex-1 overflow-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-sm font-semibold text-foreground">Runtime</h1>
-        <Button variant="ghost" size="sm" onClick={() => statusQuery.refetch()}>
+        <h1 className="text-sm font-semibold text-text">Runtime</h1>
+        <Button variant="subtle" size="sm" onClick={() => statusQuery.refetch()}>
           Refresh
         </Button>
       </div>
 
-      {statusQuery.isPending && <p className="text-sm text-muted-foreground">Loading status…</p>}
+      {statusQuery.isPending && <p className="text-sm text-text-muted">Loading status…</p>}
 
       {status && (
         <>
@@ -57,7 +55,7 @@ function RuntimePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Streams Agent</CardTitle>
-                <Badge variant={status.piAgent?.default?.busy ? "success" : "default"}>
+                <Badge variant={status.piAgent?.default?.busy ? "active" : "info"}>
                   {status.piAgent?.default?.busy ? "active" : "idle"}
                 </Badge>
               </div>
@@ -90,16 +88,16 @@ function RuntimePage() {
                       className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                     >
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-sm font-medium text-text">
                           {o.streamName ?? o.streamId}
                         </p>
-                        <p className="text-xs text-muted-foreground font-mono">
+                        <p className="font-mono text-xs text-text-muted">
                           {o.piSessionId.slice(0, 12)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <MetaItem label="Messages" value={String(o.messageCount)} />
-                        <Badge variant={o.busy ? "success" : "default"}>
+                        <Badge variant={o.busy ? "active" : "info"}>
                           {o.busy ? "active" : "idle"}
                         </Badge>
                       </div>

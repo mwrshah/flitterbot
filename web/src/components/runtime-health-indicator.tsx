@@ -39,6 +39,8 @@ export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
   const connectionState = useWsConnectionState(wsConnectionStore);
 
   const waStatus = status?.whatsapp.status ?? "unknown";
+  const waStatusLabel = statusLabel(waStatus);
+  const connectionStatusLabel = statusLabel(connectionState);
 
   useWhyDidYouRender("RuntimeHealthIndicator", { waStatus, connectionState });
 
@@ -46,21 +48,18 @@ export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
     <button
       type="button"
       onClick={() => navigate({ to: "/runtime" })}
-      className="flex items-center gap-3 px-2 py-1 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+      className="flex items-center gap-3 px-2 py-1 rounded-md hover:bg-background-hover transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-1.5">
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${statusDotColor(waStatus)}`}
-          title={statusLabel(waStatus)}
-        />
-        <span className="text-[10px] text-muted-foreground/50">WhatsApp</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${statusDotColor(waStatus)}`} aria-hidden />
+        <span className="text-[10px] text-text-muted">WhatsApp: {waStatusLabel}</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span
           className={`w-1.5 h-1.5 rounded-full ${statusDotColor(connectionState)}`}
-          title={statusLabel(connectionState)}
+          aria-hidden
         />
-        <span className="text-[10px] text-muted-foreground/50">WebSocket</span>
+        <span className="text-[10px] text-text-muted">WebSocket: {connectionStatusLabel}</span>
       </div>
     </button>
   );

@@ -71,7 +71,7 @@
   }
 
   .hljs-subst {
-     color: var(--foreground);
+     color: var(--text);
   }
 
   .hljs-section {
@@ -84,12 +84,12 @@
   }
 
   .hljs-emphasis {
-     color: var(--foreground);
+     color: var(--text);
      font-style: italic;
   }
 
   .hljs-strong {
-     color: var(--foreground);
+     color: var(--text);
      font-weight: bold;
   }
 
@@ -132,7 +132,7 @@
   }
 
   .markdown-content a {
-     @apply text-primary underline hover:text-primary/80;
+     @apply text-text-pop underline hover:text-text;
   }
 
   .markdown-content strong {
@@ -169,11 +169,11 @@
   }
 
   .markdown-content blockquote {
-     @apply border-l-4 border-border pl-4 my-4 text-muted-foreground;
+     @apply border-l-4 border-border pl-4 my-4 text-text-muted;
   }
 
   .markdown-content code:not(.hljs) {
-     @apply bg-muted text-foreground px-1.5 py-0.5 rounded text-sm;
+     @apply bg-background-muted text-text px-1.5 py-0.5 rounded text-sm;
   }
 
   .markdown-content table {
@@ -181,7 +181,7 @@
   }
 
   .markdown-content th {
-     @apply bg-muted text-foreground font-semibold p-2 border-b border-r border-border text-left;
+     @apply bg-background-muted text-text font-semibold p-2 border-b border-r border-border text-left;
   }
 
   .markdown-content th:last-child {
@@ -189,7 +189,7 @@
   }
 
   .markdown-content td {
-     @apply p-2 text-foreground border-b border-r border-border;
+     @apply p-2 text-text border-b border-r border-border;
   }
 
   .markdown-content td:last-child {
@@ -220,14 +220,15 @@
   .user-message-container {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    background: linear-gradient(135deg, rgba(217, 79, 0, 0.12), rgba(255, 107, 0, 0.12), rgba(212, 165, 0, 0.12));
-    border: 1px solid rgba(255, 107, 0, 0.25);
+    background-color: var(--background-pop);
+    background-image: var(--background-pop-image);
+    border: 1px solid var(--border-pop);
     backdrop-filter: blur(10px);
     max-width: 100%;
   }
 
   [data-slot="command-item"][data-selected="true"] {
-    background-color: var(--accent);
+    background-color: var(--background-hover);
   }
 }
 

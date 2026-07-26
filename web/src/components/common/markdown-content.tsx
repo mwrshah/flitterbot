@@ -187,7 +187,7 @@ function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
 export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   const tokens = useMemo(() => marked.lexer(content) as MarkdownToken[], [content]);
   return (
-    <div className="markdown-body text-sm text-foreground break-words">
+    <div className="markdown-body break-words text-sm text-text">
       <MarkdownBlocks tokens={tokens} />
     </div>
   );

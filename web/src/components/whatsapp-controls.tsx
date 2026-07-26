@@ -6,15 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/common/ca
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { StatusResponse } from "~/lib/types";
 
-function statusVariant(status: string): "success" | "warning" | "muted" {
+function statusVariant(status: string): "active" | "waiting" | "ended" | "info" {
   switch (status) {
     case "connected":
-      return "success";
+      return "active";
     case "starting":
     case "reconnecting":
-      return "warning";
+      return "waiting";
+    case "stopped":
+    case "disabled":
+    case "disconnected":
+      return "ended";
     default:
-      return "muted";
+      return "info";
   }
 }
 
@@ -47,7 +51,7 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
       </CardHeader>
       <CardContent>
         {isDisabled ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-text-muted">
             WhatsApp daemon is disabled. Set{" "}
             <code className="text-[11px]">WHATSAPP_ENABLED=true</code> and restart the control
             surface to enable it.
@@ -56,13 +60,13 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">
                   Daemon PID
                 </p>
                 <p className="text-sm font-mono">{status?.whatsapp.pid ?? "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">
                   Managed by
                 </p>
                 <p className="text-sm">
@@ -82,7 +86,7 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
                 {startMutation.isPending ? "Starting…" : "Start"}
               </Button>
               <Button
-                variant="secondary"
+                variant="subtle"
                 size="sm"
                 disabled={stopMutation.isPending || waStatus === "stopped"}
                 onClick={() => stopMutation.mutate()}
@@ -92,13 +96,13 @@ export function WhatsAppControls({ status }: { status?: StatusResponse }) {
             </div>
 
             {startMutation.error && (
-              <p className="text-xs text-destructive">Failed to start daemon.</p>
+              <p className="text-xs text-status-crashed">Failed to start daemon.</p>
             )}
             {stopMutation.error && (
-              <p className="text-xs text-destructive">Failed to stop daemon.</p>
+              <p className="text-xs text-status-crashed">Failed to stop daemon.</p>
             )}
 
-            <p className="text-[10px] text-muted-foreground/50">
+            <p className="text-[10px] text-text-muted">
               Auth stays terminal-driven in v1. Browser only controls start/stop.
             </p>
           </div>

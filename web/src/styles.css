@@ -2,7 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
-@import "./alternate-theme.css";
 @import "./pi-web-ui.css";
 
 @source "./pi-web-ui";
@@ -19,7 +18,26 @@
  */
 
 @theme inline {
+  /* Canonical application utilities. */
   --color-background: var(--background);
+  --color-background-muted: var(--background-muted);
+  --color-background-hover: var(--background-hover);
+  --color-background-selected: var(--background-selected);
+  --color-background-pop: var(--background-pop);
+  --color-background-contrast: var(--background-contrast);
+  --color-background-contrast-muted: var(--background-contrast-muted);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-pop: var(--text-pop);
+  --color-text-contrast: var(--text-contrast);
+  --color-text-contrast-muted: var(--text-contrast-muted);
+  --color-border: var(--border);
+  --color-border-muted: var(--border-muted);
+  --color-border-pop: var(--border-pop);
+  --color-scrim: var(--scrim);
+
+  /* Stock shadcn utility contract. Values come from the adapter in :root. */
+  --color-black: var(--scrim);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -35,14 +53,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -96,38 +108,28 @@
 :root {
   color-scheme: light;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: var(--background);
-  --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.92 0 0);
-  --accent-foreground: oklch(0.4 0.18 240);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.81 0.1 252);
-  --chart-2: oklch(53.553% 0.02798 259.829);
-  --chart-3: oklch(0.55 0.22 263);
-  --chart-4: oklch(0.49 0.22 264);
-  --chart-5: oklch(0.42 0.18 266);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Canonical light values. */
+  --background: oklch(0.985 0.002 80);
+  --background-muted: oklch(0.974 0.0025 73);
+  --background-hover: oklch(0.956 0.0053 73);
+  --background-selected: oklch(0.936 0.0086 73);
+  --background-pop: transparent;
+  --background-pop-image: linear-gradient(
+    135deg,
+    rgba(217, 79, 0, 0.12),
+    rgba(255, 107, 0, 0.12),
+    rgba(212, 165, 0, 0.12)
+  );
+  --background-contrast: var(--text);
+  --background-contrast-muted: var(--text-muted);
+  --text: oklch(0.18 0.006 255);
+  --text-muted: oklch(0.48 0.008 255);
+  --text-pop: oklch(0.4 0.18 240);
+  --text-contrast: var(--background);
+  --text-contrast-muted: var(--background-muted);
+  --border: oklch(0.89 0.006 95);
+  --border-muted: oklch(0.93 0.004 95);
+  --border-pop: rgba(255, 107, 0, 0.25);
 
   --status-active: oklch(0.74 0.15 145);
   --status-active-muted: color-mix(in oklab, var(--status-active) 22%, transparent);
@@ -145,6 +147,45 @@
   --status-ended-muted: color-mix(in oklab, var(--status-ended) 22%, transparent);
   --status-crashed: oklch(0.78 0.17 25);
   --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 22%, transparent);
+
+  /* Specialist contracts. */
+  --scrim: rgb(0 0 0);
+  --diff-selection-background: color-mix(in oklab, #0969da 35%, transparent);
+  --diff-gutter-insert-background: color-mix(in oklab, #2ea043 25%, transparent);
+  --diff-gutter-delete-background: color-mix(in oklab, #f85149 25%, transparent);
+  --diff-selected-background: color-mix(in oklab, #d4a72c 20%, transparent);
+  --diff-code-insert-background: color-mix(in oklab, #2ea043 12%, transparent);
+  --diff-code-delete-background: color-mix(in oklab, #f85149 12%, transparent);
+  --diff-code-insert-edit-background: color-mix(in oklab, #2ea043 35%, transparent);
+  --diff-code-delete-edit-background: color-mix(in oklab, #f85149 35%, transparent);
+  --diff-omit-gutter-line: #f85149;
+
+  /* Value-free shadcn adapter. */
+  --foreground: var(--text);
+  --card: var(--background);
+  --card-foreground: var(--text);
+  --popover: var(--background);
+  --popover-foreground: var(--text);
+  --primary: var(--text);
+  --primary-foreground: var(--text-contrast);
+  --secondary: var(--background-muted);
+  --secondary-foreground: var(--text);
+  --muted: var(--background-muted);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--background-hover);
+  --accent-foreground: var(--text);
+  --destructive: var(--status-crashed);
+  --destructive-foreground: var(--text-contrast);
+  --input: var(--border);
+  --ring: var(--border-pop);
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--text);
+  --sidebar-primary-foreground: var(--text-contrast);
+  --sidebar-accent: var(--background-hover);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--border-pop);
 
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
@@ -181,38 +222,23 @@
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: var(--background);
-  --card-foreground: var(--foreground);
-  --popover: oklch(0.269 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.3 0 0);
-  --accent-foreground: oklch(0.75 0.18 85);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.275 0 0);
-  --input: oklch(0.325 0 0);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.81 0.1 252);
-  --chart-2: oklch(0.62 0.19 260);
-  --chart-3: oklch(0.55 0.22 263);
-  --chart-4: oklch(0.49 0.22 264);
-  --chart-5: oklch(0.42 0.18 266);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.275 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Canonical dark values. */
+  --background: oklch(0.145 0.002 80);
+  --background-muted: oklch(0.177 0.0025 80);
+  --background-hover: oklch(0.222 0.0054 80);
+  --background-selected: oklch(0.272 0.0074 80);
+  --background-pop: oklch(0.64 0.16 48 / 0.15);
+  --background-pop-image: none;
+  --background-contrast: var(--text);
+  --background-contrast-muted: var(--text-muted);
+  --text: oklch(0.9 0.012 90);
+  --text-muted: oklch(0.68 0.01 90);
+  --text-pop: oklch(0.82 0.14 78);
+  --text-contrast: var(--background);
+  --text-contrast-muted: var(--background-muted);
+  --border: oklch(0.38 0.006 130);
+  --border-muted: oklch(0.3 0.005 130);
+  --border-pop: oklch(0.64 0.13 55 / 0.28);
 
   --status-active: oklch(0.62 0.12 145);
   --status-active-muted: color-mix(in oklab, var(--status-active) 15%, transparent);
@@ -248,7 +274,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-border-pop;
   }
 
   html {
@@ -260,7 +286,7 @@
     height: 100%;
     overflow: hidden;
     font-size: 16px;
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-text font-sans antialiased;
   }
 }
 
@@ -289,7 +315,7 @@
     font-size: 0.85em;
     padding: 0.15em 0.35em;
     border-radius: 0.25rem;
-    background: var(--color-muted);
+    background: var(--background-muted);
   }
 
   .markdown-body pre code {
@@ -316,24 +342,24 @@
     border-left: 3px solid var(--color-border);
     padding-left: 0.8em;
     margin: 0.5em 0;
-    color: var(--color-muted-foreground);
+    color: var(--text-muted);
   }
 
 
   [data-sonner-toast] [data-description] {
-    color: var(--muted-foreground);
+    color: var(--text-muted);
   }
 
 
   [data-sonner-toast][data-type="error"] {
-    background: var(--destructive) !important;
-    color: var(--destructive-foreground) !important;
-    border-color: var(--destructive) !important;
+    background: var(--status-crashed) !important;
+    color: var(--text-contrast) !important;
+    border-color: var(--border) !important;
   }
 
   [data-sonner-toast] [data-button] {
-    background: var(--primary);
-    color: var(--primary-foreground);
+    background: var(--background-contrast);
+    color: var(--text-contrast);
   }
 }
 
@@ -345,14 +371,27 @@
  */
 .diff-viewer-panel {
   --diff-background-color: transparent;
-  --diff-text-color: var(--foreground);
+  --diff-text-color: var(--text);
   --diff-font-family: var(--font-mono);
-  --diff-gutter-insert-background-color: color-mix(in oklab, #2ea043 25%, transparent);
-  --diff-gutter-delete-background-color: color-mix(in oklab, #f85149 25%, transparent);
-  --diff-code-insert-background-color: color-mix(in oklab, #2ea043 12%, transparent);
-  --diff-code-delete-background-color: color-mix(in oklab, #f85149 12%, transparent);
-  --diff-code-insert-edit-background-color: color-mix(in oklab, #2ea043 35%, transparent);
-  --diff-code-delete-edit-background-color: color-mix(in oklab, #f85149 35%, transparent);
+  --diff-selection-background-color: var(--diff-selection-background);
+  --diff-selection-text-color: var(--text);
+  --diff-gutter-insert-background-color: var(--diff-gutter-insert-background);
+  --diff-gutter-insert-text-color: var(--text);
+  --diff-gutter-delete-background-color: var(--diff-gutter-delete-background);
+  --diff-gutter-delete-text-color: var(--text);
+  --diff-gutter-selected-background-color: var(--diff-selected-background);
+  --diff-gutter-selected-text-color: var(--text);
+  --diff-code-insert-background-color: var(--diff-code-insert-background);
+  --diff-code-insert-text-color: var(--text);
+  --diff-code-delete-background-color: var(--diff-code-delete-background);
+  --diff-code-delete-text-color: var(--text);
+  --diff-code-insert-edit-background-color: var(--diff-code-insert-edit-background);
+  --diff-code-insert-edit-text-color: var(--text);
+  --diff-code-delete-edit-background-color: var(--diff-code-delete-edit-background);
+  --diff-code-delete-edit-text-color: var(--text);
+  --diff-code-selected-background-color: var(--diff-selected-background);
+  --diff-code-selected-text-color: var(--text);
+  --diff-omit-gutter-line-color: var(--diff-omit-gutter-line);
 }
 
 .diff-viewer-panel .diff {
@@ -398,6 +437,10 @@
 }
 
 @layer utilities {
+  .bg-background-pop {
+    background-image: var(--background-pop-image);
+  }
+
   .no-scrollbar {
     scrollbar-width: none !important;
   }

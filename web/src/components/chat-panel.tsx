@@ -90,7 +90,7 @@ const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: Chat
 
   return (
     <span
-      className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums"
+      className="ml-auto shrink-0 text-xs text-text-muted tabular-nums"
       title="Latest request. Pi reports cache reads and writes, but not cache misses, age, or expiry time."
     >
       cache write: {cacheWrite} tokens · cache reuse: {cacheRead}/{contextTokens} tokens
@@ -120,9 +120,9 @@ function QueuedBusyOverlay({ text }: { text: string }) {
 
   return (
     <div className="pointer-events-none absolute inset-x-6 bottom-3 z-20 flex justify-end">
-      <div className="max-w-[min(44rem,100%)] rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/85">
-        <div className="font-medium text-muted-foreground">Queued:</div>
-        <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-foreground/90">
+      <div className="max-w-[min(44rem,100%)] rounded-lg border border-border-muted bg-background px-3 py-2 text-xs shadow-lg">
+        <div className="font-medium text-text-muted">Queued:</div>
+        <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-text">
           {text}
         </div>
       </div>
@@ -222,7 +222,7 @@ function CwdPicker({
             type="button"
             onClick={onCommit}
             disabled={pending}
-            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sm text-text-muted hover:bg-background-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             title="switch cwd to this path"
           >
             →
@@ -230,7 +230,7 @@ function CwdPicker({
         </div>
         <CommandList className="max-h-80 overflow-y-auto p-1">
           {items.length === 0 && (
-            <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
+            <CommandEmpty className="px-3 py-2 text-sm text-text-muted">
               No matching paths
             </CommandEmpty>
           )}
@@ -241,14 +241,14 @@ function CwdPicker({
                 key={item.path}
                 value={item.path}
                 onSelect={() => onDrill(item)}
-                className="!flex !flex-col !items-start gap-0 rounded-md px-3 py-1.5 text-sm cursor-pointer data-[selected=true]:bg-muted [&>svg]:!hidden"
+                className="!flex !flex-col !items-start gap-0 rounded-md px-3 py-1.5 text-sm cursor-pointer data-[selected=true]:bg-background-selected [&>svg]:!hidden"
               >
                 <span className="flex items-baseline gap-2 min-w-0">
                   <span className="shrink-0">📁</span>
-                  <span className="font-mono text-xs text-foreground shrink-0">{item.name}</span>
+                  <span className="font-mono text-xs text-text shrink-0">{item.name}</span>
                 </span>
                 {dir && (
-                  <span className="max-w-full truncate pl-[calc(1em+0.5rem)] text-xs text-muted-foreground">
+                  <span className="max-w-full truncate pl-[calc(1em+0.5rem)] text-xs text-text-muted">
                     {dir}
                   </span>
                 )}
@@ -793,18 +793,16 @@ export function ChatPanel({
         className="relative flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-foreground truncate">
-            {streamName ?? "flitterbot"}
-          </h1>
+          <h1 className="text-sm font-semibold text-text truncate">{streamName ?? "flitterbot"}</h1>
           {worktree?.cwd && cwdAbsolute && (
             <>
-              <span className="text-muted-foreground/50 text-sm shrink-0">|</span>
+              <span className="text-text-muted text-sm shrink-0">|</span>
               <span ref={cwdPickerAnchorRef} className="relative flex items-center min-w-0 gap-1">
                 <button
                   type="button"
                   onClick={streamId ? openCwdPicker : undefined}
                   disabled={!streamId}
-                  className="inline-flex shrink-0 items-center gap-1 px-1 py-0.5 rounded text-xs text-muted-foreground transition-colors bg-muted/60 hover:bg-muted hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                  className="inline-flex shrink-0 items-center gap-1 rounded bg-background-muted px-1 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-text-muted"
                   title={streamId ? `switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
                   <FolderPenIcon className="size-3.5" aria-hidden="true" />
@@ -816,7 +814,7 @@ export function ChatPanel({
                   onCopy={() =>
                     cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"))
                   }
-                  className="text-muted-foreground"
+                  className="text-text-muted"
                 />
                 <ShortcutHint
                   label={cwdShortcutLabel}
@@ -888,13 +886,13 @@ export function ChatPanel({
               </DialogHeader>
               <DialogFooter>
                 <DialogClose
-                  render={<Button variant="outline" />}
+                  render={<Button variant="subtle" />}
                   disabled={pruneMutation.isPending}
                 >
                   Cancel
                 </DialogClose>
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   autoFocus
                   onClick={confirmPrune}
                   disabled={pruneMutation.isPending}

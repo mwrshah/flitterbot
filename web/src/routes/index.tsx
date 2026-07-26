@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
 function SurfacePending() {
   return (
     <div className="flex h-full items-center justify-center px-6 py-4">
-      <p className="text-xs text-muted-foreground">Loading chat UI…</p>
+      <p className="text-xs text-text-muted">Loading chat UI…</p>
     </div>
   );
 }

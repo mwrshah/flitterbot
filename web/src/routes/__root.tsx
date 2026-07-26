@@ -162,7 +162,7 @@ function RootDocument({
           toastOptions={{
             style: {
               background: "var(--background)",
-              color: "var(--foreground)",
+              color: "var(--text)",
               border: "1px solid var(--border)",
               borderRadius: "var(--radius)",
             },

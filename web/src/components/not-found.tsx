@@ -7,19 +7,19 @@ export function NotFound({ children }: { children?: ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex flex-col gap-4 max-w-sm">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-text-muted">
           {children || "The page you are looking for does not exist."}
         </p>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent transition-colors"
+            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm text-text transition-colors hover:bg-background-hover"
             onClick={() => window.history.back()}
           >
             Go back
           </button>
           <Link
-            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent transition-colors"
+            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm text-text transition-colors hover:bg-background-hover"
             to="/"
           >
             Start over

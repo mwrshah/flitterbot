@@ -193,11 +193,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     const initDetails = getPiWebUiInitError();
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-4">
-        <p className="text-xs font-medium text-destructive">
+        <p className="text-xs font-medium text-status-crashed">
           Streams Web UI failed to initialize. Check the browser console.
         </p>
         {initDetails instanceof Error ? (
-          <p className="text-xs text-destructive/70">{initDetails.message}</p>
+          <p className="text-xs text-status-crashed">{initDetails.message}</p>
         ) : null}
       </div>
     );
@@ -206,7 +206,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   if (!ready) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="text-xs text-muted-foreground">Loading chat UI…</p>
+        <p className="text-xs text-text-muted">Loading chat UI…</p>
       </div>
     );
   }

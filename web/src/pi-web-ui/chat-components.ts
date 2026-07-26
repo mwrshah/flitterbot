@@ -99,7 +99,7 @@ function iconSvg(iconNode: unknown, size: "sm" | "md" = "md", className = ""): s
 
 const COPY_SUCCESS_VISIBLE_MS = 1500;
 const HEADER_COPY_BUTTON_CLASS =
-  "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground/70 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted data-[copied=true]:cursor-default data-[copied=true]:text-muted-foreground/50 data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-muted-foreground/50";
+  "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
 
 function copyButtonLabel(copied: boolean, idleLabel: string): string {
   return copied ? i18n("Copied") : idleLabel;
@@ -309,7 +309,7 @@ export class MessageCopyButton extends LitElement {
         type="button"
         @click=${this.copy}
         data-copied=${this.copied ? "true" : "false"}
-        class="absolute bottom-1.5 right-1.5 rounded p-1 text-muted-foreground/40 opacity-60 transition-opacity cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-muted-foreground data-[copied=false]:hover:opacity-100 data-[copied=true]:opacity-100 data-[copied=true]:cursor-default data-[copied=true]:text-muted-foreground/50"
+        class="absolute bottom-1.5 right-1.5 cursor-pointer rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
         title=${copyButtonLabel(this.copied, i18n("Copy message"))}
         aria-label=${copyButtonLabel(this.copied, i18n("Copy message"))}
         aria-live="polite"
@@ -400,8 +400,8 @@ export class CodeBlock extends LitElement {
 
     return html`
       <div class="border border-border rounded-lg overflow-hidden">
-        <div class="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border">
-          <span class="text-xs text-muted-foreground font-mono">${displayLanguage}</span>
+        <div class="flex items-center justify-between px-3 py-1.5 bg-background-muted border-b border-border">
+          <span class="text-xs text-text-muted font-mono">${displayLanguage}</span>
           <button
             type="button"
             @click=${this.copy}
@@ -415,7 +415,7 @@ export class CodeBlock extends LitElement {
           </button>
         </div>
         <div class="overflow-auto max-h-96">
-          <pre class="!bg-transparent !border-0 !rounded-none m-0 px-4 pb-4 pt-3 text-xs text-foreground font-mono"><code class="hljs language-${displayLanguage}">${unsafeHTML(highlighted)}</code></pre>
+          <pre class="!bg-transparent !border-0 !rounded-none m-0 px-4 pb-4 pt-3 text-xs text-text font-mono"><code class="hljs language-${displayLanguage}">${unsafeHTML(highlighted)}</code></pre>
         </div>
       </div>
     `;
@@ -460,12 +460,12 @@ export class ConsoleBlock extends LitElement {
   }
 
   override render() {
-    const textClass = this.variant === "error" ? "text-destructive" : "text-foreground";
+    const textClass = this.variant === "error" ? "text-status-crashed" : "text-text";
 
     return html`
       <div class="border border-border rounded-lg overflow-hidden">
-        <div class="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border">
-          <span class="text-xs text-muted-foreground font-mono">${i18n("console")}</span>
+        <div class="flex items-center justify-between px-3 py-1.5 bg-background-muted border-b border-border">
+          <span class="text-xs text-text-muted font-mono">${i18n("console")}</span>
           <button
             type="button"
             @click=${this.copy}
@@ -517,21 +517,21 @@ export class ThinkingBlock extends LitElement {
   override render() {
     const isOpen = this.isExpanded;
     const shimmerClasses = this.isStreaming
-      ? "animate-shimmer bg-gradient-to-r from-muted-foreground via-foreground to-muted-foreground bg-[length:200%_100%] bg-clip-text text-transparent"
+      ? "animate-shimmer bg-gradient-to-r from-text-muted via-text to-text-muted bg-[length:200%_100%] bg-clip-text text-transparent"
       : "";
 
     return html`
       <div class="thinking-block">
         <button
           type="button"
-          class="thinking-header flex w-full items-center justify-between gap-3 rounded-sm px-1 pl-0 pb-1 text-left text-base text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          class="thinking-header flex w-full items-center justify-between gap-3 rounded-sm px-1 pl-0 pb-1 text-left text-base text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded=${String(isOpen)}
           @click=${this.toggleExpanded}
         >
           <span class="flex min-w-0 items-center gap-2">
             <span class="${shimmerClasses}">${i18n("Thinking…")}</span>
           </span>
-          <span class="shrink-0 text-[11px] uppercase tracking-[0.16em] text-muted-foreground/70">
+          <span class="shrink-0 text-[11px] uppercase tracking-[0.16em] text-text-muted">
             ${isOpen ? i18n("Hide") : i18n("Show")}
           </span>
         </button>
@@ -551,8 +551,8 @@ if (!customElements.get("thinking-block")) {
 
 function renderToolHeader(iconNode: unknown, text: string): TemplateResult {
   return html`
-    <div class="flex items-center gap-2 text-sm text-muted-foreground">
-      <span class="inline-block text-foreground">${unsafeHTML(iconSvg(iconNode, "sm"))}</span>
+    <div class="flex items-center gap-2 text-sm text-text-muted">
+      <span class="inline-block text-text">${unsafeHTML(iconSvg(iconNode, "sm"))}</span>
       <span>${text}</span>
     </div>
   `;
@@ -582,7 +582,7 @@ function renderDefaultTool(
         prettyParams.content
           ? html`
             <div>
-              <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Input")}</div>
+              <div class="text-xs font-medium mb-1 text-text-muted">${i18n("Input")}</div>
               <code-block class="mt-3" .code=${encodeUtf8Base64(prettyParams.content)} language=${prettyParams.language}></code-block>
             </div>
           `
@@ -592,7 +592,7 @@ function renderDefaultTool(
         result
           ? html`
             <div>
-              <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Output")}</div>
+              <div class="text-xs font-medium mb-1 text-text-muted">${i18n("Output")}</div>
               <code-block class="mt-3" .code=${encodeUtf8Base64(prettyOutput.content)} language=${prettyOutput.language}></code-block>
             </div>
           `
@@ -783,7 +783,7 @@ function renderEditDiffRows(rows: EditDiffRow[]): TemplateResult {
               return html`
                 <tr class="diff-line diff-line-normal" data-row=${index}>
                   <td class="diff-gutter diff-gutter-normal" colspan="2"></td>
-                  <td class="diff-code diff-code-normal text-muted-foreground">${row.content}</td>
+                  <td class="diff-code diff-code-normal text-text-muted">${row.content}</td>
                 </tr>
               `;
             }
@@ -821,7 +821,7 @@ function renderEditTool(
           ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-x-auto whitespace-pre-wrap">${resultDiff}</pre>`
           : ""
       }
-      ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
+      ${result?.isError ? html`<div class="text-xs text-status-crashed">${resultText(result)}</div>` : ""}
     </div>
   `;
 }
@@ -836,7 +836,7 @@ function renderWriteTool(
   return html`
     <div class="space-y-2">
       ${renderEditDiffRows(writeRowsFromContent(content))}
-      ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
+      ${result?.isError ? html`<div class="text-xs text-status-crashed">${resultText(result)}</div>` : ""}
     </div>
   `;
 }
@@ -852,10 +852,10 @@ function renderReadTool(
     <div>
       ${
         output
-          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-muted-foreground">… truncated</span>` : ""}</pre>`
+          ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${lines}${truncated ? html`\n<span class="text-text-muted">… truncated</span>` : ""}</pre>`
           : ""
       }
-      ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
+      ${result?.isError ? html`<div class="text-xs text-status-crashed">${output}</div>` : ""}
     </div>
   `;
 }
@@ -877,7 +877,7 @@ function renderGrepTool(
           ? html`<pre class="text-xs font-mono rounded-sm border border-border p-2 overflow-auto max-h-64 whitespace-pre-wrap">${output}</pre>`
           : ""
       }
-      ${result?.isError ? html`<div class="text-xs text-destructive">${output}</div>` : ""}
+      ${result?.isError ? html`<div class="text-xs text-status-crashed">${output}</div>` : ""}
     </div>
   `;
 }
@@ -916,7 +916,7 @@ function renderSendToUserTool(
           </div>`
           : ""
       }
-      ${result?.isError ? html`<div class="text-xs text-destructive">${resultText(result)}</div>` : ""}
+      ${result?.isError ? html`<div class="text-xs text-status-crashed">${resultText(result)}</div>` : ""}
     </div>
   `;
 }
@@ -1068,7 +1068,7 @@ export class UserMessage extends LitElement {
     return html`
       ${
         isCompaction
-          ? html`<div class="flex items-center gap-2 mx-4 mt-8 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+          ? html`<div class="flex items-center gap-2 mx-4 mt-8 mb-1 text-[10px] uppercase tracking-wide text-text-muted">
               <hr class="flex-1 border-t border-border" />
               <span>${i18n("Context compacted")}</span>
               <hr class="flex-1 border-t border-border" />
@@ -1077,7 +1077,7 @@ export class UserMessage extends LitElement {
       }
       <div class="flex justify-start ml-2 mr-4 ${isCompaction ? "mt-1" : "mt-8"} mb-2 group/user-message">
         <div class="relative">
-          <div class="user-message-container py-2 px-4 pr-8 rounded-xl">
+          <div class="user-message-container rounded-xl border border-border-pop bg-background-pop py-2 px-4 pr-8 text-text">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
             ${
               imageBlocks.length > 0
@@ -1106,7 +1106,7 @@ export class UserMessage extends LitElement {
               data-open=${this.menuOpen ? "true" : "false"}
               aria-haspopup="menu"
               aria-expanded=${this.menuOpen ? "true" : "false"}
-              class="absolute top-2 right-1.5 p-1 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-100 cursor-pointer"
+              class="absolute top-2 right-1.5 cursor-pointer rounded p-1 text-text-muted hover:text-text"
               title="${i18n("Message actions")}"
             >
               ${unsafeHTML(iconSvg(EllipsisVertical, "sm"))}
@@ -1116,19 +1116,19 @@ export class UserMessage extends LitElement {
                 ? html`
               <div
                 role="menu"
-                class="absolute top-7 right-1 z-20 min-w-[13rem] rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1 text-xs"
+                class="absolute top-7 right-1 z-20 min-w-[13rem] rounded-md border border-border bg-background text-text shadow-md py-1 text-xs"
               >
                 <button
                   role="menuitem"
                   @click=${this._requestFork}
-                  class="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                  class="w-full text-left px-3 py-1.5 hover:bg-background-hover hover:text-text cursor-pointer"
                 >
                   ${i18n("Fork above this message")}
                 </button>
                 <button
                   role="menuitem"
                   @click=${this._requestPrune}
-                  class="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive cursor-pointer"
+                  class="w-full text-left px-3 py-1.5 hover:bg-status-crashed-muted text-status-crashed cursor-pointer"
                 >
                   ${i18n("Delete (including me)")}
                 </button>
@@ -1170,15 +1170,15 @@ export class ToolMessageDebugView extends LitElement {
     return html`
       <div class="mt-3 flex flex-col gap-2">
         <div>
-          <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Call")}</div>
+          <div class="text-xs font-medium mb-1 text-text-muted">${i18n("Call")}</div>
           <code-block class="mt-3" .code=${encodeUtf8Base64(call.content)} language=${call.language}></code-block>
         </div>
         <div>
-          <div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Result")}</div>
+          <div class="text-xs font-medium mb-1 text-text-muted">${i18n("Result")}</div>
           ${
             this.hasResult
               ? html`<code-block class="mt-3" .code=${encodeUtf8Base64(output.content)} language=${output.language}></code-block>`
-              : html`<div class="text-xs text-muted-foreground">${i18n("(no result)")}</div>`
+              : html`<div class="text-xs text-text-muted">${i18n("(no result)")}</div>`
           }
         </div>
       </div>
@@ -1246,7 +1246,7 @@ export class ToolMessage extends LitElement {
 
     return html`
       <details
-        class="tool-disclosure rounded-sm bg-background text-foreground"
+        class="tool-disclosure rounded-sm bg-background text-text"
         ?open=${disclosureOpen}
         @toggle=${this._onDisclosureToggle}
       >
@@ -1254,7 +1254,7 @@ export class ToolMessage extends LitElement {
           <div class="flex items-center gap-2 min-w-0">
             <div class="min-w-0 flex-1 flex items-baseline gap-2">
               <div class="text-sm font-medium leading-none truncate shrink-0 group-hover:underline select-text"><span class="inline-block w-[1em] text-center">${summary.state}</span> ${summary.title}</div>
-              <div class="text-xs text-muted-foreground leading-none truncate min-w-0 group-hover:underline select-text">${summary.subtitle}</div>
+              <div class="text-xs text-text-muted leading-none truncate min-w-0 group-hover:underline select-text">${summary.subtitle}</div>
             </div>
           </div>
         </summary>
@@ -1331,14 +1331,14 @@ export class AssistantMessage extends LitElement {
         ${
           this.message.usage && !this.isStreaming
             ? this.onCostClick
-              ? html`<div class="px-4 mt-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${formatUsage(this.message.usage)}</div>`
-              : html`<div class="px-4 mt-2 text-xs text-muted-foreground">${formatUsage(this.message.usage)}</div>`
+              ? html`<div class="px-4 mt-2 text-xs text-text-muted cursor-pointer hover:text-text transition-colors" @click=${this.onCostClick}>${formatUsage(this.message.usage)}</div>`
+              : html`<div class="px-4 mt-2 text-xs text-text-muted">${formatUsage(this.message.usage)}</div>`
             : ""
         }
         ${
           this.message.stopReason === "error" && this.message.errorMessage
             ? html`
-              <div class="mx-4 mt-3 p-3 bg-destructive/10 text-destructive rounded-lg text-sm overflow-hidden">
+              <div class="mx-4 mt-3 p-3 bg-status-crashed-muted text-status-crashed rounded-lg text-sm overflow-hidden">
                 <strong>${i18n("Error:")}</strong> ${this.message.errorMessage}
               </div>
             `
@@ -1346,7 +1346,7 @@ export class AssistantMessage extends LitElement {
         }
         ${
           this.message.stopReason === "aborted"
-            ? html`<span class="text-sm text-destructive italic">${i18n("Request aborted")}</span>`
+            ? html`<span class="text-sm text-status-crashed italic">${i18n("Request aborted")}</span>`
             : ""
         }
       </div>

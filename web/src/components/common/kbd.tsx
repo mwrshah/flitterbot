@@ -2,30 +2,22 @@ import type { HTMLAttributes } from "react";
 import { cn } from "~/lib/utils";
 
 type KbdSize = "default" | "compact";
-type KbdTone = "default" | "sidebar";
 
 const sizeStyles: Record<KbdSize, string> = {
   default: "h-5 min-w-5 rounded-md px-1.5 text-[10px]",
   compact: "h-4 min-w-4 rounded px-1 text-[9px]",
 };
 
-const toneStyles: Record<KbdTone, string> = {
-  default: "text-muted-foreground",
-  sidebar: "text-sidebar-foreground/45",
-};
-
 type KbdProps = HTMLAttributes<HTMLElement> & {
   size?: KbdSize;
-  tone?: KbdTone;
 };
 
-function Kbd({ className, size = "default", tone = "default", ...props }: KbdProps) {
+function Kbd({ className, size = "default", ...props }: KbdProps) {
   return (
     <kbd
       className={cn(
-        "inline-flex items-center justify-center border border-border bg-muted/60 font-mono font-medium leading-none",
+        "inline-flex items-center justify-center border border-border-muted bg-background-muted font-mono font-medium leading-none text-text-muted",
         sizeStyles[size],
-        toneStyles[tone],
         className,
       )}
       {...props}
@@ -51,7 +43,6 @@ export function ShortcutHint({
   className,
   kbdClassName,
   kbdSize = "default",
-  kbdTone = "default",
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
@@ -61,7 +52,6 @@ export function ShortcutHint({
   actionKeycap?: boolean;
   kbdClassName?: string;
   kbdSize?: KbdSize;
-  kbdTone?: KbdTone;
 }) {
   const steps: string[] = [];
   for (const step of label.split(/\s+then\s+/i)) {
@@ -82,10 +72,10 @@ export function ShortcutHint({
       >
         {steps.map((step, index) => (
           <span key={step} className="inline-flex items-center gap-1">
-            {index > 0 && <span className="text-[10px] text-muted-foreground/45">then</span>}
+            {index > 0 && <span className="text-[10px] text-text-muted">then</span>}
             <KbdGroup>
               {step.split("+").map((key) => (
-                <Kbd key={key} size={kbdSize} tone={kbdTone} className={kbdClassName}>
+                <Kbd key={key} size={kbdSize} className={kbdClassName}>
                   {key}
                 </Kbd>
               ))}
@@ -96,14 +86,14 @@ export function ShortcutHint({
       {showAction && (
         <span
           className={cn(
-            "col-start-1 row-start-1 inline-flex items-center text-[10px] text-muted-foreground/50",
+            "col-start-1 row-start-1 inline-flex items-center text-[10px] text-text-muted",
             !actionActive && "invisible pointer-events-none",
             actionOnHover && "group-hover:visible group-focus-visible:visible",
           )}
           aria-hidden={actionOnHover || !actionActive}
         >
           {actionKeycap ? (
-            <Kbd size={kbdSize} tone={kbdTone} className={kbdClassName}>
+            <Kbd size={kbdSize} className={kbdClassName}>
               {actionText}
             </Kbd>
           ) : (

@@ -222,12 +222,12 @@ export const ModelSelector = memo(function ModelSelector({
       <Button
         ref={triggerRef}
         type="button"
-        variant="outline"
+        variant="subtle"
         size="sm"
         disabled={disabled || !piSessionId}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "h-10 sm:h-7 border-border/60 bg-background/40 text-sm text-muted-foreground hover:bg-accent/50 hover:border-border",
+          "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
           compact ? "px-1.5" : "px-2",
         )}
         aria-haspopup="dialog"
@@ -246,7 +246,7 @@ export const ModelSelector = memo(function ModelSelector({
           <div ref={popoverRef} className="z-50" style={popoverStyle}>
             <Command
               loop
-              className="h-full rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+              className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
               <CommandInput placeholder="Search models…" />
               <CommandList className="max-h-none flex-1">
@@ -354,10 +354,10 @@ function ThinkingLevelCommandItem({
       onSelect={onSelect}
       title={title}
       className={cn(
-        "w-auto rounded-md border border-border/50 px-2 py-1 text-[11px] leading-none text-muted-foreground [&>svg]:hidden",
-        "data-selected:border-border data-selected:bg-accent/50 data-selected:text-foreground",
-        "data-[checked=true]:border-primary/40 data-[checked=true]:bg-primary data-[checked=true]:text-primary-foreground",
-        "data-[checked=true]:data-selected:border-border data-[checked=true]:data-selected:bg-accent/50 data-[checked=true]:data-selected:text-foreground",
+        "w-auto rounded-md border border-border-muted px-2 py-1 text-[11px] leading-none text-text-muted [&>svg]:hidden",
+        "data-selected:border-border data-selected:bg-background-hover data-selected:text-text",
+        "data-[checked=true]:border-border data-[checked=true]:bg-background-selected data-[checked=true]:text-text",
+        "data-[checked=true]:data-selected:border-border data-[checked=true]:data-selected:bg-background-selected data-[checked=true]:data-selected:text-text",
       )}
     >
       {THINKING_LEVEL_LABELS[level]}
@@ -398,13 +398,13 @@ function ModelCommandItem({
       onSelect={onSelect}
       className={cn(
         "items-start py-2 [&>svg]:hidden",
-        "data-[checked=true]:bg-primary/10 data-[checked=true]:text-foreground data-[checked=true]:data-selected:bg-primary/15",
+        "data-selected:bg-background-hover data-selected:text-text data-[checked=true]:bg-background-selected data-[checked=true]:text-text data-[checked=true]:data-selected:bg-background-selected",
         !available && "opacity-60",
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium leading-tight">{model.label}</span>
-        <span className="truncate text-[11px] leading-tight text-muted-foreground/70">
+        <span className="truncate text-[11px] leading-tight text-text-muted">
           {model.provider} · {model.modelId}
           {model.contextWindow ? ` · ${formatContext(model.contextWindow)}` : ""}
           {model.thinkingLevel ? ` · thinking=${model.thinkingLevel}` : ""}
@@ -422,9 +422,9 @@ function ModelCommandItem({
         }}
         className={cn(
           "shrink-0 self-center rounded p-1 transition-colors",
-          "text-muted-foreground/50 hover:bg-accent hover:text-foreground",
+          "text-text-muted hover:bg-background-hover hover:text-text",
           "disabled:cursor-not-allowed disabled:opacity-40",
-          isPinned && "text-amber-500/80 hover:text-amber-500",
+          isPinned && "text-text-pop hover:text-text-pop",
         )}
         title={pinTitle}
       >
@@ -445,7 +445,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   if (model.authKind === "subscription") {
     return (
       <span
-        className="shrink-0 self-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400"
+        className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
         title={`Using subscription/OAuth token auth for provider "${model.provider}"`}
       >
         subscription
@@ -455,7 +455,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   if (model.authKind === "api_key") {
     return (
       <span
-        className="shrink-0 self-center rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-600 dark:text-sky-400"
+        className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
         title={`Using API key auth for provider "${model.provider}"`}
       >
         api key
@@ -464,7 +464,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   }
   return (
     <span
-      className="shrink-0 self-center rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+      className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
       title={`No auth configured for provider "${model.provider}"`}
     >
       no auth

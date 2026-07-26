@@ -2,7 +2,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { memo, useEffect } from "react";
 import { AuthProvidersSection } from "~/components/auth-providers-section";
 import { Button } from "~/components/common/button";
-import { Input } from "~/components/common/input";
+import { Input } from "~/components/ui/input";
 import { useTheme } from "~/hooks/use-theme";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { useSettings } from "~/lib/settings-store";
@@ -44,7 +44,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-40 bg-scrim/50"
         onClick={onClose}
         aria-label="Close settings"
       />
@@ -56,7 +56,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close settings"
-            className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none"
+            className="text-lg leading-none text-text-muted transition-colors hover:text-text"
           >
             &times;
           </button>
@@ -64,9 +64,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
 
         <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
           <section className="space-y-3">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Theme
-            </h3>
+            <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">Theme</h3>
             <div className="flex gap-1.5">
               {themeOptions.map((opt) => (
                 <button
@@ -75,8 +73,8 @@ export const SettingsDrawer = memo(function SettingsDrawer({
                   onClick={() => setTheme(opt.value)}
                   className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     theme === opt.value
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                      ? "bg-background-selected text-text"
+                      : "bg-background-muted text-text-muted hover:bg-background-hover hover:text-text"
                   }`}
                 >
                   <span>{opt.icon}</span>
@@ -87,11 +85,11 @@ export const SettingsDrawer = memo(function SettingsDrawer({
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
               Control Surface
             </h3>
             <div className="space-y-1.5">
-              <label htmlFor="settings-base-url" className="text-xs text-muted-foreground">
+              <label htmlFor="settings-base-url" className="text-xs text-text-muted">
                 Base URL
               </label>
               <Input
@@ -102,7 +100,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="settings-bearer-token" className="text-xs text-muted-foreground">
+              <label htmlFor="settings-bearer-token" className="text-xs text-text-muted">
                 Bearer token
               </label>
               <Input
@@ -113,7 +111,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
                 placeholder="controlSurfaceToken"
               />
             </div>
-            <label className="flex items-center gap-2.5 text-sm text-muted-foreground cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-muted">
               <input
                 type="checkbox"
                 checked={settings.useStubFallback}
@@ -132,7 +130,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
         </div>
 
         <div className="px-5 py-4 border-t border-border">
-          <Button variant="secondary" className="w-full" onClick={onClose}>
+          <Button variant="subtle" className="w-full" onClick={onClose}>
             Close settings
           </Button>
         </div>

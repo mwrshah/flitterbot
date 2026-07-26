@@ -7,7 +7,7 @@ export const Route = createFileRoute("/streams")({
     await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
   },
   errorComponent: ({ error }: ErrorComponentProps) => (
-    <div className="flex items-center justify-center h-full p-8 text-destructive">
+    <div className="flex h-full items-center justify-center p-8 text-status-crashed">
       <p>Failed to load Streams status: {String(error)}</p>
     </div>
   ),

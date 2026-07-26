@@ -61,20 +61,13 @@ function NavItem({
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
         active
-          ? "bg-accent text-accent-foreground font-medium"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+          ? "bg-background-selected font-medium text-text"
+          : "text-text-muted hover:bg-background-hover hover:text-text",
       )}
     >
       <span className="shrink-0 size-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
-      {shortcutHint && (
-        <ShortcutHint
-          label={shortcutHint}
-          className="ml-auto text-sidebar-foreground/30"
-          kbdSize="compact"
-          kbdTone="sidebar"
-        />
-      )}
+      {shortcutHint && <ShortcutHint label={shortcutHint} className="ml-auto" kbdSize="compact" />}
     </Link>
   );
 }
@@ -144,7 +137,7 @@ function StreamContextMenu({
         }
       }}
       onClick={(e) => e.preventDefault()}
-      className="flex-1 min-w-0 select-text bg-transparent outline-none border-b border-sidebar-foreground/30"
+      className="min-w-0 flex-1 select-text border-b border-border outline-none focus:border-border-pop"
     />
   ) : (
     <span className="truncate flex-1">{stream.name}</span>
@@ -283,7 +276,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden select-none bg-sidebar border-r border-sidebar-border">
+    <aside className="flex h-full min-h-0 select-none flex-col overflow-hidden border-r border-border bg-background">
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
@@ -300,11 +293,11 @@ export const Sidebar = memo(function Sidebar() {
       </nav>
 
       {(defaultPiSessionId || allStreams.length > 0) && (
-        <div className="pl-3 pr-2 pt-1 pb-3 border-t border-sidebar-border flex-1 min-h-0 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-1">
           {(defaultPiSessionId || openStreams.length > 0) && (
             <>
               <div className="flex items-center justify-between mb-2 ml-2">
-                <p className="text-[10px] pt-2  uppercase tracking-wider text-sidebar-foreground/40 font-medium">
+                <p className="pt-2 text-[10px] font-medium uppercase tracking-wider text-text-muted">
                   Active streams
                 </p>
                 <div
@@ -320,7 +313,7 @@ export const Sidebar = memo(function Sidebar() {
                     title={
                       newStreamShortcutHint ? `New stream (${newStreamShortcutHint})` : "New stream"
                     }
-                    className="size-4 flex items-center justify-center rounded text-sidebar-foreground/40 group-hover:text-sidebar-foreground group-hover:bg-sidebar-accent/50 transition-colors text-sm leading-none disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex size-4 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     +
                   </button>
@@ -335,8 +328,8 @@ export const Sidebar = memo(function Sidebar() {
                       "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                       currentPiSessionId === defaultPiSessionId ||
                         (pathname === "/streams" && !currentPiSessionId)
-                        ? "bg-accent text-accent-foreground font-medium"
-                        : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                        ? "bg-background-selected font-medium text-text"
+                        : "text-text-muted hover:bg-background-hover hover:text-text",
                     )}
                   >
                     <span
@@ -349,9 +342,8 @@ export const Sidebar = memo(function Sidebar() {
                     {defaultShortcut && (
                       <ShortcutHint
                         label={String(defaultShortcut)}
-                        className="shrink-0 ml-2 text-sidebar-foreground/30"
+                        className="ml-2 shrink-0"
                         kbdSize="compact"
-                        kbdTone="sidebar"
                       />
                     )}
                   </Link>
@@ -381,8 +373,8 @@ export const Sidebar = memo(function Sidebar() {
                           className={cn(
                             "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
-                              ? "bg-accent text-accent-foreground font-medium"
-                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                              ? "bg-background-selected font-medium text-text"
+                              : "text-text-muted hover:bg-background-hover hover:text-text",
                           )}
                         >
                           <span
@@ -395,12 +387,8 @@ export const Sidebar = memo(function Sidebar() {
                           {streamShortcuts.has(ws.id) && (
                             <ShortcutHint
                               label={String(streamShortcuts.get(ws.id))}
-                              className={cn(
-                                "shrink-0 ml-2 text-sidebar-foreground/30",
-                                ws.pinned && "group-hover:hidden",
-                              )}
+                              className={cn("ml-2 shrink-0", ws.pinned && "group-hover:hidden")}
                               kbdSize="compact"
-                              kbdTone="sidebar"
                             />
                           )}
                           {ws.pinned && (
@@ -408,7 +396,7 @@ export const Sidebar = memo(function Sidebar() {
                               type="button"
                               aria-label="Unpin stream"
                               className={cn(
-                                "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex",
+                                "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex",
                                 !streamShortcuts.has(ws.id) && "ml-auto",
                               )}
                               onClick={(event) => {
@@ -436,14 +424,14 @@ export const Sidebar = memo(function Sidebar() {
                       onReopen={onReopen}
                       onClose={() => closeStreamMutation.mutate(ws.id)}
                       renderTrigger={(label) => (
-                        <div className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40">
+                        <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted">
                           <span className={cn("shrink-0 size-2 rounded-full", "bg-status-ended")} />
                           {label}
                           {ws.pinned && (
                             <button
                               type="button"
                               aria-label="Unpin stream"
-                              className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50 group-hover:flex"
+                              className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex"
                               onClick={() => {
                                 pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
                               }}
@@ -463,7 +451,7 @@ export const Sidebar = memo(function Sidebar() {
 
           {closedStreams.length > 0 && (
             <div className={defaultPiSessionId || openStreams.length > 0 ? "mt-6" : ""}>
-              <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/30 font-medium mb-2">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-text-muted">
                 Recently closed
               </p>
               <div className="space-y-1">
@@ -491,8 +479,8 @@ export const Sidebar = memo(function Sidebar() {
                           className={cn(
                             "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
-                              ? "bg-accent text-accent-foreground font-medium"
-                              : "text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/50",
+                              ? "bg-background-selected font-medium text-text"
+                              : "text-text-muted hover:bg-background-hover hover:text-text",
                           )}
                         >
                           {label}
@@ -500,7 +488,7 @@ export const Sidebar = memo(function Sidebar() {
                             <button
                               type="button"
                               aria-label="Unpin stream"
-                              className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-sidebar-foreground/20 hover:text-sidebar-foreground/50"
+                              className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-text-muted hover:text-text"
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();

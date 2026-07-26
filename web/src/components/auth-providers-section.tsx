@@ -4,7 +4,6 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
-import { Input } from "~/components/common/input";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import type {
   AuthFlowSnapshot,
   AuthMethodType,
@@ -59,14 +59,14 @@ export const AuthProvidersSection = memo(function AuthProvidersSection() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
           Accounts &amp; Model providers
         </h3>
         {isError && (
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-text-muted transition-colors hover:text-text"
           >
             Retry
           </button>
@@ -74,11 +74,11 @@ export const AuthProvidersSection = memo(function AuthProvidersSection() {
       </div>
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading providers…</p>
+        <p className="text-xs text-text-muted">Loading providers…</p>
       ) : isError ? (
-        <p className="text-xs text-destructive">Failed to load providers: {messageOf(error)}</p>
+        <p className="text-xs text-status-crashed">Failed to load providers: {messageOf(error)}</p>
       ) : providers.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No model providers available.</p>
+        <p className="text-xs text-text-muted">No model providers available.</p>
       ) : (
         <ul className="space-y-1.5">
           {providers.map((provider) => (
@@ -128,20 +128,20 @@ function ProviderRow({
   const isConnected = Boolean(provider.credentialType);
 
   return (
-    <li className="rounded-lg border border-border bg-background/40 px-3 py-2">
+    <li className="rounded-lg border border-border bg-background-muted px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-foreground">{provider.name}</span>
+            <span className="truncate text-sm font-medium text-text">{provider.name}</span>
             {isConnected && (
-              <Badge variant="success" className="shrink-0">
+              <Badge variant="active" className="shrink-0">
                 {provider.credentialType}
               </Badge>
             )}
           </div>
         </div>
         {isConnected && (
-          <Button variant="ghost" size="sm" onClick={onLogout} disabled={busy}>
+          <Button variant="subtle" size="sm" onClick={onLogout} disabled={busy}>
             Sign out
           </Button>
         )}
@@ -152,7 +152,7 @@ function ProviderRow({
           {provider.methods.map((method) => (
             <Button
               key={`${method.type}:${method.name}`}
-              variant="outline"
+              variant="subtle"
               size="sm"
               disabled={busy}
               onClick={() => onLogin(method.type)}
@@ -226,7 +226,7 @@ function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => vo
 
         <div className="space-y-3">
           {error && !snapshot && (
-            <p className="text-xs text-destructive">Could not load flow: {messageOf(error)}</p>
+            <p className="text-xs text-status-crashed">Could not load flow: {messageOf(error)}</p>
           )}
 
           {snapshot?.events.length ? (
@@ -239,7 +239,7 @@ function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => vo
             </ul>
           ) : null}
 
-          {snapshot?.error && <p className="text-xs text-destructive">{snapshot.error}</p>}
+          {snapshot?.error && <p className="text-xs text-status-crashed">{snapshot.error}</p>}
 
           {status === "running" && snapshot?.prompt && (
             <AuthPromptForm
@@ -253,18 +253,18 @@ function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => vo
           )}
 
           {status === "running" && !snapshot?.prompt && (
-            <p className="text-xs text-muted-foreground">Waiting for the provider…</p>
+            <p className="text-xs text-text-muted">Waiting for the provider…</p>
           )}
         </div>
 
         <div className="flex justify-end gap-2">
           {terminal ? (
-            <Button variant="secondary" size="sm" onClick={onClose}>
+            <Button variant="subtle" size="sm" onClick={onClose}>
               Done
             </Button>
           ) : (
             <Button
-              variant="ghost"
+              variant="subtle"
               size="sm"
               onClick={() => cancelMutation.mutate()}
               disabled={cancelMutation.isPending}
@@ -282,12 +282,12 @@ function AuthEventView({ event }: { event: AuthFlowSnapshot["events"][number] })
   if (event.type === "auth_url") {
     return (
       <div className="space-y-1">
-        {event.instructions && <p className="text-muted-foreground">{event.instructions}</p>}
+        {event.instructions && <p className="text-text-muted">{event.instructions}</p>}
         <a
           href={event.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="break-all text-primary underline underline-offset-2"
+          className="break-all text-text-pop underline underline-offset-2"
         >
           Open authentication page
         </a>
@@ -301,11 +301,11 @@ function AuthEventView({ event }: { event: AuthFlowSnapshot["events"][number] })
           href={event.verificationUri}
           target="_blank"
           rel="noopener noreferrer"
-          className="break-all text-primary underline underline-offset-2"
+          className="break-all text-text-pop underline underline-offset-2"
         >
           Open verification page
         </a>
-        <code className="block rounded bg-muted px-2 py-1 font-mono text-base tracking-widest">
+        <code className="block rounded bg-background-muted px-2 py-1 font-mono text-base tracking-widest text-text">
           {event.userCode}
         </code>
       </div>
@@ -314,14 +314,14 @@ function AuthEventView({ event }: { event: AuthFlowSnapshot["events"][number] })
   if (event.type === "info") {
     return (
       <div className="space-y-1">
-        <p className="text-muted-foreground">{event.message}</p>
+        <p className="text-text-muted">{event.message}</p>
         {event.links?.map((link) => (
           <a
             key={link.url}
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block break-all text-primary underline underline-offset-2"
+            className="block break-all text-text-pop underline underline-offset-2"
           >
             {link.label ?? link.url}
           </a>
@@ -329,7 +329,7 @@ function AuthEventView({ event }: { event: AuthFlowSnapshot["events"][number] })
       </div>
     );
   }
-  return <p className="text-muted-foreground">{event.message}</p>;
+  return <p className="text-text-muted">{event.message}</p>;
 }
 
 function AuthPromptForm({
@@ -363,7 +363,7 @@ function AuthPromptForm({
 
   return (
     <form onSubmit={submit} className="space-y-2">
-      <label htmlFor={`auth-prompt-${prompt.id}`} className="block text-sm text-foreground">
+      <label htmlFor={`auth-prompt-${prompt.id}`} className="block text-sm text-text">
         {prompt.message}
       </label>
 
@@ -373,7 +373,7 @@ function AuthPromptForm({
             <Button
               key={opt.id}
               type="button"
-              variant="outline"
+              variant="subtle"
               size="sm"
               disabled={pending}
               onClick={() => onSubmit(opt.id)}
@@ -405,7 +405,11 @@ function AuthPromptForm({
         </div>
       )}
       {validationError && (
-        <p id={`auth-prompt-error-${prompt.id}`} className="text-xs text-destructive" role="alert">
+        <p
+          id={`auth-prompt-error-${prompt.id}`}
+          className="text-xs text-status-crashed"
+          role="alert"
+        >
           {validationError}
         </p>
       )}
@@ -435,10 +439,10 @@ function LogoutConfirmDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
+          <Button variant="subtle" size="sm" onClick={onCancel} disabled={pending}>
             Cancel
           </Button>
-          <Button variant="destructive" size="sm" onClick={onConfirm} disabled={pending}>
+          <Button variant="danger" size="sm" onClick={onConfirm} disabled={pending}>
             Sign out
           </Button>
         </div>

@@ -6,10 +6,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   useWhyDidYouRender("Card", { className });
   return (
     <div
-      className={cn(
-        "rounded-xl border border-border bg-background text-foreground shadow-sm",
-        className,
-      )}
+      className={cn("rounded-xl border border-border bg-background text-text shadow-sm", className)}
       {...props}
     />
   );

@@ -156,7 +156,7 @@ function MessageInputHoverButtons({
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleBlockWidthRef = useRef(0);
   const buttonClassName =
-    "pointer-events-auto inline-flex h-10 sm:h-7 max-w-full shrink-0 items-center rounded-md border border-border/70 bg-background/90 px-2.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring";
+    "pointer-events-auto inline-flex h-10 max-w-full shrink-0 items-center rounded-md border border-border-muted bg-background px-2.5 text-sm text-text-muted transition-colors hover:border-border hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-border-pop sm:h-7";
 
   useLayoutEffect(() => {
     if (slots.length === 0) return;
@@ -297,9 +297,8 @@ function MessageInputHoverButtons({
       {messageInputButtonShortcutLabel(index) && (
         <ShortcutHint
           label={messageInputButtonShortcutLabel(index)!}
-          className="ml-2 shrink-0 text-sidebar-foreground/30"
+          className="ml-2 shrink-0 text-text-muted"
           kbdSize="compact"
-          kbdTone="sidebar"
           aria-hidden="true"
         />
       )}
@@ -1027,7 +1026,7 @@ export const MessageInput = memo(function MessageInput({
                 <button
                   type="button"
                   onClick={() => onRemoveImage(i)}
-                  className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-status-crashed-muted text-xs text-status-crashed opacity-0 transition-opacity group-hover:opacity-100"
                 >
                   &times;
                 </button>
@@ -1050,7 +1049,7 @@ export const MessageInput = memo(function MessageInput({
         <div
           ref={containerRef}
           className={cn(
-            "relative bg-background focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/50",
+            "relative bg-background focus-within:ring-1 focus-within:ring-inset focus-within:ring-border-pop",
             fillHeight ? "flex-1 flex flex-col min-h-0" : "h-full",
           )}
         >
@@ -1080,7 +1079,7 @@ export const MessageInput = memo(function MessageInput({
             rows={fillHeight ? undefined : rows}
             placeholder={placeholder}
             className={cn(
-              "w-full bg-transparent pl-10 pr-4 pt-3 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none",
+              "w-full resize-none bg-transparent pl-10 pr-4 pt-3 text-sm text-text placeholder:text-text-muted focus:outline-none",
               fillHeight && "flex-1 min-h-0",
             )}
           />
@@ -1089,7 +1088,7 @@ export const MessageInput = memo(function MessageInput({
             tabIndex={-1}
             disabled={imagesDisabled}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded p-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground/60"
+            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-text-muted"
             title={
               imagesDisabled ? "Images can't be queued while the session is busy" : "Attach image"
             }
@@ -1130,7 +1129,7 @@ export const MessageInput = memo(function MessageInput({
             {recoveryKind ? (
               <Button
                 type="button"
-                variant="outline"
+                variant="subtle"
                 size="sm"
                 disabled={isRecoverPending || !onRecover}
                 onClick={() => onRecover?.()}
@@ -1151,7 +1150,7 @@ export const MessageInput = memo(function MessageInput({
             ) : isSessionBusy ? (
               <Button
                 type="button"
-                variant="destructive"
+                variant="danger"
                 size="sm"
                 disabled={isInterruptPending || !onInterrupt}
                 onClick={() => onInterrupt?.()}
@@ -1166,7 +1165,7 @@ export const MessageInput = memo(function MessageInput({
                 size="sm"
                 disabled={isSending || !canSend}
                 onClick={submitCurrentDraft}
-                className="h-10 w-10 border border-border sm:h-7 sm:w-auto sm:px-3"
+                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
               >
                 {isSending ? (
                   <Loader2Icon className="size-4 animate-spin" />
