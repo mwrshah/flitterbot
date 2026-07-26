@@ -213,8 +213,8 @@ function EntryRow({
 
   const dotClass = isInbound ? (isWhatsApp ? "bg-emerald-500" : "bg-orange-400") : "bg-blue-400";
   const sourceLabel = isInbound ? (isWhatsApp ? "WhatsApp" : "Web") : "Agent";
-  const bubbleClass = isInbound ? "bg-card" : "bg-muted/30";
-  const fadeFrom = isInbound ? "from-card" : "from-muted/30";
+  const bubbleClass = isInbound ? "bg-background" : "bg-muted/30";
+  const fadeFrom = isInbound ? "from-background" : "from-muted/30";
 
   return (
     <div className="flex gap-3 items-start">

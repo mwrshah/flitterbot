@@ -13,6 +13,7 @@ export const Route = createFileRoute("/theme")({
 type ThemeToken = {
   name: string;
   role: string;
+  aliases?: string[];
 };
 
 const tokenFamilies: Array<{
@@ -22,22 +23,18 @@ const tokenFamilies: Array<{
 }> = [
   {
     name: "Background",
-    description: "Page canvas and full-width regions.",
+    description: "Canvas, bounded surfaces, overlays, and grouped regions.",
     tokens: [
-      { name: "background", role: "Application canvas" },
-      { name: "background-muted", role: "Quiet regions and hover" },
+      { name: "background", role: "Default application surface" },
+      { name: "background-muted", role: "Subtle contrast between panels" },
+      { name: "background-hover", role: "Transient pointer or keyboard hover" },
       { name: "background-selected", role: "Persistent selection" },
       { name: "background-pop", role: "Distinctive user-owned region" },
-    ],
-  },
-  {
-    name: "Card",
-    description: "Bounded, raised, floating, or grouped content.",
-    tokens: [
-      { name: "card", role: "Default bounded surface" },
-      { name: "card-muted", role: "Quiet card and hover" },
-      { name: "card-selected", role: "Selected card" },
-      { name: "card-pop", role: "User message and pop card" },
+      { name: "background-contrast", role: "Inverse surface; always equals text" },
+      {
+        name: "background-contrast-muted",
+        role: "Muted inverse surface; always equals text-muted",
+      },
     ],
   },
   {
@@ -47,8 +44,8 @@ const tokenFamilies: Array<{
       { name: "text", role: "Default foreground" },
       { name: "text-muted", role: "Receding information" },
       { name: "text-pop", role: "Expressive emphasis" },
-      { name: "text-contrast", role: "Text on strongly contrasting surfaces" },
-      { name: "text-contrast-muted", role: "Muted text on contrasting surfaces" },
+      { name: "text-contrast", role: "Inverse text; always equals background" },
+      { name: "text-contrast-muted", role: "Muted inverse text; always equals background-muted" },
     ],
   },
   {
@@ -60,6 +57,18 @@ const tokenFamilies: Array<{
       { name: "border-pop", role: "Focus and emphasis" },
     ],
   },
+];
+
+const statusTokens: ThemeToken[] = [
+  { name: "active", role: "Working, inferring, or connected" },
+  { name: "supervising", role: "Waiting on downstream sessions" },
+  {
+    name: "stale",
+    aliases: ["waiting", "info", "idle", "stale"],
+    role: "Needs attention without indicating failure",
+  },
+  { name: "ended", role: "Stopped, disabled, or disconnected" },
+  { name: "crashed", role: "Failed or crashed" },
 ];
 
 const utilities = ["bg", "text", "border", "ring", "fill", "stroke"];
@@ -83,16 +92,16 @@ function Code({ children, contrast = false }: { children: ReactNode; contrast?: 
   );
 }
 
-function TokenCard({ token }: { token: ThemeToken }) {
+function TokenSwatch({ token }: { token: ThemeToken }) {
   const variable = `--${token.name}`;
-  const isPopSurface = token.name === "background-pop" || token.name === "card-pop";
+  const isPopSurface = token.name === "background-pop";
   const swatchStyle = {
     backgroundColor: `var(${variable})`,
     backgroundImage: isPopSurface ? `var(${variable}-image)` : undefined,
   } as CSSProperties;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-border-muted bg-card text-text shadow-sm">
+    <article className="overflow-hidden rounded-xl border border-border-muted bg-background text-text shadow-sm">
       <div
         className="h-24 border-b border-border-muted"
         style={swatchStyle}
@@ -115,29 +124,59 @@ function TokenCard({ token }: { token: ThemeToken }) {
   );
 }
 
+function StatusSwatch({ token }: { token: ThemeToken }) {
+  const variable = `--status-${token.name}`;
+  const names = token.aliases ?? [token.name];
+
+  return (
+    <article
+      className="rounded-xl p-4"
+      style={{
+        backgroundColor: `var(${variable}-muted)`,
+        color: `var(${variable})`,
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className="size-2.5 rounded-full"
+          style={{ backgroundColor: `var(${variable})` }}
+          aria-hidden="true"
+        />
+        <h3 className="font-mono text-sm font-semibold">{names.join(" / ")}</h3>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-text-muted">{token.role}</p>
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {names.map((name) => (
+          <Code key={name}>status-{name}</Code>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function ThemeReferencePage() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
     <main className="alternate-theme h-full overflow-auto bg-background text-text">
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
+      <div className="px-36 py-8 sm:py-12">
         <header className="grid gap-8 border-b border-border-muted pb-10 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-3xl">
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-text-pop">
-              Candidate 01 · {resolvedTheme}
+              Approved theme · {resolvedTheme}
             </p>
             <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-text sm:text-5xl">
               Eggshell &amp; Signal
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-base leading-7 text-text-muted">
-              A compact semantic color system for Flitterbot. A subtle eggshell canvas and white
-              cards stay close to the existing interface; a translucent amber signal distinguishes
-              user-owned content without turning it into a solid color block.
+              A compact semantic color system for Flitterbot. A subtle eggshell canvas stays close
+              to the existing interface; a translucent amber signal distinguishes user-owned content
+              without turning it into a solid color block.
             </p>
           </div>
 
           <div
-            className="flex w-fit gap-1 rounded-xl border border-border-muted bg-card p-1 shadow-sm"
+            className="flex w-fit gap-1 rounded-xl border border-border-muted bg-background p-1 shadow-sm"
             aria-label="Theme appearance"
           >
             {themeOptions.map(({ value, label, icon: Icon }) => {
@@ -151,7 +190,7 @@ function ThemeReferencePage() {
                   className={
                     selected
                       ? "flex min-h-10 items-center gap-2 rounded-lg bg-background-selected px-3 text-sm font-medium text-text outline-none ring-border-pop focus-visible:ring-2"
-                      : "flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-text-muted outline-none hover:bg-background-muted hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
+                      : "flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-text-muted outline-none hover:bg-background-hover hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
                   }
                 >
                   <Icon className="size-4" aria-hidden="true" />
@@ -173,21 +212,34 @@ function ThemeReferencePage() {
             </p>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <button
               type="button"
-              className="min-h-32 rounded-xl border border-border bg-card p-4 text-left outline-none hover:bg-card-muted focus-visible:ring-2 focus-visible:ring-border-pop"
+              className="min-h-32 rounded-xl border border-border bg-background p-4 text-left outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop"
             >
               <span className="block text-sm font-semibold text-text">Default → hover</span>
               <span className="mt-2 block text-xs leading-5 text-text-muted">
-                Muted surfaces acknowledge an interaction without competing with content.
+                Hover surfaces acknowledge an interaction without competing with content.
               </span>
               <span className="mt-5 block font-mono text-[10px] text-text-muted">
-                hover:bg-card-muted
+                hover:bg-background-hover
               </span>
             </button>
 
-            <div className="min-h-32 rounded-xl border border-border bg-card-selected p-4">
+            <button
+              type="button"
+              className="min-h-32 rounded-xl border border-border bg-background-muted p-4 text-left outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop"
+            >
+              <span className="block text-sm font-semibold text-text">Muted → hover</span>
+              <span className="mt-2 block text-xs leading-5 text-text-muted">
+                Contrasting panels join the same hover trajectory.
+              </span>
+              <span className="mt-5 block font-mono text-[10px] text-text-muted">
+                bg-background-muted hover:bg-background-hover
+              </span>
+            </button>
+
+            <div className="min-h-32 rounded-xl border border-border bg-background-selected p-4">
               <span className="flex items-center gap-2 text-sm font-semibold text-text">
                 <Check className="size-4" aria-hidden="true" /> Selected
               </span>
@@ -195,30 +247,32 @@ function ThemeReferencePage() {
                 A calm persistent state for streams, tabs, and navigation.
               </span>
               <span className="mt-5 block font-mono text-[10px] text-text-muted">
-                bg-card-selected
+                bg-background-selected
               </span>
             </div>
 
-            <button
-              type="button"
-              className="min-h-32 rounded-xl border border-border bg-card p-4 text-left outline-none ring-border-pop focus-visible:ring-2"
-            >
-              <span className="block text-sm font-semibold text-text">Keyboard focus</span>
+            <div className="min-h-32 rounded-xl border border-border bg-background p-4">
+              <label htmlFor="theme-focus-input" className="block text-sm font-semibold text-text">
+                Keyboard focus
+              </label>
               <span className="mt-2 block text-xs leading-5 text-text-muted">
-                Press Tab to inspect the high-contrast focus boundary.
+                Focus the input to inspect the high-contrast boundary.
               </span>
-              <span className="mt-5 block font-mono text-[10px] text-text-muted">
-                focus-visible:ring-border-pop
-              </span>
-            </button>
+              <input
+                id="theme-focus-input"
+                type="text"
+                placeholder="Focus me"
+                className="mt-3 min-h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-text outline-none placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-border-pop"
+              />
+            </div>
 
-            <div className="min-h-32 rounded-xl border border-border-pop bg-card-pop p-4 text-text">
+            <div className="min-h-32 rounded-xl border border-border-pop bg-background-pop p-4 text-text">
               <span className="block text-xs font-medium text-text-muted">You</span>
               <span className="mt-2 block text-sm leading-5">
                 Make the user’s message distinct without turning it into a solid color block.
               </span>
               <span className="mt-5 block font-mono text-[10px] text-text-muted">
-                bg-card-pop border-border-pop
+                bg-background-pop border-border-pop
               </span>
             </div>
           </div>
@@ -236,16 +290,38 @@ function ThemeReferencePage() {
                 </h2>
                 <p className="mt-1 text-sm text-text-muted">{family.description}</p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                className={`grid gap-4 sm:grid-cols-2 ${family.name === "Background" ? "lg:grid-cols-5" : "lg:grid-cols-6"}`}
+              >
                 {family.tokens.map((token) => (
-                  <TokenCard key={token.name} token={token} />
+                  <TokenSwatch key={token.name} token={token} />
                 ))}
               </div>
             </section>
           ))}
         </div>
 
-        <section className="mt-12 grid overflow-hidden rounded-2xl border border-border-muted bg-card lg:grid-cols-2">
+        <section
+          className="mt-12 border-t border-border-muted pt-10"
+          aria-labelledby="status-heading"
+        >
+          <div className="mb-5 max-w-2xl">
+            <h2 id="status-heading" className="text-xl font-semibold text-text">
+              Flitterbot status colors
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-text-muted">
+              Application-specific status tokens sit outside the core background, text, and border
+              system. Labels and icons carry the same meaning when color is unavailable.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {statusTokens.map((token) => (
+              <StatusSwatch key={token.name} token={token} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-12 grid overflow-hidden rounded-2xl border border-border-muted bg-background lg:grid-cols-2">
           <div className="p-6 sm:p-8">
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-text-pop">
               Governance
@@ -256,8 +332,8 @@ function ThemeReferencePage() {
               values, or literal colors. New roles enter the theme here before they enter the app.
             </p>
           </div>
-          <div className="grid gap-3 border-t border-border-muted bg-card-muted p-6 sm:p-8 lg:border-l lg:border-t-0">
-            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-card p-3">
+          <div className="grid gap-3 border-t border-border-muted bg-background-muted p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-background p-3">
               <Info className="mt-0.5 size-4 shrink-0 text-text-pop" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium text-text">
@@ -268,7 +344,7 @@ function ThemeReferencePage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-card p-3 opacity-55">
+            <div className="flex items-start gap-3 rounded-xl border border-border-muted bg-background p-3 opacity-55">
               <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium text-text">Disabled is a state, not a color</p>

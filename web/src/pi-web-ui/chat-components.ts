@@ -1246,7 +1246,7 @@ export class ToolMessage extends LitElement {
 
     return html`
       <details
-        class="tool-disclosure rounded-sm bg-card text-card-foreground"
+        class="tool-disclosure rounded-sm bg-background text-foreground"
         ?open=${disclosureOpen}
         @toggle=${this._onDisclosureToggle}
       >

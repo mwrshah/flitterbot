@@ -1,18 +1,16 @@
 /*
- * Candidate semantic color system. Scope it to .alternate-theme until the
- * reference is approved and application surfaces are migrated.
+ * Approved semantic values. The alternate scope remains only until the
+ * canonical cutover moves these values into styles.css.
  */
 
 @theme inline {
   --color-background: var(--background);
   --color-background-muted: var(--background-muted);
+  --color-background-hover: var(--background-hover);
   --color-background-selected: var(--background-selected);
   --color-background-pop: var(--background-pop);
-
-  --color-card: var(--card);
-  --color-card-muted: var(--card-muted);
-  --color-card-selected: var(--card-selected);
-  --color-card-pop: var(--card-pop);
+  --color-background-contrast: var(--background-contrast);
+  --color-background-contrast-muted: var(--background-contrast-muted);
 
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
@@ -23,17 +21,21 @@
   --color-border: var(--border);
   --color-border-muted: var(--border-muted);
   --color-border-pop: var(--border-pop);
+
 }
 
-@source inline("{bg,text,border,ring,fill,stroke}-{background,background-muted,background-selected,background-pop,card,card-muted,card-selected,card-pop,text,text-muted,text-pop,text-contrast,text-contrast-muted,border,border-muted,border-pop}");
+@source inline("{bg,text,border,ring,fill,stroke}-{background,background-muted,background-hover,background-selected,background-pop,background-contrast,background-contrast-muted,text,text-muted,text-pop,text-contrast,text-contrast-muted,border,border-muted,border-pop}");
 
 .alternate-theme {
   color-scheme: light;
 
-  --background: oklch(0.985 0.002 95);
-  --background-muted: oklch(0.973 0.005 95);
-  --background-selected: oklch(0.935 0.012 95);
+  --background: oklch(0.985 0.002 80);
+  --background-muted: oklch(0.974 0.0025 73);
+  --background-hover: oklch(0.956 0.0053 73);
+  --background-selected: oklch(0.936 0.0086 73);
   --background-pop: transparent;
+  --background-contrast: var(--text);
+  --background-contrast-muted: var(--text-muted);
   --background-pop-image: linear-gradient(
     135deg,
     rgba(217, 79, 0, 0.12),
@@ -41,58 +43,40 @@
     rgba(212, 165, 0, 0.12)
   );
 
-  --card: oklch(1 0 0);
-  --card-muted: oklch(0.975 0.004 95);
-  --card-selected: oklch(0.95 0.008 95);
-  --card-pop: transparent;
-  --card-pop-image: var(--background-pop-image);
-
   --text: oklch(0.18 0.006 255);
   --text-muted: oklch(0.48 0.008 255);
   --text-pop: oklch(0.4 0.18 240);
-  --text-contrast: oklch(0.19 0.006 255);
-  --text-contrast-muted: oklch(0.38 0.008 255);
+  --text-contrast: var(--background);
+  --text-contrast-muted: var(--background-muted);
 
   --border: oklch(0.89 0.006 95);
   --border-muted: oklch(0.93 0.004 95);
   --border-pop: rgba(255, 107, 0, 0.25);
+
 }
 
 .alternate-theme .bg-background-pop {
   background-image: var(--background-pop-image);
 }
 
-.alternate-theme .bg-card-pop {
-  background-image: var(--card-pop-image);
-}
-
 .dark .alternate-theme {
   color-scheme: dark;
 
-  --background: oklch(0.145 0.002 135);
-  --background-muted: oklch(0.175 0.003 135);
-  --background-selected: oklch(0.27 0.008 120);
-  --background-pop: transparent;
-  --background-pop-image: linear-gradient(
-    135deg,
-    rgba(255, 164, 64, 0.16),
-    rgba(255, 190, 64, 0.18),
-    rgba(255, 215, 96, 0.14)
-  );
+  --background: oklch(0.145 0.002 80);
+  --background-muted: oklch(0.177 0.0025 80);
+  --background-hover: oklch(0.222 0.0054 80);
+  --background-selected: oklch(0.272 0.0074 80);
+  --background-pop: oklch(0.64 0.16 48 / 0.15);
+  --background-pop-image: none;
 
-  --card: oklch(0.195 0.003 135);
-  --card-muted: oklch(0.235 0.005 135);
-  --card-selected: oklch(0.29 0.008 120);
-  --card-pop: transparent;
-  --card-pop-image: var(--background-pop-image);
-
-  --text: oklch(0.88 0.004 95);
-  --text-muted: oklch(0.65 0.004 100);
+  --text: oklch(0.9 0.012 90);
+  --text-muted: oklch(0.68 0.01 90);
   --text-pop: oklch(0.82 0.14 78);
-  --text-contrast: oklch(0.18 0.003 135);
-  --text-contrast-muted: oklch(0.34 0.004 125);
+  --text-contrast: var(--background);
+  --text-contrast-muted: var(--background-muted);
 
   --border: oklch(0.38 0.006 130);
   --border-muted: oklch(0.3 0.005 130);
-  --border-pop: rgba(255, 184, 77, 0.3);
+  --border-pop: oklch(0.64 0.13 55 / 0.28);
+
 }

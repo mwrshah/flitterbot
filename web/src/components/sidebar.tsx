@@ -26,15 +26,15 @@ import { cn } from "~/lib/utils";
 function piStatusDotClass(status: PiSessionStatus | undefined): string {
   switch (status) {
     case "active":
-      return "bg-emerald-500";
+      return "bg-status-active";
     case "waiting_for_sessions":
-      return "bg-lime-400";
+      return "bg-status-supervising";
     case "waiting_for_user":
-      return "bg-amber-500";
+      return "bg-status-waiting";
     case "crashed":
-      return "bg-red-500";
+      return "bg-status-crashed";
     default:
-      return "bg-zinc-500";
+      return "bg-status-ended";
   }
 }
 
@@ -342,9 +342,7 @@ export const Sidebar = memo(function Sidebar() {
                     <span
                       className={cn(
                         "shrink-0 size-2 rounded-full",
-                        status?.piAgent?.default?.busy
-                          ? "bg-emerald-500"
-                          : "bg-sidebar-foreground/25",
+                        status?.piAgent?.default?.busy ? "bg-status-active" : "bg-status-ended",
                       )}
                     />
                     <span className="truncate flex-1">flitterbot</span>
@@ -439,7 +437,7 @@ export const Sidebar = memo(function Sidebar() {
                       onClose={() => closeStreamMutation.mutate(ws.id)}
                       renderTrigger={(label) => (
                         <div className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-foreground/40">
-                          <span className={cn("shrink-0 size-2 rounded-full", "bg-zinc-500")} />
+                          <span className={cn("shrink-0 size-2 rounded-full", "bg-status-ended")} />
                           {label}
                           {ws.pinned && (
                             <button

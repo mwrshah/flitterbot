@@ -8,16 +8,16 @@ import { useWsConnectionState } from "~/lib/ws-connection-store";
 function statusDotColor(status: string): string {
   switch (status) {
     case "connected":
-      return "bg-emerald-500";
+      return "bg-status-active";
     case "connecting":
     case "reconnecting":
-      return "bg-amber-500";
+      return "bg-status-waiting";
     case "stopped":
     case "disabled":
     case "disconnected":
-      return "bg-zinc-400";
+      return "bg-status-ended";
     default:
-      return "bg-amber-500";
+      return "bg-status-info";
   }
 }
 

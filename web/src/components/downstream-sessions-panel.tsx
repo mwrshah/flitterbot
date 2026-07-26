@@ -30,24 +30,24 @@ function piStatusBanner(
     case "active":
       return {
         label: "Inferring",
-        colorClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+        colorClass: "bg-status-active-muted text-status-active",
       };
     case "waiting_for_sessions":
       return {
         label: "Supervising",
-        colorClass: "bg-lime-500/15 text-lime-600 dark:text-lime-400",
+        colorClass: "bg-status-supervising-muted text-status-supervising",
       };
     case "waiting_for_user":
       return {
         label: "Idle",
-        colorClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+        colorClass: "bg-status-waiting-muted text-status-waiting",
       };
     case "ended":
-      return { label: "Ended", colorClass: "bg-zinc-500/15 text-zinc-500" };
+      return { label: "Ended", colorClass: "bg-status-ended-muted text-status-ended" };
     case "crashed":
       return {
         label: "Crashed",
-        colorClass: "bg-red-500/15 text-red-600 dark:text-red-400",
+        colorClass: "bg-status-crashed-muted text-status-crashed",
       };
     default:
       return null;
@@ -57,13 +57,13 @@ function piStatusBanner(
 function statusDotColor(status: DownstreamSessionItem["status"]): string {
   switch (status) {
     case "working":
-      return "bg-emerald-500";
+      return "bg-status-active";
     case "idle":
-      return "bg-blue-400";
+      return "bg-status-idle";
     case "stale":
-      return "bg-amber-500";
+      return "bg-status-stale";
     case "ended":
-      return "bg-zinc-500";
+      return "bg-status-ended";
   }
 }
 
@@ -355,7 +355,7 @@ export function DownstreamSessionsPanel({
             )}
             {diffQuery.isSuccess && diffQuery.data?.mode === "summary" && (
               <>
-                <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-md text-xs font-medium bg-status-waiting-muted text-status-waiting">
                   Diff too large ({diffQuery.data.files} files,{" "}
                   {diffQuery.data.insertions.toLocaleString()}+ /{" "}
                   {diffQuery.data.deletions.toLocaleString()}&minus;), showing summary only

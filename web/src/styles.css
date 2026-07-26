@@ -52,6 +52,24 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Flitterbot domain statuses stay outside the core theme families. */
+  --color-status-active: var(--status-active);
+  --color-status-active-muted: var(--status-active-muted);
+  --color-status-supervising: var(--status-supervising);
+  --color-status-supervising-muted: var(--status-supervising-muted);
+  --color-status-waiting: var(--status-waiting);
+  --color-status-waiting-muted: var(--status-waiting-muted);
+  --color-status-info: var(--status-info);
+  --color-status-info-muted: var(--status-info-muted);
+  --color-status-idle: var(--status-idle);
+  --color-status-idle-muted: var(--status-idle-muted);
+  --color-status-stale: var(--status-stale);
+  --color-status-stale-muted: var(--status-stale-muted);
+  --color-status-ended: var(--status-ended);
+  --color-status-ended-muted: var(--status-ended-muted);
+  --color-status-crashed: var(--status-crashed);
+  --color-status-crashed-muted: var(--status-crashed-muted);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
@@ -80,8 +98,8 @@
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
@@ -110,6 +128,23 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --status-active: oklch(0.74 0.15 145);
+  --status-active-muted: color-mix(in oklab, var(--status-active) 22%, transparent);
+  --status-supervising: oklch(0.81 0.15 125);
+  --status-supervising-muted: color-mix(in oklab, var(--status-supervising) 22%, transparent);
+  --status-stale: oklch(0.83 0.16 45);
+  --status-stale-muted: color-mix(in oklab, var(--status-stale) 22%, transparent);
+  --status-waiting: var(--status-stale);
+  --status-waiting-muted: var(--status-stale-muted);
+  --status-info: var(--status-stale);
+  --status-info-muted: var(--status-stale-muted);
+  --status-idle: var(--status-stale);
+  --status-idle-muted: var(--status-stale-muted);
+  --status-ended: oklch(0.75 0.008 100);
+  --status-ended-muted: color-mix(in oklab, var(--status-ended) 22%, transparent);
+  --status-crashed: oklch(0.78 0.17 25);
+  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 22%, transparent);
 
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
@@ -148,8 +183,8 @@
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
   --popover: oklch(0.269 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
@@ -178,6 +213,23 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.275 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  --status-active: oklch(0.62 0.12 145);
+  --status-active-muted: color-mix(in oklab, var(--status-active) 15%, transparent);
+  --status-supervising: oklch(0.66 0.11 125);
+  --status-supervising-muted: color-mix(in oklab, var(--status-supervising) 15%, transparent);
+  --status-stale: oklch(0.64 0.13 55);
+  --status-stale-muted: color-mix(in oklab, var(--status-stale) 15%, transparent);
+  --status-waiting: var(--status-stale);
+  --status-waiting-muted: var(--status-stale-muted);
+  --status-info: var(--status-stale);
+  --status-info-muted: var(--status-stale-muted);
+  --status-idle: var(--status-stale);
+  --status-idle-muted: var(--status-stale-muted);
+  --status-ended: oklch(0.52 0.008 100);
+  --status-ended-muted: color-mix(in oklab, var(--status-ended) 15%, transparent);
+  --status-crashed: oklch(0.6 0.14 25);
+  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 15%, transparent);
 
   --syntax-keyword: oklch(0.698 0.159 21.174);
   --syntax-entity: oklch(0.792 0.124 307.715);
