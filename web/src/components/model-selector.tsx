@@ -420,12 +420,8 @@ function ModelCommandItem({
           event.stopPropagation();
           onTogglePin();
         }}
-        className={cn(
-          "shrink-0 self-center rounded p-1 transition-colors",
-          "text-text-muted hover:bg-background-hover hover:text-text",
-          "disabled:cursor-not-allowed disabled:opacity-40",
-          isPinned && "text-text-pop hover:text-text-pop",
-        )}
+        className="shrink-0 self-center rounded p-1 text-border-pop transition-colors hover:bg-background-hover hover:text-border-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label={pinTitle}
         title={pinTitle}
       >
         <StarIcon className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
