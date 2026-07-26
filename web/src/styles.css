@@ -135,7 +135,7 @@
   --status-active-muted: color-mix(in oklab, var(--status-active) 22%, transparent);
   --status-supervising: oklch(0.81 0.15 125);
   --status-supervising-muted: color-mix(in oklab, var(--status-supervising) 22%, transparent);
-  --status-stale: rgb(255 107 0);
+  --status-stale: oklch(0.83 0.16 45);
   --status-stale-muted: color-mix(in oklab, var(--status-stale) 22%, transparent);
   --status-waiting: var(--status-stale);
   --status-waiting-muted: var(--status-stale-muted);
@@ -145,8 +145,8 @@
   --status-idle-muted: var(--status-stale-muted);
   --status-ended: oklch(0.75 0.008 100);
   --status-ended-muted: color-mix(in oklab, var(--status-ended) 22%, transparent);
-  --status-crashed: oklch(0.78 0.17 25);
-  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 22%, transparent);
+  --status-crashed: oklch(0.665 0.205 27);
+  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 12%, transparent);
 
   /* Specialist contracts. */
   --scrim: rgb(0 0 0);
@@ -254,8 +254,8 @@
   --status-idle-muted: var(--status-stale-muted);
   --status-ended: oklch(0.52 0.008 100);
   --status-ended-muted: color-mix(in oklab, var(--status-ended) 15%, transparent);
-  --status-crashed: oklch(0.6 0.14 25);
-  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 15%, transparent);
+  --status-crashed: oklch(0.58 0.18 27);
+  --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 12%, transparent);
 
   --syntax-keyword: oklch(0.698 0.159 21.174);
   --syntax-entity: oklch(0.792 0.124 307.715);
