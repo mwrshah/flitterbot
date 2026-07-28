@@ -73,7 +73,6 @@ import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
 import { createPiModelRuntime } from "./pi-auth.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
-import { nextForkName } from "./streams/fork-name.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import { stripInjectedDatetimeBlocks } from "./streams/format-stream-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
@@ -1756,15 +1755,12 @@ export class ControlSurfaceRuntime {
     const baseName = stripStreamNamePrefix(
       sourceStream?.name ?? managed.streamName ?? "flitterbot",
     );
-    let name = nextForkName(baseName);
-    while (getStreamByName(this.blackboard, name)) name = nextForkName(name);
-
     // Copy the stream as-is: same repo_path, worktree_path, base_branch, and agent cwd.
     // This intentionally shares the source worktree/branch, breaking the 1:1 stream-to-worktree
     // invariant -- both forks act on the same checkout until the user diverges them.
     const cwd = row?.cwd ?? sourceStream?.repo_path ?? this.config.projectsDir;
     const result = await this.spawnStreamWithSession({
-      name,
+      name: baseName,
       cwd,
       repoPath: sourceStream?.repo_path ?? cwd,
       ...(sourceStream?.worktree_path ? { worktreePath: sourceStream.worktree_path } : {}),

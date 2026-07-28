@@ -39,12 +39,41 @@ export function setStreamPinned(
   return getStreamById(db, streamId);
 }
 
+export function nextStreamName(name: string): string {
+  const numbered = /^([1-9]\d*)(\D.*)$/.exec(name);
+  return numbered && BigInt(numbered[1]!) >= 2n
+    ? `${BigInt(numbered[1]!) + 1n}${numbered[2]}`
+    : `2${name}`;
+}
+
+function availableStreamName(
+  db: BlackboardDatabase,
+  requestedName: string,
+  excludeStreamId?: string,
+): string {
+  let candidate = requestedName;
+  let collision = getStreamByName(db, candidate);
+  while (collision && collision.id !== excludeStreamId) {
+    candidate = nextStreamName(candidate);
+    collision = getStreamByName(db, candidate);
+  }
+  return candidate;
+}
+
 export function setStreamName(
   db: BlackboardDatabase,
   streamId: string,
   name: string,
 ): StreamRow | null {
-  db.prepare("UPDATE streams SET name = ? WHERE id = ?").run(name, streamId);
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    const availableName = availableStreamName(db, name, streamId);
+    db.prepare("UPDATE streams SET name = ? WHERE id = ?").run(availableName, streamId);
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
   return getStreamById(db, streamId);
 }
 
@@ -55,12 +84,20 @@ export function insertStream(
   streamUser?: string,
 ): StreamRow {
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO streams (id, name, type, stream_user) VALUES (?, ?, ?, ?)").run(
-    id,
-    name,
-    type,
-    streamUser ?? null,
-  );
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    const availableName = availableStreamName(db, name);
+    db.prepare("INSERT INTO streams (id, name, type, stream_user) VALUES (?, ?, ?, ?)").run(
+      id,
+      availableName,
+      type,
+      streamUser ?? null,
+    );
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
   return getStreamById(db, id)!;
 }
 
