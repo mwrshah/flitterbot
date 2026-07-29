@@ -100,7 +100,8 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
       settingsManager,
       modelRuntime,
       resourceLoaderOptions: {
-        extensionFactories: [createFlitterbotExtension(customTools, additionalSkillPaths)],
+        additionalSkillPaths,
+        extensionFactories: [createFlitterbotExtension(customTools)],
         appendSystemPromptOverride: (base) => [rolePrompt, ...(memory ? [memory] : []), ...base],
       },
     });
