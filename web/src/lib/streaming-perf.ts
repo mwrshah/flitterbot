@@ -3,15 +3,13 @@ type SpanKind =
   | "deltaToCallback"
   | "streamingDomWrite"
   | "streamingLitRender"
-  | "committedLitRender"
-  | "scroll";
+  | "committedLitRender";
 
 type CounterKind =
   | "deltasReceived"
   | "callbacksFired"
   | "streamingUpdateCalls"
   | "committedMessageSyncs"
-  | "scrollCalls"
   | "messageListUpdates"
   | "streamingAssistantUpdates"
   | "committedAssistantUpdates";
@@ -26,7 +24,6 @@ const spanSamples: Record<SpanKind, number[]> = {
   streamingDomWrite: [],
   streamingLitRender: [],
   committedLitRender: [],
-  scroll: [],
 };
 
 const counters: Record<CounterKind, number> = {
@@ -34,7 +31,6 @@ const counters: Record<CounterKind, number> = {
   callbacksFired: 0,
   streamingUpdateCalls: 0,
   committedMessageSyncs: 0,
-  scrollCalls: 0,
   messageListUpdates: 0,
   streamingAssistantUpdates: 0,
   committedAssistantUpdates: 0,
@@ -127,15 +123,6 @@ export const streamingPerf = {
     endSpan(token);
   },
 
-  beginScroll() {
-    incrementCounter("scrollCalls");
-    return beginSpan("scroll");
-  },
-
-  endScroll(token: number | null) {
-    endSpan(token);
-  },
-
   markMessageListUpdated() {
     incrementCounter("messageListUpdates");
   },
@@ -163,7 +150,6 @@ export const streamingPerf = {
     reportSpan("Streaming DOM write", spanSamples.streamingDomWrite);
     reportSpan("Streaming Lit render", spanSamples.streamingLitRender);
     reportSpan("Committed Lit render", spanSamples.committedLitRender);
-    reportSpan("Scroll", spanSamples.scroll);
     console.groupEnd();
   },
 

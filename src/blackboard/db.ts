@@ -13,8 +13,8 @@ export class BlackboardDatabase {
     this.path = dbPath;
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     this.sqlite = new DatabaseSync(dbPath);
-    this.sqlite.exec("PRAGMA journal_mode=WAL;");
     this.sqlite.exec("PRAGMA busy_timeout=5000;");
+    this.sqlite.exec("PRAGMA journal_mode=WAL;");
     this.sqlite.exec("PRAGMA foreign_keys=ON;");
     migrateBlackboard(this.sqlite);
   }

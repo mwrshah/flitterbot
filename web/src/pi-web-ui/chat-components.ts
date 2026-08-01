@@ -26,6 +26,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import htmlLanguage from "highlight.js/lib/languages/xml";
 import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
+import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
@@ -40,7 +41,11 @@ import {
   SquareTerminal,
 } from "lucide";
 import type { ActiveToolState } from "~/lib/active-tool-store";
-import { streamingUiDebug, streamingUiDebugWarn } from "~/lib/debug-log";
+import {
+  getAgentMessageRowKeys,
+  isRenderableAgentMessage,
+  STREAMING_MESSAGE_ROW_KEY,
+} from "~/lib/agent-message-rows";
 import { renderSafeMarkdownHtml } from "~/lib/markdown-html";
 import { streamingPerf } from "~/lib/streaming-perf";
 
@@ -1358,20 +1363,40 @@ if (!customElements.get("assistant-message")) {
   customElements.define("assistant-message", AssistantMessage);
 }
 
+export type MessageListVirtualState = {
+  items: Array<{ index: number; key: string | number | bigint; start: number }>;
+  totalSize: number;
+  measureElement: (element: Element | undefined) => void;
+};
+
 export class MessageList extends LitElement {
   @property({ type: Array }) messages: RenderMessage[] = [];
   @property({ type: Array }) tools: AgentTool[] = [];
   @property({ type: Object }) pendingToolCalls?: Set<string>;
   @property({ attribute: false }) onCostClick?: () => void;
   @property({ type: Boolean }) isSessionBusy = false;
+  @property({ attribute: false }) virtualState?: MessageListVirtualState;
 
   private _streamingEl: AssistantMessage | null = null;
   private _activeToolStates = new Map<string, ActiveToolState>();
-  private _pendingToolResultCommits = new Map<string, ToolResultMessageType>();
+  private _committedToolResultIds = new Set<string>();
+  private _measureCallbacks = new Map<
+    string | number | bigint,
+    (element: Element | undefined) => void
+  >();
   private _toolMessageEls = new Map<string, ToolMessageElement>();
-
-  private _cachedRenderItems: Array<{ key: string; template: TemplateResult }> | null = null;
-  private _committedTotal = 0;
+  private _lastToolSyncMessages?: RenderMessage[];
+  private _lastToolSyncRange = "";
+  private _virtualGeometry?: MessageListVirtualState;
+  private _appliedGeometry?: MessageListVirtualState;
+  private _renderItemsCache?: {
+    messages: RenderMessage[];
+    tools: AgentTool[];
+    pendingToolCalls?: Set<string>;
+    onCostClick?: () => void;
+    isSessionBusy: boolean;
+    items: Array<{ key: string; template: TemplateResult }>;
+  };
 
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -1382,52 +1407,74 @@ export class MessageList extends LitElement {
     this.style.display = "block";
   }
 
-  override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
-    if (changedProperties.has("isSessionBusy")) {
-      this._committedTotal = 0;
-      this._cachedRenderItems = null;
-      return true;
-    }
-    if (
-      this._committedTotal > 0 &&
-      changedProperties.has("messages") &&
-      changedProperties.size === 1
-    ) {
-      const newLength = (this.messages as RenderMessage[]).length;
-      if (newLength < this._committedTotal) {
-        streamingUiDebug(
-          "[debug][message-list] shouldUpdate FALLTHROUGH: history shrank (messages.length=%d, committedTotal=%d) — full render",
-          newLength,
-          this._committedTotal,
-        );
-        this._committedTotal = 0;
-        this._cachedRenderItems = null;
-        return true;
-      }
-      if (newLength === this._committedTotal) {
-        streamingUiDebug(
-          "[debug][message-list] shouldUpdate SUPPRESSED: React catch-up render skipped (messages.length=%d, committedTotal=%d)",
-          newLength,
-          this._committedTotal,
-        );
-        this._committedTotal = 0;
-        this._cachedRenderItems = null;
-        return false;
-      }
-      streamingUiDebug(
-        "[debug][message-list] shouldUpdate FALLTHROUGH: more messages than committed (messages.length=%d, committedTotal=%d) — full render",
-        newLength,
-        this._committedTotal,
-      );
-      this._committedTotal = 0;
-      this._cachedRenderItems = null;
-    }
-    return true;
-  }
-
   override updated(): void {
     streamingPerf.markMessageListUpdated();
-    this.syncToolMessageTargets();
+    const geometry = this._virtualGeometry ?? this.virtualState;
+    if (geometry) this.updateVirtualGeometry(geometry, true);
+    this.mountStreamingElement();
+    const rangeItems = this.virtualState?.items ?? [];
+    const range = rangeItems.map((item) => item.key).join("|") || "empty";
+    const visibleKeys = new Set(rangeItems.map((item) => item.key));
+    for (const key of this._measureCallbacks.keys()) {
+      if (!visibleKeys.has(key)) this._measureCallbacks.delete(key);
+    }
+    if (this.messages !== this._lastToolSyncMessages || range !== this._lastToolSyncRange) {
+      this._lastToolSyncMessages = this.messages;
+      this._lastToolSyncRange = range;
+      this.syncToolMessageTargets();
+    }
+  }
+
+  updateVirtualGeometry(state: MessageListVirtualState, force = false): void {
+    const previous = this._appliedGeometry;
+    this._virtualGeometry = state;
+    const canvas = this.querySelector<HTMLElement>("[data-virtual-canvas]");
+    if (!canvas) return;
+    const height = `${state.totalSize}px`;
+    if (canvas.style.height !== height) canvas.style.height = height;
+
+    const positionsChanged =
+      force ||
+      previous?.items.length !== state.items.length ||
+      previous.items.some(
+        (item, index) =>
+          item.index !== state.items[index]?.index || item.start !== state.items[index]?.start,
+      );
+    if (!positionsChanged) {
+      this._appliedGeometry = state;
+      return;
+    }
+
+    const rows = new Map(
+      Array.from(canvas.querySelectorAll<HTMLElement>(":scope > [data-index]")).map((row) => [
+        Number(row.dataset.index),
+        row,
+      ]),
+    );
+    for (const item of state.items) {
+      const row = rows.get(item.index);
+      if (!row) continue;
+      const transform = `translate3d(0, ${item.start}px, 0)`;
+      if (row.style.transform !== transform) row.style.transform = transform;
+    }
+    this._appliedGeometry = state;
+  }
+
+  private getMeasureCallback(
+    key: string | number | bigint,
+    measureElement: MessageListVirtualState["measureElement"],
+  ): (element: Element | undefined) => void {
+    let callback = this._measureCallbacks.get(key);
+    if (!callback) {
+      callback = (element) => measureElement(element);
+      this._measureCallbacks.set(key, callback);
+    }
+    return callback;
+  }
+
+  private mountStreamingElement(): void {
+    if (!this._streamingEl || this._streamingEl.isConnected) return;
+    this.querySelector("[data-streaming-slot]")?.appendChild(this._streamingEl);
   }
 
   updateStreaming(msg: AssistantMessageType, isThinkingStreaming = false): Promise<unknown> {
@@ -1438,11 +1485,8 @@ export class MessageList extends LitElement {
       ) as unknown as AssistantMessage;
       this._streamingEl.style.display = "block";
       this._streamingEl.hideToolCalls = false;
-      const container = this.querySelector(":scope > div");
-      if (container) {
-        container.appendChild(this._streamingEl as unknown as Node);
-      }
     }
+    this.mountStreamingElement();
     this._streamingEl.isStreaming = isThinkingStreaming;
     this._streamingEl.message = msg;
     this._streamingEl.style.display = "block";
@@ -1457,9 +1501,7 @@ export class MessageList extends LitElement {
   clearStreaming(): void {
     const el = this._streamingEl;
     if (!el) return;
-    requestAnimationFrame(() => {
-      el.style.display = "none";
-    });
+    el.style.display = "none";
   }
 
   setActiveTools(states: ActiveToolState[]): void {
@@ -1487,102 +1529,6 @@ export class MessageList extends LitElement {
     this._activeToolStates.clear();
   }
 
-  commitStreaming(messages: AgentMessage[]): void {
-    if (this._streamingEl) {
-      this._streamingEl.style.display = "none";
-    }
-
-    const newItems = this.buildRenderItemsForCommit(messages);
-    if (!newItems.length) return;
-
-    if (!this._cachedRenderItems) {
-      this._cachedRenderItems = this.buildRenderItems();
-    }
-
-    const cachedBefore = this._cachedRenderItems.length;
-    this._cachedRenderItems.push(...newItems);
-    this._committedTotal = (this.messages as RenderMessage[]).length + messages.length;
-
-    streamingUiDebug(
-      "[debug][message-list] commitStreaming: appending %d items (cachedTotal=%d → %d)",
-      newItems.length,
-      cachedBefore,
-      this._cachedRenderItems.length,
-    );
-
-    this.requestUpdate();
-  }
-
-  commitToolResult(message: AgentMessage): boolean {
-    const toolResult = message as ToolResultMessageType;
-    const target = this._toolMessageEls.get(toolResult.toolCallId);
-    if (!target) {
-      this._pendingToolResultCommits.set(toolResult.toolCallId, toolResult);
-      streamingUiDebug(
-        "[debug][message-list] commitToolResult queued: waiting for tool-message target toolCallId=%s",
-        toolResult.toolCallId,
-      );
-      return false;
-    }
-
-    this.applyToolResultCommitToElement(target, toolResult);
-    this.noteToolResultCommit(1);
-
-    streamingUiDebug(
-      "[debug][message-list] commitToolResult: toolCallId=%s committedTotal=%d",
-      toolResult.toolCallId,
-      this._committedTotal,
-    );
-
-    return true;
-  }
-
-  private buildRenderItemsForCommit(
-    messages: AgentMessage[],
-  ): Array<{ key: string; template: TemplateResult }> {
-    const items: Array<{ key: string; template: TemplateResult }> = [];
-    let fallbackIndex =
-      this._cachedRenderItems?.length ?? (this.messages as RenderMessage[]).length;
-
-    for (const msg of messages) {
-      const role = (msg as unknown as { role: string }).role;
-      if (role === "artifact" || role === "toolResult") continue;
-
-      const ts = (msg as unknown as { timestamp?: number }).timestamp;
-      const key = ts != null ? `${role}:${ts}` : `msg:${fallbackIndex}`;
-      fallbackIndex++;
-
-      if (role === "user" || role === "user-with-attachments") {
-        const entryId = (msg as unknown as { _entryId?: string })._entryId;
-        items.push({
-          key,
-          template: html`<user-message .message=${msg} .entryId=${entryId}></user-message>`,
-        });
-      } else if (role === "assistant") {
-        const getCopyText = this.isSessionBusy
-          ? undefined
-          : () => MessageList.getAssistantPlainText(msg as AssistantMessageType);
-        items.push({
-          key,
-          template: html`
-            <assistant-message
-              .message=${msg as AssistantMessageType}
-              .tools=${this.tools}
-              .isStreaming=${false}
-              .pendingToolCalls=${this.pendingToolCalls}
-              .toolResultsById=${new Map()}
-              .hideToolCalls=${false}
-              .onCostClick=${this.onCostClick}
-              .getCopyText=${getCopyText}
-            ></assistant-message>
-          `,
-        });
-      }
-    }
-
-    return items;
-  }
-
   private applyActiveToolStates(): void {
     for (const [toolUseId, state] of this._activeToolStates) {
       const target = this._toolMessageEls.get(toolUseId);
@@ -1603,45 +1549,8 @@ export class MessageList extends LitElement {
     }
   }
 
-  private applyToolResultCommitToElement(
-    target: ToolMessageElement,
-    toolResult: ToolResultMessageType,
-  ): void {
-    target.pending = false;
-    target.result = toolResult;
-    this._activeToolStates.delete(toolResult.toolCallId);
-    this._pendingToolResultCommits.delete(toolResult.toolCallId);
-  }
-
-  private noteToolResultCommit(count: number): void {
-    this._committedTotal =
-      Math.max(this._committedTotal, (this.messages as RenderMessage[]).length) + count;
-  }
-
-  private applyPendingToolResultCommits(): void {
-    let appliedCount = 0;
-    for (const [toolUseId, toolResult] of Array.from(this._pendingToolResultCommits.entries())) {
-      const target = this._toolMessageEls.get(toolUseId);
-      if (!target) continue;
-      this.applyToolResultCommitToElement(target, toolResult);
-      appliedCount += 1;
-    }
-    if (appliedCount > 0) {
-      this.noteToolResultCommit(appliedCount);
-      streamingUiDebug(
-        "[debug][message-list] applyPendingToolResultCommits: applied=%d committedTotal=%d",
-        appliedCount,
-        this._committedTotal,
-      );
-    }
-  }
-
   private hasCommittedToolResult(toolUseId: string): boolean {
-    return this.messages.some(
-      (message) =>
-        (message as unknown as { role?: string }).role === "toolResult" &&
-        (message as ToolResultMessageType).toolCallId === toolUseId,
-    );
+    return this._committedToolResultIds.has(toolUseId);
   }
 
   private pruneCommittedToolStates(): void {
@@ -1663,7 +1572,6 @@ export class MessageList extends LitElement {
       }
     }
     this._toolMessageEls = next;
-    this.applyPendingToolResultCommits();
     this.applyActiveToolStates();
   }
 
@@ -1690,12 +1598,7 @@ export class MessageList extends LitElement {
   }
 
   private buildRenderItems(): Array<{ key: string; template: TemplateResult }> {
-    if (this._committedTotal > 0) {
-      streamingUiDebugWarn(
-        "[message-list] buildRenderItems called while committedTotal=%d — expected imperative path to handle this",
-        this._committedTotal,
-      );
-    }
+    const rowKeys = getAgentMessageRowKeys(this.messages as AgentMessage[]);
     const resultByCallId = new Map<string, ToolResultMessageType>();
     for (const message of this.messages) {
       if ((message as unknown as { role: string }).role === "toolResult") {
@@ -1705,6 +1608,8 @@ export class MessageList extends LitElement {
         );
       }
     }
+
+    this._committedToolResultIds = new Set(resultByCallId.keys());
 
     const lastAssistantInTurn = new Set<AssistantMessageType>();
     let lastAssistant: AssistantMessageType | null = null;
@@ -1723,13 +1628,9 @@ export class MessageList extends LitElement {
     let fallbackIndex = 0;
 
     for (const msg of this.messages) {
+      if (!isRenderableAgentMessage(msg as AgentMessage)) continue;
       const role = (msg as unknown as { role: string }).role;
-      if (role === "artifact" || role === "toolResult") {
-        continue;
-      }
-
-      const ts = (msg as unknown as { timestamp?: number }).timestamp;
-      const key = ts != null ? `${role}:${ts}` : `msg:${fallbackIndex}`;
+      const key = rowKeys[fallbackIndex]!;
       fallbackIndex++;
 
       if (role === "user" || role === "user-with-attachments") {
@@ -1765,31 +1666,58 @@ export class MessageList extends LitElement {
     return items;
   }
 
-  override render() {
-    let items: Array<{ key: string; template: TemplateResult }>;
-    if (this._cachedRenderItems) {
-      items = this._cachedRenderItems;
-      streamingUiDebug(
-        "[debug][message-list] render: using cached render items (count=%d)",
-        items.length,
-      );
-      if (this._committedTotal === 0) {
-        this._cachedRenderItems = null;
-      }
-    } else {
-      items = this.buildRenderItems();
-      streamingUiDebug(
-        "[debug][message-list] render: FULL buildRenderItems (count=%d messages=%d)",
-        items.length,
-        (this.messages as RenderMessage[]).length,
-      );
+  private getRenderItems(): Array<{ key: string; template: TemplateResult }> {
+    const cached = this._renderItemsCache;
+    if (
+      cached?.messages === this.messages &&
+      cached.tools === this.tools &&
+      cached.pendingToolCalls === this.pendingToolCalls &&
+      cached.onCostClick === this.onCostClick &&
+      cached.isSessionBusy === this.isSessionBusy
+    ) {
+      return cached.items;
     }
+
+    const items = this.buildRenderItems();
+    this._renderItemsCache = {
+      messages: this.messages,
+      tools: this.tools,
+      pendingToolCalls: this.pendingToolCalls,
+      onCostClick: this.onCostClick,
+      isSessionBusy: this.isSessionBusy,
+      items,
+    };
+    return items;
+  }
+
+  override render() {
+    const items = this.getRenderItems();
+    const virtualState = this.virtualState;
+    if (!virtualState) return nothing;
+
     return html`<div class="flex flex-col">
-      ${repeat(
-        items,
-        (item) => item.key,
-        (item) => item.template,
-      )}
+      <div
+        data-virtual-canvas
+        style=${`height:${virtualState.totalSize}px;position:relative;width:100%;`}
+      >
+        ${repeat(
+          virtualState.items,
+          (virtualItem) => virtualItem.key,
+          (virtualItem) => {
+            const item = items[virtualItem.index];
+            const isStreamingSlot = virtualItem.key === STREAMING_MESSAGE_ROW_KEY;
+            return html`
+              <div
+                data-index=${virtualItem.index}
+                ${ref(this.getMeasureCallback(virtualItem.key, virtualState.measureElement))}
+                style=${`position:absolute;top:0;left:0;display:flex;flex-direction:column;width:100%;transform:translate3d(0, ${virtualItem.start}px, 0);`}
+              >
+                ${isStreamingSlot ? html`<div data-streaming-slot></div>` : item?.template}
+              </div>
+            `;
+          },
+        )}
+      </div>
     </div>`;
   }
 }

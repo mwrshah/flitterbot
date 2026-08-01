@@ -72,8 +72,14 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         timestamp: new Date(item.createdAt).getTime(),
         source,
         _entryId: item.id,
+        _rowKey: item.clientMessageId ?? item.id,
         ...(item.compaction ? { _compaction: true } : {}),
-      } as AgentMessage & { source: MessageSource; _entryId?: string; _compaction?: boolean });
+      } as AgentMessage & {
+        source: MessageSource;
+        _entryId?: string;
+        _rowKey?: string;
+        _compaction?: boolean;
+      });
       continue;
     }
 
@@ -110,6 +116,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         content,
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
+        _entryId: item.id,
       } as unknown as AgentMessage);
       continue;
     }
@@ -134,6 +141,7 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
         content: [orphanCall],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
+        _entryId: item.id,
       } as unknown as AgentMessage);
       continue;
     }
@@ -151,8 +159,4 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
   }
 
   return messages;
-}
-
-export function timelineItemsToAgentMessages(items: ChatTimelineItem[]): AgentMessage[] {
-  return timelineToAgentMessages(items);
 }

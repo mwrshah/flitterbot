@@ -39,7 +39,6 @@ import {
 import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
-import { useStickToBottom } from "~/hooks/use-stick-to-bottom";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { activeToolStore } from "~/lib/active-tool-store";
@@ -53,7 +52,6 @@ import {
 import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { StreamRecoveryKind } from "~/lib/stream-recovery";
-import { streamingPerf } from "~/lib/streaming-perf";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
@@ -474,10 +472,7 @@ export function ChatPanel({
     });
   }, []);
 
-  const { viewportRef, scrollToBottom, isAtBottomRef, engageAndScroll } = useStickToBottom({
-    initialScrollWhen: agentMessages.length > 0,
-    initialScrollKey: piSessionId,
-  });
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     clearBusyQueuedText();
@@ -516,13 +511,9 @@ export function ChatPanel({
     }
 
     if (shouldScrollToPostedMessage) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          engageAndScroll();
-        });
-      });
+      messageListRef.current?.scrollToEnd();
     }
-  }, [busyQueuedText, clearBusyQueuedText, engageAndScroll, timeline]);
+  }, [busyQueuedText, clearBusyQueuedText, timeline]);
 
   const handlePruneRequested = useCallback((entryId: string) => {
     setPruneTarget(entryId);
@@ -542,13 +533,6 @@ export function ChatPanel({
       onSettled: () => setPruneTarget(null),
     });
   }, [pruneTarget, pruneMutation]);
-
-  const handleMessagesRendered = useCallback(() => {
-    if (!isAtBottomRef.current) return;
-    const scrollToken = streamingPerf.beginScroll();
-    scrollToBottom();
-    streamingPerf.endScroll(scrollToken);
-  }, [isAtBottomRef, scrollToBottom]);
 
   useEffect(() => {
     streamingStore.onStreamingDelta(
@@ -588,32 +572,22 @@ export function ChatPanel({
       },
     );
 
-    streamingStore.onCommit(piSessionId, (agentMessages) => {
-      messageListRef.current?.commitStreaming(agentMessages);
-    });
-    streamingStore.onToolResultCommit(piSessionId, (agentMessage) => {
-      messageListRef.current?.commitToolResult(agentMessage);
-    });
-
     activeToolStore.onUpdate(piSessionId, (event) => {
       if (event.type === "clear_all") {
         messageListRef.current?.clearActiveTools();
         return;
       }
       messageListRef.current?.applyActiveToolState(event.state);
-      handleMessagesRendered();
     });
     messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
 
     return () => {
       streamingStore.offStreamingDelta(piSessionId);
-      streamingStore.offCommit(piSessionId);
-      streamingStore.offToolResultCommit(piSessionId);
       activeToolStore.offUpdate(piSessionId);
       messageListRef.current?.clearStreaming();
       messageListRef.current?.clearActiveTools();
     };
-  }, [piSessionId, handleMessagesRendered]);
+  }, [piSessionId]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -700,7 +674,7 @@ export function ChatPanel({
           ...(old ?? []),
           optimistic,
         ]);
-        engageAndScroll();
+        messageListRef.current?.scrollToEnd();
       }
 
       setIsSending(true);
@@ -722,7 +696,6 @@ export function ChatPanel({
     },
     [
       appendBusyQueuedText,
-      engageAndScroll,
       isSessionBusy,
       onSendMessage,
       piSessionId,
@@ -854,12 +827,13 @@ export function ChatPanel({
             <div
               ref={viewportRef}
               data-scroll-container="main"
-              className="h-full overflow-auto px-6 py-4 space-y-3"
+              className="h-full overflow-auto px-6"
             >
               <StreamsMessageList
                 ref={messageListRef}
                 messages={agentMessages}
-                onMessagesRendered={handleMessagesRendered}
+                initialScrollKey={piSessionId}
+                viewportRef={viewportRef}
                 onPruneRequested={handlePruneRequested}
                 onForkRequested={handleForkRequested}
                 isSessionBusy={isSessionBusy}
