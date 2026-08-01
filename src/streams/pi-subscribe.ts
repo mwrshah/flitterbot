@@ -242,7 +242,6 @@ export function subscribeToPiSession(
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
 ): () => void {
-  // transient streaming key for one message_start/message_end window; the timeline persists the SDK entry.id (getLeafId()) instead
   let streamingKeyCounter = session.messages.length;
   let currentStreamingMessageId: string | null = null;
 
@@ -329,7 +328,6 @@ export function subscribeToPiSession(
         const anyRole = extractAnyMessageRole(event.message);
         if (!anyRole) break;
 
-        // defer to microtask so the SDK's appendMessage runs first, making getLeafId() available
         const capturedMessage = event.message;
         const capturedTimestamp = extractTimestamp(event.message, now);
         const capturedRole = anyRole;

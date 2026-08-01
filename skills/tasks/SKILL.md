@@ -20,8 +20,10 @@ Pass one JSON request to the script. Use stdin for large payloads.
 ```bash
 node scripts/tasks.mjs '{"action":"list_tasks","preset":"today"}'
 printf '%s\n' '{"action":"create_task","project_name":"Inbox","description":"Follow up"}' | node scripts/tasks.mjs -
-node scripts/tasks.mjs --json '{"action":"list_tasks","preset":"today"}'   # JSON output
+node scripts/tasks.mjs --json '{"action":"list_tasks","preset":"today"}'
 ```
+
+The third form adds `--json` for JSON output.
 
 Default output is concise Markdown. Add `--json` / `--format json` / `"format":"json"` for machine output (`{ok, message, ...data}` on success, `{ok:false, error}` on failure).
 

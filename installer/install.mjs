@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// ponytail: install/uninstall/hook-post each carry log rotation; share one installer utility.
+// ponytail: diffText should use execFileSync('diff', ['-u', a, b]) or JS diff; shell-quoted temp paths are repeated in uninstall too.
+// ponytail: walkDir and walkFiles overlap; keep one recursive walker.
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -72,7 +75,6 @@ function fileSizeBytes(path) {
   try { return statSync(path).size; } catch { return 0; }
 }
 
-// ponytail: install/uninstall/hook-post each carry log rotation; share one installer utility.
 function rotateLog(path) {
   mkdirSync(dirname(path), { recursive: true });
   if (fileSizeBytes(path) < 10 * 1024 * 1024) return;
@@ -123,7 +125,6 @@ function sortedPrettyJson(obj) {
   return JSON.stringify(sortKeys(obj), null, 2);
 }
 
-// ponytail: use execFileSync('diff', ['-u', a, b]) or JS diff; shell-quoted temp paths are repeated in uninstall too.
 function diffText(before, after) {
   try {
     const tmpA = join("/tmp", `.flitterbot-diff-a.${process.pid}`);
@@ -181,7 +182,6 @@ function generateToken() {
   return randomUUID();
 }
 
-// ponytail: walkDir and walkFiles overlap; keep one recursive walker.
 function walkDir(dir, prefix = "") {
   const entries = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

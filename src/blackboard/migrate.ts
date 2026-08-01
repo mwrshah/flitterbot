@@ -34,7 +34,6 @@ function hasLegacyMarkers(db: DatabaseSync): boolean {
   if (!hasTable(db, "sessions")) {
     return false;
   }
-  // stream_sessions (V16/V17) is not legacy — V18 renames it back to pi_sessions
   if (hasTable(db, "stream_sessions")) {
     return false;
   }
@@ -60,7 +59,6 @@ function applyFullSchema(db: DatabaseSync): void {
   db.exec(BLACKBOARD_SCHEMA_SQL);
 }
 
-// ponytail: prune old migration branches when legacy DB compatibility is no longer needed.
 function applyLegacyUpgrade(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
@@ -334,7 +332,6 @@ function applyV7Migration(db: DatabaseSync): void {
 }
 
 function applyV8Migration(db: DatabaseSync): void {
-  // No-op recreation — 'init' already in V6's CHECK; kept for migration-chain continuity
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
@@ -388,7 +385,6 @@ function applyV9Migration(db: DatabaseSync): void {
 }
 
 function applyV10Migration(db: DatabaseSync): void {
-  // SQLite can't DROP COLUMN (pre-3.35) or ALTER CHECK, so both tables are recreated
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
 
@@ -471,7 +467,6 @@ function applyV10Migration(db: DatabaseSync): void {
   }
 }
 
-// SQLite CHECK constraints are part of the table definition, so the table is recreated
 function applyV11Migration(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys=OFF;");
   db.exec("BEGIN IMMEDIATE;");
@@ -1004,7 +999,6 @@ function applyV17Migration(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE;");
 
   try {
-    // transform pi_outbound → stream_outbound on INSERT; old CHECK rejects an in-place UPDATE
     db.exec(`
       CREATE TABLE messages_v17 (
           id TEXT PRIMARY KEY,
@@ -1267,11 +1261,9 @@ function applyV23Migration(db: DatabaseSync): void {
     if (!hasColumn(db, "pi_sessions", "session_user")) {
       db.exec("ALTER TABLE pi_sessions ADD COLUMN session_user TEXT;");
     }
-    // Backfill owner for per-user default streams from their `flitterbot: <userId>` name.
     db.exec(
       "UPDATE streams SET stream_user = TRIM(SUBSTR(name, LENGTH('flitterbot: ') + 1)) WHERE name LIKE 'flitterbot: %' AND stream_user IS NULL;",
     );
-    // Trickle owner down to each stream's pi_sessions (1:1 stream↔session).
     db.exec(
       "UPDATE pi_sessions SET session_user = (SELECT stream_user FROM streams WHERE streams.id = pi_sessions.stream_id) WHERE session_user IS NULL AND stream_id IS NOT NULL;",
     );

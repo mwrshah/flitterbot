@@ -28,16 +28,20 @@ Pattern:
 
 ### Example: User Config
 
+The server function, in `web/src/server/user-config.ts`:
+
 ```ts
-// web/src/server/user-config.ts — Server function
 export const fetchUserConfig = createServerFn({ method: 'GET' }).handler(async () => {
   const url = `${process.env.VITE_FLITTERBOT_BASE_URL}/api/user-config/default_user`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.VITE_FLITTERBOT_TOKEN}` } });
   if (!res.ok) throw new Error(`${res.status}`);
   return (await res.json()).config;
 });
+```
 
-// web/src/lib/queries.ts — Query options (no apiClient needed)
+The query options, in `web/src/lib/queries.ts` — no `apiClient` needed:
+
+```ts
 export function userConfigQueryOptions() {
   return {
     queryKey: ['user-config'] as const,
@@ -45,13 +49,19 @@ export function userConfigQueryOptions() {
     staleTime: 30_000,
   };
 }
+```
 
-// web/src/routes/__root.tsx — Root loader seeds the cache
+The root loader, in `web/src/routes/__root.tsx`, seeds the cache:
+
+```ts
 loader: async ({ context }) => {
   await context.queryClient.ensureQueryData(userConfigQueryOptions());
 },
+```
 
-// Any component — reads from cache, zero fetch
+Any component then reads from the cache with zero fetch:
+
+```ts
 const { data: config } = useQuery(userConfigQueryOptions());
 ```
 

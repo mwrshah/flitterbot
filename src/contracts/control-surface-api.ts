@@ -210,10 +210,16 @@ export interface SessionDetailResponse {
   tmux?: TmuxSessionInspection | null;
 }
 
+export const STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT = 30;
+export const STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT = 200;
+
 export interface StreamsHistoryResponse {
   piSessionId: string | null;
   sessionFile: string | null;
   items: ChatTimelineItem[];
+  olderPageCursor?: string | null;
+  hasOlderRows?: boolean;
+  appliedVisibleRowLimit?: number;
 }
 
 export type SessionTranscriptResponse = TranscriptPageResponse;

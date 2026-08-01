@@ -176,7 +176,6 @@ function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => vo
   const queryClient = useQueryClient();
   const flowQueryKey = ["auth-flow", flowId] as const;
 
-  // Poll while the flow is running so OAuth callbacks / device approvals surface.
   const { data: snapshot, error } = useQuery({
     queryKey: flowQueryKey,
     queryFn: () => apiClient.getAuthFlow(flowId),
@@ -355,7 +354,6 @@ function AuthPromptForm({
       }
       setValidationError(null);
       onSubmit(trimmed);
-      // Secrets must not be retained in component state after submit.
       if (isSecret) setValue("");
     },
     [value, isSecret, onSubmit],

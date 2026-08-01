@@ -60,7 +60,6 @@ const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
 const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
 
-// ponytail: share or delete this Pretext measuring path; PathPicker already has the same dependency pattern.
 function pretextTextWidth(text: string, font: string, lineHeight: number) {
   const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
   const result = layoutWithLines(prepared, HOVER_BUTTON_MEASURE_WIDTH_PX, lineHeight);
@@ -139,7 +138,6 @@ function messageInputButtonShortcutLabel(index: number) {
   return MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS[index] ?? null;
 }
 
-// ponytail: this adaptive hover-button layout is a mini layout engine; fixed overflow/flex-wrap would be cheaper.
 function MessageInputHoverButtons({
   slots,
   composerRef,

@@ -2,3 +2,5 @@ pre-commit:
   commands:
     audit-ts:
       run: pnpm run audit:ts
+    codedecorum:
+      run: uv run codedecorum --scope full .

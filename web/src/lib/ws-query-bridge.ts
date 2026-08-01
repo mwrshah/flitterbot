@@ -3,6 +3,11 @@ import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { streamingUiDebug } from "~/lib/debug-log";
+import {
+  appendItemToPage,
+  commitMessageEndToPage,
+  updateNewestHistoryPage,
+} from "~/lib/history-cache";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
@@ -77,58 +82,19 @@ function appendTimelineItem(
     return;
   }
 
-  queryClient.setQueryData<ChatTimelineItem[]>(["streams-history", sessionId, "agent"], (old) => {
-    const items = old ?? [];
-
-    if (item.kind === "tool" && (item as ChatTimelineTool).toolUseId) {
-      const tool = item as ChatTimelineTool;
-      if (tool.phase !== "end") {
-        const dup = items.some(
-          (existing) =>
-            existing.kind === "tool" &&
-            (existing as ChatTimelineTool).toolUseId === tool.toolUseId &&
-            (existing as ChatTimelineTool).phase !== "end",
-        );
-        if (dup) {
-          streamingUiDebug(
-            "[debug][ws-bridge] appendTimelineItem DEDUP skipped active toolUseId=%s phase=%s session=%s",
-            tool.toolUseId,
-            tool.phase,
-            sessionId,
-          );
-          return items;
-        }
-      }
-      const dup = items.some(
-        (existing) =>
-          existing.kind === "tool" &&
-          (existing as ChatTimelineTool).toolUseId === tool.toolUseId &&
-          (existing as ChatTimelineTool).phase === tool.phase,
+  updateNewestHistoryPage(queryClient, sessionId, (items) => {
+    const next = appendItemToPage(items, item);
+    if (next === items) {
+      streamingUiDebug(
+        "[debug][ws-bridge] appendTimelineItem DEDUP skipped kind=%s id=%s session=%s",
+        item.kind,
+        item.id,
+        sessionId,
       );
-      if (dup) {
-        streamingUiDebug(
-          "[debug][ws-bridge] appendTimelineItem DEDUP skipped toolUseId=%s phase=%s session=%s",
-          tool.toolUseId,
-          tool.phase,
-          sessionId,
-        );
-        return items;
-      }
-    } else if (item.kind === "message") {
-      const dup = items.some((existing) => existing.id === item.id);
-      if (dup) {
-        streamingUiDebug(
-          "[debug][ws-bridge] appendTimelineItem DEDUP skipped id=%s session=%s",
-          item.id,
-          sessionId,
-        );
-        return items;
-      }
+      return items;
     }
-
-    const next = [...items, item];
     streamingUiDebug(
-      "[debug][ws-bridge] appendTimelineItem kind=%s → timeline.length=%d session=%s",
+      "[debug][ws-bridge] appendTimelineItem kind=%s → newest page length=%d session=%s",
       item.kind,
       next.length,
       sessionId,
@@ -137,7 +103,6 @@ function appendTimelineItem(
   });
 }
 
-// ponytail: replace this long event switch with a handler map keyed by message.type.
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;
@@ -242,86 +207,32 @@ export function setupWsQueryBridge(deps: {
       if (hasContent || message.toolCalls?.length) {
         const now = new Date().toISOString();
 
-        const committedItems: ChatTimelineItem[] = [];
-        if (hasContent) {
-          const stamped: ChatTimelineMessage =
-            isUser && clientMessageId
-              ? { ...msg, ...(blocks ? { blocks } : {}), clientMessageId }
-              : blocks
-                ? { ...msg, blocks }
-                : msg;
-          committedItems.push(stamped);
-        }
-        if (message.toolCalls?.length) {
-          for (const tc of message.toolCalls) {
-            committedItems.push({
-              id: createId("tool"),
-              kind: "tool",
-              tool: tc.toolName ?? "tool",
-              phase: "start",
-              toolUseId: tc.toolUseId,
-              args: tc.args as JsonValue | undefined,
-              displayArgs: tc.displayArgs as JsonValue | undefined,
-              createdAt: now,
-            });
-          }
-        }
+        const committed: ChatTimelineMessage | undefined = hasContent
+          ? isUser && clientMessageId
+            ? { ...msg, ...(blocks ? { blocks } : {}), clientMessageId }
+            : blocks
+              ? { ...msg, blocks }
+              : msg
+          : undefined;
 
-        queryClient.setQueryData<ChatTimelineItem[]>(
-          ["streams-history", piSessionId, "agent"],
-          (old) => {
-            const items = old ?? [];
+        const toolItems: ChatTimelineTool[] = (message.toolCalls ?? []).map((tc) => ({
+          id: createId("tool"),
+          kind: "tool",
+          tool: tc.toolName ?? "tool",
+          phase: "start",
+          toolUseId: tc.toolUseId,
+          args: tc.args as JsonValue | undefined,
+          displayArgs: tc.displayArgs as JsonValue | undefined,
+          createdAt: now,
+        }));
 
-            let next = items;
-            if (hasContent) {
-              const committed = committedItems[0] as ChatTimelineMessage;
-              const committedServerMessageId = committed.serverMessageId;
-              let idx = -1;
-              if (isUser && clientMessageId) {
-                idx = items.findIndex(
-                  (existing) => existing.kind === "message" && existing.id === clientMessageId,
-                );
-              }
-              if (idx < 0 && committedServerMessageId) {
-                idx = items.findIndex(
-                  (existing) =>
-                    existing.kind === "message" &&
-                    (existing.id === committedServerMessageId ||
-                      (existing as ChatTimelineMessage).serverMessageId ===
-                        committedServerMessageId),
-                );
-              }
-              if (idx < 0) {
-                idx = items.findIndex((existing) => existing.id === committed.id);
-              }
-              if (idx >= 0) {
-                next = [...items];
-                next[idx] = committed;
-              } else {
-                next = [...items, committed];
-              }
-            }
-
-            if (message.toolCalls?.length) {
-              const base = next === items ? [...items] : next;
-              const toolItems = hasContent ? committedItems.slice(1) : committedItems;
-              for (const toolItem of toolItems) {
-                const tc = toolItem as ChatTimelineTool;
-                const alreadyExists = base.some(
-                  (existing) =>
-                    existing.kind === "tool" &&
-                    (existing as ChatTimelineTool).toolUseId === tc.toolUseId &&
-                    (existing as ChatTimelineTool).phase !== "end",
-                );
-                if (!alreadyExists) {
-                  base.push(tc);
-                }
-              }
-              next = base;
-            }
-
-            return next;
-          },
+        updateNewestHistoryPage(queryClient, piSessionId, (items) =>
+          commitMessageEndToPage(items, {
+            ...(committed ? { committed } : {}),
+            ...(clientMessageId ? { clientMessageId } : {}),
+            isUser,
+            toolItems,
+          }),
         );
       }
 
@@ -427,7 +338,6 @@ export function setupWsQueryBridge(deps: {
       streamingStore.clearSession(piSessionId);
       activeToolStore.clearSession(piSessionId);
       if (message.aborted) {
-        // abort skips message_end, so revalidate from the server session file
         queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
       }
       return;

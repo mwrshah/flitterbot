@@ -26,8 +26,9 @@ Users override bindings via `AppConfig.shortcuts` (`ShortcutBindingsConfig`), a 
 
 ```ts
 type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
-// Example: { "nav.surface": "Alt+KeyH", "scroll.top": "Home" }
 ```
+
+Example value: `{ "nav.surface": "Alt+KeyH", "scroll.top": "Home" }`.
 
 ## Built-in Actions
 

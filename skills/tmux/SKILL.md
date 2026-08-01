@@ -41,35 +41,57 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 /bin/bash scripts/sessions.sh message <S> "run the tests"
 ```
 
+**Status** — process-level view of each session: FREE, BUSY (claude), BUSY (process), NOT RUNNING.
+
 ```bash
-# Status — process-level view of each session: FREE, BUSY (claude), BUSY (process), NOT RUNNING
 /bin/bash scripts/sessions.sh status
+```
 
-# State — Claude UI state: IDLE (duration), INFERRING, FREE (duration), NOT RUNNING
-/bin/bash scripts/sessions.sh state               # all sessions
-/bin/bash scripts/sessions.sh state <S>           # single session
+**State** — Claude UI state: IDLE (duration), INFERRING, FREE (duration), NOT RUNNING. Omit `<S>` for all sessions, pass it for a single session.
 
-# Launch — auto-selects a free session (or reclaims longest-idle). ALWAYS use this form.
+```bash
+/bin/bash scripts/sessions.sh state
+/bin/bash scripts/sessions.sh state <S>
+```
+
+**Launch** — auto-selects a free session (or reclaims longest-idle). ALWAYS use this form. Output is `Launched in session e (ready)` — parse it to get the session letter.
+
+```bash
 /bin/bash scripts/sessions.sh launch ~/project
 /bin/bash scripts/sessions.sh launch ~/project --pi-session-id abc --stream-id def
-# Output: "Launched in session e (ready)" — parse this to get the session letter.
-# Fallback: explicit session letter (rarely needed)
+```
+
+Fallback with an explicit session letter (rarely needed):
+
+```bash
 /bin/bash scripts/sessions.sh launch <S> ~/project
+```
 
-# Quit
+**Quit**
+
+```bash
 /bin/bash scripts/sessions.sh quit <S>
+```
 
-# Message — send a prompt to Claude, then verify inference started (preferred over send)
+**Message** — send a prompt to Claude, then verify inference started (preferred over send).
+
+```bash
 /bin/bash scripts/sessions.sh message <S> "fix the login bug"
+```
 
-# Send — raw keystrokes only (bare Enter for permission prompts, shell commands)
+**Send** — raw keystrokes only (bare Enter for permission prompts, shell commands). The second form sends a bare Enter.
+
+```bash
 /bin/bash scripts/sessions.sh send <S> "text here"
-/bin/bash scripts/sessions.sh send <S>            # bare Enter
+/bin/bash scripts/sessions.sh send <S>
+```
 
-# Other
-/bin/bash scripts/sessions.sh clear <S>           # reset Claude conversation
-/bin/bash scripts/sessions.sh read <S>            # capture screen contents
-/bin/bash scripts/sessions.sh session-id <S>      # Claude Code session UUID
+**Other** — `clear` resets Claude's conversation, `read` captures screen contents, `session-id` prints the Claude Code session UUID.
+
+```bash
+/bin/bash scripts/sessions.sh clear <S>
+/bin/bash scripts/sessions.sh read <S>
+/bin/bash scripts/sessions.sh session-id <S>
 ```
 
 ### Behavior

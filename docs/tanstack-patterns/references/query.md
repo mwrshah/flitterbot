@@ -42,7 +42,6 @@ export function getRouter() {
   const queryClient = new QueryClient()
   const router = createRouter({
     routeTree,
-    // optionally expose the QueryClient via router context
     context: { queryClient },
     scrollRestoration: true,
     defaultPreload: 'intent',
@@ -51,9 +50,6 @@ export function getRouter() {
   setupRouterSsrQueryIntegration({
     router,
     queryClient,
-    // optional:
-    // handleRedirects: true,
-    // wrapQueryClient: true,
   })
 
   return router
@@ -61,6 +57,8 @@ export function getRouter() {
 ```
 
 <!-- ::end:framework -->
+
+Passing `context: { queryClient }` to `createRouter` is optional; it exposes the `QueryClient` via router context. `setupRouterSsrQueryIntegration` also accepts two optional settings, `handleRedirects: true` and `wrapQueryClient: true`.
 
 By default, the integration wraps your router with a `QueryClientProvider`. If you already provide your own provider, pass `wrapQueryClient: false` and keep your custom wrapper.
 
@@ -77,11 +75,15 @@ By default, the integration wraps your router with a `QueryClientProvider`. If y
 - `useSuspenseQuery`: runs on the server during SSR when its data is required and will be streamed to the client as it resolves.
 - `useQuery`: does not execute on the server; it will fetch on the client after hydration. Use this for data that is not required for SSR.
 
-```tsx
-// Suspense: executes on server and streams
-const { data } = useSuspenseQuery(postsQuery)
+Suspense — executes on server and streams:
 
-// Non-suspense: executes only on client
+```tsx
+const { data } = useSuspenseQuery(postsQuery)
+```
+
+Non-suspense — executes only on client:
+
+```tsx
 const { data, isLoading } = useQuery(postsQuery)
 ```
 
@@ -89,11 +91,15 @@ const { data, isLoading } = useQuery(postsQuery)
 
 # React
 
-```tsx
-// Suspense: executes on server and streams
-const { data } = useSuspenseQuery(postsQuery)
+Suspense — executes on server and streams:
 
-// Non-suspense: executes only on client
+```tsx
+const { data } = useSuspenseQuery(postsQuery)
+```
+
+Non-suspense — executes only on client:
+
+```tsx
 const { data, isLoading } = useQuery(postsQuery)
 ```
 
@@ -101,7 +107,7 @@ const { data, isLoading } = useQuery(postsQuery)
 
 ### Preload with a loader and read with a hook
 
-Preload critical data in the route `loader` to avoid waterfalls and loading flashes, then read it in the component. The integration ensures server-fetched data is dehydrated and streamed to the client during SSR.
+Preload critical data in the route `loader` to avoid waterfalls and loading flashes, then read it in the component. The integration ensures server-fetched data is dehydrated and streamed to the client during SSR. Below, `ensureQueryData` in the loader puts the data in the cache before render, and the component reads it with `useSuspenseQuery`, which gives the best SSR and streaming behavior.
 
 <!-- ::start:framework -->
 
@@ -117,13 +123,11 @@ const postsQuery = queryOptions({
 })
 
 export const Route = createFileRoute('/posts')({
-  // Ensure the data is in the cache before render
   loader: ({ context }) => context.queryClient.ensureQueryData(postsQuery),
   component: PostsPage,
 })
 
 function PostsPage() {
-  // Prefer suspense for best SSR + streaming behavior
   const { data } = useSuspenseQuery(postsQuery)
   return <div>{data.map((p: any) => p.title).join(', ')}</div>
 }
@@ -133,7 +137,7 @@ function PostsPage() {
 
 ### Prefetching and streaming
 
-You can also prefetch with `fetchQuery` or `ensureQueryData` in a loader without consuming the data in a component. If you return the promise directly from the loader, it will be awaited and thus block the SSR request until the query finishes. If you don't await the promise nor return it, the query will be started on the server and will be streamed to the client without blocking the SSR request.
+You can also prefetch with `fetchQuery` or `ensureQueryData` in a loader without consuming the data in a component. If you return the promise directly from the loader, it will be awaited and thus block the SSR request until the query finishes. If you don't await the promise nor return it, the query will be started on the server and will be streamed to the client without blocking the SSR request — that is what the loader below does, neither awaiting nor returning the promise.
 
 <!-- ::start:framework -->
 
@@ -151,7 +155,6 @@ const userQuery = (id: string) =>
 
 export const Route = createFileRoute('/user/$id')({
   loader: ({ params }) => {
-    // do not await this nor return the promise, just kick off the query to stream it to the client
     context.queryClient.fetchQuery(userQuery(params.id))
   },
 })

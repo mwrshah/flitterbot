@@ -10,13 +10,6 @@ export type WorktreeBootstrapConfig = {
   baseRef: string | null;
 };
 
-// Bootstrap recipe lives in the repo's local .git/config (uncommitted, per-clone) under a
-// `[flitterbot]` section as multivars, mirroring how gtr stores its hooks:
-//   [flitterbot]
-//     copyPath = klair-api/.env
-//     copyPath = .scratch/certs
-//     postCreate = (cd klair-client && pnpm install)
-//     postCreate = (cd klair-api && uv sync)
 async function getAll(repoPath: string, key: string): Promise<string[]> {
   try {
     const { stdout } = await execPromise(`git config --get-all ${key}`, {
@@ -28,7 +21,6 @@ async function getAll(repoPath: string, key: string): Promise<string[]> {
       .map((l) => l.trim())
       .filter(Boolean);
   } catch {
-    // git config exits 1 when the key is absent — that's "unconfigured", not an error.
     return [];
   }
 }
@@ -106,9 +98,6 @@ const PRUNE_DIRS = [
   ".gradle",
 ];
 
-// Package managers that keep a global/content-addressed cache, so installing in each new worktree
-// reuses already-fetched packages instead of refetching from the network. Resolved per-dir in
-// priority order — lockfiles disambiguate which tool actually owns a pyproject.toml/yarn.lock.
 const CACHING_RULES: Array<{ marker: string; manager: string; cmd: string }> = [
   {
     marker: "pnpm-lock.yaml",
@@ -129,7 +118,6 @@ const CACHING_RULES: Array<{ marker: string; manager: string; cmd: string }> = [
   { marker: "composer.lock", manager: "composer", cmd: "composer install" },
 ];
 
-// yarn is split: berry (.yarnrc.yml, PnP/global cache) caches, classic (.yarn-only lockfile) refetches.
 const YARN_BERRY = { manager: "yarn (berry)", cmd: "yarn install" };
 
 const NONCACHING_RULES: Array<{ marker: string; manager: string }> = [
@@ -139,7 +127,6 @@ const NONCACHING_RULES: Array<{ marker: string; manager: string }> = [
   { marker: "Pipfile", manager: "pipenv" },
 ];
 
-// pyproject.toml with no companion lockfile — ambiguous tool, default-suggest uv but note it.
 const BARE_PYPROJECT = { manager: "python (no lockfile)", cmd: "uv sync" };
 
 const ALL_MARKERS = [
@@ -156,8 +143,6 @@ export type DiscoveredEcosystem = {
   caching: boolean;
 };
 
-// Single fast scan: shell out to `find` (depth-capped, heavy dirs pruned) instead of recursively
-// readdir-walking in JS. One pass collects every env file + package-manager marker, then we group.
 async function findPaths(repoPath: string, maxDepth: number): Promise<string[]> {
   const prune = PRUNE_DIRS.map((d) => `-name ${d}`).join(" -o ");
   const names = [".env*", ...ALL_MARKERS].map((n) => `-name ${JSON.stringify(n)}`).join(" -o ");
@@ -226,10 +211,6 @@ export async function discoverRepo(
   return { envFiles, ecosystems };
 }
 
-// Build the human/LLM-facing advisory: explains the two knobs, optionally shows the current
-// config, dumps what was discovered, and hands the agent ready-to-run `git config` commands so it
-// can persist a bootstrap recipe into .git/config. Used both for the unconfigured auto-path and
-// the explicit discovery dry-run.
 export async function buildDiscoveryAdvisory(
   repoPath: string,
   config: WorktreeBootstrapConfig,

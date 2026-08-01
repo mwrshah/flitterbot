@@ -11,18 +11,15 @@ If you are using a library like [TanStack Query](https://tanstack.com/query/late
 
 ## Deferred Data Loading with `Await`
 
-To defer slow or non-critical data, return an **unawaited/unresolved** promise anywhere in your loader response:
+To defer slow or non-critical data, return an **unawaited/unresolved** promise anywhere in your loader response. Below, the slow fetch is kicked off without being awaited, while the fast one is awaited before the loader returns:
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute, defer } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/posts/$postId')({
   loader: async () => {
-    // Fetch some slower data, but do not await it
     const slowDataPromise = fetchSlowData()
 
-    // Fetch and await some data that resolves quickly
     const fastData = await fetchFastData()
 
     return {
@@ -37,19 +34,15 @@ As soon as any awaited promises are resolved, the next route will begin renderin
 
 In the component, deferred promises can be resolved and utilized using the `Await` component:
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute, Await } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/posts/$postId')({
-  // ...
   component: PostIdComponent,
 })
 
 function PostIdComponent() {
   const { deferredSlowData, fastData } = Route.useLoaderData()
-
-  // do something with fastData
 
   return (
     <Await promise={deferredSlowData} fallback={<div>Loading...</div>}>
@@ -87,17 +80,14 @@ So, instead of using `defer` and `Await`, you'll instead want to use the Route's
 
 # React
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute } from '@tanstack/react-router'
 import { slowDataOptions, fastDataOptions } from '~/api/query-options'
 
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context: { queryClient } }) => {
-    // Kick off the fetching of some slower data, but do not await it
     queryClient.prefetchQuery(slowDataOptions())
 
-    // Fetch and await some data that resolves quickly
     await queryClient.ensureQueryData(fastDataOptions())
   },
 })
@@ -105,17 +95,14 @@ export const Route = createFileRoute('/posts/$postId')({
 
 # Solid
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute } from '@tanstack/solid-router'
 import { slowDataOptions, fastDataOptions } from '~/api/query-options'
 
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context: { queryClient } }) => {
-    // Kick off the fetching of some slower data, but do not await it
     queryClient.prefetchQuery(slowDataOptions())
 
-    // Fetch and await some data that resolves quickly
     await queryClient.ensureQueryData(fastDataOptions())
   },
 })
@@ -129,21 +116,17 @@ Then in your component, you can use the library's hooks to access the data:
 
 # React
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { slowDataOptions, fastDataOptions } from '~/api/query-options'
 
 export const Route = createFileRoute('/posts/$postId')({
-  // ...
   component: PostIdComponent,
 })
 
 function PostIdComponent() {
   const fastData = useSuspenseQuery(fastDataOptions())
-
-  // do something with fastData
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -161,21 +144,17 @@ function SlowDataComponent() {
 
 # Solid
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 import { createFileRoute } from '@tanstack/solid-router'
 import { useSuspenseQuery } from '@tanstack/solid-query'
 import { slowDataOptions, fastDataOptions } from '~/api/query-options'
 
 export const Route = createFileRoute('/posts/$postId')({
-  // ...
   component: PostIdComponent,
 })
 
 function PostIdComponent() {
   const fastData = useSuspenseQuery(fastDataOptions())
-
-  // do something with fastData
 
   return (
     <Suspense fallback={<div>Loading...</div>}>

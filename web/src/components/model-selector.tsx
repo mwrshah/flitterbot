@@ -153,7 +153,6 @@ export const ModelSelector = memo(function ModelSelector({
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
 
-  // ponytail: Base UI/popover positioning can replace this manual viewport math and listeners.
   const updatePopoverPosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;

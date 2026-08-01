@@ -39,7 +39,6 @@ const NON_GIT_WORKTREE_AGENT_INSTRUCTIONS = [
   "2. Retry set_up_worktree from inside the intended git repository.",
 ].join("\n");
 
-// ponytail: share the git exec helper with close-stream instead of carrying another shell-string wrapper.
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
@@ -90,8 +89,6 @@ async function createWorktree(
   return { worktreePath };
 }
 
-// Copy each configured path (file or dir) from the main repo into the worktree. Runs BEFORE
-// postCreate hooks so install/build steps see the env/secret files they need.
 function runCopyPaths(repoPath: string, worktreePath: string, copyPaths: string[]): string[] {
   const results: string[] = [];
   for (const rel of copyPaths) {
@@ -117,8 +114,6 @@ function runCopyPaths(repoPath: string, worktreePath: string, copyPaths: string[
   return results;
 }
 
-// Run postCreate hooks sequentially in declared order (ordering matters: install before build),
-// each with cwd = worktree root. Best-effort: a failing hook never fails worktree creation.
 async function runPostCreate(worktreePath: string, postCreate: string[]): Promise<string[]> {
   const results: string[] = [];
   for (const cmd of postCreate) {
@@ -157,9 +152,6 @@ async function resolveMainWorktreePath(repoPath: string): Promise<string> {
   return firstWorktree || repoPath;
 }
 
-// Resolve the checked-out branch at a path, or null if the path is missing, not a repo, or on a
-// detached HEAD. Never throws — base_ref resolution tries cwd then repo_path and only fails if both
-// come back null, so the caller stays in control of the fallback chain.
 async function tryHeadBranch(dir: string): Promise<string | null> {
   if (!existsSync(dir)) return null;
   let branch: string;
@@ -307,8 +299,6 @@ export async function executeSetUpWorktree(
     };
   }
 
-  // Resolve the current worktree from cwd, then anchor created worktrees on the repo's main
-  // worktree so launching from an existing linked worktree does not nest another -worktrees dir.
   let currentWorktreePath: string;
   let repoPath: string;
   try {

@@ -21,7 +21,6 @@ type CloseStreamResult = {
   resolvedBaseBranch?: string | null;
 };
 
-// ponytail: share this git exec helper with set-up-worktree and prefer execFile args for quoting.
 async function exec(cmd: string, cwd: string, timeoutMs = 30_000): Promise<string> {
   const { stdout } = await execPromise(cmd, { cwd, timeout: timeoutMs });
   return stdout.trim();
@@ -121,7 +120,6 @@ async function mergeToTarget(
     return { ok: true, mergedAt: repoPath };
   }
 
-  // Git refuses `git checkout main` in repoPath when another worktree already has it checked out, so merge there instead.
   const existingWorktree = await findWorktreeForBranch(repoPath, targetBranch);
   let mergeCwd: string;
   if (existingWorktree) {
@@ -145,7 +143,6 @@ async function mergeToTarget(
   } catch {}
 
   try {
-    // git's default merge message — the model-authored commit_message goes to the in-flight auto-commit, not the merge commit.
     await exec(`git merge ${branch} --no-edit`, mergeCwd);
     return { ok: true, mergedAt: mergeCwd };
   } catch {
@@ -229,7 +226,6 @@ export async function executeCloseStream(
   let pushed = false;
   let resolvedTargetBranch: string | undefined;
 
-  // Every precondition failure returns an explicit error — a silent skip would close the stream while no git work happened, invisibly to the user.
   if (mode === "merge") {
     const worktreePath = stream.worktree_path;
     const repoPath = stream.repo_path;

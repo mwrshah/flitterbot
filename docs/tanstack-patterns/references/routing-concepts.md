@@ -63,13 +63,17 @@ To create a root route, call the `createRootRoute()` function and export it as t
 
 # React
 
+Standard root route:
+
 ```tsx
-// Standard root route
 import { createRootRoute } from '@tanstack/react-router'
 
 export const Route = createRootRoute()
+```
 
-// Root route with Context
+Root route with context:
+
+```tsx
 import { createRootRouteWithContext } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -81,13 +85,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()
 
 # Solid
 
+Standard root route:
+
 ```tsx
-// Standard root route
 import { createRootRoute } from '@tanstack/solid-router'
 
 export const Route = createRootRoute()
+```
 
-// Root route with Context
+Root route with context:
+
+```tsx
 import { createRootRouteWithContext } from '@tanstack/solid-router'
 import type { QueryClient } from '@tanstack/solid-query'
 
@@ -145,7 +153,7 @@ Basic routes are simple and straightforward. They match the path exactly and ren
 
 Index routes specifically target their parent route when it is **matched exactly and no child route is matched**.
 
-Let's take a look at an index route for a `/posts` URL:
+Let's take a look at an index route for a `/posts` URL. Note the trailing slash in the path passed to `createFileRoute`, which is what targets index routes.
 
 <!-- ::start:framework -->
 
@@ -154,7 +162,6 @@ Let's take a look at an index route for a `/posts` URL:
 ```tsx title="src/routes/posts.index.tsx"
 import { createFileRoute } from '@tanstack/react-router'
 
-// Note the trailing slash, which is used to target index routes
 export const Route = createFileRoute('/posts/')({
   component: PostsIndexComponent,
 })
@@ -169,7 +176,6 @@ function PostsIndexComponent() {
 ```tsx title="src/routes/posts.index.tsx"
 import { createFileRoute } from '@tanstack/solid-router'
 
-// Note the trailing slash, which is used to target index routes
 export const Route = createFileRoute('/posts/')({
   component: PostsIndexComponent,
 })
@@ -187,7 +193,7 @@ This route will be matched when the URL is `/posts` exactly.
 
 Route path segments that start with a `$` followed by a label are dynamic and capture that section of the URL into the `params` object for use in your application. For example, a pathname of `/posts/123` would match the `/posts/$postId` route, and the `params` object would be `{ postId: '123' }`.
 
-These params are then usable in your route's configuration and components! Let's look at a `posts.$postId.tsx` route:
+These params are then usable in your route's configuration and components! Let's look at a `posts.$postId.tsx` route — below, `loader` reads them from its `params` argument, and the component reads them through `Route.useParams()`.
 
 <!-- ::start:framework -->
 
@@ -197,14 +203,11 @@ These params are then usable in your route's configuration and components! Let's
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/posts/$postId')({
-  // In a loader
   loader: ({ params }) => fetchPost(params.postId),
-  // Or in a component
   component: PostComponent,
 })
 
 function PostComponent() {
-  // In a component!
   const { postId } = Route.useParams()
   return <div>Post ID: {postId}</div>
 }
@@ -216,14 +219,11 @@ function PostComponent() {
 import { createFileRoute } from '@tanstack/solid-router'
 
 export const Route = createFileRoute('/posts/$postId')({
-  // In a loader
   loader: ({ params }) => fetchPost(params.postId),
-  // Or in a component
   component: PostComponent,
 })
 
 function PostComponent() {
-  // In a component!
   const { postId } = Route.useParams()
   return <div>Post ID: {postId()}</div>
 }
@@ -251,14 +251,13 @@ For example, a route targeting the `files/$` path is a splat route. If the URL p
 
 ## Optional Path Parameters
 
-Optional path parameters allow you to define route segments that may or may not be present in the URL. They use the `{-$paramName}` syntax and provide flexible routing patterns where certain parameters are optional.
+Optional path parameters allow you to define route segments that may or may not be present in the URL. They use the `{-$paramName}` syntax and provide flexible routing patterns where certain parameters are optional. In the example below the `-$category` segment is optional, so the route matches both `/posts` and `/posts/tech`.
 
 <!-- ::start:framework -->
 
 # React
 
 ```tsx title="src/routes/posts.{-$category}.tsx"
-// The `-$category` segment is optional, so this route matches both `/posts` and `/posts/tech`
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/posts/{-$category}')({
@@ -275,7 +274,6 @@ function PostsComponent() {
 # Solid
 
 ```tsx title="src/routes/posts.{-$category}.tsx"
-// The `-$category` segment is optional, so this route matches both `/posts` and `/posts/tech`
 import { createFileRoute } from '@tanstack/solid-router'
 
 export const Route = createFileRoute('/posts/{-$category}')({
@@ -300,7 +298,6 @@ You can also define multiple optional parameters in a single route:
 # React
 
 ```tsx title="src/routes/posts.{-$category}.${-$slug}.tsx"
-// The `-$category` segment is optional, so this route matches both `/posts` and `/posts/tech`
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/posts/{-$category}/{-$slug}')({
@@ -311,7 +308,6 @@ export const Route = createFileRoute('/posts/{-$category}/{-$slug}')({
 # Solid
 
 ```tsx title="src/routes/posts.{-$category}.${-$slug}.tsx"
-// The `-$category` segment is optional, so this route matches both `/posts` and `/posts/tech`
 import { createFileRoute } from '@tanstack/solid-router'
 
 export const Route = createFileRoute('/posts/{-$category}/{-$slug}')({

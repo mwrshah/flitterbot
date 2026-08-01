@@ -1,5 +1,13 @@
-import { keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
+import {
+  getHistoryNextPageParam,
+  getHistoryPreviousPageParam,
+  HISTORY_STALE_TIME,
+  type HistoryPageParam,
+  mergeHistoryPages,
+  streamsHistoryQueryKey,
+} from "~/lib/history-cache";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import type {
   ChatTimelineItem,
@@ -19,6 +27,7 @@ import {
   fetchStreamsInputHistory,
   fetchStreamsWorktree,
   type StreamInfo,
+  type StreamsHistoryPage,
 } from "~/server/streams";
 import { fetchUserConfig } from "~/server/user-config";
 
@@ -76,24 +85,25 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   };
 }
 
-export function streamsHistoryQueryOptions(
-  piSessionId: string | undefined,
-  surface?: "input" | "agent",
-) {
-  return {
-    queryKey: ["streams-history", piSessionId ?? "default", surface ?? "agent"] as const,
-    queryFn: async (): Promise<ChatTimelineItem[]> =>
-      (await fetchStreamsHistory({
+export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
+  return infiniteQueryOptions({
+    queryKey: streamsHistoryQueryKey(piSessionId),
+    queryFn: ({ pageParam }): Promise<StreamsHistoryPage> =>
+      fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
-          ...(surface ? { surface } : {}),
+          surface: "agent",
+          ...(pageParam ? { before: pageParam } : {}),
         },
-      })) as ChatTimelineItem[],
+      }),
+    initialPageParam: undefined as HistoryPageParam,
+    getPreviousPageParam: getHistoryPreviousPageParam,
+    getNextPageParam: getHistoryNextPageParam,
     enabled: piSessionId !== undefined,
-    staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
-    placeholderData: [],
-    structuralSharing: mergeTimelineItems,
-  };
+    staleTime: HISTORY_STALE_TIME,
+    gcTime: 0,
+    structuralSharing: mergeHistoryPages,
+  });
 }
 
 export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
@@ -143,7 +153,7 @@ export function surfaceTimelineQueryOptions() {
     queryKey: ["surface-timeline"] as const,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsInputHistory()) as ChatTimelineItem[],
-    staleTime: 0, // WS setQueryData resets dataUpdatedAt while viewing; on route leave WS unsubscribes so data goes stale naturally
+    staleTime: 0, // WS writes reset dataUpdatedAt while viewing
     structuralSharing: mergeTimelineItems,
   };
 }

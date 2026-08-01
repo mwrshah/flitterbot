@@ -2,7 +2,6 @@ import { marked } from "marked";
 import { type JSX, memo, type ReactNode, useMemo } from "react";
 import { safeMarkdownUrl } from "~/lib/markdown-html";
 
-// Marked is shimmed as `any` in this app; normalize tokens at the boundary and keep local access typed.
 type MarkdownToken = {
   type?: string;
   raw?: unknown;

@@ -170,14 +170,15 @@ function rows(dump, table) {
   return dump.tables?.[table]?.rows ?? [];
 }
 
+const SQLITE_NAIVE_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+function markSqliteNaiveDatetimeAsUtc(value) {
+  return SQLITE_NAIVE_DATETIME.test(value) ? `${value.replace(" ", "T")}Z` : value;
+}
+
 function parseTime(value) {
   if (!value || typeof value !== "string") return 0;
-  // SQLite's datetime() treats timezone-less values as UTC. Node parses
-  // "YYYY-MM-DD HH:mm:ss" as local time, so normalize SQLite-style strings.
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
-    ? `${value.replace(" ", "T")}Z`
-    : value;
-  const ms = Date.parse(normalized);
+  const ms = Date.parse(markSqliteNaiveDatetimeAsUtc(value));
   return Number.isFinite(ms) ? ms : 0;
 }
 

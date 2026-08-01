@@ -94,8 +94,9 @@ ring-border   | ring-border-muted   | ring-border-pop
 
 These are the approved cutover values. `styles.css` becomes their sole owner; `alternate-theme.css` holds them only until cutover.
 
+Light:
+
 ```css
-/* Light */
 --background: oklch(0.985 0.002 80);
 --background-muted: oklch(0.974 0.0025 73);
 --background-hover: oklch(0.956 0.0053 73);
@@ -117,8 +118,11 @@ These are the approved cutover values. `styles.css` becomes their sole owner; `a
 --border: oklch(0.89 0.006 95);
 --border-muted: oklch(0.93 0.004 95);
 --border-pop: rgba(255, 107, 0, 0.25);
+```
 
-/* Dark */
+Dark:
+
+```css
 --background: oklch(0.145 0.002 80);
 --background-muted: oklch(0.177 0.0025 80);
 --background-hover: oklch(0.222 0.0054 80);
@@ -139,15 +143,19 @@ These are the approved cutover values. `styles.css` becomes their sole owner; `a
 
 Flitterbot status utilities use `status-active`, `status-supervising`, `status-ended`, and `status-crashed`, each with a muted companion. `status-waiting`, `status-info`, `status-idle`, and `status-stale` are semantic aliases of one orange attention color. Status treatments use dots or muted fills with text and never add status-colored borders. Syntax, diff, and scrim variables remain specialist stylesheet contracts rather than aliases for general UI colors.
 
+Light statuses, whose muted companions use 22% of their base:
+
 ```css
-/* Light statuses; muted companions use 22% of their base. */
 --status-active: oklch(0.74 0.15 145);
 --status-supervising: oklch(0.81 0.15 125);
 --status-stale: oklch(0.83 0.16 45);
 --status-ended: oklch(0.75 0.008 100);
 --status-crashed: oklch(0.78 0.17 25);
+```
 
-/* Dark statuses; muted companions use 15% of their base. */
+Dark statuses, whose muted companions use 15% of their base, followed by the semantic aliases shared by both themes:
+
+```css
 --status-active: oklch(0.62 0.12 145);
 --status-supervising: oklch(0.66 0.11 125);
 --status-stale: oklch(0.64 0.13 55);
@@ -163,27 +171,28 @@ Flitterbot status utilities use `status-active`, `status-supervising`, `status-e
 
 Flitterbot keeps shadcn's documented Tailwind contract because `components.json` uses `cssVariables: true` with Base Nova. `styles.css` contains one adapter that maps shadcn variables to canonical app tokens; it owns no color values.
 
+The `@theme inline` block declares the canonical app utilities first, then the shadcn boundary utilities; the excerpt below is abridged, and the real block spells out the complete documented shadcn contract.
+
 ```css
 @theme inline {
-  /* Canonical app utilities */
   --color-text: var(--text);
   --color-background-muted: var(--background-muted);
   --color-background-hover: var(--background-hover);
 
-  /* Shadcn boundary utilities */
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  /* Complete documented shadcn contract */
 }
+```
 
+In `:root`, the canonical values come first and are the only entries holding real colors; every adapter alias after them is a pure `var()` reference.
+
+```css
 :root {
-  /* Canonical values live here. */
   --text: <approved-color>;
   --background-muted: <approved-color>;
   --background-hover: <approved-color>;
 
-  /* Adapter aliases contain no values. */
   --foreground: var(--text);
   --card: var(--background);
   --card-foreground: var(--text);

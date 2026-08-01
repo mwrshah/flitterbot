@@ -54,17 +54,31 @@ function extractErrorMessage(body: string): string | null {
   return body;
 }
 
+export type StreamsHistoryPage = {
+  items: ChatTimelineItem[];
+  olderPageCursor?: string | null;
+};
+
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
-  .validator((input: { piSessionId?: string; surface?: "input" | "agent" }) => input)
-  .handler(async ({ data }): Promise<ChatTimelineItem[]> => {
+  .validator(
+    (input: {
+      piSessionId?: string;
+      surface?: "input" | "agent";
+      before?: string;
+      limit?: number;
+    }) => input,
+  )
+  .handler(async ({ data }): Promise<StreamsHistoryPage> => {
     const qs = new URLSearchParams([
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
       ...(data.surface ? [["surface", data.surface] as [string, string]] : []),
+      ...(data.before ? [["before", data.before] as [string, string]] : []),
+      ...(data.limit ? [["limit", String(data.limit)] as [string, string]] : []),
     ]).toString();
     const path = qs ? `/api/streams/history?${qs}` : "/api/streams/history";
     try {
-      const res = (await streamsRequest(path)) as { items: ChatTimelineItem[] };
-      return res.items;
+      const res = (await streamsRequest(path)) as StreamsHistoryPage;
+      return { items: res.items ?? [], olderPageCursor: res.olderPageCursor ?? null };
     } catch (err) {
       console.error(
         "fetchStreamsHistory failed (piSessionId=%s, surface=%s):",
@@ -130,7 +144,6 @@ export type DiffResult =
   | { mode: "diff"; diff: string }
   | { mode: "summary"; stat: string; files: number; insertions: number; deletions: number };
 
-// ponytail: route this through streamsRequest so timeout/auth/error handling has one implementation.
 export const fetchStreamsDiff = createServerFn({ method: "GET" })
   .validator((input: { piSessionId: string }) => input)
   .handler(async ({ data }): Promise<DiffResult | null> => {

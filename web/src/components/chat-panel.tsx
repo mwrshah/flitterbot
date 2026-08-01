@@ -49,6 +49,7 @@ import {
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
+import { updateNewestHistoryPage } from "~/lib/history-cache";
 import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { StreamRecoveryKind } from "~/lib/stream-recovery";
@@ -76,10 +77,6 @@ function formatTokens(n: number): string {
   return `${n}`;
 }
 
-/**
- * Reads the latest request's cache and context usage from the timeline. Shows "—" until
- * the next turn reports usage, such as immediately after compaction.
- */
 const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: ChatTimelineItem[] }) {
   const usage = useMemo(() => latestMeasuredContextUsage(timeline), [timeline]);
   const cacheWrite = usage ? formatTokens(usage.cacheWrite) : "—";
@@ -104,6 +101,9 @@ type ChatPanelProps = {
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
   ) => Promise<void>;
+  onLoadPrevious: () => void;
+  hasPrevious: boolean;
+  isLoadingPrevious: boolean;
   streamId?: string;
   streamName?: string;
   streamType?: StreamSummary["type"];
@@ -135,7 +135,6 @@ function dirFromPath(path: string, name: string): string {
   return cleanPath;
 }
 
-// ponytail: this duplicates PathPicker/Command picker behavior; consolidate to one path-picker component.
 function CwdPicker({
   pickerRef,
   pickerStyle,
@@ -259,7 +258,6 @@ function CwdPicker({
   );
 }
 
-// ponytail: prefer invalidating status over hand-patching this nested status cache shape.
 function markPiSessionBusy(
   status: StatusResponse | undefined,
   piSessionId: string,
@@ -298,6 +296,9 @@ export function ChatPanel({
   timeline,
   isSessionBusy,
   onSendMessage,
+  onLoadPrevious,
+  hasPrevious,
+  isLoadingPrevious,
   streamId,
   streamName,
   streamType,
@@ -658,7 +659,6 @@ export function ChatPanel({
         markPiSessionBusy(status, piSessionId),
       );
 
-      const cacheKey = ["streams-history", piSessionId, "agent"] as const;
       if (shouldSeedOptimisticMessage) {
         const now = new Date().toISOString();
         const optimistic: ChatTimelineMessage = {
@@ -670,10 +670,7 @@ export function ChatPanel({
           createdAt: now,
           ...(images?.length ? { images } : {}),
         };
-        queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) => [
-          ...(old ?? []),
-          optimistic,
-        ]);
+        updateNewestHistoryPage(queryClient, piSessionId, (items) => [...items, optimistic]);
         messageListRef.current?.scrollToEnd();
       }
 
@@ -684,8 +681,8 @@ export function ChatPanel({
         setPendingImages([]);
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-        queryClient.setQueryData<ChatTimelineItem[]>(cacheKey, (old) =>
-          (old ?? []).filter((item) => item.id !== clientMessageId),
+        updateNewestHistoryPage(queryClient, piSessionId, (items) =>
+          items.filter((item) => item.id !== clientMessageId),
         );
         queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
@@ -837,6 +834,9 @@ export function ChatPanel({
                 onPruneRequested={handlePruneRequested}
                 onForkRequested={handleForkRequested}
                 isSessionBusy={isSessionBusy}
+                onLoadPrevious={onLoadPrevious}
+                hasPrevious={hasPrevious}
+                isLoadingPrevious={isLoadingPrevious}
               />
             </div>
             <QueuedBusyOverlay text={busyQueuedText} />

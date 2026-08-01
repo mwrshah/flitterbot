@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// ponytail: this installer JSON/log/diff helper set duplicates install.mjs; extract shared code.
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -76,7 +77,6 @@ function atomicWrite(path, content) {
   renameSync(tmp, path);
 }
 
-// ponytail: this installer JSON/log/diff helper set duplicates install.mjs; extract shared code.
 function readJsonFile(path) {
   const raw = readFileSync(path, "utf8").trim();
   return raw ? JSON.parse(raw) : {};

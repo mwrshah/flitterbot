@@ -126,7 +126,6 @@ export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMess
       (item.phase === "start" || item.phase === "update") &&
       item.toolUseId
     ) {
-      // Orphan tool — no preceding assistant message (e.g. after reconnect).
       const orphanCall: RenderableToolCall = {
         type: "toolCall",
         id: item.toolUseId,

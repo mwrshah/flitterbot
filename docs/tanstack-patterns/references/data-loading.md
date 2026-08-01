@@ -59,15 +59,13 @@ The router cache is built-in and is as easy as returning data from any route's `
 
 Route `loader` functions are called when a route match is loaded. They are called with a single parameter which is an object containing many helpful properties. We'll go over those in a bit, but first, let's look at the two supported `loader` forms:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
 })
 ```
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: {
     handler: () => fetchPosts(),
@@ -106,7 +104,7 @@ To consume data from a `loader`, use the `useLoaderData` hook defined on your Ro
 const posts = Route.useLoaderData()
 ```
 
-If you don't have ready access to your route object (i.e. you're deep in the component tree for the current route), you can use `getRouteApi` to access the same hook (as well as the other hooks on the Route object). This should be preferred over importing the Route object, which is likely to create circular dependencies.
+If you don't have ready access to your route object (i.e. you're deep in the component tree for the current route), you can use `getRouteApi` to access the same hook (as well as the other hooks on the Route object). This should be preferred over importing the Route object, which is likely to create circular dependencies. In your component:
 
 <!-- ::start:framework -->
 
@@ -114,8 +112,6 @@ If you don't have ready access to your route object (i.e. you're deep in the com
 
 ```tsx
 import { getRouteApi } from '@tanstack/react-router'
-
-// in your component
 
 const routeApi = getRouteApi('/posts')
 const data = routeApi.useLoaderData()
@@ -125,8 +121,6 @@ const data = routeApi.useLoaderData()
 
 ```tsx
 import { getRouteApi } from '@tanstack/solid-router'
-
-// in your component
 
 const routeApi = getRouteApi('/posts')
 const data = routeApi.useLoaderData()
@@ -180,8 +174,7 @@ Imagine a `/posts` route supports some pagination via search params `offset` and
 
 Once we have these deps in place, the route will always reload when the deps change.
 
-```tsx
-// /routes/posts.tsx
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loaderDeps: ({ search: { offset, limit } }) => ({ offset, limit }),
   loader: ({ deps: { offset, limit } }) =>
@@ -220,11 +213,9 @@ By default, `staleTime` for navigations is set to `0`ms (and 30 seconds for prel
 
 **This is a good default for most use cases, but you may find that some route data is more static or potentially expensive to load.** In these cases, you can use the `staleTime` option to control how long the route's data is considered fresh for navigations. Let's take a look at an example:
 
-```tsx
-// /routes/posts.tsx
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
-  // Consider the route's data fresh for 10 seconds
   staleTime: 10_000,
 })
 ```
@@ -237,8 +228,7 @@ By default, stale successful matches use stale-while-revalidate behavior. That m
 
 If you want a specific loader to wait for a stale reload to finish before continuing, use the object form and set `staleReloadMode: 'blocking'`:
 
-```tsx
-// /routes/posts.tsx
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: {
     handler: () => fetchPosts(),
@@ -262,8 +252,7 @@ Use `'background'` when showing stale data during revalidation is acceptable. Us
 
 To disable automatic stale reloads for a route, set the `staleTime` option to `Infinity`:
 
-```tsx
-// /routes/posts.tsx
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   staleTime: Infinity,
@@ -286,16 +275,13 @@ This differs from `staleReloadMode: 'blocking'`:
 
 ## Using `shouldReload` and `gcTime` to opt-out of caching
 
-Similar to Remix's default functionality, you may want to configure a route to only load on entry or when critical loader deps change. You can do this by using the `gcTime` option combined with the `shouldReload` option, which accepts either a `boolean` or a function that receives the same `beforeLoad` and `loaderContext` parameters and returns a boolean indicating if the route should reload.
+Similar to Remix's default functionality, you may want to configure a route to only load on entry or when critical loader deps change. You can do this by using the `gcTime` option combined with the `shouldReload` option, which accepts either a `boolean` or a function that receives the same `beforeLoad` and `loaderContext` parameters and returns a boolean indicating if the route should reload. Below, `gcTime: 0` stops the route's data from being cached after it's unloaded, and `shouldReload: false` limits reloads to navigations to the route and changes in its deps.
 
-```tsx
-// /routes/posts.tsx
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loaderDeps: ({ search: { offset, limit } }) => ({ offset, limit }),
   loader: ({ deps }) => fetchPosts(deps),
-  // Do not cache this route's data after it's unloaded
   gcTime: 0,
-  // Only reload the route when the user navigates to it or when deps change
   shouldReload: false,
 })
 ```
@@ -328,7 +314,11 @@ The `context` argument passed to the `loader` function is an object containing a
 
 Starting at the very top of the router, you can pass an initial context to the router via the `context` option. This context will be available to all routes in the router and get copied and extended by each route as they are matched. This happens by passing a context to a route via the `beforeLoad` option. This context will be available to all the route's child routes. The resulting context will be available to the route's `loader` function.
 
-In this example, we'll create a function in our route context to fetch posts, then use it in our `loader` function.
+In this example, we'll create a function in our route context to fetch posts, then use it in our `loader` function. Walking through the files below:
+
+- `__root.tsx` creates a root route with the `createRootRouteWithContext<{...}>()` function, passing it whatever types you would like available in your router context. The double call is on purpose, since `createRootRouteWithContext` is a factory.
+- `posts.tsx` shows the posts route referencing context to get our `fetchPosts` function — a powerful tool for dependency injection across your router and routes.
+- `router.tsx` uses your router context to create a new router, supplying `fetchPosts` to the context. This will require that you fulfil the type requirements of the router context.
 
 > 🧠 Context is a powerful tool for dependency injection. You can use it to inject services, hooks, and other objects into your router and routes. You can also additively pass data down the route tree at every route using a route's `beforeLoad` option.
 
@@ -351,10 +341,9 @@ export const fetchPosts = async () => {
 ```tsx
 import { createRootRouteWithContext } from '@tanstack/react-router'
 
-// Create a root route using the createRootRouteWithContext<{...}>() function and pass it whatever types you would like to be available in your router context.
 export const Route = createRootRouteWithContext<{
   fetchPosts: typeof fetchPosts
-}>()() // NOTE: the double call is on purpose, since createRootRouteWithContext is a factory ;)
+}>()()
 ```
 
 # Solid
@@ -362,10 +351,9 @@ export const Route = createRootRouteWithContext<{
 ```tsx
 import { createRootRouteWithContext } from '@tanstack/solid-router'
 
-// Create a root route using the createRootRouteWithContext<{...}>() function and pass it whatever types you would like to be available in your router context.
 export const Route = createRootRouteWithContext<{
   fetchPosts: typeof fetchPosts
-}>()() // NOTE: the double call is on purpose, since createRootRouteWithContext is a factory ;)
+}>()()
 ```
 
 <!-- ::end:framework -->
@@ -373,9 +361,6 @@ export const Route = createRootRouteWithContext<{
 - `/routes/posts.tsx`
 
 ```tsx
-// Notice how our postsRoute references context to get our fetchPosts function
-// This can be a powerful tool for dependency injection across your router
-// and routes.
 export const Route = createFileRoute('/posts')({
   loader: ({ context: { fetchPosts } }) => fetchPosts(),
 })
@@ -386,12 +371,9 @@ export const Route = createFileRoute('/posts')({
 ```tsx
 import { routeTree } from './routeTree.gen'
 
-// Use your routerContext to create a new router
-// This will require that you fullfil the type requirements of the routerContext
 const router = createRouter({
   routeTree,
   context: {
-    // Supply the fetchPosts function to the router context
     fetchPosts,
   },
 })
@@ -401,8 +383,7 @@ const router = createRouter({
 
 To use path params in your `loader` function, access them via the `params` property on the function's parameters. Here's an example:
 
-```tsx
-// src/routes/posts.$postId.tsx
+```tsx title="src/routes/posts.$postId.tsx"
 export const Route = createFileRoute('/posts/$postId')({
   loader: ({ params: { postId } }) => fetchPostById(postId),
 })
@@ -412,17 +393,13 @@ export const Route = createFileRoute('/posts/$postId')({
 
 Passing down global context to your router is great, but what if you want to provide context that is specific to a route? This is where the `beforeLoad` option comes in. The `beforeLoad` option is a function that runs right before attempting to load a route and receives the same parameters as `loader`. Beyond its ability to redirect potential matches, block loader requests, etc, it can also return an object that will be merged into the route's context. Let's take a look at an example where we inject some data into our route context via the `beforeLoad` option:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
-  // Pass the fetchPosts function to the route context
   beforeLoad: () => ({
     fetchPosts: () => console.info('foo'),
   }),
   loader: ({ context: { fetchPosts } }) => {
     fetchPosts() // 'foo'
-
-    // ...
   },
 })
 ```
@@ -437,8 +414,7 @@ You might be here wondering why `search` isn't directly available in the `loader
 - Directly accessing search params in a loader function can lead to bugs in caching and preloading where the data being loaded is not unique to the current URL pathname and search params. For example, you might ask your `/posts` route to preload page 2's results, but without the distinction of pages in your route configuration, you will end up fetching, storing and displaying page 2's data on your `/posts` or `?page=1` screen instead of it preloading in the background!
 - Placing a threshold between search parameters and the loader function allows the router to understand your dependencies and reactivity.
 
-```tsx
-// /routes/users.user.tsx
+```tsx title="/routes/users.user.tsx"
 export const Route = createFileRoute('/users/user')({
   validateSearch: (search) =>
     search as {
@@ -453,16 +429,14 @@ export const Route = createFileRoute('/users/user')({
 
 ### Accessing Search Params via `routeOptions.loaderDeps`
 
-```tsx
-// /routes/posts.tsx
+Below, `validateSearch` uses zod to validate and parse the search params, `loaderDeps` passes the offset through to the loader deps, and the loader uses that offset.
+
+```tsx title="/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
-  // Use zod to validate and parse the search params
   validateSearch: z.object({
     offset: z.number().int().nonnegative().catch(0),
   }),
-  // Pass the offset to your loader deps via the loaderDeps function
   loaderDeps: ({ search: { offset } }) => ({ offset }),
-  // Use the offset from context in the loader function
   loader: async ({ deps: { offset } }) =>
     fetchPosts({
       offset,
@@ -472,14 +446,12 @@ export const Route = createFileRoute('/posts')({
 
 ## Using the Abort Signal
 
-The `abortController` property of the `loader` function is an [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController). Its signal is cancelled when the route is unloaded or when the `loader` call becomes outdated. This is useful for cancelling network requests when the route is unloaded or when the route's params change. Here is an example using it with a fetch call:
+The `abortController` property of the `loader` function is an [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController). Its signal is cancelled when the route is unloaded or when the `loader` call becomes outdated. This is useful for cancelling network requests when the route is unloaded or when the route's params change. Here is an example passing the signal to an underlying fetch call — anything that supports signals works the same way:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: ({ abortController }) =>
     fetchPosts({
-      // Pass this to an underlying fetch call or anything that supports signals
       signal: abortController.signal,
     }),
 })
@@ -489,8 +461,7 @@ export const Route = createFileRoute('/posts')({
 
 The `preload` property of the `loader` function is a boolean which is `true` when the route is being preloaded instead of loaded. Some data loading libraries may handle preloading differently than a standard fetch, so you may want to pass `preload` to your data loading library, or use it to execute the appropriate data loading logic:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: async ({ preload }) =>
     fetchPosts({
@@ -530,12 +501,10 @@ TanStack Router provides a few ways to handle errors that occur during the route
 
 The `routeOptions.onError` option is a function that is called when an error occurs during the route loading.
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   onError: ({ error }) => {
-    // Log the error
     console.error(error)
   },
 })
@@ -545,11 +514,9 @@ export const Route = createFileRoute('/posts')({
 
 The `routeOptions.onCatch` option is a function that is called whenever an error was caught by the router's CatchBoundary.
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   onCatch: ({ error, errorInfo }) => {
-    // Log the error
     console.error(error)
   },
 })
@@ -562,12 +529,10 @@ The `routeOptions.errorComponent` option is a component that is rendered when an
 - `error` - The error that occurred
 - `reset` - A function to reset the internal `CatchBoundary`
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   errorComponent: ({ error }) => {
-    // Render an error message
     return <div>{error.message}</div>
   },
 })
@@ -575,8 +540,7 @@ export const Route = createFileRoute('/posts')({
 
 The `reset` function can be used to allow the user to retry rendering the error boundaries normal children:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   errorComponent: ({ error, reset }) => {
@@ -585,7 +549,6 @@ export const Route = createFileRoute('/posts')({
         {error.message}
         <button
           onClick={() => {
-            // Reset the router error boundary
             reset()
           }}
         >
@@ -599,8 +562,7 @@ export const Route = createFileRoute('/posts')({
 
 If the error was the result of a route load, you should instead call `router.invalidate()`, which will coordinate both a router reload and an error boundary reset:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   errorComponent: ({ error, reset }) => {
@@ -611,7 +573,6 @@ export const Route = createFileRoute('/posts')({
         {error.message}
         <button
           onClick={() => {
-            // Invalidate the route to reload the loader, which will also reset the error boundary
             router.invalidate()
           }}
         >
@@ -627,17 +588,14 @@ export const Route = createFileRoute('/posts')({
 
 TanStack Router provides a default `ErrorComponent` that is rendered when an error occurs during the route loading or rendering lifecycle. If you choose to override your routes' error components, it's still wise to always fall back to rendering any uncaught errors with the default `ErrorComponent`:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 export const Route = createFileRoute('/posts')({
   loader: () => fetchPosts(),
   errorComponent: ({ error }) => {
     if (error instanceof MyCustomError) {
-      // Render a custom error message
       return <div>{error.message}</div>
     }
 
-    // Fallback to the default ErrorComponent
     return <ErrorComponent error={error} />
   },
 })

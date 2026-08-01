@@ -5,16 +5,8 @@
 # No driver pane — the user's current terminal is the driver.
 # Each session runs in its own terminal window (tiled by the WM).
 # NOTE: Callers must NEVER sleep/poll to wait for session completion — rely on user prompt or hook callback.
-#
-# Usage:
-#   sessions.sh status              - show all sessions with free/busy state
-#   sessions.sh state [N]           - detect Claude UI state (IDLE/INFERRING/NO_CLAUDE)
-#   sessions.sh launch [N] [DIR] [ARGS] - launch claude in session N (or first free)
-#   sessions.sh quit N              - quit Claude in session N (Ctrl+C twice)
-#   sessions.sh send N ["text"]     - send text + Enter (or bare Enter if no text)
-#   sessions.sh clear N             - clear Claude's conversation in session N
-#   sessions.sh message N "prompt"  - send prompt + verify inference started
-#   sessions.sh read N              - capture what's on screen in session N
+# Subcommands and their arguments are documented in ../SKILL.md.
+# ponytail: this duplicates TypeScript tmux UI detection; keep one implementation or generate one from the other.
 
 _generate_sessions() {
   local letters=(a b c d e f g h i j k l m n o p q r s t u v w x y z)
@@ -102,8 +94,6 @@ _claude_launch_cmd() {
 }
 
 cmd_launch() {
-  # --- Extract identity flags from ANY position in the arg list ---
-  
   local stream_id="${FLITTERBOT_STREAM_ID:-}"
   local pi_session_id="${FLITTERBOT_PI_SESSION_ID:-}"
   local remaining=()
@@ -127,11 +117,12 @@ cmd_launch() {
     fi
   fi
 
-  # --- Session selection with mkdir lock to prevent race conditions ---
-  # When multiple launches happen in parallel, they must serialize the
-  # find-free-session + claim-session sequence to avoid all picking the same one.
-  # Uses mkdir for locking — atomic on all platforms (macOS + Linux), unlike flock.
   local LOCK_DIR="/tmp/tmux-launch.lock"
+  local SHELL_FORK_GRACE_SECONDS=0.5
+
+  _lock_break_stale() {
+    rm -rf "$LOCK_DIR"
+  }
 
   _lock_acquire() {
     local max_wait=10 waited=0
@@ -139,8 +130,7 @@ cmd_launch() {
       sleep 0.2
       waited=$((waited + 1))
       if [ "$waited" -ge "$((max_wait * 5))" ]; then
-        # Stale lock — remove and retry
-        rm -rf "$LOCK_DIR"
+        _lock_break_stale
       fi
     done
     echo $$ > "$LOCK_DIR/pid"
@@ -158,7 +148,6 @@ cmd_launch() {
     done
 
     if [ -z "$session" ]; then
-      # No free sessions — find the longest-idle Claude session to reclaim
       local best="" best_idle=0
       for s in $SESSIONS; do
         if has_claude "$s"; then
@@ -197,9 +186,6 @@ cmd_launch() {
       return 1
     fi
 
-    # Claim the session: send Ctrl-C, cd, and claude command while holding the lock.
-    # The lock is held until the claude command is sent and the shell has time to
-    # start it — so the next concurrent launcher sees it as busy via is_free().
     tmux send-keys -t "$session" C-c
     sleep 0.2
 
@@ -211,9 +197,9 @@ cmd_launch() {
     local cmd
     cmd=$(_claude_launch_cmd "$session" "$stream_id" "$pi_session_id" "$args")
     tmux send-keys -t "$session" "$cmd" Enter
-    sleep 0.5  # give shell time to fork claude process before releasing lock
+    sleep "$SHELL_FORK_GRACE_SECONDS"
 
-    _lock_release  # claude process is now starting, session no longer free
+    _lock_release
   else
     if ! session_exists "$session"; then
       tmux new-session -d -s "$session"
@@ -252,7 +238,6 @@ cmd_launch() {
         fi
         sleep 0.5
       done
-      # Claude is running but didn't reach IDLE — still usable
       echo "Launched in session $session (Claude running, may still be loading)"
       return 0
     fi
@@ -396,7 +381,6 @@ cmd_session_id() {
   fi
 }
 
-# ponytail: this duplicates TypeScript tmux UI detection; keep one implementation or generate one from the other.
 _pane_ui_state() {
   local session="$1"
   if ! has_claude "$session"; then

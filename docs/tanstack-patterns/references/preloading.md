@@ -35,7 +35,7 @@ The simplest way to preload routes for your application is to set the `defaultPr
 import { createRouter } from '@tanstack/react-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreload: 'intent',
 })
 ```
@@ -46,7 +46,7 @@ const router = createRouter({
 import { createRouter } from '@tanstack/solid-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreload: 'intent',
 })
 ```
@@ -67,7 +67,7 @@ By default, preloading will start after **50ms** of the user hovering or touchin
 import { createRouter } from '@tanstack/react-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadDelay: 100,
 })
 ```
@@ -78,7 +78,7 @@ const router = createRouter({
 import { createRouter } from '@tanstack/solid-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadDelay: 100,
 })
 ```
@@ -101,7 +101,7 @@ To change this, you can set the `defaultPreloadStaleTime` option on your router:
 import { createRouter } from '@tanstack/react-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadStaleTime: 10_000,
 })
 ```
@@ -112,7 +112,7 @@ const router = createRouter({
 import { createRouter } from '@tanstack/solid-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadStaleTime: 10_000,
 })
 ```
@@ -121,11 +121,11 @@ const router = createRouter({
 
 Or, you can use the `routeOptions.preloadStaleTime` option on individual routes:
 
-```tsx
-// src/routes/posts.$postId.tsx
+Setting `preloadStaleTime` to 10 seconds, as below, preloads the route again whenever the preload cache is older than that:
+
+```tsx title="src/routes/posts.$postId.tsx"
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params }) => fetchPost(params.postId),
-  // Preload the route again if the preload cache is older than 10 seconds
   preloadStaleTime: 10_000,
 })
 ```
@@ -146,7 +146,7 @@ For example:
 import { createRouter } from '@tanstack/react-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadStaleTime: 0,
 })
 ```
@@ -157,7 +157,7 @@ const router = createRouter({
 import { createRouter } from '@tanstack/solid-router'
 
 const router = createRouter({
-  // ...
+  routeTree,
   defaultPreloadStaleTime: 0,
 })
 ```
@@ -186,7 +186,7 @@ function Component() {
           params: { id: 1 },
         })
       } catch (err) {
-        // Failed to preload route
+        reportPreloadRouteFailure(err)
       }
     }
 
@@ -211,7 +211,7 @@ function Component() {
           params: { id: 1 },
         })
       } catch (err) {
-        // Failed to preload route
+        reportPreloadRouteFailure(err)
       }
     }
 
@@ -244,7 +244,7 @@ function Component() {
           router.loadRouteChunk(postsRoute.parentRoute),
         ])
       } catch (err) {
-        // Failed to preload route chunk
+        reportPreloadRouteChunkFailure(err)
       }
     }
 
@@ -271,7 +271,7 @@ function Component() {
           router.loadRouteChunk(postsRoute.parentRoute),
         ])
       } catch (err) {
-        // Failed to preload route chunk
+        reportPreloadRouteChunkFailure(err)
       }
     }
 

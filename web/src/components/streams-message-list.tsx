@@ -15,10 +15,16 @@ import {
 } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";
-import { getAgentMessageRowKeys, STREAMING_MESSAGE_ROW_KEY } from "~/lib/agent-message-rows";
+import {
+  getAgentMessageRowKeys,
+  isPrependedRowKeys,
+  STREAMING_MESSAGE_ROW_KEY,
+} from "~/lib/agent-message-rows";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList, MessageListVirtualState } from "~/pi-web-ui/chat-components";
+
+const LOAD_PREVIOUS_ROW_THRESHOLD = 3;
 
 const EMPTY_TOOLS: AgentTool[] = [];
 const EMPTY_PENDING = new Set<string>();
@@ -38,6 +44,9 @@ type StreamsMessageListProps = {
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
   isSessionBusy?: boolean;
+  onLoadPrevious?: () => void;
+  hasPrevious?: boolean;
+  isLoadingPrevious?: boolean;
   initialScrollKey: string;
   viewportRef: RefObject<HTMLDivElement | null>;
   ref?: Ref<StreamsMessageListHandle>;
@@ -48,6 +57,9 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   onPruneRequested,
   onForkRequested,
   isSessionBusy = false,
+  onLoadPrevious,
+  hasPrevious = false,
+  isLoadingPrevious = false,
   initialScrollKey,
   viewportRef,
   ref,
@@ -65,9 +77,27 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     virtualizerRef.current?.measureElement(element ?? null);
   }, []);
   const previousRowCountRef = useRef(rowKeys.length);
+  const previousFirstRowKeyRef = useRef<string | undefined>(rowKeys[0]);
   const pendingAppendFollowRef = useRef(false);
+  const isPrepend = isPrependedRowKeys(
+    previousFirstRowKeyRef.current,
+    previousRowCountRef.current,
+    rowKeys,
+  );
   const shouldFollowAppend =
-    rowKeys.length > previousRowCountRef.current && (virtualizerRef.current?.isAtEnd() ?? true);
+    !isPrepend &&
+    rowKeys.length > previousRowCountRef.current &&
+    (virtualizerRef.current?.isAtEnd() ?? true);
+
+  const loadPreviousRef = useRef(onLoadPrevious);
+  loadPreviousRef.current = onLoadPrevious;
+  const canLoadPreviousRef = useRef(false);
+  canLoadPreviousRef.current = hasPrevious && !isLoadingPrevious;
+  const loadPreviousRequestedRef = useRef(false);
+  const completedInitialScrollKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isLoadingPrevious) loadPreviousRequestedRef.current = false;
+  }, [isLoadingPrevious]);
   const virtualSnapshotRef = useRef<
     | {
         sourceItems: ReturnType<Virtualizer<HTMLDivElement, Element>["getVirtualItems"]>;
@@ -79,6 +109,19 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     (instance: Virtualizer<HTMLDivElement, Element>) => {
       const sourceItems = instance.getVirtualItems();
       const totalSize = instance.getTotalSize();
+
+      const firstVisibleIndex = sourceItems[0]?.index;
+      if (
+        completedInitialScrollKeyRef.current !== null &&
+        firstVisibleIndex !== undefined &&
+        firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
+        canLoadPreviousRef.current &&
+        !loadPreviousRequestedRef.current
+      ) {
+        loadPreviousRequestedRef.current = true;
+        loadPreviousRef.current?.();
+      }
+
       const previous = virtualSnapshotRef.current;
       if (previous?.sourceItems === sourceItems && previous.state.totalSize === totalSize) {
         const element = elementRef.current;
@@ -114,8 +157,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     [measureElement],
   );
   const virtualizer = useVirtualizer({
-    // Lit owns row geometry; leaving containerRef unwired makes direct mode suppress unchanged-range React renders only.
-    directDomUpdates: true,
+    directDomUpdates: true, // Lit owns row geometry, not React
     onChange: publishVirtualState,
     count: rowKeys.length + 1,
     getScrollElement: () => viewportRef.current,
@@ -131,13 +173,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   useLayoutEffect(() => {
     virtualizerRef.current = virtualizer;
     previousRowCountRef.current = rowKeys.length;
+    previousFirstRowKeyRef.current = rowKeys[0];
     if (shouldFollowAppend) pendingAppendFollowRef.current = true;
     return () => {
       virtualizerRef.current = null;
     };
-  }, [rowKeys.length, shouldFollowAppend, virtualizer]);
-  const initialScrollRef = useRef<string | null>(null);
-
+  }, [rowKeys, shouldFollowAppend, virtualizer]);
   const flushActiveTools = () => {
     const el = elementRef.current;
     if (!el) return;
@@ -197,8 +238,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         pendingAppendFollowRef.current = false;
         virtualizer.scrollToEnd();
       }
-      if (rowKeys.length > 0 && initialScrollRef.current !== initialScrollKey) {
-        initialScrollRef.current = initialScrollKey;
+      if (rowKeys.length > 0 && completedInitialScrollKeyRef.current !== initialScrollKey) {
+        completedInitialScrollKeyRef.current = initialScrollKey;
         virtualizer.scrollToEnd();
       }
     });
@@ -312,6 +353,9 @@ function areStreamsMessageListPropsEqual(
   return (
     prev.messages === next.messages &&
     prev.isSessionBusy === next.isSessionBusy &&
+    prev.onLoadPrevious === next.onLoadPrevious &&
+    prev.hasPrevious === next.hasPrevious &&
+    prev.isLoadingPrevious === next.isLoadingPrevious &&
     prev.initialScrollKey === next.initialScrollKey &&
     prev.viewportRef === next.viewportRef &&
     prev.onPruneRequested === next.onPruneRequested &&

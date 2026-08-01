@@ -4,6 +4,10 @@ import {
   type SessionEntry,
   type SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import {
+  STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT,
+  STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT,
+} from "../contracts/control-surface-api.ts";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -288,7 +292,6 @@ function shapeHistoryItems(
   return mode === "input" ? keepOnlySurfaced(items) : items;
 }
 
-// ponytail: if the pi SDK exposes normalized timeline events, replace this local transcript reshaper.
 function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
   const entryIds = new Set(entries.map((entry) => entry.id));
   const compactionsByFirstKeptId = new Map<string, SessionEntry[]>();
@@ -331,6 +334,87 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
     parseMessageRecord(messageRecord, createdAt, entry.id, items);
   }
   return items;
+}
+
+function isVisibleRow(item: ChatTimelineItem): boolean {
+  return item.kind === "message" && (item.role === "user" || item.role === "assistant");
+}
+
+export function encodeHistoryCursor(item: ChatTimelineItem, index: number): string {
+  return Buffer.from(JSON.stringify({ v: 1, id: item.id, i: index }), "utf8").toString("base64url");
+}
+
+export type HistoryCursor = { id: string; index: number };
+
+export function decodeHistoryCursor(raw: string): HistoryCursor | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  const record = asRecord(parsed);
+  if (record.v !== 1) return null;
+  if (typeof record.id !== "string" || !record.id) return null;
+  if (typeof record.i !== "number" || !Number.isInteger(record.i) || record.i < 0) return null;
+  return { id: record.id, index: record.i };
+}
+
+export function clampVisibleRowLimit(raw: string | null): number {
+  if (raw === null || raw.trim() === "") return STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT;
+  const truncated = Math.trunc(parsed);
+  if (truncated < 1) return 1;
+  if (truncated > STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT)
+    return STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT;
+  return truncated;
+}
+
+export type HistoryPage = {
+  items: ChatTimelineItem[];
+  olderPageCursor: string | null;
+  hasOlderRows: boolean;
+  appliedVisibleRowLimit: number;
+};
+
+export function takePageEndingBeforeCursor(
+  items: ChatTimelineItem[],
+  visibleRowLimit: number,
+  cursor: HistoryCursor | null,
+): HistoryPage | null {
+  let endExclusive = items.length;
+  if (cursor) {
+    const atIndex = items[cursor.index];
+    if (atIndex && atIndex.id === cursor.id) {
+      endExclusive = cursor.index;
+    } else {
+      const found = items.findIndex((item) => item.id === cursor.id);
+      if (found < 0) return null;
+      endExclusive = found;
+    }
+  }
+
+  let firstItemOfPage = 0;
+  let visibleRowsTaken = 0;
+  for (let i = endExclusive - 1; i >= 0; i--) {
+    if (!isVisibleRow(items[i]!)) continue;
+    visibleRowsTaken++;
+    if (visibleRowsTaken === visibleRowLimit) {
+      firstItemOfPage = i;
+      break;
+    }
+  }
+
+  const hasOlderRows = items.slice(0, firstItemOfPage).some(isVisibleRow);
+  return {
+    items: items.slice(hasOlderRows ? firstItemOfPage : 0, endExclusive),
+    hasOlderRows,
+    olderPageCursor: hasOlderRows
+      ? encodeHistoryCursor(items[firstItemOfPage]!, firstItemOfPage)
+      : null,
+    appliedVisibleRowLimit: visibleRowLimit,
+  };
 }
 
 export function readStreamsHistoryFromSession(
