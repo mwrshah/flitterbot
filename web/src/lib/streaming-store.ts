@@ -1,4 +1,3 @@
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { streamingUiDebug } from "./debug-log";
 import { streamingPerf } from "./streaming-perf";
 
@@ -12,15 +11,10 @@ type StreamingCallback = (
   messageId: string | null,
 ) => void;
 
-type CommitCallback = (messages: AgentMessage[]) => void;
-type ToolResultCommitCallback = (message: AgentMessage) => void;
-
 const texts = new Map<string, StreamingText>();
 const thinking = new Map<string, StreamingThinking>();
 const thinkingActive = new Map<string, boolean>();
 const streamingCallbacks = new Map<string, StreamingCallback>();
-const commitCallbacks = new Map<string, CommitCallback>();
-const toolResultCommitCallbacks = new Map<string, ToolResultCommitCallback>();
 
 function fireCallbacks(sessionId: string) {
   const cb = streamingCallbacks.get(sessionId);
@@ -105,42 +99,5 @@ export const streamingStore = {
 
   offStreamingDelta(sessionId: string) {
     streamingCallbacks.delete(sessionId);
-  },
-
-  onCommit(sessionId: string, callback: CommitCallback) {
-    commitCallbacks.set(sessionId, callback);
-  },
-
-  offCommit(sessionId: string) {
-    commitCallbacks.delete(sessionId);
-  },
-
-  commitMessage(sessionId: string, agentMessages: AgentMessage[]) {
-    const cb = commitCallbacks.get(sessionId);
-    streamingUiDebug(
-      "[debug][streaming-store] commitMessage: session=%s messages=%d hasCallback=%s",
-      sessionId,
-      agentMessages.length,
-      String(!!cb),
-    );
-    if (cb) cb(agentMessages);
-  },
-
-  onToolResultCommit(sessionId: string, callback: ToolResultCommitCallback) {
-    toolResultCommitCallbacks.set(sessionId, callback);
-  },
-
-  offToolResultCommit(sessionId: string) {
-    toolResultCommitCallbacks.delete(sessionId);
-  },
-
-  commitToolResult(sessionId: string, agentMessage: AgentMessage) {
-    const cb = toolResultCommitCallbacks.get(sessionId);
-    streamingUiDebug(
-      "[debug][streaming-store] commitToolResult: session=%s hasCallback=%s",
-      sessionId,
-      String(!!cb),
-    );
-    if (cb) cb(agentMessage);
   },
 };

@@ -3,7 +3,6 @@ import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { activeToolStore } from "~/lib/active-tool-store";
 import { streamingUiDebug } from "~/lib/debug-log";
-import { timelineItemsToAgentMessages } from "~/lib/pi-web-ui-bridge";
 import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
@@ -324,18 +323,6 @@ export function setupWsQueryBridge(deps: {
             return next;
           },
         );
-
-        if (!isUser) {
-          const agentMessages = timelineItemsToAgentMessages(committedItems);
-          if (agentMessages.length > 0) {
-            streamingUiDebug(
-              "[debug][ws-bridge] message_end: imperative commit dispatched (%d agentMessages) for session=%s",
-              agentMessages.length,
-              piSessionId,
-            );
-            streamingStore.commitMessage(piSessionId, agentMessages);
-          }
-        }
       }
 
       streamingStore.clearSession(piSessionId);
@@ -420,10 +407,6 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "tool_result") {
       appendTimelineItem(queryClient, piSessionId, message.item);
 
-      const [toolResultMessage] = timelineItemsToAgentMessages([message.item]);
-      if (toolResultMessage) {
-        streamingStore.commitToolResult(piSessionId, toolResultMessage);
-      }
       if (message.item.toolUseId) {
         activeToolStore.dropTool(piSessionId, message.item.toolUseId);
       }

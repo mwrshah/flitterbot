@@ -1,11 +1,24 @@
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { memo, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import {
+  memo,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";
+import { getAgentMessageRowKeys, STREAMING_MESSAGE_ROW_KEY } from "~/lib/agent-message-rows";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
-import type { MessageList } from "~/pi-web-ui/chat-components";
+import type { MessageList, MessageListVirtualState } from "~/pi-web-ui/chat-components";
 
 const EMPTY_TOOLS: AgentTool[] = [];
 const EMPTY_PENDING = new Set<string>();
@@ -14,8 +27,7 @@ type MessageListElement = HTMLElement & MessageList & { updateComplete: Promise<
 export type StreamsMessageListHandle = {
   updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean): void;
   clearStreaming(): void;
-  commitStreaming(messages: AgentMessage[]): void;
-  commitToolResult(message: AgentMessage): boolean;
+  scrollToEnd(): void;
   setActiveTools(states: ActiveToolState[]): void;
   applyActiveToolState(state: ActiveToolState): void;
   clearActiveTools(): void;
@@ -23,40 +35,108 @@ export type StreamsMessageListHandle = {
 
 type StreamsMessageListProps = {
   messages: AgentMessage[];
-  onMessagesRendered?: () => void;
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
   isSessionBusy?: boolean;
+  initialScrollKey: string;
+  viewportRef: RefObject<HTMLDivElement | null>;
   ref?: Ref<StreamsMessageListHandle>;
 };
 
 export const StreamsMessageList = memo(function StreamsMessageList({
   messages,
-  onMessagesRendered,
   onPruneRequested,
   onForkRequested,
   isSessionBusy = false,
+  initialScrollKey,
+  viewportRef,
   ref,
 }: StreamsMessageListProps) {
-  useWhyDidYouRender("StreamsMessageList", { messages, onMessagesRendered, isSessionBusy });
+  useWhyDidYouRender("StreamsMessageList", { messages, isSessionBusy });
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<MessageListElement | null>(null);
   const pendingActiveToolsRef = useRef<Map<string, ActiveToolState>>(new Map());
   const clearActiveToolsQueuedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const rowKeys = useMemo(() => getAgentMessageRowKeys(messages), [messages]);
+  const virtualizerRef = useRef<Virtualizer<HTMLDivElement, Element> | null>(null);
+  const measureElement = useCallback((element: Element | undefined) => {
+    virtualizerRef.current?.measureElement(element ?? null);
+  }, []);
+  const previousRowCountRef = useRef(rowKeys.length);
+  const pendingAppendFollowRef = useRef(false);
+  const shouldFollowAppend =
+    rowKeys.length > previousRowCountRef.current && (virtualizerRef.current?.isAtEnd() ?? true);
+  const virtualSnapshotRef = useRef<
+    | {
+        sourceItems: ReturnType<Virtualizer<HTMLDivElement, Element>["getVirtualItems"]>;
+        state: MessageListVirtualState;
+      }
+    | undefined
+  >(undefined);
+  const publishVirtualState = useCallback(
+    (instance: Virtualizer<HTMLDivElement, Element>) => {
+      const sourceItems = instance.getVirtualItems();
+      const totalSize = instance.getTotalSize();
+      const previous = virtualSnapshotRef.current;
+      if (previous?.sourceItems === sourceItems && previous.state.totalSize === totalSize) {
+        const element = elementRef.current;
+        if (element && !element.virtualState) {
+          element.virtualState = previous.state;
+          element.updateVirtualGeometry(previous.state);
+        }
+        return;
+      }
 
-  const notifyMessagesRendered = (renderComplete?: Promise<unknown>) => {
-    const el = elementRef.current;
-    if (!el) return;
-    void (renderComplete ?? el.updateComplete).then(() => {
-      if (elementRef.current !== el) return;
-      flushActiveTools();
-      requestAnimationFrame(() => {
-        onMessagesRendered?.();
-      });
-    });
-  };
+      const state: MessageListVirtualState = {
+        items: sourceItems.map(({ index, key, start }) => ({ index, key, start })),
+        totalSize,
+        measureElement,
+      };
+      virtualSnapshotRef.current = { sourceItems, state };
+      const element = elementRef.current;
+      if (!element) return;
+
+      const sameRange =
+        previous?.state.items.length === state.items.length &&
+        previous.state.items.every(
+          (item, index) =>
+            item.index === state.items[index]?.index && item.key === state.items[index]?.key,
+        );
+      if (sameRange && element.virtualState) {
+        element.updateVirtualGeometry(state);
+      } else {
+        element.virtualState = state;
+        element.updateVirtualGeometry(state);
+      }
+    },
+    [measureElement],
+  );
+  const virtualizer = useVirtualizer({
+    // Lit owns row geometry; leaving containerRef unwired makes direct mode suppress unchanged-range React renders only.
+    directDomUpdates: true,
+    onChange: publishVirtualState,
+    count: rowKeys.length + 1,
+    getScrollElement: () => viewportRef.current,
+    getItemKey: (index) => (index === rowKeys.length ? STREAMING_MESSAGE_ROW_KEY : rowKeys[index]!),
+    estimateSize: (index) => (index === rowKeys.length ? 0 : 120),
+    overscan: 2,
+    paddingStart: 16,
+    paddingEnd: 16,
+    anchorTo: "end",
+    scrollEndThreshold: 120,
+    useFlushSync: false,
+  });
+  useLayoutEffect(() => {
+    virtualizerRef.current = virtualizer;
+    previousRowCountRef.current = rowKeys.length;
+    if (shouldFollowAppend) pendingAppendFollowRef.current = true;
+    return () => {
+      virtualizerRef.current = null;
+    };
+  }, [rowKeys.length, shouldFollowAppend, virtualizer]);
+  const initialScrollRef = useRef<string | null>(null);
 
   const flushActiveTools = () => {
     const el = elementRef.current;
@@ -101,6 +181,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     }
 
     const el = elementRef.current as MessageListElement & Record<string, unknown>;
+    publishVirtualState(virtualizer);
     flushActiveTools();
 
     const renderToken = streamingPerf.beginCommittedLitRender();
@@ -110,9 +191,26 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     el.isSessionBusy = isSessionBusy;
     void el.updateComplete.then(() => {
       streamingPerf.endCommittedLitRender(renderToken);
-      notifyMessagesRendered();
+      if (elementRef.current !== el) return;
+      flushActiveTools();
+      if (pendingAppendFollowRef.current) {
+        pendingAppendFollowRef.current = false;
+        virtualizer.scrollToEnd();
+      }
+      if (rowKeys.length > 0 && initialScrollRef.current !== initialScrollKey) {
+        initialScrollRef.current = initialScrollKey;
+        virtualizer.scrollToEnd();
+      }
     });
-  }, [ready, messages, onMessagesRendered, isSessionBusy]);
+  }, [
+    ready,
+    messages,
+    isSessionBusy,
+    initialScrollKey,
+    publishVirtualState,
+    rowKeys.length,
+    virtualizer,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -154,20 +252,13 @@ export const StreamsMessageList = memo(function StreamsMessageList({
 
   useImperativeHandle(ref, () => ({
     updateStreaming(message: AssistantMessage, isThinkingStreaming: boolean) {
-      const renderComplete = elementRef.current?.updateStreaming(message, isThinkingStreaming);
-      notifyMessagesRendered(renderComplete);
+      elementRef.current?.updateStreaming(message, isThinkingStreaming);
     },
     clearStreaming() {
       elementRef.current?.clearStreaming();
     },
-    commitStreaming(messages: AgentMessage[]) {
-      elementRef.current?.commitStreaming(messages);
-      notifyMessagesRendered();
-    },
-    commitToolResult(message: AgentMessage) {
-      const committed = elementRef.current?.commitToolResult(message) ?? false;
-      if (committed) notifyMessagesRendered();
-      return committed;
+    scrollToEnd() {
+      virtualizer.scrollToEnd();
     },
     setActiveTools(states: ActiveToolState[]) {
       pendingActiveToolsRef.current = new Map(states.map((state) => [state.toolUseId, state]));
@@ -218,5 +309,12 @@ function areStreamsMessageListPropsEqual(
   prev: StreamsMessageListProps,
   next: StreamsMessageListProps,
 ) {
-  return prev.messages === next.messages && prev.isSessionBusy === next.isSessionBusy;
+  return (
+    prev.messages === next.messages &&
+    prev.isSessionBusy === next.isSessionBusy &&
+    prev.initialScrollKey === next.initialScrollKey &&
+    prev.viewportRef === next.viewportRef &&
+    prev.onPruneRequested === next.onPruneRequested &&
+    prev.onForkRequested === next.onForkRequested
+  );
 }

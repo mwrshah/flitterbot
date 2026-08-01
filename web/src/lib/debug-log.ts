@@ -28,8 +28,3 @@ export function streamingUiDebug(message?: unknown, ...optionalParams: unknown[]
   if (!isStreamingUiDebugEnabled()) return;
   console.debug(message, ...optionalParams);
 }
-
-export function streamingUiDebugWarn(message?: unknown, ...optionalParams: unknown[]): void {
-  if (!isStreamingUiDebugEnabled()) return;
-  console.warn(message, ...optionalParams);
-}
