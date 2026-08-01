@@ -108,7 +108,6 @@ type EnqueueInput = {
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
 
-// ponytail: this god object mixes server lifecycle, routing, streams, WhatsApp, tools, and queues; split by domain when touching it.
 export class ControlSurfaceRuntime {
   readonly config: FlitterbotConfig;
   readonly blackboard: BlackboardDatabase;
@@ -171,8 +170,6 @@ export class ControlSurfaceRuntime {
       allowModelNetwork: true,
     });
 
-    // Legacy work streams predate per-user ownership; in a single-user history they were all the
-    // owner's, so adopt unowned work streams to the configured default user for owner-scoped routing.
     const defaultUser = loadWhatsAppConfig().defaultUser;
     if (defaultUser) {
       const adopted = this.blackboard
@@ -1728,8 +1725,6 @@ export class ControlSurfaceRuntime {
       throw new Error("Source session file not found");
     }
 
-    // Fork reads the on-disk transcript into a fresh SessionManager: createBranchedSession
-    // mutates the manager it runs on, so it must never touch the live session's manager.
     const forkManager = SessionManager.open(sourceFile, this.config.controlSurfaceSessionsDir);
     let leafId: string | null;
     if (entryId) {
@@ -1746,8 +1741,6 @@ export class ControlSurfaceRuntime {
 
     const forkedFile = forkManager.createBranchedSession(leafId);
     if (!forkedFile) throw new Error("Failed to create forked session");
-    // createBranchedSession defers the file write when the branch has no assistant message
-    // (its throwaway manager never flushes), leaving forkedFile as a path that was never written.
     if (!fs.existsSync(forkedFile)) {
       throw new Error("Nothing to fork: the selected branch has no completed turns yet");
     }
@@ -1755,9 +1748,6 @@ export class ControlSurfaceRuntime {
     const baseName = stripStreamNamePrefix(
       sourceStream?.name ?? managed.streamName ?? "flitterbot",
     );
-    // Copy the stream as-is: same repo_path, worktree_path, base_branch, and agent cwd.
-    // This intentionally shares the source worktree/branch, breaking the 1:1 stream-to-worktree
-    // invariant -- both forks act on the same checkout until the user diverges them.
     const cwd = row?.cwd ?? sourceStream?.repo_path ?? this.config.projectsDir;
     const result = await this.spawnStreamWithSession({
       name: baseName,
@@ -1980,7 +1970,6 @@ export class ControlSurfaceRuntime {
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
           this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
 
-          // Owner trickles from the creating default stream (per-user) or the global default session (owner).
           const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
           const streamUser =
             parentStream?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
@@ -2119,7 +2108,6 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
-                // agent-authored bootstrap prompt — sender "system" keeps it from coalescing with subsequent real user messages
                 sender: "system",
                 metadata: {
                   stream_id: ws.id,
@@ -2142,7 +2130,6 @@ export class ControlSurfaceRuntime {
                 id: `ws-init-${ws.id}`,
                 text: prompt,
                 source: "web",
-                // agent-authored bootstrap prompt — sender "system" keeps it from coalescing with subsequent real user messages
                 sender: "system",
                 metadata: {
                   stream_id: ws.id,

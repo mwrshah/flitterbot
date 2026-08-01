@@ -11,7 +11,14 @@ import type {
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
-import { readStreamsHistory, readStreamsHistoryFromSession } from "../streams/history.ts";
+import {
+  clampVisibleRowLimit,
+  decodeHistoryCursor,
+  type HistoryCursor,
+  readStreamsHistory,
+  readStreamsHistoryFromSession,
+  takePageEndingBeforeCursor,
+} from "../streams/history.ts";
 import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
 import { enrichTimelineToolDisplays } from "../streams/tool-display.ts";
 import { sendJson } from "./_shared.ts";
@@ -65,9 +72,24 @@ export async function handleBrowserStreamsHistoryRoute(
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
   const piSessionId = url.searchParams.get("piSessionId");
+  const visibleRowLimit = clampVisibleRowLimit(url.searchParams.get("limit"));
+  const beforeParam = url.searchParams.get("before");
+
+  let cursor: HistoryCursor | null = null;
+  if (beforeParam !== null && beforeParam !== "") {
+    cursor = decodeHistoryCursor(beforeParam);
+    if (!cursor) return sendJson(response, 400, { error: "Invalid cursor" });
+  }
 
   try {
-    return await handleBrowserStreamsHistoryRouteInner(runtime, response, historyMode, piSessionId);
+    return await handleBrowserStreamsHistoryRouteInner(
+      runtime,
+      response,
+      historyMode,
+      piSessionId,
+      visibleRowLimit,
+      cursor,
+    );
   } catch (err) {
     const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
@@ -85,6 +107,8 @@ async function handleBrowserStreamsHistoryRouteInner(
   response: http.ServerResponse,
   historyMode: "input" | "agent",
   piSessionId: string | null,
+  visibleRowLimit: number,
+  cursor: HistoryCursor | null,
 ) {
   if (historyMode === "input" && !piSessionId) {
     const piSessionIds: string[] = [];
@@ -135,10 +159,15 @@ async function handleBrowserStreamsHistoryRouteInner(
           const formatter =
             runtime.sessionManager.toolDisplayCache.formatterForPiSession(piSessionId);
           const enriched = enrichTimelineToolDisplays(diskBody.items, formatter);
+          const page = takePageEndingBeforeCursor(enriched, visibleRowLimit, cursor);
+          if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
           const body: StreamsHistoryResponse = {
             piSessionId: piSessionId,
             sessionFile: row.session_file,
-            items: enriched,
+            items: page.items,
+            olderPageCursor: page.olderPageCursor,
+            hasOlderRows: page.hasOlderRows,
+            appliedVisibleRowLimit: page.appliedVisibleRowLimit,
           };
           return sendJson(response, 200, body);
         }
@@ -172,10 +201,15 @@ async function handleBrowserStreamsHistoryRouteInner(
     );
     items = enrichTimelineToolDisplays(items, formatter);
   }
+  const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
+  if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
   const body: StreamsHistoryResponse = {
     piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,
-    items,
+    items: page.items,
+    olderPageCursor: page.olderPageCursor,
+    hasOlderRows: page.hasOlderRows,
+    appliedVisibleRowLimit: page.appliedVisibleRowLimit,
   };
   return sendJson(response, 200, body);
 }

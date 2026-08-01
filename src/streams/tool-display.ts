@@ -34,7 +34,6 @@ function expandHome(value: string, homeDir: string | undefined): string | undefi
   if (!homeDir) return undefined;
   if (value === "~") return homeDir;
   if (value.startsWith("~/")) return path.join(homeDir, value.slice(2));
-  // `~user/...` — do not expand; semantics depend on the OS user db.
   return undefined;
 }
 

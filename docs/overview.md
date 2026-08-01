@@ -254,7 +254,11 @@ pnpm install
 pnpm --dir web install
 node installer/install.mjs
 ~/.flitterbot/bin/flitterbot-up start
-# optional
+```
+
+Optional extras — the web UI and WhatsApp linking:
+
+```bash
 pnpm --dir web dev
 ~/.flitterbot/bin/flitterbot-wa auth
 ```

@@ -1,3 +1,5 @@
+// ponytail: use crypto.randomUUID() unless short human-facing IDs are essential.
+// ponytail: simplify migration backup/signature machinery if only the current JSON shape matters.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,7 +17,6 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-// ponytail: use crypto.randomUUID() unless short human-facing IDs are essential.
 function compactId() {
   return Array.from(crypto.randomBytes(ID_LENGTH), (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join("");
 }
@@ -39,7 +40,6 @@ function readStore() {
   }
 }
 
-// ponytail: simplify migration backup/signature machinery if only the current JSON shape matters.
 function writeStore(store) {
   if (store[MIGRATION_NEEDED]) backupStoreBeforeMigration();
   const normalized = normalizeStore({ ...store, updatedAt: nowIso() });
@@ -323,9 +323,8 @@ async function propagateInboundTaskChanges(store, idx, syncContext) {
       const afterLink = getExternalLink({ externalLinks: patch.externalLinks }, provider.system);
       task.externalLinks = patch.externalLinks;
       indexTaskExternalLinks(idx, task);
-      // No mapping before or after means this task was never a sync candidate for the
-      // target provider (e.g. a Todoist-only Inbox task and Linear), so it is not a skip.
-      if (!beforeLink && !afterLink) continue;
+      const neverASyncCandidateForProvider = !beforeLink && !afterLink;
+      if (neverASyncCandidateForProvider) continue;
       if (afterLink && !beforeLink) outbound[provider.system].created++;
       else outbound[provider.system].updated++;
     }

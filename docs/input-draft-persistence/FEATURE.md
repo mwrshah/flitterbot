@@ -55,18 +55,25 @@ __root__ (RootComponent)
 
 ### A. Module-Level Variable
 
+At module scope, outside the component:
+
 ```ts
-// At module scope, outside the component
 let savedDraft = '';
+```
 
-// Inside the component
-const [draft, setDraft] = useState(() => savedDraft);     // lazy init, runs once
+Inside the component, seeded by a lazy initializer that runs once:
 
-// In handleDraftChange (already fires on every keystroke):
+```ts
+const [draft, setDraft] = useState(() => savedDraft);
+```
+
+In `handleDraftChange`, which already fires on every keystroke, one line is added and the existing picker logic is unchanged:
+
+```ts
 const handleDraftChange = useCallback((value: string) => {
-  savedDraft = value;    // <-- one line added
+  savedDraft = value;
   setDraft(value);
-  // ... existing picker logic unchanged
+  runExistingPickerLogic(value);
 }, [skills, computeSlashLeft]);
 ```
 
@@ -91,19 +98,26 @@ const handleDraftChange = useCallback((value: string) => {
 
 ### B. sessionStorage Written Imperatively
 
+At module scope:
+
 ```ts
-// At module scope
 let savedDraft = sessionStorage.getItem('flitterbot:draft') ?? '';
+```
 
-// Inside the component
+Inside the component:
+
+```ts
 const [draft, setDraft] = useState(() => savedDraft);
+```
 
-// In handleDraftChange:
+In `handleDraftChange`, with a write-through to `sessionStorage` and the picker logic unchanged:
+
+```ts
 const handleDraftChange = useCallback((value: string) => {
   savedDraft = value;
-  sessionStorage.setItem('flitterbot:draft', value);   // <-- write-through
+  sessionStorage.setItem('flitterbot:draft', value);
   setDraft(value);
-  // ... picker logic
+  runExistingPickerLogic(value);
 }, [skills, computeSlashLeft]);
 ```
 
@@ -142,9 +156,9 @@ This means adding state at the AppShell or root level:
 
 ```tsx
 function AppShell() {
-  const [draft, setDraft] = useState("");  // lifted
+  const [liftedDraft, setLiftedDraft] = useState("");
   return (
-    <DraftContext.Provider value={{ draft, setDraft }}>
+    <DraftContext.Provider value={{ draft: liftedDraft, setDraft: setLiftedDraft }}>
       <Outlet />
     </DraftContext.Provider>
   );
@@ -180,14 +194,21 @@ The question: should navigating from Stream A to Stream B restore Stream A's dra
 - Surface (/) is conceptually different from any individual stream
 
 **Implementation cost for keying**:
+At module scope:
+
 ```ts
-// Module scope
 const draftStore = new Map<string, string>();
+```
 
-// Inside the component -- needs a new prop for the key
+Inside the component, which needs a new prop carrying the key:
+
+```ts
 const [draft, setDraft] = useState(() => draftStore.get(draftKey) ?? '');
+```
 
-// In handleDraftChange:
+In `handleDraftChange`:
+
+```ts
 draftStore.set(draftKey, value);
 ```
 
@@ -203,12 +224,11 @@ ChatPanel already receives `streamId` as a prop. Surface has no streamId. Messag
 
 **Primary: Module-level Map + sessionStorage write-through (A+B+F combined)**
 
-```ts
-// web/src/components/common/message-input.tsx — module scope
+At module scope in `web/src/components/common/message-input.tsx`, the store is declared and then hydrated from `sessionStorage` on first load — the `window` guard keeps the hydration client-only:
 
+```ts
 const draftStore = new Map<string, string>();
 
-// Hydrate from sessionStorage on first load (client only)
 if (typeof window !== 'undefined') {
   try {
     const saved = sessionStorage.getItem('flitterbot:drafts');
@@ -224,35 +244,47 @@ function persistDrafts() {
 }
 ```
 
-Inside the component:
+Inside the component, a new prop carries the key:
+
 ```ts
-// New prop
 draftKey?: string;
+```
 
-// Initialization (lazy, runs once, no useEffect)
+Initialization is lazy, runs once, and needs no useEffect:
+
+```ts
 const [draft, setDraft] = useState(() => draftStore.get(draftKey ?? '__default__') ?? '');
+```
 
-// In handleDraftChange (already fires every keystroke):
+`handleDraftChange` already fires every keystroke; `persistDrafts` is the sessionStorage write-through, and the existing picker logic is unchanged:
+
+```ts
 const handleDraftChange = useCallback((value: string) => {
   const key = draftKeyRef.current ?? '__default__';
   draftStore.set(key, value);
-  persistDrafts();           // sessionStorage write-through
+  persistDrafts();
   setDraft(value);
-  // ... existing picker logic
+  runExistingPickerLogic(value);
 }, [skills, computeSlashLeft]);
+```
 
-// In submit handlers -- clear the stored draft:
+The submit handlers clear the stored draft:
+
+```ts
 draftStore.delete(draftKeyRef.current ?? '__default__');
 persistDrafts();
 setDraft("");
 ```
 
-Consumer changes:
-```tsx
-// Surface (surface.tsx)
-<MessageInput draftKey="__surface__" ... />
+Consumer changes — Surface (`surface.tsx`) passes a fixed key:
 
-// ChatPanel (chat-panel.tsx) -- use streamId when available
+```tsx
+<MessageInput draftKey="__surface__" ... />
+```
+
+ChatPanel (`chat-panel.tsx`) uses `streamId` when available:
+
+```tsx
 <MessageInput draftKey={streamId ?? piSessionId} ... />
 ```
 
@@ -275,8 +307,9 @@ If page-refresh persistence is not needed, drop sessionStorage entirely and use 
 
 ```ts
 const draftStore = new Map<string, string>();
-// That's it. No sessionStorage, no JSON, no SSR guard.
 ```
+
+That single line is the whole of it — no sessionStorage, no JSON, no SSR guard.
 
 This is the absolute minimum viable solution and is what I recommend starting with. sessionStorage can be added later if refresh-persistence proves valuable.
 

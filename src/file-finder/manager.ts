@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { FileFinder } from "@ff-labs/fff-node";
 
-// ponytail: revisit whether this process needs an LRU of file finders; a single finder per active repo may be enough.
 const instances = new Map<string, FileFinder>();
 const MAX_INSTANCES = 8;
 const ENV_FILE_PREFIX = ".env";

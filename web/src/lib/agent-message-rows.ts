@@ -25,6 +25,16 @@ export function getAgentMessageRowKey(message: AgentMessage, renderIndex: number
   );
 }
 
+export function isPrependedRowKeys(
+  previousFirstKey: string | undefined,
+  previousCount: number,
+  nextKeys: string[],
+): boolean {
+  if (nextKeys.length <= previousCount) return false;
+  if (previousCount === 0 || previousFirstKey === undefined) return false;
+  return nextKeys[0] !== previousFirstKey;
+}
+
 export function getAgentMessageRowKeys(messages: AgentMessage[]): string[] {
   const keys: string[] = [];
   const used = new Set<string>([STREAMING_MESSAGE_ROW_KEY]);

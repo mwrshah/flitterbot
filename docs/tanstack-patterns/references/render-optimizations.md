@@ -20,8 +20,9 @@ When only `bar` is changed by navigating from `/details?foo=f1&bar=b1` to `/deta
 
 You can access and subscribe to the router state using various hooks like `useRouterState`, `useSearch`, and others. If you only want a specific component to re-render when a particular subset of the router state such as a subset of the search parameters changes, you can use partial subscriptions with the `select` property.
 
+With the selector below, the component won't re-render when `bar` changes:
+
 ```tsx
-// component won't re-render when `bar` changes
 const foo = Route.useSearch({ select: ({ foo }) => foo })
 ```
 

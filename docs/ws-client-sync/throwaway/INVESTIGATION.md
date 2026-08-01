@@ -143,8 +143,9 @@ This is a 4-hop chain for a single tool call lifecycle. The buffering in step 1-
 The `queryFn` in `piHistoryQueryOptions` reads *existing* Query cache data inside the query function itself to merge with fetched data:
 ```ts
 const existing = queryClient?.getQueryData<ChatTimelineItem[]>(key);
-// ...merge fetched + extras
 ```
+
+The elided remainder merges the fetched items with the extras held in `existing`.
 
 This is unusual — query functions typically don't read cache. It exists to prevent "oscillation" during reconnect (comment on line 33). When a reconnect triggers `invalidateQueries`, the refetch from the server might return stale data that doesn't include items accumulated via WS `setQueryData`. The merge preserves those WS-accumulated items.
 

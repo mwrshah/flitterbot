@@ -69,11 +69,15 @@ Using `useQuery` means these queries don't participate in the SSR streaming/dehy
 
 **Fix recommendation:** Use `useSuspenseQuery` for data that is critical to the initial render and was seeded by the loader. This ensures proper SSR streaming behavior and eliminates the need for fallback defaults:
 
-```tsx
-// surface.tsx
-const { data: timeline } = useSuspenseQuery(surfaceTimelineQueryOptions());
+In `surface.tsx`:
 
-// runtime-health-indicator.tsx
+```tsx
+const { data: timeline } = useSuspenseQuery(surfaceTimelineQueryOptions());
+```
+
+In `runtime-health-indicator.tsx`:
+
+```tsx
 const { data: status } = useSuspenseQuery(statusQueryOptions(apiClient));
 ```
 

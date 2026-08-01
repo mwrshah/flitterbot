@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// ponytail: share log rotation/config loading with installer runtime instead of another tiny copy.
 
 import { readFileSync, appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +12,6 @@ const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || join(FLITTERBOT_HOME, "conf
 const POST_TIMEOUT_MS = 2000;
 const ROTATE_BYTES = 10 * 1024 * 1024;
 
-// ponytail: share log rotation/config loading with installer runtime instead of another tiny copy.
 function logError(message) {
   try {
     mkdirSync(LOG_DIR, { recursive: true });

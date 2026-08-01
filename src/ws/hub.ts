@@ -22,7 +22,6 @@ type WebSocketMessageHandler = (
   data: ControlSurfaceWebSocketClientEvent | unknown,
 ) => void | Promise<void>;
 
-// ponytail: this hand-rolls WebSocket framing; replacing with a tiny maintained server library would delete protocol code.
 export class WebSocketHub {
   private readonly clients = new Map<string, WebSocketClient>();
   private readonly onMessage?: WebSocketMessageHandler;
@@ -147,7 +146,6 @@ export class WebSocketHub {
       if (!frame) return;
       client.buffer = client.buffer.subarray(frame.bytesConsumed);
 
-      // Control frames (close, ping) are never fragmented — handle before reassembly
       if (frame.opcode === 0x8) {
         this.clients.delete(client.id);
         client.socket.end();

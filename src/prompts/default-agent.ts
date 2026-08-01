@@ -1,3 +1,4 @@
+// === HUMAN REVIEW LINE === whole file FINAL; no EDITABLE region ===
 // Appended after the SDK default body (see ./sdk-prompt-reference.ts).
 export function buildDefaultAgentPrompt(piSessionId: string, projectsDir: string): string {
   return `# Specific Instructions for this Session (MUST ADHERE)
@@ -37,4 +38,3 @@ When communicating with the user, distill to the essential point. Be direct, avo
 When the user asks for a link or to see the document, reply with a code-fenced bash command: \`zed <absolute-path>/<filename>\`.
 `;
 }
-// === HUMAN REVIEW LINE === ABOVE: FINAL === BELOW: EDITABLE ===

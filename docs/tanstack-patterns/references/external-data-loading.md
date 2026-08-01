@@ -44,8 +44,7 @@ The easiest way to integrate external caching/data library into Router is to use
 
 Here is a naive illustration (don't do this) of using a Route's `loader` option to seed the cache for some data:
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 let postsCache = []
 
 export const Route = createFileRoute('/posts')({
@@ -71,20 +70,17 @@ This example is **obviously flawed**, but illustrates the point that you can use
 
 ## A more realistic example using TanStack Query
 
-Let's take a look at a more realistic example using TanStack Query.
+Let's take a look at a more realistic example using TanStack Query. The `loader` option ensures the data is loaded, and `useSuspenseQuery` in the component reads it from the cache and subscribes to updates.
 
-```tsx
-// src/routes/posts.tsx
+```tsx title="src/routes/posts.tsx"
 const postsQueryOptions = queryOptions({
   queryKey: ['posts'],
   queryFn: () => fetchPosts(),
 })
 
 export const Route = createFileRoute('/posts')({
-  // Use the `loader` option to ensure that the data is loaded
   loader: () => queryClient.ensureQueryData(postsQueryOptions),
   component: () => {
-    // Read the data from the cache and subscribe to updates
     const {
       data: { posts },
     } = useSuspenseQuery(postsQueryOptions)
@@ -102,7 +98,7 @@ export const Route = createFileRoute('/posts')({
 
 ### Error handling with TanStack Query
 
-When an error occurs while using `suspense` with `TanStack Query`, you need to let queries know that you want to try again when re-rendering. This can be done by using the `reset` function provided by the `useQueryErrorResetBoundary` hook. You can invoke this function in an effect as soon as the error component mounts. This will make sure that the query is reset and will try to fetch data again when the route component is rendered again. This will also cover cases where users navigate away from the route instead of clicking the `retry` button.
+When an error occurs while using `suspense` with `TanStack Query`, you need to let queries know that you want to try again when re-rendering. This can be done by using the `reset` function provided by the `useQueryErrorResetBoundary` hook. You can invoke this function in an effect as soon as the error component mounts. This will make sure that the query is reset and will try to fetch data again when the route component is rendered again. This will also cover cases where users navigate away from the route instead of clicking the `retry` button. In the example below, the effect resets the query error boundary, and the retry button calls `router.invalidate()` to reload the loader and reset any router error boundaries.
 
 ```tsx
 export const Route = createFileRoute('/')({
@@ -112,7 +108,6 @@ export const Route = createFileRoute('/')({
     const queryErrorResetBoundary = useQueryErrorResetBoundary()
 
     useEffect(() => {
-      // Reset the query error boundary
       queryErrorResetBoundary.reset()
     }, [queryErrorResetBoundary])
 
@@ -121,7 +116,6 @@ export const Route = createFileRoute('/')({
         {error.message}
         <button
           onClick={() => {
-            // Invalidate the route to reload the loader, and reset any router error boundaries
             router.invalidate()
           }}
         >
@@ -145,37 +139,31 @@ The `dehydrate` function can return any serializable JSON data which will get me
 
 For example, let's dehydrate and hydrate a TanStack Query `QueryClient` so that our data we fetched on the server will be available for hydration on the client.
 
-```tsx
-// src/router.tsx
+A few things to note about the example below:
+
+- Create your loader client, or similar data stores, **inside** of your `createRouter` function. This ensures that your data stores are unique to each request and always present on both server and client.
+- Providing the loader client to the router `context` is optional, done here for convenience — you can provide anything you want to the router context.
+- `dehydrate` runs on the server and dehydrates the loader client so the router can serialize it and send it to the client for us; `hydrate` runs on the client and hydrates the loader client with the data we dehydrated on the server.
+- `Wrap` is also optional, and wraps our router in the loader client provider.
+
+```tsx title="src/router.tsx"
 
 export function createRouter() {
-  // Make sure you create your loader client or similar data
-  // stores inside of your `createRouter` function. This ensures
-  // that your data stores are unique to each request and
-  // always present on both server and client.
   const queryClient = new QueryClient()
 
   return createRouter({
     routeTree,
-    // Optionally provide your loaderClient to the router context for
-    // convenience (you can provide anything you want to the router
-    // context!)
     context: {
       queryClient,
     },
-    // On the server, dehydrate the loader client so the router
-    // can serialize it and send it to the client for us
     dehydrate: () => {
       return {
         queryClientState: dehydrate(queryClient),
       }
     },
-    // On the client, hydrate the loader client with the data
-    // we dehydrated on the server
     hydrate: (dehydrated) => {
       hydrate(queryClient, dehydrated.queryClientState)
     },
-    // Optionally, we can use `Wrap` to wrap our router in the loader client provider
     Wrap: ({ children }) => {
       return (
         <QueryClientProvider client={queryClient}>

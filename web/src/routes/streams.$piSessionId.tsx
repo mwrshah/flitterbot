@@ -17,7 +17,6 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   statusQueryOptions,
   streamsDownstreamSessionsQueryOptions,
-  streamsHistoryQueryOptions,
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
 import { getStreamRecoveryKind } from "~/lib/stream-recovery";
@@ -38,17 +37,6 @@ export const Route = createFileRoute("/streams/$piSessionId")({
       streamsDownstreamSessionsQueryOptions(params.piSessionId),
     );
     void context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId));
-
-    const history = await context.queryClient
-      .ensureQueryData(streamsHistoryQueryOptions(params.piSessionId))
-      .catch((error: unknown) => {
-        if (error instanceof Error && /404|not found/i.test(error.message)) {
-          redirectToBestStream(status);
-        }
-        throw error;
-      });
-
-    return { history };
   },
   head: () => ({
     meta: [{ title: "Flitterbot" }],
@@ -69,7 +57,6 @@ function PiSessionRoute() {
   const { config, setConfig } = useUserConfig();
   const streamsLayout = parsePanelLayout(config, STREAMS_MAIN_KEY, STREAMS_MAIN_DEFAULT);
   const { piSessionId } = Route.useParams();
-  const { history } = Route.useLoaderData();
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const navigate = useNavigate();
@@ -114,10 +101,15 @@ function PiSessionRoute() {
   const recoveryKind = isDefaultSession ? undefined : getStreamRecoveryKind(stream);
   const selectedModel = isDefaultSession ? status?.piAgent?.default?.model : stream?.model;
 
-  const { timeline, onSendMessage, effectivePiSessionId, isSessionBusy } = useStreamsChat(
-    piSessionId,
-    history,
-  );
+  const {
+    timeline,
+    onSendMessage,
+    effectivePiSessionId,
+    isSessionBusy,
+    loadPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+  } = useStreamsChat(piSessionId);
 
   return (
     <PanelGroup
@@ -132,6 +124,9 @@ function PiSessionRoute() {
           timeline={timeline}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
+          onLoadPrevious={loadPreviousPage}
+          hasPrevious={hasPreviousPage}
+          isLoadingPrevious={isFetchingPreviousPage}
           streamId={isDefaultSession ? undefined : stream?.id}
           streamName={isDefaultSession ? "flitterbot" : stream?.name}
           streamType={isDefaultSession ? "defaultStream" : stream?.type}

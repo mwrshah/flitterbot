@@ -6,8 +6,7 @@ The automatic code splitting feature in TanStack Router allows you to optimize y
 
 To turn this feature on, simply set the `autoCodeSplitting` option to `true` in your bundler plugin configuration. This enables the router to automatically handle code splitting for your routes without requiring any additional setup.
 
-```ts
-// vite.config.ts
+```ts title="vite.config.ts"
 import { defineConfig } from 'vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
@@ -82,23 +81,27 @@ For automatic code splitting to work, there are some rules in-place to make sure
 
 Route properties like `component`, `loader`, etc., should not be exported from the route file. Exporting these properties results in them being bundled into the main application bundle, which means that they will not be code-split.
 
+Given a route that references a not-found component:
+
 ```tsx
 export const Route = createRoute('/posts')({
-  // ...
   notFoundComponent: PostsNotFoundComponent,
 })
+```
 
-// ❌ Do NOT do this!
-// Exporting the notFoundComponent will prevent it from being code-split
-// and will be included in the main bundle.
+❌ Do **not** export it. Exporting the `notFoundComponent` will prevent it from being code-split and will include it in the main bundle:
+
+```tsx
 export function PostsNotFoundComponent() {
-  // ❌
-  // ...
+  return <div>Post not found</div>
 }
+```
 
+✅ Declare it without `export` instead:
+
+```tsx
 function PostsNotFoundComponent() {
-  // ✅
-  // ...
+  return <div>Post not found</div>
 }
 ```
 
@@ -139,7 +142,7 @@ export default defineConfig({
 
 ### Advanced programmatic control (`splitBehavior`)
 
-For complex rulesets, you can use the `splitBehavior` function in your vite config to programmatically define how routes should be split into chunks based on their `routeId`. This function allows you to implement custom logic for grouping properties together, giving you fine-grained control over the code splitting behavior.
+For complex rulesets, you can use the `splitBehavior` function in your vite config to programmatically define how routes should be split into chunks based on their `routeId`. This function allows you to implement custom logic for grouping properties together, giving you fine-grained control over the code splitting behavior. In the example below, all routes under `/posts` bundle the loader and component together; returning nothing leaves every other route on the `defaultBehavior`.
 
 ```ts title="vite.config.ts"
 import { defineConfig } from 'vite'
@@ -151,11 +154,9 @@ export default defineConfig({
       autoCodeSplitting: true,
       codeSplittingOptions: {
         splitBehavior: ({ routeId }) => {
-          // For all routes under /posts, bundle the loader and component together
           if (routeId.startsWith('/posts')) {
             return [['loader', 'component']]
           }
-          // All other routes will use the `defaultBehavior`
         },
       },
     }),
@@ -171,14 +172,13 @@ For ultimate control, you can override the global configuration directly inside 
 import { loadPostsData } from './-heavy-posts-utils'
 
 export const Route = createFileRoute('/posts')({
-  // For this specific route, bundle the loader and component together.
   codeSplitGroupings: [['loader', 'component']],
   loader: () => loadPostsData(),
   component: PostsComponent,
 })
 
 function PostsComponent() {
-  // ...
+  return <PostsList />
 }
 ```
 
@@ -202,8 +202,7 @@ The `loader` function is responsible for fetching data needed by the route. By d
 > Moving the `loader` into its own chunk is a **performance trade-off**. It introduces an additional trip to the server before the data can be fetched, which can lead to slower initial page loads. This is because the `loader` **must** be fetched and executed before the route can render its component.
 > Therefore, we recommend keeping the `loader` in the initial bundle unless you have a specific reason to split it.
 
-```ts
-// vite.config.ts
+```ts title="vite.config.ts"
 import { defineConfig } from 'vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
@@ -215,7 +214,7 @@ export default defineConfig({
         defaultBehavior: [
           ['loader'], // The loader will be in its own chunk
           ['component'],
-          // ... other component groupings
+          ['errorComponent', 'notFoundComponent'],
         ],
       },
     }),

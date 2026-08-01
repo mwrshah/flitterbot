@@ -91,9 +91,7 @@ export class FlitterbotWsClient {
       }
     };
 
-    this.socket.onerror = () => {
-      // onclose fires after onerror — let onclose handle the transition
-    };
+    this.socket.onerror = () => {}; // onclose handles the transition
   }
 
   disconnect() {
@@ -119,9 +117,9 @@ export class FlitterbotWsClient {
     const s = this.socket;
     if (!s) return;
     this.socket = null;
-    // No-op handlers (not null) keep the browser dispatching close/error events so the close handshake completes; nulling them leaves sockets "Pending"
-    s.onclose = () => {};
-    s.onerror = () => {};
+    const keepDispatchingUntilCloseHandshakeCompletes = () => {};
+    s.onclose = keepDispatchingUntilCloseHandshakeCompletes;
+    s.onerror = keepDispatchingUntilCloseHandshakeCompletes;
     s.onmessage = null;
     s.onopen = null;
     if (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING) {
@@ -163,7 +161,6 @@ export class FlitterbotWsClient {
     }, delay);
   }
 
-  // ponytail: visibility ping duplicates heartbeat timeout logic; collapse to one ping/watchdog helper.
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {

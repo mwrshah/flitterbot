@@ -22,7 +22,6 @@ type PiSessionRecord = {
 };
 
 export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
-  // session_user trickles 1:1 from the owning stream — single source of truth is streams.stream_user.
   const sessionUser = session.stream_id
     ? (db.get<{ stream_user: string | null }>(
         "SELECT stream_user FROM streams WHERE id = ?",

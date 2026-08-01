@@ -1,3 +1,16 @@
+/*
+ * Flitterbot Web CSS architecture:
+ * - Tailwind/shadcn own element reset and component sizing.
+ * - This file owns theme tokens, base app shell defaults, and scoped adapters
+ *   for rendered/vendor content that cannot be expressed at the call site.
+ * - No unlayered global element styling. If a rule touches real elements, keep
+ *   it in @layer base/components/utilities so Tailwind utilities can override it.
+ * - Exception: the .diff-viewer-panel block at the end is deliberately unlayered.
+ *   react-diff-view's stylesheet is imported from DownstreamSessionsPanel as
+ *   unlayered CSS; inside @layer components its `.diff-gutter-col { width: 7ch }`
+ *   and `.diff-gutter { padding: 0 1ch }` would win regardless of specificity.
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -8,17 +21,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Flitterbot Web CSS architecture:
- * - Tailwind/shadcn own element reset and component sizing.
- * - This file owns theme tokens, base app shell defaults, and scoped adapters
- *   for rendered/vendor content that cannot be expressed at the call site.
- * - No unlayered global element styling. If a rule touches real elements, keep
- *   it in @layer base/components/utilities so Tailwind utilities can override it.
- */
-
 @theme inline {
-  /* Canonical application utilities. */
   --color-background: var(--background);
   --color-background-muted: var(--background-muted);
   --color-background-hover: var(--background-hover);
@@ -36,7 +39,6 @@
   --color-border-pop: var(--border-pop);
   --color-scrim: var(--scrim);
 
-  /* Stock shadcn utility contract. Values come from the adapter in :root. */
   --color-black: var(--scrim);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -64,7 +66,6 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Flitterbot domain statuses stay outside the core theme families. */
   --color-status-active: var(--status-active);
   --color-status-active-muted: var(--status-active-muted);
   --color-status-supervising: var(--status-supervising);
@@ -108,7 +109,6 @@
 :root {
   color-scheme: light;
 
-  /* Canonical light values. */
   --background: oklch(0.985 0.002 80);
   --background-muted: oklch(0.974 0.0025 73);
   --background-hover: oklch(0.956 0.0053 73);
@@ -148,7 +148,6 @@
   --status-crashed: oklch(0.665 0.205 27);
   --status-crashed-muted: color-mix(in oklab, var(--status-crashed) 12%, transparent);
 
-  /* Specialist contracts. */
   --scrim: rgb(0 0 0);
   --diff-selection-background: color-mix(in oklab, #0969da 35%, transparent);
   --diff-gutter-insert-background: color-mix(in oklab, #2ea043 25%, transparent);
@@ -160,7 +159,6 @@
   --diff-code-delete-edit-background: color-mix(in oklab, #f85149 35%, transparent);
   --diff-omit-gutter-line: #f85149;
 
-  /* Value-free shadcn adapter. */
   --foreground: var(--text);
   --card: var(--background);
   --card-foreground: var(--text);
@@ -222,7 +220,6 @@
 .dark {
   color-scheme: dark;
 
-  /* Canonical dark values. */
   --background: oklch(0.145 0.002 80);
   --background-muted: oklch(0.177 0.0025 80);
   --background-hover: oklch(0.222 0.0054 80);
@@ -363,12 +360,6 @@
   }
 }
 
-/*
- * react-diff-view overrides are intentionally unlayered. The library stylesheet
- * is imported from DownstreamSessionsPanel as unlayered CSS; if these rules live
- * in @layer components, the library's `.diff-gutter-col { width: 7ch }` and
- * `.diff-gutter { padding: 0 1ch }` win regardless of selector specificity.
- */
 .diff-viewer-panel {
   --diff-background-color: transparent;
   --diff-text-color: var(--text);

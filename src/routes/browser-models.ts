@@ -84,8 +84,6 @@ export async function handleBrowserModelsPinRoute(
 export async function buildModelsListResponse(
   runtime: ControlSurfaceRuntime,
 ): Promise<ModelsListResponse> {
-  // ModelRegistry is the single source of truth: built-in catalog merged with
-  // any custom providers/models declared in ~/.flitterbot/control-surface/agent/models.json.
   const registry = await getModelRegistry(runtime);
   const pinned = runtime.config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));

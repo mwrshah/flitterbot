@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback } from "react";
-import { statusQueryOptions, streamsHistoryQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
+import { useCallback, useMemo } from "react";
+import { flattenHistoryPages } from "~/lib/history-cache";
+import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "~/lib/queries";
+import type { ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
@@ -12,14 +13,15 @@ export type SendUserMessageOptions = {
 
 const rootApi = getRouteApi("__root__");
 
-export function useStreamsChat(piSessionId: string | undefined, loaderHistory: ChatTimelineItem[]) {
+export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
-  const { data: timeline = [] } = useQuery({
-    ...streamsHistoryQueryOptions(piSessionId),
-    initialData: loaderHistory,
-    refetchOnMount: "always",
-  });
+  const { data, error, fetchPreviousPage, hasPreviousPage, isFetchingPreviousPage } =
+    useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
+  const timeline = useMemo(() => flattenHistoryPages(data), [data]);
+  const loadPreviousPage = useCallback(() => {
+    void fetchPreviousPage();
+  }, [fetchPreviousPage]);
   const connectionState = useWsConnectionState(wsConnectionStore);
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
@@ -45,11 +47,16 @@ export function useStreamsChat(piSessionId: string | undefined, loaderHistory: C
     [sendMessage, piSessionId],
   );
 
+  if (error) throw error;
+
   return {
     timeline,
     connectionState,
     onSendMessage,
     effectivePiSessionId,
     isSessionBusy,
+    loadPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
   };
 }

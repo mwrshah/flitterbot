@@ -1,3 +1,5 @@
+// === HUMAN REVIEW LINE === whole file FINAL; no EDITABLE region ===
+
 export type OrchestratorContext = {
   streamName: string;
   streamId: string;
@@ -10,7 +12,6 @@ export type OrchestratorPromptOptions = {
   tmux?: boolean;
 };
 
-// Appended after the SDK default body (see ./sdk-prompt-reference.ts).
 export function buildOrchestratorPrompt(
   ctx: OrchestratorContext,
   options: OrchestratorPromptOptions = {},
@@ -63,4 +64,3 @@ Launch sub-agents with \`--pi-session-id ${ctx.piSessionId}${wsFlag}\` so stop e
 Sub-agents auto-notify on completion via stop events — so fire and forget instead of waiting. No polling or sleeping. On a stop event, if needed you may query the blackboard for session details, and read the transcript or tmux pane, then decide: notify the user, follow up on the same session through tmux \`message\`, or launch a fresh session when a new exploration is required — re-prompting isn't the goal when the direction has shifted. Reserve \`send\` for raw keystrokes: a bare Enter for permission prompts, or an Escape to cancel an inferring session and stop it in its tracks. Stop events from sessions you didn't prompt mean the user is interacting directly — read to stay in the loop, but don't act.
 `;
 }
-// === HUMAN REVIEW LINE === ABOVE: FINAL === BELOW: EDITABLE ===

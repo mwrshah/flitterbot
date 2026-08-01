@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ponytail: recall.py duplicates config parsing and entry parsing; share a tiny module.
 """Single entry point for the configured learnings note.
 
 Subcommands:
@@ -42,7 +43,6 @@ def expand_home(value: str) -> Path:
     return Path(value)
 
 
-# ponytail: recall.py duplicates config parsing and entry parsing; share a tiny module.
 def resolve_note_path() -> Path:
     config_path = expand_home(os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json"))
     if not config_path.exists():

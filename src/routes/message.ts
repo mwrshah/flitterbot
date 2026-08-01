@@ -66,9 +66,6 @@ async function routeMessage(
   source: MessageSource,
   metadata?: MessageMetadata,
 ): Promise<{ metadata: StreamRoutingMeta } | null> {
-  // Resolve the owner the sender maps to, plus the fallback target + default-conversation session
-  // used to hydrate the classifier. Owner (defaultUser) falls back to the global default session;
-  // every other WhatsApp user falls back to their own `flitterbot: <userId>` default stream.
   let ownerUser: string | undefined;
   let fallback: StreamRoutingMeta = { router_action: "default" };
   let defaultPiSessionId = runtime.sessionManager.getDefault()?.piSessionId;

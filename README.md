@@ -12,12 +12,14 @@ Node.js 22+, pnpm, tmux, Claude Code CLI, sqlite3.
 
 ```bash
 pnpm install && pnpm --dir web install
-cp .env.example .env                    # set GROQ_API_KEY
-node installer/install.mjs              # deploys ~/.flitterbot/, wires hooks
+cp .env.example .env
+node installer/install.mjs
 ~/.flitterbot/bin/flitterbot-up start
-~/.flitterbot/bin/flitterbot-wa auth    # optional: WhatsApp
-pnpm --dir web dev                      # optional: web UI (:3188)
+~/.flitterbot/bin/flitterbot-wa auth
+pnpm --dir web dev
 ```
+
+Step by step: copying `.env.example` gives you a file in which to set `GROQ_API_KEY`; `installer/install.mjs` deploys `~/.flitterbot/` and wires the hooks; the last two steps are optional — `flitterbot-wa auth` links WhatsApp, and `pnpm --dir web dev` starts the web UI on port 3188.
 
 Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 
@@ -40,10 +42,12 @@ Flitterbot uses `~/.agents` as its agent resource directory, loading global inst
 ```bash
 ~/.flitterbot/bin/flitterbot-up   start | status | stop | restart
 ~/.flitterbot/bin/flitterbot-wa   start | status | stop | auth
-pnpm --dir web dev                          # web UI
-pnpm run control-surface                    # run from source
-node ~/.flitterbot/uninstall.mjs [--meta]   # remove hooks+scheduler (+~/.flitterbot/)
+pnpm --dir web dev
+pnpm run control-surface
+node ~/.flitterbot/uninstall.mjs [--meta]
 ```
+
+`pnpm --dir web dev` starts the web UI, and `pnpm run control-surface` runs the control surface from source. The uninstaller removes hooks and the scheduler; adding `--meta` also removes `~/.flitterbot/` itself.
 
 ## Troubleshooting
 

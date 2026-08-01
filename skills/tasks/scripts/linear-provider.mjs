@@ -1,3 +1,4 @@
+// ponytail: share provider conflict/date helpers with Todoist instead of duplicating them per provider.
 const LINEAR_API = "https://api.linear.app/graphql";
 const LINEAR_SYSTEM = "linear";
 
@@ -268,7 +269,6 @@ function assertLinearNotAhead(link, localRecord, remoteUpdatedAt, message) {
   if (remoteNewerThanLocal(remoteUpdatedAt, baselineUpdatedAt)) throw new Error(message);
 }
 
-// ponytail: share provider conflict/date helpers with Todoist instead of duplicating them per provider.
 function remoteNewerThanLocal(remoteUpdatedAt, localUpdatedAt) {
   if (!remoteUpdatedAt || !localUpdatedAt) return true;
   const remote = Date.parse(remoteUpdatedAt);

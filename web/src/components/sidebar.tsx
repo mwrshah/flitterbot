@@ -92,24 +92,21 @@ function StreamContextMenu({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(stream.name);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Base UI restores focus to the trigger when the context menu closes, which
-  // blurs the freshly-mounted input. Defer focusing past that restore and
-  // ignore any blur fired before the input is genuinely ready.
-  const readyRef = useRef(false);
+  const focusSettledRef = useRef(false);
 
   useEffect(() => {
     if (!editing) return;
-    readyRef.current = false;
+    focusSettledRef.current = false;
     const raf = requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
-      readyRef.current = true;
+      focusSettledRef.current = true;
     });
     return () => cancelAnimationFrame(raf);
   }, [editing]);
 
   const commit = () => {
-    if (!readyRef.current) return;
+    if (!focusSettledRef.current) return;
     setEditing(false);
     const trimmed = value.trim();
     if (trimmed && trimmed !== stream.name) {
@@ -324,6 +321,8 @@ export const Sidebar = memo(function Sidebar() {
                   <Link
                     to="/streams/$piSessionId"
                     params={{ piSessionId: defaultPiSessionId }}
+                    // hovering a stream must not fetch its history
+                    preload={false}
                     className={cn(
                       "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                       currentPiSessionId === defaultPiSessionId ||
@@ -370,6 +369,8 @@ export const Sidebar = memo(function Sidebar() {
                         <Link
                           to="/streams/$piSessionId"
                           params={{ piSessionId }}
+                          // hovering a stream must not fetch its history
+                          preload={false}
                           className={cn(
                             "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
@@ -476,6 +477,8 @@ export const Sidebar = memo(function Sidebar() {
                         <Link
                           to="/streams/$piSessionId"
                           params={{ piSessionId }}
+                          // hovering a stream must not fetch its history
+                          preload={false}
                           className={cn(
                             "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId

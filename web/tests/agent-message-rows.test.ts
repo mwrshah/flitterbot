@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAgentMessageRowKeys } from "../src/lib/agent-message-rows.ts";
+import { getAgentMessageRowKeys, isPrependedRowKeys } from "../src/lib/agent-message-rows.ts";
 
 type AgentMessage = Parameters<typeof getAgentMessageRowKeys>[0][number];
 
@@ -45,4 +45,18 @@ test("disambiguates duplicate entry ids", () => {
   ]);
 
   assert.deepEqual(keys, ["same", "same:1"]);
+});
+
+test("tells an older-page prepend apart from a live append", () => {
+  const grewWithSameFirstKey = isPrependedRowKeys("a", 2, ["a", "b", "c"]);
+  const grewWithNewFirstKey = isPrependedRowKeys("a", 2, ["z", "a", "b"]);
+  const unchanged = isPrependedRowKeys("a", 2, ["a", "b"]);
+  const shrankByPruning = isPrependedRowKeys("a", 3, ["b"]);
+  const firstLoadWithNothingToCompare = isPrependedRowKeys(undefined, 0, ["a"]);
+
+  assert.equal(grewWithSameFirstKey, false);
+  assert.equal(grewWithNewFirstKey, true);
+  assert.equal(unchanged, false);
+  assert.equal(shrankByPruning, false);
+  assert.equal(firstLoadWithNothingToCompare, false);
 });

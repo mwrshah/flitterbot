@@ -20,7 +20,6 @@ export type ImageAttachment = {
   mimeType: string;
 };
 
-/** Per-turn token usage carried on an assistant message, read straight from the pi session file. */
 export type TokenUsage = {
   input: number;
   output: number;
@@ -45,7 +44,6 @@ export type ChatTimelineMessage = {
   compaction?: boolean;
   serverMessageId?: string;
   clientMessageId?: string;
-  /** Cumulative context usage snapshot at this assistant turn (from the pi session file). */
   usage?: TokenUsage;
   createdAt: string;
 };
@@ -56,9 +54,7 @@ export type ChatTimelineTool = {
   tool: string;
   phase: "start" | "update" | "end";
   toolUseId?: string;
-  /** Canonical tool input — must stay unchanged through UI rendering; replay and debug paths read raw values here. */
   args?: JsonValue;
-  /** UI-only display projection of `args` — must never be sent back into tool execution. */
   displayArgs?: JsonValue;
   result?: JsonValue;
   isError?: boolean;

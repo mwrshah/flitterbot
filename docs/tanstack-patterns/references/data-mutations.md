@@ -47,7 +47,7 @@ const addTodo = async (todo: Todo) => {
     await api.addTodo()
     router.invalidate()
   } catch {
-    //
+    ignoreAddTodoFailure()
   }
 }
 ```
@@ -64,7 +64,7 @@ const addTodo = async (todo: Todo) => {
     await api.addTodo()
     await router.invalidate({ sync: true })
   } catch {
-    //
+    ignoreAddTodoFailure()
   }
 }
 ```
@@ -84,7 +84,7 @@ Without notifying your mutation management library about the route change, it's 
 
 ## Using mutation keys
 
-Hopefully and hypothetically, the easiest way is for your mutation library to support a keying mechanism that will allow your mutations's state to be reset when the key changes:
+Hopefully and hypothetically, the easiest way is for your mutation library to support a keying mechanism that will allow your mutations's state to be reset when the key changes. Including `roomId` in the key below clears the mutation state, submission state included, whenever the room changes:
 
 ```tsx
 const routeApi = getRouteApi('/room/$roomId/chat')
@@ -94,13 +94,10 @@ function ChatRoom() {
 
   const sendMessageMutation = useCoolMutation({
     fn: sendMessage,
-    // Clear the mutation state when the roomId changes
-    // including any submission state
     key: ['sendMessage', roomId],
   })
 
-  // Fire off a bunch of messages
-  const test = () => {
+  const fireOffABunchOfMessages = () => {
     sendMessageMutation.mutate({ roomId, message: 'Hello!' })
     sendMessageMutation.mutate({ roomId, message: 'How are you?' })
     sendMessageMutation.mutate({ roomId, message: 'Goodbye!' })
@@ -129,14 +126,13 @@ For libraries that don't have a keying mechanism, we'll likely need to manually 
 
 The `router.subscribe` method is a function that subscribes a callback to various router events. The event in particular that we'll use here is the `onResolved` event. It's important to understand that this event is fired when the location path is _changed (not just reloaded) and has finally resolved_.
 
-This is a great place to reset your old mutation states. Here's an example:
+This is a great place to reset your old mutation states. In the example below, clearing the mutation cache in the `onResolved` callback resets those states whenever the route changes:
 
 ```tsx
 const router = createRouter()
 const coolMutationCache = createCoolMutationCache()
 
 const unsubscribeFn = router.subscribe('onResolved', () => {
-  // Reset mutation states when the route changes
   coolMutationCache.clear()
 })
 ```

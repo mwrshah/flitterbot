@@ -15,7 +15,7 @@ These are just suggested uses of the router context. You can use it for whatever
 
 ## Typed Router Context
 
-Like everything else, the root router context is strictly typed. This type can be augmented via any route's `beforeLoad` option as it is merged down the route match tree. To constrain the type of the root router context, you must use the `createRootRouteWithContext<YourContextTypeHere>()(routeOptions)` function to create a new router context instead of the `createRootRoute()` function to create your root route. Here's an example:
+Like everything else, the root router context is strictly typed. This type can be augmented via any route's `beforeLoad` option as it is merged down the route match tree. To constrain the type of the root router context, you must use the `createRootRouteWithContext<YourContextTypeHere>()(routeOptions)` function to create a new router context instead of the `createRootRoute()` function to create your root route. In the example below, the router context type is used to create the root route and then, further down, to create the router itself:
 
 <!-- ::start:framework -->
 
@@ -31,16 +31,12 @@ interface MyRouterContext {
   user: User
 }
 
-// Use the routerContext to create your root route
 const rootRoute = createRootRouteWithContext<MyRouterContext>()({
   component: App,
 })
 
-const routeTree = rootRoute.addChildren([
-  // ...
-])
+const routeTree = rootRoute.addChildren(childRoutes)
 
-// Use the routerContext to create your router
 const router = createRouter({
   routeTree,
 })
@@ -58,16 +54,12 @@ interface MyRouterContext {
   user: User
 }
 
-// Use the routerContext to create your root route
 const rootRoute = createRootRouteWithContext<MyRouterContext>()({
   component: App,
 })
 
-const routeTree = rootRoute.addChildren([
-  // ...
-])
+const routeTree = rootRoute.addChildren(childRoutes)
 
-// Use the routerContext to create your router
 const router = createRouter({
   routeTree,
 })
@@ -92,7 +84,6 @@ The router context is passed to the router at instantiation time. You can pass t
 ```tsx
 import { createRouter } from '@tanstack/react-router'
 
-// Use the routerContext you created to create your router
 const router = createRouter({
   routeTree,
   context: {
@@ -109,7 +100,6 @@ const router = createRouter({
 ```tsx
 import { createRouter } from '@tanstack/solid-router'
 
-// Use the routerContext you created to create your router
 const router = createRouter({
   routeTree,
   context: {
@@ -175,8 +165,7 @@ function useAuth() {
 
 Once you have defined the router context type, you can use it in your route definitions:
 
-```tsx
-// src/routes/todos.tsx
+```tsx title="src/routes/todos.tsx"
 export const Route = createFileRoute('/todos')({
   component: Todos,
   loader: ({ context }) => fetchTodosByUserId(context.user.id),
@@ -205,8 +194,7 @@ const router = createRouter({
 
 Then, in your route:
 
-```tsx
-// src/routes/todos.tsx
+```tsx title="src/routes/todos.tsx"
 export const Route = createFileRoute('/todos')({
   component: Todos,
   loader: ({ context }) => context.fetchTodosByUserId(context.userId),
@@ -273,8 +261,7 @@ const router = createRouter({
 
 Then, in your route:
 
-```tsx
-// src/routes/todos.tsx
+```tsx title="src/routes/todos.tsx"
 export const Route = createFileRoute('/todos')({
   component: Todos,
   loader: async ({ context }) => {
@@ -296,12 +283,11 @@ When trying to use React Context or Hooks in your route's `beforeLoad` or `loade
 
 So, how do we use React Context or Hooks in our route's `beforeLoad` or `loader` functions? We can use the router context to pass down the React Context or Hooks to our route's `beforeLoad` or `loader` functions.
 
-Let's look at the setup for an example, where we pass down a `useNetworkStrength` hook to our route's `loader` function:
+Let's look at the setup for an example, where we pass down a `useNetworkStrength` hook to our route's `loader` function. First, make sure the context for the root route is typed:
 
 <!-- ::start:tabs variant="files" -->
 
 ```tsx title="src/routes/__root.tsx"
-// First, make sure the context for the root route is typed
 import { createRootRouteWithContext } from '@tanstack/react-router'
 import { useNetworkStrength } from '@/hooks/useNetworkStrength'
 
@@ -347,12 +333,11 @@ import { useNetworkStrength } from '@/hooks/useNetworkStrength'
 
 function App() {
   const networkStrength = useNetworkStrength()
-  // Inject the returned value from the hook into the router context
   return <RouterProvider router={router} context={{ networkStrength }} />
 }
-
-// ...
 ```
+
+The `context` prop is what injects the value returned by the hook into the router context.
 
 <!-- ::end:tabs -->
 
@@ -367,7 +352,7 @@ export const Route = createFileRoute('/posts')({
   component: Posts,
   loader: ({ context }) => {
     if (context.networkStrength === 'STRONG') {
-      // Do something
+      prefetchHighResolutionAssets()
     }
   },
 })
@@ -515,7 +500,7 @@ export const Route = createRootRoute({
         }
       })
 
-    // ...
+    return <Breadcrumbs items={breadcrumbs} />
   },
 })
 ```

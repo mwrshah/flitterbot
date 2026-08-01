@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "~/components/common/markdown-content";
 import { MessageInput } from "~/components/common/message-input";
@@ -129,6 +130,7 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
     <Link
       to="/streams/$piSessionId"
       params={{ piSessionId }}
+      preload={false}
       className={`${cls} cursor-pointer transition-colors hover:bg-background-hover`}
     >
       {streamName}
@@ -152,7 +154,6 @@ function ImageStack({ images }: { images: ImageAttachment[] }) {
   );
 }
 
-// ponytail: reuse the common clipboard hook/component instead of another local copy button.
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -330,7 +331,6 @@ export function Surface() {
 
   const items = virtualizer.getVirtualItems();
 
-  // ponytail: share image-file-to-base64 handling with ChatPanel/MessageInput.
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!imageFiles.length) return;
@@ -406,7 +406,9 @@ export function Surface() {
         orientation="vertical"
         className="flex-1 min-h-0"
         defaultLayout={chatLayout}
-        onLayoutChanged={(layout) => setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))}
+        onLayoutChanged={(layout: PanelLayout) =>
+          setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
+        }
       >
         <Panel id="feed" defaultSize="85%" minSize="20%">
           <div

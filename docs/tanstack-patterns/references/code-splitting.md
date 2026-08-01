@@ -74,10 +74,11 @@ When using the `autoCodeSplitting` feature, TanStack Router will automatically c
 > The automatic code-splitting feature is **ONLY** available when you are using file-based routing with one of our [supported bundlers](../routing/file-based-routing.md#getting-started-with-file-based-routing).
 > This will **NOT** work if you are **only** using the CLI (`@tanstack/router-cli`).
 
+Make sure to add the framework plugin (`react()` below) *after* the TanStack Router Bundler plugin.
+
 To enable automatic code-splitting, you just need to add the following to the configuration of your TanStack Router Bundler Plugin:
 
-```ts
-// vite.config.ts
+```ts title="vite.config.ts"
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
@@ -85,10 +86,9 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 export default defineConfig({
   plugins: [
     tanstackRouter({
-      // ...
       autoCodeSplitting: true,
     }),
-    react(), // Make sure to add this plugin after the TanStack Router Bundler plugin
+    react(),
   ],
 })
 ```
@@ -133,7 +133,7 @@ export const Route = createFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -149,7 +149,7 @@ export const Route = createFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -199,7 +199,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -213,7 +213,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -234,9 +234,7 @@ You might run into a situation where you end up splitting out everything from a 
 ```tsx title="src/routes/posts.tsx"
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/posts')({
-  // Hello?
-})
+export const Route = createFileRoute('/posts')({})
 ```
 
 ```tsx title="src/routes/posts.lazy.tsx"
@@ -247,7 +245,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -260,9 +258,7 @@ function Posts() {
 ```tsx title="src/routes/posts.tsx"
 import { createFileRoute } from '@tanstack/solid-router'
 
-export const Route = createFileRoute('/posts')({
-  // Hello?
-})
+export const Route = createFileRoute('/posts')({})
 ```
 
 ```tsx title="src/routes/posts.lazy.tsx"
@@ -273,7 +269,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -295,7 +291,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -309,7 +305,7 @@ export const Route = createLazyFileRoute('/posts')({
 })
 
 function Posts() {
-  // ...
+  return <PostList />
 }
 ```
 
@@ -363,9 +359,13 @@ const route = createRoute({
   loader: lazyFn(() => import('./loader'), 'loader'),
 })
 
-// In another file...a
+```
+
+In another file:
+
+```tsx
 export const loader = async (context: LoaderContext) => {
-  /// ...
+  return fetchMyRouteData(context)
 }
 ```
 
@@ -380,9 +380,13 @@ const route = createRoute({
   loader: lazyFn(() => import('./loader'), 'loader'),
 })
 
-// In another file...a
+```
+
+In another file:
+
+```tsx
 export const loader = async (context: LoaderContext) => {
-  /// ...
+  return fetchMyRouteData(context)
 }
 ```
 
@@ -420,7 +424,6 @@ const route = getRouteApi('/my-route')
 
 export function MyComponent() {
   const loaderData = route.useLoaderData()
-  //    ^? { foo: string }
 
   return <div>...</div>
 }
@@ -452,7 +455,6 @@ const route = getRouteApi('/my-route')
 
 export function MyComponent() {
   const loaderData = route.useLoaderData()
-  //    ^? { foo: string }
 
   return <div>...</div>
 }
