@@ -11,5 +11,18 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
-  plugins: [tailwindcss(), tanstackStart(), viteReact()],
+  plugins: [
+    tailwindcss(),
+    tanstackStart({
+      router: {
+        routeTreeFileHeader: [
+          '// codedecorum: ignore all',
+          '/* eslint-disable */',
+          '// @ts-nocheck',
+          '// noinspection JSUnusedGlobalSymbols',
+        ],
+      },
+    }),
+    viteReact(),
+  ],
 })
