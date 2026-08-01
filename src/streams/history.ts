@@ -232,7 +232,9 @@ export function toolResultMessageToTimelineItem(
         : "unknown_tool",
     phase: "end",
     toolUseId: toolCallId,
-    result: (messageRecord.details ?? resultText) as JsonValue | undefined,
+    result: (messageRecord.toolName === "bash"
+      ? resultText
+      : (messageRecord.details ?? resultText)) as JsonValue | undefined,
     isError: Boolean(messageRecord.isError),
     createdAt,
   };
