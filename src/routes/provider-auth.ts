@@ -1,5 +1,5 @@
 import type http from "node:http";
-import type { ProviderAuthType } from "../contracts/index.ts";
+import type { AuthType } from "@earendil-works/pi-ai";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -110,7 +110,7 @@ function authorized(
   return false;
 }
 
-function isProviderAuthType(value: unknown): value is ProviderAuthType {
+function isProviderAuthType(value: unknown): value is AuthType {
   return value === "oauth" || value === "api_key";
 }
 

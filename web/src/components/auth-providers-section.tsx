@@ -12,12 +12,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
-import type {
-  AuthFlowSnapshot,
-  AuthMethodType,
-  AuthProvider,
-  AuthProviderMethod,
-} from "~/lib/types";
+import type { AuthFlowSnapshot, AuthProvider, AuthProviderMethod } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
 
@@ -37,8 +32,13 @@ export const AuthProvidersSection = memo(function AuthProvidersSection() {
   const [logoutTarget, setLogoutTarget] = useState<AuthProvider | null>(null);
 
   const loginMutation = useMutation({
-    mutationFn: ({ providerId, authType }: { providerId: string; authType: AuthMethodType }) =>
-      apiClient.startAuthLogin(providerId, authType),
+    mutationFn: ({
+      providerId,
+      authType,
+    }: {
+      providerId: string;
+      authType: AuthProviderMethod["type"];
+    }) => apiClient.startAuthLogin(providerId, authType),
     onSuccess: (snapshot) => setActiveFlowId(snapshot.id),
     onError: (err) => toast.error(`Login failed: ${messageOf(err)}`),
   });
@@ -122,7 +122,7 @@ function ProviderRow({
 }: {
   provider: AuthProvider;
   busy: boolean;
-  onLogin: (authType: AuthMethodType) => void;
+  onLogin: (authType: AuthProviderMethod["type"]) => void;
   onLogout: () => void;
 }) {
   const isConnected = Boolean(provider.credentialType);

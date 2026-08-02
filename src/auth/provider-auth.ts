@@ -5,7 +5,6 @@ import type {
   AuthFlowSnapshot,
   AuthProvider,
   AuthProvidersResponse,
-  ProviderAuthType,
 } from "../contracts/index.ts";
 
 const FLOW_RETENTION_MS = 10 * 60 * 1000;
@@ -21,7 +20,7 @@ type AuthFlow = {
   id: string;
   status: AuthFlowSnapshot["status"];
   providerId: string;
-  authType: ProviderAuthType;
+  authType: AuthType;
   events: AuthEvent[];
   controller: AbortController;
   prompt?: PendingPrompt;
@@ -34,7 +33,7 @@ export class ProviderAuthManager {
   private readonly flows = new Map<string, AuthFlow>();
   private readonly loginStarts = new Map<
     string,
-    { authType: ProviderAuthType; promise: Promise<AuthFlowSnapshot> }
+    { authType: AuthType; promise: Promise<AuthFlowSnapshot> }
   >();
   private stopped = false;
 
@@ -81,7 +80,7 @@ export class ProviderAuthManager {
     return { providers };
   }
 
-  startLogin(providerId: string, authType: ProviderAuthType): Promise<AuthFlowSnapshot> {
+  startLogin(providerId: string, authType: AuthType): Promise<AuthFlowSnapshot> {
     if (this.stopped) return Promise.reject(new Error("Provider authentication is stopped"));
     const existing = [...this.flows.values()].find(
       (flow) => flow.providerId === providerId && flow.status === "running",
@@ -113,10 +112,7 @@ export class ProviderAuthManager {
     return tracked;
   }
 
-  private async createLogin(
-    providerId: string,
-    authType: ProviderAuthType,
-  ): Promise<AuthFlowSnapshot> {
+  private async createLogin(providerId: string, authType: AuthType): Promise<AuthFlowSnapshot> {
     const runtime = await this.createRuntime();
     if (this.stopped) throw new Error("Provider authentication is stopped");
     const provider = runtime.getProvider(providerId);
@@ -197,7 +193,7 @@ export class ProviderAuthManager {
 
   private async runLogin(runtime: ModelRuntime, flow: AuthFlow): Promise<void> {
     try {
-      await runtime.login(flow.providerId, flow.authType as AuthType, {
+      await runtime.login(flow.providerId, flow.authType, {
         signal: flow.controller.signal,
         notify: (event) => {
           if (flow.status !== "running") return;
@@ -223,15 +219,11 @@ export class ProviderAuthManager {
     }
     this.rejectPrompt(flow, new Error("Authentication prompt was replaced"));
     return new Promise<string>((resolve, reject) => {
+      const { signal: _signal, ...transportPrompt } = prompt;
       const pending: PendingPrompt = {
         prompt: {
           id: crypto.randomUUID(),
-          type: prompt.type,
-          message: prompt.message,
-          ...("placeholder" in prompt && prompt.placeholder
-            ? { placeholder: prompt.placeholder }
-            : {}),
-          ...(prompt.type === "select" ? { options: prompt.options } : {}),
+          ...transportPrompt,
         },
         resolve,
         reject,

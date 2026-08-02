@@ -20,7 +20,7 @@ import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ImageAttachment, StatusResponse } from "~/lib/types";
+import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
 
@@ -118,7 +118,7 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
 
   let piSessionId: string | undefined;
   if (streamId) {
-    const status = queryClient.getQueryData<StatusResponse>(["status"]);
+    const status = queryClient.getQueryData<StatusQueryData>(["status"]);
     piSessionId = status?.streams?.find((s) => s.id === streamId)?.piSessionId ?? undefined;
   }
 

@@ -1,3 +1,4 @@
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
@@ -23,18 +24,13 @@ import {
   CommandList,
   CommandSeparator,
 } from "~/components/ui/command";
-import type {
-  ModelListItem,
-  ModelsListResponse,
-  ModelsMutationResponse,
-  ThinkingLevel,
-} from "~/lib/types";
+import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
 export const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
-const THINKING_LEVELS: ThinkingLevel[] = [
+const THINKING_LEVELS: ModelThinkingLevel[] = [
   "off",
   "minimal",
   "low",
@@ -43,7 +39,7 @@ const THINKING_LEVELS: ThinkingLevel[] = [
   "xhigh",
   "max",
 ];
-const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
+const THINKING_LEVEL_LABELS: Record<ModelThinkingLevel, string> = {
   off: "off",
   minimal: "min",
   low: "low",
@@ -58,7 +54,7 @@ export type ModelSelectorProps = {
   disabled?: boolean;
   piSessionId: string;
   selectedModelId?: string;
-  selectedThinkingLevel?: ThinkingLevel;
+  selectedThinkingLevel?: ModelThinkingLevel;
 };
 
 export const ModelSelector = memo(function ModelSelector({
@@ -118,7 +114,7 @@ export const ModelSelector = memo(function ModelSelector({
     },
   });
   const thinkingMutation = useMutation({
-    mutationFn: (level: ThinkingLevel) => {
+    mutationFn: (level: ModelThinkingLevel) => {
       if (!piSessionId) throw new Error("No Pi session selected");
       return apiClient.setPiSessionThinkingLevel(piSessionId, level);
     },
@@ -339,7 +335,7 @@ function ThinkingLevelCommandItem({
   title,
   onSelect,
 }: {
-  level: ThinkingLevel;
+  level: ModelThinkingLevel;
   selected: boolean;
   disabled: boolean;
   title: string;
@@ -521,7 +517,7 @@ function extractVersionParts(model: ModelListItem): number[] {
   return match[1].split(/[.-]/).map((part) => Number(part));
 }
 
-function getAvailableThinkingLevels(model: ModelListItem | undefined): ThinkingLevel[] {
+function getAvailableThinkingLevels(model: ModelListItem | undefined): ModelThinkingLevel[] {
   if (!model) return THINKING_LEVELS;
   if (!model.reasoning) return ["off"];
   return THINKING_LEVELS.filter(

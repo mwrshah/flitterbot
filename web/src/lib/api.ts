@@ -1,18 +1,17 @@
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type {
   AuthFlowSnapshot,
-  AuthMethodType,
+  AuthProviderMethod,
   AuthProvidersResponse,
-  DirectMessageResponse,
   DirectoryCompletionsResponse,
+  DirectSessionMessageResponse,
   ModelsListResponse,
   ModelsMutationResponse,
   SessionDetailResponse,
-  SessionListResponse,
+  SessionsListResponse,
   SkillsListResponse,
   StatusResponse,
-  StreamsHistoryResponse,
-  ThinkingLevel,
-  TranscriptPage,
+  TranscriptPageResponse,
 } from "./types";
 
 export type ControlSurfaceSettings = {
@@ -43,7 +42,7 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
   return {
     getStatus: () => request<StatusResponse>("/status"),
 
-    listSessions: () => request<SessionListResponse>("/api/sessions"),
+    listSessions: () => request<SessionsListResponse>("/api/sessions"),
 
     getSessionDetail: (sessionId: string) =>
       request<SessionDetailResponse>(`/api/sessions/${sessionId}`),
@@ -51,24 +50,14 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
     getTranscript: (sessionId: string, cursor?: string, limit = 25) => {
       const params = new URLSearchParams({ limit: String(limit) });
       if (cursor) params.set("cursor", cursor);
-      return request<TranscriptPage>(`/api/sessions/${sessionId}/transcript?${params}`);
+      return request<TranscriptPageResponse>(`/api/sessions/${sessionId}/transcript?${params}`);
     },
 
     sendDirectSessionMessage: (sessionId: string, text: string) =>
-      request<DirectMessageResponse>(`/sessions/${sessionId}/message`, {
+      request<DirectSessionMessageResponse>(`/sessions/${sessionId}/message`, {
         method: "POST",
         body: JSON.stringify({ text }),
       }),
-
-    getStreamsHistory: (surface?: "input", piSessionId?: string) => {
-      const params = new URLSearchParams();
-      if (surface) params.set("surface", surface);
-      if (piSessionId) params.set("piSessionId", piSessionId);
-      const qs = params.toString();
-      return request<StreamsHistoryResponse>(
-        qs ? `/api/streams/history?${qs}` : "/api/streams/history",
-      );
-    },
 
     startWhatsApp: () => request<{ ok: boolean }>("/runtime/whatsapp/start", { method: "POST" }),
 
@@ -152,7 +141,7 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ id }),
       }),
 
-    setPiSessionThinkingLevel: (piSessionId: string, level: ThinkingLevel) =>
+    setPiSessionThinkingLevel: (piSessionId: string, level: ModelThinkingLevel) =>
       request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/thinking-level`, {
         method: "PUT",
         body: JSON.stringify({ level }),
@@ -166,7 +155,7 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     listAuthProviders: () => request<AuthProvidersResponse>("/api/auth/providers"),
 
-    startAuthLogin: (providerId: string, authType: AuthMethodType) =>
+    startAuthLogin: (providerId: string, authType: AuthProviderMethod["type"]) =>
       request<AuthFlowSnapshot>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ providerId, authType }),

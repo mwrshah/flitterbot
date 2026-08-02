@@ -1,8 +1,5 @@
 import type http from "node:http";
-import type {
-  RuntimeWhatsAppStartResponse,
-  RuntimeWhatsAppStopResponse,
-} from "../contracts/index.ts";
+import type { RuntimeWhatsAppControlResponse } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
@@ -16,7 +13,7 @@ export async function handleRuntimeWhatsAppRoute(
     return sendJson(response, 401, { ok: false, error: "unauthorized" });
   }
 
-  const result: RuntimeWhatsAppStartResponse | RuntimeWhatsAppStopResponse =
+  const result: RuntimeWhatsAppControlResponse =
     action === "start" ? await runtime.startWhatsAppDaemon() : await runtime.stopWhatsAppDaemon();
   return sendJson(response, 200, result);
 }

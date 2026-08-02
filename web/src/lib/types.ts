@@ -1,9 +1,30 @@
-import type {
-  ChatTimelineItem,
-  ChatTimelineMessage,
-  ChatTimelineTool,
-} from "../../../src/contracts/timeline.ts";
+import type { SkillListItem, StatusResponse } from "../../../src/contracts/control-surface-api.ts";
+import type { ChatTimelineMessage, ChatTimelineTool } from "../../../src/contracts/timeline.ts";
 
+export type { PiSessionStatus } from "../../../src/contracts/blackboard.ts";
+export type {
+  AuthFlowPrompt,
+  AuthFlowSnapshot,
+  AuthProvider,
+  AuthProviderMethod,
+  AuthProvidersResponse,
+  DirectoryCompletionItem,
+  DirectoryCompletionsResponse,
+  DirectSessionMessageResponse,
+  DownstreamSessionItem,
+  ModelListItem,
+  ModelsListResponse,
+  ModelsMutationResponse,
+  PiSessionModelInfo,
+  RuntimeWhatsAppControlResponse,
+  SessionDetailResponse,
+  SessionsListResponse,
+  ShortcutBindingsConfig,
+  SkillsListResponse,
+  StatusResponse,
+  StreamSummary,
+  StreamsHistoryResponse,
+} from "../../../src/contracts/control-surface-api.ts";
 export type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -12,275 +33,31 @@ export type {
   JsonValue,
   MessageSource,
 } from "../../../src/contracts/timeline.ts";
+export type { TranscriptPageResponse } from "../../../src/contracts/transcript.ts";
 
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
 
-type SessionSummary = {
-  sessionId: string;
-  status: "working" | "idle" | "stale" | "ended";
-  taskDescription?: string;
-  project?: string;
-  tmuxSession?: string;
-  transcriptPath?: string;
-  lastEventAt?: string;
-  streamId?: string;
-  streamName?: string;
-};
-
-type SessionDetail = {
-  sessionId: string;
-  status: "working" | "idle" | "stale" | "ended";
-  taskDescription?: string;
-  project?: string;
-  tmuxSession?: string;
-  transcriptPath?: string;
-  lastEventAt?: string;
-  startedAt?: string;
-  cwd?: string;
-  model?: string;
-  streamId?: string;
-  streamName?: string;
-  recentEvents: SessionEvent[];
-};
-
-type SessionEvent = {
-  id: number;
-  event_name: string;
-  tool_name?: string;
-  payload?: string;
-  timestamp: string;
-};
-
-type TmuxSessionInspection = {
-  exists: boolean;
-  attached: boolean;
-  pane?: {
-    uiState?: string;
-    currentCommand?: string;
-    target?: string;
-    panePid?: number;
-    capture?: string;
-  };
-};
-
-type TranscriptItem = {
-  id: string;
-  kind: "message" | "tool_call" | "tool_result" | "event";
-  role?: string;
-  text?: string;
-  title?: string;
-  rawType?: string;
-  toolName?: string;
-  timestamp?: string;
-  metadata: Record<string, unknown>;
-};
-
-export type TranscriptPage = {
-  items: TranscriptItem[];
-  nextCursor?: string;
-};
-
-export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
-
-type PiSessionModelInfo = {
-  id: string;
-  provider: string;
-  modelId: string;
-  thinkingLevel?: ThinkingLevel;
-};
-
-export type StatusResponse = {
-  source?: string;
-  pid?: number;
-  uptime: number;
-  blackboard: string;
+export type OfflineStatus = {
+  source: "offline";
+  ok?: never;
+  pid?: never;
+  uptime: 0;
+  piAgent?: never;
+  blackboard: "";
   whatsapp: {
-    status: string;
-    pid?: number;
-    managedByControlSurface?: boolean;
+    status: "disconnected";
+    pid?: never;
+    managedByControlSurface?: never;
+    requiresManualAuth?: never;
   };
-  piAgent?: {
-    default?: {
-      piSessionId?: string;
-      busy?: boolean;
-      messageCount?: number;
-      state?: string;
-      model?: PiSessionModelInfo;
-    };
-    orchestrators?: Array<{
-      piSessionId: string;
-      streamId: string;
-      streamName?: string;
-      messageCount: number;
-      busy: boolean;
-    }>;
-  };
-  streams?: StreamSummary[];
-  shortcuts?: ShortcutBindingsConfig;
+  streams: [];
+  shortcuts: Record<never, never>;
 };
 
-export type PiSessionStatus =
-  | "active"
-  | "waiting_for_user"
-  | "waiting_for_sessions"
-  | "ended"
-  | "crashed";
+export type StatusQueryData = StatusResponse | OfflineStatus;
 
-export type StreamSummary = {
-  id: string;
-  name: string;
-  type: "work" | "defaultStream";
-  status: "open" | "closed";
-  pinned: boolean;
-  closedAt?: string;
-  repoPath?: string;
-  worktreePath?: string;
-  piSessionId?: string;
-  piSessionStatus?: PiSessionStatus;
-  model?: PiSessionModelInfo;
-  sessionCount: number;
-  createdAt: string;
-};
-
-export type SessionListResponse = {
-  items: SessionSummary[];
-};
-
-export type DownstreamSessionItem = {
-  sessionId: string;
-  status: "working" | "idle" | "stale" | "ended";
-  streamId: string | null;
-  streamName: string | null;
-  tmuxSession: string | null;
-  cwd: string | null;
-  taskDescription: string | null;
-  project: string | null;
-};
-
-export type SessionDetailResponse = {
-  session: SessionDetail;
-  tmux?: TmuxSessionInspection | null;
-};
-
-export type DirectMessageResponse = {
-  ok: boolean;
-  delivery?: string;
-  reason?: string;
-};
-
-export type StreamsHistoryResponse = {
-  items: ChatTimelineItem[];
-};
-
-export type SkillListItem = {
-  name: string;
-  description: string;
-  disableModelInvocation: boolean;
+export type SkillPickerItem = SkillListItem & {
   kind?: "skill" | "command";
-};
-
-export type SkillsListResponse = {
-  items: SkillListItem[];
-};
-
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-
-export type ModelListItem = {
-  id: string;
-  label: string;
-  provider: string;
-  modelId: string;
-  thinkingLevel?: ThinkingLevel;
-  reasoning?: boolean;
-  supportsXhigh?: boolean;
-  supportsMax?: boolean;
-  name?: string;
-  contextWindow?: number;
-  available?: boolean;
-  authKind?: "subscription" | "api_key" | "none";
-};
-
-export type ModelsListResponse = {
-  pinned: ModelListItem[];
-  all: ModelListItem[];
-  defaultModel: string;
-  defaultThinkingLevel: ThinkingLevel;
-};
-
-export type ModelsMutationResponse = ModelsListResponse & {
-  ok: true;
-};
-
-export type DirectoryCompletionItem = {
-  name: string;
-  kind: "directory" | "file";
-  path: string;
-  insertText: string;
-};
-
-export type DirectoryCompletionsResponse = {
-  items: DirectoryCompletionItem[];
-  cwd: string;
-  query: string;
-};
-
-export type AuthMethodType = "oauth" | "api_key";
-
-export type AuthProviderMethod = {
-  type: AuthMethodType;
-  name: string;
-  loginLabel?: string;
-};
-
-export type AuthProvider = {
-  id: string;
-  name: string;
-  methods: AuthProviderMethod[];
-  credentialType?: AuthMethodType;
-};
-
-export type AuthFlowStatus = "running" | "succeeded" | "failed" | "cancelled";
-
-export type AuthPromptType = "text" | "secret" | "select" | "manual_code";
-
-export type AuthPromptOption = {
-  id: string;
-  label: string;
-  description?: string;
-};
-
-export type AuthPrompt = {
-  id: string;
-  type: AuthPromptType;
-  message: string;
-  placeholder?: string;
-  options?: AuthPromptOption[];
-};
-
-export type AuthEvent =
-  | { type: "info"; message: string; links?: readonly { url: string; label?: string }[] }
-  | { type: "auth_url"; url: string; instructions?: string }
-  | {
-      type: "device_code";
-      userCode: string;
-      verificationUri: string;
-      intervalSeconds?: number;
-      expiresInSeconds?: number;
-    }
-  | { type: "progress"; message: string };
-
-export type AuthFlowSnapshot = {
-  id: string;
-  status: AuthFlowStatus;
-  providerId: string;
-  authType: AuthMethodType;
-  events: AuthEvent[];
-  prompt?: AuthPrompt;
-  error?: string;
-};
-
-export type AuthProvidersResponse = {
-  providers: AuthProvider[];
 };
 
 export type WsMessage =

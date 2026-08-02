@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
@@ -8,7 +9,7 @@ import {
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import { getStreamById } from "../blackboard/query-streams.ts";
-import type { FlitterbotConfig, ThinkingLevel } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { ApiError, MessageMetadata } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -35,7 +36,7 @@ export interface ManagedPiSession {
     provider: string;
     id: string;
     entryId: string;
-    thinkingLevel: ThinkingLevel;
+    thinkingLevel: ModelThinkingLevel;
   };
   unsubscribe: () => void;
   pendingDestroy?: boolean;

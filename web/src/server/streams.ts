@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { ChatTimelineItem, DownstreamSessionItem } from "~/lib/types";
+import type { ChatTimelineItem, DownstreamSessionItem, StreamsHistoryResponse } from "~/lib/types";
 
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
@@ -54,11 +54,6 @@ function extractErrorMessage(body: string): string | null {
   return body;
 }
 
-export type StreamsHistoryPage = {
-  items: ChatTimelineItem[];
-  olderPageCursor?: string | null;
-};
-
 export const fetchStreamsHistory = createServerFn({ method: "GET" })
   .validator(
     (input: {
@@ -68,7 +63,7 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
       limit?: number;
     }) => input,
   )
-  .handler(async ({ data }): Promise<StreamsHistoryPage> => {
+  .handler(async ({ data }): Promise<StreamsHistoryResponse> => {
     const qs = new URLSearchParams([
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
       ...(data.surface ? [["surface", data.surface] as [string, string]] : []),
@@ -77,8 +72,7 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
     ]).toString();
     const path = qs ? `/api/streams/history?${qs}` : "/api/streams/history";
     try {
-      const res = (await streamsRequest(path)) as StreamsHistoryPage;
-      return { items: res.items ?? [], olderPageCursor: res.olderPageCursor ?? null };
+      return (await streamsRequest(path)) as StreamsHistoryResponse;
     } catch (err) {
       console.error(
         "fetchStreamsHistory failed (piSessionId=%s, surface=%s):",
@@ -168,9 +162,9 @@ export const fetchStreamsDiff = createServerFn({ method: "GET" })
 export const fetchStreamsInputHistory = createServerFn({ method: "GET" }).handler(
   async (): Promise<ChatTimelineItem[]> => {
     try {
-      const res = (await streamsRequest("/api/streams/history?surface=input")) as {
-        items: ChatTimelineItem[];
-      };
+      const res = (await streamsRequest(
+        "/api/streams/history?surface=input",
+      )) as StreamsHistoryResponse;
       return res.items;
     } catch (err) {
       console.error("fetchStreamsInputHistory failed:", err);

@@ -1,8 +1,8 @@
-import type { SkillListItem } from "~/lib/types";
+import type { SkillPickerItem } from "~/lib/types";
 
 export type InternalCommandScope = "default-stream" | "work-stream" | "surface";
 
-export const INTERNAL_COMMANDS: SkillListItem[] = [
+export const INTERNAL_COMMANDS: SkillPickerItem[] = [
   {
     name: "clear",
     description: "Reset the current session",
@@ -29,19 +29,19 @@ export const INTERNAL_COMMANDS: SkillListItem[] = [
   },
 ];
 
-const NEW_STREAM_COMMAND: SkillListItem = {
+const NEW_STREAM_COMMAND: SkillPickerItem = {
   name: "new-stream",
   description: "Start a new work stream",
   disableModelInvocation: true,
   kind: "command",
 };
 
-const CONTEXTUAL_COMMANDS: Record<InternalCommandScope, SkillListItem[]> = {
+const CONTEXTUAL_COMMANDS: Record<InternalCommandScope, SkillPickerItem[]> = {
   "default-stream": [NEW_STREAM_COMMAND],
   "work-stream": [],
   surface: [NEW_STREAM_COMMAND],
 };
 
-export function getInternalCommandsForScope(scope: InternalCommandScope): SkillListItem[] {
+export function getInternalCommandsForScope(scope: InternalCommandScope): SkillPickerItem[] {
   return [...INTERNAL_COMMANDS, ...CONTEXTUAL_COMMANDS[scope]];
 }

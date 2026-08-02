@@ -1,9 +1,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
-import { flattenHistoryPages } from "~/lib/history-cache";
+import { useCallback } from "react";
 import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "~/lib/queries";
-import type { ImageAttachment } from "~/lib/types";
+import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
@@ -12,13 +11,18 @@ export type SendUserMessageOptions = {
 };
 
 const rootApi = getRouteApi("__root__");
+const EMPTY_TIMELINE: ChatTimelineItem[] = [];
 
 export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
-  const { data, error, fetchPreviousPage, hasPreviousPage, isFetchingPreviousPage } =
-    useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
-  const timeline = useMemo(() => flattenHistoryPages(data), [data]);
+  const {
+    data: timeline = EMPTY_TIMELINE,
+    error,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+  } = useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
   const loadPreviousPage = useCallback(() => {
     void fetchPreviousPage();
   }, [fetchPreviousPage]);

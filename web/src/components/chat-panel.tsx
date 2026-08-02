@@ -1,3 +1,4 @@
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { FolderPenIcon } from "lucide-react";
@@ -59,9 +60,8 @@ import type {
   ChatTimelineMessage,
   DirectoryCompletionItem,
   ImageAttachment,
-  StatusResponse,
+  StatusQueryData,
   StreamSummary,
-  ThinkingLevel,
 } from "~/lib/types";
 import { setStreamCwd } from "~/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -109,7 +109,7 @@ type ChatPanelProps = {
   streamType?: StreamSummary["type"];
   streamHasWorktree?: boolean;
   selectedModelId?: string;
-  selectedThinkingLevel?: ThinkingLevel;
+  selectedThinkingLevel?: ModelThinkingLevel;
   recoveryKind?: StreamRecoveryKind;
 };
 
@@ -259,9 +259,9 @@ function CwdPicker({
 }
 
 function markPiSessionBusy(
-  status: StatusResponse | undefined,
+  status: StatusQueryData | undefined,
   piSessionId: string,
-): StatusResponse | undefined {
+): StatusQueryData | undefined {
   if (!status?.piAgent) return status;
 
   const defaultSession = status.piAgent.default;
@@ -273,7 +273,7 @@ function markPiSessionBusy(
         ...status.piAgent,
         default: { ...defaultSession, busy: true },
       },
-    } satisfies StatusResponse;
+    } satisfies StatusQueryData;
   }
 
   const orchestrators = status.piAgent.orchestrators;
@@ -288,7 +288,7 @@ function markPiSessionBusy(
         sessionIndex === index ? { ...session, busy: true } : session,
       ),
     },
-  } satisfies StatusResponse;
+  } satisfies StatusQueryData;
 }
 
 export function ChatPanel({
@@ -655,7 +655,7 @@ export function ChatPanel({
         return;
       }
 
-      queryClient.setQueryData<StatusResponse>(["status"], (status) =>
+      queryClient.setQueryData<StatusQueryData>(["status"], (status) =>
         markPiSessionBusy(status, piSessionId),
       );
 

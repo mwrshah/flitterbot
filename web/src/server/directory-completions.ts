@@ -1,14 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { DirectoryCompletionItem } from "~/lib/types";
+import type { DirectoryCompletionsResponse } from "~/lib/types";
 
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
-
-export type DirectoryCompletionsResult = {
-  items: DirectoryCompletionItem[];
-  cwd: string;
-  query: string;
-};
 
 export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
   .validator(
@@ -19,7 +13,7 @@ export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
       directoriesOnly?: boolean;
     }) => input,
   )
-  .handler(async ({ data }): Promise<DirectoryCompletionsResult> => {
+  .handler(async ({ data }): Promise<DirectoryCompletionsResponse> => {
     const params = new URLSearchParams([
       ["query", data.query],
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
@@ -39,11 +33,7 @@ export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
     try {
       const res = await fetch(url, { headers, signal: controller.signal });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const body = (await res.json()) as {
-        items: DirectoryCompletionItem[];
-        cwd: string;
-        query: string;
-      };
+      const body = (await res.json()) as DirectoryCompletionsResponse;
       return { items: body.items, cwd: body.cwd, query: body.query };
     } catch (err) {
       console.error("fetchDirectoryCompletions failed (query=%s):", data.query, err);

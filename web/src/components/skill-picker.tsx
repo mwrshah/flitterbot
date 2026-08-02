@@ -11,12 +11,12 @@ import {
 import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
 import { Command, CommandItem, CommandList } from "~/components/ui/command";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { SkillListItem } from "~/lib/types";
+import type { SkillPickerItem } from "~/lib/types";
 
 type SkillPickerProps = {
   open: boolean;
-  items: SkillListItem[];
-  onSelect: (skill: SkillListItem) => void;
+  items: SkillPickerItem[];
+  onSelect: (skill: SkillPickerItem) => void;
   onEscape?: () => void;
   caretLeft?: number;
   commandRef?: Ref<HTMLDivElement>;

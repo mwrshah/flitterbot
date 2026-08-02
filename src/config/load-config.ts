@@ -2,13 +2,21 @@ import "dotenv/config";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
 
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
-export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+export const THINKING_LEVELS = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const satisfies readonly ModelThinkingLevel[];
 export type PiTransport = "sse" | "websocket" | "websocket-cached" | "auto";
 
-export function isThinkingLevel(value: unknown): value is ThinkingLevel {
+export function isThinkingLevel(value: unknown): value is ModelThinkingLevel {
   return typeof value === "string" && (THINKING_LEVELS as readonly string[]).includes(value);
 }
 
@@ -17,7 +25,7 @@ export type ModelConfigEntry = {
   label: string;
   provider: string;
   modelId: string;
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: ModelThinkingLevel;
 };
 
 type RawConfigJson = {
@@ -97,7 +105,7 @@ export type FlitterbotConfig = {
   controlSurfaceToken: string;
   models: ModelConfigEntry[];
   defaultModel: string;
-  defaultThinkingLevel: ThinkingLevel;
+  defaultThinkingLevel: ModelThinkingLevel;
   piTransport: PiTransport;
   stallMinutes: number;
   toolTimeoutMinutes: number;
@@ -229,7 +237,7 @@ function requireConfigObject<T extends Record<string, unknown>>(
   throw new Error(`Missing required object config key: ${String(key)}`);
 }
 
-function requireThinkingLevel(raw: RawConfigJson): ThinkingLevel {
+function requireThinkingLevel(raw: RawConfigJson): ModelThinkingLevel {
   const value = raw.defaultThinkingLevel;
   if (isThinkingLevel(value)) return value;
   throw new Error(

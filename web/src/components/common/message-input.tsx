@@ -1,4 +1,5 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon } from "lucide-react";
@@ -27,12 +28,7 @@ import {
 } from "~/lib/global-shortcuts";
 import { getInternalCommandsForScope, type InternalCommandScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
-import type {
-  DirectoryCompletionItem,
-  ImageAttachment,
-  SkillListItem,
-  ThinkingLevel,
-} from "~/lib/types";
+import type { DirectoryCompletionItem, ImageAttachment, SkillPickerItem } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 const draftStore = new Map<string, string>();
@@ -113,15 +109,15 @@ function normalizePathPickerRemainder(inserted: string, remainder: string) {
   return { value: remainder, closesPicker: false };
 }
 
-function filterSkillsForPicker(skills: SkillListItem[], filter: string) {
+function filterSkillsForPicker(skills: SkillPickerItem[], filter: string) {
   const lower = filter.toLowerCase();
   const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
-  const nonCommands: SkillListItem[] = [];
-  const commands: SkillListItem[] = [];
+  const nonCommands: SkillPickerItem[] = [];
+  const commands: SkillPickerItem[] = [];
   for (const item of matched) {
     (item.kind === "command" ? commands : nonCommands).push(item);
   }
-  const cmp = (a: SkillListItem, b: SkillListItem) => {
+  const cmp = (a: SkillPickerItem, b: SkillPickerItem) => {
     const aStarts = a.name.toLowerCase().startsWith(lower);
     const bStarts = b.name.toLowerCase().startsWith(lower);
     if (aStarts !== bStarts) return aStarts ? -1 : 1;
@@ -378,7 +374,7 @@ type MessageInputProps = {
   showModelSelector?: boolean;
   modelSelectorPiSessionId?: string;
   selectedModelId?: string;
-  selectedThinkingLevel?: ThinkingLevel;
+  selectedThinkingLevel?: ModelThinkingLevel;
   isSessionBusy?: boolean;
   attachmentsDisabled?: boolean;
   onInterrupt?: () => void;
@@ -704,7 +700,7 @@ export const MessageInput = memo(function MessageInput({
   );
 
   const handleSkillSelect = useCallback(
-    (skill: SkillListItem) => {
+    (skill: SkillPickerItem) => {
       const value = draftRef.current;
       const slashIdx = slashPositionRef.current;
       let tokenEnd = slashIdx + 1;

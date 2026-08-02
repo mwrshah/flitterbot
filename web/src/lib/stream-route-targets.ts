@@ -1,4 +1,4 @@
-import type { StatusResponse } from "~/lib/types";
+import type { StatusQueryData } from "~/lib/types";
 
 export function getAdjacentStreamPath(
   streamPaths: readonly string[],
@@ -15,12 +15,12 @@ export function getAdjacentStreamPath(
   return streamPaths[(currentIndex + direction + streamPaths.length) % streamPaths.length];
 }
 
-export function isKnownStreamPiSession(status: StatusResponse, piSessionId: string): boolean {
+export function isKnownStreamPiSession(status: StatusQueryData, piSessionId: string): boolean {
   if (status.piAgent?.default?.piSessionId === piSessionId) return true;
   return (status.streams ?? []).some((stream) => stream.piSessionId === piSessionId);
 }
 
-export function getBestStreamPiSessionId(status: StatusResponse): string | undefined {
+export function getBestStreamPiSessionId(status: StatusQueryData): string | undefined {
   return (
     status.piAgent?.default?.piSessionId ??
     status.streams?.find((stream) => stream.status === "open" && stream.piSessionId)?.piSessionId ??

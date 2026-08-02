@@ -1,24 +1,15 @@
 import { infiniteQueryOptions, keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
-import {
-  getHistoryNextPageParam,
-  getHistoryPreviousPageParam,
-  HISTORY_STALE_TIME,
-  type HistoryPageParam,
-  mergeHistoryPages,
-  streamsHistoryQueryKey,
-} from "~/lib/history-cache";
+import { HISTORY_STALE_TIME, mergeHistoryPages, streamsHistoryQueryKey } from "~/lib/history-cache";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import type {
   ChatTimelineItem,
+  DirectoryCompletionsResponse,
   DownstreamSessionItem,
-  SkillListItem,
-  StatusResponse,
+  SkillPickerItem,
+  StatusQueryData,
 } from "~/lib/types";
-import {
-  type DirectoryCompletionsResult,
-  fetchDirectoryCompletions,
-} from "~/server/directory-completions";
+import { fetchDirectoryCompletions } from "~/server/directory-completions";
 import {
   type DiffResult,
   fetchDownstreamSessions,
@@ -27,7 +18,6 @@ import {
   fetchStreamsInputHistory,
   fetchStreamsWorktree,
   type StreamInfo,
-  type StreamsHistoryPage,
 } from "~/server/streams";
 import { fetchUserConfig } from "~/server/user-config";
 
@@ -67,7 +57,7 @@ function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["status"] as const,
-    queryFn: async (): Promise<StatusResponse> => {
+    queryFn: async (): Promise<StatusQueryData> => {
       try {
         return await apiClient.getStatus();
       } catch {
@@ -88,7 +78,7 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
   return infiniteQueryOptions({
     queryKey: streamsHistoryQueryKey(piSessionId),
-    queryFn: ({ pageParam }): Promise<StreamsHistoryPage> =>
+    queryFn: ({ pageParam }) =>
       fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
@@ -96,9 +86,11 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
           ...(pageParam ? { before: pageParam } : {}),
         },
       }),
-    initialPageParam: undefined as HistoryPageParam,
-    getPreviousPageParam: getHistoryPreviousPageParam,
-    getNextPageParam: getHistoryNextPageParam,
+    initialPageParam: undefined as string | undefined,
+    getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
+    getNextPageParam: () => undefined,
+    select: (data) =>
+      data.pages.length === 1 ? data.pages[0]!.items : data.pages.flatMap((page) => page.items),
     enabled: piSessionId !== undefined,
     staleTime: HISTORY_STALE_TIME,
     gcTime: 0,
@@ -161,7 +153,7 @@ export function surfaceTimelineQueryOptions() {
 export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["skills"] as const,
-    queryFn: async (): Promise<SkillListItem[]> => {
+    queryFn: async (): Promise<SkillPickerItem[]> => {
       try {
         const res = await apiClient.listSkills();
         return [...INTERNAL_COMMANDS, ...res.items];
@@ -183,7 +175,7 @@ export function directoryCompletionsQueryOptions(
   const directoriesOnly = opts?.directoriesOnly ?? false;
   return {
     queryKey: ["directory-completions", query, streamId ?? "", directoriesOnly] as const,
-    queryFn: (): Promise<DirectoryCompletionsResult> =>
+    queryFn: (): Promise<DirectoryCompletionsResponse> =>
       fetchDirectoryCompletions({
         data: { query, streamId, directoriesOnly },
       }),

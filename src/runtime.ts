@@ -4,7 +4,7 @@ import type http from "node:http";
 import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
 import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { ProviderAuthManager } from "./auth/provider-auth.ts";
@@ -45,7 +45,7 @@ import {
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { killTmuxSession } from "./claude-sessions/tmux.ts";
-import { type FlitterbotConfig, loadConfig, type ThinkingLevel } from "./config/load-config.ts";
+import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
 import type {
@@ -59,13 +59,13 @@ import type {
   HookResponse,
   MessageMetadata,
   PiSessionModelInfo,
-  RuntimeWhatsAppStartResponse,
-  RuntimeWhatsAppStopResponse,
+  RuntimeWhatsAppControlResponse,
   ClaudeSessionListItem as SessionListItem,
-  SessionTranscriptResponse,
   StatusResponse,
   StreamRoutingMeta,
   StreamSurfacedWebSocketEvent,
+  StreamType,
+  TranscriptPageResponse,
 } from "./contracts/index.ts";
 import { executeCloseStream } from "./custom-tools/close-stream.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
@@ -789,7 +789,7 @@ export class ControlSurfaceRuntime {
 
   async setPiSessionThinkingLevel(
     piSessionId: string,
-    thinkingLevel: ThinkingLevel,
+    thinkingLevel: ModelThinkingLevel,
   ): Promise<PiSessionModelInfo> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) {
@@ -1033,7 +1033,7 @@ export class ControlSurfaceRuntime {
     sessionId: string,
     cursor?: string,
     limit: number = 50,
-  ): Promise<SessionTranscriptResponse> {
+  ): Promise<TranscriptPageResponse> {
     const session = getSessionById(this.blackboard, sessionId);
     if (!session?.transcriptPath) {
       return {
@@ -1053,7 +1053,7 @@ export class ControlSurfaceRuntime {
     return directSessionMessage(this, sessionId, text);
   }
 
-  async startWhatsAppDaemon(): Promise<RuntimeWhatsAppStartResponse> {
+  async startWhatsAppDaemon(): Promise<RuntimeWhatsAppControlResponse> {
     if (!this.whatsappEnabled) {
       return { ok: false, status: "disabled", managedByControlSurface: true };
     }
@@ -1070,7 +1070,7 @@ export class ControlSurfaceRuntime {
     return { ok: true, ...this.whatsappStatusCache };
   }
 
-  async stopWhatsAppDaemon(): Promise<RuntimeWhatsAppStopResponse> {
+  async stopWhatsAppDaemon(): Promise<RuntimeWhatsAppControlResponse> {
     if (!this.whatsappEnabled) {
       return { ok: false, status: "disabled", managedByControlSurface: true };
     }
@@ -1272,7 +1272,7 @@ export class ControlSurfaceRuntime {
   private async spawnStreamWithSession(opts: {
     name: string;
     cwd: string;
-    type?: "work" | "defaultStream";
+    type?: StreamType;
     streamUser?: string;
     repoPath?: string;
     worktreePath?: string;

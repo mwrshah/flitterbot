@@ -8,59 +8,54 @@
  * agent_end, and WS reconnect.
  */
 import { type InfiniteData, type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
-import type { ChatTimelineItem, ChatTimelineMessage, ChatTimelineTool } from "~/lib/types";
-import type { StreamsHistoryPage } from "~/server/streams";
-
-export type HistoryPageParam = string | undefined;
-export type HistoryInfiniteData = InfiniteData<StreamsHistoryPage, unknown>;
-
-const EMPTY_TIMELINE: ChatTimelineItem[] = [];
+import type {
+  ChatTimelineItem,
+  ChatTimelineMessage,
+  ChatTimelineTool,
+  StreamsHistoryResponse,
+} from "~/lib/types";
 
 export function streamsHistoryQueryKey(piSessionId: string | undefined) {
   return ["streams-history", piSessionId ?? "default", "agent"] as const;
 }
 
-export function getHistoryPreviousPageParam(firstPage: StreamsHistoryPage): HistoryPageParam {
-  return firstPage.olderPageCursor ?? undefined;
-}
-
-export function getHistoryNextPageParam(): HistoryPageParam {
-  return undefined;
-}
-
 export const HISTORY_STALE_TIME = Number.POSITIVE_INFINITY;
-
-export function flattenHistoryPages(data: HistoryInfiniteData | undefined): ChatTimelineItem[] {
-  if (!data?.pages.length) return EMPTY_TIMELINE;
-  if (data.pages.length === 1) return data.pages[0]?.items ?? EMPTY_TIMELINE;
-  return data.pages.flatMap((page) => page.items);
-}
 
 export function updateNewestHistoryPage(
   queryClient: QueryClient,
   piSessionId: string | undefined,
   updater: (items: ChatTimelineItem[]) => ChatTimelineItem[],
 ): void {
-  queryClient.setQueryData<HistoryInfiniteData>(streamsHistoryQueryKey(piSessionId), (old) => {
-    if (!old?.pages.length) {
-      const items = updater([]);
-      if (!items.length) return old;
-      return {
-        pages: [{ items, olderPageCursor: null }],
-        pageParams: [undefined],
-      };
-    }
-    const lastIndex = old.pages.length - 1;
-    const lastPage = old.pages[lastIndex];
-    if (!lastPage) return old;
+  queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    streamsHistoryQueryKey(piSessionId),
+    (old) => {
+      if (!old?.pages.length) {
+        const items = updater([]);
+        if (!items.length) return old;
+        return {
+          pages: [
+            {
+              piSessionId: piSessionId ?? null,
+              sessionFile: null,
+              items,
+              olderPageCursor: null,
+            },
+          ],
+          pageParams: [undefined],
+        };
+      }
+      const lastIndex = old.pages.length - 1;
+      const lastPage = old.pages[lastIndex];
+      if (!lastPage) return old;
 
-    const nextItems = updater(lastPage.items);
-    if (nextItems === lastPage.items) return old;
+      const nextItems = updater(lastPage.items);
+      if (nextItems === lastPage.items) return old;
 
-    const pages = [...old.pages];
-    pages[lastIndex] = { ...lastPage, items: nextItems };
-    return { pages, pageParams: old.pageParams };
-  });
+      const pages = [...old.pages];
+      pages[lastIndex] = { ...lastPage, items: nextItems };
+      return { pages, pageParams: old.pageParams };
+    },
+  );
 }
 
 export function appendItemToPage(
@@ -181,8 +176,8 @@ function mergeNewestPageItems(
 }
 
 export function mergeHistoryPages(oldData: unknown, newData: unknown): unknown {
-  const prev = oldData as HistoryInfiniteData | undefined;
-  const next = newData as HistoryInfiniteData;
+  const prev = oldData as InfiniteData<StreamsHistoryResponse, string | undefined> | undefined;
+  const next = newData as InfiniteData<StreamsHistoryResponse, string | undefined>;
 
   if (!prev?.pages.length || !next.pages.length) return replaceEqualDeep(prev, next);
 

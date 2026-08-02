@@ -21,7 +21,7 @@ import {
 } from "~/lib/queries";
 import { getStreamRecoveryKind } from "~/lib/stream-recovery";
 import { getBestStreamPiSessionId, isKnownStreamPiSession } from "~/lib/stream-route-targets";
-import type { StatusResponse } from "~/lib/types";
+import type { StatusQueryData } from "~/lib/types";
 
 export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
@@ -148,7 +148,7 @@ function PiSessionRoute() {
   );
 }
 
-function redirectToBestStream(status: StatusResponse): never {
+function redirectToBestStream(status: StatusQueryData): never {
   const piSessionId = getBestStreamPiSessionId(status);
   if (piSessionId) {
     throw redirect({ to: "/streams/$piSessionId", params: { piSessionId } });

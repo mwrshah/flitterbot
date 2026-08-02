@@ -18,7 +18,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { FlitterbotApiClient } from "~/lib/api";
 import { skillsQueryOptions, statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
 import type { SettingsStore } from "~/lib/settings-store";
-import type { StatusResponse } from "~/lib/types";
+import type { StatusQueryData } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 import type { WsConnectionStore } from "~/lib/ws-connection-store";
 import type { SendMessageFn } from "~/lib/ws-query-bridge";
@@ -95,7 +95,9 @@ function useShortcutStatus(apiClient: FlitterbotApiClient) {
   return data;
 }
 
-function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | undefined): string[] {
+function useStreamPaths(
+  status: Pick<StatusQueryData, "piAgent" | "streams"> | undefined,
+): string[] {
   return useMemo(() => {
     const paths: string[] = [];
     if (status?.piAgent?.default?.piSessionId) {

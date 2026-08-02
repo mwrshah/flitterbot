@@ -4,7 +4,7 @@ import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/common/card";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { StatusResponse } from "~/lib/types";
+import type { StatusQueryData } from "~/lib/types";
 
 function statusVariant(status: string): "active" | "waiting" | "ended" | "info" {
   switch (status) {
@@ -22,7 +22,7 @@ function statusVariant(status: string): "active" | "waiting" | "ended" | "info" 
   }
 }
 
-export function WhatsAppControls({ status }: { status?: StatusResponse }) {
+export function WhatsAppControls({ status }: { status?: StatusQueryData }) {
   useWhyDidYouRender("WhatsAppControls", { status });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();

@@ -1,11 +1,17 @@
-import type { ClaudeSessionStatus } from "./blackboard.ts";
+import type { AuthEvent, AuthPrompt, AuthType, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { Skill } from "@earendil-works/pi-coding-agent";
+import type {
+  ClaudeSessionStatus,
+  PiSessionStatus,
+  StreamStatus,
+  StreamType,
+} from "./blackboard.ts";
 import type { ChatTimelineItem, MessageSource } from "./timeline.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
-import type { TranscriptPageResponse } from "./transcript.ts";
 
 export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
@@ -23,7 +29,6 @@ export type WhatsAppDaemonStatus =
   | "stopping";
 
 export interface WhatsAppRuntimeStatus {
-  ok?: boolean;
   status: WhatsAppDaemonStatus;
   pid?: number | null;
   managedByControlSurface: boolean;
@@ -34,7 +39,7 @@ export interface PiSessionModelInfo {
   id: string;
   provider: string;
   modelId: string;
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  thinkingLevel?: ModelThinkingLevel;
 }
 
 export interface PiSessionRuntimeStatus {
@@ -85,14 +90,14 @@ export interface PiMultiSessionStatus {
 export interface StreamSummary {
   id: string;
   name: string;
-  type: "work" | "defaultStream";
-  status: "open" | "closed";
+  type: StreamType;
+  status: StreamStatus;
   pinned: boolean;
   closedAt?: string;
   repoPath?: string;
   worktreePath?: string;
   piSessionId?: string;
-  piSessionStatus?: "active" | "waiting_for_user" | "waiting_for_sessions" | "ended" | "crashed";
+  piSessionStatus?: PiSessionStatus;
   model?: PiSessionModelInfo;
   sessionCount: number;
   createdAt: string;
@@ -125,7 +130,7 @@ export interface ModelListItem {
   label: string;
   provider: string;
   modelId: string;
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  thinkingLevel?: ModelThinkingLevel;
   reasoning?: boolean;
   supportsXhigh?: boolean;
   supportsMax?: boolean;
@@ -139,21 +144,7 @@ export interface ModelsListResponse {
   pinned: ModelListItem[];
   all: ModelListItem[];
   defaultModel: string;
-  defaultThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-}
-
-export interface ModelsPinRequest {
-  id: string;
-  pin: boolean;
-  label?: string;
-}
-
-export interface ModelsDefaultRequest {
-  id: string;
-}
-
-export interface ModelsThinkingLevelRequest {
-  level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  defaultThinkingLevel: ModelThinkingLevel;
 }
 
 export interface ModelsMutationResponse extends ModelsListResponse {
@@ -222,8 +213,6 @@ export interface StreamsHistoryResponse {
   appliedVisibleRowLimit?: number;
 }
 
-export type SessionTranscriptResponse = TranscriptPageResponse;
-
 export interface DirectSessionMessageRequest {
   text: string;
 }
@@ -244,22 +233,12 @@ export interface DirectSessionMessageResponse {
   error?: string;
 }
 
-export interface RuntimeWhatsAppControlResponse {
+export type RuntimeWhatsAppControlResponse = Omit<WhatsAppRuntimeStatus, "pid"> & {
   ok: boolean;
-  status: WhatsAppDaemonStatus;
   pid?: number;
-  managedByControlSurface?: boolean;
-  requiresManualAuth?: boolean;
-}
+};
 
-export type RuntimeWhatsAppStartResponse = RuntimeWhatsAppControlResponse;
-export type RuntimeWhatsAppStopResponse = RuntimeWhatsAppControlResponse;
-
-export interface SkillListItem {
-  name: string;
-  description: string;
-  disableModelInvocation: boolean;
-}
+export type SkillListItem = Pick<Skill, "name" | "description" | "disableModelInvocation">;
 
 export interface SkillsListResponse {
   items: SkillListItem[];
@@ -278,10 +257,8 @@ export interface DirectoryCompletionsResponse {
   query: string;
 }
 
-export type ProviderAuthType = "oauth" | "api_key";
-
 export interface AuthProviderMethod {
-  type: ProviderAuthType;
+  type: AuthType;
   name: string;
   loginLabel?: string;
 }
@@ -290,39 +267,23 @@ export interface AuthProvider {
   id: string;
   name: string;
   methods: AuthProviderMethod[];
-  credentialType?: ProviderAuthType;
+  credentialType?: AuthType;
 }
 
 export interface AuthProvidersResponse {
   providers: AuthProvider[];
 }
 
-export type AuthFlowEvent =
-  | { type: "info"; message: string; links?: readonly { url: string; label?: string }[] }
-  | { type: "auth_url"; url: string; instructions?: string }
-  | {
-      type: "device_code";
-      userCode: string;
-      verificationUri: string;
-      intervalSeconds?: number;
-      expiresInSeconds?: number;
-    }
-  | { type: "progress"; message: string };
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-export interface AuthFlowPrompt {
-  id: string;
-  type: "text" | "secret" | "select" | "manual_code";
-  message: string;
-  placeholder?: string;
-  options?: readonly { id: string; label: string; description?: string }[];
-}
+export type AuthFlowPrompt = DistributiveOmit<AuthPrompt, "signal"> & { id: string };
 
 export interface AuthFlowSnapshot {
   id: string;
   status: "running" | "succeeded" | "failed" | "cancelled";
   providerId: string;
-  authType: ProviderAuthType;
-  events: AuthFlowEvent[];
+  authType: AuthType;
+  events: AuthEvent[];
   prompt?: AuthFlowPrompt;
   error?: string;
 }

@@ -1,15 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  FLITTERBOT_CONFIG_PATH,
-  type ModelConfigEntry,
-  type ThinkingLevel,
-} from "./load-config.ts";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
+import { FLITTERBOT_CONFIG_PATH, type ModelConfigEntry } from "./load-config.ts";
 
 export function persistModelsToConfigFile(update: {
   models: ModelConfigEntry[];
   defaultModel?: string;
-  defaultThinkingLevel?: ThinkingLevel;
+  defaultThinkingLevel?: ModelThinkingLevel;
 }): void {
   const existing = readConfigFile();
   const next: Record<string, unknown> = { ...existing, models: update.models };
