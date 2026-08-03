@@ -1,5 +1,5 @@
-import { streamingUiDebug } from "./debug-log";
-import { streamingPerf } from "./streaming-perf";
+import { streamingUiDebug } from "./debug-log.ts";
+import { streamingPerf } from "./streaming-perf.ts";
 
 type StreamingText = { text: string; messageId: string };
 type StreamingThinking = { text: string; messageId: string };

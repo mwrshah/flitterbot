@@ -1,5 +1,6 @@
 import type { AnyRouter } from "@tanstack/react-router";
 import type { FlitterbotWsClient } from "~/lib/ws";
+import { streamingStore } from "./streaming-store.ts";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
@@ -54,6 +55,9 @@ export function setupWsRouteSubscriptions(
     const nextTarget = resolveSubscriptionTarget(router);
     if (sameTarget(activeTarget, nextTarget)) return;
 
+    if (activeTarget && activeTarget.piSessionId !== "*") {
+      streamingStore.clearSession(activeTarget.piSessionId);
+    }
     activeTarget = nextTarget;
 
     if (nextTarget) {

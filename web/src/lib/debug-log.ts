@@ -19,7 +19,7 @@ function browserToggleEnabled(): boolean {
 
 export function isStreamingUiDebugEnabled(): boolean {
   return (
-    import.meta.env.DEV &&
+    import.meta.env?.DEV &&
     (import.meta.env.VITE_DEBUG_STREAMING_UI === "true" || browserToggleEnabled())
   );
 }
