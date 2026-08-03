@@ -64,7 +64,7 @@ The configured harness is used unless `--harness claude|codex` is supplied. An e
 /bin/bash scripts/sessions.sh launch ~/project
 /bin/bash scripts/sessions.sh launch ~/project --pi-session-id abc --stream-id def
 /bin/bash scripts/sessions.sh launch ~/Documents/coded-programs/Surtr-worktrees/057-finops-invoices-cron --harness codex
-/bin/bash scripts/sessions.sh launch ~/project --harness claude
+/bin/bash scripts/sessions.sh launch ~/project --harness claude //skip --harness unless specified by the user
 ```
 
 Fallback with an explicit session letter (rarely needed):
