@@ -137,7 +137,7 @@ export type FlitterbotConfig = {
 
 export const TMUX_SKILL_DIRECTIVE = "/skill:tmux";
 export const SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER =
-  "IMPORTANT! Before doing  anything else, load the /skill:tmux pls";
+  "Aside: If you require parallelization for a large effort, or clean context you can use /skill:tmux in that instance";
 
 const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");

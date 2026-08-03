@@ -567,7 +567,7 @@ async function bootstrapConfig() {
   const DEFAULT_AGENT_FIRST_MESSAGE =
     "Load up /skill:tasks /skill:notes and run ls on the project repositories directory. Then wait for the user";
   const DEFAULT_NEW_STREAM_FIRST_MESSAGE_FOOTER =
-    "IMPORTANT! Before doing  anything else, load the /skill:tmux pls";
+    "Aside: If you require parallelization for a large effort, or clean context you can use /skill:tmux in that instance";
 
   const STATIC_DEFAULTS = {
     controlSurfaceHost: "127.0.0.1",
