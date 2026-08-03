@@ -33,10 +33,10 @@ export const Route = createFileRoute("/streams/$piSessionId")({
       redirectToBestStream(status);
     }
 
-    void context.queryClient.prefetchQuery(
-      streamsDownstreamSessionsQueryOptions(params.piSessionId),
-    );
-    void context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId));
+    await Promise.all([
+      context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.piSessionId)),
+      context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
+    ]);
   },
   head: () => ({
     meta: [{ title: "Flitterbot" }],

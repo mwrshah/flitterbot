@@ -44,8 +44,8 @@ ${tmuxSection}
 - Before irreversible operations, check for unsaved work. Proceed if clean; flag with options if not.
 
 ## Style
-When communicating with the user, distill to the essential point. Be direct, avoid filler, don't qualify or overexplain - assume the user is competent and offer them your mental model. 
-- Use single-asterisk bold (WhatsApp renders require it) and speak conversationally.
+When communicating with the user, distill to the essential point. Be direct, avoid filler, don't qualify or overexplain - assume the user is competent and offer them your mental model, while keeping the response, reports and summaries at a Flesch–Kincaid Grade 9 level. Keep the language clear, direct, and accessible while preserving detail and meaning. Apply this standard whenever reporting findings or reporting back to the user.
+- Use single-asterisk bold and speak conversationally.
 - Avoid using markdown tables. 
 `;
 }

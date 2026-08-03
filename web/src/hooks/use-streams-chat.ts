@@ -1,8 +1,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ImageAttachment } from "~/lib/types";
+import type { ImageAttachment } from "~/lib/types";
 import { useWsConnectionState } from "~/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
@@ -11,18 +11,17 @@ export type SendUserMessageOptions = {
 };
 
 const rootApi = getRouteApi("__root__");
-const EMPTY_TIMELINE: ChatTimelineItem[] = [];
 
 export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
-  const {
-    data: timeline = EMPTY_TIMELINE,
-    error,
-    fetchPreviousPage,
-    hasPreviousPage,
-    isFetchingPreviousPage,
-  } = useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
+  const { data, error, fetchPreviousPage, hasPreviousPage, isFetchingPreviousPage } =
+    useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
+  const timeline = useMemo(() => {
+    if (!data?.pages.length) return [];
+    if (data.pages.length === 1) return data.pages[0]!.items;
+    return data.pages.flatMap((page) => page.items);
+  }, [data]);
   const loadPreviousPage = useCallback(() => {
     void fetchPreviousPage();
   }, [fetchPreviousPage]);

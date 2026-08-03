@@ -89,8 +89,6 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
     getNextPageParam: () => undefined,
-    select: (data) =>
-      data.pages.length === 1 ? data.pages[0]!.items : data.pages.flatMap((page) => page.items),
     enabled: piSessionId !== undefined,
     staleTime: HISTORY_STALE_TIME,
     gcTime: 0,
