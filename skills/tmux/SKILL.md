@@ -30,7 +30,7 @@ All commands run via `/bin/bash scripts/sessions.sh <command>` relative to the s
 
 3. **Always use auto-select for launch** — do NOT specify a session letter. Let the script pick a free session. The output line `Launched in session X (ready)` tells you which session was assigned — parse it to know where to send subsequent `message`/`send`/`read` commands.
 
-4. **Respect an explicit harness override.** The configured harness is the default route. When the user specifies `--harness codex` or `--harness claude`, preserve that flag in the launch command; the explicit choice takes precedence over configuration.
+4. **Respect an explicit harness override.** When the user specifies `--harness codex` or `--harness claude`, preserve that flag in the launch command; the explicit choice takes precedence over configuration. When the user does not specify a harness, omit `--harness` so the script uses the configured default automatically.
 
 5. **Never sleep or poll to wait for a session to finish.** Rely on the user prompting you again or a hook callback delivering the completion notification.
 6. If a stopped tmux-launched agent says it launched or is waiting on a downstream/background agent/workflow (keywords like “running in the background”, “Dynamic Workflow”, or “background agent”), do nothing; let it finish and expect another stop hook with its result.
@@ -57,8 +57,6 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 ```
 
 **Launch** — auto-selects a free session (or reclaims longest-idle). ALWAYS use this form. Output is `Launched in session e (ready)` — parse it to get the session letter.
-
-The configured harness is used unless `--harness claude|codex` is supplied. An explicit flag is a routing override and must be passed through unchanged.
 
 ```bash
 /bin/bash scripts/sessions.sh launch ~/project
