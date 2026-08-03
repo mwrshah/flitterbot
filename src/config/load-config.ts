@@ -15,6 +15,7 @@ export const THINKING_LEVELS = [
   "max",
 ] as const satisfies readonly ModelThinkingLevel[];
 export type PiTransport = "sse" | "websocket" | "websocket-cached" | "auto";
+export type Harness = "claude" | "codex";
 
 export function isThinkingLevel(value: unknown): value is ModelThinkingLevel {
   return typeof value === "string" && (THINKING_LEVELS as readonly string[]).includes(value);
@@ -59,6 +60,7 @@ type RawConfigJson = {
   learningsNotePath?: unknown;
   todoistApiKey?: unknown;
   linearApiKey?: unknown;
+  harness?: unknown;
 };
 
 const ACCEPTED_CONFIG_KEYS = [
@@ -92,6 +94,7 @@ const ACCEPTED_CONFIG_KEYS = [
   "learningsNotePath",
   "todoistApiKey",
   "linearApiKey",
+  "harness",
 ] as const satisfies readonly (keyof RawConfigJson)[];
 
 const ACCEPTED_MODEL_CONFIG_KEYS = ["id", "label", "provider", "modelId", "thinkingLevel"] as const;
@@ -133,6 +136,7 @@ export type FlitterbotConfig = {
   tmuxEnabled: boolean;
   extraSkillPaths: string[];
   learningsNotePath: string;
+  harness: Harness;
 };
 
 export const TMUX_SKILL_DIRECTIVE = "/skill:tmux";
@@ -258,6 +262,12 @@ function requirePiTransport(raw: RawConfigJson): PiTransport {
   throw new Error(
     "Invalid required config key piTransport: expected sse, websocket, websocket-cached, or auto",
   );
+}
+
+function requireHarness(raw: RawConfigJson): Harness {
+  const value = raw.harness;
+  if (value === "claude" || value === "codex") return value;
+  throw new Error('Invalid required config key harness: expected "claude" or "codex"');
 }
 
 function parseExtraSkillPaths(raw: RawConfigJson): string[] {
@@ -389,6 +399,7 @@ export function loadConfig(): FlitterbotConfig {
     tmuxEnabled: requireConfigBoolean(raw, "tmuxEnabled"),
     extraSkillPaths: parseExtraSkillPaths(raw),
     learningsNotePath: expandHome(requireConfigString(raw, "learningsNotePath")),
+    harness: requireHarness(raw),
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
