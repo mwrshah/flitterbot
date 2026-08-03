@@ -375,7 +375,7 @@ export const Sidebar = memo(function Sidebar() {
                             "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
                               ? "bg-background-selected font-medium text-text"
-                              : "text-text-muted hover:bg-background-hover hover:text-text",
+                              : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
                           )}
                         >
                           <span
@@ -483,7 +483,7 @@ export const Sidebar = memo(function Sidebar() {
                             "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
                               ? "bg-background-selected font-medium text-text"
-                              : "text-text-muted hover:bg-background-hover hover:text-text",
+                              : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
                           )}
                         >
                           {label}
