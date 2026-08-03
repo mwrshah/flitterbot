@@ -54,7 +54,7 @@ type RawConfigJson = {
   whatsappEnabled?: unknown;
   shortcuts?: unknown;
   defaultAgentFirstMessage?: unknown;
-  newStreamFirstMessageFooter?: unknown;
+  tmuxBootstrapMessage?: unknown;
   tmuxEnabled?: unknown;
   extraSkillPaths?: unknown;
   learningsNotePath?: unknown;
@@ -88,7 +88,7 @@ const ACCEPTED_CONFIG_KEYS = [
   "whatsappEnabled",
   "shortcuts",
   "defaultAgentFirstMessage",
-  "newStreamFirstMessageFooter",
+  "tmuxBootstrapMessage",
   "tmuxEnabled",
   "extraSkillPaths",
   "learningsNotePath",
@@ -131,17 +131,13 @@ export type FlitterbotConfig = {
   whatsappEnabled: boolean;
   shortcuts: ShortcutBindingsConfig;
   defaultAgentFirstMessage: string;
-  newStreamFirstMessageFooter: string;
+  tmuxBootstrapMessage: string;
   flitterbotSkillsDir: string;
   tmuxEnabled: boolean;
   extraSkillPaths: string[];
   learningsNotePath: string;
   harness: Harness;
 };
-
-export const TMUX_SKILL_DIRECTIVE = "/skill:tmux";
-export const SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER =
-  "Aside: If you require parallelization for a large effort, or clean context you can use /skill:tmux in that instance";
 
 const HOME = os.homedir();
 const FLITTERBOT_DIR = path.join(HOME, ".flitterbot");
@@ -212,6 +208,13 @@ function requireConfigString(raw: RawConfigJson, key: keyof RawConfigJson): stri
   const value = raw[key];
   if (typeof value === "string") return value;
   throw new Error(`Missing required string config key: ${String(key)}`);
+}
+
+function optionalConfigString(raw: RawConfigJson, key: keyof RawConfigJson): string {
+  const value = raw[key];
+  if (value === undefined) return "";
+  if (typeof value === "string") return value;
+  throw new Error(`Invalid optional string config key: ${String(key)}`);
 }
 
 function requireConfigNumber(raw: RawConfigJson, key: keyof RawConfigJson): number {
@@ -339,24 +342,6 @@ function resolveDefaultModel(raw: RawConfigJson, models: ModelConfigEntry[]): st
   );
 }
 
-export function validateTmuxStreamFooterConfig(
-  config: Pick<FlitterbotConfig, "newStreamFirstMessageFooter" | "tmuxEnabled">,
-): void {
-  const footerHasTmuxSkill = config.newStreamFirstMessageFooter.includes(TMUX_SKILL_DIRECTIVE);
-
-  if (!config.tmuxEnabled && footerHasTmuxSkill) {
-    throw new Error(
-      `Invalid startup config ${FLITTERBOT_CONFIG_PATH}: newStreamFirstMessageFooter includes ${TMUX_SKILL_DIRECTIVE} but tmuxEnabled is false. Remove the tmux skill footer or set "tmuxEnabled": true.`,
-    );
-  }
-
-  if (config.tmuxEnabled && !footerHasTmuxSkill) {
-    throw new Error(
-      `Invalid startup config ${FLITTERBOT_CONFIG_PATH}: tmuxEnabled is true but newStreamFirstMessageFooter does not include ${TMUX_SKILL_DIRECTIVE}. Add "newStreamFirstMessageFooter": "${SUGGESTED_TMUX_FIRST_MESSAGE_FOOTER}" to ${FLITTERBOT_CONFIG_PATH}.`,
-    );
-  }
-}
-
 export function loadConfig(): FlitterbotConfig {
   ensureDir(FLITTERBOT_DIR);
   ensureDir(path.join(FLITTERBOT_DIR, "logs"));
@@ -394,7 +379,7 @@ export function loadConfig(): FlitterbotConfig {
     whatsappEnabled: requireConfigBoolean(raw, "whatsappEnabled"),
     shortcuts: requireConfigObject<ShortcutBindingsConfig>(raw, "shortcuts"),
     defaultAgentFirstMessage: requireConfigString(raw, "defaultAgentFirstMessage"),
-    newStreamFirstMessageFooter: requireConfigString(raw, "newStreamFirstMessageFooter"),
+    tmuxBootstrapMessage: optionalConfigString(raw, "tmuxBootstrapMessage"),
     flitterbotSkillsDir: path.join(FLITTERBOT_DIR, "skills"),
     tmuxEnabled: requireConfigBoolean(raw, "tmuxEnabled"),
     extraSkillPaths: parseExtraSkillPaths(raw),
@@ -409,8 +394,6 @@ export function loadConfig(): FlitterbotConfig {
     controlSurfacePidPath: pidPath,
     controlSurfaceLogPath: logPath,
   };
-
-  validateTmuxStreamFooterConfig(config);
 
   ensureDir(config.projectsDir);
   ensureDir(controlSurfaceDir);

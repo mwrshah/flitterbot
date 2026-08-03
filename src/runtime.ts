@@ -54,7 +54,6 @@ import type {
   WhatsAppDaemonStatus as ControlSurfaceWhatsAppStatus,
   DaemonCommand,
   DaemonResponse,
-  DeliveryMode,
   DirectSessionMessageResponse,
   HookResponse,
   MessageMetadata,
@@ -74,7 +73,10 @@ import { createPiModelRuntime } from "./pi-auth.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
-import { stripInjectedDatetimeBlocks } from "./streams/format-stream-prompt.ts";
+import {
+  resolveTmuxBootstrapMessage,
+  stripInjectedDatetimeBlocks,
+} from "./streams/format-stream-prompt.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
 import { stripStreamNamePrefix } from "./streams/strip-name-prefix.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
@@ -99,7 +101,6 @@ type EnqueueInput = {
   text: string;
   source: QueueSource;
   metadata?: MessageMetadata;
-  deliveryMode?: DeliveryMode;
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   serverMessageId?: string;
@@ -409,7 +410,6 @@ export class ControlSurfaceRuntime {
       metadata: input.metadata,
       receivedAt: new Date().toISOString(),
       webClientId: input.webClientId,
-      deliveryMode: input.deliveryMode ?? "followUp",
       images: images?.length ? images : undefined,
       serverMessageId: messageUuid,
       clientMessageId: input.clientMessageId,
@@ -444,15 +444,6 @@ export class ControlSurfaceRuntime {
 
     if (item.source === "web" || item.source === "whatsapp") {
       item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
-    }
-
-    if (item.deliveryMode === "steer" && target.queue.isBusy() && target.runtime?.session) {
-      this.log(`steer bypass: delivering ${item.id} directly to ${target.role} (queue busy)`);
-      void target.runtime.session.prompt(formatPromptWithContext(item), {
-        streamingBehavior: "steer",
-        images: item.images,
-      });
-      return { ok: true, item };
     }
 
     item.streamId = target.streamId ?? undefined;
@@ -630,7 +621,6 @@ export class ControlSurfaceRuntime {
       text,
       metadata: { event: normalized, ...payload },
       receivedAt: new Date().toISOString(),
-      deliveryMode: "followUp",
       streamId: targetQueue.streamId ?? undefined,
       streamName: targetQueue.streamName ?? undefined,
     };
@@ -1124,7 +1114,13 @@ export class ControlSurfaceRuntime {
     return this.sessionManager.getDefault();
   }
 
-  private async processQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
+  private async processQueueItem(
+    managed: ManagedPiSession,
+    item: QueueItem,
+    steered = false,
+  ): Promise<void> {
+    if (steered) return this.steerQueueItem(managed, item);
+
     await this.sessionReloads.get(managed.piSessionId);
 
     if (!managed.runtime && managed.role !== "default" && managed.streamId) {
@@ -1151,25 +1147,7 @@ export class ControlSurfaceRuntime {
 
     const promptText = formatPromptWithContext(item);
 
-    if (session.isStreaming) {
-      await session.prompt(promptText, {
-        streamingBehavior: item.deliveryMode ?? "followUp",
-        images: item.images,
-      });
-    } else {
-      await session.prompt(promptText, { images: item.images });
-    }
-
-    const serverMsgId = item.metadata?.serverMessageId as string | undefined;
-    if (serverMsgId) {
-      for (let i = session.messages.length - 1; i >= 0; i--) {
-        const msg = session.messages[i] as Record<string, unknown> | undefined;
-        if (msg?.role === "user") {
-          msg.id = serverMsgId;
-          break;
-        }
-      }
-    }
+    await this.deliverQueueItem(session, item, promptText);
 
     this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
 
@@ -1247,6 +1225,37 @@ export class ControlSurfaceRuntime {
         );
       }
     }
+  }
+
+  private async steerQueueItem(managed: ManagedPiSession, item: QueueItem): Promise<void> {
+    const session = managed.runtime?.session;
+    if (!session?.isStreaming) throw new Error("pi session is not available for steering");
+
+    if (item.source !== "hook") managed.state.addSteeredItem(item);
+    try {
+      const delivery = this.deliverQueueItem(session, item, formatPromptWithContext(item));
+      this.log(`queue item ${item.id} delivered as steering guidance`);
+      await delivery;
+    } catch (error) {
+      managed.state.removeSteeredItem(item);
+      throw error;
+    }
+  }
+
+  private deliverQueueItem(session: AgentSession, item: QueueItem, text: string): Promise<void> {
+    const content = item.images?.length ? [{ type: "text" as const, text }, ...item.images] : text;
+    if (item.source !== "hook") {
+      return session.sendUserMessage(content, { deliverAs: "steer" });
+    }
+    return session.sendCustomMessage(
+      {
+        customType: "flitterbot-hook",
+        content,
+        display: false,
+        details: { queueItemId: item.id, metadata: item.metadata },
+      },
+      { deliverAs: "steer", triggerTurn: true },
+    );
   }
 
   private transitionStreamsAfterTurn(piSessionId: string): void {
@@ -2025,6 +2034,11 @@ export class ControlSurfaceRuntime {
               ? stripInjectedDatetimeBlocks(originalText)
               : undefined;
 
+            const tmuxBootstrapMessage = resolveTmuxBootstrapMessage(
+              this.config.tmuxEnabled,
+              this.config.tmuxBootstrapMessage,
+            );
+
             if (currentUserText && !skipUserMessage) {
               let prompt: string;
               try {
@@ -2063,7 +2077,7 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
-                      this.config.newStreamFirstMessageFooter,
+                      tmuxBootstrapMessage,
                     );
                     this.log(
                       `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
@@ -2074,7 +2088,7 @@ export class ControlSurfaceRuntime {
                       ws.name,
                       ws.id,
                       agentMessage,
-                      this.config.newStreamFirstMessageFooter,
+                      tmuxBootstrapMessage,
                     );
                   }
                 } else {
@@ -2083,7 +2097,7 @@ export class ControlSurfaceRuntime {
                     ws.name,
                     ws.id,
                     agentMessage,
-                    this.config.newStreamFirstMessageFooter,
+                    tmuxBootstrapMessage,
                   );
                 }
               } catch (error) {
@@ -2100,7 +2114,7 @@ export class ControlSurfaceRuntime {
                   ws.name,
                   ws.id,
                   agentMessage,
-                  this.config.newStreamFirstMessageFooter,
+                  tmuxBootstrapMessage,
                 );
               }
 
@@ -2124,7 +2138,7 @@ export class ControlSurfaceRuntime {
                 ws.name,
                 ws.id,
                 agentMessage,
-                this.config.newStreamFirstMessageFooter,
+                tmuxBootstrapMessage,
               );
               orchestrator.queue.enqueue({
                 id: `ws-init-${ws.id}`,
@@ -2722,7 +2736,6 @@ export class ControlSurfaceRuntime {
           source: "web",
           metadata: { via: "ws", ...routerMeta },
           webClientId: client.id,
-          deliveryMode: payload.deliveryMode === "steer" ? "steer" : "followUp",
           images: Array.isArray(payload.images) ? payload.images : undefined,
           serverMessageId,
           clientMessageId:

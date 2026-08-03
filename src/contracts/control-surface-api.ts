@@ -13,7 +13,6 @@ import type {
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
 
-export type DeliveryMode = "followUp" | "steer";
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
   | "unknown"
@@ -120,7 +119,6 @@ export interface MessageRequest {
   text: string;
   source?: MessageSource;
   metadata?: Record<string, unknown>;
-  deliveryMode?: DeliveryMode;
   images?: Array<{ data: string; mimeType: string }>;
   targetPiSessionId?: string;
 }
