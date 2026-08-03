@@ -1044,7 +1044,7 @@ async function installClaudeHooks() {
 
   const modifications = [];
   for (const { event, arg } of HOOKS) {
-    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg}`;
+    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg} claude`;
     const desiredGroup = {
       matcher: "",
       hooks: [{ type: "command", command: hookCmd, async: true, timeout: 15 }],
@@ -1128,7 +1128,7 @@ async function installCodexHooks() {  // writes ~/.codex/hooks.json: { hooks: { 
   let changes = false;
   const modifications = [];
   for (const { event, arg } of HOOKS) {
-    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg}`;
+    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg} codex`;
     const desiredGroup = {
       matcher: "",
       hooks: [{ type: "command", command: hookCmd, timeout: 15 }],  // no async: codex skips async hooks

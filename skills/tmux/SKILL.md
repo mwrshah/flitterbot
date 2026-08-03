@@ -1,12 +1,12 @@
 ---
 name: tmux
-description: Manage Claude Code across up to 50 tmux sessions (one per terminal window, tiled by WM)
+description: Manage Claude Code or Codex across up to 50 tmux sessions (one per terminal window, tiled by WM)
 argument-hint: "[status|launch|quit|send|message] [session] [args]"
 ---
 
 # tmux — Separate Sessions Workstation
 
-Manage up to 50 Claude Code instances, each in its own tmux session (`a` through `z`, then `aa` through `ax`). Sessions are created automatically as detached tmux sessions when needed. To watch a session, you can instruct the user to attach from any terminal: `tmux attach -t <S>`.
+Manage up to 50 Claude Code or Codex instances, each in its own tmux session (`a` through `z`, then `aa` through `ax`). Sessions are created automatically as detached tmux sessions when needed. To watch a session, you can instruct the user to attach from any terminal: `tmux attach -t <S>`.
 
 ## Supporting Files
 
@@ -24,14 +24,16 @@ All commands run via `/bin/bash scripts/sessions.sh <command>` relative to the s
 
 ### Rules
 
-1. **Launch Claude with `sessions.sh launch`** — never raw tmux. The script sets required env vars (`FLITTERBOT_AGENT_MANAGED=1` etc.). Without them, stop hooks won't fire. If launch fails, report the error.
+1. **Launch the agent with `sessions.sh launch`** — never raw tmux. The script sets required env vars (`FLITTERBOT_AGENT_MANAGED=1` etc.). Without them, stop hooks won't fire. If launch fails, report the error.
 
-2. **Send prompts with `message`, not `send`.** `message` verifies Claude started inferring and retries if needed. Use `send` only for raw keystrokes (bare Enter to accept a prompt, typing a shell command).
+2. **Send prompts with `message`, not `send`.** `message` verifies the agent started inferring and retries if needed. Use `send` only for raw keystrokes (bare Enter to accept a prompt, typing a shell command).
 
 3. **Always use auto-select for launch** — do NOT specify a session letter. Let the script pick a free session. The output line `Launched in session X (ready)` tells you which session was assigned — parse it to know where to send subsequent `message`/`send`/`read` commands.
 
-4. **Never sleep or poll to wait for a session to finish.** Rely on the user prompting you again or a hook callback delivering the completion notification.
-5. If a stopped tmux-launched Claude Code session says it launched or is waiting on a downstream/background agent/workflow (keywords like “running in the background”, “Dynamic Workflow”, or “background agent”), do nothing; let it finish and expect another stop hook with its result.
+4. **Respect an explicit harness override.** The configured harness is the default route. When the user specifies `--harness codex` or `--harness claude`, preserve that flag in the launch command; the explicit choice takes precedence over configuration.
+
+5. **Never sleep or poll to wait for a session to finish.** Rely on the user prompting you again or a hook callback delivering the completion notification.
+6. If a stopped tmux-launched agent says it launched or is waiting on a downstream/background agent/workflow (keywords like “running in the background”, “Dynamic Workflow”, or “background agent”), do nothing; let it finish and expect another stop hook with its result.
 
 ### Commands
 
@@ -47,7 +49,7 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 /bin/bash scripts/sessions.sh status
 ```
 
-**State** — Claude UI state: IDLE (duration), INFERRING, FREE (duration), NOT RUNNING. Omit `<S>` for all sessions, pass it for a single session.
+**State** — agent UI state: IDLE (duration), INFERRING, FREE (duration), NOT RUNNING. Omit `<S>` for all sessions, pass it for a single session.
 
 ```bash
 /bin/bash scripts/sessions.sh state
@@ -56,9 +58,13 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 
 **Launch** — auto-selects a free session (or reclaims longest-idle). ALWAYS use this form. Output is `Launched in session e (ready)` — parse it to get the session letter.
 
+The configured harness is used unless `--harness claude|codex` is supplied. An explicit flag is a routing override and must be passed through unchanged.
+
 ```bash
 /bin/bash scripts/sessions.sh launch ~/project
 /bin/bash scripts/sessions.sh launch ~/project --pi-session-id abc --stream-id def
+/bin/bash scripts/sessions.sh launch ~/Documents/coded-programs/Surtr-worktrees/057-finops-invoices-cron --harness codex
+/bin/bash scripts/sessions.sh launch ~/project --harness claude
 ```
 
 Fallback with an explicit session letter (rarely needed):
@@ -73,7 +79,7 @@ Fallback with an explicit session letter (rarely needed):
 /bin/bash scripts/sessions.sh quit <S>
 ```
 
-**Message** — send a prompt to Claude, then verify inference started (preferred over send).
+**Message** — send a prompt to the agent, then verify inference started (preferred over send).
 
 ```bash
 /bin/bash scripts/sessions.sh message <S> "fix the login bug"
@@ -86,7 +92,7 @@ Fallback with an explicit session letter (rarely needed):
 /bin/bash scripts/sessions.sh send <S>
 ```
 
-**Other** — `clear` resets Claude's conversation, `read` captures screen contents, `session-id` prints the Claude Code session UUID.
+**Other** — `clear` resets the agent's conversation, `read` captures screen contents, `session-id` prints the harness session UUID.
 
 ```bash
 /bin/bash scripts/sessions.sh clear <S>

@@ -2799,7 +2799,7 @@ function formatHookMessage(eventName: string, payload: Record<string, unknown>):
     "lastAssistantMessage",
   ]);
   const lines = [
-    `${humanizeHookEvent(eventName)}: ${hookVerb(eventName)}`,
+    `${humanizeHookEvent(eventName)}: ${hookVerb(eventName, pickString(payload, ["harness"]))}`,
     sessionId ? `Session ID: ${sessionId}` : undefined,
     project ? `Project: ${project}` : undefined,
     cwd ? `CWD: ${cwd}` : undefined,
@@ -2850,18 +2850,19 @@ function humanizeHookEvent(eventName: string): string {
     .join("");
 }
 
-function hookVerb(eventName: string): string {
+function hookVerb(eventName: string, harness?: string): string {
+  const agentName = harness === "codex" ? "Codex" : "Claude Code";
   switch (eventName) {
     case "session-start":
-      return "Claude Code session started.";
+      return `${agentName} session started.`;
     case "stop":
-      return "Claude Code session stopped.";
+      return `${agentName} session stopped.`;
     case "session-end":
-      return "Claude Code session ended.";
+      return `${agentName} session ended.`;
     case "subagent-start":
-      return "Claude subagent started.";
+      return `${agentName} subagent started.`;
     case "subagent-stop":
-      return "Claude subagent stopped.";
+      return `${agentName} subagent stopped.`;
     default:
       return "Hook event received.";
   }

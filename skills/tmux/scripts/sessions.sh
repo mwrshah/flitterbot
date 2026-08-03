@@ -33,6 +33,13 @@ _resolve_launch_harness() {
   echo "${h:-claude}"
 }
 
+_validate_harness() {
+  case "$1" in
+    claude|codex) return 0 ;;
+    *) echo "ERROR: --harness must be claude or codex"; return 1 ;;
+  esac
+}
+
 is_valid_session() {
   local name="$1"
   for s in $SESSIONS; do
@@ -107,7 +114,7 @@ cmd_status() {
 
 _agent_launch_cmd() {
   local harness="$1" session="$2" stream_id="$3" pi_session_id="$4" args="$5"
-  local envp="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
+  local envp="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_HARNESS=$harness FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
   local cmd
   if [ "$harness" = "codex" ]; then
     cmd="$envp codex --yolo --dangerously-bypass-hook-trust"
@@ -135,6 +142,7 @@ cmd_launch() {
   done
   local harness
   harness=$(_resolve_launch_harness "$harness_arg")
+  _validate_harness "$harness" || return 1
 
   local session="" dir="" args=""
   if [[ ${#remaining[@]} -gt 0 ]]; then
@@ -269,11 +277,11 @@ cmd_launch() {
         fi
         sleep 0.5
       done
-      echo "Launched in session $session (Claude running, may still be loading)"
+      echo "Launched in session $session ($harness running, may still be loading)"
       return 0
     fi
   done
-  echo "WARNING: Launch command sent to session $session but Claude not detected after 15s. Check manually."
+  echo "WARNING: Launch command sent to session $session but $harness not detected after 15s. Check manually."
   return 1
 }
 

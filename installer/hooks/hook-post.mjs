@@ -35,8 +35,10 @@ function loadConfig() {
   }
 }
 
-function enrichPayload(payload) {
+function enrichPayload(payload, hookHarness) {
   const env = process.env;
+  const harness = env.FLITTERBOT_HARNESS || hookHarness;
+  if (harness === "claude" || harness === "codex") payload.harness = harness;
   if (env.FLITTERBOT_AGENT_MANAGED === "1") {
     payload.agent_managed = true;
     if (env.FLITTERBOT_TMUX_SESSION) payload.tmux_session = env.FLITTERBOT_TMUX_SESSION;
@@ -94,7 +96,7 @@ async function main() {
     process.exit(0);
   }
 
-  payload = enrichPayload(payload);
+  payload = enrichPayload(payload, process.argv[3]);
   const config = loadConfig();
   const result = await postToControlSurface(eventSlug, payload, config);
 
