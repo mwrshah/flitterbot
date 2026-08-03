@@ -21,7 +21,6 @@ import type { SettingsStore } from "~/lib/settings-store";
 import type { StatusQueryData } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 import type { WsConnectionStore } from "~/lib/ws-connection-store";
-import type { SendMessageFn } from "~/lib/ws-query-bridge";
 import appCss from "~/styles.css?url";
 import { seo } from "~/utils/seo";
 
@@ -31,7 +30,7 @@ export const Route = createRootRouteWithContext<{
   wsClient: FlitterbotWsClient;
   wsConnectionStore: WsConnectionStore;
   settingsStore: SettingsStore;
-  sendMessage: SendMessageFn;
+  sendMessage: FlitterbotWsClient["sendMessage"];
   startRealtime: () => () => void;
 }>()({
   loader: async ({ context }) => {

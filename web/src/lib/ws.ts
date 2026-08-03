@@ -1,7 +1,14 @@
+import type {
+  ControlSurfaceWebSocketServerEvent,
+  WebSocketClientMessageEvent,
+  WebSocketClientPingEvent,
+  WebSocketClientSubscribeEvent,
+  WebSocketClientUnsubscribeEvent,
+} from "../../../src/contracts/websocket.ts";
 import type { ControlSurfaceSettings } from "./api";
-import type { ConnectionState, WsMessage } from "./types";
+import type { ConnectionState } from "./types";
 
-type WsSubscriber = (message: WsMessage) => void;
+type WsSubscriber = (message: ControlSurfaceWebSocketServerEvent) => void;
 type ConnectionSubscriber = (state: ConnectionState) => void;
 type SessionSubscription = { piSessionId: string; eventTypes?: string[] };
 
@@ -74,8 +81,8 @@ export class FlitterbotWsClient {
     this.socket.onmessage = (event) => {
       this.resetHeartbeatTimeout();
       try {
-        const message = JSON.parse(event.data as string) as WsMessage;
-        if ((message as { type: string }).type === "pong") return;
+        const message = JSON.parse(event.data as string) as ControlSurfaceWebSocketServerEvent;
+        if (message.type === "pong") return;
         for (const fn of this.subscribers) fn(message);
       } catch {}
     };
@@ -165,7 +172,8 @@ export class FlitterbotWsClient {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify({ type: "ping" }));
+        const ping: WebSocketClientPingEvent = { type: "ping" };
+        this.socket.send(JSON.stringify(ping));
         if (!this.heartbeatTimeout) {
           this.heartbeatTimeout = setTimeout(() => {
             this.heartbeatTimeout = null;
@@ -203,7 +211,8 @@ export class FlitterbotWsClient {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
           this.reconnect();
         } else {
-          this.socket.send(JSON.stringify({ type: "ping" }));
+          const ping: WebSocketClientPingEvent = { type: "ping" };
+          this.socket.send(JSON.stringify(ping));
           if (!this.heartbeatTimeout) {
             this.heartbeatTimeout = setTimeout(() => {
               this.heartbeatTimeout = null;
@@ -226,20 +235,17 @@ export class FlitterbotWsClient {
 
   async sendMessage(
     text: string,
-    deliveryMode: string,
-    options?: {
-      images?: Array<{ data: string; mimeType: string }>;
-      targetPiSessionId?: string;
-      clientMessageId?: string;
-    },
+    options?: Pick<WebSocketClientMessageEvent, "images" | "targetPiSessionId" | "clientMessageId">,
   ): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
-    const payload: Record<string, unknown> = { type: "message", text, deliveryMode };
-    if (options?.images?.length) payload.images = options.images;
-    if (options?.targetPiSessionId) payload.targetPiSessionId = options.targetPiSessionId;
-    if (options?.clientMessageId) payload.clientMessageId = options.clientMessageId;
+    const payload: WebSocketClientMessageEvent = {
+      type: "message",
+      text,
+      deliveryMode: "followUp",
+      ...options,
+    };
     this.socket.send(JSON.stringify(payload));
   }
 
@@ -297,14 +303,18 @@ export class FlitterbotWsClient {
 
   private sendSubscribe(piSessionId: string, eventTypes?: string[]) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const payload: Record<string, unknown> = { type: "subscribe", piSessionId };
-    if (eventTypes && eventTypes.length > 0) payload.eventTypes = eventTypes;
+    const payload: WebSocketClientSubscribeEvent = {
+      type: "subscribe",
+      piSessionId,
+      ...(eventTypes?.length ? { eventTypes } : {}),
+    };
     this.socket.send(JSON.stringify(payload));
   }
 
   private sendUnsubscribe(piSessionId: string) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    this.socket.send(JSON.stringify({ type: "unsubscribe", piSessionId }));
+    const payload: WebSocketClientUnsubscribeEvent = { type: "unsubscribe", piSessionId };
+    this.socket.send(JSON.stringify(payload));
   }
 }
 

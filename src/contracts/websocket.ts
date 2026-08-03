@@ -91,24 +91,22 @@ export interface MessageEndWebSocketEvent {
 
 export interface ToolExecutionStartWebSocketEvent {
   type: "tool_execution_start";
-  piSessionId?: string;
-  tool?: string;
-  toolUseId?: string;
-  args?: unknown;
+  piSessionId: string;
+  tool: string;
+  toolUseId: string;
+  args: unknown;
   displayArgs?: unknown;
-  timestamp?: string;
-  event?: unknown;
+  timestamp: string;
 }
 
 export interface ToolExecutionEndWebSocketEvent {
   type: "tool_execution_end";
-  piSessionId?: string;
-  tool?: string;
-  toolUseId?: string;
-  result?: unknown;
-  isError?: boolean;
-  timestamp?: string;
-  event?: unknown;
+  piSessionId: string;
+  tool: string;
+  toolUseId: string;
+  result: unknown;
+  isError: boolean;
+  timestamp: string;
 }
 
 export interface ThinkingStartWebSocketEvent {
@@ -130,21 +128,12 @@ export interface ThinkingEndWebSocketEvent {
   messageId: string;
 }
 
-export interface ToolCallStartWebSocketEvent {
-  type: "toolcall_start";
-  piSessionId?: string;
-  contentIndex: number;
-  toolName?: string;
-  toolUseId?: string;
-}
-
 export interface ToolExecutionUpdateWebSocketEvent {
   type: "tool_execution_update";
-  piSessionId?: string;
-  toolUseId?: string;
-  partialResult?: unknown;
-  timestamp?: string;
-  event?: unknown;
+  piSessionId: string;
+  toolUseId: string;
+  partialResult: unknown;
+  timestamp: string;
 }
 
 export interface ToolResultWebSocketEvent {
@@ -155,9 +144,8 @@ export interface ToolResultWebSocketEvent {
 
 export interface TurnEndWebSocketEvent {
   type: "turn_end";
-  piSessionId?: string;
-  event?: unknown;
-  timestamp?: string;
+  piSessionId: string;
+  timestamp: string;
 }
 
 export interface StreamSurfacedWebSocketEvent {
@@ -263,7 +251,6 @@ export type ControlSurfaceWebSocketServerEvent =
   | ThinkingStartWebSocketEvent
   | ThinkingDeltaWebSocketEvent
   | ThinkingEndWebSocketEvent
-  | ToolCallStartWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionUpdateWebSocketEvent

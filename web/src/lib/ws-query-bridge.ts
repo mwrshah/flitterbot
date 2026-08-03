@@ -13,36 +13,10 @@ import type {
   ChatTimelineItem,
   ChatTimelineMessage,
   ChatTimelineTool,
-  ImageAttachment,
   JsonValue,
-  WsMessage,
 } from "~/lib/types";
 import { createId } from "~/lib/utils";
 import type { FlitterbotWsClient } from "~/lib/ws";
-
-type SendMessageOptions = {
-  images?: ImageAttachment[];
-  targetPiSessionId?: string;
-  clientMessageId?: string;
-};
-
-export type SendMessageFn = (text: string, options?: SendMessageOptions) => Promise<void>;
-
-export function createSendMessage(deps: { wsClient: FlitterbotWsClient }): SendMessageFn {
-  const { wsClient } = deps;
-  return async (text, options) => {
-    try {
-      await wsClient.sendMessage(text, "followUp", {
-        images: options?.images,
-        targetPiSessionId: options?.targetPiSessionId,
-        clientMessageId: options?.clientMessageId,
-      });
-    } catch (error) {
-      console.error("WS send failed (socket not open):", error);
-      throw error;
-    }
-  };
-}
 
 function appendTimelineItem(
   queryClient: QueryClient,
@@ -110,7 +84,7 @@ export function setupWsQueryBridge(deps: {
 }): () => void {
   const { queryClient, wsClient, router } = deps;
 
-  const unsubscribeMessages = wsClient.subscribe((message: WsMessage) => {
+  const unsubscribeMessages = wsClient.subscribe((message) => {
     const piSessionId =
       "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
 
@@ -189,10 +163,6 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "thinking_end") {
       streamingStore.setThinkingStreaming(piSessionId, false);
-      return;
-    }
-
-    if (message.type === "toolcall_start") {
       return;
     }
 
@@ -281,7 +251,6 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_update") {
-      if (!message.toolUseId) return;
       activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
@@ -291,7 +260,6 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_start") {
-      if (!message.toolUseId) return;
       activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
@@ -300,16 +268,10 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_end") {
-      const eventRecord =
-        message.event && typeof message.event === "object"
-          ? (message.event as Record<string, unknown>)
-          : undefined;
-      if (!message.toolUseId) return;
       activeToolStore.upsertTool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: false,
-        partialResult:
-          message.result ?? eventRecord?.result ?? eventRecord?.output ?? eventRecord?.toolResult,
+        partialResult: message.result,
         isError: message.isError,
       });
       return;

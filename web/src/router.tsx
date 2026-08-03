@@ -7,7 +7,7 @@ import { createFlitterbotApiClient } from "./lib/api";
 import { createSettingsStore } from "./lib/settings-store";
 import { FlitterbotWsClient } from "./lib/ws";
 import { createWsConnectionStore } from "./lib/ws-connection-store";
-import { createSendMessage, setupWsQueryBridge } from "./lib/ws-query-bridge";
+import { setupWsQueryBridge } from "./lib/ws-query-bridge";
 import { setupWsRouteSubscriptions } from "./lib/ws-route-subscriptions";
 import { routeTree } from "./routeTree.gen";
 
@@ -23,7 +23,7 @@ export function getRouter() {
   const apiClient = createFlitterbotApiClient(() => settingsStore.get());
   const wsClient = new FlitterbotWsClient(() => settingsStore.get());
   const wsConnectionStore = createWsConnectionStore(wsClient);
-  const sendMessage = createSendMessage({ wsClient });
+  const sendMessage = wsClient.sendMessage.bind(wsClient);
 
   const router = createRouter({
     routeTree,

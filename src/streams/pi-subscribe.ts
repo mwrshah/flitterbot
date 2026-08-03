@@ -1,109 +1,11 @@
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
-import type {
-  ChatTimelineMessage,
-  ControlSurfaceWebSocketServerEvent,
-  MessageEndWebSocketEvent,
-  StreamSurfacedWebSocketEvent,
-  ThinkingEndWebSocketEvent,
-  ThinkingStartWebSocketEvent,
-  ToolCallStartWebSocketEvent,
-  ToolExecutionEndWebSocketEvent,
-  ToolExecutionStartWebSocketEvent,
-  ToolExecutionUpdateWebSocketEvent,
-  ToolResultWebSocketEvent,
-  TurnEndWebSocketEvent,
-} from "../contracts/index.ts";
+import type { ChatTimelineMessage } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { parseUsage, toolResultMessageToTimelineItem } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 import type { ToolDisplayContextCache } from "./tool-display.ts";
-
-type PiSessionSubscriptionEvent =
-  | {
-      type: "message_start";
-      message?: unknown;
-      [key: string]: unknown;
-    }
-  | {
-      type: "message_update";
-      message?: unknown;
-      assistantMessageEvent?: {
-        type?: string;
-        delta?: string;
-        contentIndex?: number;
-      };
-    }
-  | {
-      type: "message_end";
-      message?: unknown;
-    }
-  | {
-      type: "tool_execution_start";
-      toolName?: string;
-      toolCallId?: string;
-      parameters?: unknown;
-      args?: unknown;
-      [key: string]: unknown;
-    }
-  | {
-      type: "tool_execution_end";
-      toolName?: string;
-      toolCallId?: string;
-      result?: unknown;
-      isError?: boolean;
-      [key: string]: unknown;
-    }
-  | {
-      type: "tool_execution_update";
-      toolName?: string;
-      toolCallId?: string;
-      partialResult?: unknown;
-      [key: string]: unknown;
-    }
-  | {
-      type: "turn_start";
-      [key: string]: unknown;
-    }
-  | {
-      type: "turn_end";
-      [key: string]: unknown;
-    }
-  | {
-      type: "agent_start";
-      [key: string]: unknown;
-    }
-  | {
-      type: "agent_end";
-      [key: string]: unknown;
-    }
-  | {
-      type: "compaction_start";
-      [key: string]: unknown;
-    }
-  | {
-      type: "compaction_end";
-      [key: string]: unknown;
-    }
-  | {
-      type: "auto_retry_start";
-      [key: string]: unknown;
-    }
-  | {
-      type: "auto_retry_end";
-      [key: string]: unknown;
-    }
-  | {
-      type: string;
-      [key: string]: unknown;
-    };
-
-type SubscribablePiSession = {
-  sessionId: string;
-  messages: Array<unknown>;
-  subscribe: (listener: (event: PiSessionSubscriptionEvent) => void) => () => void;
-  sessionManager: { getLeafId: () => string | null };
-};
 
 function hasPartialContent(partial: unknown): boolean {
   if (partial == null) return false;
@@ -113,23 +15,18 @@ function hasPartialContent(partial: unknown): boolean {
   return Object.keys(r).length > 0;
 }
 
-function broadcast(wsHub: WebSocketHub, payload: ControlSurfaceWebSocketServerEvent): void {
-  wsHub.broadcast(payload);
-}
-
 function broadcastSurfaced(
   wsHub: WebSocketHub,
   piSessionId: string,
   message: ChatTimelineMessage,
 ): void {
-  const payload: StreamSurfacedWebSocketEvent = {
+  wsHub.broadcast({
     type: "stream_surfaced",
     piSessionId,
     message,
     streamId: message.streamId,
     streamName: message.streamName,
-  };
-  broadcast(wsHub, payload);
+  });
 }
 
 type BroadcastRole = "user" | "assistant";
@@ -233,7 +130,7 @@ function extractTimestamp(message: unknown, fallback: string): string {
 }
 
 export function subscribeToPiSession(
-  session: SubscribablePiSession,
+  session: AgentSession,
   state: PiSessionState,
   blackboard: BlackboardDatabase,
   wsHub: WebSocketHub,
@@ -261,66 +158,42 @@ export function subscribeToPiSession(
         break;
       }
       case "message_update": {
-        const ame = event.assistantMessageEvent as
-          | { type?: string; delta?: string; contentIndex?: number }
-          | undefined;
-        if (!ame?.type) break;
+        const ame = event.assistantMessageEvent;
 
         if (
           ame.type === "text_delta" &&
           typeof ame.delta === "string" &&
           currentStreamingMessageId
         ) {
-          broadcast(wsHub, {
+          wsHub.broadcast({
             type: "text_delta",
             piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
         } else if (ame.type === "thinking_start" && currentStreamingMessageId) {
-          const payload: ThinkingStartWebSocketEvent = {
+          wsHub.broadcast({
             type: "thinking_start",
             piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
-          };
-          broadcast(wsHub, payload);
+          });
         } else if (
           ame.type === "thinking_delta" &&
           typeof ame.delta === "string" &&
           currentStreamingMessageId
         ) {
-          broadcast(wsHub, {
+          wsHub.broadcast({
             type: "thinking_delta",
             piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
             delta: ame.delta,
           });
         } else if (ame.type === "thinking_end" && currentStreamingMessageId) {
-          const payload: ThinkingEndWebSocketEvent = {
+          wsHub.broadcast({
             type: "thinking_end",
             piSessionId: session.sessionId,
             messageId: currentStreamingMessageId,
-          };
-          broadcast(wsHub, payload);
-        } else if (ame.type === "toolcall_start" && typeof ame.contentIndex === "number") {
-          let toolName: string | undefined;
-          let toolUseId: string | undefined;
-          const msg = event.message as
-            | { content?: Array<{ name?: string; id?: string }> }
-            | undefined;
-          const block = msg?.content?.[ame.contentIndex];
-          if (block) {
-            toolName = block.name;
-            toolUseId = block.id;
-          }
-          const payload: ToolCallStartWebSocketEvent = {
-            type: "toolcall_start",
-            piSessionId: session.sessionId,
-            contentIndex: ame.contentIndex,
-            toolName,
-            toolUseId,
-          };
-          broadcast(wsHub, payload);
+          });
         }
         break;
       }
@@ -343,12 +216,11 @@ export function subscribeToPiSession(
               capturedTimestamp,
             );
             if (item) {
-              const payload: ToolResultWebSocketEvent = {
+              wsHub.broadcast({
                 type: "tool_result",
                 piSessionId: session.sessionId,
                 item,
-              };
-              broadcast(wsHub, payload);
+              });
             }
           });
           break;
@@ -401,72 +273,64 @@ export function subscribeToPiSession(
             if (usage) {
               timelineMessage.usage = usage;
             }
-            const payload: MessageEndWebSocketEvent = {
+            wsHub.broadcast({
               type: "message_end",
               piSessionId: session.sessionId,
               message: { ...timelineMessage, intermediate: true },
               ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
-            };
-            broadcast(wsHub, payload);
+            });
             lastAssistantMessage = timelineMessage;
             messageEndFired = true;
           } else {
-            const payload: MessageEndWebSocketEvent = {
+            wsHub.broadcast({
               type: "message_end",
               piSessionId: session.sessionId,
               message: timelineMessage,
               ...(capturedClientMessageId ? { clientMessageId: capturedClientMessageId } : {}),
-            };
-            broadcast(wsHub, payload);
+            });
             broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
           }
         });
         break;
       }
       case "tool_execution_start": {
-        const args = event.args ?? event.parameters;
-        const toolName = event.toolName as string | undefined;
+        const args = event.args;
+        const toolName = event.toolName;
         const displayArgs = toolName
           ? toolDisplayCache.displayArgsForTool(session.sessionId, toolName, args)
           : undefined;
-        const payload: ToolExecutionStartWebSocketEvent = {
+        wsHub.broadcast({
           type: "tool_execution_start",
           piSessionId: session.sessionId,
           tool: toolName,
-          toolUseId: event.toolCallId as string | undefined,
+          toolUseId: event.toolCallId,
           args,
           ...(displayArgs ? { displayArgs } : {}),
           timestamp: now,
-          event,
-        };
-        broadcast(wsHub, payload);
+        });
         break;
       }
       case "tool_execution_end": {
-        const payload: ToolExecutionEndWebSocketEvent = {
+        wsHub.broadcast({
           type: "tool_execution_end",
           piSessionId: session.sessionId,
-          tool: event.toolName as string | undefined,
-          toolUseId: event.toolCallId as string | undefined,
+          tool: event.toolName,
+          toolUseId: event.toolCallId,
           result: event.result,
-          isError: event.isError as boolean | undefined,
+          isError: event.isError,
           timestamp: now,
-          event,
-        };
-        broadcast(wsHub, payload);
+        });
         break;
       }
       case "tool_execution_update": {
         if (!hasPartialContent(event.partialResult)) break;
-        const payload: ToolExecutionUpdateWebSocketEvent = {
+        wsHub.broadcast({
           type: "tool_execution_update",
           piSessionId: session.sessionId,
-          toolUseId: event.toolCallId as string | undefined,
+          toolUseId: event.toolCallId,
           partialResult: event.partialResult,
           timestamp: now,
-          event,
-        };
-        broadcast(wsHub, payload);
+        });
         break;
       }
       case "turn_start":
@@ -477,13 +341,11 @@ export function subscribeToPiSession(
         touchPiEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
 
-        const payload: TurnEndWebSocketEvent = {
+        wsHub.broadcast({
           type: "turn_end",
           piSessionId: session.sessionId,
           timestamp: now,
-          event,
-        };
-        broadcast(wsHub, payload);
+        });
         break;
       }
       case "agent_start":
@@ -493,7 +355,7 @@ export function subscribeToPiSession(
         break;
       case "agent_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
-        broadcast(wsHub, {
+        wsHub.broadcast({
           type: "agent_end",
           piSessionId: session.sessionId,
           ...(messageEndFired ? {} : { aborted: true }),
