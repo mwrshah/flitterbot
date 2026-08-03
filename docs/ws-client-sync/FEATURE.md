@@ -21,7 +21,7 @@ ws-query-bridge.ts ── routes WS events to the correct state layer
   ├─► Streaming Store (high-frequency deltas: text_delta, thinking_delta)
   │     • Plain Map<sessionId, text/thinking> — not React state
   │     • Lit web component reads imperatively via callback — zero React re-renders
-  │     • Cleared on message_end / turn_end / agent_end
+  │     • Cleared on message_end / turn_end / agent_end and active stream route changes
   │
   ├─► Active Tool Store (ephemeral tool_execution_start/update/end progress)
   │     • Plain Map<sessionId, toolUseId, partialResult> — not React state
@@ -188,6 +188,8 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 - `refetchOnMount: "always"` — every route mount triggers background refetch
 - WS reconnection — invalidates all `streams-history` queries
 - `agent_end` with `aborted: true` — invalidates the specific session's timeline
+
+**When the active stream route changes:** `setupWsRouteSubscriptions()` receives TanStack Router's `onResolved` event, clears the previous session's ephemeral streaming state, then swaps the server subscription. Navigation from the sidebar, shortcuts, redirects, and other router-driven paths therefore share the same cleanup contract.
 
 ## Re-render Budget
 
