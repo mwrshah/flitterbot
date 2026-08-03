@@ -15,6 +15,7 @@ const HOME = homedir();
 const FLITTERBOT_DIR = join(HOME, ".flitterbot");
 const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
 const SETTINGS = join(HOME, ".claude", "settings.json");
+const CODEX_HOOKS_FILE = join(HOME, ".codex", "hooks.json");
 const PLIST = join(HOME, "Library", "LaunchAgents", "com.flitterbot.scheduler.plist");
 const PLIST_LABEL = "com.flitterbot.scheduler";
 const SYSTEMD_USER_DIR = join(HOME, ".config", "systemd", "user");
@@ -182,6 +183,74 @@ function ensurePrereqs() {
 }
 
 async function uninstallHooks() {
+  await uninstallClaudeHooks();
+  await uninstallCodexHooks();
+}
+
+async function uninstallCodexHooks() {  // strip only flitterbot groups from ~/.codex/hooks.json
+  if (!existsSync(CODEX_HOOKS_FILE)) {
+    if (manifestTargetExists("~/.codex/hooks.json")) {
+      warn("~/.codex/hooks.json is missing. Clearing manifest hook entries.");
+      if (!DRY_RUN) manifestDeleteTarget("~/.codex/hooks.json");
+    }
+    return;
+  }
+
+  let hooksFile;
+  try { hooksFile = readJsonFile(CODEX_HOOKS_FILE); } catch {
+    error("~/.codex/hooks.json is malformed JSON. Aborting Codex hooks uninstall.");
+    process.exit(1);
+  }
+
+  const prefix = `${HOME}/.flitterbot/hooks/`;
+  const prefixNode = `node ${HOME}/.flitterbot/hooks/`;
+  const isFlitterbotGroup = (group) => (group.hooks || []).some((h) => {
+    const cmd = h.command || "";
+    return cmd.startsWith(prefix) || cmd.startsWith(prefixNode);
+  });
+
+  const filtered = { ...hooksFile };
+  if (filtered.hooks && typeof filtered.hooks === "object") {
+    const newHooks = {};
+    for (const [event, groups] of Object.entries(filtered.hooks)) {
+      if (!Array.isArray(groups)) continue;
+      const kept = groups.filter((g) => !isFlitterbotGroup(g));
+      if (kept.length > 0) newHooks[event] = kept;
+    }
+    if (Object.keys(newHooks).length > 0) filtered.hooks = newHooks;
+    else delete filtered.hooks;
+  }
+
+  if (canonicalJson(hooksFile) === canonicalJson(filtered)) {
+    info("Flitterbot Codex hook entries are already absent.");
+    if (!DRY_RUN) manifestDeleteTarget("~/.codex/hooks.json");
+    return;
+  }
+
+  info(`=== Hooks changes to ${CODEX_HOOKS_FILE} ===`);
+  console.log(diffText(
+    sortedPrettyJson(hooksFile) + "\n",
+    sortedPrettyJson(filtered) + "\n",
+  ));
+  info("");
+
+  if (await confirm()) {
+    if (!DRY_RUN) {
+      if (Object.keys(filtered).length === 0) {  // nothing left; drop the file
+        rmSync(CODEX_HOOKS_FILE, { force: true });
+        info("Removed empty ~/.codex/hooks.json.");
+      } else {
+        writeJsonFile(CODEX_HOOKS_FILE, filtered);
+        info("Codex hooks removed from ~/.codex/hooks.json.");
+      }
+      manifestDeleteTarget("~/.codex/hooks.json");
+    }
+  } else {
+    info("Skipped Codex hooks uninstall.");
+  }
+}
+
+async function uninstallClaudeHooks() {
   if (!existsSync(SETTINGS)) {
     if (manifestTargetExists("~/.claude/settings.json")) {
       warn("settings.json is missing. Clearing manifest hook entries.");

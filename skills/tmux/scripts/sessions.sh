@@ -6,6 +6,9 @@
 # Each session runs in its own terminal window (tiled by the WM).
 # NOTE: Callers must NEVER sleep/poll to wait for session completion — rely on user prompt or hook callback.
 # Subcommands and their arguments are documented in ../SKILL.md.
+# Harness (claude/codex) is chosen via --harness or config.json "harness" (default claude). Codex launches
+# with --yolo --dangerously-bypass-hook-trust; its "working" state is the "esc to interrupt" status line;
+# its session id is read from the newest ~/.codex rollout matching the pane cwd (not shown on screen).
 # ponytail: this duplicates TypeScript tmux UI detection; keep one implementation or generate one from the other.
 
 _generate_sessions() {
@@ -17,6 +20,18 @@ _generate_sessions() {
 }
 DEFAULT_SESSIONS="$(_generate_sessions)"
 SESSIONS="${TMUX2_SESSIONS:-$DEFAULT_SESSIONS}"
+
+CONFIG_PATH="${FLITTERBOT_CONFIG:-$HOME/.flitterbot/config.json}"
+
+_resolve_launch_harness() {
+  local explicit="$1"
+  if [ -n "$explicit" ]; then echo "$explicit"; return; fi
+  local h=""
+  if [ -f "$CONFIG_PATH" ]; then
+    h=$(sed -n 's/.*"harness"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_PATH" | head -1)
+  fi
+  echo "${h:-claude}"
+}
 
 is_valid_session() {
   local name="$1"
@@ -43,13 +58,19 @@ is_free() {
   ! pgrep -P "$pid" >/dev/null 2>&1
 }
 
-has_claude() {
+session_harness() {
   local s="$1"
   session_exists "$s" || return 1
   local pid
   pid=$(pane_pid "$s")
   [ -z "$pid" ] && return 1
-  pgrep -P "$pid" -x claude >/dev/null 2>&1
+  if pgrep -P "$pid" -x claude >/dev/null 2>&1; then echo "claude"; return 0; fi
+  if pgrep -P "$pid" -x codex  >/dev/null 2>&1; then echo "codex";  return 0; fi
+  return 1
+}
+
+has_agent() {
+  session_harness "$1" >/dev/null 2>&1
 }
 
 pane_idle_seconds() {
@@ -71,8 +92,8 @@ cmd_status() {
   for s in $SESSIONS; do
     if ! session_exists "$s"; then
       echo "$s: NOT RUNNING"
-    elif has_claude "$s"; then
-      echo "$s: BUSY (claude)"
+    elif has_agent "$s"; then
+      echo "$s: BUSY ($(session_harness "$s"))"
     elif ! is_free "$s"; then
       local pid cmd_name
       pid=$(pane_pid "$s")
@@ -84,9 +105,15 @@ cmd_status() {
   done
 }
 
-_claude_launch_cmd() {
-  local session="$1" stream_id="$2" pi_session_id="$3" args="$4"
-  local cmd="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id} claude --dangerously-skip-permissions"
+_agent_launch_cmd() {
+  local harness="$1" session="$2" stream_id="$3" pi_session_id="$4" args="$5"
+  local envp="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
+  local cmd
+  if [ "$harness" = "codex" ]; then
+    cmd="$envp codex --yolo --dangerously-bypass-hook-trust"
+  else
+    cmd="$envp claude --dangerously-skip-permissions"
+  fi
   if [ -n "$args" ]; then
     cmd="$cmd $args"
   fi
@@ -96,14 +123,18 @@ _claude_launch_cmd() {
 cmd_launch() {
   local stream_id="${FLITTERBOT_STREAM_ID:-}"
   local pi_session_id="${FLITTERBOT_PI_SESSION_ID:-}"
+  local harness_arg=""
   local remaining=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --stream-id) stream_id="$2"; shift 2 ;;
       --pi-session-id) pi_session_id="$2"; shift 2 ;;
+      --harness) harness_arg="$2"; shift 2 ;;
       *) remaining+=("$1"); shift ;;
     esac
   done
+  local harness
+  harness=$(_resolve_launch_harness "$harness_arg")
 
   local session="" dir="" args=""
   if [[ ${#remaining[@]} -gt 0 ]]; then
@@ -150,7 +181,7 @@ cmd_launch() {
     if [ -z "$session" ]; then
       local best="" best_idle=0
       for s in $SESSIONS; do
-        if has_claude "$s"; then
+        if has_agent "$s"; then
           local state
           state=$(_pane_ui_state "$s")
           if [ "$state" = "IDLE" ]; then
@@ -195,7 +226,7 @@ cmd_launch() {
     fi
 
     local cmd
-    cmd=$(_claude_launch_cmd "$session" "$stream_id" "$pi_session_id" "$args")
+    cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
     tmux send-keys -t "$session" "$cmd" Enter
     sleep "$SHELL_FORK_GRACE_SECONDS"
 
@@ -220,14 +251,14 @@ cmd_launch() {
     fi
 
     local cmd
-    cmd=$(_claude_launch_cmd "$session" "$stream_id" "$pi_session_id" "$args")
+    cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
     tmux send-keys -t "$session" "$cmd" Enter
   fi
 
   local launch_attempt
   for launch_attempt in $(seq 1 15); do
     sleep 1
-    if has_claude "$session"; then
+    if has_agent "$session"; then
       local ready_attempt
       for ready_attempt in $(seq 1 16); do
         local ui_state
@@ -260,11 +291,11 @@ cmd_quit() {
     echo "Session $session is already free"
     return 0
   fi
-  if has_claude "$session"; then
+  if has_agent "$session"; then
     tmux send-keys -t "$session" C-c
     sleep 0.5
     tmux send-keys -t "$session" C-c
-    echo "Quit Claude in session $session"
+    echo "Quit agent in session $session"
   else
     tmux send-keys -t "$session" C-c
     echo "Quit process in session $session"
@@ -293,6 +324,11 @@ cmd_send() {
 }
 
 _prep_input() {
+  if [ "$(session_harness "$1")" = "codex" ]; then
+    tmux send-keys -t "$1" C-u
+    sleep 0.1
+    return
+  fi
   tmux send-keys -t "$1" Escape
   sleep 0.1
   tmux send-keys -t "$1" C-l
@@ -343,7 +379,7 @@ cmd_message() {
   _prep_input "$session"
   tmux send-keys -t "$session" -l "$prompt"
   tmux send-keys -t "$session" Enter
-  echo "Sent prompt to Claude in session $session"
+  echo "Sent prompt to session $session"
 
   _qc_message_sent "$session"
 }
@@ -361,6 +397,20 @@ cmd_read() {
   tmux capture-pane -t "$session" -p
 }
 
+_codex_session_id() {
+  local session="$1" cwd base f
+  cwd=$(tmux display-message -t "$session" -p '#{pane_current_path}' 2>/dev/null)
+  base="$HOME/.codex/sessions"
+  f=$(ls -t "$base"/*/*/*/rollout-*.jsonl 2>/dev/null | while read -r file; do
+        if head -1 "$file" | grep -q "\"cwd\"[[:space:]]*:[[:space:]]*\"$cwd\""; then
+          echo "$file"; break
+        fi
+      done)
+  [ -z "$f" ] && f=$(ls -t "$base"/*/*/*/rollout-*.jsonl 2>/dev/null | head -1)
+  if [ -z "$f" ]; then echo "NOT_FOUND"; return 1; fi
+  echo "$f" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -1
+}
+
 cmd_session_id() {
   local session="$1"
   if [ -z "$session" ]; then
@@ -371,8 +421,12 @@ cmd_session_id() {
     echo "ERROR: Session $session does not exist"
     return 1
   fi
+  if [ "$(session_harness "$session")" = "codex" ]; then
+    _codex_session_id "$session"
+    return
+  fi
   local uuid
-  uuid=$(tmux capture-pane -t "$session" -p | tail -10 | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -1)
+  uuid=$(tmux capture-pane -t "$session" -p | tail -10 | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -1)
   if [ -n "$uuid" ]; then
     echo "$uuid"
   else
@@ -381,10 +435,25 @@ cmd_session_id() {
   fi
 }
 
+_codex_ui_state() {
+  local session="$1" attempt
+  for attempt in 1 2 3; do
+    if tmux capture-pane -t "$session" -p | grep -qi 'esc to interrupt'; then
+      echo "INFERRING"
+      return
+    fi
+    [ "$attempt" -lt 3 ] && sleep 0.15
+  done
+  echo "IDLE"
+}
+
 _pane_ui_state() {
   local session="$1"
-  if ! has_claude "$session"; then
-    echo "NO_CLAUDE"
+  local harness
+  harness=$(session_harness "$session") || { echo "NO_CLAUDE"; return; }
+
+  if [ "$harness" = "codex" ]; then
+    _codex_ui_state "$session"
     return
   fi
 
@@ -419,7 +488,7 @@ _state_line() {
   local state idle_secs idle_str
   if ! session_exists "$s"; then
     echo "$s: NOT RUNNING"
-  elif has_claude "$s"; then
+  elif has_agent "$s"; then
     state=$(_pane_ui_state "$s")
     if [ "$state" = "IDLE" ]; then
       idle_secs=$(pane_idle_seconds "$s")

@@ -18,6 +18,7 @@ const HOME = homedir();
 const FLITTERBOT_DIR = join(HOME, ".flitterbot");
 const MANIFEST = join(FLITTERBOT_DIR, "manifest.json");
 const SETTINGS = join(HOME, ".claude", "settings.json");
+const CODEX_HOOKS_FILE = join(HOME, ".codex", "hooks.json");
 const PLIST_DEST = join(HOME, "Library", "LaunchAgents", "com.flitterbot.scheduler.plist");
 const SYSTEMD_USER_DIR = join(HOME, ".config", "systemd", "user");
 const SYSTEMD_SERVICE_NAME = "flitterbot-scheduler.service";
@@ -176,6 +177,36 @@ async function confirm(prompt) {
 
 function commandExists(cmd) {
   try { execSync(`command -v ${cmd}`, { stdio: "pipe" }); return true; } catch { return false; }
+}
+
+async function promptHarness(currentValue) {  // asks A/B only when both agents present; else auto-picks
+  const hasClaude = commandExists("claude");
+  const hasCodex = commandExists("codex");
+
+  if (AUTO_YES || DRY_RUN) {
+    if (currentValue === "claude" || currentValue === "codex") return currentValue;
+    if (hasClaude) return "claude";
+    if (hasCodex) return "codex";
+    return "claude";
+  }
+
+  if (hasClaude && !hasCodex) { info("Only Claude found on PATH. Default harness: claude."); return "claude"; }
+  if (hasCodex && !hasClaude) { info("Only Codex found on PATH. Default harness: codex."); return "codex"; }
+  if (!hasClaude && !hasCodex) { warn("Neither claude nor codex on PATH. Defaulting harness to claude."); return "claude"; }
+
+  const dflt = currentValue === "codex" ? "codex" : "claude";
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    const hint = dflt === "claude" ? "[A/b]" : "[a/B]";
+    const q = `\nWhich agent should be the default harness?\n  A) Claude\n  B) Codex\nChoose ${hint}: `;
+    rl.question(q, (answer) => {
+      rl.close();
+      const a = answer.trim().toLowerCase();
+      if (a === "a" || a === "claude") return resolve("claude");
+      if (a === "b" || a === "codex") return resolve("codex");
+      resolve(dflt);
+    });
+  });
 }
 
 function generateToken() {
@@ -578,6 +609,8 @@ async function bootstrapConfig() {
   setDefault("sourceRoot", configAfter.projectRoot ?? projectRoot);
   setDefault("controlSurfaceCommand", commandHint);
 
+  configAfter.harness = await promptHarness(configBefore.harness);
+
   if (canonicalJson(configBefore) !== canonicalJson(configAfter)) {
     info("=== Runtime config changes ===");
     console.log(showJsonDiff(configPath, configAfter));
@@ -958,6 +991,19 @@ async function deployRuntimeFiles() {
 }
 
 async function installHooks() {
+  const hasClaude = commandExists("claude");
+  const hasCodex = commandExists("codex");
+  if (!hasClaude && !hasCodex) {
+    warn("Neither claude nor codex found on PATH. Skipping hook install.");
+    return;
+  }
+  if (hasClaude) await installClaudeHooks();
+  else info("claude not found on PATH. Skipping Claude hooks.");
+  if (hasCodex) await installCodexHooks();
+  else info("codex not found on PATH. Skipping Codex hooks.");
+}
+
+async function installClaudeHooks() {
   let settingsBefore = {};
   let beforeHash = "null";
   const prefix = `${HOOKS_DIR}/`;
@@ -1047,6 +1093,90 @@ async function installHooks() {
     if (existsSync(SETTINGS)) afterHash = sha256File(SETTINGS);
 
     manifestWriteTarget("~/.claude/settings.json", {
+      type: "json-merge",
+      modifications,
+      checksums: {
+        algorithm: "sha256",
+        file_before_install: beforeHash === "null" ? null : beforeHash,
+        file_after_install: afterHash === "null" ? null : afterHash,
+      },
+    });
+  }
+}
+
+async function installCodexHooks() {  // writes ~/.codex/hooks.json: { hooks: { <Event>: [group] } }
+  let before = {};
+  let beforeHash = "null";
+  if (existsSync(CODEX_HOOKS_FILE)) {
+    try { before = readJsonFile(CODEX_HOOKS_FILE); } catch {
+      error("~/.codex/hooks.json is malformed JSON. Aborting.");
+      process.exit(1);
+    }
+    beforeHash = sha256File(CODEX_HOOKS_FILE);
+  }
+
+  const prefix = `${HOOKS_DIR}/`;
+  const prefixNode = `node ${HOOKS_DIR}/`;
+  const isFlitterbotGroup = (group) => (group.hooks || []).some((h) => {
+    const cmd = h.command || "";
+    return cmd.startsWith(prefix) || cmd.startsWith(prefixNode);
+  });
+
+  const current = { ...before };
+  if (!current.hooks || typeof current.hooks !== "object") current.hooks = {};
+
+  let changes = false;
+  const modifications = [];
+  for (const { event, arg } of HOOKS) {
+    const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg}`;
+    const desiredGroup = {
+      matcher: "",
+      hooks: [{ type: "command", command: hookCmd, timeout: 15 }],  // no async: codex skips async hooks
+    };
+
+    const groups = current.hooks[event] || [];
+    const flitterbotGroups = groups.filter(isFlitterbotGroup);
+    const identicalGroups = flitterbotGroups.filter((g) => canonicalJson(g) === canonicalJson(desiredGroup));
+
+    if (flitterbotGroups.length !== 1 || identicalGroups.length !== 1) {
+      const nonFlitterbot = groups.filter((g) => !isFlitterbotGroup(g));
+      current.hooks[event] = [...nonFlitterbot, desiredGroup];
+      changes = true;
+    }
+
+    modifications.push({
+      id: `codex-hook:${event}`,
+      action: "append",
+      content: desiredGroup,
+      content_sha256: sha256Text(canonicalJson(desiredGroup)),
+    });
+  }
+
+  if (Object.keys(current.hooks).length === 0) delete current.hooks;
+
+  if (!changes && existsSync(CODEX_HOOKS_FILE)) {
+    info("Codex hooks already installed. No changes needed.");
+  } else {
+    info(`=== Hook changes to ${CODEX_HOOKS_FILE} ===`);
+    console.log(showJsonDiff(CODEX_HOOKS_FILE, current));
+    info("");
+
+    if (await confirm()) {
+      if (!DRY_RUN) {
+        mkdirSync(dirname(CODEX_HOOKS_FILE), { recursive: true });
+        writeJsonFile(CODEX_HOOKS_FILE, current);
+      }
+    } else {
+      info("Skipped Codex hooks install.");
+      return;
+    }
+  }
+
+  if (!DRY_RUN) {
+    let afterHash = beforeHash;
+    if (existsSync(CODEX_HOOKS_FILE)) afterHash = sha256File(CODEX_HOOKS_FILE);
+
+    manifestWriteTarget("~/.codex/hooks.json", {
       type: "json-merge",
       modifications,
       checksums: {
