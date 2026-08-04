@@ -112,7 +112,7 @@ cmd_status() {
 
 _agent_launch_cmd() {
   local harness="$1" session="$2" stream_id="$3" pi_session_id="$4" args="$5"
-  local envp="env -u CLAUDECODE -u ANTHROPIC_API_KEY FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_HARNESS=$harness FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
+  local envp="env -u CLAUDECODE FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_HARNESS=$harness FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
   local cmd
   if [ "$harness" = "codex" ]; then
     cmd="$envp codex --yolo --dangerously-bypass-hook-trust"
