@@ -1,4 +1,3 @@
-import type { DeliveryMode } from "./control-surface-api.ts";
 import type {
   ChatTimelineMessage,
   ChatTimelineTool,
@@ -11,7 +10,6 @@ export const CONTROL_SURFACE_WS_PATH = "/ws";
 export interface WebSocketClientMessageEvent {
   type: "message";
   text: string;
-  deliveryMode?: DeliveryMode;
   images?: ImageAttachment[];
   targetPiSessionId?: string;
   modelId?: string;
@@ -51,7 +49,6 @@ type QueuedTurnSummary = {
   metadata?: Record<string, unknown>;
   receivedAt: string;
   webClientId?: string;
-  deliveryMode?: DeliveryMode;
 };
 
 export interface QueueItemStartWebSocketEvent {

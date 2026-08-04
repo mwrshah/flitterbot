@@ -3,7 +3,6 @@ import { getActivePiSessionId, getStreamByName } from "../blackboard/query-strea
 import { classifyMessage } from "../classifier/classify.ts";
 import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type {
-  DeliveryMode,
   MessageMetadata,
   MessageRequest,
   MessageResponse,
@@ -29,7 +28,6 @@ export async function handleMessageRoute(
   }
 
   const source = normalizeSource(body.source);
-  const deliveryMode: DeliveryMode = body.deliveryMode === "steer" ? "steer" : "followUp";
   const formatted = formatInboundMessage(body.text, source, body.metadata);
 
   let streamMeta: StreamRoutingMeta = {};
@@ -52,7 +50,6 @@ export async function handleMessageRoute(
     text: formatted,
     source,
     metadata: { ...body.metadata, ...streamMeta },
-    deliveryMode,
     images: Array.isArray(body.images) ? body.images : undefined,
   });
 

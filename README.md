@@ -30,8 +30,8 @@ Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 Runtime tuning: edit `~/.flitterbot/config.json` — keys are self-describing. The user-facing prompt knobs are:
 
 - `defaultAgentFirstMessage` — first instruction queued when the default agent starts.
-- `newStreamFirstMessageFooter` — footer appended to the first prompt sent to every new stream orchestrator.
-- `tmuxEnabled` — include tmux sub-agent orchestration instructions in orchestrator prompts.
+- `tmuxBootstrapMessage` — optional setup text included in a new stream's first prompt when tmux is enabled.
+- `tmuxEnabled` — enable tmux sub-agent orchestration and delivery of `tmuxBootstrapMessage`. The message may remain populated while tmux is disabled.
 - `extraSkillPaths` — additional skill directories loaded after bundled Flitterbot skills.
 - `learningsNotePath` — Markdown document used by the bundled `learnings` skill.
 

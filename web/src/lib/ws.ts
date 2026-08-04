@@ -243,7 +243,6 @@ export class FlitterbotWsClient {
     const payload: WebSocketClientMessageEvent = {
       type: "message",
       text,
-      deliveryMode: "followUp",
       ...options,
     };
     this.socket.send(JSON.stringify(payload));

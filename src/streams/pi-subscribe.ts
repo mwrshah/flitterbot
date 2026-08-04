@@ -138,6 +138,8 @@ export function subscribeToPiSession(
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
+  onTurnEnd?: () => void,
+  onAgentStart?: () => void,
 ): () => void {
   let streamingKeyCounter = session.messages.length;
   let currentStreamingMessageId: string | null = null;
@@ -231,7 +233,7 @@ export function subscribeToPiSession(
         const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
         if (!role || (!content && blocks.length === 0)) break;
 
-        const currentItem = role === "user" ? state.getSnapshot().currentItem : undefined;
+        const currentItem = role === "user" ? state.takeUserMessageItem() : undefined;
         const capturedSource = currentItem?.source;
         const capturedStreamId = currentItem?.streamId ?? sessionStreamId ?? undefined;
         const capturedStreamName = currentItem?.streamName ?? sessionStreamName ?? undefined;
@@ -340,6 +342,7 @@ export function subscribeToPiSession(
       case "turn_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
+        onTurnEnd?.();
 
         wsHub.broadcast({
           type: "turn_end",
@@ -350,6 +353,7 @@ export function subscribeToPiSession(
       }
       case "agent_start":
         touchPiEvent(blackboard, session.sessionId, now, "active");
+        onAgentStart?.();
         lastAssistantMessage = null;
         messageEndFired = false;
         break;

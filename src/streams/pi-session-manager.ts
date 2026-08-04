@@ -47,6 +47,7 @@ export interface ManagedPiSession {
 export type ProcessQueueItemCallback = (
   managed: ManagedPiSession,
   item: QueueItem,
+  steered?: boolean,
 ) => Promise<void>;
 
 function rewriteSessionHeaderCwd(sessionFile: string, cwd: string): string | undefined {
@@ -437,6 +438,8 @@ export class PiSessionManager {
           this.destroyStreamSession(managed.streamId, "close_stream");
         }
       },
+      () => managed.queue.steerPendingHooks(),
+      () => managed.queue.enableSteering(),
     );
 
     this.toolDisplayCache.invalidatePiSession(managed.piSessionId);
@@ -575,9 +578,15 @@ export class PiSessionManager {
     streamName: string,
     streamId: string,
     agentMessage?: string,
-    footer?: string,
+    bootstrapMessage?: string,
   ): string {
-    return formatStreamPrompt([currentMessage], streamName, streamId, agentMessage, footer);
+    return formatStreamPrompt(
+      [currentMessage],
+      streamName,
+      streamId,
+      agentMessage,
+      bootstrapMessage,
+    );
   }
 
   private logResourceMessages(role: string, messages: string[]): void {
@@ -617,6 +626,8 @@ export class PiSessionManager {
     const processCallback = this.processCallback;
     managed.queue = new TurnQueue({
       process: (item) => processCallback(managed, item),
+      steer: (item) => processCallback(managed, item, true),
+      canSteer: () => managed.runtime?.session.isStreaming ?? false,
       onItemStart: (item) => {
         state.setBusy(true, item);
         this.wsHub.broadcast({
@@ -631,13 +642,15 @@ export class PiSessionManager {
           ...(streamId ? { streamId } : {}),
         });
       },
-      onItemEnd: (item, error) => {
-        state.setBusy(false);
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi",
-          timestamp: new Date().toISOString(),
-        });
+      onItemEnd: (item, error, steered) => {
+        if (!steered) {
+          state.setBusy(false);
+          this.wsHub.broadcast({
+            type: "status_changed",
+            subsystem: "pi",
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         if (error) {
           const apiErr = error instanceof Error ? (error as ApiError) : undefined;
@@ -647,7 +660,7 @@ export class PiSessionManager {
           this.log(
             `queue item ${item.id} failed (${managed.role}${streamId ? ` stream=${streamId}` : ""}): ${detail}`,
           );
-          if (managed.role !== "default" && streamId) {
+          if (!steered && managed.role !== "default" && streamId) {
             this.destroyStreamSession(streamId, "crashed");
           }
         }
@@ -681,6 +694,8 @@ export class PiSessionManager {
           this.destroyStreamSession(managed.streamId, "close_stream");
         }
       },
+      () => managed.queue.steerPendingHooks(),
+      () => managed.queue.enableSteering(),
     );
   }
 

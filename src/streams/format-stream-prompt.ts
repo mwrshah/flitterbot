@@ -8,12 +8,19 @@ export function stripInjectedDatetimeBlocks(text: string): string {
   return text.replace(LEADING_DATETIME_BLOCK_RE, "").replace(TRAILING_DATETIME_BLOCK_RE, "");
 }
 
+export function resolveTmuxBootstrapMessage(
+  tmuxEnabled: boolean,
+  tmuxBootstrapMessage: string,
+): string | undefined {
+  return tmuxEnabled ? tmuxBootstrapMessage : undefined;
+}
+
 export function formatStreamPrompt(
   messages: string[],
   _streamName: string,
   _streamId: string,
   agentMessage?: string,
-  footer?: string,
+  bootstrapMessage?: string,
 ): string {
   let body = messages[0] ?? "";
 
@@ -33,9 +40,11 @@ export function formatStreamPrompt(
     agentSection = `\n\nAdditional context:\n${agentMessage}`;
   }
 
-  const footerSection = footer?.trim() ? `\n---\nStream setup:\n${footer.trim()}` : "";
+  const bootstrapSection = bootstrapMessage?.trim()
+    ? `\n---\nStream setup:\n${bootstrapMessage.trim()}`
+    : "";
 
   const datetime = formatDatetimeBlock();
 
-  return `${body}${agentSection}${footerSection}\n\n${datetime}`;
+  return `${body}${agentSection}${bootstrapSection}\n\n${datetime}`;
 }
