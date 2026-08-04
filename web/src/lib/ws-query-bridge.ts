@@ -1,81 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { activeToolStore } from "~/lib/active-tool-store";
+import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
-import {
-  appendItemToPage,
-  commitMessageEndToPage,
-  updateNewestHistoryPage,
-} from "~/lib/history-cache";
-import { streamingStore } from "~/lib/streaming-store";
-import type {
-  ChatTimelineItem,
-  ChatTimelineMessage,
-  ChatTimelineTool,
-  JsonValue,
-} from "~/lib/types";
-import { createId } from "~/lib/utils";
+import type { ChatTimelineMessage, ChatTimelineTool, JsonValue } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
-
-function appendTimelineItem(
-  queryClient: QueryClient,
-  sessionId: string,
-  item: ChatTimelineItem,
-  surface: "agent" | "input" = "agent",
-) {
-  if (surface === "input") {
-    queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
-      const items = old ?? [];
-
-      if (item.kind === "message") {
-        const msg = item as ChatTimelineMessage;
-        const dupIdx = items.findIndex((existing) => {
-          if (existing.kind !== "message") return false;
-          const ex = existing as ChatTimelineMessage;
-          if (ex.id === msg.id) return true;
-          if (msg.serverMessageId && ex.serverMessageId === msg.serverMessageId) return true;
-          if (ex.role === msg.role && ex.content === msg.content) return true;
-          return false;
-        });
-        if (dupIdx >= 0) {
-          streamingUiDebug(
-            "[debug][ws-bridge] appendTimelineItem DEDUP surface-timeline: replacing idx=%d with id=%s role=%s",
-            dupIdx,
-            msg.id,
-            msg.role,
-          );
-          const updated = [...items];
-          updated[dupIdx] = item;
-          return updated;
-        }
-      }
-
-      return [...items, item];
-    });
-    return;
-  }
-
-  updateNewestHistoryPage(queryClient, sessionId, (items) => {
-    const next = appendItemToPage(items, item);
-    if (next === items) {
-      streamingUiDebug(
-        "[debug][ws-bridge] appendTimelineItem DEDUP skipped kind=%s id=%s session=%s",
-        item.kind,
-        item.id,
-        sessionId,
-      );
-      return items;
-    }
-    streamingUiDebug(
-      "[debug][ws-bridge] appendTimelineItem kind=%s → newest page length=%d session=%s",
-      item.kind,
-      next.length,
-      sessionId,
-    );
-    return next;
-  });
-}
 
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
@@ -105,35 +34,12 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    if (message.type === "history_rewritten") {
-      queryClient.invalidateQueries({
-        queryKey: ["streams-history", message.piSessionId],
-      });
-      return;
-    }
-
-    if (message.type === "message_ack") {
-      streamingUiDebug(
-        "[debug][ws-bridge] message_ack: adding optimistic entry smId=%s cacheSize=%d",
-        message.serverMessageId,
-        (queryClient.getQueryData<ChatTimelineItem[]>(["surface-timeline"]) ?? []).length,
-      );
-      queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => [
-        ...(old ?? []),
-        {
-          id: message.serverMessageId,
-          kind: "message" as const,
-          role: "user" as const,
-          content: message.text,
-          source: message.source,
-          serverMessageId: message.serverMessageId,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      return;
-    }
-
     if (message.type === "error") {
+      if (message.piSessionId) {
+        queryClient.invalidateQueries({
+          queryKey: conversationState.historyQueryKey(message.piSessionId),
+        });
+      }
       toast.error(message.message);
       return;
     }
@@ -146,23 +52,44 @@ export function setupWsQueryBridge(deps: {
 
     if (!piSessionId) return;
 
+    if (message.type === "conversation_reset") {
+      conversationState.reset(piSessionId, message.position);
+      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
+      return;
+    }
+
+    const observation = conversationState.observeEvent(piSessionId, message);
+    if (observation === "duplicate" || observation === "recovering") return;
+    if (observation === "gap") {
+      conversationState.clear(piSessionId);
+      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
+      wsClient.resumeSessionSubscription();
+      return;
+    }
+
+    if (message.type === "history_rewritten") {
+      conversationState.historyRewritten(piSessionId);
+      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
+      return;
+    }
+
     if (message.type === "text_delta") {
-      streamingStore.appendTextDelta(piSessionId, message.messageId, message.delta);
+      conversationState.textDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     if (message.type === "thinking_start") {
-      streamingStore.setThinkingStreaming(piSessionId, true, message.messageId);
+      conversationState.thinkingStart(piSessionId, message.messageId);
       return;
     }
 
     if (message.type === "thinking_delta") {
-      streamingStore.appendThinkingDelta(piSessionId, message.messageId, message.delta);
+      conversationState.thinkingDelta(piSessionId, message.messageId, message.delta);
       return;
     }
 
     if (message.type === "thinking_end") {
-      streamingStore.setThinkingStreaming(piSessionId, false);
+      conversationState.thinkingEnd(piSessionId, message.messageId);
       return;
     }
 
@@ -172,23 +99,20 @@ export function setupWsQueryBridge(deps: {
       const blocks = (msg as ChatTimelineMessage).blocks;
       const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
       const isUser = msg.role === "user";
-      const clientMessageId = message.clientMessageId;
 
       if (hasContent || message.toolCalls?.length) {
         const now = new Date().toISOString();
 
         const committed: ChatTimelineMessage | undefined = hasContent
-          ? isUser && clientMessageId
-            ? { ...msg, ...(blocks ? { blocks } : {}), clientMessageId }
-            : blocks
-              ? { ...msg, blocks }
-              : msg
+          ? blocks
+            ? { ...msg, blocks }
+            : msg
           : undefined;
 
         const toolItems: ChatTimelineTool[] = (message.toolCalls ?? []).map((tc) => ({
-          id: createId("tool"),
+          id: `tool-${tc.toolUseId}-start`,
           kind: "tool",
-          tool: tc.toolName ?? "tool",
+          tool: tc.toolName,
           phase: "start",
           toolUseId: tc.toolUseId,
           args: tc.args as JsonValue | undefined,
@@ -196,17 +120,16 @@ export function setupWsQueryBridge(deps: {
           createdAt: now,
         }));
 
-        updateNewestHistoryPage(queryClient, piSessionId, (items) =>
-          commitMessageEndToPage(items, {
-            ...(committed ? { committed } : {}),
-            ...(clientMessageId ? { clientMessageId } : {}),
-            isUser,
-            toolItems,
-          }),
+        conversationState.commitMessage(
+          queryClient,
+          piSessionId,
+          committed,
+          isUser ? msg.id : undefined,
+          toolItems,
         );
       }
 
-      streamingStore.clearSession(piSessionId);
+      conversationState.finishMessage(piSessionId);
       return;
     }
 
@@ -218,40 +141,12 @@ export function setupWsQueryBridge(deps: {
       };
       if (!surfacedMessage.content.trim()) return;
 
-      const smId = surfacedMessage.serverMessageId;
-      if (smId) {
-        queryClient.setQueryData<ChatTimelineItem[]>(["surface-timeline"], (old) => {
-          if (!old) {
-            streamingUiDebug(
-              "[debug][ws-bridge] stream_surfaced: no cache, creating fresh smId=%s",
-              smId,
-            );
-            return [surfacedMessage];
-          }
-          const idx = old.findIndex(
-            (item) =>
-              item.kind === "message" && (item as ChatTimelineMessage).serverMessageId === smId,
-          );
-          if (idx >= 0) {
-            const updated = [...old];
-            updated[idx] = surfacedMessage;
-            return updated;
-          }
-          return [...old, surfacedMessage];
-        });
-      } else {
-        streamingUiDebug(
-          "[debug][ws-bridge] stream_surfaced: no serverMessageId, appending via appendTimelineItem. surfacedId=%s role=%s",
-          surfacedMessage.id,
-          surfacedMessage.role,
-        );
-        appendTimelineItem(queryClient, piSessionId, surfacedMessage, "input");
-      }
+      conversationState.commitSurface(queryClient, surfacedMessage);
       return;
     }
 
     if (message.type === "tool_execution_update") {
-      activeToolStore.upsertTool(piSessionId, {
+      conversationState.tool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
         partialResult: message.partialResult,
@@ -260,7 +155,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_start") {
-      activeToolStore.upsertTool(piSessionId, {
+      conversationState.tool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: true,
       });
@@ -268,7 +163,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_end") {
-      activeToolStore.upsertTool(piSessionId, {
+      conversationState.tool(piSessionId, {
         toolUseId: message.toolUseId,
         pending: false,
         partialResult: message.result,
@@ -278,10 +173,10 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_result") {
-      appendTimelineItem(queryClient, piSessionId, message.item);
+      conversationState.appendLiveItem(queryClient, piSessionId, message.item);
 
       if (message.item.toolUseId) {
-        activeToolStore.dropTool(piSessionId, message.item.toolUseId);
+        conversationState.dropTool(piSessionId, message.item.toolUseId);
       }
       return;
     }
@@ -291,14 +186,13 @@ export function setupWsQueryBridge(deps: {
         "[debug][ws-bridge] turn_end: calling clearSession for session=%s",
         piSessionId,
       );
-      streamingStore.clearSession(piSessionId);
-      activeToolStore.clearSession(piSessionId);
+      conversationState.clear(piSessionId);
+      conversationState.settleTurn(queryClient, piSessionId);
       return;
     }
 
     if (message.type === "agent_end") {
-      streamingStore.clearSession(piSessionId);
-      activeToolStore.clearSession(piSessionId);
+      conversationState.clear(piSessionId);
       if (message.aborted) {
         queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
       }
@@ -315,7 +209,7 @@ export function setupWsQueryBridge(deps: {
     if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
       queryClient.invalidateQueries({ queryKey: ["status"] });
       queryClient.invalidateQueries({ queryKey: ["streams-history"] });
-      queryClient.invalidateQueries({ queryKey: ["surface-timeline"] });
+      queryClient.invalidateQueries({ queryKey: conversationState.surfaceQueryKey });
       router.invalidate();
     }
   });

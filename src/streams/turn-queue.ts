@@ -14,12 +14,11 @@ export type QueueItem = {
   streamId?: string;
   streamName?: string;
   serverMessageId?: string;
-  clientMessageId?: string;
 };
 
 export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.sender !== "user") return false;
-  if (item.source !== "web" && item.source !== "whatsapp") return false;
+  if (item.source !== "whatsapp") return false;
   if (item.images && item.images.length > 0) return false;
   return true;
 }
@@ -42,7 +41,6 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     if (it.metadata) Object.assign(metadata, it.metadata);
   }
   metadata.coalescedFrom = items.map((it) => it.id);
-  if (last.serverMessageId) metadata.serverMessageId = last.serverMessageId;
   return {
     id: `coalesced:${first.id}+${items.length - 1}`,
     source: first.source,
@@ -55,7 +53,6 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     streamId: first.streamId,
     streamName: first.streamName,
     serverMessageId: last.serverMessageId,
-    clientMessageId: last.clientMessageId,
   };
 }
 

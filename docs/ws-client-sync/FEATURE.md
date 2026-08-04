@@ -4,7 +4,7 @@ Canonical reference for how server-side SDK events reach the web UI and how clie
 
 ## Architecture Overview
 
-Four layers, four state paths, zero React re-renders during streaming, active tool progress, and message commit.
+Flitterbot uses one server identity boundary and one client conversation-state owner. Streaming and tool progress bypass React without becoming separate state authorities.
 
 ```
 PI SDK (Claude)
@@ -18,24 +18,15 @@ WebSocket transport
   ▼
 ws-query-bridge.ts ── routes WS events to the correct state layer
   │
-  ├─► Streaming Store (high-frequency deltas: text_delta, thinking_delta)
-  │     • Plain Map<sessionId, text/thinking> — not React state
+  ├─► Conversation State (one reducer and one per-session record)
+  │     • Streaming text/thinking and active tools share one owner
   │     • Lit web component reads imperatively via callback — zero React re-renders
-  │     • Cleared on message_end / turn_end / agent_end and active stream route changes
-  │
-  ├─► Active Tool Store (ephemeral tool_execution_start/update/end progress)
-  │     • Plain Map<sessionId, toolUseId, partialResult> — not React state
   │     • Lit tool cards update imperatively by toolUseId — zero React re-renders
-  │     • Cleared when canonical tool_result arrives or on turn_end/agent_end cleanup
-  │
-  ├─► Imperative Commit (message_end + tool_result)
-  │     • streamingStore.commitMessage() → ChatPanel onCommit → Lit commitStreaming()
-  │     • Converts timeline items to AgentMessages, appends only new items to Lit
-  │     • Lit's shouldUpdate() suppresses the redundant React catch-up render
+  │     • Streaming clears at message_end; tools clear at canonical result/turn end
   │
   └─► TanStack Query Cache (persistence layer: messages, tool calls)
         • Updated via queryClient.setQueryData() on canonical WS commits: message_end + tool_result
-        • Serves navigation, refetch, mergeTimelineItems reconciliation
+        • Serves navigation and canonical server snapshot replacement
         • React components subscribe via useQuery() but Lit's shouldUpdate prevents
           redundant re-renders when data was already committed imperatively
 ```
@@ -48,7 +39,7 @@ A complete turn: user sends message → assistant thinks → responds with text 
 
 ### 1. message_start (assistant)
 
-**Server:** Assigns ordinal message ID (`msg-N`), broadcasts `{type: "message_start", piSessionId, messageId}`.
+**Server:** Assigns a UUID owned by Flitterbot and writes it onto the Pi message object before Pi persistence. The same UUID is used by all deltas, the final live commit, and later history snapshots.
 
 **Frontend:** Adds "Thinking..." status pill. No state layer touched.
 
@@ -56,18 +47,18 @@ A complete turn: user sends message → assistant thinks → responds with text 
 
 **Server:** Broadcasts each as its own WS event with `piSessionId` and `messageId`.
 
-**Frontend → Streaming Store:**
-- `thinking_start` → `setThinkingStreaming(sid, true, msgId)` — pre-initializes entry, removes typing pill
-- `thinking_delta` → `appendThinkingDelta(sid, msgId, delta)` — accumulates text
-- `thinking_end` → `setThinkingStreaming(sid, false)`
+**Frontend → Conversation State:**
+- `thinking_start` opens the identified streaming record.
+- `thinking_delta` appends to that record.
+- `thinking_end` marks reasoning complete.
 
-Lit component renders thinking live via imperative callback. React sees nothing.
+A new `messageId` replaces the complete streaming record instead of appending to text from an earlier message. Lit renders through the conversation's single imperative subscriber. React sees nothing.
 
 ### 3. text_delta
 
 **Server:** Broadcasts `{type: "text_delta", piSessionId, messageId, delta}`.
 
-**Frontend → Streaming Store:** `appendTextDelta(sid, msgId, delta)`. Removes typing pill on first delta. Lit component renders live.
+**Frontend → Conversation State:** The reducer appends the delta only to the matching `messageId`. Lit renders the updated record through the imperative subscriber.
 
 ### 4. toolcall_start
 
@@ -84,47 +75,46 @@ This is the critical event. It commits assistant message content to both the Lit
    - `{type: "text"}` → `MessageBlock[]` + concatenated text string
    - `{type: "thinking"}` → `MessageBlock[]` (when non-empty)
    - `{type: "toolCall"}` → `ExtractedToolCall[]` (toolUseId, toolName, args)
-2. Constructs `ChatTimelineMessage` with `content` (text) and `blocks` (when thinking present)
-3. Broadcasts `{type: "message_end", piSessionId, message, toolCalls?}`
-4. Sets `messageEndFired = true` for abort detection
+2. Constructs `ChatTimelineMessage` with the Flitterbot ID and final content.
+3. Broadcasts the canonical content immediately, without waiting for Pi's append timing.
+4. After Pi persists the same identified message, broadcasts the same canonical ID enriched with `piEntryId`.
+5. If enrichment fails, emits a session-scoped recovery error; the client keeps the canonical content and refetches history.
 
 **Frontend (`ws-query-bridge.ts`):**
-1. ONE atomic `queryClient.setQueryData()` call that:
-   - Upserts the message by ID (replace if exists, append if new)
-   - Appends tool call start items from `message.toolCalls`, deduped by `toolUseId` (skips items where an active tool with the same `toolUseId` and `phase !== "end"` already exists — prevents duplicates when the cache already has tool starts from a prior server fetch)
-2. Imperative commit: `timelineItemsToAgentMessages(committedItems)` → `streamingStore.commitMessage()` → ChatPanel `onCommit` callback → `messageListRef.commitStreaming()` → Lit appends only new items
-3. `streamingStore.clearSession()` — clears streaming overlay
+1. `conversationState.commitMessage()` performs one Query-cache transaction.
+2. The transaction upserts the message and deterministic tool-start records strictly by canonical ID. The accepted web UUID is both the optimistic and canonical Flitterbot ID, so no identity swap or content matching occurs.
+3. `conversationState.finishMessage()` clears only the streaming overlay; active tools remain live.
 4. The `setQueryData` call persists data for navigation/refetch, but Lit's `shouldUpdate()` detects the data was already committed imperatively and returns `false` — net result: **0 React re-renders** for message_end
 
 ### 6. tool_execution_start
 
 **Server:** Broadcasts with `tool`, `toolUseId`, `args`, `timestamp`.
 
-**Frontend → Active Tool Store:** marks the tool as running in the ephemeral tool store. If the assistant message has already been committed, the matching `<tool-message>` element is updated imperatively in-place. 0 React re-renders.
+**Frontend → Conversation State:** marks the tool as running in the session reducer. If the assistant message has already been committed, the matching `<tool-message>` element is updated imperatively in-place. 0 React re-renders.
 
 ### 7. tool_execution_update
 
 **Server:** Broadcasts with `toolUseId` and `partialResult`.
 
-**Frontend → Active Tool Store:** merges `partialResult` into the ephemeral tool state and pushes it directly into the matching Lit tool card by `toolUseId`. 0 React re-renders.
+**Frontend → Conversation State:** merges `partialResult` into the identified tool state and pushes it directly into the matching Lit tool card by `toolUseId`. 0 React re-renders.
 
 ### 8. tool_execution_end
 
 **Server:** Broadcasts with `toolUseId`, `result`, `isError`.
 
-**Frontend → Active Tool Store:** updates the live tool card with the final streamed result, but does **not** flush durable timeline state from the WS payload. The websocket result is treated as provisional UI progress until the server canonicalizes the turn.
+**Frontend → Conversation State:** updates the live tool card with the final streamed result, but does **not** flush durable timeline state from the WS payload. The websocket result is treated as provisional UI progress until the server canonicalizes the turn.
 
 ### 9. tool_result — The Canonical Tool Commit Point
 
 **Server:** When `message_end` fires with `role === "toolResult"`, the server converts that message into the canonical `ChatTimelineTool { phase: "end" }` shape and broadcasts `{type: "tool_result", item}`.
 
-**Frontend:** `appendTimelineItem()` persists the canonical tool result into the Query cache, then `timelineItemsToAgentMessages([item])` → `streamingStore.commitToolResult()` → ChatPanel `onToolResultCommit` → `messageListRef.commitToolResult()` updates only the matching Lit tool card and suppresses the subsequent React catch-up render.
+**Frontend:** `conversationState.appendLiveItem()` upserts the canonical tool result by its deterministic ID and drops its ephemeral active-tool state.
 
 ### 10. turn_end
 
 **Server:** Broadcasts `{type: "turn_end", piSessionId}`.
 
-**Frontend:** `streamingStore.clearSession()` — safety-net cleanup for text/thinking overlays. Any still-live active tool state is also cleared.
+**Frontend:** `conversationState.clear()` clears the session's streaming and active-tool state.
 
 ### 11. agent_end
 
@@ -132,21 +122,21 @@ This is the critical event. It commits assistant message content to both the Lit
 
 **Frontend:**
 - Removes typing pill
-- Clears streaming store
+- Clears ephemeral conversation state
 - If `aborted`: invalidates timeline query → triggers refetch from server session file → 1 re-render
 - Normal: no cache update, no re-render (message_end already committed)
 
 ## Imperative Commit Path
 
-Four-layer architecture for getting data from WS events to the Lit component:
+The conversation owner exposes four paths to the Lit component:
 
-**1. Streaming Store (delta channel)** — High-frequency deltas (`text_delta`, `thinking_delta`) at ~30Hz. `streamingStore.appendTextDelta()` / `appendThinkingDelta()` accumulate text in a plain `Map`. The Lit component reads via `onStreamingDelta` callback and renders a streaming overlay. React sees nothing.
+**1. Conversation reducer (delta channel)** — High-frequency deltas (`text_delta`, `thinking_delta`) update the session's streaming fields. The single imperative subscriber renders the overlay. React sees nothing.
 
-**2. Active Tool Store (tool progress channel)** — `tool_execution_start` / `tool_execution_update` / `tool_execution_end` live in a plain `Map<sessionId, toolUseId, ActiveToolState>`. ChatPanel subscribes imperatively and forwards each update to `messageListRef.applyActiveToolState()`. `MessageList` keeps a `toolUseId -> <tool-message>` index and mutates only the matching tool card. React sees nothing.
+**2. Active tools (tool progress channel)** — `tool_execution_start` / `tool_execution_update` / `tool_execution_end` update the same per-session reducer record. ChatPanel's single subscriber forwards targeted updates to `messageListRef.applyActiveToolState()`.
 
-**3. Imperative Commit (message_end + tool_result)** — canonical server commits are pushed into the current Lit UI without going through a full React render cycle. For assistant/user `message_end`, `ws-query-bridge` builds `committedItems`, converts them to `AgentMessage[]`, then calls `streamingStore.commitMessage()` → ChatPanel `onCommit` → `messageListRef.commitStreaming()` → Lit `MessageList.commitStreaming()`. For canonical `tool_result`, `ws-query-bridge` converts the single timeline item into a `toolResult` AgentMessage and calls `streamingStore.commitToolResult()` → ChatPanel `onToolResultCommit` → `messageListRef.commitToolResult()` → Lit updates only the matching tool card. Both paths set `_committedTotal` so the subsequent React catch-up render is suppressed.
+**3. Live commits (`message_end` + `tool_result`)** — canonical events pass through the same conversation-state boundary into the newest Query page. IDs are deterministic, so commits require no content, server-ID, or tool-phase dedup heuristics.
 
-**4. Query Cache (persistence)** — `setQueryData` runs on canonical WS commits for persistence: `message_end` for assistant/user messages and `tool_result` for tool results. It remains the source of truth for navigation, refetch reconciliation (`mergeTimelineItems`), and server revalidation. React components subscribe via `useQuery()`, but the hot path never depends on React renders.
+**4. Query Cache (snapshot)** — Conversation state owns all Query writes. Refetched server snapshots replace cached snapshots canonically; unknown cached extras are not preserved.
 
 ## Tool Call Lifecycle & ID Matching
 
@@ -155,8 +145,8 @@ Four-layer architecture for getting data from WS events to the Lit component:
 | Event | Source | Action |
 |---|---|---|
 | `message_end` (toolCalls) | SDK content array | Creates tool item: `{toolUseId, phase: "start"}` |
-| `tool_execution_start` | SDK tool_execution_start | Marks matching active tool card as running in the active tool store |
-| `tool_execution_update` | SDK tool_execution_update | Merges `partialResult` into the active tool store and updates the matching tool card imperatively |
+| `tool_execution_start` | SDK tool_execution_start | Marks the matching tool card as running in the conversation reducer |
+| `tool_execution_update` | SDK tool_execution_update | Merges `partialResult` in the conversation reducer and updates the matching tool card imperatively |
 | `tool_execution_end` | SDK tool_execution_end | Updates the active tool card with the final streamed result only |
 | `tool_result` | `message_end(role="toolResult")` | Appends canonical `{toolUseId, phase: "end", result}` and commits it imperatively |
 | `turn_end` | SDK turn_end | Clears any remaining ephemeral state |
@@ -165,29 +155,66 @@ Four-layer architecture for getting data from WS events to the Lit component:
 
 Thinking traces flow through both state layers:
 
-1. **Live streaming** (streaming store): `thinking_start` → `thinking_delta(s)` → `thinking_end`. Lit component renders the expanding text via imperative callback. No React involvement.
+1. **Live streaming** (conversation reducer): `thinking_start` → `thinking_delta(s)` → `thinking_end`. Lit component renders the expanding text via imperative callback. No React involvement.
 
 2. **Commit** (Query cache): `message_end` carries `blocks: [{type: "thinking", thinking: "..."}, {type: "text", text: "..."}]` extracted from the SDK message. Committed atomically alongside text blocks in the single `setQueryData` call.
 
 3. **Persistence**: The SDK's in-memory `session.messages` array and the JSONL session file both contain the full content blocks including thinking. The server's history API (`readStreamsHistoryFromMessages` → `parseMessageContent`) extracts thinking blocks into the `ChatTimelineMessage.blocks` field.
 
-4. **Survival across route switches**: Server is source of truth. When navigating away and back, TanStack Query revalidates from the server. `mergeTimelineItems` reconciles WS-accumulated items with server data. Thinking blocks survive because the server always has them.
+4. **Survival across route switches**: Server is source of truth. When navigating away and back, TanStack Query accepts the canonical server snapshot. Thinking blocks survive because the server always has them.
 
-## Dedup & Revalidation
+## Ordered Replay, Snapshots, and Revalidation
 
-The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to reconcile server-fetched data with WS-accumulated cache on every refetch.
+### Stable conversation identity
 
-**How `mergeTimelineItems` works:**
+```ts
+type PersistedPiMessage = AgentMessage & { flitterbotMessageId: string }
+type ChatTimelineMessage = {
+  id: string                 // flitterbotMessageId: canonical UI identity
+  piEntryId: string          // Pi JSONL entry id: prune/fork persistence handle
+}
 
-1. Build a `serverIds` set from the fetched data: `id`, `serverMessageId`, and `toolUseId` values
-2. Filter the old cache for "extras" — items whose identity isn't in `serverIds`
-3. If no extras: return canonical server data (always prefer fresh content over cached snapshots — the ID-only equality check was removed because same IDs doesn't mean same content, e.g. cached version had incomplete thinking blocks from intermediate WS snapshots)
-4. If extras exist: return `[...serverData, ...extras]` (WS-accumulated items the server doesn't know about yet are preserved)
+message_start(message)
+  -> ensureFlitterbotMessageId(message)
+  -> stream deltas(message.id)
+  -> Pi appends { id: piEntryId, message: { flitterbotMessageId } }
+
+message_end(message)
+  -> broadcast timeline item { id: flitterbotMessageId }
+  -> resolve the persisted JSONL entry by flitterbotMessageId
+  -> broadcast the same item enriched with { piEntryId }
+
+history snapshot
+  -> parse JSONL entry
+  -> { id: message.flitterbotMessageId ?? piEntryId, piEntryId }
+```
+
+Legacy JSONL without `flitterbotMessageId` remains readable and uses its Pi entry ID for both identities. Pi entry IDs are never inferred from the current leaf.
+
+### Client state boundary
+
+```text
+<ChatPanel>
+  -> conversationState (one per-session owner)
+     -> snapshot reducer (server history + optimistic reconciliation)
+     -> live reducer (message_end + tool_result)
+     -> streaming overlay (imperative delta callback)
+     -> active tools (imperative keyed callback)
+  -> <MessageList> (rendered snapshot plus imperative hot-path updates)
+```
+
+TanStack Query stores paginated snapshots, but `conversation-state.ts` owns every snapshot, live, optimistic, streaming, tool, and surface mutation.
+
+Each replayable server event carries `{incarnation, sequence}`. The client rejects duplicate positions and detects gaps. On reconnect or route return, it subscribes after its last position. The server replays from one bounded global buffer. An expired cursor or changed runtime incarnation emits `conversation_reset`, clears ephemeral state, and refetches the authoritative JSONL snapshot.
+
+Snapshot replacement overlays only records explicitly tracked as pending optimistic or live commits. It never preserves arbitrary cache extras. Once a snapshot contains a canonical ID, the reducer removes that pending record.
 
 **When revalidation happens:**
-- `refetchOnMount: "always"` — every route mount triggers background refetch
-- WS reconnection — invalidates all `streams-history` queries
-- `agent_end` with `aborted: true` — invalidates the specific session's timeline
+- WebSocket reconnect;
+- replay gap, expired cursor, or runtime incarnation change;
+- `history_rewritten` after prune or compaction;
+- aborted generation;
+- persistence-enrichment failure.
 
 **When the active stream route changes:** `setupWsRouteSubscriptions()` receives TanStack Router's `onResolved` event, clears the previous session's ephemeral streaming state, then swaps the server subscription. Navigation from the sidebar, shortcuts, redirects, and other router-driven paths therefore share the same cleanup contract.
 
@@ -195,12 +222,12 @@ The `streamsHistoryQueryOptions` uses `structuralSharing: mergeTimelineItems` to
 
 | Event | setQueryData calls | React re-renders |
 |---|---|---|
-| text_delta | 0 | 0 (streaming store → Lit) |
-| thinking_delta | 0 | 0 (streaming store → Lit) |
+| text_delta | 0 | 0 (conversation reducer → Lit) |
+| thinking_delta | 0 | 0 (conversation reducer → Lit) |
 | message_end | 1 (message + tool calls atomic) + 1 imperative commit | 0 (Lit `shouldUpdate` suppresses React catch-up) |
-| tool_execution_start | 0 | 0 (active tool store → targeted Lit tool card) |
-| tool_execution_update | 0 | 0 (active tool store → targeted Lit tool card) |
-| tool_execution_end | 0 | 0 (active tool store → targeted Lit tool card) |
+| tool_execution_start | 0 | 0 (conversation reducer → targeted Lit tool card) |
+| tool_execution_update | 0 | 0 (conversation reducer → targeted Lit tool card) |
+| tool_execution_end | 0 | 0 (conversation reducer → targeted Lit tool card) |
 | tool_result | 1 (append canonical end item) + 1 imperative tool-result commit | 0 |
 | turn_end | 0 | 0 |
 | agent_end (normal) | 0 | 0 |
@@ -213,11 +240,11 @@ A typical assistant turn with thinking + text + 1 tool call: 0 React re-renders 
 | File | Role |
 |---|---|
 | `src/streams/pi-subscribe.ts` | Server: SDK event subscription → WS broadcast. `extractMessageBlocks()` extracts text, thinking, and tool calls. |
-| `src/contracts/websocket.ts` | WS event type contracts (shared between server and frontend types) |
+| `src/contracts/websocket.ts` | WS event identity, position, replay-resume, and reset contracts |
 | `src/streams/history.ts` | Server: parses SDK messages / JSONL session file → `ChatTimelineItem[]` for history API |
-| `web/src/lib/streaming-store.ts` | Frontend: imperative Map-based store for high-frequency text/thinking deltas + commit channels for message_end and canonical tool_result flushes |
-| `web/src/lib/active-tool-store.ts` | Frontend: imperative per-session store for live tool progress keyed by `toolUseId` |
-| `web/src/lib/ws-query-bridge.ts` | Frontend: routes WS events → streaming store, active tool store, or Query cache. Contains atomic message_end handler and canonical tool_result flush. |
-| `web/src/lib/queries.ts` | Frontend: TanStack Query options + `mergeTimelineItems` structuralSharing |
+| `web/src/lib/conversation-state.ts` | Frontend: sole per-session reducer/owner for snapshots, live commits, optimistic rows, streaming, and active tools. |
+| `src/ws/hub.ts` | Assigns monotonic per-session positions and serves bounded replay. |
+| `web/src/lib/ws-query-bridge.ts` | Translates ordered WS events into conversation-state actions. |
+| `web/src/lib/queries.ts` | Frontend: TanStack Query options with canonical snapshot replacement. |
 | `web/src/hooks/use-streams-chat.ts` | Frontend: React hook wiring timeline query to chat components |
 | `web/src/lib/types.ts` | Frontend: `WsMessage` union type, `ChatTimelineItem` types |

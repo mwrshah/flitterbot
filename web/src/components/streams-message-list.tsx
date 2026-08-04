@@ -14,8 +14,8 @@ import {
   useState,
 } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { ActiveToolState } from "~/lib/active-tool-store";
 import { getAgentMessageRowKeys, STREAMING_MESSAGE_ROW_KEY } from "~/lib/agent-message-rows";
+import type { ActiveToolState } from "~/lib/conversation-state";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList, MessageListVirtualState } from "~/pi-web-ui/chat-components";

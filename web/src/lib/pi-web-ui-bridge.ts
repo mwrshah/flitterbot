@@ -84,8 +84,8 @@ export function timelineToAgentMessages(
         content,
         timestamp: new Date(item.createdAt).getTime(),
         source,
-        _entryId: item.id,
-        _rowKey: item.clientMessageId ?? item.id,
+        ...(item.piEntryId ? { _entryId: item.piEntryId } : {}),
+        _rowKey: item.id,
         ...(item.compaction ? { _compaction: true } : {}),
       } as AgentMessage & {
         source: MessageSource;
@@ -129,7 +129,8 @@ export function timelineToAgentMessages(
         content,
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
-        _entryId: item.id,
+        ...(item.piEntryId ? { _entryId: item.piEntryId } : {}),
+        _rowKey: item.id,
       } as unknown as AgentMessage);
       continue;
     }
@@ -153,7 +154,8 @@ export function timelineToAgentMessages(
         content: [orphanCall],
         stopReason: "endTurn",
         timestamp: new Date(item.createdAt).getTime(),
-        _entryId: item.id,
+        ...(item.piEntryId ? { _entryId: item.piEntryId } : {}),
+        _rowKey: item.id,
       } as unknown as AgentMessage);
       continue;
     }

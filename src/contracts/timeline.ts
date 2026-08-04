@@ -31,6 +31,7 @@ export type TokenUsage = {
 
 export type ChatTimelineMessage = {
   id: string;
+  piEntryId?: string;
   kind: "message";
   role: "user" | "assistant" | "system";
   content: string;
@@ -42,14 +43,13 @@ export type ChatTimelineMessage = {
   streaming?: boolean;
   intermediate?: boolean;
   compaction?: boolean;
-  serverMessageId?: string;
-  clientMessageId?: string;
   usage?: TokenUsage;
   createdAt: string;
 };
 
 export type ChatTimelineTool = {
   id: string;
+  piEntryId?: string;
   kind: "tool";
   tool: string;
   phase: "start" | "update" | "end";

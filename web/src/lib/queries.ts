@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
-import { HISTORY_STALE_TIME, mergeHistoryPages, streamsHistoryQueryKey } from "~/lib/history-cache";
+import { conversationState } from "~/lib/conversation-state";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import type {
   ChatTimelineItem,
@@ -20,39 +20,6 @@ import {
   type StreamInfo,
 } from "~/server/streams";
 import { fetchUserConfig } from "~/server/user-config";
-
-function mergeTimelineItems(oldData: unknown, newData: unknown): unknown {
-  const prev = oldData as ChatTimelineItem[] | undefined;
-  const next = newData as ChatTimelineItem[];
-
-  if (!prev?.length) return next;
-
-  const serverIds = new Set<string>();
-  for (const item of next) {
-    serverIds.add(item.id);
-    const smId = (item as Record<string, unknown>).serverMessageId;
-    if (typeof smId === "string") serverIds.add(smId);
-    const cmId = (item as Record<string, unknown>).clientMessageId;
-    if (typeof cmId === "string") serverIds.add(cmId);
-    if (item.kind === "tool" && item.toolUseId) serverIds.add(item.toolUseId);
-  }
-
-  const extras = prev.filter((item) => {
-    if (serverIds.has(item.id)) return false;
-    const smId = (item as Record<string, unknown>).serverMessageId;
-    if (typeof smId === "string" && serverIds.has(smId)) return false;
-    const cmId = (item as Record<string, unknown>).clientMessageId;
-    if (typeof cmId === "string" && serverIds.has(cmId)) return false;
-    if (item.kind === "tool" && item.toolUseId && serverIds.has(item.toolUseId)) return false;
-    return true;
-  });
-
-  if (!extras.length) {
-    return replaceEqualDeep(prev, next);
-  }
-
-  return replaceEqualDeep(prev, [...next, ...extras]);
-}
 
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
@@ -77,7 +44,7 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
 
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
   return infiniteQueryOptions({
-    queryKey: streamsHistoryQueryKey(piSessionId),
+    queryKey: conversationState.historyQueryKey(piSessionId),
     queryFn: ({ pageParam }) =>
       fetchStreamsHistory({
         data: {
@@ -90,9 +57,9 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
     getNextPageParam: () => undefined,
     enabled: piSessionId !== undefined,
-    staleTime: HISTORY_STALE_TIME,
+    staleTime: conversationState.historyStaleTime,
     gcTime: 0,
-    structuralSharing: mergeHistoryPages,
+    structuralSharing: conversationState.snapshotReconciler(piSessionId ?? "default"),
   });
 }
 
@@ -140,11 +107,11 @@ export function userConfigQueryOptions() {
 
 export function surfaceTimelineQueryOptions() {
   return {
-    queryKey: ["surface-timeline"] as const,
+    queryKey: conversationState.surfaceQueryKey,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsInputHistory()) as ChatTimelineItem[],
     staleTime: 0, // WS writes reset dataUpdatedAt while viewing
-    structuralSharing: mergeTimelineItems,
+    structuralSharing: replaceEqualDeep,
   };
 }
 

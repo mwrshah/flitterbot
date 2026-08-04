@@ -1,5 +1,6 @@
 import type {
   ControlSurfaceWebSocketServerEvent,
+  ConversationEventPosition,
   WebSocketClientMessageEvent,
   WebSocketClientPingEvent,
   WebSocketClientSubscribeEvent,
@@ -26,6 +27,7 @@ export class FlitterbotWsClient {
   private subscribers = new Set<WsSubscriber>();
   private connectionSubscribers = new Set<ConnectionSubscriber>();
   private activeSessionSubscription: SessionSubscription | null = null;
+  private resumePositionFor?: (piSessionId: string) => ConversationEventPosition | undefined;
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -248,6 +250,12 @@ export class FlitterbotWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
+  setResumePositionProvider(
+    provider: ((piSessionId: string) => ConversationEventPosition | undefined) | undefined,
+  ): void {
+    this.resumePositionFor = provider;
+  }
+
   setSessionSubscription(piSessionId: string, eventTypes?: string[]): void {
     const next: SessionSubscription = {
       piSessionId,
@@ -278,6 +286,10 @@ export class FlitterbotWsClient {
     this.sendUnsubscribe(previous.piSessionId);
   }
 
+  resumeSessionSubscription(): void {
+    this.flushSessionSubscription();
+  }
+
   subscribe(fn: WsSubscriber): () => void {
     this.subscribers.add(fn);
     return () => {
@@ -302,10 +314,12 @@ export class FlitterbotWsClient {
 
   private sendSubscribe(piSessionId: string, eventTypes?: string[]) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const after = piSessionId === "*" ? undefined : this.resumePositionFor?.(piSessionId);
     const payload: WebSocketClientSubscribeEvent = {
       type: "subscribe",
       piSessionId,
       ...(eventTypes?.length ? { eventTypes } : {}),
+      ...(after ? { after } : {}),
     };
     this.socket.send(JSON.stringify(payload));
   }

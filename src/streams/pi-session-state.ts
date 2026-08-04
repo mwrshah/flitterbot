@@ -67,6 +67,10 @@ export class PiSessionState {
     return this.steeredItems.shift();
   }
 
+  peekUserMessageItem(): QueueItem | undefined {
+    return this.currentItemAwaitingUserMessage ? this.snapshot.currentItem : this.steeredItems[0];
+  }
+
   removeSteeredItem(item: QueueItem): void {
     const index = this.steeredItems.indexOf(item);
     if (index !== -1) this.steeredItems.splice(index, 1);

@@ -1,6 +1,6 @@
 import type { AnyRouter } from "@tanstack/react-router";
 import type { FlitterbotWsClient } from "~/lib/ws";
-import { streamingStore } from "./streaming-store.ts";
+import { conversationState } from "./conversation-state.ts";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
@@ -50,13 +50,14 @@ export function setupWsRouteSubscriptions(
   wsClient: FlitterbotWsClient,
 ): () => void {
   let activeTarget: SubscriptionTarget | null = null;
+  wsClient.setResumePositionProvider((piSessionId) => conversationState.position(piSessionId));
 
   const apply = () => {
     const nextTarget = resolveSubscriptionTarget(router);
     if (sameTarget(activeTarget, nextTarget)) return;
 
     if (activeTarget && activeTarget.piSessionId !== "*") {
-      streamingStore.clearSession(activeTarget.piSessionId);
+      conversationState.clear(activeTarget.piSessionId);
     }
     activeTarget = nextTarget;
 
@@ -73,5 +74,6 @@ export function setupWsRouteSubscriptions(
   return () => {
     unsubscribeRouter();
     wsClient.clearSessionSubscription();
+    wsClient.setResumePositionProvider(undefined);
   };
 }

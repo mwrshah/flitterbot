@@ -40,8 +40,8 @@ import {
   Search,
   SquareTerminal,
 } from "lucide";
-import type { ActiveToolState } from "~/lib/active-tool-store";
 import { getAgentMessageRowKeys, isRenderableAgentMessage } from "~/lib/agent-message-rows";
+import type { ActiveToolState } from "~/lib/conversation-state";
 import { renderSafeMarkdownHtml } from "~/lib/markdown-html";
 import { streamingPerf } from "~/lib/streaming-perf";
 

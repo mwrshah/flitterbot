@@ -3,6 +3,7 @@ import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type { ChatTimelineMessage } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
+import { ensureConversationMessageId, findConversationEntry } from "./conversation-identity.ts";
 import { parseUsage, toolResultMessageToTimelineItem } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 import type { ToolDisplayContextCache } from "./tool-display.ts";
@@ -27,6 +28,17 @@ function broadcastSurfaced(
     streamId: message.streamId,
     streamName: message.streamName,
   });
+}
+
+function reportMissingPersistedMessage(
+  wsHub: WebSocketHub,
+  piSessionId: string,
+  messageId: string | undefined,
+): void {
+  const detail = messageId ? ` for Flitterbot message ${messageId}` : " without a Flitterbot ID";
+  const message = `Pi persisted-message lookup failed${detail}`;
+  console.error("%s (piSessionId=%s)", message, piSessionId);
+  wsHub.broadcast({ type: "error", message, piSessionId });
 }
 
 type BroadcastRole = "user" | "assistant";
@@ -109,12 +121,6 @@ function extractMessageBlocks(message: unknown): {
   };
 }
 
-function _extractMessageId(message: unknown): string | undefined {
-  if (!message || typeof message !== "object") return undefined;
-  const id = (message as Record<string, unknown>).id;
-  return typeof id === "string" && id.trim() ? id : undefined;
-}
-
 function extractTimestamp(message: unknown, fallback: string): string {
   if (!message || typeof message !== "object") return fallback;
 
@@ -141,7 +147,6 @@ export function subscribeToPiSession(
   onTurnEnd?: () => void,
   onAgentStart?: () => void,
 ): () => void {
-  let streamingKeyCounter = session.messages.length;
   let currentStreamingMessageId: string | null = null;
 
   let lastAssistantMessage: ChatTimelineMessage | null = null;
@@ -153,9 +158,11 @@ export function subscribeToPiSession(
     switch (event.type) {
       case "message_start": {
         const role = extractMessageRole(event.message);
+        const preferredId =
+          role === "user" ? state.peekUserMessageItem()?.serverMessageId : undefined;
+        const messageId = ensureConversationMessageId(event.message, preferredId);
         if (role === "assistant") {
-          currentStreamingMessageId = `streaming-${streamingKeyCounter}`;
-          streamingKeyCounter += 1;
+          currentStreamingMessageId = messageId ?? null;
         }
         break;
       }
@@ -203,27 +210,41 @@ export function subscribeToPiSession(
         const anyRole = extractAnyMessageRole(event.message);
         if (!anyRole) break;
 
-        const capturedMessage = event.message;
-        const capturedTimestamp = extractTimestamp(event.message, now);
         const capturedRole = anyRole;
+        const preferredId =
+          capturedRole === "assistant"
+            ? (currentStreamingMessageId ?? undefined)
+            : capturedRole === "user"
+              ? state.peekUserMessageItem()?.serverMessageId
+              : undefined;
+        const capturedMessage = event.message;
+        const capturedMessageId = ensureConversationMessageId(capturedMessage, preferredId);
+        const capturedTimestamp = extractTimestamp(event.message, now);
         currentStreamingMessageId = null;
 
         if (capturedRole === "toolResult") {
+          if (!capturedMessageId) {
+            reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
+            break;
+          }
+          const liveItem = toolResultMessageToTimelineItem(capturedMessage, capturedTimestamp);
+          if (!liveItem) break;
+          wsHub.broadcast({
+            type: "tool_result",
+            piSessionId: session.sessionId,
+            item: liveItem,
+          });
           queueMicrotask(() => {
-            const entryId = session.sessionManager.getLeafId();
-            if (!entryId) return;
-            const item = toolResultMessageToTimelineItem(
-              capturedMessage,
-              entryId,
-              capturedTimestamp,
-            );
-            if (item) {
-              wsHub.broadcast({
-                type: "tool_result",
-                piSessionId: session.sessionId,
-                item,
-              });
+            const entry = findConversationEntry(session.sessionManager, capturedMessageId);
+            if (!entry) {
+              reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
+              return;
             }
+            wsHub.broadcast({
+              type: "tool_result",
+              piSessionId: session.sessionId,
+              item: { ...liveItem, piEntryId: entry.id },
+            });
           });
           break;
         }
@@ -231,14 +252,12 @@ export function subscribeToPiSession(
         const role =
           capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
         const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
-        if (!role || (!content && blocks.length === 0)) break;
+        if (!role || (!content && blocks.length === 0 && toolCalls.length === 0)) break;
 
         const currentItem = role === "user" ? state.takeUserMessageItem() : undefined;
         const capturedSource = currentItem?.source;
         const capturedStreamId = currentItem?.streamId ?? sessionStreamId ?? undefined;
         const capturedStreamName = currentItem?.streamName ?? sessionStreamName ?? undefined;
-        const capturedServerMessageId = currentItem?.serverMessageId;
-        const capturedClientMessageId = currentItem?.clientMessageId;
         const capturedHasThinking = blocks.some((b) => b.type === "thinking");
         const capturedBlocks = capturedHasThinking ? blocks : undefined;
         const enrichedToolCalls: ExtractedToolCall[] = toolCalls.map((tc) => {
@@ -251,47 +270,58 @@ export function subscribeToPiSession(
         });
         const capturedToolCalls = enrichedToolCalls.length > 0 ? enrichedToolCalls : undefined;
 
+        if (!capturedMessageId) {
+          reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
+          break;
+        }
+
+        const timelineMessage: ChatTimelineMessage = {
+          id: capturedMessageId,
+          kind: "message",
+          role,
+          content: content ?? "",
+          source: capturedSource,
+          streamId: capturedStreamId,
+          streamName: capturedStreamName,
+          createdAt: capturedTimestamp,
+        };
+        if (capturedBlocks) timelineMessage.blocks = capturedBlocks;
+        if (role === "assistant") {
+          const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
+          if (usage) timelineMessage.usage = usage;
+          wsHub.broadcast({
+            type: "message_end",
+            piSessionId: session.sessionId,
+            message: { ...timelineMessage, intermediate: true },
+            ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
+          });
+          lastAssistantMessage = timelineMessage;
+          messageEndFired = true;
+        } else {
+          wsHub.broadcast({
+            type: "message_end",
+            piSessionId: session.sessionId,
+            message: timelineMessage,
+          });
+          broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
+        }
+
         queueMicrotask(() => {
-          const entryId = session.sessionManager.getLeafId();
-          if (!entryId) return;
-
-          const timelineMessage: ChatTimelineMessage = {
-            id: entryId,
-            kind: "message",
-            role,
-            content: content ?? "",
-            source: capturedSource,
-            streamId: capturedStreamId,
-            streamName: capturedStreamName,
-            serverMessageId: capturedServerMessageId,
-            createdAt: capturedTimestamp,
-          };
-          if (capturedBlocks) {
-            timelineMessage.blocks = capturedBlocks;
+          const entry = findConversationEntry(session.sessionManager, capturedMessageId);
+          if (!entry) {
+            reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
+            return;
           }
-
-          if (role === "assistant") {
-            const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
-            if (usage) {
-              timelineMessage.usage = usage;
-            }
-            wsHub.broadcast({
-              type: "message_end",
-              piSessionId: session.sessionId,
-              message: { ...timelineMessage, intermediate: true },
-              ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
-            });
-            lastAssistantMessage = timelineMessage;
-            messageEndFired = true;
-          } else {
-            wsHub.broadcast({
-              type: "message_end",
-              piSessionId: session.sessionId,
-              message: timelineMessage,
-              ...(capturedClientMessageId ? { clientMessageId: capturedClientMessageId } : {}),
-            });
-            broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
-          }
+          wsHub.broadcast({
+            type: "message_end",
+            piSessionId: session.sessionId,
+            message: {
+              ...timelineMessage,
+              piEntryId: entry.id,
+              ...(role === "assistant" ? { intermediate: true } : {}),
+            },
+            ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
+          });
         });
         break;
       }

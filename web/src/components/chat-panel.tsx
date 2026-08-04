@@ -42,19 +42,17 @@ import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { activeToolStore } from "~/lib/active-tool-store";
 import { latestMeasuredContextUsage } from "~/lib/context-usage";
+import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
-import { updateNewestHistoryPage } from "~/lib/history-cache";
 import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { StreamRecoveryKind } from "~/lib/stream-recovery";
-import { streamingStore } from "~/lib/streaming-store";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -503,12 +501,12 @@ export function ChatPanel({
     for (const item of timeline) {
       if (item.kind !== "message") continue;
       const message = item as ChatTimelineMessage;
-      if (message.role !== "user" || !message.clientMessageId) continue;
+      if (message.role !== "user") continue;
 
-      if (busyQueuedText && message.clientMessageId === clientMessageId) {
+      if (busyQueuedText && message.id === clientMessageId) {
         clearBusyQueuedText();
       }
-      if (pendingScrollIds.delete(message.clientMessageId)) {
+      if (pendingScrollIds.delete(message.id)) {
         shouldScrollToPostedMessage = true;
       }
     }
@@ -538,16 +536,17 @@ export function ChatPanel({
   }, [pruneTarget, pruneMutation]);
 
   useEffect(() => {
-    streamingStore.onStreamingDelta(
-      piSessionId,
-      (text, thinking, isThinkingStreaming, messageId) => {
-        if (messageId != null) {
+    const unsubscribe = conversationState.subscribe(piSessionId, {
+      onStreaming(streaming) {
+        if (streaming) {
           messageListRef.current?.updateStreaming(
             {
               role: "assistant",
               content: [
-                ...(thinking != null ? [{ type: "thinking" as const, thinking }] : []),
-                ...(text ? [{ type: "text" as const, text }] : []),
+                ...(streaming.thinking
+                  ? [{ type: "thinking" as const, thinking: streaming.thinking }]
+                  : []),
+                ...(streaming.text ? [{ type: "text" as const, text: streaming.text }] : []),
               ],
               api: "openai-responses",
               provider: "openai",
@@ -563,30 +562,26 @@ export function ChatPanel({
               stopReason: "stop",
               timestamp: Date.now(),
             },
-            isThinkingStreaming,
+            streaming.thinkingActive,
           );
         } else {
           streamingUiDebug(
-            "[debug][ChatPanel] clearStreaming() — messageId=null, streaming store fired end-of-stream for session=%s",
+            "[debug][ChatPanel] clearStreaming() — conversation state ended streaming for session=%s",
             piSessionId,
           );
           messageListRef.current?.clearStreaming();
         }
       },
-    );
-
-    activeToolStore.onUpdate(piSessionId, (event) => {
-      if (event.type === "clear_all") {
-        messageListRef.current?.clearActiveTools();
-        return;
-      }
-      messageListRef.current?.applyActiveToolState(event.state);
+      onTool(event) {
+        if (event.type === "clear_all") {
+          messageListRef.current?.clearActiveTools();
+          return;
+        }
+        messageListRef.current?.applyActiveToolState(event.state);
+      },
     });
-    messageListRef.current?.setActiveTools(activeToolStore.getSnapshot(piSessionId));
-
     return () => {
-      streamingStore.offStreamingDelta(piSessionId);
-      activeToolStore.offUpdate(piSessionId);
+      unsubscribe();
       messageListRef.current?.clearStreaming();
       messageListRef.current?.clearActiveTools();
     };
@@ -670,10 +665,9 @@ export function ChatPanel({
           content: displayText,
           source: "web",
           createdAt: now,
-          clientMessageId,
           ...(images?.length ? { images } : {}),
         };
-        updateNewestHistoryPage(queryClient, piSessionId, (items) => [...items, optimistic]);
+        conversationState.addOptimistic(queryClient, piSessionId, optimistic);
       }
 
       setIsSending(true);
@@ -683,9 +677,7 @@ export function ChatPanel({
         setPendingImages([]);
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-        updateNewestHistoryPage(queryClient, piSessionId, (items) =>
-          items.filter((item) => item.id !== clientMessageId),
-        );
+        conversationState.removeOptimistic(queryClient, piSessionId, clientMessageId);
         queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);

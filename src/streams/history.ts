@@ -17,6 +17,7 @@ import type {
   StreamsHistoryResponse,
   TokenUsage,
 } from "../contracts/index.ts";
+import { conversationMessageId } from "./conversation-identity.ts";
 
 export function parseUsage(value: unknown): TokenUsage | undefined {
   const record = asRecord(value);
@@ -78,6 +79,7 @@ function pushMessage(
   blocks?: StreamsHistoryMessageBlock[],
   images?: ImageAttachment[],
   usage?: TokenUsage,
+  piEntryId?: string,
 ): void {
   const normalized = content.trim();
   const normalizedBlocks = blocks?.filter((block) =>
@@ -92,6 +94,7 @@ function pushMessage(
 
   const item: ChatTimelineMessage = {
     id,
+    ...(piEntryId ? { piEntryId } : {}),
     kind: "message",
     role,
     content: normalized,
@@ -116,33 +119,24 @@ function parseMessageContent(
   createdAt: string,
   content: unknown,
   usage?: TokenUsage,
+  piEntryId?: string,
 ): void {
   if (!Array.isArray(content)) {
     const text = firstText(content);
-    if (text) pushMessage(items, messageId, role, text, createdAt, undefined, undefined, usage);
+    if (text)
+      pushMessage(items, messageId, role, text, createdAt, undefined, undefined, usage, piEntryId);
     return;
   }
 
   const messageBlocks: StreamsHistoryMessageBlock[] = [];
   const imageAttachments: ImageAttachment[] = [];
+  const toolItems: ChatTimelineTool[] = [];
   let textBuffer = "";
 
   const flushTextBlock = () => {
     if (!textBuffer.trim()) return;
     messageBlocks.push({ type: "text", text: textBuffer });
     textBuffer = "";
-  };
-
-  const flushMessage = () => {
-    flushTextBlock();
-    const images = imageAttachments.length > 0 ? [...imageAttachments] : undefined;
-    imageAttachments.length = 0;
-    if (messageBlocks.length === 0 && !images) return;
-    const contentText = messageBlocks
-      .map((block) => (block.type === "text" ? block.text : block.thinking))
-      .join("\n\n");
-    pushMessage(items, messageId, role, contentText, createdAt, [...messageBlocks], images, usage);
-    messageBlocks.length = 0;
   };
 
   for (const block of content) {
@@ -171,13 +165,19 @@ function parseMessageContent(
       continue;
     }
 
-    if (type === "toolCall") {
-      flushMessage();
-      const toolUseId = typeof record.id === "string" ? record.id : `unknown-${messageId}`;
-      items.push({
+    if (
+      type === "toolCall" &&
+      typeof record.id === "string" &&
+      record.id.trim() &&
+      typeof record.name === "string" &&
+      record.name.trim()
+    ) {
+      flushTextBlock();
+      const toolUseId = record.id;
+      toolItems.push({
         id: `tool-${toolUseId}-start`,
         kind: "tool",
-        tool: typeof record.name === "string" && record.name.trim() ? record.name : "unknown_tool",
+        tool: record.name,
         phase: "start",
         toolUseId,
         args: record.arguments as JsonValue | undefined,
@@ -186,50 +186,70 @@ function parseMessageContent(
     }
   }
 
-  flushMessage();
+  flushTextBlock();
+  const contentText = messageBlocks
+    .map((block) => (block.type === "text" ? block.text : block.thinking))
+    .join("\n\n");
+  pushMessage(
+    items,
+    messageId,
+    role,
+    contentText,
+    createdAt,
+    messageBlocks,
+    imageAttachments,
+    usage,
+    piEntryId,
+  );
+  items.push(...toolItems);
 }
 
 function parseMessageRecord(
   messageRecord: Record<string, unknown>,
   createdAt: string,
   messageId: string,
+  piEntryId: string,
   items: ChatTimelineItem[],
 ): void {
   const role = messageRecord.role;
 
   if (role === "user" || role === "assistant" || role === "system") {
     const usage = role === "assistant" ? parseUsage(messageRecord.usage) : undefined;
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, usage);
+    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, usage, piEntryId);
     return;
   }
 
   if (role === "toolResult") {
-    const item = toolResultMessageToTimelineItem(messageRecord, messageId, createdAt);
+    const item = toolResultMessageToTimelineItem(messageRecord, createdAt, piEntryId);
     if (item) items.push(item);
   }
 }
 
 export function toolResultMessageToTimelineItem(
   message: unknown,
-  messageId: string,
   createdAt: string,
+  piEntryId?: string,
 ): ChatTimelineTool | undefined {
   const messageRecord = asRecord(message);
   if (messageRecord.role !== "toolResult") return undefined;
 
   const resultText = firstText(messageRecord.content);
-  const toolCallId =
-    typeof messageRecord.toolCallId === "string"
-      ? messageRecord.toolCallId
-      : `unknown-${messageId}`;
+  const toolCallId = messageRecord.toolCallId;
+  const toolName = messageRecord.toolName;
+  if (
+    typeof toolCallId !== "string" ||
+    !toolCallId.trim() ||
+    typeof toolName !== "string" ||
+    !toolName.trim()
+  ) {
+    return undefined;
+  }
 
   return {
     id: `tool-${toolCallId}-end`,
+    ...(piEntryId ? { piEntryId } : {}),
     kind: "tool",
-    tool:
-      typeof messageRecord.toolName === "string" && messageRecord.toolName.trim()
-        ? messageRecord.toolName
-        : "unknown_tool",
+    tool: toolName,
     phase: "end",
     toolUseId: toolCallId,
     result: (messageRecord.toolName === "bash"
@@ -321,6 +341,7 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
       if (summary?.trim()) {
         items.push({
           id: entry.id,
+          piEntryId: entry.id,
           kind: "message",
           role: "user",
           content: summary,
@@ -337,6 +358,7 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
         if (content) {
           items.push({
             id: entry.id,
+            piEntryId: entry.id,
             kind: "message",
             role: "user",
             content,
@@ -350,7 +372,13 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
     if (entry.type !== "message") continue;
     const messageRecord = asRecord(entry.message);
     const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);
-    parseMessageRecord(messageRecord, createdAt, entry.id, items);
+    parseMessageRecord(
+      messageRecord,
+      createdAt,
+      conversationMessageId(messageRecord) ?? entry.id,
+      entry.id,
+      items,
+    );
   }
   return items;
 }

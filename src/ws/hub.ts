@@ -6,6 +6,7 @@ import {
   type ConnectedWebSocketEvent,
   type ControlSurfaceWebSocketClientEvent,
   type ControlSurfaceWebSocketServerEvent,
+  type ConversationEventPosition,
 } from "../contracts/index.ts";
 
 export type WebSocketClient = {
@@ -22,9 +23,36 @@ type WebSocketMessageHandler = (
   data: ControlSurfaceWebSocketClientEvent | unknown,
 ) => void | Promise<void>;
 
+type ReplayEvent = {
+  piSessionId: string;
+  payload: ControlSurfaceWebSocketServerEvent;
+};
+
+const REPLAY_LIMIT = 5_000;
+const REPLAYED_EVENT_TYPES = new Set([
+  "text_delta",
+  "thinking_start",
+  "thinking_delta",
+  "thinking_end",
+  "message_end",
+  "tool_execution_start",
+  "tool_execution_update",
+  "tool_execution_end",
+  "tool_result",
+  "turn_start",
+  "turn_end",
+  "agent_start",
+  "agent_end",
+  "history_rewritten",
+]);
+
 export class WebSocketHub {
   private readonly clients = new Map<string, WebSocketClient>();
   private readonly onMessage?: WebSocketMessageHandler;
+  private readonly incarnation = crypto.randomUUID();
+  private readonly sequenceBySession = new Map<string, number>();
+  private replayEvents: ReplayEvent[] = [];
+  private replayStart = 0;
 
   constructor(onMessage?: WebSocketMessageHandler) {
     this.onMessage = onMessage;
@@ -90,7 +118,22 @@ export class WebSocketHub {
     const piSessionId =
       "piSessionId" in payload ? (payload.piSessionId as string | undefined) : undefined;
     const eventType = payload.type;
-    const frame = encodeFrame(JSON.stringify(payload));
+    let published = payload;
+    if (piSessionId && REPLAYED_EVENT_TYPES.has(eventType)) {
+      const position: ConversationEventPosition = {
+        incarnation: this.incarnation,
+        sequence: (this.sequenceBySession.get(piSessionId) ?? 0) + 1,
+      };
+      this.sequenceBySession.set(piSessionId, position.sequence);
+      published = { ...payload, position };
+      this.replayEvents.push({ piSessionId, payload: published });
+      if (this.replayEvents.length - this.replayStart > REPLAY_LIMIT) this.replayStart += 1;
+      if (this.replayStart >= REPLAY_LIMIT) {
+        this.replayEvents = this.replayEvents.slice(this.replayStart);
+        this.replayStart = 0;
+      }
+    }
+    const frame = encodeFrame(JSON.stringify(published));
     for (const client of this.clients.values()) {
       if (!piSessionId) {
         this.safeWrite(client, frame);
@@ -113,10 +156,48 @@ export class WebSocketHub {
     }
   }
 
-  subscribeClient(clientId: string, piSessionId: string, eventTypes?: string[]): void {
+  subscribeClient(
+    clientId: string,
+    piSessionId: string,
+    eventTypes?: string[],
+    after?: ConversationEventPosition,
+  ): void {
     const client = this.clients.get(clientId);
-    if (client) {
-      client.subscriptions.set(piSessionId, eventTypes ? new Set(eventTypes) : null);
+    if (!client) return;
+    const filter = eventTypes ? new Set(eventTypes) : null;
+    client.subscriptions.set(piSessionId, filter);
+    if (piSessionId === "*") return;
+
+    const currentSequence = this.sequenceBySession.get(piSessionId) ?? 0;
+    const available = this.replayEvents
+      .slice(this.replayStart)
+      .filter((event) => event.piSessionId === piSessionId);
+    const oldestSequence = available[0]?.payload.position?.sequence ?? currentSequence + 1;
+    let resumeSequence = after?.sequence ?? oldestSequence - 1;
+    const reason = after
+      ? after.incarnation !== this.incarnation
+        ? "incarnation_changed"
+        : after.sequence < oldestSequence - 1 || after.sequence > currentSequence
+          ? "replay_expired"
+          : undefined
+      : oldestSequence > 1
+        ? "replay_expired"
+        : undefined;
+    if (reason) {
+      resumeSequence = reason === "incarnation_changed" ? currentSequence : oldestSequence - 1;
+      this.send(clientId, {
+        type: "conversation_reset",
+        piSessionId,
+        position: { incarnation: this.incarnation, sequence: resumeSequence },
+        reason,
+      });
+      if (reason === "incarnation_changed") return;
+    }
+
+    for (const event of available) {
+      if ((event.payload.position?.sequence ?? 0) <= resumeSequence) continue;
+      if (filter && !filter.has(event.payload.type)) continue;
+      this.safeWrite(client, encodeFrame(JSON.stringify(event.payload)));
     }
   }
 

@@ -16,10 +16,16 @@ export interface WebSocketClientMessageEvent {
   clientMessageId?: string;
 }
 
+export interface ConversationEventPosition {
+  incarnation: string;
+  sequence: number;
+}
+
 export interface WebSocketClientSubscribeEvent {
   type: "subscribe";
   piSessionId: string;
   eventTypes?: string[];
+  after?: ConversationEventPosition;
 }
 
 export interface WebSocketClientUnsubscribeEvent {
@@ -83,7 +89,6 @@ export interface MessageEndWebSocketEvent {
     args?: unknown;
     displayArgs?: unknown;
   }>;
-  clientMessageId?: string;
 }
 
 export interface ToolExecutionStartWebSocketEvent {
@@ -173,6 +178,7 @@ export interface PongWebSocketEvent {
 export interface ErrorWebSocketEvent {
   type: "error";
   message: string;
+  piSessionId?: string;
 }
 
 export interface SessionsChangedWebSocketEvent {
@@ -185,13 +191,6 @@ export interface WorktreeChangedWebSocketEvent {
   type: "worktree_changed";
   piSessionId: string;
   streamId: string;
-}
-
-export interface MessageAckWebSocketEvent {
-  type: "message_ack";
-  serverMessageId: string;
-  text: string;
-  source: "web";
 }
 
 export interface ResourcesReloadedWebSocketEvent {
@@ -240,7 +239,14 @@ export interface HistoryRewrittenWebSocketEvent {
   reason: "prune" | "compact";
 }
 
-export type ControlSurfaceWebSocketServerEvent =
+export interface ConversationResetWebSocketEvent {
+  type: "conversation_reset";
+  piSessionId: string;
+  position: ConversationEventPosition;
+  reason: "incarnation_changed" | "replay_expired";
+}
+
+type ControlSurfaceWebSocketServerEventPayload =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
@@ -262,12 +268,16 @@ export type ControlSurfaceWebSocketServerEvent =
   | AutoRetryStartWebSocketEvent
   | AutoRetryEndWebSocketEvent
   | HistoryRewrittenWebSocketEvent
+  | ConversationResetWebSocketEvent
   | StreamSurfacedWebSocketEvent
   | StreamsChangedWebSocketEvent
   | StatusChangedWebSocketEvent
   | SessionsChangedWebSocketEvent
   | WorktreeChangedWebSocketEvent
-  | MessageAckWebSocketEvent
   | ResourcesReloadedWebSocketEvent
   | PongWebSocketEvent
   | ErrorWebSocketEvent;
+
+export type ControlSurfaceWebSocketServerEvent = ControlSurfaceWebSocketServerEventPayload & {
+  position?: ConversationEventPosition;
+};

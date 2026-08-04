@@ -18,7 +18,6 @@ export function getAgentMessageRowKey(message: AgentMessage, renderIndex: number
   const role = (message as { role: string }).role;
   return (
     identified._rowKey ??
-    identified._entryId ??
     (identified.timestamp !== undefined
       ? `${role}:${identified.timestamp}:${renderIndex}`
       : `${role}:${renderIndex}`)

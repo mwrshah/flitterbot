@@ -104,7 +104,6 @@ type EnqueueInput = {
   webClientId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   serverMessageId?: string;
-  clientMessageId?: string;
 };
 
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
@@ -412,35 +411,20 @@ export class ControlSurfaceRuntime {
       webClientId: input.webClientId,
       images: images?.length ? images : undefined,
       serverMessageId: messageUuid,
-      clientMessageId: input.clientMessageId,
     };
 
-    try {
-      const source = item.source as "whatsapp" | "web" | "cron";
-      const streamId = (input.metadata?.stream_id as string) ?? undefined;
-      const targetSessionId = (input.metadata?._targetSessionId as string) ?? undefined;
-      const piSessionId = targetSessionId
-        ? targetSessionId
-        : streamId
-          ? this.sessionManager.getByStream(streamId)?.piSessionId
-          : this.sessionManager.getDefault()?.piSessionId;
-      persistInboundMessage(this.blackboard, {
-        id: messageUuid,
-        source,
-        content: input.text,
-        sender: "user",
-        streamId,
-        piSessionId: piSessionId,
-        metadata: input.metadata,
-      });
-    } catch (error) {
-      this.log(`message persist failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-
     const target = this.resolveTargetSession(input, item);
-    if (!target) {
-      throw new Error("No target session available");
-    }
+    if (!target) throw new Error("No target session available");
+
+    persistInboundMessage(this.blackboard, {
+      id: messageUuid,
+      source: item.source,
+      content: input.text,
+      sender: "user",
+      streamId: target.streamId ?? undefined,
+      piSessionId: target.piSessionId,
+      metadata: input.metadata,
+    });
 
     if (item.source === "web" || item.source === "whatsapp") {
       item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
@@ -1190,7 +1174,6 @@ export class ControlSurfaceRuntime {
       }
 
       if (pendingSurface && persistedId) {
-        pendingSurface.serverMessageId = persistedId;
         const surfacedPayload: StreamSurfacedWebSocketEvent = {
           type: "stream_surfaced",
           piSessionId: managed.piSessionId,
@@ -2687,6 +2670,7 @@ export class ControlSurfaceRuntime {
         client.id,
         payload.piSessionId,
         Array.isArray(payload.eventTypes) ? payload.eventTypes : undefined,
+        payload.after,
       );
       return;
     }
@@ -2698,7 +2682,14 @@ export class ControlSurfaceRuntime {
       const targetPiSessionId =
         typeof payload.targetPiSessionId === "string" ? payload.targetPiSessionId : undefined;
 
-      const serverMessageId = crypto.randomUUID();
+      const clientMessageId =
+        typeof payload.clientMessageId === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          payload.clientMessageId,
+        )
+          ? payload.clientMessageId
+          : undefined;
+      const serverMessageId = clientMessageId ?? crypto.randomUUID();
       let routerMeta: StreamRoutingMeta = {};
       if (targetPiSessionId) {
         routerMeta._targetSessionId = targetPiSessionId;
@@ -2741,8 +2732,6 @@ export class ControlSurfaceRuntime {
           webClientId: client.id,
           images: Array.isArray(payload.images) ? payload.images : undefined,
           serverMessageId,
-          clientMessageId:
-            typeof payload.clientMessageId === "string" ? payload.clientMessageId : undefined,
         });
 
         const MAX_USER_WA_LENGTH = 30_000;
