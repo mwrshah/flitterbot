@@ -1487,6 +1487,9 @@ export class ControlSurfaceRuntime {
     if (ws.status === "closed") {
       reopenStream(this.blackboard, streamId);
     }
+    const managed = this.sessionManager.getByStream(streamId);
+    if (managed) managed.pendingDestroy = false;
+
     if (shouldReconcileWorktreeOnRecovery(ws.status)) {
       const reconciled = clearWorktreePathIfStale(this.blackboard, ws);
       if (reconciled.cleared) {

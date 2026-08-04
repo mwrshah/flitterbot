@@ -15,11 +15,7 @@ import {
 } from "react";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import type { ActiveToolState } from "~/lib/active-tool-store";
-import {
-  getAgentMessageRowKeys,
-  isPrependedRowKeys,
-  STREAMING_MESSAGE_ROW_KEY,
-} from "~/lib/agent-message-rows";
+import { getAgentMessageRowKeys, STREAMING_MESSAGE_ROW_KEY } from "~/lib/agent-message-rows";
 import { ensurePiWebUiReady, getPiWebUiInitError } from "~/lib/pi-web-ui-init";
 import { streamingPerf } from "~/lib/streaming-perf";
 import type { MessageList, MessageListVirtualState } from "~/pi-web-ui/chat-components";
@@ -72,23 +68,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const rowKeys = useMemo(() => getAgentMessageRowKeys(messages), [messages]);
+  const streamingRowKey = `${STREAMING_MESSAGE_ROW_KEY}:${rowKeys[rowKeys.length - 1] ?? "empty"}`;
   const virtualizerRef = useRef<Virtualizer<HTMLDivElement, Element> | null>(null);
   const measureElement = useCallback((element: Element | undefined) => {
     virtualizerRef.current?.measureElement(element ?? null);
   }, []);
-  const previousRowCountRef = useRef(rowKeys.length);
-  const previousFirstRowKeyRef = useRef<string | undefined>(rowKeys[0]);
-  const pendingAppendFollowRef = useRef(false);
-  const isPrepend = isPrependedRowKeys(
-    previousFirstRowKeyRef.current,
-    previousRowCountRef.current,
-    rowKeys,
-  );
-  const shouldFollowAppend =
-    !isPrepend &&
-    rowKeys.length > previousRowCountRef.current &&
-    (virtualizerRef.current?.isAtEnd() ?? true);
-
   const loadPreviousRef = useRef(onLoadPrevious);
   loadPreviousRef.current = onLoadPrevious;
   const canLoadPreviousRef = useRef(false);
@@ -112,7 +96,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
 
       const firstVisibleIndex = sourceItems[0]?.index;
       if (
-        completedInitialScrollKeyRef.current !== null &&
+        completedInitialScrollKeyRef.current === initialScrollKey &&
         firstVisibleIndex !== undefined &&
         firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
         canLoadPreviousRef.current &&
@@ -154,31 +138,29 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         element.updateVirtualGeometry(state);
       }
     },
-    [measureElement],
+    [initialScrollKey, measureElement],
   );
   const virtualizer = useVirtualizer({
     directDomUpdates: true, // Lit owns row geometry, not React
     onChange: publishVirtualState,
     count: rowKeys.length + 1,
     getScrollElement: () => viewportRef.current,
-    getItemKey: (index) => (index === rowKeys.length ? STREAMING_MESSAGE_ROW_KEY : rowKeys[index]!),
+    getItemKey: (index) => (index === rowKeys.length ? streamingRowKey : rowKeys[index]!),
     estimateSize: (index) => (index === rowKeys.length ? 0 : 120),
     overscan: 2,
     paddingStart: 16,
     paddingEnd: 16,
     anchorTo: "end",
+    followOnAppend: true,
     scrollEndThreshold: 120,
     useFlushSync: false,
   });
   useLayoutEffect(() => {
     virtualizerRef.current = virtualizer;
-    previousRowCountRef.current = rowKeys.length;
-    previousFirstRowKeyRef.current = rowKeys[0];
-    if (shouldFollowAppend) pendingAppendFollowRef.current = true;
     return () => {
       virtualizerRef.current = null;
     };
-  }, [rowKeys, shouldFollowAppend, virtualizer]);
+  }, [virtualizer]);
   const flushActiveTools = () => {
     const el = elementRef.current;
     if (!el) return;
@@ -209,7 +191,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ready) return;
     const container = containerRef.current;
     if (!container) return;
@@ -234,13 +216,9 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       streamingPerf.endCommittedLitRender(renderToken);
       if (elementRef.current !== el) return;
       flushActiveTools();
-      if (pendingAppendFollowRef.current) {
-        pendingAppendFollowRef.current = false;
-        virtualizer.scrollToEnd();
-      }
       if (rowKeys.length > 0 && completedInitialScrollKeyRef.current !== initialScrollKey) {
-        completedInitialScrollKeyRef.current = initialScrollKey;
         virtualizer.scrollToEnd();
+        completedInitialScrollKeyRef.current = initialScrollKey;
       }
     });
   }, [

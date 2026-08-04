@@ -493,7 +493,7 @@ export function ChatPanel({
     ]);
   }, [cwdAbsolute, cwdCopy.copy]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
     const pendingScrollIds = pendingPostedScrollClientMessageIdsRef.current;
     let shouldScrollToPostedMessage = false;
@@ -668,10 +668,10 @@ export function ChatPanel({
           content: displayText,
           source: "web",
           createdAt: now,
+          clientMessageId,
           ...(images?.length ? { images } : {}),
         };
         updateNewestHistoryPage(queryClient, piSessionId, (items) => [...items, optimistic]);
-        messageListRef.current?.scrollToEnd();
       }
 
       setIsSending(true);

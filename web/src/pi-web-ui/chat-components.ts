@@ -41,11 +41,7 @@ import {
   SquareTerminal,
 } from "lucide";
 import type { ActiveToolState } from "~/lib/active-tool-store";
-import {
-  getAgentMessageRowKeys,
-  isRenderableAgentMessage,
-  STREAMING_MESSAGE_ROW_KEY,
-} from "~/lib/agent-message-rows";
+import { getAgentMessageRowKeys, isRenderableAgentMessage } from "~/lib/agent-message-rows";
 import { renderSafeMarkdownHtml } from "~/lib/markdown-html";
 import { streamingPerf } from "~/lib/streaming-perf";
 
@@ -1624,7 +1620,7 @@ export class MessageList extends LitElement {
           (virtualItem) => virtualItem.key,
           (virtualItem) => {
             const item = items[virtualItem.index];
-            const isStreamingSlot = virtualItem.key === STREAMING_MESSAGE_ROW_KEY;
+            const isStreamingSlot = virtualItem.index === items.length;
             return html`
               <div
                 data-index=${virtualItem.index}
