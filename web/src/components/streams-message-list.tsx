@@ -77,6 +77,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   canLoadPreviousRef.current = hasPrevious && !isLoadingPrevious;
   const loadPreviousRequestedRef = useRef(false);
   const didInitialScrollRef = useRef(false);
+  const initialScrollFrameRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!isLoadingPrevious) loadPreviousRequestedRef.current = false;
   }, [isLoadingPrevious]);
@@ -93,22 +94,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       const totalSize = instance.getTotalSize();
 
       const firstVisibleIndex = sourceItems[0]?.index;
-      const lastVisibleIndex = sourceItems[sourceItems.length - 1]?.index;
-      const initialScrollWasComplete = didInitialScrollRef.current;
       if (
-        !initialScrollWasComplete &&
-        instance.options.count > 1 &&
-        elementRef.current?.querySelector("[data-virtual-canvas]") &&
-        firstVisibleIndex !== undefined &&
-        (!canLoadPreviousRef.current || firstVisibleIndex > LOAD_PREVIOUS_ROW_THRESHOLD) &&
-        lastVisibleIndex === instance.options.count - 1 &&
-        instance.isAtEnd()
-      ) {
-        didInitialScrollRef.current = true;
-        if (containerRef.current) containerRef.current.style.visibility = "visible";
-      }
-      if (
-        initialScrollWasComplete &&
+        didInitialScrollRef.current &&
         firstVisibleIndex !== undefined &&
         firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
         canLoadPreviousRef.current &&
@@ -228,14 +215,34 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       streamingPerf.endCommittedLitRender(renderToken);
       if (elementRef.current !== el) return;
       flushActiveTools();
-      if (rowKeys.length > 0 && !didInitialScrollRef.current) {
-        virtualizer.scrollToEnd();
+      if (
+        rowKeys.length > 0 &&
+        !didInitialScrollRef.current &&
+        initialScrollFrameRef.current === undefined
+      ) {
+        initialScrollFrameRef.current = requestAnimationFrame(() => {
+          if (elementRef.current !== el) {
+            initialScrollFrameRef.current = undefined;
+            return;
+          }
+          virtualizer.scrollToEnd();
+          initialScrollFrameRef.current = requestAnimationFrame(() => {
+            initialScrollFrameRef.current = undefined;
+            if (elementRef.current !== el) return;
+            didInitialScrollRef.current = true;
+            if (containerRef.current) containerRef.current.style.visibility = "visible";
+            publishVirtualState(virtualizer);
+          });
+        });
       }
     });
   }, [ready, messages, isSessionBusy, publishVirtualState, rowKeys.length, virtualizer]);
 
   useEffect(() => {
     return () => {
+      if (initialScrollFrameRef.current !== undefined) {
+        cancelAnimationFrame(initialScrollFrameRef.current);
+      }
       elementRef.current = null;
     };
   }, []);

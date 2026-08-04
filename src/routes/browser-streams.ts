@@ -206,7 +206,7 @@ async function handleBrowserStreamsHistoryRouteInner(
   const body: StreamsHistoryResponse = {
     piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,
-    ...(!cursor && targetSession.runtime?.session.systemPrompt
+    ...(!page.hasOlderRows && targetSession.runtime?.session.systemPrompt
       ? { systemPrompt: targetSession.runtime.session.systemPrompt }
       : {}),
     ...(!cursor && snapshot.piSessionId
