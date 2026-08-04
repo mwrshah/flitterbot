@@ -338,6 +338,12 @@
   }
 
 
+  [data-base-ui-portal] {
+    isolation: isolate;
+    position: relative;
+    z-index: 50;
+  }
+
   [data-sonner-toast] [data-description] {
     color: var(--text-muted);
   }
