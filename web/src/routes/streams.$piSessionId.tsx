@@ -103,6 +103,7 @@ function PiSessionRoute() {
 
   const {
     timeline,
+    systemPrompt,
     onSendMessage,
     effectivePiSessionId,
     isSessionBusy,
@@ -122,6 +123,7 @@ function PiSessionRoute() {
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
+          systemPrompt={systemPrompt}
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
           onLoadPrevious={loadPreviousPage}
