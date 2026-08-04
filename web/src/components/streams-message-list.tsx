@@ -43,7 +43,6 @@ type StreamsMessageListProps = {
   onLoadPrevious?: () => void;
   hasPrevious?: boolean;
   isLoadingPrevious?: boolean;
-  initialScrollKey: string;
   viewportRef: RefObject<HTMLDivElement | null>;
   ref?: Ref<StreamsMessageListHandle>;
 };
@@ -56,7 +55,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   onLoadPrevious,
   hasPrevious = false,
   isLoadingPrevious = false,
-  initialScrollKey,
   viewportRef,
   ref,
 }: StreamsMessageListProps) {
@@ -78,7 +76,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const canLoadPreviousRef = useRef(false);
   canLoadPreviousRef.current = hasPrevious && !isLoadingPrevious;
   const loadPreviousRequestedRef = useRef(false);
-  const completedInitialScrollKeyRef = useRef<string | null>(null);
+  const didInitialScrollRef = useRef(false);
   useEffect(() => {
     if (!isLoadingPrevious) loadPreviousRequestedRef.current = false;
   }, [isLoadingPrevious]);
@@ -95,8 +93,22 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       const totalSize = instance.getTotalSize();
 
       const firstVisibleIndex = sourceItems[0]?.index;
+      const lastVisibleIndex = sourceItems[sourceItems.length - 1]?.index;
+      const initialScrollWasComplete = didInitialScrollRef.current;
       if (
-        completedInitialScrollKeyRef.current === initialScrollKey &&
+        !initialScrollWasComplete &&
+        instance.options.count > 1 &&
+        elementRef.current?.querySelector("[data-virtual-canvas]") &&
+        firstVisibleIndex !== undefined &&
+        (!canLoadPreviousRef.current || firstVisibleIndex > LOAD_PREVIOUS_ROW_THRESHOLD) &&
+        lastVisibleIndex === instance.options.count - 1 &&
+        instance.isAtEnd()
+      ) {
+        didInitialScrollRef.current = true;
+        if (containerRef.current) containerRef.current.style.visibility = "visible";
+      }
+      if (
+        initialScrollWasComplete &&
         firstVisibleIndex !== undefined &&
         firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
         canLoadPreviousRef.current &&
@@ -138,7 +150,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         element.updateVirtualGeometry(state);
       }
     },
-    [initialScrollKey, measureElement],
+    [measureElement],
   );
   const virtualizer = useVirtualizer({
     directDomUpdates: true, // Lit owns row geometry, not React
@@ -216,20 +228,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       streamingPerf.endCommittedLitRender(renderToken);
       if (elementRef.current !== el) return;
       flushActiveTools();
-      if (rowKeys.length > 0 && completedInitialScrollKeyRef.current !== initialScrollKey) {
+      if (rowKeys.length > 0 && !didInitialScrollRef.current) {
         virtualizer.scrollToEnd();
-        completedInitialScrollKeyRef.current = initialScrollKey;
       }
     });
-  }, [
-    ready,
-    messages,
-    isSessionBusy,
-    initialScrollKey,
-    publishVirtualState,
-    rowKeys.length,
-    virtualizer,
-  ]);
+  }, [ready, messages, isSessionBusy, publishVirtualState, rowKeys.length, virtualizer]);
 
   useEffect(() => {
     return () => {
@@ -321,7 +324,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     );
   }
 
-  return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
+  return <div ref={containerRef} style={{ minHeight: "2rem", visibility: "hidden" }} />;
 }, areStreamsMessageListPropsEqual);
 
 function areStreamsMessageListPropsEqual(
@@ -334,7 +337,6 @@ function areStreamsMessageListPropsEqual(
     prev.onLoadPrevious === next.onLoadPrevious &&
     prev.hasPrevious === next.hasPrevious &&
     prev.isLoadingPrevious === next.isLoadingPrevious &&
-    prev.initialScrollKey === next.initialScrollKey &&
     prev.viewportRef === next.viewportRef &&
     prev.onPruneRequested === next.onPruneRequested &&
     prev.onForkRequested === next.onForkRequested

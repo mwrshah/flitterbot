@@ -829,9 +829,9 @@ export function ChatPanel({
               className="h-full overflow-auto px-6"
             >
               <StreamsMessageList
+                key={piSessionId}
                 ref={messageListRef}
                 messages={agentMessages}
-                initialScrollKey={piSessionId}
                 viewportRef={viewportRef}
                 onPruneRequested={handlePruneRequested}
                 onForkRequested={handleForkRequested}
