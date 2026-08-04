@@ -51,6 +51,7 @@ export class WebSocketHub {
   private readonly onMessage?: WebSocketMessageHandler;
   private readonly incarnation = crypto.randomUUID();
   private readonly sequenceBySession = new Map<string, number>();
+  private readonly historySequenceBySession = new Map<string, number>();
   private replayEvents: ReplayEvent[] = [];
   private replayStart = 0;
 
@@ -115,6 +116,21 @@ export class WebSocketHub {
   }
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
+    this.publish(payload, false);
+  }
+
+  broadcastHistoryCommit(payload: ControlSurfaceWebSocketServerEvent): void {
+    this.publish(payload, true);
+  }
+
+  historyPosition(piSessionId: string): ConversationEventPosition {
+    return {
+      incarnation: this.incarnation,
+      sequence: this.historySequenceBySession.get(piSessionId) ?? 0,
+    };
+  }
+
+  private publish(payload: ControlSurfaceWebSocketServerEvent, historyCommit: boolean): void {
     const piSessionId =
       "piSessionId" in payload ? (payload.piSessionId as string | undefined) : undefined;
     const eventType = payload.type;
@@ -125,6 +141,7 @@ export class WebSocketHub {
         sequence: (this.sequenceBySession.get(piSessionId) ?? 0) + 1,
       };
       this.sequenceBySession.set(piSessionId, position.sequence);
+      if (historyCommit) this.historySequenceBySession.set(piSessionId, position.sequence);
       published = { ...payload, position };
       this.replayEvents.push({ piSessionId, payload: published });
       if (this.replayEvents.length - this.replayStart > REPLAY_LIMIT) this.replayStart += 1;

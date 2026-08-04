@@ -30,14 +30,22 @@ type ConversationSubscriber = {
   onTool(event: { type: "upsert"; state: ActiveToolState } | { type: "clear_all" }): void;
 };
 
+type PendingCanonical = {
+  item: ChatTimelineItem;
+  position?: ConversationEventPosition;
+};
+
 type ConversationSession = {
   streaming?: StreamingState;
   tools: Map<string, ActiveToolState>;
   pendingOptimistic: Map<string, ChatTimelineMessage>;
-  pendingCanonical: Map<string, ChatTimelineItem>;
-  position?: ConversationEventPosition;
-  recovering?: boolean;
+  pendingCanonical: Map<string, PendingCanonical>;
   subscriber?: ConversationSubscriber;
+};
+
+type EventLedger = {
+  position: ConversationEventPosition;
+  recovering: boolean;
 };
 
 type ConversationAction =
@@ -57,6 +65,7 @@ type ConversationAction =
   | { type: "clear" };
 
 const sessions = new Map<string, ConversationSession>();
+const eventLedgers = new Map<string, EventLedger>();
 
 function sessionFor(sessionId: string): ConversationSession {
   let session = sessions.get(sessionId);
@@ -183,13 +192,30 @@ function reconcileSnapshot(sessionId: string, oldData: unknown, snapshotData: un
   if (!session) return replaceEqualDeep(oldData, snapshotData);
 
   const snapshotIds = new Set(snapshot.pages.flatMap((page) => page.items.map((item) => item.id)));
-  for (const id of snapshotIds) {
-    session.pendingCanonical.delete(id);
-    session.pendingOptimistic.delete(id);
+  const watermark = snapshot.pages[snapshot.pages.length - 1]?.historyPosition;
+  if (watermark) {
+    const ledger = eventLedgers.get(sessionId);
+    if (
+      !ledger ||
+      ledger.position.incarnation !== watermark.incarnation ||
+      ledger.position.sequence < watermark.sequence
+    ) {
+      eventLedgers.set(sessionId, { position: { ...watermark }, recovering: false });
+    }
   }
 
+  for (const [id, pending] of session.pendingCanonical) {
+    const coveredByWatermark =
+      watermark &&
+      pending.position &&
+      (pending.position.incarnation !== watermark.incarnation ||
+        pending.position.sequence <= watermark.sequence);
+    if (snapshotIds.has(id) || coveredByWatermark) session.pendingCanonical.delete(id);
+  }
+  for (const id of snapshotIds) session.pendingOptimistic.delete(id);
+
   const overlays: ChatTimelineItem[] = [
-    ...session.pendingCanonical.values(),
+    ...Array.from(session.pendingCanonical.values(), ({ item }) => item),
     ...session.pendingOptimistic.values(),
   ].filter((item) => !snapshotIds.has(item.id));
   if (!overlays.length) return replaceEqualDeep(oldData, snapshotData);
@@ -208,7 +234,7 @@ export const conversationState = {
   historyStaleTime: Number.POSITIVE_INFINITY,
 
   position(sessionId: string): ConversationEventPosition | undefined {
-    const position = sessions.get(sessionId)?.position;
+    const position = eventLedgers.get(sessionId)?.position;
     return position ? { ...position } : undefined;
   },
 
@@ -218,31 +244,29 @@ export const conversationState = {
   ): "accept" | "duplicate" | "gap" | "recovering" {
     const position = event.position;
     if (!position) return "accept";
-    const session = sessionFor(sessionId);
-    const previous = session.position;
+    const ledger = eventLedgers.get(sessionId);
+    const previous = ledger?.position;
     if (!previous) {
-      session.position = { ...position };
+      eventLedgers.set(sessionId, { position: { ...position }, recovering: false });
       return "accept";
     }
     if (previous.incarnation !== position.incarnation) {
-      session.recovering = true;
+      eventLedgers.set(sessionId, { position: previous, recovering: true });
       return "gap";
     }
     if (position.sequence <= previous.sequence) return "duplicate";
     if (position.sequence !== previous.sequence + 1) {
-      if (session.recovering) return "recovering";
-      session.recovering = true;
+      if (ledger?.recovering) return "recovering";
+      eventLedgers.set(sessionId, { position: previous, recovering: true });
       return "gap";
     }
-    session.position = { ...position };
-    session.recovering = false;
+    eventLedgers.set(sessionId, { position: { ...position }, recovering: false });
     return "accept";
   },
 
   reset(sessionId: string, position: ConversationEventPosition): void {
     const session = sessionFor(sessionId);
-    session.position = { ...position };
-    session.recovering = false;
+    eventLedgers.set(sessionId, { position: { ...position }, recovering: false });
     session.pendingCanonical.clear();
     reduce(sessionId, { type: "clear" });
   },
@@ -280,11 +304,12 @@ export const conversationState = {
     message: ChatTimelineMessage | undefined,
     optimisticId: string | undefined,
     tools: ChatTimelineTool[],
+    position?: ConversationEventPosition,
   ): void {
     const session = sessionFor(sessionId);
     if (optimisticId) session.pendingOptimistic.delete(optimisticId);
-    if (message) session.pendingCanonical.set(message.id, message);
-    for (const tool of tools) session.pendingCanonical.set(tool.id, tool);
+    if (message) session.pendingCanonical.set(message.id, { item: message, position });
+    for (const tool of tools) session.pendingCanonical.set(tool.id, { item: tool, position });
 
     updateTimeline(queryClient, sessionId, (items) => {
       let next = items;
@@ -299,8 +324,13 @@ export const conversationState = {
     });
   },
 
-  appendLiveItem(queryClient: QueryClient, sessionId: string, item: ChatTimelineItem): void {
-    sessionFor(sessionId).pendingCanonical.set(item.id, item);
+  appendLiveItem(
+    queryClient: QueryClient,
+    sessionId: string,
+    item: ChatTimelineItem,
+    position?: ConversationEventPosition,
+  ): void {
+    sessionFor(sessionId).pendingCanonical.set(item.id, { item, position });
     updateTimeline(queryClient, sessionId, (items) => upsert(items, item));
   },
 

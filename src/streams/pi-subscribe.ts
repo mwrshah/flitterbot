@@ -229,18 +229,13 @@ export function subscribeToPiSession(
           }
           const liveItem = toolResultMessageToTimelineItem(capturedMessage, capturedTimestamp);
           if (!liveItem) break;
-          wsHub.broadcast({
-            type: "tool_result",
-            piSessionId: session.sessionId,
-            item: liveItem,
-          });
           queueMicrotask(() => {
             const entry = findConversationEntry(session.sessionManager, capturedMessageId);
             if (!entry) {
               reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
               return;
             }
-            wsHub.broadcast({
+            wsHub.broadcastHistoryCommit({
               type: "tool_result",
               piSessionId: session.sessionId,
               item: { ...liveItem, piEntryId: entry.id },
@@ -289,20 +284,9 @@ export function subscribeToPiSession(
         if (role === "assistant") {
           const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
           if (usage) timelineMessage.usage = usage;
-          wsHub.broadcast({
-            type: "message_end",
-            piSessionId: session.sessionId,
-            message: { ...timelineMessage, intermediate: true },
-            ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
-          });
           lastAssistantMessage = timelineMessage;
           messageEndFired = true;
         } else {
-          wsHub.broadcast({
-            type: "message_end",
-            piSessionId: session.sessionId,
-            message: timelineMessage,
-          });
           broadcastSurfaced(wsHub, session.sessionId, timelineMessage);
         }
 
@@ -312,7 +296,7 @@ export function subscribeToPiSession(
             reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
             return;
           }
-          wsHub.broadcast({
+          wsHub.broadcastHistoryCommit({
             type: "message_end",
             piSessionId: session.sessionId,
             message: {

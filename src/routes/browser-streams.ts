@@ -23,10 +23,10 @@ import type { ManagedPiSession } from "../streams/pi-session-manager.ts";
 import { enrichTimelineToolDisplays } from "../streams/tool-display.ts";
 import { sendJson } from "./_shared.ts";
 
-async function readSessionHistory(
+function readSessionHistory(
   managed: ManagedPiSession,
   historyMode: "input" | "agent",
-): Promise<ChatTimelineItem[]> {
+): ChatTimelineItem[] {
   const snapshot = managed.state.getSnapshot();
   if (!snapshot.piSessionId) return [];
 
@@ -186,7 +186,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     return sendJson(response, 404, { error: "Session not found" });
   }
 
-  let items = await readSessionHistory(targetSession, historyMode);
+  let items = readSessionHistory(targetSession, historyMode);
   if (targetSession.streamName) {
     for (const item of items) {
       if (item.kind === "message") {
@@ -208,6 +208,9 @@ async function handleBrowserStreamsHistoryRouteInner(
     sessionFile: snapshot.sessionFile ?? null,
     ...(!cursor && targetSession.runtime?.session.systemPrompt
       ? { systemPrompt: targetSession.runtime.session.systemPrompt }
+      : {}),
+    ...(!cursor && snapshot.piSessionId
+      ? { historyPosition: runtime.wsHub.historyPosition(snapshot.piSessionId) }
       : {}),
     items: page.items,
     olderPageCursor: page.olderPageCursor,

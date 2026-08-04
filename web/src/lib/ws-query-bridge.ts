@@ -126,6 +126,7 @@ export function setupWsQueryBridge(deps: {
           committed,
           isUser ? msg.id : undefined,
           toolItems,
+          message.position,
         );
       }
 
@@ -173,7 +174,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_result") {
-      conversationState.appendLiveItem(queryClient, piSessionId, message.item);
+      conversationState.appendLiveItem(queryClient, piSessionId, message.item, message.position);
 
       if (message.item.toolUseId) {
         conversationState.dropTool(piSessionId, message.item.toolUseId);

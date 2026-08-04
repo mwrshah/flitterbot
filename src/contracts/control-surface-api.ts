@@ -12,6 +12,7 @@ import type {
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
+import type { ConversationEventPosition } from "./websocket.ts";
 
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
@@ -206,6 +207,7 @@ export interface StreamsHistoryResponse {
   piSessionId: string | null;
   sessionFile: string | null;
   systemPrompt?: string;
+  historyPosition?: ConversationEventPosition;
   items: ChatTimelineItem[];
   olderPageCursor?: string | null;
   hasOlderRows?: boolean;
