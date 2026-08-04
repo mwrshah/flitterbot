@@ -239,7 +239,9 @@ cmd_launch() {
       for ready_attempt in $(seq 1 16); do
         local ui_state
         ui_state=$(_pane_ui_state "$session")
-        if [ "$ui_state" = "IDLE" ]; then
+        if [ "$ui_state" = "TRUST_PROMPT" ]; then
+          tmux send-keys -t "$session" Enter
+        elif [ "$ui_state" = "IDLE" ]; then
           echo "Launched in session $session (ready)"
           return 0
         fi
@@ -412,9 +414,14 @@ cmd_session_id() {
 }
 
 _codex_ui_state() {
-  local session="$1" attempt
+  local session="$1" attempt pane
   for attempt in 1 2 3; do
-    if tmux capture-pane -t "$session" -p | grep -qi 'esc to interrupt'; then
+    pane=$(tmux capture-pane -t "$session" -p)
+    if grep -q 'Do you trust the contents of this directory?' <<< "$pane"; then
+      echo "TRUST_PROMPT"
+      return
+    fi
+    if grep -qi 'esc to interrupt' <<< "$pane"; then
       echo "INFERRING"
       return
     fi
