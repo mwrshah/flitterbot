@@ -96,6 +96,7 @@ const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: Chat
 type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
+  systemPrompt?: string;
   isSessionBusy: boolean;
   onSendMessage: (
     text: string,
@@ -294,6 +295,7 @@ function markPiSessionBusy(
 export function ChatPanel({
   piSessionId,
   timeline,
+  systemPrompt,
   isSessionBusy,
   onSendMessage,
   onLoadPrevious,
@@ -433,7 +435,7 @@ export function ChatPanel({
   const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
   const pendingPostedScrollClientMessageIdsRef = useRef<Set<string>>(new Set());
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
-  const agentMessages = useAgentMessages(timeline);
+  const agentMessages = useAgentMessages(timeline, systemPrompt);
 
   const pruneMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),

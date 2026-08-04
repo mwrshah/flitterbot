@@ -41,8 +41,21 @@ function assistantBlocksToContent(message: ChatTimelineMessage): AssistantMessag
   });
 }
 
-export function timelineToAgentMessages(timeline: ChatTimelineItem[]): AgentMessage[] {
-  const messages: AgentMessage[] = [];
+export function timelineToAgentMessages(
+  timeline: ChatTimelineItem[],
+  systemPrompt?: string,
+): AgentMessage[] {
+  const messages: AgentMessage[] = systemPrompt
+    ? [
+        {
+          role: "user",
+          content: systemPrompt,
+          timestamp: 0,
+          source: "init",
+          _rowKey: "system-prompt",
+        } as AgentMessage,
+      ]
+    : [];
   const consumed = new Set<number>();
 
   for (let i = 0; i < timeline.length; i++) {
