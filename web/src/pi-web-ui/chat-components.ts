@@ -8,6 +8,7 @@ import type {
   Usage,
   UserMessage as UserMessageType,
 } from "@earendil-works/pi-ai";
+import "~/components/message-actions-menu";
 import type { RenderableToolCall } from "~/lib/pi-web-ui-bridge";
 
 function toolDisplayArguments(call: ToolCall): Record<string, unknown> {
@@ -34,7 +35,6 @@ import {
   Code,
   Copy,
   createElement,
-  EllipsisVertical,
   FolderOpen,
   MessageSquare,
   Search,
@@ -995,8 +995,6 @@ export class UserMessage extends LitElement {
   @property({ type: Object }) message!: UserMessageWithAttachments | UserMessageType;
   @property({ attribute: false }) entryId?: string;
 
-  @state() private menuOpen = false;
-
   protected override createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -1004,51 +1002,7 @@ export class UserMessage extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.style.display = "block";
-    document.addEventListener("click", this._onDocClick);
   }
-
-  override disconnectedCallback(): void {
-    document.removeEventListener("click", this._onDocClick);
-    super.disconnectedCallback();
-  }
-
-  private _onDocClick = (ev: MouseEvent): void => {
-    if (!this.menuOpen) return;
-    const target = ev.target as Node | null;
-    if (target && this.contains(target)) return;
-    this.menuOpen = false;
-  };
-
-  private _toggleMenu = (ev: MouseEvent): void => {
-    ev.stopPropagation();
-    this.menuOpen = !this.menuOpen;
-  };
-
-  private _requestPrune = (ev: MouseEvent): void => {
-    ev.stopPropagation();
-    this.menuOpen = false;
-    if (!this.entryId) return;
-    this.dispatchEvent(
-      new CustomEvent("prune-message", {
-        detail: { entryId: this.entryId },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  };
-
-  private _requestFork = (ev: MouseEvent): void => {
-    ev.stopPropagation();
-    this.menuOpen = false;
-    if (!this.entryId) return;
-    this.dispatchEvent(
-      new CustomEvent("fork-message", {
-        detail: { entryId: this.entryId },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  };
 
   override render() {
     if (!this.message?.content) return nothing;
@@ -1103,44 +1057,8 @@ export class UserMessage extends LitElement {
           <message-copy-button .getText=${() => plainText}></message-copy-button>
           ${
             canPrune
-              ? html`
-            <button
-              @click=${this._toggleMenu}
-              data-open=${this.menuOpen ? "true" : "false"}
-              aria-haspopup="menu"
-              aria-expanded=${this.menuOpen ? "true" : "false"}
-              class="absolute top-2 right-1.5 cursor-pointer rounded p-1 text-text-muted hover:text-text"
-              title="${i18n("Message actions")}"
-            >
-              ${unsafeHTML(iconSvg(EllipsisVertical, "sm"))}
-            </button>
-            ${
-              this.menuOpen
-                ? html`
-              <div
-                role="menu"
-                class="absolute top-7 right-1 z-20 min-w-[13rem] rounded-md border border-border bg-background text-text shadow-md py-1 text-xs"
-              >
-                <button
-                  role="menuitem"
-                  @click=${this._requestFork}
-                  class="w-full text-left px-3 py-1.5 hover:bg-background-hover hover:text-text cursor-pointer"
-                >
-                  ${i18n("Fork above this message")}
-                </button>
-                <button
-                  role="menuitem"
-                  @click=${this._requestPrune}
-                  class="w-full text-left px-3 py-1.5 hover:bg-status-crashed-muted text-status-crashed cursor-pointer"
-                >
-                  ${i18n("Delete (including me)")}
-                </button>
-              </div>
-            `
-                : ""
-            }
-          `
-              : ""
+              ? html`<message-actions-menu .entryId=${this.entryId}></message-actions-menu>`
+              : nothing
           }
         </div>
       </div>
