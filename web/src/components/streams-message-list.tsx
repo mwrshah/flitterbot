@@ -77,7 +77,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   canLoadPreviousRef.current = hasPrevious && !isLoadingPrevious;
   const loadPreviousRequestedRef = useRef(false);
   const didInitialScrollRef = useRef(false);
-  const initialScrollFrameRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!isLoadingPrevious) loadPreviousRequestedRef.current = false;
   }, [isLoadingPrevious]);
@@ -215,34 +214,15 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       streamingPerf.endCommittedLitRender(renderToken);
       if (elementRef.current !== el) return;
       flushActiveTools();
-      if (
-        rowKeys.length > 0 &&
-        !didInitialScrollRef.current &&
-        initialScrollFrameRef.current === undefined
-      ) {
-        initialScrollFrameRef.current = requestAnimationFrame(() => {
-          if (elementRef.current !== el) {
-            initialScrollFrameRef.current = undefined;
-            return;
-          }
-          virtualizer.scrollToEnd();
-          initialScrollFrameRef.current = requestAnimationFrame(() => {
-            initialScrollFrameRef.current = undefined;
-            if (elementRef.current !== el) return;
-            didInitialScrollRef.current = true;
-            if (containerRef.current) containerRef.current.style.visibility = "visible";
-            publishVirtualState(virtualizer);
-          });
-        });
+      if (rowKeys.length > 0 && !didInitialScrollRef.current) {
+        virtualizer.scrollToEnd();
+        didInitialScrollRef.current = true;
       }
     });
   }, [ready, messages, isSessionBusy, publishVirtualState, rowKeys.length, virtualizer]);
 
   useEffect(() => {
     return () => {
-      if (initialScrollFrameRef.current !== undefined) {
-        cancelAnimationFrame(initialScrollFrameRef.current);
-      }
       elementRef.current = null;
     };
   }, []);
@@ -331,7 +311,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     );
   }
 
-  return <div ref={containerRef} style={{ minHeight: "2rem", visibility: "hidden" }} />;
+  return <div ref={containerRef} style={{ minHeight: "2rem" }} />;
 }, areStreamsMessageListPropsEqual);
 
 function areStreamsMessageListPropsEqual(
