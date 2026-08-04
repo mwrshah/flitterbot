@@ -43,13 +43,19 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 /bin/bash scripts/sessions.sh message <S> "run the tests"
 ```
 
-**Status** — process-level view of each session: FREE, BUSY (claude), BUSY (process), NOT RUNNING.
+**Status** — agent state for all tmux sessions:
+
+- `FREE`: no process occupies the tmux slot.
+- `IDLE`: an agent occupies the slot and can receive another prompt.
+- `INFERRING`: the agent is working.
+- `BUSY (other)`: a non-agent process occupies the slot.
+- `NOT RUNNING`: the tmux session does not exist.
 
 ```bash
 /bin/bash scripts/sessions.sh status
 ```
 
-**State** — agent UI state: IDLE (duration), INFERRING, FREE (duration), NOT RUNNING. Omit `<S>` for all sessions, pass it for a single session.
+**State** — the same state model for one or all sessions. Omit `<S>` for all sessions, or pass it for one session.
 
 ```bash
 /bin/bash scripts/sessions.sh state
@@ -65,19 +71,13 @@ In examples below, `<S>` is any valid session name (a–z, aa–ax). Substitute 
 /bin/bash scripts/sessions.sh launch ~/project --harness claude //skip --harness unless specified by the user
 ```
 
-Fallback with an explicit session letter (rarely needed):
-
-```bash
-/bin/bash scripts/sessions.sh launch <S> ~/project
-```
-
 **Quit**
 
 ```bash
 /bin/bash scripts/sessions.sh quit <S>
 ```
 
-**Message** — send a prompt to the agent, then verify inference started (preferred over send).
+**Message** — reprompt an existing idle agent, then verify inference started (preferred over send).
 
 ```bash
 /bin/bash scripts/sessions.sh message <S> "fix the login bug"

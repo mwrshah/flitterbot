@@ -80,8 +80,19 @@ has_agent() {
   session_harness "$1" >/dev/null 2>&1
 }
 
-pane_idle_seconds() {
-  tmux display-message -t "$1" -p '#{pane_idle}' 2>/dev/null
+session_idle_seconds() {
+  local activity now
+  activity=$(tmux display-message -t "$1" -p '#{session_activity}' 2>/dev/null)
+  if ! [[ "$activity" =~ ^[0-9]+$ ]]; then
+    echo 0
+    return
+  fi
+  now=$(date +%s)
+  if [ "$activity" -ge "$now" ]; then
+    echo 0
+  else
+    echo "$((now - activity))"
+  fi
 }
 
 format_idle() {
@@ -96,20 +107,7 @@ format_idle() {
 }
 
 cmd_status() {
-  for s in $SESSIONS; do
-    if ! session_exists "$s"; then
-      echo "$s: NOT RUNNING"
-    elif has_agent "$s"; then
-      echo "$s: BUSY ($(session_harness "$s"))"
-    elif ! is_free "$s"; then
-      local pid cmd_name
-      pid=$(pane_pid "$s")
-      cmd_name=$(pgrep -P "$pid" | head -1 | xargs -I{} ps -o comm= -p {} 2>/dev/null)
-      echo "$s: BUSY ($cmd_name)"
-    else
-      echo "$s: FREE"
-    fi
-  done
+  cmd_state
 }
 
 _agent_launch_cmd() {
@@ -144,16 +142,10 @@ cmd_launch() {
   harness=$(_resolve_launch_harness "$harness_arg")
   _validate_harness "$harness" || return 1
 
-  local session="" dir="" args=""
-  if [[ ${#remaining[@]} -gt 0 ]]; then
-    if is_valid_session "${remaining[0]}"; then
-      session="${remaining[0]}"
-      dir="${remaining[1]:-}"
-      args="${remaining[2]:-}"
-    else
-      dir="${remaining[0]}"
-      args="${remaining[1]:-}"
-    fi
+  local session="" dir="${remaining[0]:-}" args="${remaining[1]:-}"
+  if [ -n "$dir" ] && is_valid_session "$dir"; then
+    echo "ERROR: launch allocates a tmux session automatically; use message $dir \"prompt\" to reprompt its agent"
+    return 1
   fi
 
   local LOCK_DIR="/tmp/tmux-launch.lock"
@@ -179,89 +171,65 @@ cmd_launch() {
     rm -rf "$LOCK_DIR"
   }
 
+  _lock_acquire
+
+  for s in $SESSIONS; do
+    if ! session_exists "$s" || is_free "$s"; then session="$s"; break; fi
+  done
+
   if [ -z "$session" ]; then
-    _lock_acquire
-
+    local best="" best_idle=0
     for s in $SESSIONS; do
-      if ! session_exists "$s" || is_free "$s"; then session="$s"; break; fi
-    done
-
-    if [ -z "$session" ]; then
-      local best="" best_idle=0
-      for s in $SESSIONS; do
-        if has_agent "$s"; then
-          local state
-          state=$(_pane_ui_state "$s")
-          if [ "$state" = "IDLE" ]; then
-            local idle_secs
-            idle_secs=$(pane_idle_seconds "$s")
-      idle_secs=${idle_secs:-0}
-            if [ "$idle_secs" -gt "$best_idle" ]; then
-              best="$s"
-              best_idle="$idle_secs"
-            fi
+      if has_agent "$s"; then
+        local state
+        state=$(_pane_ui_state "$s")
+        if [ "$state" = "IDLE" ]; then
+          local idle_secs
+          idle_secs=$(session_idle_seconds "$s")
+          idle_secs=${idle_secs:-0}
+          if [ "$idle_secs" -gt "$best_idle" ]; then
+            best="$s"
+            best_idle="$idle_secs"
           fi
         fi
-      done
-      if [ -z "$best" ]; then
-        _lock_release
-        echo "ERROR: No free sessions and no idle Claude sessions to reclaim"
-        return 1
       fi
-      echo "Reclaiming session $best (idle $(format_idle "$best_idle"))"
-      cmd_quit "$best"
-      sleep 2
-      session="$best"
-    fi
-
-    if ! session_exists "$session"; then
-      tmux new-session -d -s "$session"
-      echo "Created session $session"
-    fi
-
-    if ! is_free "$session"; then
+    done
+    if [ -z "$best" ]; then
       _lock_release
-      echo "ERROR: Session $session is busy"
+      echo "ERROR: No free tmux sessions and no idle agents to reclaim"
       return 1
     fi
-
-    tmux send-keys -t "$session" C-c
-    sleep 0.2
-
-    if [ -n "$dir" ]; then
-      tmux send-keys -t "$session" "cd $(printf '%q' "$dir")" Enter
-      sleep 0.3
-    fi
-
-    local cmd
-    cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
-    tmux send-keys -t "$session" "$cmd" Enter
-    sleep "$SHELL_FORK_GRACE_SECONDS"
-
-    _lock_release
-  else
-    if ! session_exists "$session"; then
-      tmux new-session -d -s "$session"
-      echo "Created session $session"
-    fi
-
-    if ! is_free "$session"; then
-      echo "ERROR: Session $session is busy"
-      return 1
-    fi
-
-    tmux send-keys -t "$session" C-c
-    sleep 0.2
-
-    if [ -n "$dir" ]; then
-      tmux send-keys -t "$session" "cd $(printf '%q' "$dir")" Enter
-      sleep 0.3
-    fi
-
-    local cmd
-    cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
-    tmux send-keys -t "$session" "$cmd" Enter
+    echo "Reclaiming session $best (idle $(format_idle "$best_idle"))"
+    cmd_quit "$best"
+    sleep 2
+    session="$best"
   fi
+
+  if ! session_exists "$session"; then
+    tmux new-session -d -s "$session"
+    echo "Created session $session"
+  fi
+
+  if ! is_free "$session"; then
+    _lock_release
+    echo "ERROR: Session $session is busy"
+    return 1
+  fi
+
+  tmux send-keys -t "$session" C-c
+  sleep 0.2
+
+  if [ -n "$dir" ]; then
+    tmux send-keys -t "$session" "cd $(printf '%q' "$dir")" Enter
+    sleep 0.3
+  fi
+
+  local cmd
+  cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
+  tmux send-keys -t "$session" "$cmd" Enter
+  sleep "$SHELL_FORK_GRACE_SECONDS"
+
+  _lock_release
 
   local launch_attempt
   for launch_attempt in $(seq 1 15); do
@@ -358,7 +326,7 @@ cmd_clear() {
   _prep_input "$session"
   tmux send-keys -t "$session" -l '/clear'
   tmux send-keys -t "$session" Enter
-  echo "Cleared Claude conversation in session $session"
+  echo "Cleared agent conversation in session $session"
 }
 
 cmd_message() {
@@ -379,8 +347,8 @@ cmd_message() {
     echo "ERROR: Session $session is currently inferring. Wait until idle."
     return 1
   fi
-  if [ "$pre_state" = "NO_CLAUDE" ]; then
-    echo "ERROR: Session $session has no Claude running"
+  if [ "$pre_state" = "NO_AGENT" ]; then
+    echo "ERROR: Session $session has no agent running"
     return 1
   fi
 
@@ -458,7 +426,7 @@ _codex_ui_state() {
 _pane_ui_state() {
   local session="$1"
   local harness
-  harness=$(session_harness "$session") || { echo "NO_CLAUDE"; return; }
+  harness=$(session_harness "$session") || { echo "NO_AGENT"; return; }
 
   if [ "$harness" = "codex" ]; then
     _codex_ui_state "$session"
@@ -499,7 +467,7 @@ _state_line() {
   elif has_agent "$s"; then
     state=$(_pane_ui_state "$s")
     if [ "$state" = "IDLE" ]; then
-      idle_secs=$(pane_idle_seconds "$s")
+      idle_secs=$(session_idle_seconds "$s")
       idle_secs=${idle_secs:-0}
       idle_str=$(format_idle "$idle_secs")
       echo "$s: IDLE ($idle_str)"
@@ -507,8 +475,8 @@ _state_line() {
       echo "$s: $state"
     fi
   elif is_free "$s"; then
-    idle_secs=$(pane_idle_seconds "$s")
-      idle_secs=${idle_secs:-0}
+    idle_secs=$(session_idle_seconds "$s")
+    idle_secs=${idle_secs:-0}
     idle_str=$(format_idle "$idle_secs")
     echo "$s: FREE ($idle_str)"
   else

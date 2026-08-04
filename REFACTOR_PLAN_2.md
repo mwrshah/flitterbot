@@ -40,7 +40,7 @@ At each edge, ask: runtime shape, owner, invariant, source mutability, and avail
    - Review targets: tool result DTOs, routing metadata copied only to recover stream identity, queue-depth wrappers.
 
 5. **Direct message to managed Claude Code/tmux session**
-   - Path: web downstream panel → direct-session route → `sendMessageToClaudeSession` → tmux UI inspection → literal send/Enter → delivery result → response DTO → UI mutation state.
+   - Path: web downstream panel → direct-session route → `sendMessageToAgentSession` → tmux UI inspection → literal send/Enter → delivery result → response DTO → UI mutation state.
    - Legitimate change: API command → tmux operation/result.
    - Excess: imported result renames, response/failure unions copying tmux result semantics, inspection snapshots transformed before one consumer.
 

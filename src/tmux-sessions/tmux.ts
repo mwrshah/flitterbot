@@ -8,8 +8,12 @@ import type {
 } from "../contracts/index.ts";
 
 const execFile = promisify(execFileCallback);
-const INFERENCE_MARKERS = /[✢✳✶✻✽]/u;
-const COLOR_BEFORE_MARKER = /38;2;(\d+);(\d+);(\d+)(?:(?!38;2;|\u001b\[0m).){0,40}[✢✳✶✻✽]/gsu;
+const CLAUDE_INFERENCE_MARKERS = /[✢✳✶✻✽]/u;
+const CLAUDE_COLOR_BEFORE_MARKER =
+  /38;2;(\d+);(\d+);(\d+)(?:(?!38;2;|\u001b\[0m).){0,40}[✢✳✶✻✽]/gsu;
+const CODEX_INFERENCE_MARKER = /esc to interrupt/i;
+
+type AgentHarness = "claude" | "codex";
 
 class TmuxError extends Error {
   readonly code?: number | string;
@@ -55,21 +59,22 @@ function warmInferenceColor(r: number, b: number): boolean {
   return r > 200 && r - b > 50;
 }
 
+function detectAgentHarness(currentCommand: string | null): AgentHarness | null {
+  if (currentCommand === "claude") return "claude";
+  if (currentCommand?.startsWith("codex")) return "codex";
+  return null;
+}
+
 function detectUiStateFromCapture(capture: string, currentCommand: string | null): TmuxUiState {
-  if (!currentCommand || currentCommand !== "claude") {
-    return currentCommand ? "BUSY_OTHER" : "NO_CLAUDE";
-  }
+  const harness = detectAgentHarness(currentCommand);
+  if (!harness) return currentCommand ? "BUSY_OTHER" : "NO_AGENT";
+  if (harness === "codex") return CODEX_INFERENCE_MARKER.test(capture) ? "INFERRING" : "IDLE";
+  if (!CLAUDE_INFERENCE_MARKERS.test(capture)) return "IDLE";
 
-  if (!INFERENCE_MARKERS.test(capture)) {
-    return "IDLE";
-  }
-
-  for (const match of capture.matchAll(COLOR_BEFORE_MARKER)) {
+  for (const match of capture.matchAll(CLAUDE_COLOR_BEFORE_MARKER)) {
     const r = Number(match[1]);
     const b = Number(match[3]);
-    if (warmInferenceColor(r, b)) {
-      return "INFERRING";
-    }
+    if (warmInferenceColor(r, b)) return "INFERRING";
   }
 
   return "IDLE";
@@ -166,8 +171,13 @@ export async function sendLiteralToTmuxSession(
   }
 }
 
-export async function prepareClaudeInput(sessionName: string): Promise<void> {
+export async function prepareAgentInput(sessionName: string): Promise<void> {
   const target = getPrimaryTarget(sessionName);
+  const pane = await getPaneSnapshot(target);
+  if (detectAgentHarness(pane?.currentCommand ?? null) === "codex") {
+    await runTmux(["send-keys", "-t", target, "C-u"]);
+    return;
+  }
   await runTmux(["send-keys", "-t", target, "Escape"]);
   await runTmux(["send-keys", "-t", target, "C-l"]);
   await runTmux(["send-keys", "-t", target, "i"]);

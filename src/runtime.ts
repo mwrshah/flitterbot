@@ -44,7 +44,6 @@ import {
   updateStreamRepoPath,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
-import { killTmuxSession } from "./claude-sessions/tmux.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
@@ -85,6 +84,7 @@ import {
   shouldReconcileWorktreeOnRecovery,
 } from "./streams/worktree-link.ts";
 import { fireAndForgetPeriodicTaskSync } from "./tasks/periodic-sync.ts";
+import { killTmuxSession } from "./tmux-sessions/tmux.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
 import { loadWhatsAppConfig } from "./whatsapp/config.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";

@@ -4,7 +4,7 @@ import type {
 } from "../contracts/index.ts";
 import {
   inspectTmuxSession,
-  prepareClaudeInput,
+  prepareAgentInput,
   sendEnterToTmuxSession,
   sendLiteralToTmuxSession,
 } from "./tmux.ts";
@@ -21,7 +21,7 @@ async function currentUiState(sessionName: string): Promise<TmuxUiState> {
   return inspection.pane?.uiState ?? "MISSING";
 }
 
-export async function sendMessageToClaudeSession(
+export async function sendMessageToAgentSession(
   sessionName: string,
   prompt: string,
   options: { verifyInference?: boolean; maxRetries?: number; settleMs?: number } = {},
@@ -35,11 +35,11 @@ export async function sendMessageToClaudeSession(
     return { ok: false, reason: "tmux_session_missing", uiState: "MISSING" };
   }
 
-  if (before.pane?.currentCommand !== "claude") {
-    return { ok: false, reason: "no_live_claude", uiState: before.pane?.uiState ?? "NO_CLAUDE" };
+  if (!before.pane || before.pane.uiState === "NO_AGENT" || before.pane.uiState === "BUSY_OTHER") {
+    return { ok: false, reason: "no_live_agent", uiState: before.pane?.uiState ?? "NO_AGENT" };
   }
 
-  await prepareClaudeInput(sessionName);
+  await prepareAgentInput(sessionName);
   await sendLiteralToTmuxSession(sessionName, prompt, { enter: false });
   await sendEnterToTmuxSession(sessionName);
 
@@ -56,7 +56,7 @@ export async function sendMessageToClaudeSession(
     await new Promise<void>((resolve) => setTimeout(resolve, settleMs));
 
     const after = await inspectTmuxSession(sessionName);
-    const uiState = after.pane?.uiState ?? (after.exists ? "NO_CLAUDE" : "MISSING");
+    const uiState = after.pane?.uiState ?? (after.exists ? "NO_AGENT" : "MISSING");
     if (uiState === "INFERRING") {
       return { ok: true, delivery: "tmux_send_keys", retries: attempt, uiState };
     }

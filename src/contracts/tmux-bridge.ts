@@ -1,4 +1,4 @@
-export type TmuxUiState = "IDLE" | "INFERRING" | "NO_CLAUDE" | "BUSY_OTHER" | "MISSING";
+export type TmuxUiState = "IDLE" | "INFERRING" | "NO_AGENT" | "BUSY_OTHER" | "MISSING";
 export type TmuxDeliveryMethod = "tmux_send_keys";
 
 export interface TmuxSessionSummary {
@@ -22,7 +22,7 @@ export interface TmuxSessionInspection extends TmuxSessionSummary {
   pane: TmuxPaneSnapshot | null;
 }
 
-export interface LaunchClaudeSessionInput {
+export interface LaunchAgentSessionInput {
   cwd: string;
   prompt: string;
   sessionName?: string;
@@ -30,11 +30,11 @@ export interface LaunchClaudeSessionInput {
   todoistTaskId?: string;
   piSessionId?: string;
   streamId?: string;
-  claudeCommand?: string;
+  agentCommand?: string;
   extraArgs?: string[];
 }
 
-export interface LaunchClaudeSessionResult {
+export interface LaunchAgentSessionResult {
   tmuxSession: string;
   cwd: string;
   delivery: TmuxDeliveryMethod;
@@ -42,7 +42,7 @@ export interface LaunchClaudeSessionResult {
 
 export type SendMessageToTmuxSessionFailureReason =
   | "tmux_session_missing"
-  | "no_live_claude"
+  | "no_live_agent"
   | "message_not_acknowledged";
 
 export type SendMessageToTmuxSessionResult =

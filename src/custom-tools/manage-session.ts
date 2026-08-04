@@ -1,9 +1,9 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { getInjectionEligibility, getSessionById } from "../blackboard/query-sessions.ts";
-import { sendMessageToClaudeSession } from "../claude-sessions/send-message.ts";
-import { inspectTmuxSession, tmuxSessionExists } from "../claude-sessions/tmux.ts";
 import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { DirectSessionMessageResponse } from "../contracts/index.ts";
+import { sendMessageToAgentSession } from "../tmux-sessions/send-message.ts";
+import { inspectTmuxSession, tmuxSessionExists } from "../tmux-sessions/tmux.ts";
 
 type SessionControlContext = {
   blackboard: BlackboardDatabase;
@@ -52,7 +52,7 @@ export async function directSessionMessage(
     return { ok: false, sessionId, busy: false, reason: "stale_or_ambiguous" };
   }
 
-  const delivery = await sendMessageToClaudeSession(tmuxSession, text, {
+  const delivery = await sendMessageToAgentSession(tmuxSession, text, {
     verifyInference: true,
     maxRetries: 2,
     settleMs: 2000,

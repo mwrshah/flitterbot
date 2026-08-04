@@ -168,7 +168,7 @@ Domain-organized, max 2-level nesting (`src/domain/file.ts`):
 src/
 ├── blackboard/      # SQLite wrapper, migrations, query-*/write-*
 ├── classifier/      # Groq LLM routing
-├── claude-sessions/ # Tmux inspection + injection
+├── tmux-sessions/   # Agent-neutral tmux inspection + injection
 ├── config/          # FlitterbotConfig loader
 ├── contracts/       # Shared types, schema DDL, enums (SSOT), message.ts
 ├── custom-tools/    # close-workstream, set-up-worktree

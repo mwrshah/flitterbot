@@ -1,11 +1,11 @@
-export { sendMessageToClaudeSession } from "./send-message.ts";
+export { sendMessageToAgentSession } from "./send-message.ts";
 export {
   createDetachedTmuxSession,
   ensureUniqueTmuxSessionName,
   inspectTmuxSession,
   killTmuxSession,
   listTmuxSessions,
-  prepareClaudeInput,
+  prepareAgentInput,
   sendEnterToTmuxSession,
   sendLiteralToTmuxSession,
   tmuxSessionExists,

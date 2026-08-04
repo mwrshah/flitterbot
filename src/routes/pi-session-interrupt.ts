@@ -1,8 +1,8 @@
 import type http from "node:http";
 import { getActiveManagedSessionsByPi } from "../blackboard/query-sessions.ts";
-import { sendEscapeToTmuxSession } from "../claude-sessions/tmux.ts";
 import type { PiSessionInterruptResponse } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
+import { sendEscapeToTmuxSession } from "../tmux-sessions/tmux.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
 export async function handlePiSessionInterruptRoute(

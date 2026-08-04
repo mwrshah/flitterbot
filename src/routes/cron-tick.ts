@@ -9,10 +9,10 @@ type CountRow = { count: number };
 
 const STALE_PROMPT_PREFIX = "Stale session check:";
 const IDLE_PROMPT =
-  "Idle check: All tracked Claude Code sessions appear stopped or idle. " +
+  "Idle check: All tracked agent sessions appear stopped or idle. " +
   "Review the latest session state, recent transcripts, and local tasks/notes context. " +
   "Figure out what the user most likely wants to tackle next. If an obvious next prompt exists " +
-  "for an idle Claude session, consider continuing it. If parallel Claude Code work would help, " +
+  "for an idle agent session, consider continuing it. If parallel subagent work would help, " +
   "prepare a concrete suggestion and ask the user for confirmation before launching anything significant.";
 
 function skip(

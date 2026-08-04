@@ -5,7 +5,7 @@ import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
 import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
-import { killTmuxSession } from "../claude-sessions/tmux.ts";
+import { killTmuxSession } from "../tmux-sessions/tmux.ts";
 
 const execPromise = promisify(cpExec);
 
