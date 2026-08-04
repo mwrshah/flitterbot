@@ -206,9 +206,6 @@ async function handleBrowserStreamsHistoryRouteInner(
   const body: StreamsHistoryResponse = {
     piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,
-    ...(!page.hasOlderRows && targetSession.runtime?.session.systemPrompt
-      ? { systemPrompt: targetSession.runtime.session.systemPrompt }
-      : {}),
     ...(!cursor && snapshot.piSessionId
       ? { historyPosition: runtime.wsHub.historyPosition(snapshot.piSessionId) }
       : {}),

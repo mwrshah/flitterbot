@@ -206,7 +206,6 @@ export const STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT = 200;
 export interface StreamsHistoryResponse {
   piSessionId: string | null;
   sessionFile: string | null;
-  systemPrompt?: string;
   historyPosition?: ConversationEventPosition;
   items: ChatTimelineItem[];
   olderPageCursor?: string | null;
