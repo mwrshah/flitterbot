@@ -220,9 +220,6 @@
   .user-message-container {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    background-color: var(--background-pop);
-    background-image: var(--background-pop-image);
-    border: 1px solid var(--border-pop);
     backdrop-filter: blur(10px);
     max-width: 100%;
   }

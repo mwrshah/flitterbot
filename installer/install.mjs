@@ -79,14 +79,14 @@ function fileSizeBytes(path) {
 function rotateLog(path) {
   mkdirSync(dirname(path), { recursive: true });
   if (fileSizeBytes(path) < 10 * 1024 * 1024) return;
-  try { rmSync(path + ".1", { force: true }); } catch {}
-  try { renameSync(path, path + ".1"); } catch {}
+  try { rmSync(path + ".1", { force: true }); } catch { }
+  try { renameSync(path, path + ".1"); } catch { }
 }
 
 function log(msg) {
   rotateLog(LOG_FILE);
   const ts = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-  try { writeFileSync(LOG_FILE, `[${ts}] ${msg}\n`, { flag: "a" }); } catch {}
+  try { writeFileSync(LOG_FILE, `[${ts}] ${msg}\n`, { flag: "a" }); } catch { }
 }
 
 function info(msg) { console.log(msg); log(`INFO: ${msg}`); }
@@ -137,8 +137,8 @@ function diffText(before, after) {
     rmSync(tmpB, { force: true });
     return result;
   } catch (e) {
-    try { rmSync(`/tmp/.flitterbot-diff-a.${process.pid}`, { force: true }); } catch {}
-    try { rmSync(`/tmp/.flitterbot-diff-b.${process.pid}`, { force: true }); } catch {}
+    try { rmSync(`/tmp/.flitterbot-diff-a.${process.pid}`, { force: true }); } catch { }
+    try { rmSync(`/tmp/.flitterbot-diff-b.${process.pid}`, { force: true }); } catch { }
     return e.stdout || "";
   }
 }
@@ -453,7 +453,7 @@ function applyLegacyCrontabText(afterText) {
     writeFileSync(tmp, afterText + "\n");
     try { execSync(`crontab "${tmp}"`, { stdio: "pipe" }); } finally { rmSync(tmp, { force: true }); }
   } else {
-    try { execSync("crontab -r", { stdio: "pipe" }); } catch {}
+    try { execSync("crontab -r", { stdio: "pipe" }); } catch { }
   }
 }
 
@@ -487,8 +487,8 @@ function prepareDirectories() {
     join(FLITTERBOT_DIR, "whatsapp", "logs"),
   ];
   for (const d of dirs) mkdirSync(d, { recursive: true });
-  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "auth"), 0o700); } catch {}
-  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "logs"), 0o700); } catch {}
+  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "auth"), 0o700); } catch { }
+  try { chmodSync(join(FLITTERBOT_DIR, "whatsapp", "logs"), 0o700); } catch { }
 }
 
 function preflight() {
@@ -567,7 +567,7 @@ async function bootstrapConfig() {
   const DEFAULT_AGENT_FIRST_MESSAGE =
     "Load up /skill:tasks /skill:notes and run ls on the project repositories directory. Then wait for the user";
   const DEFAULT_TMUX_BOOTSTRAP_MESSAGE =
-    "Aside: If you require parallelization for a large effort, or clean context you can use /skill:tmux in that instance";
+    "Aside: For a large task, you can use /skill:tmux if parallel work or a clean context would help.";
 
   const STATIC_DEFAULTS = {
     controlSurfaceHost: "127.0.0.1",
@@ -774,7 +774,7 @@ function readBlackboardSchemaVersion(schemaFile) {
     const schema = readFileSync(schemaFile, "utf8");
     const match = schema.match(/blackboard schema \(v(\d+)\)/i);
     if (match) return Number.parseInt(match[1], 10);
-  } catch {}
+  } catch { }
   return 0;
 }
 
@@ -802,7 +802,7 @@ function initBlackboard() {
     try {
       const cfg = readJsonFile(configPath);
       if (cfg.blackboardPath) dbPath = cfg.blackboardPath.replace(/^~/, HOME);
-    } catch {}
+    } catch { }
   }
 
   mkdirSync(dirname(dbPath), { recursive: true });
@@ -819,7 +819,7 @@ function initBlackboard() {
         hasSessions = sqlite(
           "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions';",
         ) !== "0";
-      } catch {}
+      } catch { }
     }
 
     if (!hasSessions) {
@@ -828,7 +828,7 @@ function initBlackboard() {
       info(`blackboard.db created at ${dbPath} (schema v${schemaVersion})`);
     } else {
       let current = "0";
-      try { current = sqlite("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;"); } catch {}
+      try { current = sqlite("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;"); } catch { }
       info(`blackboard.db exists at ${dbPath} (schema v${current})`);
       if (parseInt(current, 10) < schemaVersion) {
         info(`  note: server will migrate v${current} → v${schemaVersion} on next startup`);
@@ -1224,10 +1224,10 @@ async function installLaunchd() {
     if (await confirm()) {
       if (!DRY_RUN) {
         mkdirSync(dirname(PLIST_DEST), { recursive: true });
-        try { execSync(`launchctl bootout gui/$(id -u) "${PLIST_DEST}"`, { stdio: "pipe" }); } catch {}
+        try { execSync(`launchctl bootout gui/$(id -u) "${PLIST_DEST}"`, { stdio: "pipe" }); } catch { }
         atomicWrite(PLIST_DEST, plistContent);
         chmodSync(PLIST_DEST, 0o644);
-        try { execSync(`launchctl bootstrap gui/$(id -u) "${PLIST_DEST}"`, { stdio: "pipe" }); } catch {}
+        try { execSync(`launchctl bootstrap gui/$(id -u) "${PLIST_DEST}"`, { stdio: "pipe" }); } catch { }
       }
     } else {
       rmSync(tmpPlist, { force: true });
@@ -1281,8 +1281,8 @@ async function installLinuxSystemd() {
 
   let timerEnabled = false;
   let timerActive = false;
-  try { execSync(`systemctl --user is-enabled ${SYSTEMD_TIMER_NAME}`, { stdio: "pipe" }); timerEnabled = true; } catch {}
-  try { execSync(`systemctl --user is-active ${SYSTEMD_TIMER_NAME}`, { stdio: "pipe" }); timerActive = true; } catch {}
+  try { execSync(`systemctl --user is-enabled ${SYSTEMD_TIMER_NAME}`, { stdio: "pipe" }); timerEnabled = true; } catch { }
+  try { execSync(`systemctl --user is-active ${SYSTEMD_TIMER_NAME}`, { stdio: "pipe" }); timerActive = true; } catch { }
   if (!timerEnabled || !timerActive) needsChanges = true;
 
   let legacyBeforeText = "";

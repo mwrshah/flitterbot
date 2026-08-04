@@ -1064,9 +1064,12 @@ export class UserMessage extends LitElement {
 
     const plainText = textContent?.text || "";
     const canPrune = Boolean(this.entryId);
-    const isCompaction = Boolean(
-      (this.message as unknown as { _compaction?: boolean })._compaction,
-    );
+    const messageMetadata = this.message as unknown as {
+      _compaction?: boolean;
+      source?: string;
+    };
+    const isCompaction = Boolean(messageMetadata._compaction);
+    const isHook = messageMetadata.source === "hook";
 
     return html`
       ${
@@ -1080,7 +1083,7 @@ export class UserMessage extends LitElement {
       }
       <div class="flex justify-start ml-2 mr-4 ${isCompaction ? "mt-1" : "mt-8"} mb-2 group/user-message">
         <div class="relative">
-          <div class="user-message-container rounded-xl border border-border-pop bg-background-pop py-2 px-4 pr-8 text-text">
+          <div class="user-message-container rounded-xl border ${isHook ? "border-border bg-background-selected" : "border-border-pop bg-background-pop"} py-2 px-4 pr-8 text-text">
             ${textContent?.text ? html`<span style="white-space: pre-wrap;">${textContent.text}</span>` : ""}
             ${
               imageBlocks.length > 0
