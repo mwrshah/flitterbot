@@ -1251,7 +1251,7 @@ export class ControlSurfaceRuntime {
       {
         customType: "flitterbot-hook",
         content,
-        display: false,
+        display: true,
         details: { queueItemId: item.id, metadata: item.metadata },
       },
       { deliverAs: "steer", triggerTurn: true },

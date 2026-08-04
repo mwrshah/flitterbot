@@ -330,6 +330,23 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
       }
       continue;
     }
+    if (entry.type === "custom_message") {
+      const record = asRecord(entry);
+      if (record.customType === "flitterbot-hook") {
+        const content = firstText(record.content);
+        if (content) {
+          items.push({
+            id: entry.id,
+            kind: "message",
+            role: "user",
+            content,
+            source: "hook",
+            createdAt: isoTimestamp(record.timestamp, entry.timestamp),
+          });
+        }
+      }
+      continue;
+    }
     if (entry.type !== "message") continue;
     const messageRecord = asRecord(entry.message);
     const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);
