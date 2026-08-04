@@ -511,7 +511,7 @@ do_list() {
         for port in "${PLAN_PORTS[@]}"; do
             if [[ -n "$port" ]] && port_has_worktree_owner "$port" "$path"; then active=true; fi
         done
-        state=""; valid_state "$file" "$path" && state=tracked
+        state=""; if valid_state "$file" "$path"; then state=tracked; fi
         if $active || [[ -n "$state" ]]; then
             any=true; echo "  $name${state:+ ($state)}"
             for ((i=0; i<${#PLAN_SERVICES[@]}; i++)); do describe_port "${PLAN_SERVICES[$i]}" "${PLAN_PORTS[$i]}"; done
