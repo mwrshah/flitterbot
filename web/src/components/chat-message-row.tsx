@@ -13,7 +13,7 @@ import {
   type ConversationStreamingState,
   useConversationStreaming,
 } from "~/lib/conversation-state";
-import type { ChatTimelineMessage, TokenUsage } from "~/lib/types";
+import type { ChatTimelineMessage } from "~/lib/types";
 
 const SINGLE_LINE_TOLERANCE_PX = 3;
 
@@ -102,22 +102,6 @@ function ThinkingBlock({ content, streaming = false }: { content: string; stream
       )}
     </div>
   );
-}
-
-function formatCount(value: number): string {
-  if (value < 1_000) return String(value);
-  if (value < 10_000) return `${(value / 1_000).toFixed(1)}k`;
-  return `${Math.round(value / 1_000)}k`;
-}
-
-function Usage({ usage }: { usage: TokenUsage }) {
-  const parts = [
-    usage.input ? `↑${formatCount(usage.input)}` : "",
-    usage.output ? `↓${formatCount(usage.output)}` : "",
-    usage.cacheRead ? `R${formatCount(usage.cacheRead)}` : "",
-    usage.cacheWrite ? `W${formatCount(usage.cacheWrite)}` : "",
-  ].filter(Boolean);
-  return <div className="mt-2 px-4 text-xs text-text-muted tabular-nums">{parts.join(" ")}</div>;
 }
 
 function ToolBlock({ tool, piSessionId }: { tool: ConversationToolBlock; piSessionId: string }) {
@@ -242,7 +226,6 @@ function AssistantMessageRow({
       {row.copyText && (!isSessionBusy || !row.isCurrentTurn) && (
         <MessageCopyButton text={row.copyText} target={copyTarget} />
       )}
-      {message?.usage && <Usage usage={message.usage} />}
     </div>
   );
 }
