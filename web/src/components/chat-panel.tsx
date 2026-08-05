@@ -42,7 +42,7 @@ import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { latestMeasuredContextUsage } from "~/lib/context-usage";
-import { conversationState } from "~/lib/conversation-state";
+import { removeNewestHistoryItem, upsertNewestHistoryItems } from "~/lib/conversation-history";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
@@ -609,7 +609,7 @@ export function ChatPanel({
           createdAt: now,
           ...(images?.length ? { images } : {}),
         };
-        conversationState.addOptimistic(queryClient, piSessionId, optimistic);
+        upsertNewestHistoryItems(queryClient, piSessionId, [optimistic]);
       }
 
       setIsSending(true);
@@ -619,7 +619,7 @@ export function ChatPanel({
         setPendingImages([]);
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-        conversationState.removeOptimistic(queryClient, piSessionId, clientMessageId);
+        removeNewestHistoryItem(queryClient, piSessionId, clientMessageId);
         queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);

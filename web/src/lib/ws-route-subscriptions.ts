@@ -1,6 +1,9 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { FlitterbotWsClient } from "~/lib/ws";
+import { latestHistoryPosition } from "./conversation-history.ts";
 import { conversationState } from "./conversation-state.ts";
+import type { StreamsHistoryResponse } from "./types.ts";
 
 const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
 
@@ -47,10 +50,10 @@ function sameTarget(a: SubscriptionTarget | null, b: SubscriptionTarget | null):
 
 export function setupWsRouteSubscriptions(
   router: AnyRouter,
+  queryClient: QueryClient,
   wsClient: FlitterbotWsClient,
 ): () => void {
   let activeTarget: SubscriptionTarget | null = null;
-  wsClient.setResumePositionProvider((piSessionId) => conversationState.position(piSessionId));
 
   const apply = () => {
     const nextTarget = resolveSubscriptionTarget(router);
@@ -62,6 +65,17 @@ export function setupWsRouteSubscriptions(
     activeTarget = nextTarget;
 
     if (nextTarget) {
+      if (nextTarget.piSessionId !== "*") {
+        const data = queryClient.getQueryData<{
+          pages: StreamsHistoryResponse[];
+        }>(["streams-history", nextTarget.piSessionId, "agent"]);
+        const newestPage = data?.pages.at(-1);
+        conversationState.installSnapshot(nextTarget.piSessionId, newestPage?.live);
+        wsClient.setResumePosition(
+          nextTarget.piSessionId,
+          latestHistoryPosition(queryClient, nextTarget.piSessionId),
+        );
+      }
       wsClient.setSessionSubscription(nextTarget.piSessionId, nextTarget.eventTypes);
     } else {
       wsClient.clearSessionSubscription();
@@ -74,6 +88,5 @@ export function setupWsRouteSubscriptions(
   return () => {
     unsubscribeRouter();
     wsClient.clearSessionSubscription();
-    wsClient.setResumePositionProvider(undefined);
   };
 }

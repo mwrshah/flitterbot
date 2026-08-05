@@ -27,7 +27,7 @@ export class FlitterbotWsClient {
   private subscribers = new Set<WsSubscriber>();
   private connectionSubscribers = new Set<ConnectionSubscriber>();
   private activeSessionSubscription: SessionSubscription | null = null;
-  private resumePositionFor?: (piSessionId: string) => ConversationEventPosition | undefined;
+  private resumePositions = new Map<string, ConversationEventPosition>();
   private _connectionState: ConnectionState = "disconnected";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -84,7 +84,7 @@ export class FlitterbotWsClient {
       this.resetHeartbeatTimeout();
       try {
         const message = JSON.parse(event.data as string) as ControlSurfaceWebSocketServerEvent;
-        if (message.type === "pong") return;
+        if (message.type === "pong" || !this.acceptPositionedMessage(message)) return;
         for (const fn of this.subscribers) fn(message);
       } catch {}
     };
@@ -250,10 +250,18 @@ export class FlitterbotWsClient {
     this.socket.send(JSON.stringify(payload));
   }
 
-  setResumePositionProvider(
-    provider: ((piSessionId: string) => ConversationEventPosition | undefined) | undefined,
-  ): void {
-    this.resumePositionFor = provider;
+  setResumePosition(piSessionId: string, position: ConversationEventPosition | undefined): void {
+    if (position) this.resumePositions.set(piSessionId, { ...position });
+    else this.resumePositions.delete(piSessionId);
+  }
+
+  activeSubscriptionPiSessionId(): string | undefined {
+    const piSessionId = this.activeSessionSubscription?.piSessionId;
+    return piSessionId === "*" ? undefined : piSessionId;
+  }
+
+  pauseSessionSubscription(piSessionId: string): void {
+    if (this.activeSubscriptionPiSessionId() === piSessionId) this.sendUnsubscribe(piSessionId);
   }
 
   setSessionSubscription(piSessionId: string, eventTypes?: string[]): void {
@@ -312,9 +320,39 @@ export class FlitterbotWsClient {
     );
   }
 
+  private acceptPositionedMessage(message: ControlSurfaceWebSocketServerEvent): boolean {
+    const piSessionId = "piSessionId" in message ? message.piSessionId : undefined;
+    if (!piSessionId || !message.position) return true;
+    if (message.type === "conversation_reset") {
+      this.resumePositions.set(piSessionId, { ...message.position });
+      return true;
+    }
+
+    const previous = this.resumePositions.get(piSessionId);
+    if (!previous) {
+      this.resumePositions.set(piSessionId, { ...message.position });
+      return true;
+    }
+    if (
+      previous.incarnation !== message.position.incarnation ||
+      message.position.sequence !== previous.sequence + 1
+    ) {
+      if (
+        message.position.incarnation === previous.incarnation &&
+        message.position.sequence <= previous.sequence
+      ) {
+        return false;
+      }
+      this.flushSessionSubscription();
+      return false;
+    }
+    this.resumePositions.set(piSessionId, { ...message.position });
+    return true;
+  }
+
   private sendSubscribe(piSessionId: string, eventTypes?: string[]) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const after = piSessionId === "*" ? undefined : this.resumePositionFor?.(piSessionId);
+    const after = piSessionId === "*" ? undefined : this.resumePositions.get(piSessionId);
     const payload: WebSocketClientSubscribeEvent = {
       type: "subscribe",
       piSessionId,

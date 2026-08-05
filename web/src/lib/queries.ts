@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
-import { conversationState } from "~/lib/conversation-state";
+import { historyQueryKey, surfaceQueryKey } from "~/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import type {
   ChatTimelineItem,
@@ -47,12 +47,10 @@ const STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT = 10;
 const STREAMS_HISTORY_GC_TIME_MS = 30_000;
 
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
-  const sessionId = piSessionId ?? "default";
   return infiniteQueryOptions({
-    queryKey: conversationState.historyQueryKey(piSessionId),
+    queryKey: historyQueryKey(piSessionId),
     queryFn: async ({ pageParam }) => {
-      const generation = conversationState.snapshotGeneration(sessionId);
-      const snapshot = await fetchStreamsHistory({
+      return fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
           surface: "agent",
@@ -62,15 +60,13 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
           ...(pageParam ? { before: pageParam } : {}),
         },
       });
-      return conversationState.tagSnapshot(sessionId, generation, snapshot);
     },
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
     getNextPageParam: () => undefined,
     enabled: piSessionId !== undefined,
-    staleTime: conversationState.historyStaleTime,
+    staleTime: Number.POSITIVE_INFINITY,
     gcTime: STREAMS_HISTORY_GC_TIME_MS,
-    structuralSharing: conversationState.snapshotReconciler(sessionId),
   });
 }
 
@@ -118,7 +114,7 @@ export function userConfigQueryOptions() {
 
 export function surfaceTimelineQueryOptions() {
   return {
-    queryKey: conversationState.surfaceQueryKey,
+    queryKey: surfaceQueryKey,
     queryFn: async (): Promise<ChatTimelineItem[]> =>
       (await fetchStreamsInputHistory()) as ChatTimelineItem[],
     staleTime: 0, // WS writes reset dataUpdatedAt while viewing

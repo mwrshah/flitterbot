@@ -203,12 +203,20 @@ async function handleBrowserStreamsHistoryRouteInner(
   }
   const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
   if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
+  const conversationSnapshot =
+    !cursor && snapshot.piSessionId
+      ? runtime.wsHub.conversationSnapshot(snapshot.piSessionId)
+      : undefined;
+  if (
+    conversationSnapshot?.live.streaming &&
+    page.items.some((item) => item.id === conversationSnapshot.live.streaming?.messageId)
+  ) {
+    conversationSnapshot.live.streaming = undefined;
+  }
   const body: StreamsHistoryResponse = {
     piSessionId: snapshot.piSessionId ?? null,
     sessionFile: snapshot.sessionFile ?? null,
-    ...(!cursor && snapshot.piSessionId
-      ? { historyPosition: runtime.wsHub.historyPosition(snapshot.piSessionId) }
-      : {}),
+    ...(conversationSnapshot ?? {}),
     items: page.items,
     olderPageCursor: page.olderPageCursor,
     hasOlderRows: page.hasOlderRows,
