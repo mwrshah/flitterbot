@@ -4,7 +4,6 @@ import {
   type Ref,
   type RefObject,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -56,17 +55,15 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const loadPreviousRequestedRef = useRef(false);
   const didInitialScrollRef = useRef(false);
 
-  useEffect(() => {
-    if (!isLoadingPrevious) loadPreviousRequestedRef.current = false;
-  }, [isLoadingPrevious]);
+  const loadPreviousIfNeeded = useCallback(
+    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, reachedTop: boolean) => {
+      const viewportHeight = viewportRef.current?.clientHeight ?? 0;
+      const contentDoesNotFillViewport =
+        viewportHeight > 0 && instance.getTotalSize() <= viewportHeight;
 
-  const onVirtualizerChange = useCallback(
-    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, sync: boolean) => {
       if (
         didInitialScrollRef.current &&
-        sync &&
-        instance.scrollDirection === "backward" &&
-        instance.scrollOffset === 0 &&
+        (contentDoesNotFillViewport || reachedTop) &&
         canLoadPreviousRef.current &&
         !loadPreviousRequestedRef.current
       ) {
@@ -74,7 +71,16 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         loadPreviousRef.current?.();
       }
     },
-    [],
+    [viewportRef],
+  );
+
+  const onVirtualizerChange = useCallback(
+    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, sync: boolean) => {
+      const reachedTop =
+        sync && instance.scrollDirection === "backward" && instance.scrollOffset === 0;
+      loadPreviousIfNeeded(instance, reachedTop);
+    },
+    [loadPreviousIfNeeded],
   );
 
   const virtualizer = useVirtualizer({
@@ -93,13 +99,19 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   });
 
   useLayoutEffect(() => {
-    if (!rows.length || didInitialScrollRef.current) return;
+    if (isLoadingPrevious) return;
+    loadPreviousRequestedRef.current = false;
+    if (!rows.length) return;
+
     const frame = requestAnimationFrame(() => {
-      virtualizer.scrollToEnd();
-      didInitialScrollRef.current = true;
+      if (!didInitialScrollRef.current) {
+        didInitialScrollRef.current = true;
+        virtualizer.scrollToEnd();
+      }
+      loadPreviousIfNeeded(virtualizer, false);
     });
     return () => cancelAnimationFrame(frame);
-  }, [rows.length, virtualizer]);
+  }, [isLoadingPrevious, loadPreviousIfNeeded, rows.length, virtualizer]);
 
   useImperativeHandle(ref, () => ({
     scrollToEnd() {

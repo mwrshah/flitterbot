@@ -42,6 +42,10 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   };
 }
 
+const STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT = 4;
+const STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT = 10;
+const STREAMS_HISTORY_GC_TIME_MS = 30_000;
+
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
   const sessionId = piSessionId ?? "default";
   return infiniteQueryOptions({
@@ -52,6 +56,9 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
         data: {
           ...(piSessionId ? { piSessionId } : {}),
           surface: "agent",
+          limit: pageParam
+            ? STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT
+            : STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT,
           ...(pageParam ? { before: pageParam } : {}),
         },
       });
@@ -62,7 +69,7 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
     getNextPageParam: () => undefined,
     enabled: piSessionId !== undefined,
     staleTime: conversationState.historyStaleTime,
-    gcTime: 0,
+    gcTime: STREAMS_HISTORY_GC_TIME_MS,
     structuralSharing: conversationState.snapshotReconciler(sessionId),
   });
 }
