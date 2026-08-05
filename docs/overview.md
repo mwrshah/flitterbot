@@ -140,11 +140,11 @@ Auth: QR or pairing code; credentials backed up on every update; expiry creates 
 
 ### Web App
 
-Thin browser client. TanStack Start (SSR + file-based routing), Tailwind v4 (oklch), Lit components for chat (`@mariozechner/pi-agent-core`), `marked` + `highlight.js`.
+Thin browser client. TanStack Start (SSR + file-based routing), Tailwind v4 (oklch), React chat rows virtualized by TanStack Virtual, and `@tanstack/markdown` + `highlight.js`.
 
 Routes: `/` (Input Surface — unified activity feed), `/pi` (agent tabs: default + per-orchestrator sessions, with downstream sessions panel), `/runtime` (status). Nested `/pi` layout: `/pi/default`, `/pi/$sessionId`.
 
-State: TanStack Query as primary state layer with WS-driven cache invalidation via `ws-query-bridge.ts`. `SettingsStore` and theme use `useSyncExternalStore`. Imperative streaming store feeds Lit components directly for high-frequency deltas. WebSocket client: auto-reconnect with exponential backoff, heartbeat ping/pong, visibility-aware reconnect, circuit breaker.
+State: TanStack Query stores canonical timelines with WebSocket-driven writes and invalidation through `ws-query-bridge.ts`. `conversation-state.ts` exposes immutable streaming and active-tool snapshots through localized `useSyncExternalStore` hooks. Settings and theme use the same external-store primitive. WebSocket client: auto-reconnect with exponential backoff, heartbeat ping/pong, visibility-aware reconnect, circuit breaker.
 
 Features: skill picker (`cmdk`), image attachments (paste/drop/pick, base64), path picker (`@`-triggered directory completions), origin badges, light/dark/system theme, WhatsApp controls, sidebar with workstream navigation. WS subscription filtering: clients subscribe to session IDs per route; server filters `broadcast()` per-subscription. WS events use server-assigned UUIDs for message deduplication; ping/pong heartbeat for connection health.
 
@@ -208,7 +208,7 @@ This overview is the source of truth for feature inventory. Linked feature docs 
 | 18 | [WebSocket Client Sync](ws-client-sync/FEATURE.md) | Canonical server-event → WS → client-cache/streaming-store synchronization model |
 | 19 | [TanStack Patterns](tanstack-patterns/FEATURE.md) | TanStack Query/Router patterns replacing imperative state; SSR-safe data loading guidance |
 | 20 | [Pretext Text Rendering](pretext-text-rendering/FEATURE.md) | Text measurement, virtualization height prediction, cursor positioning, and path truncation |
-| 21 | [Streaming Markdown Performance](streaming-markdown-perf/FEATURE.md) | Planned incremental markdown parsing, chunking, direct-DOM streaming block, and highlight caching |
+| 21 | [Streaming Markdown Performance](streaming-markdown-perf/FEATURE.md) | Frame-bound TanStack Markdown streaming, localized React updates, and commit-only code highlighting |
 
 ## Dependency Order
 

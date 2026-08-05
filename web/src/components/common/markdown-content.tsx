@@ -1,193 +1,162 @@
-import { marked } from "marked";
-import { type JSX, memo, type ReactNode, useMemo } from "react";
-import { safeMarkdownUrl } from "~/lib/markdown-html";
+import { streamingMarkdownExtension } from "@tanstack/markdown/extensions/streaming";
+import {
+  Markdown,
+  type MarkdownComponentProps,
+  type MarkdownComponents,
+} from "@tanstack/markdown/react";
+import {
+  createContext,
+  isValidElement,
+  memo,
+  type ReactElement,
+  type ReactNode,
+  useContext,
+  useId,
+} from "react";
+import { CodeBlock } from "~/components/common/code-block";
+import { namespacedFootnoteId, safeMarkdownUrl } from "~/lib/markdown";
 
-type MarkdownToken = {
-  type?: string;
-  raw?: unknown;
-  text?: unknown;
-  tokens?: MarkdownToken[];
-  href?: unknown;
-  title?: unknown;
-  depth?: unknown;
-  ordered?: unknown;
-  start?: unknown;
-  items?: MarkdownToken[];
-  lang?: unknown;
-  header?: MarkdownToken[];
-  rows?: MarkdownToken[][];
+const MarkdownFootnoteNamespace = createContext("");
+
+function MarkdownLink({
+  href,
+  id,
+  "aria-describedby": describedBy,
+  children,
+  ...props
+}: MarkdownComponentProps<"a">) {
+  const namespace = useContext(MarkdownFootnoteNamespace);
+  const safeHref = safeMarkdownUrl(href);
+  if (!safeHref) return <>{children}</>;
+
+  const renderedHref = safeHref.startsWith("#user-content-fn")
+    ? `#${namespace}-${safeHref.slice(1)}`
+    : safeHref;
+  const renderedId = namespacedFootnoteId(id, namespace);
+  const renderedDescription = describedBy
+    ?.split(" ")
+    .map((value) => namespacedFootnoteId(value, namespace))
+    .join(" ");
+  const external = !renderedHref.startsWith("#");
+
+  return (
+    <a
+      {...props}
+      href={renderedHref}
+      id={renderedId}
+      aria-describedby={renderedDescription}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+    >
+      {children}
+    </a>
+  );
+}
+
+function MarkdownFootnoteContainer({ id, children, ...props }: MarkdownComponentProps<"li">) {
+  const namespace = useContext(MarkdownFootnoteNamespace);
+  return (
+    <li {...props} id={namespacedFootnoteId(id, namespace)}>
+      {children}
+    </li>
+  );
+}
+
+function MarkdownFootnoteHeading({ id, children, ...props }: MarkdownComponentProps<"h2">) {
+  const namespace = useContext(MarkdownFootnoteNamespace);
+  return (
+    <h2 {...props} id={namespacedFootnoteId(id, namespace)}>
+      {children}
+    </h2>
+  );
+}
+
+function MarkdownImage({ src, alt, ...props }: MarkdownComponentProps<"img">) {
+  const safeSrc = safeMarkdownUrl(src);
+  if (!safeSrc) return <>{alt}</>;
+
+  return (
+    <img
+      {...props}
+      src={safeSrc}
+      alt={alt ?? ""}
+      loading="lazy"
+      decoding="async"
+      className="max-h-[480px] max-w-full object-contain"
+    />
+  );
+}
+
+type CodeChildProps = {
+  children?: ReactNode;
+  className?: string;
 };
 
-function tokenText(token: MarkdownToken): string {
-  return String(token.text ?? token.raw ?? "");
+function codeChild(children: ReactNode): ReactElement<CodeChildProps> | null {
+  return isValidElement<CodeChildProps>(children) ? children : null;
 }
 
-function tokenTitle(token: MarkdownToken): string | undefined {
-  return typeof token.title === "string" && token.title ? token.title : undefined;
-}
+type MarkdownPreProps = MarkdownComponentProps<"pre"> & { "data-lang"?: string };
 
-function MarkdownInlineTokens({ tokens }: { tokens: MarkdownToken[] | undefined }) {
-  if (!tokens?.length) return null;
-  return tokens.map((token, index) => <MarkdownInline token={token} key={index} />);
-}
+function renderMarkdownPre(
+  { children, "data-lang": dataLanguage, ...props }: MarkdownPreProps,
+  highlight: boolean,
+) {
+  const code = codeChild(children);
+  if (!code) return <pre {...props}>{children}</pre>;
 
-function MarkdownInline({ token }: { token: MarkdownToken }): ReactNode {
-  switch (token.type) {
-    case "strong":
-      return (
-        <strong>
-          <MarkdownInlineTokens tokens={token.tokens} />
-        </strong>
-      );
-    case "em":
-      return (
-        <em>
-          <MarkdownInlineTokens tokens={token.tokens} />
-        </em>
-      );
-    case "del":
-      return (
-        <del>
-          <MarkdownInlineTokens tokens={token.tokens} />
-        </del>
-      );
-    case "codespan":
-      return <code>{tokenText(token)}</code>;
-    case "br":
-      return <br />;
-    case "link": {
-      const href = safeMarkdownUrl(token.href);
-      const children = token.tokens?.length ? (
-        <MarkdownInlineTokens tokens={token.tokens} />
-      ) : (
-        tokenText(token)
-      );
-      return href ? (
-        <a href={href} title={tokenTitle(token)} target="_blank" rel="noreferrer">
-          {children}
-        </a>
-      ) : (
-        children
-      );
-    }
-    case "image": {
-      const src = safeMarkdownUrl(token.href);
-      return src ? (
-        <img src={src} alt={tokenText(token)} title={tokenTitle(token)} />
-      ) : (
-        tokenText(token)
-      );
-    }
-    case "html":
-      return tokenText(token);
-    default:
-      return token.tokens?.length ? (
-        <MarkdownInlineTokens tokens={token.tokens} />
-      ) : (
-        tokenText(token)
-      );
-  }
-}
+  const classLanguage = code.props.className?.match(/(?:^|\s)language-([^\s]+)/)?.[1];
+  const language = dataLanguage ?? classLanguage;
 
-function MarkdownBlocks({ tokens }: { tokens: MarkdownToken[] | undefined }) {
-  if (!tokens?.length) return null;
-  return tokens.map((token, index) => <MarkdownBlock token={token} key={index} />);
-}
-
-function MarkdownBlock({ token }: { token: MarkdownToken }): ReactNode {
-  switch (token.type) {
-    case "space":
-      return null;
-    case "hr":
-      return <hr />;
-    case "heading": {
-      const Tag =
-        `h${Math.min(Math.max(Number(token.depth) || 2, 1), 6)}` as keyof JSX.IntrinsicElements;
-      return (
-        <Tag>
-          <MarkdownInlineTokens tokens={token.tokens} />
-        </Tag>
-      );
-    }
-    case "paragraph":
-      return (
-        <p>
-          <MarkdownInlineTokens tokens={token.tokens} />
-        </p>
-      );
-    case "text":
-      return (
-        <p>
-          {token.tokens?.length ? <MarkdownInlineTokens tokens={token.tokens} /> : tokenText(token)}
-        </p>
-      );
-    case "blockquote":
-      return (
-        <blockquote>
-          <MarkdownBlocks tokens={token.tokens} />
-        </blockquote>
-      );
-    case "list": {
-      const ListTag = token.ordered ? "ol" : "ul";
-      return (
-        <ListTag start={typeof token.start === "number" ? token.start : undefined}>
-          {(token.items ?? []).map((item: MarkdownToken, itemIndex: number) => (
-            <li key={itemIndex}>
-              <MarkdownBlocks tokens={item.tokens} />
-            </li>
-          ))}
-        </ListTag>
-      );
-    }
-    case "code":
-      return (
-        <pre>
-          <code className={token.lang ? `language-${String(token.lang)}` : undefined}>
-            {tokenText(token)}
-          </code>
-        </pre>
-      );
-    case "table":
-      return (
-        <table>
-          <thead>
-            <tr>
-              {(token.header ?? []).map((cell: MarkdownToken, cellIndex: number) => (
-                <th key={cellIndex}>
-                  <MarkdownInlineTokens tokens={cell.tokens} />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(token.rows ?? []).map((row: MarkdownToken[], rowIndex: number) => (
-              <tr key={rowIndex}>
-                {row.map((cell, cellIndex) => (
-                  <td key={cellIndex}>
-                    <MarkdownInlineTokens tokens={cell.tokens} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      );
-    case "html":
-      return <p>{tokenText(token)}</p>;
-    default:
-      return token.tokens?.length ? (
-        <MarkdownBlocks tokens={token.tokens} />
-      ) : (
-        <p>{tokenText(token)}</p>
-      );
-  }
-}
-
-export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
-  const tokens = useMemo(() => marked.lexer(content) as MarkdownToken[], [content]);
   return (
-    <div className="markdown-body break-words text-sm text-text">
-      <MarkdownBlocks tokens={tokens} />
-    </div>
+    <CodeBlock code={String(code.props.children ?? "")} language={language} highlight={highlight} />
+  );
+}
+
+function MarkdownPre(props: MarkdownPreProps) {
+  return renderMarkdownPre(props, true);
+}
+
+function StreamingMarkdownPre(props: MarkdownPreProps) {
+  return renderMarkdownPre(props, false);
+}
+
+const markdownComponents = {
+  a: MarkdownLink,
+  h2: MarkdownFootnoteHeading,
+  img: MarkdownImage,
+  li: MarkdownFootnoteContainer,
+  pre: MarkdownPre,
+} satisfies MarkdownComponents;
+
+const streamingMarkdownComponents = {
+  ...markdownComponents,
+  pre: StreamingMarkdownPre,
+} satisfies MarkdownComponents;
+
+const streamingExtensions = [streamingMarkdownExtension()];
+
+export const MarkdownContent = memo(function MarkdownContent({
+  content,
+  streaming = false,
+}: {
+  content: string;
+  streaming?: boolean;
+}) {
+  const namespace = `markdown-${useId().replaceAll(":", "")}`;
+  return (
+    <MarkdownFootnoteNamespace.Provider value={namespace}>
+      <div className="markdown-content break-words text-sm text-text">
+        <Markdown
+          allowHtml={false}
+          frontmatter={false}
+          headingIds={false}
+          components={streaming ? streamingMarkdownComponents : markdownComponents}
+          extensions={streaming ? streamingExtensions : undefined}
+        >
+          {content}
+        </Markdown>
+      </div>
+    </MarkdownFootnoteNamespace.Provider>
   );
 });

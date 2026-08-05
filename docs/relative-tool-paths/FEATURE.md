@@ -222,31 +222,13 @@ displayArgs: tc.displayArgs,
 
 ### Render model
 
-Do not cast vendor `ToolCall` to add `_displayArguments`.
-
-Own a local web render type in one place, preferably `web/src/lib/pi-web-ui-bridge.ts` or a small adjacent module:
+The React chat consumes `ChatTimelineItem[]` directly. `buildConversationRows()` pairs canonical tool phases without adapting them to vendor message types. `ToolMessage` selects display input once:
 
 ```ts
-export type RenderableToolCall = ToolCall & {
-  displayArguments?: Record<string, unknown>;
-};
+const params = item.displayArgs ?? item.args;
 ```
 
-The bridge constructs renderable tool calls from timeline items:
-
-```ts
-{
-  type: "toolCall",
-  id: item.toolUseId,
-  name: item.tool,
-  arguments: item.args ?? {},
-  displayArguments: item.displayArgs ?? undefined,
-}
-```
-
-`web/src/pi-web-ui/chat-components.ts` consumes `displayArguments ?? arguments` directly. The canonical `arguments` remains available for any action path that needs raw values.
-
-If the vendor `AssistantMessage["content"]` type makes this awkward, define the local render message type used by Flitterbot's Lit components instead of pretending the content is exactly the vendor shape. The component is application-owned, so it can use the application render contract.
+Specialized summaries and details use `params`. The canonical `item.args` remains unchanged for persistence and any non-display behavior. No vendor `ToolCall` cast, private field, or parallel render type exists.
 
 ## Files
 
@@ -259,10 +241,10 @@ If the vendor `AssistantMessage["content"]` type makes this awkward, define the 
 - `src/contracts/websocket.ts` (modify) — add WS display args for tool calls and tool execution start.
 - `web/src/lib/types.ts` (modify) — mirror WS display args on the frontend union.
 - `web/src/lib/ws-query-bridge.ts` (modify) — store `displayArgs` on timeline tool items from `message_end.toolCalls`.
-- `web/src/lib/pi-web-ui-bridge.ts` (modify) — construct an owned renderable tool-call shape with `displayArguments`.
-- `web/src/pi-web-ui/chat-components.ts` (modify) — render `displayArguments ?? arguments` without mutating or augmenting vendor `ToolCall`.
+- `web/src/lib/conversation-rows.ts` — pair canonical timeline tool phases without adapting their shape.
+- `web/src/components/chat-tool-message.tsx` — render `displayArgs ?? args` directly from `ChatTimelineTool`.
 - `src/streams/tool-display.test.ts` (create) — formatter and cache invalidation behavior.
-- `web/src/lib/pi-web-ui-bridge.test.ts` or existing equivalent (modify/create) — verifies renderable tool calls preserve canonical args and expose display args.
+- `web/tests/conversation-rows.test.ts` — verifies canonical tool pairing without a vendor-message bridge.
 
 ## Test Plan
 
@@ -290,7 +272,7 @@ Cache tests:
 Contract/bridge tests:
 
 - `message_end.toolCalls[].args` remains canonical while `displayArgs` is persisted on `ChatTimelineTool`.
-- `timelineToAgentMessages()` emits renderable tool calls with raw `arguments` and optional `displayArguments`.
+- `buildConversationRows()` preserves canonical `args` and `displayArgs` on paired tool items.
 - Tool rendering uses display args for summaries and details.
 
 Manual checks:

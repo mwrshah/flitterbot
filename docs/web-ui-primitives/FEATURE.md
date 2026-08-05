@@ -59,7 +59,7 @@ The app has both generated `ui/*` primitives and app-facing `common/*` primitive
 - `web/src/components/common/copyable-code.tsx:12` — clickable `span`, not keyboard-accessible by default; needs copy control rendered as button or Button-rendered inline control.
 - `web/src/components/not-found.tsx:14` — raw Back button; needs app Button.
 - `web/src/components/default-catch-boundary.tsx:28` — raw button with legacy `button button-secondary` classes outside current primitive system; needs app Button.
-- `web/src/pi-web-ui/chat-components.ts:199,301,362,415,986,1003` — Lit raw buttons for copy, code copy, console copy, thinking toggle, message actions, prune menu item; needs Lit-compatible primitive layer or explicit boundary: legacy Pi web UI owns its style system until removed.
+- `web/src/components/chat-message-row.tsx`, `web/src/components/chat-tool-message.tsx`, and `web/src/components/common/code-block.tsx` — React-owned message and tool copy buttons use shared interaction classes but not one copy primitive; consolidate feedback and labeling without changing row ownership.
 
 ### Panels, cards, surfaces, containers
 
@@ -75,7 +75,7 @@ The app has both generated `ui/*` primitives and app-facing `common/*` primitive
 - `web/src/components/model-selector.tsx` — uses Base UI Menu directly instead of shared `DropdownMenu`; popup, sections, rows, auth badges, pin actions, thinking toggle, search box are custom. Missing: `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `MenuSection`, `MenuSearch`, `MenuActionButton`.
 - `web/src/components/path-picker.tsx` — uses `ui/command`, but custom portal/positioner and local item classes; needs shared `FloatingCommandPicker` for slash/path pickers.
 - `web/src/components/skill-picker.tsx` — same as PathPicker: `ui/command` plus local portal/positioning and repeated list/item styling; needs shared `FloatingCommandPicker`.
-- `web/src/pi-web-ui/chat-components.ts:986` — hand-rolled message actions menu with `role="menu"` and button `role="menuitem"`; needs Base UI Menu or legacy boundary decision.
+- `web/src/components/message-actions-menu.tsx` — message actions use the shared Base UI-backed dropdown menu; its trigger remains a local icon-button treatment.
 
 ### Inputs and forms
 
@@ -141,15 +141,14 @@ Required foundation set:
 6. Systemize panel/list/message surfaces.
    - Convert downstream panel and sidebar rows after foundations are stable.
    - Convert surface message bubbles and stream badges last; they are dense and performance-sensitive.
-7. Decide the Lit `pi-web-ui` boundary.
-   - If legacy/soon removed, document it as outside React primitive migration.
-   - If user-facing long-term, create Lit-compatible class helpers or web-component primitives mirroring React tokens and accessibility rules.
+7. Consolidate React chat controls.
+   - Move message, code, and tool copy controls onto one accessible feedback primitive.
+   - Keep message actions on the shared Base UI-backed dropdown menu.
 
 ## Discussion decisions needed
 
 - Which feature code may import `components/ui/*` directly, versus app-facing `common/*`?
 - Keep expanding `common/` as the primitive layer, or split generic primitives later?
-- Is `pi-web-ui/chat-components.ts` in scope or a legacy boundary?
 - Should `Composer` stay bespoke, or should its sub-controls use normal primitives wherever possible?
 - Enforcement level: documentation only, import restriction, or custom lint rule?
 

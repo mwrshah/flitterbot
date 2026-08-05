@@ -55,7 +55,7 @@ Stream route component
               → fetchPreviousPage near the top
 
 WebSocket event
-  → history cache helper
+  → conversationState
     → mutate newest infinite-query page
       → virtual message rows
 ```
@@ -63,15 +63,13 @@ WebSocket event
 Tests:
 
 ```text
-Synthetic session transcript
-  → browser history route
-    → cursor walk
-      → page boundary, ordering, and completeness assertions
+SDK message fixtures
+  → history parser and buildConversationRows
+    → ordered tool placement, phase pairing, update coalescing, turn-copy, and stable-key assertions
 
-History cache primitives
-  → page flattening
-  → newest-page mutation
-  → optimistic commit reconciliation
+Conversation state fixtures
+  → snapshot reconciliation
+    → current-incarnation overlays survive stale snapshot responses
 ```
 
 ## Component Tree
@@ -80,11 +78,10 @@ History cache primitives
 <PiSessionRoute>
 └── <ChatPanel>
     └── <StreamsMessageList>
-        └── <message-list>
-            └── visible virtual rows
+        └── visible React message and tool rows
 ```
 
-`PiSessionRoute` owns route validation. `useStreamsChat` owns infinite server data and previous-page loading. `ChatPanel` owns sending and optimistic writes. `StreamsMessageList` owns top detection and virtual scroll anchoring. The Lit message list renders only the published virtual range.
+`PiSessionRoute` owns route validation. `useStreamsChat` owns infinite server data and previous-page loading. `ChatPanel` owns sending and optimistic writes. `StreamsMessageList` derives rows directly from `ChatTimelineItem[]`; TanStack Virtual owns top detection, measured geometry, end anchoring, and prepend preservation.
 
 ## Files
 
@@ -92,11 +89,13 @@ History cache primitives
 - `src/streams/history.ts` — encodes cursors and slices complete visible-row pages.
 - `src/routes/browser-streams.ts` — validates pagination input and serves pages.
 - `web/src/server/streams.ts` — sends cursor requests through the existing server function.
-- `web/src/lib/history-cache.ts` — owns the infinite-query data shape and newest-page mutations.
+- `web/src/lib/conversation-state.ts` — owns infinite-query live writes and snapshot reconciliation.
 - `web/src/lib/queries.ts` — defines the infinite history query.
 - `web/src/hooks/use-streams-chat.ts` — flattens pages and exposes older-page loading.
-- `web/src/components/streams-message-list.tsx` — requests older pages near the top.
+- `web/src/lib/conversation-rows.ts` — pairs canonical message and tool items into virtual rows.
+- `web/src/components/streams-message-list.tsx` — renders measured React rows and requests older pages near the top.
 - `web/src/components/sidebar.tsx` — disables stream-history intent preloading.
 - `web/src/lib/ws-query-bridge.ts` — writes live events to the newest page.
-- `tests/streams-history-pagination.test.ts` — verifies the server contract.
-- `web/tests/history-cache.test.ts` — verifies client page ownership and reconciliation.
+- `tests/streams-history-message-order.test.ts` — verifies persisted text/thinking/tool block order.
+- `web/tests/conversation-rows.test.ts` — verifies ordered tool rendering, phase pairing, copy ownership, and stable row keys.
+- `web/tests/conversation-state.test.ts` — verifies snapshots, subscriptions, and stale-incarnation rejection.

@@ -1,7 +1,11 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
-import type { ChatTimelineMessage } from "../contracts/index.ts";
+import type {
+  ChatTimelineMessage,
+  ChatTimelineMessageBlock,
+  ImageAttachment,
+} from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { ensureConversationMessageId, findConversationEntry } from "./conversation-identity.ts";
 import { parseUsage, toolResultMessageToTimelineItem } from "./history.ts";
@@ -60,7 +64,6 @@ function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
   return undefined;
 }
 
-type MessageBlock = { type: "text"; text: string } | { type: "thinking"; thinking: string };
 type ExtractedToolCall = {
   toolUseId: string;
   toolName: string;
@@ -68,37 +71,50 @@ type ExtractedToolCall = {
   displayArgs?: unknown;
 };
 
-function extractMessageBlocks(message: unknown): {
+export function extractMessageBlocks(message: unknown): {
   text: string | undefined;
-  blocks: MessageBlock[];
+  blocks: ChatTimelineMessageBlock[];
+  images: ImageAttachment[];
   toolCalls: ExtractedToolCall[];
 } {
   if (!message || typeof message !== "object")
-    return { text: undefined, blocks: [], toolCalls: [] };
+    return { text: undefined, blocks: [], images: [], toolCalls: [] };
 
   const record = message as Record<string, unknown>;
   const content = record.content;
 
   if (Array.isArray(content)) {
-    const blocks: MessageBlock[] = [];
+    const blocks: ChatTimelineMessageBlock[] = [];
+    const images: ImageAttachment[] = [];
     const toolCalls: ExtractedToolCall[] = [];
     let textBuffer = "";
+    const flushTextBlock = () => {
+      const text = textBuffer;
+      textBuffer = "";
+      if (text.trim()) blocks.push({ type: "text", text });
+    };
 
     for (const block of content) {
       if (!block || typeof block !== "object") continue;
       const item = block as Record<string, unknown>;
       if (item.type === "text" && typeof item.text === "string") {
         textBuffer += item.text;
-        blocks.push({ type: "text", text: item.text });
+      } else if (
+        item.type === "image" &&
+        typeof item.data === "string" &&
+        typeof item.mimeType === "string"
+      ) {
+        images.push({ data: item.data, mimeType: item.mimeType });
       } else if (item.type === "thinking" && typeof item.thinking === "string") {
-        if (item.thinking.trim()) {
-          blocks.push({ type: "thinking", thinking: item.thinking });
-        }
+        flushTextBlock();
+        if (item.thinking.trim()) blocks.push({ type: "thinking", thinking: item.thinking });
       } else if (
         item.type === "toolCall" &&
         typeof item.id === "string" &&
         typeof item.name === "string"
       ) {
+        flushTextBlock();
+        blocks.push({ type: "tool", toolUseId: item.id });
         toolCalls.push({
           toolUseId: item.id,
           toolName: item.name,
@@ -107,8 +123,14 @@ function extractMessageBlocks(message: unknown): {
       }
     }
 
-    const text = textBuffer.trim().length > 0 ? textBuffer : undefined;
-    return { text, blocks, toolCalls };
+    flushTextBlock();
+    const textBlocks = blocks.flatMap((block) => (block.type === "text" ? [block.text] : []));
+    return {
+      text: textBlocks.length ? textBlocks.join("\n\n") : undefined,
+      blocks,
+      images,
+      toolCalls,
+    };
   }
 
   const directText = [record.text, record.message].find(
@@ -117,6 +139,7 @@ function extractMessageBlocks(message: unknown): {
   return {
     text: directText,
     blocks: directText ? [{ type: "text", text: directText }] : [],
+    images: [],
     toolCalls: [],
   };
 }
@@ -246,15 +269,25 @@ export function subscribeToPiSession(
 
         const role =
           capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
-        const { text: content, blocks, toolCalls } = extractMessageBlocks(capturedMessage);
-        if (!role || (!content && blocks.length === 0 && toolCalls.length === 0)) break;
-
+        if (!role) break;
+        const { text: content, blocks, images, toolCalls } = extractMessageBlocks(capturedMessage);
         const currentItem = role === "user" ? state.takeUserMessageItem() : undefined;
+        const capturedImages =
+          images.length > 0
+            ? images
+            : (currentItem?.images?.map(({ data, mimeType }) => ({ data, mimeType })) ?? []);
+        if (
+          !content &&
+          blocks.length === 0 &&
+          capturedImages.length === 0 &&
+          toolCalls.length === 0
+        )
+          break;
+
         const capturedSource = currentItem?.source;
         const capturedStreamId = currentItem?.streamId ?? sessionStreamId ?? undefined;
         const capturedStreamName = currentItem?.streamName ?? sessionStreamName ?? undefined;
-        const capturedHasThinking = blocks.some((b) => b.type === "thinking");
-        const capturedBlocks = capturedHasThinking ? blocks : undefined;
+        const capturedBlocks = blocks.length > 0 ? blocks : undefined;
         const enrichedToolCalls: ExtractedToolCall[] = toolCalls.map((tc) => {
           const display = toolDisplayCache.displayArgsForTool(
             session.sessionId,
@@ -281,6 +314,7 @@ export function subscribeToPiSession(
           createdAt: capturedTimestamp,
         };
         if (capturedBlocks) timelineMessage.blocks = capturedBlocks;
+        if (capturedImages.length > 0) timelineMessage.images = capturedImages;
         if (role === "assistant") {
           const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
           if (usage) timelineMessage.usage = usage;

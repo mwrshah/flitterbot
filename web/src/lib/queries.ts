@@ -43,23 +43,27 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
 }
 
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
+  const sessionId = piSessionId ?? "default";
   return infiniteQueryOptions({
     queryKey: conversationState.historyQueryKey(piSessionId),
-    queryFn: ({ pageParam }) =>
-      fetchStreamsHistory({
+    queryFn: async ({ pageParam }) => {
+      const generation = conversationState.snapshotGeneration(sessionId);
+      const snapshot = await fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
           surface: "agent",
           ...(pageParam ? { before: pageParam } : {}),
         },
-      }),
+      });
+      return conversationState.tagSnapshot(sessionId, generation, snapshot);
+    },
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
     getNextPageParam: () => undefined,
     enabled: piSessionId !== undefined,
     staleTime: conversationState.historyStaleTime,
     gcTime: 0,
-    structuralSharing: conversationState.snapshotReconciler(piSessionId ?? "default"),
+    structuralSharing: conversationState.snapshotReconciler(sessionId),
   });
 }
 

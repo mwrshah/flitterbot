@@ -247,7 +247,7 @@ styles.css
     → app utilities
       → common wrappers
       → application components and routes
-      → vendored pi-web-ui adapter
+      → React chat and tool surfaces
       → /theme live reference
 
 useTheme()
@@ -277,7 +277,7 @@ No component owns theme state beyond `useTheme`, synchronizes colors in React, o
 
 The cutover covers every current semantic or palette-color caller under `web/src`:
 
-- **Foundation and adapters:** `styles.css`, `alternate-theme.css`, `pi-web-ui.css`, `pi-web-ui/chat-components.ts`.
+- **Foundation and adapters:** `styles.css`, `alternate-theme.css`, and `chat.css`.
 - **Shared app primitives:** `components/common/badge.tsx`, `button.tsx`, `card.tsx`, `copyable-code.tsx`, `input.tsx`, `kbd.tsx`, `markdown-content.tsx`, `message-input.tsx`, and `resizable.tsx`.
 - **Application surfaces:** `components/auth-providers-section.tsx`, `chat-panel.tsx`, `downstream-sessions-panel.tsx`, `model-selector.tsx`, `not-found.tsx`, `path-picker.tsx`, `runtime-health-indicator.tsx`, `settings-drawer.tsx`, `sidebar.tsx`, `skill-picker.tsx`, `streams-message-list.tsx`, `surface.tsx`, and `whatsapp-controls.tsx`.
 - **Routes:** `routes/index.tsx`, `runtime.tsx`, `streams.$piSessionId.tsx`, `streams.route.tsx`, and `theme.tsx`.
@@ -309,7 +309,7 @@ The structural `Card` component API remains a layout abstraction; its colors use
 After the stylesheet contract and primitives are fixed, use disjoint file ownership:
 
 1. **Shell and routes** — sidebar, settings, auth, path/skill/model selectors, route layouts, not-found, and route pages.
-2. **Messaging** — chat panel, message input/list, surface rendering, `pi-web-ui.css`, and `pi-web-ui/chat-components.ts`.
+2. **Messaging** — chat panel, message input/list, message/tool rows, Markdown/code rendering, surface rendering, and `chat.css`.
 3. **Runtime and downstream** — runtime health, downstream sessions, WhatsApp controls, status badges, and diff containers.
 
 Each stream migrates app-owned semantics at the call site and removes palette literals. Only the foundation owner edits the shadcn adapter. Shared stylesheet or primitive changes return to that owner rather than being duplicated across streams.
@@ -364,8 +364,8 @@ Delete any migration-only notes; retain this FEATURE.md only
 - `web/src/styles.css` — modify: sole canonical theme, base rules, and specialist tokens.
 - `web/src/alternate-theme.css` — remove: alternate scope and duplicate token source.
 - `web/src/routes/theme.tsx` — modify: global canonical reference without alternate scoping.
-- `web/src/pi-web-ui.css` — modify: canonical markdown, syntax, message, and adapter colors.
-- `web/src/pi-web-ui/chat-components.ts` — modify: canonical message-component utilities.
+- `web/src/chat.css` — modify: canonical Markdown, syntax, message, tool, and disclosure colors.
+- `web/src/components/chat-message-row.tsx` and `chat-tool-message.tsx` — modify: canonical React message-component utilities.
 - `web/src/components/ui/**` — audit: keep generated recipes aligned with shadcn and verify adapter coverage.
 - `web/src/components/common/**` — modify: canonical shared primitive recipes.
 - `web/src/components/*.tsx` — modify: canonical application and status semantics.

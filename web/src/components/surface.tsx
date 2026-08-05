@@ -2,15 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { CopyIcon, SettingsIcon } from "lucide-react";
-import {
-  type MouseEvent,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "~/components/common/markdown-content";
@@ -18,6 +10,7 @@ import { MessageInput } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
 import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
+import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { surfaceTimelineQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "~/lib/types";
@@ -155,34 +148,23 @@ function ImageStack({ images }: { images: ImageAttachment[] }) {
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const onClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 1500);
-    });
-  };
+  const { copied, copy } = useCopyToClipboard();
+  const label = copied ? "Copied" : "Copy message";
 
   return (
     <button
       type="button"
-      onClick={onClick}
-      title={copied ? "Copied" : "Copy message"}
+      onClick={(event) => {
+        event.stopPropagation();
+        void copy(text).catch((error) => console.error("Failed to copy message", error));
+      }}
+      title={label}
+      aria-label={label}
       className={`absolute bottom-1.5 right-1.5 cursor-pointer rounded p-1 transition-colors ${
         copied ? "text-status-active" : "text-text-muted hover:text-text"
       }`}
     >
-      <CopyIcon className="w-3.5 h-3.5" />
+      <CopyIcon className="w-3.5 h-3.5" aria-hidden="true" />
     </button>
   );
 }

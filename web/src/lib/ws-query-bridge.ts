@@ -97,7 +97,7 @@ export function setupWsQueryBridge(deps: {
       const msg = message.message;
 
       const blocks = (msg as ChatTimelineMessage).blocks;
-      const hasContent = msg.content.trim() || (blocks && blocks.length > 0);
+      const hasContent = Boolean(msg.content.trim() || blocks?.length || msg.images?.length);
       const isUser = msg.role === "user";
 
       if (hasContent || message.toolCalls?.length) {
@@ -140,7 +140,7 @@ export function setupWsQueryBridge(deps: {
         streamId: message.message.streamId ?? message.streamId,
         streamName: message.message.streamName ?? message.streamName,
       };
-      if (!surfacedMessage.content.trim()) return;
+      if (!surfacedMessage.content.trim() && !surfacedMessage.images?.length) return;
 
       conversationState.commitSurface(queryClient, surfacedMessage);
       return;

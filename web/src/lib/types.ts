@@ -27,10 +27,12 @@ export type {
 export type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  ChatTimelineMessageBlock,
   ChatTimelineTool,
   ImageAttachment,
   JsonValue,
   MessageSource,
+  TokenUsage,
 } from "../../../src/contracts/timeline.ts";
 export type { TranscriptPageResponse } from "../../../src/contracts/transcript.ts";
 

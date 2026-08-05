@@ -82,9 +82,11 @@ function pushMessage(
   piEntryId?: string,
 ): void {
   const normalized = content.trim();
-  const normalizedBlocks = blocks?.filter((block) =>
-    block.type === "text" ? block.text.trim() : block.thinking.trim(),
-  );
+  const normalizedBlocks = blocks?.filter((block) => {
+    if (block.type === "text") return block.text.trim();
+    if (block.type === "thinking") return block.thinking.trim();
+    return block.toolUseId.trim();
+  });
   if (
     !normalized &&
     (!normalizedBlocks || normalizedBlocks.length === 0) &&
@@ -134,9 +136,9 @@ function parseMessageContent(
   let textBuffer = "";
 
   const flushTextBlock = () => {
-    if (!textBuffer.trim()) return;
-    messageBlocks.push({ type: "text", text: textBuffer });
+    const text = textBuffer;
     textBuffer = "";
+    if (text.trim()) messageBlocks.push({ type: "text", text });
   };
 
   for (const block of content) {
@@ -174,6 +176,7 @@ function parseMessageContent(
     ) {
       flushTextBlock();
       const toolUseId = record.id;
+      messageBlocks.push({ type: "tool", toolUseId });
       toolItems.push({
         id: `tool-${toolUseId}-start`,
         kind: "tool",
@@ -188,7 +191,7 @@ function parseMessageContent(
 
   flushTextBlock();
   const contentText = messageBlocks
-    .map((block) => (block.type === "text" ? block.text : block.thinking))
+    .flatMap((block) => (block.type === "text" ? [block.text] : []))
     .join("\n\n");
   pushMessage(
     items,

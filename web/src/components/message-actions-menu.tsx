@@ -1,5 +1,4 @@
 import { EllipsisVerticalIcon } from "lucide-react";
-import { createRoot, type Root } from "react-dom/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +6,13 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 
-function MessageActionsMenu({ onFork, onPrune }: { onFork: () => void; onPrune: () => void }) {
+export function MessageActionsMenu({
+  onFork,
+  onPrune,
+}: {
+  onFork: () => void;
+  onPrune: () => void;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -46,40 +51,4 @@ function MessageActionsMenu({ onFork, onPrune }: { onFork: () => void; onPrune: 
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-class MessageActionsMenuElement extends HTMLElement {
-  entryId?: string;
-  private root?: Root;
-
-  connectedCallback(): void {
-    this.style.display = "contents";
-    this.root = createRoot(this);
-    this.root.render(
-      <MessageActionsMenu
-        onFork={() => this.dispatchAction("fork-message")}
-        onPrune={() => this.dispatchAction("prune-message")}
-      />,
-    );
-  }
-
-  disconnectedCallback(): void {
-    this.root?.unmount();
-    this.root = undefined;
-  }
-
-  private dispatchAction(name: "fork-message" | "prune-message"): void {
-    if (!this.entryId) return;
-    this.dispatchEvent(
-      new CustomEvent(name, {
-        detail: { entryId: this.entryId },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
-}
-
-if (!customElements.get("message-actions-menu")) {
-  customElements.define("message-actions-menu", MessageActionsMenuElement);
 }

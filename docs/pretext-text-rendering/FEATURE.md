@@ -28,14 +28,11 @@ Uses `prepareWithSegments()` + `layoutWithLines()` to compute the X offset of th
 
 `measureTextWidth()` wraps `prepareWithSegments()` + `layoutWithLines()` (huge width = single line). `smartMiddleTruncate()` binary-searches for the longest suffix that fits: `"pa...tures"`. Called per path result during render.
 
-## Spec Status
+## Ownership Boundary
 
-| Spec | Status |
-|---|---|
-| `specs/01-virtualization-height-prediction/` | **Implemented** in surface.tsx. Module-level prepare cache, layout-based height estimation, custom virtualizer with binary search. |
-| `specs/02-chat-bubble-shrinkwrap/` | Not implemented. Bubbles use CSS max-width. |
-| `specs/03-streaming-layout-integration/` | Not implemented. No height prediction during streaming. |
-| `specs/04-sidebar-label-measurement/` | Not implemented. Sidebar uses CSS truncation. |
+Pretext serves text-only surfaces where its font metrics match the rendered content. The chat timeline intentionally does not use Pretext for height prediction or bubble sizing: Markdown, code, images, thinking disclosures, and tool cards make plain-text estimates inaccurate. `StreamsMessageList` uses TanStack Virtual's DOM measurement for visible chat rows, end anchoring, and streaming growth.
+
+The sidebar still uses CSS truncation; `specs/04-sidebar-label-measurement/` remains unimplemented.
 
 ## Key Files
 

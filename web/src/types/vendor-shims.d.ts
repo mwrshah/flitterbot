@@ -9,8 +9,3 @@ declare module "highlight.js/lib/languages/*" {
   const language: any;
   export default language;
 }
-
-declare module "marked" {
-  // biome-ignore lint/suspicious/noExplicitAny: vendor type stub
-  export const marked: any;
-}

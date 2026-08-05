@@ -21,9 +21,9 @@ At each edge, ask: runtime shape, owner, invariant, source mutability, and avail
 ### Messaging and agent execution
 
 1. **Web user message → Pi turn → streamed browser result → final surfacing**
-   - Path: `MessageInput`/`Surface` → route context `sendMessage` → `createSendMessage` → `FlitterbotWsClient.sendMessage` → `WebSocketHub` → `ControlSurfaceRuntime.handleWebSocketMessage` → classification/explicit target → `runtime.enqueue` → `TurnQueue` → `processQueueItem` → Pi `AgentSession.prompt` → `AgentSessionEvent` subscription → websocket server events → `ws-query-bridge` → streaming/tool stores and TanStack Query → `ChatPanel`/Lit message list; final assistant text → blackboard + WhatsApp + `stream_surfaced`.
-   - Runtime identities: browser command, `QueueItem`, Pi SDK messages/events, websocket events, `ChatTimelineItem`, Pi UI `AgentMessage`.
-   - Legitimate changes: external browser command → queue item; SDK event/message → transport-safe timeline/event; timeline → Pi UI library message at render boundary.
+   - Path: `MessageInput`/`Surface` → route context `sendMessage` → `createSendMessage` → `FlitterbotWsClient.sendMessage` → `WebSocketHub` → `ControlSurfaceRuntime.handleWebSocketMessage` → classification/explicit target → `runtime.enqueue` → `TurnQueue` → `processQueueItem` → Pi `AgentSession.prompt` → `AgentSessionEvent` subscription → websocket server events → `ws-query-bridge` → conversation snapshots and TanStack Query → `ChatPanel`/React virtual rows; final assistant text → blackboard + WhatsApp + `stream_surfaced`.
+   - Runtime identities: browser command, `QueueItem`, Pi SDK messages/events, websocket events, and canonical `ChatTimelineItem` render data.
+   - Legitimate changes: external browser command → queue item; SDK event/message → transport-safe timeline/event.
    - Current excess: pass-through `createSendMessage`; local `SendMessageFn`; handwritten browser `WsMessage` duplicate of the shared websocket union; handwritten `PiSessionSubscriptionEvent` duplicate of SDK `AgentSessionEvent`; `SubscribablePiSession` projection of SDK `AgentSession`; record-built client events; payload aliases and casts around already typed events.
 
 2. **WhatsApp inbound → classification → Pi turn → WhatsApp/web response**
@@ -45,18 +45,18 @@ At each edge, ask: runtime shape, owner, invariant, source mutability, and avail
    - Excess: imported result renames, response/failure unions copying tmux result semantics, inspection snapshots transformed before one consumer.
 
 6. **Pi SDK event → websocket → browser state**
-   - Path: `AgentSessionEvent` → `pi-subscribe.ts` → `ControlSurfaceWebSocketServerEvent` → `WebSocketHub.broadcast` → JSON → browser websocket client → query bridge → one of streaming store, active-tool store, history cache, status invalidation, or toast.
+   - Path: `AgentSessionEvent` → `pi-subscribe.ts` → `ControlSurfaceWebSocketServerEvent` → `WebSocketHub.broadcast` → JSON → browser websocket client → query bridge → one of localized conversation snapshots, canonical timeline cache, status invalidation, or toast.
    - Excess: SDK event union copied locally; shared server-event union copied again as `WsMessage`; event payloads retain both selected fields and raw `event`; transport fields use `unknown` where `JsonValue`/SDK fields already own shape; no-op `toolcall_start`; one-call broadcast wrapper.
 
 7. **Assistant message commit and tool lifecycle**
-   - Path: SDK `message_end` → `extractMessageBlocks` → `ChatTimelineMessage` plus separate `toolCalls` → browser reconstructs `ChatTimelineTool[]` → `commitMessageEndToPage`; tool execution events → active store; SDK tool-result message → `toolResultMessageToTimelineItem` → canonical end item → cache → `timelineToAgentMessages` pairs calls/results for Lit.
-   - Legitimate changes: SDK provider message → app timeline at server boundary; timeline → Pi UI message at render boundary.
-   - Excess: tool calls split from message then rejoined by adjacency; start/update/end shapes overlap; history parser and live subscriber separately parse SDK message content; repeated dedup identities and casts.
+   - Path: SDK `message_end` → `extractMessageBlocks` → ordered `ChatTimelineMessage.blocks` with tool references plus `ChatTimelineTool[]` → conversation-state cache commit; tool execution events → keyed transient tool snapshot; SDK tool-result message → `toolResultMessageToTimelineItem` → canonical end item → cache → `buildConversationRows` pairs start/end by `toolUseId` for direct React rendering.
+   - Legitimate changes: SDK provider message → app timeline at the server boundary.
+   - Remaining review target: history parsing and live subscription still parse SDK message content in separate functions.
 
 8. **Agent history reload/pagination → browser cache → render**
-   - Path: Pi `SessionManager` branch/JSONL → `entriesToTimeline` → history route/page → `StreamsHistoryResponse` → TanStack infinite query → `mergeHistoryPages` → flat timeline → `timelineToAgentMessages` → Lit.
-   - Legitimate changes: persisted SDK entries → timeline; query pages remain TanStack-owned; flat timeline → render-native messages.
-   - Excess: live and persisted paths produce timeline through different parsers; cursor/page response optionality; duplicated merge/dedup identity logic in `history-cache`, query bridge, and surface timeline.
+   - Path: Pi `SessionManager` branch/JSONL → `entriesToTimeline` → history route/page → `StreamsHistoryResponse` → TanStack infinite query → flat timeline → `buildConversationRows` → TanStack Virtual React rows.
+   - Legitimate changes: persisted SDK entries → timeline; query pages remain TanStack-owned; row grouping preserves the timeline contract.
+   - Remaining review targets: live and persisted paths parse SDK content separately; cursor/page response optionality.
 
 9. **Input Surface unified timeline**
    - Path: blackboard messages/history APIs + `message_ack` optimistic user entry + `stream_surfaced` final entries → `surface-timeline` query → `timelineToEntries` → rows.
@@ -184,8 +184,8 @@ Pi AgentSessionEvent (SDK-owned)
 → one server adaptation to ControlSurfaceWebSocketServerEvent
 → JSON transport
 → ControlSurfaceWebSocketServerEvent (shared contract in browser)
-→ library-owned TanStack Query / imperative streaming stores
-→ ChatTimelineItem or ephemeral tool state
+→ library-owned TanStack Query / keyed conversation snapshots
+→ ChatTimelineItem or ephemeral streaming/tool state
 ```
 
 Browser commands use the inverse shared contract:

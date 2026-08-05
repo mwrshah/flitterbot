@@ -37,14 +37,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { useAgentMessages } from "~/hooks/use-agent-messages";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { latestMeasuredContextUsage } from "~/lib/context-usage";
 import { conversationState } from "~/lib/conversation-state";
-import { streamingUiDebug } from "~/lib/debug-log";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
@@ -431,8 +429,6 @@ export function ChatPanel({
   const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
   const pendingPostedScrollClientMessageIdsRef = useRef<Set<string>>(new Set());
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
-  const agentMessages = useAgentMessages(timeline);
-
   const pruneMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),
     onSuccess: () => {
@@ -532,58 +528,6 @@ export function ChatPanel({
       onSettled: () => setPruneTarget(null),
     });
   }, [pruneTarget, pruneMutation]);
-
-  useEffect(() => {
-    const unsubscribe = conversationState.subscribe(piSessionId, {
-      onStreaming(streaming) {
-        if (streaming) {
-          messageListRef.current?.updateStreaming(
-            {
-              role: "assistant",
-              content: [
-                ...(streaming.thinking
-                  ? [{ type: "thinking" as const, thinking: streaming.thinking }]
-                  : []),
-                ...(streaming.text ? [{ type: "text" as const, text: streaming.text }] : []),
-              ],
-              api: "openai-responses",
-              provider: "openai",
-              model: "",
-              usage: {
-                input: 0,
-                output: 0,
-                cacheRead: 0,
-                cacheWrite: 0,
-                totalTokens: 0,
-                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-              },
-              stopReason: "stop",
-              timestamp: Date.now(),
-            },
-            streaming.thinkingActive,
-          );
-        } else {
-          streamingUiDebug(
-            "[debug][ChatPanel] clearStreaming() — conversation state ended streaming for session=%s",
-            piSessionId,
-          );
-          messageListRef.current?.clearStreaming();
-        }
-      },
-      onTool(event) {
-        if (event.type === "clear_all") {
-          messageListRef.current?.clearActiveTools();
-          return;
-        }
-        messageListRef.current?.applyActiveToolState(event.state);
-      },
-    });
-    return () => {
-      unsubscribe();
-      messageListRef.current?.clearStreaming();
-      messageListRef.current?.clearActiveTools();
-    };
-  }, [piSessionId]);
 
   const addImageFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -821,7 +765,8 @@ export function ChatPanel({
               <StreamsMessageList
                 key={piSessionId}
                 ref={messageListRef}
-                messages={agentMessages}
+                piSessionId={piSessionId}
+                timeline={timeline}
                 viewportRef={viewportRef}
                 onPruneRequested={handlePruneRequested}
                 onForkRequested={handleForkRequested}

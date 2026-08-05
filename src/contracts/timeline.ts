@@ -29,13 +29,18 @@ export type TokenUsage = {
   totalTokens: number;
 };
 
+export type ChatTimelineMessageBlock =
+  | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string }
+  | { type: "tool"; toolUseId: string };
+
 export type ChatTimelineMessage = {
   id: string;
   piEntryId?: string;
   kind: "message";
   role: "user" | "assistant" | "system";
   content: string;
-  blocks?: Array<{ type: "text"; text: string } | { type: "thinking"; thinking: string }>;
+  blocks?: ChatTimelineMessageBlock[];
   images?: ImageAttachment[];
   source?: MessageSource;
   streamId?: string;
