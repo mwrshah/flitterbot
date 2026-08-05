@@ -129,8 +129,8 @@ function PiSessionRoute() {
           isSessionBusy={isSessionBusy}
           onSendMessage={onSendMessage}
           onLoadPrevious={loadPreviousPage}
-          hasPrevious={hasPreviousPage}
-          isLoadingPrevious={isFetchingPreviousPage}
+          hasPreviousPage={hasPreviousPage}
+          isFetchingPreviousPage={isFetchingPreviousPage}
           streamId={isDefaultSession ? undefined : stream?.id}
           streamName={isDefaultSession ? "flitterbot" : stream?.name}
           streamType={isDefaultSession ? "defaultStream" : stream?.type}

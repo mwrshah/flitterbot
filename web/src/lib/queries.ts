@@ -40,7 +40,7 @@ export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   };
 }
 
-const STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT = 4;
+const STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT = 30;
 const STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT = 10;
 const STREAMS_HISTORY_GC_TIME_MS = 30_000;
 

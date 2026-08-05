@@ -96,8 +96,8 @@ type ChatPanelProps = {
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
   ) => Promise<void>;
   onLoadPrevious: () => void;
-  hasPrevious: boolean;
-  isLoadingPrevious: boolean;
+  hasPreviousPage: boolean;
+  isFetchingPreviousPage: boolean;
   streamId?: string;
   streamName?: string;
   streamType?: StreamSummary["type"];
@@ -291,8 +291,8 @@ export function ChatPanel({
   isSessionBusy,
   onSendMessage,
   onLoadPrevious,
-  hasPrevious,
-  isLoadingPrevious,
+  hasPreviousPage,
+  isFetchingPreviousPage,
   streamId,
   streamName,
   streamType,
@@ -464,8 +464,6 @@ export function ChatPanel({
       return next;
     });
   }, []);
-
-  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     clearBusyQueuedText();
@@ -729,25 +727,18 @@ export function ChatPanel({
       >
         <Panel id="feed" defaultSize="85%" minSize="20%">
           <div className="relative h-full">
-            <div
-              ref={viewportRef}
-              data-scroll-container="main"
-              className="h-full overflow-auto px-6"
-            >
-              <StreamsMessageList
-                key={piSessionId}
-                ref={messageListRef}
-                piSessionId={piSessionId}
-                timeline={timeline}
-                viewportRef={viewportRef}
-                onPruneRequested={handlePruneRequested}
-                onForkRequested={handleForkRequested}
-                isSessionBusy={isSessionBusy}
-                onLoadPrevious={onLoadPrevious}
-                hasPrevious={hasPrevious}
-                isLoadingPrevious={isLoadingPrevious}
-              />
-            </div>
+            <StreamsMessageList
+              key={piSessionId}
+              ref={messageListRef}
+              piSessionId={piSessionId}
+              timeline={timeline}
+              onPruneRequested={handlePruneRequested}
+              onForkRequested={handleForkRequested}
+              isSessionBusy={isSessionBusy}
+              onLoadPrevious={onLoadPrevious}
+              hasPreviousPage={hasPreviousPage}
+              isFetchingPreviousPage={isFetchingPreviousPage}
+            />
             <QueuedBusyOverlay text={busyQueuedText} />
           </div>
         </Panel>
