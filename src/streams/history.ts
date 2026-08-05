@@ -11,10 +11,10 @@ import {
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  ChatTimelineMessageBlock,
   ChatTimelineTool,
   ImageAttachment,
   JsonValue,
-  StreamsHistoryResponse,
   TokenUsage,
 } from "../contracts/index.ts";
 import { conversationMessageId } from "./conversation-identity.ts";
@@ -37,8 +37,6 @@ export function parseUsage(value: unknown): TokenUsage | undefined {
 }
 
 type StreamsHistoryMode = "agent" | "input";
-
-type StreamsHistoryMessageBlock = NonNullable<ChatTimelineMessage["blocks"]>[number];
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -76,7 +74,7 @@ function pushMessage(
   role: "user" | "assistant" | "system",
   content: string,
   createdAt: string,
-  blocks?: StreamsHistoryMessageBlock[],
+  blocks?: ChatTimelineMessageBlock[],
   images?: ImageAttachment[],
   usage?: TokenUsage,
   piEntryId?: string,
@@ -122,15 +120,24 @@ function parseMessageContent(
   content: unknown,
   usage?: TokenUsage,
   piEntryId?: string,
+  fallbackImages?: ImageAttachment[],
 ): void {
   if (!Array.isArray(content)) {
-    const text = firstText(content);
-    if (text)
-      pushMessage(items, messageId, role, text, createdAt, undefined, undefined, usage, piEntryId);
+    pushMessage(
+      items,
+      messageId,
+      role,
+      firstText(content) ?? "",
+      createdAt,
+      undefined,
+      fallbackImages,
+      usage,
+      piEntryId,
+    );
     return;
   }
 
-  const messageBlocks: StreamsHistoryMessageBlock[] = [];
+  const messageBlocks: ChatTimelineMessageBlock[] = [];
   const imageAttachments: ImageAttachment[] = [];
   const toolItems: ChatTimelineTool[] = [];
   let textBuffer = "";
@@ -179,6 +186,7 @@ function parseMessageContent(
       messageBlocks.push({ type: "tool", toolUseId });
       toolItems.push({
         id: `tool-${toolUseId}-start`,
+        ...(piEntryId ? { piEntryId } : {}),
         kind: "tool",
         tool: record.name,
         phase: "start",
@@ -200,67 +208,73 @@ function parseMessageContent(
     contentText,
     createdAt,
     messageBlocks,
-    imageAttachments,
+    imageAttachments.length ? imageAttachments : fallbackImages,
     usage,
     piEntryId,
   );
   items.push(...toolItems);
 }
 
-function parseMessageRecord(
-  messageRecord: Record<string, unknown>,
-  createdAt: string,
-  messageId: string,
-  piEntryId: string,
-  items: ChatTimelineItem[],
-): void {
-  const role = messageRecord.role;
-
-  if (role === "user" || role === "assistant" || role === "system") {
-    const usage = role === "assistant" ? parseUsage(messageRecord.usage) : undefined;
-    parseMessageContent(items, messageId, role, createdAt, messageRecord.content, usage, piEntryId);
-    return;
-  }
-
-  if (role === "toolResult") {
-    const item = toolResultMessageToTimelineItem(messageRecord, createdAt, piEntryId);
-    if (item) items.push(item);
-  }
-}
-
-export function toolResultMessageToTimelineItem(
+export function piMessageToTimelineItems(
   message: unknown,
-  createdAt: string,
-  piEntryId?: string,
-): ChatTimelineTool | undefined {
-  const messageRecord = asRecord(message);
-  if (messageRecord.role !== "toolResult") return undefined;
+  {
+    messageId,
+    createdAt,
+    piEntryId,
+    fallbackImages,
+  }: {
+    messageId: string;
+    createdAt: string;
+    piEntryId?: string;
+    fallbackImages?: ImageAttachment[];
+  },
+): ChatTimelineItem[] {
+  const record = asRecord(message);
+  const role = record.role;
+  if (role === "user" || role === "assistant" || role === "system") {
+    const items: ChatTimelineItem[] = [];
+    const usage = role === "assistant" ? parseUsage(record.usage) : undefined;
+    parseMessageContent(
+      items,
+      messageId,
+      role,
+      createdAt,
+      record.content,
+      usage,
+      piEntryId,
+      fallbackImages,
+    );
+    return items;
+  }
+  if (role !== "toolResult") return [];
 
-  const resultText = firstText(messageRecord.content);
-  const toolCallId = messageRecord.toolCallId;
-  const toolName = messageRecord.toolName;
+  const resultText = firstText(record.content);
+  const toolCallId = record.toolCallId;
+  const toolName = record.toolName;
   if (
     typeof toolCallId !== "string" ||
     !toolCallId.trim() ||
     typeof toolName !== "string" ||
     !toolName.trim()
   ) {
-    return undefined;
+    return [];
   }
 
-  return {
-    id: `tool-${toolCallId}-end`,
-    ...(piEntryId ? { piEntryId } : {}),
-    kind: "tool",
-    tool: toolName,
-    phase: "end",
-    toolUseId: toolCallId,
-    result: (messageRecord.toolName === "bash"
-      ? resultText
-      : (messageRecord.details ?? resultText)) as JsonValue | undefined,
-    isError: Boolean(messageRecord.isError),
-    createdAt,
-  };
+  return [
+    {
+      id: `tool-${toolCallId}-end`,
+      ...(piEntryId ? { piEntryId } : {}),
+      kind: "tool",
+      tool: toolName,
+      phase: "end",
+      toolUseId: toolCallId,
+      result: (toolName === "bash" ? resultText : (record.details ?? resultText)) as
+        | JsonValue
+        | undefined,
+      isError: Boolean(record.isError),
+      createdAt,
+    },
+  ];
 }
 
 function keepOnlySurfacedAssistant(items: ChatTimelineItem[]): ChatTimelineItem[] {
@@ -375,12 +389,12 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
     if (entry.type !== "message") continue;
     const messageRecord = asRecord(entry.message);
     const createdAt = isoTimestamp(messageRecord.timestamp, entry.timestamp);
-    parseMessageRecord(
-      messageRecord,
-      createdAt,
-      conversationMessageId(messageRecord) ?? entry.id,
-      entry.id,
-      items,
+    items.push(
+      ...piMessageToTimelineItems(messageRecord, {
+        messageId: conversationMessageId(messageRecord) ?? entry.id,
+        createdAt,
+        piEntryId: entry.id,
+      }),
     );
   }
   return items;
@@ -421,11 +435,9 @@ export function clampVisibleRowLimit(raw: string | null): number {
   return truncated;
 }
 
-export type HistoryPage = {
+type HistoryPage = {
   items: ChatTimelineItem[];
   olderPageCursor: string | null;
-  hasOlderRows: boolean;
-  appliedVisibleRowLimit: number;
 };
 
 export function takePageEndingBeforeCursor(
@@ -459,45 +471,31 @@ export function takePageEndingBeforeCursor(
   const hasOlderRows = items.slice(0, firstItemOfPage).some(isVisibleRow);
   return {
     items: items.slice(hasOlderRows ? firstItemOfPage : 0, endExclusive),
-    hasOlderRows,
     olderPageCursor: hasOlderRows
       ? encodeHistoryCursor(items[firstItemOfPage]!, firstItemOfPage)
       : null,
-    appliedVisibleRowLimit: visibleRowLimit,
   };
 }
 
 export function readStreamsHistoryFromSession(
-  piSessionId: string,
   sessionManager: SessionManager,
   mode: StreamsHistoryMode = "agent",
-): StreamsHistoryResponse {
-  const sessionFile = sessionManager.getSessionFile() ?? null;
-  const branch = sessionManager.getBranch();
-  const items = entriesToTimeline(branch);
-  return {
-    piSessionId,
-    sessionFile,
-    items: shapeHistoryItems(items, mode),
-  };
+): ChatTimelineItem[] {
+  return shapeHistoryItems(entriesToTimeline(sessionManager.getBranch()), mode);
 }
 
 export function readStreamsHistory(
   piSessionId: string,
   sessionFile: string,
   mode: StreamsHistoryMode = "agent",
-): StreamsHistoryResponse {
+): ChatTimelineItem[] {
   if (!fs.existsSync(sessionFile)) {
     console.warn(
       "readStreamsHistory: session file missing on disk (sessionId=%s, file=%s)",
       piSessionId,
       sessionFile,
     );
-    return {
-      piSessionId,
-      sessionFile,
-      items: [],
-    };
+    return [];
   }
 
   let raw: string;
@@ -510,7 +508,7 @@ export function readStreamsHistory(
       sessionFile,
       err instanceof Error ? err.message : String(err),
     );
-    return { piSessionId, sessionFile, items: [] };
+    return [];
   }
 
   const fileEntries = parseSessionEntries(raw);
@@ -522,9 +520,7 @@ export function readStreamsHistory(
     byId.set(fe.id, fe);
   }
 
-  if (entries.length === 0) {
-    return { piSessionId, sessionFile, items: [] };
-  }
+  if (entries.length === 0) return [];
 
   const leaf = entries[entries.length - 1]!;
   const path: SessionEntry[] = [];
@@ -534,10 +530,5 @@ export function readStreamsHistory(
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }
 
-  const items = entriesToTimeline(path);
-  return {
-    piSessionId,
-    sessionFile,
-    items: shapeHistoryItems(items, mode),
-  };
+  return shapeHistoryItems(entriesToTimeline(path), mode);
 }

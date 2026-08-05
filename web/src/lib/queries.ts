@@ -3,7 +3,6 @@ import type { FlitterbotApiClient } from "~/lib/api";
 import { historyQueryKey, surfaceQueryKey } from "~/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
 import type {
-  ChatTimelineItem,
   DirectoryCompletionsResponse,
   DownstreamSessionItem,
   SkillPickerItem,
@@ -15,7 +14,6 @@ import {
   fetchDownstreamSessions,
   fetchStreamsDiff,
   fetchStreamsHistory,
-  fetchStreamsInputHistory,
   fetchStreamsWorktree,
   type StreamInfo,
 } from "~/server/streams";
@@ -115,8 +113,7 @@ export function userConfigQueryOptions() {
 export function surfaceTimelineQueryOptions() {
   return {
     queryKey: surfaceQueryKey,
-    queryFn: async (): Promise<ChatTimelineItem[]> =>
-      (await fetchStreamsInputHistory()) as ChatTimelineItem[],
+    queryFn: async () => (await fetchStreamsHistory({ data: { surface: "input" } })).items,
     staleTime: 0, // WS writes reset dataUpdatedAt while viewing
     structuralSharing: replaceEqualDeep,
   };

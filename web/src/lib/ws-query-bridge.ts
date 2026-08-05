@@ -9,8 +9,9 @@ import {
 } from "~/lib/conversation-history";
 import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
-import type { ChatTimelineMessage, ChatTimelineTool, JsonValue } from "~/lib/types";
+import type { ChatTimelineMessage } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
+import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
 
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
@@ -20,7 +21,7 @@ export function setupWsQueryBridge(deps: {
   const { queryClient, wsClient, router } = deps;
   const recovering = new Set<string>();
 
-  const reloadHistory = async (piSessionId: string) => {
+  const reloadHistory = async (piSessionId: string, resumePosition?: ConversationEventPosition) => {
     if (recovering.has(piSessionId)) return;
     recovering.add(piSessionId);
     wsClient.pauseSessionSubscription(piSessionId);
@@ -30,11 +31,10 @@ export function setupWsQueryBridge(deps: {
     try {
       await router.invalidate();
       if (wsClient.activeSubscriptionPiSessionId() !== piSessionId) return;
-      const data = queryClient.getQueryData<{
-        pages: Array<{ live?: Parameters<typeof conversationState.installSnapshot>[1] }>;
-      }>(historyQueryKey(piSessionId));
-      conversationState.installSnapshot(piSessionId, data?.pages.at(-1)?.live);
-      wsClient.setResumePosition(piSessionId, latestHistoryPosition(queryClient, piSessionId));
+      wsClient.setResumePosition(
+        piSessionId,
+        resumePosition ?? latestHistoryPosition(queryClient, piSessionId),
+      );
       wsClient.resumeSessionSubscription();
     } catch (error) {
       toast.error(`Failed to reload session history: ${String(error)}`);
@@ -78,7 +78,12 @@ export function setupWsQueryBridge(deps: {
 
     if (!piSessionId || recovering.has(piSessionId)) return;
 
-    if (message.type === "conversation_reset" || message.type === "history_rewritten") {
+    if (message.type === "conversation_reset") {
+      void reloadHistory(piSessionId, message.position);
+      return;
+    }
+
+    if (message.type === "history_rewritten") {
       void reloadHistory(piSessionId);
       return;
     }
@@ -104,26 +109,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "message_end") {
-      const msg = message.message;
-      const blocks = (msg as ChatTimelineMessage).blocks;
-      const hasContent = Boolean(msg.content.trim() || blocks?.length || msg.images?.length);
-      const items: Array<ChatTimelineMessage | ChatTimelineTool> = [];
-      if (hasContent) items.push(blocks ? { ...msg, blocks } : msg);
-
-      const now = new Date().toISOString();
-      for (const toolCall of message.toolCalls ?? []) {
-        items.push({
-          id: `tool-${toolCall.toolUseId}-start`,
-          kind: "tool",
-          tool: toolCall.toolName,
-          phase: "start",
-          toolUseId: toolCall.toolUseId,
-          args: toolCall.args as JsonValue | undefined,
-          displayArgs: toolCall.displayArgs as JsonValue | undefined,
-          createdAt: now,
-        });
-      }
-      upsertNewestHistoryItems(queryClient, piSessionId, items);
+      upsertNewestHistoryItems(queryClient, piSessionId, message.items);
       conversationState.finishMessage(piSessionId);
       return;
     }
@@ -171,9 +157,7 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "tool_result") {
       upsertNewestHistoryItems(queryClient, piSessionId, [message.item]);
-      if (message.item.toolUseId) {
-        conversationState.dropTool(piSessionId, message.item.toolUseId);
-      }
+      conversationState.dropTool(piSessionId, message.item.toolUseId);
       return;
     }
 

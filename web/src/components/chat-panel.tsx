@@ -42,13 +42,11 @@ import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { latestMeasuredContextUsage } from "~/lib/context-usage";
-import { removeNewestHistoryItem, upsertNewestHistoryItems } from "~/lib/conversation-history";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
-import { getInternalCommandsForScope } from "~/lib/internal-commands";
 import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
 import type { StreamRecoveryKind } from "~/lib/stream-recovery";
 import type {
@@ -562,17 +560,6 @@ export function ChatPanel({
       const clientMessageId = crypto.randomUUID();
       pendingPostedScrollClientMessageIdsRef.current.add(clientMessageId);
       const displayText = text || "(image)";
-      const internalCommandScope =
-        !streamId || streamType === "defaultStream" ? "default-stream" : "work-stream";
-      const trimmedText = displayText.trim();
-      const textWithoutWhitespace = displayText.replace(/\s+/g, "");
-      const shouldSeedOptimisticMessage = !getInternalCommandsForScope(internalCommandScope).some(
-        ({ name }) =>
-          trimmedText === name ||
-          trimmedText === `/${name}` ||
-          textWithoutWhitespace === name ||
-          textWithoutWhitespace === `/${name}`,
-      );
       const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
 
       if (queueBehindBusy) {
@@ -598,20 +585,6 @@ export function ChatPanel({
         markPiSessionBusy(status, piSessionId),
       );
 
-      if (shouldSeedOptimisticMessage) {
-        const now = new Date().toISOString();
-        const optimistic: ChatTimelineMessage = {
-          id: clientMessageId,
-          kind: "message",
-          role: "user",
-          content: displayText,
-          source: "web",
-          createdAt: now,
-          ...(images?.length ? { images } : {}),
-        };
-        upsertNewestHistoryItems(queryClient, piSessionId, [optimistic]);
-      }
-
       setIsSending(true);
 
       try {
@@ -619,7 +592,6 @@ export function ChatPanel({
         setPendingImages([]);
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-        removeNewestHistoryItem(queryClient, piSessionId, clientMessageId);
         queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);

@@ -1,5 +1,4 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { ConversationLiveSnapshot } from "../../../src/contracts/control-surface-api.ts";
 
 export type ActiveToolState = Readonly<{
   toolUseId: string;
@@ -183,17 +182,6 @@ function reduce(sessionId: string, action: ConversationAction): void {
 }
 
 export const conversationState = {
-  installSnapshot(sessionId: string, snapshot: ConversationLiveSnapshot | undefined): void {
-    const session = sessionFor(sessionId);
-    const previousToolIds = new Set(session.tools.keys());
-    cancelStreamingPublish(session);
-    session.streaming = snapshot?.streaming;
-    session.publishedStreaming = snapshot?.streaming;
-    session.tools = new Map(snapshot?.tools.map((tool) => [tool.toolUseId, tool]) ?? []);
-    emitStreaming(session);
-    for (const toolUseId of session.tools.keys()) previousToolIds.add(toolUseId);
-    for (const toolUseId of previousToolIds) emitTool(session, toolUseId);
-  },
   textDelta(sessionId: string, messageId: string, delta: string): void {
     reduce(sessionId, { type: "text_delta", messageId, delta });
   },

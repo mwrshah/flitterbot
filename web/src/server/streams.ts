@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { ChatTimelineItem, DownstreamSessionItem, StreamsHistoryResponse } from "~/lib/types";
+import type { DownstreamSessionItem, StreamsHistoryResponse } from "~/lib/types";
 
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
@@ -158,17 +158,3 @@ export const fetchStreamsDiff = createServerFn({ method: "GET" })
       clearTimeout(timeout);
     }
   });
-
-export const fetchStreamsInputHistory = createServerFn({ method: "GET" }).handler(
-  async (): Promise<ChatTimelineItem[]> => {
-    try {
-      const res = (await streamsRequest(
-        "/api/streams/history?surface=input",
-      )) as StreamsHistoryResponse;
-      return res.items;
-    } catch (err) {
-      console.error("fetchStreamsInputHistory failed:", err);
-      throw err;
-    }
-  },
-);

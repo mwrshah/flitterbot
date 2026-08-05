@@ -1,14 +1,10 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
-import type {
-  ChatTimelineMessage,
-  ChatTimelineMessageBlock,
-  ImageAttachment,
-} from "../contracts/index.ts";
+import type { ChatTimelineMessage, ChatTimelineTool } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { ensureConversationMessageId, findConversationEntry } from "./conversation-identity.ts";
-import { parseUsage, toolResultMessageToTimelineItem } from "./history.ts";
+import { piMessageToTimelineItems } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 import type { ToolDisplayContextCache } from "./tool-display.ts";
 
@@ -62,86 +58,6 @@ function extractAnyMessageRole(message: unknown): AnyMessageRole | undefined {
   }
 
   return undefined;
-}
-
-type ExtractedToolCall = {
-  toolUseId: string;
-  toolName: string;
-  args?: unknown;
-  displayArgs?: unknown;
-};
-
-export function extractMessageBlocks(message: unknown): {
-  text: string | undefined;
-  blocks: ChatTimelineMessageBlock[];
-  images: ImageAttachment[];
-  toolCalls: ExtractedToolCall[];
-} {
-  if (!message || typeof message !== "object")
-    return { text: undefined, blocks: [], images: [], toolCalls: [] };
-
-  const record = message as Record<string, unknown>;
-  const content = record.content;
-
-  if (Array.isArray(content)) {
-    const blocks: ChatTimelineMessageBlock[] = [];
-    const images: ImageAttachment[] = [];
-    const toolCalls: ExtractedToolCall[] = [];
-    let textBuffer = "";
-    const flushTextBlock = () => {
-      const text = textBuffer;
-      textBuffer = "";
-      if (text.trim()) blocks.push({ type: "text", text });
-    };
-
-    for (const block of content) {
-      if (!block || typeof block !== "object") continue;
-      const item = block as Record<string, unknown>;
-      if (item.type === "text" && typeof item.text === "string") {
-        textBuffer += item.text;
-      } else if (
-        item.type === "image" &&
-        typeof item.data === "string" &&
-        typeof item.mimeType === "string"
-      ) {
-        images.push({ data: item.data, mimeType: item.mimeType });
-      } else if (item.type === "thinking" && typeof item.thinking === "string") {
-        flushTextBlock();
-        if (item.thinking.trim()) blocks.push({ type: "thinking", thinking: item.thinking });
-      } else if (
-        item.type === "toolCall" &&
-        typeof item.id === "string" &&
-        typeof item.name === "string"
-      ) {
-        flushTextBlock();
-        blocks.push({ type: "tool", toolUseId: item.id });
-        toolCalls.push({
-          toolUseId: item.id,
-          toolName: item.name,
-          args: item.arguments as unknown,
-        });
-      }
-    }
-
-    flushTextBlock();
-    const textBlocks = blocks.flatMap((block) => (block.type === "text" ? [block.text] : []));
-    return {
-      text: textBlocks.length ? textBlocks.join("\n\n") : undefined,
-      blocks,
-      images,
-      toolCalls,
-    };
-  }
-
-  const directText = [record.text, record.message].find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  );
-  return {
-    text: directText,
-    blocks: directText ? [{ type: "text", text: directText }] : [],
-    images: [],
-    toolCalls: [],
-  };
 }
 
 function extractTimestamp(message: unknown, fallback: string): string {
@@ -245,79 +161,66 @@ export function subscribeToPiSession(
         const capturedTimestamp = extractTimestamp(event.message, now);
         currentStreamingMessageId = null;
 
+        if (!capturedMessageId) {
+          reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
+          break;
+        }
+
+        const role =
+          capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
+        const currentItem = role === "user" ? state.takeUserMessageItem() : undefined;
+        const fallbackImages = currentItem?.images?.map(({ data, mimeType }) => ({
+          data,
+          mimeType,
+        }));
+        const timelineItems = piMessageToTimelineItems(capturedMessage, {
+          messageId: capturedMessageId,
+          createdAt: capturedTimestamp,
+          fallbackImages,
+        });
+
         if (capturedRole === "toolResult") {
-          if (!capturedMessageId) {
-            reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
-            break;
-          }
-          const liveItem = toolResultMessageToTimelineItem(capturedMessage, capturedTimestamp);
-          if (!liveItem) break;
+          const toolResult = timelineItems[0];
+          if (toolResult?.kind !== "tool") break;
           queueMicrotask(() => {
             const entry = findConversationEntry(session.sessionManager, capturedMessageId);
             if (!entry) {
               reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
               return;
             }
-            wsHub.broadcast({
+            wsHub.broadcastHistoryCommit({
               type: "tool_result",
               piSessionId: session.sessionId,
-              item: { ...liveItem, piEntryId: entry.id },
+              item: { ...toolResult, piEntryId: entry.id },
             });
           });
           break;
         }
 
-        const role =
-          capturedRole === "user" || capturedRole === "assistant" ? capturedRole : undefined;
         if (!role) break;
-        const { text: content, blocks, images, toolCalls } = extractMessageBlocks(capturedMessage);
-        const currentItem = role === "user" ? state.takeUserMessageItem() : undefined;
-        const capturedImages =
-          images.length > 0
-            ? images
-            : (currentItem?.images?.map(({ data, mimeType }) => ({ data, mimeType })) ?? []);
-        if (
-          !content &&
-          blocks.length === 0 &&
-          capturedImages.length === 0 &&
-          toolCalls.length === 0
-        )
-          break;
-
-        const capturedSource = currentItem?.source;
-        const capturedStreamId = currentItem?.streamId ?? sessionStreamId ?? undefined;
-        const capturedStreamName = currentItem?.streamName ?? sessionStreamName ?? undefined;
-        const capturedBlocks = blocks.length > 0 ? blocks : undefined;
-        const enrichedToolCalls: ExtractedToolCall[] = toolCalls.map((tc) => {
-          const display = toolDisplayCache.displayArgsForTool(
-            session.sessionId,
-            tc.toolName,
-            tc.args,
-          );
-          return display ? { ...tc, displayArgs: display } : tc;
-        });
-        const capturedToolCalls = enrichedToolCalls.length > 0 ? enrichedToolCalls : undefined;
-
-        if (!capturedMessageId) {
-          reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
-          break;
-        }
-
+        const message = timelineItems.find(
+          (item): item is ChatTimelineMessage => item.kind === "message",
+        );
+        if (!message) break;
         const timelineMessage: ChatTimelineMessage = {
-          id: capturedMessageId,
-          kind: "message",
-          role,
-          content: content ?? "",
-          source: capturedSource,
-          streamId: capturedStreamId,
-          streamName: capturedStreamName,
-          createdAt: capturedTimestamp,
+          ...message,
+          source: currentItem?.source,
+          streamId: currentItem?.streamId ?? sessionStreamId ?? undefined,
+          streamName: currentItem?.streamName ?? sessionStreamName ?? undefined,
         };
-        if (capturedBlocks) timelineMessage.blocks = capturedBlocks;
-        if (capturedImages.length > 0) timelineMessage.images = capturedImages;
+        const toolItems = timelineItems
+          .filter((item): item is ChatTimelineTool => item.kind === "tool")
+          .map((item) => {
+            const displayArgs = toolDisplayCache.displayArgsForTool(
+              session.sessionId,
+              item.tool,
+              item.args,
+            );
+            return displayArgs ? { ...item, displayArgs } : item;
+          });
+        const committedItems = [timelineMessage, ...toolItems];
+
         if (role === "assistant") {
-          const usage = parseUsage((capturedMessage as { usage?: unknown }).usage);
-          if (usage) timelineMessage.usage = usage;
           lastAssistantMessage = timelineMessage;
           messageEndFired = true;
         } else {
@@ -330,15 +233,10 @@ export function subscribeToPiSession(
             reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
             return;
           }
-          wsHub.broadcast({
+          wsHub.broadcastHistoryCommit({
             type: "message_end",
             piSessionId: session.sessionId,
-            message: {
-              ...timelineMessage,
-              piEntryId: entry.id,
-              ...(role === "assistant" ? { intermediate: true } : {}),
-            },
-            ...(capturedToolCalls ? { toolCalls: capturedToolCalls } : {}),
+            items: committedItems.map((item) => ({ ...item, piEntryId: entry.id })),
           });
         });
         break;

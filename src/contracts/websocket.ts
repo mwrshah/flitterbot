@@ -1,4 +1,5 @@
 import type {
+  ChatTimelineItem,
   ChatTimelineMessage,
   ChatTimelineTool,
   ImageAttachment,
@@ -82,13 +83,7 @@ export interface TextDeltaWebSocketEvent {
 export interface MessageEndWebSocketEvent {
   type: "message_end";
   piSessionId?: string;
-  message: ChatTimelineMessage;
-  toolCalls?: Array<{
-    toolUseId: string;
-    toolName: string;
-    args?: unknown;
-    displayArgs?: unknown;
-  }>;
+  items: ChatTimelineItem[];
 }
 
 export interface ToolExecutionStartWebSocketEvent {

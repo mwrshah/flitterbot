@@ -138,7 +138,7 @@ function AssistantContents({
     } else if (block.type === "tool") {
       content.push(
         <ToolBlock
-          key={`tool:${index}:${block.tool.start.toolUseId ?? block.tool.start.id}`}
+          key={`tool:${index}:${block.tool.start.toolUseId}`}
           tool={block.tool}
           piSessionId={piSessionId}
         />,
@@ -262,7 +262,6 @@ function StreamingAssistantContents({
         : []),
       ...(streaming.text ? [{ type: "text" as const, text: streaming.text }] : []),
     ],
-    streaming: true,
     createdAt: new Date(0).toISOString(),
   };
   return (

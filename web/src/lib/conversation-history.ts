@@ -15,11 +15,11 @@ export function latestHistoryPosition(
   const data = queryClient.getQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
     historyQueryKey(sessionId),
   );
-  const position = data?.pages.at(-1)?.resumePosition;
+  const position = data?.pages.at(-1)?.historyPosition;
   return position ? { ...position } : undefined;
 }
 
-export function updateNewestHistoryPage(
+function updateNewestHistoryPage(
   queryClient: QueryClient,
   sessionId: string,
   update: (items: ChatTimelineItem[]) => ChatTimelineItem[],
@@ -58,16 +58,5 @@ export function upsertNewestHistoryItems(
       }
     }
     return next;
-  });
-}
-
-export function removeNewestHistoryItem(
-  queryClient: QueryClient,
-  sessionId: string,
-  itemId: string,
-): void {
-  updateNewestHistoryPage(queryClient, sessionId, (items) => {
-    const next = items.filter((item) => item.id !== itemId);
-    return next.length === items.length ? items : next;
   });
 }

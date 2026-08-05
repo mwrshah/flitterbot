@@ -28,9 +28,7 @@ export function buildConversationContentParts(
 ): ConversationContentPart[] {
   const blocks =
     message?.blocks ?? (message ? [{ type: "text" as const, text: message.content }] : []);
-  const toolsById = new Map(
-    tools.flatMap((tool) => (tool.start.toolUseId ? [[tool.start.toolUseId, tool] as const] : [])),
-  );
+  const toolsById = new Map(tools.map((tool) => [tool.start.toolUseId, tool]));
   const renderedTools = new Set<ConversationToolBlock>();
   const parts: ConversationContentPart[] = [];
 
@@ -61,9 +59,7 @@ function assistantText(message: ChatTimelineMessage): string[] {
 export function buildConversationRows(items: ChatTimelineItem[]): ConversationRow[] {
   const ends = new Map<string, ChatTimelineTool>();
   for (const item of items) {
-    if (item.kind === "tool" && item.phase === "end" && item.toolUseId) {
-      ends.set(item.toolUseId, item);
-    }
+    if (item.kind === "tool" && item.phase === "end") ends.set(item.toolUseId, item);
   }
 
   const rows: ConversationRow[] = [];
@@ -71,10 +67,6 @@ export function buildConversationRows(items: ChatTimelineItem[]): ConversationRo
   let attachTo: ConversationRow | undefined;
 
   for (const item of items) {
-    if (item.kind === "divider") {
-      attachTo = undefined;
-      continue;
-    }
     if (item.kind === "message") {
       attachTo = undefined;
       if (item.role === "system") continue;
@@ -85,7 +77,7 @@ export function buildConversationRows(items: ChatTimelineItem[]): ConversationRo
     }
     if (item.phase !== "start" && item.phase !== "update") continue;
 
-    const existing = item.toolUseId ? activeToolBlocks.get(item.toolUseId) : undefined;
+    const existing = activeToolBlocks.get(item.toolUseId);
     if (existing) {
       existing.start = {
         ...existing.start,
@@ -103,10 +95,10 @@ export function buildConversationRows(items: ChatTimelineItem[]): ConversationRo
     }
     const block = {
       start: item,
-      end: item.toolUseId ? ends.get(item.toolUseId) : undefined,
+      end: ends.get(item.toolUseId),
     };
     attachTo.tools.push(block);
-    if (item.toolUseId) activeToolBlocks.set(item.toolUseId, block);
+    activeToolBlocks.set(item.toolUseId, block);
   }
 
   const keyCounts = new Map<string, number>();

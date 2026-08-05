@@ -7,7 +7,6 @@ export type {
   AuthProvider,
   AuthProviderMethod,
   AuthProvidersResponse,
-  ConversationLiveSnapshot,
   DirectoryCompletionItem,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,

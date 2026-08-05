@@ -45,8 +45,6 @@ export type ChatTimelineMessage = {
   source?: MessageSource;
   streamId?: string;
   streamName?: string;
-  streaming?: boolean;
-  intermediate?: boolean;
   compaction?: boolean;
   usage?: TokenUsage;
   createdAt: string;
@@ -58,7 +56,7 @@ export type ChatTimelineTool = {
   kind: "tool";
   tool: string;
   phase: "start" | "update" | "end";
-  toolUseId?: string;
+  toolUseId: string;
   args?: JsonValue;
   displayArgs?: JsonValue;
   result?: JsonValue;
@@ -66,10 +64,4 @@ export type ChatTimelineTool = {
   createdAt: string;
 };
 
-export type ChatTimelineDivider = {
-  id: string;
-  kind: "divider";
-  createdAt: string;
-};
-
-export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool | ChatTimelineDivider;
+export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool;

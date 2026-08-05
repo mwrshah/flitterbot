@@ -401,7 +401,7 @@ function pathParam(p: Record<string, unknown>): string {
 }
 
 export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
-  const toolUseId = item.toolUseId ?? endItem?.toolUseId ?? item.id;
+  const toolUseId = item.toolUseId;
   const active = useConversationToolState(piSessionId, toolUseId);
   const result = effectiveResult(endItem, active);
   const params = item.displayArgs ?? item.args;

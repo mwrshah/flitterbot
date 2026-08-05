@@ -6,7 +6,7 @@ import type {
   StreamStatus,
   StreamType,
 } from "./blackboard.ts";
-import type { ChatTimelineItem, JsonValue, MessageSource } from "./timeline.ts";
+import type { ChatTimelineItem, MessageSource } from "./timeline.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
@@ -203,30 +203,10 @@ export interface SessionDetailResponse {
 export const STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT = 30;
 export const STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT = 200;
 
-export interface ConversationLiveSnapshot {
-  streaming?: {
-    messageId: string;
-    text: string;
-    thinking: string;
-    thinkingActive: boolean;
-  };
-  tools: Array<{
-    toolUseId: string;
-    pending: boolean;
-    partialResult?: JsonValue;
-    isError?: boolean;
-  }>;
-}
-
 export interface StreamsHistoryResponse {
-  piSessionId: string | null;
-  sessionFile: string | null;
-  resumePosition?: ConversationEventPosition;
-  live?: ConversationLiveSnapshot;
   items: ChatTimelineItem[];
+  historyPosition?: ConversationEventPosition;
   olderPageCursor?: string | null;
-  hasOlderRows?: boolean;
-  appliedVisibleRowLimit?: number;
 }
 
 export interface DirectSessionMessageRequest {

@@ -34,22 +34,16 @@ function readSessionHistory(
 
   const session = managed.runtime?.session;
   if (session && session.sessionId === snapshot.piSessionId) {
-    const body = readStreamsHistoryFromSession(
-      snapshot.piSessionId,
-      session.sessionManager,
-      historyMode,
-    );
-    if (body.items.length > 0 || !snapshot.sessionFile) {
-      items = body.items;
+    const liveItems = readStreamsHistoryFromSession(session.sessionManager, historyMode);
+    if (liveItems.length > 0 || !snapshot.sessionFile) {
+      items = liveItems;
     } else if (snapshot.sessionFile) {
-      const fileBody = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
-      items = fileBody.items;
+      items = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
     } else {
       return [];
     }
   } else if (snapshot.sessionFile) {
-    const body = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
-    items = body.items;
+    items = readStreamsHistory(snapshot.piSessionId, snapshot.sessionFile, historyMode);
   } else {
     return [];
   }
@@ -93,11 +87,7 @@ export async function handleBrowserStreamsHistoryRoute(
   } catch (err) {
     const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
-    const body: StreamsHistoryResponse = {
-      piSessionId: piSessionId,
-      sessionFile: null,
-      items: [],
-    };
+    const body: StreamsHistoryResponse = { items: [] };
     return sendJson(response, 500, body);
   }
 }
@@ -140,7 +130,7 @@ async function handleBrowserStreamsHistoryRouteInner(
       }),
     );
 
-    const body: StreamsHistoryResponse = { piSessionId: null, sessionFile: null, items };
+    const body: StreamsHistoryResponse = { items };
     return sendJson(response, 200, body);
   }
 
@@ -154,20 +144,18 @@ async function handleBrowserStreamsHistoryRouteInner(
         .prepare("SELECT session_file FROM pi_sessions WHERE pi_session_id = ?")
         .get(piSessionId) as { session_file: string | null } | undefined;
       if (row?.session_file) {
-        const diskBody = readStreamsHistory(piSessionId, row.session_file, historyMode);
-        if (diskBody.items.length > 0) {
+        const historyPosition = !cursor ? runtime.wsHub.historyPosition(piSessionId) : undefined;
+        const diskItems = readStreamsHistory(piSessionId, row.session_file, historyMode);
+        if (diskItems.length > 0) {
           const formatter =
             runtime.sessionManager.toolDisplayCache.formatterForPiSession(piSessionId);
-          const enriched = enrichTimelineToolDisplays(diskBody.items, formatter);
+          const enriched = enrichTimelineToolDisplays(diskItems, formatter);
           const page = takePageEndingBeforeCursor(enriched, visibleRowLimit, cursor);
           if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
           const body: StreamsHistoryResponse = {
-            piSessionId: piSessionId,
-            sessionFile: row.session_file,
+            ...(historyPosition ? { historyPosition } : {}),
             items: page.items,
             olderPageCursor: page.olderPageCursor,
-            hasOlderRows: page.hasOlderRows,
-            appliedVisibleRowLimit: page.appliedVisibleRowLimit,
           };
           return sendJson(response, 200, body);
         }
@@ -186,6 +174,11 @@ async function handleBrowserStreamsHistoryRouteInner(
     return sendJson(response, 404, { error: "Session not found" });
   }
 
+  const snapshot = targetSession.state.getSnapshot();
+  const historyPosition =
+    !cursor && snapshot.piSessionId
+      ? runtime.wsHub.historyPosition(snapshot.piSessionId)
+      : undefined;
   let items = readSessionHistory(targetSession, historyMode);
   if (targetSession.streamName) {
     for (const item of items) {
@@ -194,7 +187,6 @@ async function handleBrowserStreamsHistoryRouteInner(
       }
     }
   }
-  const snapshot = targetSession.state.getSnapshot();
   if (snapshot.piSessionId) {
     const formatter = runtime.sessionManager.toolDisplayCache.formatterForPiSession(
       snapshot.piSessionId,
@@ -203,24 +195,10 @@ async function handleBrowserStreamsHistoryRouteInner(
   }
   const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
   if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
-  const conversationSnapshot =
-    !cursor && snapshot.piSessionId
-      ? runtime.wsHub.conversationSnapshot(snapshot.piSessionId)
-      : undefined;
-  if (
-    conversationSnapshot?.live.streaming &&
-    page.items.some((item) => item.id === conversationSnapshot.live.streaming?.messageId)
-  ) {
-    conversationSnapshot.live.streaming = undefined;
-  }
   const body: StreamsHistoryResponse = {
-    piSessionId: snapshot.piSessionId ?? null,
-    sessionFile: snapshot.sessionFile ?? null,
-    ...(conversationSnapshot ?? {}),
+    ...(historyPosition ? { historyPosition } : {}),
     items: page.items,
     olderPageCursor: page.olderPageCursor,
-    hasOlderRows: page.hasOlderRows,
-    appliedVisibleRowLimit: page.appliedVisibleRowLimit,
   };
   return sendJson(response, 200, body);
 }
