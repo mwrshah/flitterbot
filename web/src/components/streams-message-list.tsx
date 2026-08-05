@@ -1,3 +1,19 @@
+/*
+ * Scroll behavior encodes four hard-won, load-bearing constraints.
+ * 1. Component owns its scroll element: ancestor refs attach after child
+ *    layout effects, so a parent-owned viewport left the virtualizer
+ *    detached at mount and the initial scroll no-oped.
+ * 2. Initial pin + auto-fill decide in a layout effect after rows commit,
+ *    when geometry is measured. Deciding in onChange read estimates and
+ *    fetched history mid-init, breaking end anchoring during reconcile.
+ * 3. Older pages load only on real user scrolls (sync + backward): the
+ *    virtualizer's offset lags programmatic scrollTo until a scroll
+ *    event lands, so "near top" false-fires while at the bottom.
+ * 4. The router's Suspense boundary hides/re-shows this subtree on nav:
+ *    effects replay, the hidden box zeroes scrollTop, the virtualizer
+ *    re-attaches a stale offset. Init is per attachment, not instance.
+ * Scroll restoration is off for /streams (router.tsx).
+ */
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "~/components/chat-message-row";
@@ -44,10 +60,10 @@ export const StreamsMessageList = memo(function StreamsMessageList({
 
   const virtualizer = useVirtualizer({
     count: rows.length + 1,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollRef.current, // owned here: ancestor refs attach too late
     getItemKey: (index) => (index === rows.length ? streamingRowKey : rows[index]!.key),
     estimateSize: (index) => (index === rows.length ? 0 : ESTIMATED_ROW_HEIGHT),
-    overscan: 2,
+    overscan: 2, // scroll-memory: initialOffset+cache go here
     paddingStart: 16,
     paddingEnd: 16,
     anchorTo: "end",
@@ -56,7 +72,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     directDomUpdates: true,
     onChange: (instance, sync) => {
       if (!didFinishInitialFillRef.current || !sync || instance.scrollDirection !== "backward") {
-        return;
+        return; // user scroll only: offset lags our writes
       }
       const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
       if (
@@ -71,13 +87,13 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   });
 
   useLayoutEffect(function rearmInitialFillAfterRouteReveal() {
-    didFinishInitialFillRef.current = false;
-  }, []);
+    didFinishInitialFillRef.current = false; // Suspense replay wipes scrollTop: re-pin
+  }, []); // scroll-memory: skip re-arm + snapshot save here
 
   useLayoutEffect(function pinToEndAndFillInitialViewport() {
     if (didFinishInitialFillRef.current || virtualizer.getVirtualItems().length === 0) return;
 
-    virtualizer.scrollToEnd();
+    virtualizer.scrollToEnd(); // post-commit: measured geometry, no estimates
 
     const viewportHeight = scrollRef.current?.clientHeight ?? 0;
     if (virtualizer.getTotalSize() > viewportHeight || !hasPreviousPage) {
@@ -85,7 +101,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     } else if (!isFetchingPreviousPage) {
       onLoadPrevious();
     }
-  });
+  }); // no deps: re-pins across each fill prepend
 
   useImperativeHandle(ref, () => ({
     scrollToEnd() {

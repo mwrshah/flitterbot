@@ -728,7 +728,7 @@ export function ChatPanel({
         <Panel id="feed" defaultSize="85%" minSize="20%">
           <div className="relative h-full">
             <StreamsMessageList
-              key={piSessionId}
+              key={piSessionId} // remount per session: re-arms initial pin
               ref={messageListRef}
               piSessionId={piSessionId}
               timeline={timeline}
