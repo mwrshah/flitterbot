@@ -60,7 +60,7 @@ export function getRouter() {
       router,
     });
 
-    const stopWsRouteSubscriptions = setupWsRouteSubscriptions(router, wsClient);
+    const stopWsRouteSubscriptions = setupWsRouteSubscriptions(router, queryClient, wsClient);
     const stopWsConnectionStore = wsConnectionStore.start();
 
     stopRealtime = () => {

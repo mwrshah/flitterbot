@@ -7,6 +7,7 @@ import {
   type ControlSurfaceWebSocketClientEvent,
   type ControlSurfaceWebSocketServerEvent,
   type ConversationEventPosition,
+  type ConversationLiveSnapshot,
 } from "../contracts/index.ts";
 
 export type WebSocketClient = {
@@ -51,7 +52,7 @@ export class WebSocketHub {
   private readonly onMessage?: WebSocketMessageHandler;
   private readonly incarnation = crypto.randomUUID();
   private readonly sequenceBySession = new Map<string, number>();
-  private readonly historySequenceBySession = new Map<string, number>();
+  private readonly liveBySession = new Map<string, ConversationLiveSnapshot>();
   private replayEvents: ReplayEvent[] = [];
   private replayStart = 0;
 
@@ -116,21 +117,27 @@ export class WebSocketHub {
   }
 
   broadcast(payload: ControlSurfaceWebSocketServerEvent): void {
-    this.publish(payload, false);
+    this.publish(payload);
   }
 
-  broadcastHistoryCommit(payload: ControlSurfaceWebSocketServerEvent): void {
-    this.publish(payload, true);
-  }
-
-  historyPosition(piSessionId: string): ConversationEventPosition {
+  conversationSnapshot(piSessionId: string): {
+    resumePosition: ConversationEventPosition;
+    live: ConversationLiveSnapshot;
+  } {
+    const live = this.liveBySession.get(piSessionId);
     return {
-      incarnation: this.incarnation,
-      sequence: this.historySequenceBySession.get(piSessionId) ?? 0,
+      resumePosition: {
+        incarnation: this.incarnation,
+        sequence: this.sequenceBySession.get(piSessionId) ?? 0,
+      },
+      live: {
+        ...(live?.streaming ? { streaming: { ...live.streaming } } : {}),
+        tools: live?.tools.map((tool) => ({ ...tool })) ?? [],
+      },
     };
   }
 
-  private publish(payload: ControlSurfaceWebSocketServerEvent, historyCommit: boolean): void {
+  private publish(payload: ControlSurfaceWebSocketServerEvent): void {
     const piSessionId =
       "piSessionId" in payload ? (payload.piSessionId as string | undefined) : undefined;
     const eventType = payload.type;
@@ -141,8 +148,8 @@ export class WebSocketHub {
         sequence: (this.sequenceBySession.get(piSessionId) ?? 0) + 1,
       };
       this.sequenceBySession.set(piSessionId, position.sequence);
-      if (historyCommit) this.historySequenceBySession.set(piSessionId, position.sequence);
       published = { ...payload, position };
+      this.updateLiveState(piSessionId, published);
       this.replayEvents.push({ piSessionId, payload: published });
       if (this.replayEvents.length - this.replayStart > REPLAY_LIMIT) this.replayStart += 1;
       if (this.replayStart >= REPLAY_LIMIT) {
@@ -165,6 +172,98 @@ export class WebSocketHub {
     }
   }
 
+  private updateLiveState(piSessionId: string, event: ControlSurfaceWebSocketServerEvent): void {
+    const current = this.liveBySession.get(piSessionId) ?? { tools: [] };
+    if (event.type === "text_delta") {
+      const streaming =
+        current.streaming?.messageId === event.messageId
+          ? current.streaming
+          : { messageId: event.messageId, text: "", thinking: "", thinkingActive: false };
+      this.liveBySession.set(piSessionId, {
+        ...current,
+        streaming: { ...streaming, text: streaming.text + event.delta },
+      });
+      return;
+    }
+    if (event.type === "thinking_start" || event.type === "thinking_delta") {
+      const streaming =
+        current.streaming?.messageId === event.messageId
+          ? current.streaming
+          : { messageId: event.messageId, text: "", thinking: "", thinkingActive: false };
+      this.liveBySession.set(piSessionId, {
+        ...current,
+        streaming:
+          event.type === "thinking_start"
+            ? { ...streaming, thinkingActive: true }
+            : { ...streaming, thinking: streaming.thinking + event.delta },
+      });
+      return;
+    }
+    if (event.type === "thinking_end") {
+      if (current.streaming?.messageId === event.messageId) {
+        this.liveBySession.set(piSessionId, {
+          ...current,
+          streaming: { ...current.streaming, thinkingActive: false },
+        });
+      }
+      return;
+    }
+    if (event.type === "tool_execution_start" || event.type === "tool_execution_update") {
+      const previous = current.tools.find((tool) => tool.toolUseId === event.toolUseId);
+      const tool = {
+        toolUseId: event.toolUseId,
+        pending: true,
+        partialResult:
+          event.type === "tool_execution_update"
+            ? (event.partialResult as ConversationLiveSnapshot["tools"][number]["partialResult"])
+            : previous?.partialResult,
+        isError: previous?.isError,
+      };
+      this.liveBySession.set(piSessionId, {
+        ...current,
+        tools: [...current.tools.filter((item) => item.toolUseId !== event.toolUseId), tool],
+      });
+      return;
+    }
+    if (event.type === "tool_execution_end") {
+      this.liveBySession.set(piSessionId, {
+        ...current,
+        tools: [
+          ...current.tools.filter((item) => item.toolUseId !== event.toolUseId),
+          {
+            toolUseId: event.toolUseId,
+            pending: false,
+            partialResult:
+              event.result as ConversationLiveSnapshot["tools"][number]["partialResult"],
+            isError: event.isError,
+          },
+        ],
+      });
+      return;
+    }
+    if (event.type === "tool_result") {
+      this.liveBySession.set(piSessionId, {
+        ...current,
+        tools: current.tools.filter((tool) => tool.toolUseId !== event.item.toolUseId),
+      });
+      return;
+    }
+    if (event.type === "message_end") {
+      if (current.streaming?.messageId === event.message.id) {
+        const { streaming: _, ...withoutStreaming } = current;
+        this.liveBySession.set(piSessionId, withoutStreaming);
+      }
+      return;
+    }
+    if (
+      event.type === "turn_end" ||
+      event.type === "agent_end" ||
+      event.type === "history_rewritten"
+    ) {
+      this.liveBySession.delete(piSessionId);
+    }
+  }
+
   private safeWrite(client: WebSocketClient, frame: Buffer): void {
     try {
       client.socket.write(frame);
@@ -182,15 +281,17 @@ export class WebSocketHub {
     const client = this.clients.get(clientId);
     if (!client) return;
     const filter = eventTypes ? new Set(eventTypes) : null;
-    client.subscriptions.set(piSessionId, filter);
-    if (piSessionId === "*") return;
+    if (piSessionId === "*") {
+      client.subscriptions.set(piSessionId, filter);
+      return;
+    }
 
     const currentSequence = this.sequenceBySession.get(piSessionId) ?? 0;
     const available = this.replayEvents
       .slice(this.replayStart)
       .filter((event) => event.piSessionId === piSessionId);
     const oldestSequence = available[0]?.payload.position?.sequence ?? currentSequence + 1;
-    let resumeSequence = after?.sequence ?? oldestSequence - 1;
+    const resumeSequence = after?.sequence ?? oldestSequence - 1;
     const reason = after
       ? after.incarnation !== this.incarnation
         ? "incarnation_changed"
@@ -201,16 +302,16 @@ export class WebSocketHub {
         ? "replay_expired"
         : undefined;
     if (reason) {
-      resumeSequence = reason === "incarnation_changed" ? currentSequence : oldestSequence - 1;
       this.send(clientId, {
         type: "conversation_reset",
         piSessionId,
-        position: { incarnation: this.incarnation, sequence: resumeSequence },
+        position: { incarnation: this.incarnation, sequence: currentSequence },
         reason,
       });
-      if (reason === "incarnation_changed") return;
+      return;
     }
 
+    client.subscriptions.set(piSessionId, filter);
     for (const event of available) {
       if ((event.payload.position?.sequence ?? 0) <= resumeSequence) continue;
       if (filter && !filter.has(event.payload.type)) continue;

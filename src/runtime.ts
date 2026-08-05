@@ -1630,7 +1630,7 @@ export class ControlSurfaceRuntime {
     const newCount = session.messages.length;
     managed.state.noteEvent(newCount);
 
-    this.wsHub.broadcastHistoryCommit({
+    this.wsHub.broadcast({
       type: "history_rewritten",
       piSessionId,
       reason: "compact",
@@ -1691,7 +1691,7 @@ export class ControlSurfaceRuntime {
     const newCount = session.messages.length;
     managed.state.noteEvent(newCount);
 
-    this.wsHub.broadcastHistoryCommit({
+    this.wsHub.broadcast({
       type: "history_rewritten",
       piSessionId,
       reason: "prune",

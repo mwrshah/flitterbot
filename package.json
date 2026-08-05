@@ -6,6 +6,7 @@
   "scripts": {
     "prepare": "lefthook install",
     "control-surface": "node --experimental-strip-types src/server.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts && pnpm --dir web test",
     "web:dev": "pnpm --dir web run dev",
     "web:build": "pnpm --dir web run build",
     "audit": "pnpm run audit:ts && pnpm run audit:shell",

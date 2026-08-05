@@ -1,6 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
+import {
+  historyQueryKey,
+  latestHistoryPosition,
+  surfaceQueryKey,
+  upsertNewestHistoryItems,
+} from "~/lib/conversation-history";
 import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
 import type { ChatTimelineMessage, ChatTimelineTool, JsonValue } from "~/lib/types";
@@ -12,6 +18,30 @@ export function setupWsQueryBridge(deps: {
   router: AnyRouter;
 }): () => void {
   const { queryClient, wsClient, router } = deps;
+  const recovering = new Set<string>();
+
+  const reloadHistory = async (piSessionId: string) => {
+    if (recovering.has(piSessionId)) return;
+    recovering.add(piSessionId);
+    wsClient.pauseSessionSubscription(piSessionId);
+    conversationState.clear(piSessionId);
+    queryClient.removeQueries({ queryKey: historyQueryKey(piSessionId), exact: true });
+
+    try {
+      await router.invalidate();
+      if (wsClient.activeSubscriptionPiSessionId() !== piSessionId) return;
+      const data = queryClient.getQueryData<{
+        pages: Array<{ live?: Parameters<typeof conversationState.installSnapshot>[1] }>;
+      }>(historyQueryKey(piSessionId));
+      conversationState.installSnapshot(piSessionId, data?.pages.at(-1)?.live);
+      wsClient.setResumePosition(piSessionId, latestHistoryPosition(queryClient, piSessionId));
+      wsClient.resumeSessionSubscription();
+    } catch (error) {
+      toast.error(`Failed to reload session history: ${String(error)}`);
+    } finally {
+      recovering.delete(piSessionId);
+    }
+  };
 
   const unsubscribeMessages = wsClient.subscribe((message) => {
     const piSessionId =
@@ -35,11 +65,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "error") {
-      if (message.piSessionId) {
-        queryClient.invalidateQueries({
-          queryKey: conversationState.historyQueryKey(message.piSessionId),
-        });
-      }
+      if (message.piSessionId) void reloadHistory(message.piSessionId);
       toast.error(message.message);
       return;
     }
@@ -50,26 +76,10 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    if (!piSessionId) return;
+    if (!piSessionId || recovering.has(piSessionId)) return;
 
-    if (message.type === "conversation_reset") {
-      conversationState.reset(piSessionId, message.position);
-      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
-      return;
-    }
-
-    const observation = conversationState.observeEvent(piSessionId, message);
-    if (observation === "duplicate" || observation === "recovering") return;
-    if (observation === "gap") {
-      conversationState.clear(piSessionId);
-      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
-      wsClient.resumeSessionSubscription();
-      return;
-    }
-
-    if (message.type === "history_rewritten") {
-      conversationState.historyRewritten(piSessionId);
-      queryClient.invalidateQueries({ queryKey: conversationState.historyQueryKey(piSessionId) });
+    if (message.type === "conversation_reset" || message.type === "history_rewritten") {
+      void reloadHistory(piSessionId);
       return;
     }
 
@@ -95,41 +105,25 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "message_end") {
       const msg = message.message;
-
       const blocks = (msg as ChatTimelineMessage).blocks;
       const hasContent = Boolean(msg.content.trim() || blocks?.length || msg.images?.length);
-      const isUser = msg.role === "user";
+      const items: Array<ChatTimelineMessage | ChatTimelineTool> = [];
+      if (hasContent) items.push(blocks ? { ...msg, blocks } : msg);
 
-      if (hasContent || message.toolCalls?.length) {
-        const now = new Date().toISOString();
-
-        const committed: ChatTimelineMessage | undefined = hasContent
-          ? blocks
-            ? { ...msg, blocks }
-            : msg
-          : undefined;
-
-        const toolItems: ChatTimelineTool[] = (message.toolCalls ?? []).map((tc) => ({
-          id: `tool-${tc.toolUseId}-start`,
+      const now = new Date().toISOString();
+      for (const toolCall of message.toolCalls ?? []) {
+        items.push({
+          id: `tool-${toolCall.toolUseId}-start`,
           kind: "tool",
-          tool: tc.toolName,
+          tool: toolCall.toolName,
           phase: "start",
-          toolUseId: tc.toolUseId,
-          args: tc.args as JsonValue | undefined,
-          displayArgs: tc.displayArgs as JsonValue | undefined,
+          toolUseId: toolCall.toolUseId,
+          args: toolCall.args as JsonValue | undefined,
+          displayArgs: toolCall.displayArgs as JsonValue | undefined,
           createdAt: now,
-        }));
-
-        conversationState.commitMessage(
-          queryClient,
-          piSessionId,
-          committed,
-          isUser ? msg.id : undefined,
-          toolItems,
-          message.position,
-        );
+        });
       }
-
+      upsertNewestHistoryItems(queryClient, piSessionId, items);
       conversationState.finishMessage(piSessionId);
       return;
     }
@@ -141,8 +135,13 @@ export function setupWsQueryBridge(deps: {
         streamName: message.message.streamName ?? message.streamName,
       };
       if (!surfacedMessage.content.trim() && !surfacedMessage.images?.length) return;
-
-      conversationState.commitSurface(queryClient, surfacedMessage);
+      queryClient.setQueryData<ChatTimelineMessage[]>(surfaceQueryKey, (old) => {
+        const index = old?.findIndex((item) => item.id === surfacedMessage.id) ?? -1;
+        if (index < 0) return [...(old ?? []), surfacedMessage];
+        const next = [...(old ?? [])];
+        next[index] = surfacedMessage;
+        return next;
+      });
       return;
     }
 
@@ -156,10 +155,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_execution_start") {
-      conversationState.tool(piSessionId, {
-        toolUseId: message.toolUseId,
-        pending: true,
-      });
+      conversationState.tool(piSessionId, { toolUseId: message.toolUseId, pending: true });
       return;
     }
 
@@ -174,8 +170,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "tool_result") {
-      conversationState.appendLiveItem(queryClient, piSessionId, message.item, message.position);
-
+      upsertNewestHistoryItems(queryClient, piSessionId, [message.item]);
       if (message.item.toolUseId) {
         conversationState.dropTool(piSessionId, message.item.toolUseId);
       }
@@ -184,34 +179,26 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "turn_end") {
       streamingUiDebug(
-        "[debug][ws-bridge] turn_end: calling clearSession for session=%s",
+        "[debug][ws-bridge] turn_end: clearing transient state for session=%s",
         piSessionId,
       );
       conversationState.clear(piSessionId);
-      conversationState.settleTurn(queryClient, piSessionId);
       return;
     }
 
     if (message.type === "agent_end") {
       conversationState.clear(piSessionId);
-      if (message.aborted) {
-        queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId, "agent"] });
-      }
-      return;
+      if (message.aborted) void reloadHistory(piSessionId);
     }
   });
 
-  let prevConnectionState = wsClient.connectionState;
-
+  let previousConnectionState = wsClient.connectionState;
   const unsubscribeConnection = wsClient.subscribeConnection((state) => {
-    const prev = prevConnectionState;
-    prevConnectionState = state;
-
-    if (state === "connected" && (prev === "disconnected" || prev === "reconnecting")) {
+    const previous = previousConnectionState;
+    previousConnectionState = state;
+    if (state === "connected" && (previous === "disconnected" || previous === "reconnecting")) {
       queryClient.invalidateQueries({ queryKey: ["status"] });
-      queryClient.invalidateQueries({ queryKey: ["streams-history"] });
-      queryClient.invalidateQueries({ queryKey: conversationState.surfaceQueryKey });
-      router.invalidate();
+      queryClient.invalidateQueries({ queryKey: surfaceQueryKey });
     }
   });
 

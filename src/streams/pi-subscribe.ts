@@ -258,7 +258,7 @@ export function subscribeToPiSession(
               reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
               return;
             }
-            wsHub.broadcastHistoryCommit({
+            wsHub.broadcast({
               type: "tool_result",
               piSessionId: session.sessionId,
               item: { ...liveItem, piEntryId: entry.id },
@@ -330,7 +330,7 @@ export function subscribeToPiSession(
             reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
             return;
           }
-          wsHub.broadcastHistoryCommit({
+          wsHub.broadcast({
             type: "message_end",
             piSessionId: session.sessionId,
             message: {
