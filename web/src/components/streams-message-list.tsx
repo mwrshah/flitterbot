@@ -110,6 +110,19 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         rows: rows.length,
         isLoadingPrevious,
       });
+
+      if (!didInitialScrollRef.current && instance.scrollElement && rows.length) {
+        didInitialScrollRef.current = true;
+        logScrollState("before initial scrollToEnd", instance, { rows: rows.length });
+        instance.scrollToEnd();
+        logScrollState("after initial scrollToEnd", instance, { rows: rows.length });
+        requestAnimationFrame(() => {
+          logScrollState("frame after initial scrollToEnd", instance, { rows: rows.length });
+        });
+        loadPreviousIfNeeded(instance, false);
+        return;
+      }
+
       loadPreviousIfNeeded(
         instance,
         firstVisibleIndex !== undefined && firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD,
@@ -136,22 +149,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   useLayoutEffect(() => {
     if (isLoadingPrevious) return;
     loadPreviousRequestedRef.current = false;
-    if (!rows.length) return;
-
-    let frame: number | undefined;
-    if (!didInitialScrollRef.current) {
-      logScrollState("before initial scrollToEnd", virtualizer, { rows: rows.length });
-      virtualizer.scrollToEnd();
-      logScrollState("after initial scrollToEnd", virtualizer, { rows: rows.length });
-      frame = requestAnimationFrame(() => {
-        logScrollState("frame after initial scrollToEnd", virtualizer, { rows: rows.length });
-      });
-      didInitialScrollRef.current = true;
-    }
-    loadPreviousIfNeeded(virtualizer, false);
-    return () => {
-      if (frame !== undefined) cancelAnimationFrame(frame);
-    };
+    if (rows.length) loadPreviousIfNeeded(virtualizer, false);
   }, [isLoadingPrevious, loadPreviousIfNeeded, rows.length, virtualizer]);
 
   useImperativeHandle(ref, () => ({
