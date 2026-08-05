@@ -15,7 +15,6 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { buildConversationRows } from "~/lib/conversation-rows";
 import type { ChatTimelineItem } from "~/lib/types";
 
-const LOAD_PREVIOUS_ROW_THRESHOLD = 3;
 const STREAMING_ROW_KEY = "streaming";
 
 export type StreamsMessageListHandle = {
@@ -62,12 +61,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   }, [isLoadingPrevious]);
 
   const onVirtualizerChange = useCallback(
-    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>) => {
-      const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
+    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, sync: boolean) => {
       if (
         didInitialScrollRef.current &&
-        firstVisibleIndex !== undefined &&
-        firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
+        sync &&
+        instance.scrollDirection === "backward" &&
+        instance.scrollOffset === 0 &&
         canLoadPreviousRef.current &&
         !loadPreviousRequestedRef.current
       ) {
@@ -95,8 +94,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
 
   useLayoutEffect(() => {
     if (!rows.length || didInitialScrollRef.current) return;
-    virtualizer.scrollToEnd();
-    didInitialScrollRef.current = true;
+    const frame = requestAnimationFrame(() => {
+      virtualizer.scrollToEnd();
+      didInitialScrollRef.current = true;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [rows.length, virtualizer]);
 
   useImperativeHandle(ref, () => ({

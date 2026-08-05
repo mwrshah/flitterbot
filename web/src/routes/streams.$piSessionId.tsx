@@ -17,6 +17,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import {
   statusQueryOptions,
   streamsDownstreamSessionsQueryOptions,
+  streamsHistoryInfiniteQueryOptions,
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
 import { getStreamRecoveryKind } from "~/lib/stream-recovery";
@@ -34,6 +35,9 @@ export const Route = createFileRoute("/streams/$piSessionId")({
     }
 
     await Promise.all([
+      context.queryClient.ensureInfiniteQueryData(
+        streamsHistoryInfiniteQueryOptions(params.piSessionId),
+      ),
       context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.piSessionId)),
       context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
     ]);
