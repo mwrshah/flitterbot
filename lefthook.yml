@@ -3,4 +3,4 @@ pre-commit:
     audit-ts:
       run: pnpm run audit:ts
     codedecorum:
-      run: uv run codedecorum --scope full .
+      run: uv run codedecorum .
