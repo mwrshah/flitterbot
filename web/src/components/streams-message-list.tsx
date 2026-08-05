@@ -1,4 +1,4 @@
-import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "~/components/chat-message-row";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -6,42 +6,8 @@ import { buildConversationRows } from "~/lib/conversation-rows";
 import type { ChatTimelineItem } from "~/lib/types";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
+const ESTIMATED_ROW_HEIGHT = 280;
 const STREAMING_ROW_KEY = "streaming";
-
-function logScrollState(
-  phase: string,
-  instance: Virtualizer<HTMLDivElement, Element>,
-  details?: Record<string, unknown>,
-) {
-  const viewport = instance.scrollElement;
-  const canvas = viewport?.firstElementChild?.firstElementChild as HTMLElement | undefined;
-  const virtualItems = instance.getVirtualItems();
-  console.log(`[chat-scroll ${performance.now().toFixed(1)}ms] ${phase}`, {
-    ...details,
-    count: instance.options.count,
-    domScrollTop: viewport?.scrollTop,
-    virtualScrollOffset: instance.scrollOffset,
-    clientHeight: viewport?.clientHeight,
-    scrollHeight: viewport?.scrollHeight,
-    domMaxScrollTop: viewport ? viewport.scrollHeight - viewport.clientHeight : undefined,
-    domDistanceFromEnd: viewport
-      ? viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop
-      : undefined,
-    virtualDistanceFromEnd: instance.getDistanceFromEnd(),
-    totalSize: instance.getTotalSize(),
-    canvasStyleHeight: canvas?.style.height,
-    canvasRectHeight: canvas?.getBoundingClientRect().height,
-    isAtExactEnd: instance.isAtEnd(0),
-    scrollDirection: instance.scrollDirection,
-    virtualRange: [virtualItems[0]?.index, virtualItems.at(-1)?.index],
-    virtualItems: virtualItems.map(({ index, start, size, end }) => ({
-      index,
-      start,
-      size,
-      end,
-    })),
-  });
-}
 
 export type StreamsMessageListHandle = {
   scrollToEnd(): void;
@@ -80,7 +46,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     count: rows.length + 1,
     getScrollElement: () => scrollRef.current,
     getItemKey: (index) => (index === rows.length ? streamingRowKey : rows[index]!.key),
-    estimateSize: (index) => (index === rows.length ? 0 : 120),
+    estimateSize: (index) => (index === rows.length ? 0 : ESTIMATED_ROW_HEIGHT),
     overscan: 2,
     paddingStart: 16,
     paddingEnd: 16,
@@ -89,59 +55,34 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     scrollEndThreshold: 120,
     directDomUpdates: true,
     onChange: (instance, sync) => {
+      if (!didFinishInitialFillRef.current || !sync || instance.scrollDirection !== "backward") {
+        return;
+      }
       const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
-      logScrollState("virtualizer onChange", instance, {
-        sync,
-        rows: rows.length,
-        firstVisibleIndex,
-        didFinishInitialFill: didFinishInitialFillRef.current,
-        hasPreviousPage,
-        isFetchingPreviousPage,
-      });
-      if (!didFinishInitialFillRef.current) return;
       if (
         firstVisibleIndex !== undefined &&
         firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
         hasPreviousPage &&
         !isFetchingPreviousPage
       ) {
-        logScrollState("near-top fetchPreviousPage", instance);
         onLoadPrevious();
       }
     },
   });
 
-  useLayoutEffect(() => {
-    if (didFinishInitialFillRef.current) return;
+  useLayoutEffect(function rearmInitialFillAfterRouteReveal() {
+    didFinishInitialFillRef.current = false;
+  }, []);
 
-    const virtualItems = virtualizer.getVirtualItems();
-    logScrollState("initial layout effect", virtualizer, {
-      rows: rows.length,
-      hasVirtualItems: virtualItems.length > 0,
-      hasPreviousPage,
-      isFetchingPreviousPage,
-    });
-    if (virtualItems.length === 0) return;
+  useLayoutEffect(function pinToEndAndFillInitialViewport() {
+    if (didFinishInitialFillRef.current || virtualizer.getVirtualItems().length === 0) return;
 
     virtualizer.scrollToEnd();
-    logScrollState("immediately after initial scrollToEnd", virtualizer);
 
     const viewportHeight = scrollRef.current?.clientHeight ?? 0;
-    const contentOverflowsViewport = virtualizer.getTotalSize() > viewportHeight;
-    if (contentOverflowsViewport || !hasPreviousPage) {
+    if (virtualizer.getTotalSize() > viewportHeight || !hasPreviousPage) {
       didFinishInitialFillRef.current = true;
-      logScrollState("initial fill marked complete", virtualizer, {
-        contentOverflowsViewport,
-      });
-      queueMicrotask(() => logScrollState("microtask after initial completion", virtualizer));
-      requestAnimationFrame(() => {
-        logScrollState("first frame after initial completion", virtualizer);
-        requestAnimationFrame(() => {
-          logScrollState("second frame after initial completion", virtualizer);
-        });
-      });
     } else if (!isFetchingPreviousPage) {
-      logScrollState("underfilled fetchPreviousPage", virtualizer);
       onLoadPrevious();
     }
   });

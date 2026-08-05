@@ -39,7 +39,7 @@ export function getRouter() {
     defaultPreload: "intent",
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
-    scrollRestoration: true,
+    scrollRestoration: ({ location }) => !location.pathname.startsWith("/streams"),
   });
 
   setupRouterSsrQueryIntegration({
