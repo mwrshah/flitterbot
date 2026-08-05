@@ -14,6 +14,7 @@ import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
 import { buildConversationRows } from "~/lib/conversation-rows";
 import type { ChatTimelineItem } from "~/lib/types";
 
+const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const STREAMING_ROW_KEY = "streaming";
 
 export type StreamsMessageListHandle = {
@@ -75,10 +76,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   );
 
   const onVirtualizerChange = useCallback(
-    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, sync: boolean) => {
-      const reachedTop =
-        sync && instance.scrollDirection === "backward" && instance.scrollOffset === 0;
-      loadPreviousIfNeeded(instance, reachedTop);
+    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>) => {
+      const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
+      loadPreviousIfNeeded(
+        instance,
+        firstVisibleIndex !== undefined && firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD,
+      );
     },
     [loadPreviousIfNeeded],
   );
@@ -94,7 +97,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     anchorTo: "end",
     followOnAppend: true,
     scrollEndThreshold: 120,
-    useFlushSync: false,
+    directDomUpdates: true,
     onChange: onVirtualizerChange,
   });
 
@@ -103,14 +106,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     loadPreviousRequestedRef.current = false;
     if (!rows.length) return;
 
-    const frame = requestAnimationFrame(() => {
-      if (!didInitialScrollRef.current) {
-        didInitialScrollRef.current = true;
-        virtualizer.scrollToEnd();
-      }
-      loadPreviousIfNeeded(virtualizer, false);
-    });
-    return () => cancelAnimationFrame(frame);
+    if (!didInitialScrollRef.current) {
+      virtualizer.scrollToEnd();
+      didInitialScrollRef.current = true;
+    }
+    loadPreviousIfNeeded(virtualizer, false);
   }, [isLoadingPrevious, loadPreviousIfNeeded, rows.length, virtualizer]);
 
   useImperativeHandle(ref, () => ({
@@ -122,8 +122,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   return (
     <div className="relative w-full" style={{ minHeight: "2rem" }}>
       <div
+        ref={virtualizer.containerRef}
         style={{
-          height: `${virtualizer.getTotalSize()}px`,
           position: "relative",
           width: "100%",
         }}
@@ -142,7 +142,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
                 display: "flex",
                 flexDirection: "column",
                 width: "100%",
-                transform: `translate3d(0, ${virtualItem.start}px, 0)`,
               }}
             >
               {row ? (
