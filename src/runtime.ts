@@ -2192,7 +2192,7 @@ export class ControlSurfaceRuntime {
         name: "enqueue_message",
         label: "Enqueue Message",
         description:
-          "Send a message to an existing orchestrator running on an open stream. Use to forward user follow-ups, delegate context, or nudge an orchestrator. Does NOT create a stream or spawn an orchestrator — use create_stream for that.",
+          "Send a message to an existing orchestrator or stream. Use ONLY when the intended target is clearly the existing stream based on context, or explicit call out. Can be used to nudge an orchestrator or provide additional context that was missing the first time around. Note that even for connected matters, the user's intent is likely to create a stream or spawn an orchestrator — use create_stream for that. You can default to creating a new stream unless it is very clearly meant for the same stream",
         parameters: {
           type: "object",
           properties: {
