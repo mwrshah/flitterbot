@@ -17,6 +17,28 @@ import type { ChatTimelineItem } from "~/lib/types";
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const STREAMING_ROW_KEY = "streaming";
 
+function logScrollState(
+  label: string,
+  instance: Virtualizer<HTMLDivElement, HTMLDivElement>,
+  details?: Record<string, unknown>,
+) {
+  const viewport = instance.scrollElement;
+  const virtualItems = instance.getVirtualItems();
+  console.log(`[chat-scroll] ${label}`, {
+    ...details,
+    count: instance.options.count,
+    scrollOffset: instance.scrollOffset,
+    totalSize: instance.getTotalSize(),
+    viewportHeight: viewport?.clientHeight,
+    scrollHeight: viewport?.scrollHeight,
+    maxScrollOffset: viewport ? viewport.scrollHeight - viewport.clientHeight : undefined,
+    distanceFromEnd: instance.getDistanceFromEnd(),
+    isAtExactEnd: instance.isAtEnd(0),
+    scrollDirection: instance.scrollDirection,
+    virtualRange: [virtualItems[0]?.index, virtualItems.at(-1)?.index],
+  });
+}
+
 export type StreamsMessageListHandle = {
   scrollToEnd(): void;
 };
@@ -68,6 +90,10 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         canLoadPreviousRef.current &&
         !loadPreviousRequestedRef.current
       ) {
+        logScrollState("load previous page", instance, {
+          reachedTop,
+          contentDoesNotFillViewport,
+        });
         loadPreviousRequestedRef.current = true;
         loadPreviousRef.current?.();
       }
@@ -76,14 +102,20 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   );
 
   const onVirtualizerChange = useCallback(
-    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>) => {
+    (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, sync: boolean) => {
       const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
+      logScrollState("virtualizer change", instance, {
+        sync,
+        firstVisibleIndex,
+        rows: rows.length,
+        isLoadingPrevious,
+      });
       loadPreviousIfNeeded(
         instance,
         firstVisibleIndex !== undefined && firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD,
       );
     },
-    [loadPreviousIfNeeded],
+    [isLoadingPrevious, loadPreviousIfNeeded, rows.length],
   );
 
   const virtualizer = useVirtualizer({
@@ -106,11 +138,20 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     loadPreviousRequestedRef.current = false;
     if (!rows.length) return;
 
+    let frame: number | undefined;
     if (!didInitialScrollRef.current) {
+      logScrollState("before initial scrollToEnd", virtualizer, { rows: rows.length });
       virtualizer.scrollToEnd();
+      logScrollState("after initial scrollToEnd", virtualizer, { rows: rows.length });
+      frame = requestAnimationFrame(() => {
+        logScrollState("frame after initial scrollToEnd", virtualizer, { rows: rows.length });
+      });
       didInitialScrollRef.current = true;
     }
     loadPreviousIfNeeded(virtualizer, false);
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
   }, [isLoadingPrevious, loadPreviousIfNeeded, rows.length, virtualizer]);
 
   useImperativeHandle(ref, () => ({
