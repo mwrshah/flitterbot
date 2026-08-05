@@ -77,6 +77,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   canLoadPreviousRef.current = hasPrevious && !isLoadingPrevious;
   const loadPreviousRequestedRef = useRef(false);
   const didInitialScrollRef = useRef(false);
+  const initialScrollFrameRef = useRef<number | undefined>(undefined);
 
   const loadPreviousIfNeeded = useCallback(
     (instance: Virtualizer<HTMLDivElement, HTMLDivElement>, reachedTop: boolean) => {
@@ -112,14 +113,17 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       });
 
       if (!didInitialScrollRef.current && instance.scrollElement && rows.length) {
-        didInitialScrollRef.current = true;
-        logScrollState("before initial scrollToEnd", instance, { rows: rows.length });
-        instance.scrollToEnd();
-        logScrollState("after initial scrollToEnd", instance, { rows: rows.length });
-        requestAnimationFrame(() => {
-          logScrollState("frame after initial scrollToEnd", instance, { rows: rows.length });
-        });
-        loadPreviousIfNeeded(instance, false);
+        if (initialScrollFrameRef.current === undefined) {
+          logScrollState("before initial scrollToEnd", instance, { rows: rows.length });
+          instance.scrollToEnd();
+          initialScrollFrameRef.current = requestAnimationFrame(() => {
+            initialScrollFrameRef.current = undefined;
+            instance.scrollToEnd();
+            didInitialScrollRef.current = true;
+            logScrollState("settled initial scrollToEnd", instance, { rows: rows.length });
+            loadPreviousIfNeeded(instance, false);
+          });
+        }
         return;
       }
 
