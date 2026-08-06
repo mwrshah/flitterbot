@@ -28,11 +28,13 @@ export function useStreamsChat(piSessionId: string | undefined) {
   const connectionState = useWsConnectionState(wsConnectionStore);
 
   const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const isSessionBusy = (() => {
-    if (!piSessionId || !status?.piAgent) return false;
-    if (status.piAgent.default?.piSessionId === piSessionId) return !!status.piAgent.default.busy;
-    return !!status.piAgent.orchestrators?.find((o) => o.piSessionId === piSessionId)?.busy;
+  const sessionStatus = (() => {
+    if (!piSessionId || !status?.piAgent) return undefined;
+    if (status.piAgent.default?.piSessionId === piSessionId) return status.piAgent.default;
+    return status.piAgent.orchestrators?.find((o) => o.piSessionId === piSessionId);
   })();
+  const isSessionBusy = sessionStatus?.busy ?? false;
+  const isSessionCompacting = sessionStatus?.isCompacting ?? false;
 
   const effectivePiSessionId = piSessionId ?? "default";
 
@@ -58,6 +60,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     onSendMessage,
     effectivePiSessionId,
     isSessionBusy,
+    isSessionCompacting,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,

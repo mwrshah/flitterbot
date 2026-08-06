@@ -52,7 +52,6 @@ import type {
   ChatTimelineMessage,
   DirectoryCompletionItem,
   ImageAttachment,
-  StatusQueryData,
   StreamSummary,
 } from "~/lib/types";
 import { setStreamCwd } from "~/server/streams";
@@ -88,6 +87,7 @@ type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
   isSessionBusy: boolean;
+  isSessionCompacting: boolean;
   onSendMessage: (
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
@@ -249,43 +249,11 @@ function CwdPicker({
   );
 }
 
-function markPiSessionBusy(
-  status: StatusQueryData | undefined,
-  piSessionId: string,
-): StatusQueryData | undefined {
-  if (!status?.piAgent) return status;
-
-  const defaultSession = status.piAgent.default;
-  if (defaultSession?.piSessionId === piSessionId) {
-    if (defaultSession.busy) return status;
-    return {
-      ...status,
-      piAgent: {
-        ...status.piAgent,
-        default: { ...defaultSession, busy: true },
-      },
-    } satisfies StatusQueryData;
-  }
-
-  const orchestrators = status.piAgent.orchestrators;
-  const index = orchestrators?.findIndex((session) => session.piSessionId === piSessionId) ?? -1;
-  if (!orchestrators || index < 0 || orchestrators[index]?.busy) return status;
-
-  return {
-    ...status,
-    piAgent: {
-      ...status.piAgent,
-      orchestrators: orchestrators.map((session, sessionIndex) =>
-        sessionIndex === index ? { ...session, busy: true } : session,
-      ),
-    },
-  } satisfies StatusQueryData;
-}
-
 export function ChatPanel({
   piSessionId,
   timeline,
   isSessionBusy,
+  isSessionCompacting,
   onSendMessage,
   onLoadPrevious,
   hasPreviousPage,
@@ -302,6 +270,7 @@ export function ChatPanel({
     piSessionId,
     timeline,
     isSessionBusy,
+    isSessionCompacting,
     streamId,
     recoveryKind,
   });
@@ -546,22 +515,18 @@ export function ChatPanel({
         return;
       }
 
-      queryClient.setQueryData<StatusQueryData>(["status"], (status) =>
-        markPiSessionBusy(status, piSessionId),
-      );
-
       setIsSending(true);
 
       try {
         await onSendMessage(displayText, { images, clientMessageId });
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-        queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);
         throw error;
       } finally {
         setIsSending(false);
+        void queryClient.invalidateQueries({ queryKey: ["status"] });
       }
     },
     [
@@ -761,6 +726,7 @@ export function ChatPanel({
             selectedModelId={selectedModelId}
             selectedThinkingLevel={selectedThinkingLevel}
             isSessionBusy={isSessionBusy}
+            isCompacting={isSessionCompacting}
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}
             recoveryKind={effectiveRecoveryKind}

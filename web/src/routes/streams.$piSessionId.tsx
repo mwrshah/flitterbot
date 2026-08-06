@@ -110,6 +110,7 @@ function PiSessionRoute() {
     onSendMessage,
     effectivePiSessionId,
     isSessionBusy,
+    isSessionCompacting,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,
@@ -127,6 +128,7 @@ function PiSessionRoute() {
           piSessionId={effectivePiSessionId}
           timeline={timeline}
           isSessionBusy={isSessionBusy}
+          isSessionCompacting={isSessionCompacting}
           onSendMessage={onSendMessage}
           onLoadPrevious={loadPreviousPage}
           hasPreviousPage={hasPreviousPage}

@@ -5,7 +5,7 @@ import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import type { AssistantMessage, ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
-import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, CompactionResult, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { ProviderAuthManager } from "./auth/provider-auth.ts";
 import { type BlackboardDatabase, openBlackboard, pingBlackboard } from "./blackboard/db.ts";
@@ -121,6 +121,7 @@ export class ControlSurfaceRuntime {
   private stopping = false;
   private maintenanceTimer?: NodeJS.Timeout;
   private readonly sessionReloads = new Map<string, Promise<void>>();
+  private readonly compactionClaims = new WeakSet<ManagedPiSession>();
   private whatsappStatusWatcher?: fs.FSWatcher;
   private whatsappStatusCache: {
     status: ControlSurfaceWhatsAppStatus;
@@ -372,7 +373,13 @@ export class ControlSurfaceRuntime {
           if (!piSessionId) throw new Error("No pi session available to compact");
           await this.compactPiSession(piSessionId, customInstructions);
         } catch (error) {
-          this.log(`/compact failed: ${error instanceof Error ? error.message : String(error)}`);
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`/compact failed: ${message}`);
+          this.wsHub.broadcast({
+            type: "error",
+            message: `Compact failed: ${message}`,
+            ...(piSessionId ? { piSessionId } : {}),
+          });
         }
       })();
       return { ok: true, compacted: true };
@@ -836,6 +843,7 @@ export class ControlSurfaceRuntime {
         streamName: o.streamName,
         messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
         busy: snap.busy,
+        isCompacting: o.runtime?.session?.isCompacting ?? false,
       };
     });
 
@@ -877,6 +885,7 @@ export class ControlSurfaceRuntime {
               messageCount: def!.runtime?.session?.messages?.length ?? defSnapshot.messageCount,
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
               busy: defSnapshot.busy,
+              isCompacting: def!.runtime?.session?.isCompacting ?? false,
               model: this.toPiSessionModelInfo(def!.modelInfo),
             }
           : null,
@@ -1610,45 +1619,58 @@ export class ControlSurfaceRuntime {
   }> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) throw new Error("Pi session not found");
-
-    if (!managed.runtime) {
-      if (managed.role !== "default" && managed.streamId) {
-        this.log(`activating dormant stream session for compact stream=${managed.streamId}`);
-        await this.sessionManager.activateStreamSession(
-          managed,
-          this.createStreamSessionTools(managed.streamId),
-        );
-      } else {
-        throw new Error("Pi session is not active and cannot be activated for compact");
-      }
+    if (this.compactionClaims.has(managed)) throw new Error("Pi session is already compacting");
+    this.compactionClaims.add(managed);
+    try {
+      return await this.compactManagedPiSession(managed, piSessionId, customInstructions);
+    } finally {
+      this.compactionClaims.delete(managed);
     }
+  }
 
-    const session = managed.runtime?.session;
-    if (!session) throw new Error("Pi session failed to activate");
-    if (session.isCompacting) throw new Error("Pi session is already compacting");
-    if (managed.state.getSnapshot().busy) throw new Error("Pi session is busy");
+  private async compactManagedPiSession(
+    managed: ManagedPiSession,
+    piSessionId: string,
+    customInstructions?: string,
+  ) {
+    if (!managed.queue.pause()) throw new Error("Pi session is busy");
+    try {
+      if (!managed.runtime) {
+        if (managed.role !== "default" && managed.streamId) {
+          this.log(`activating dormant stream session for compact stream=${managed.streamId}`);
+          await this.sessionManager.activateStreamSession(
+            managed,
+            this.createStreamSessionTools(managed.streamId),
+          );
+        } else {
+          throw new Error("Pi session is not active and cannot be activated for compact");
+        }
+      }
 
-    const result = await session.compact(customInstructions?.trim() || undefined);
-    const newCount = session.messages.length;
-    managed.state.noteEvent(newCount);
+      const session = managed.runtime?.session;
+      if (!session) throw new Error("Pi session failed to activate");
+      if (session.isCompacting) throw new Error("Pi session is already compacting");
+      if (session.isStreaming) throw new Error("Pi session is busy");
+      const result: CompactionResult = await session.compact(
+        customInstructions?.trim() || undefined,
+      );
+      const newCount = session.messages.length;
+      managed.state.noteEvent(newCount);
 
-    this.wsHub.broadcastHistoryCommit({
-      type: "history_rewritten",
-      piSessionId,
-      reason: "compact",
-    });
-
-    this.log(
-      `compacted pi session ${piSessionId} at entry ${result.firstKeptEntryId} (${result.tokensBefore} tokens before; messages now ${newCount})`,
-    );
-    return {
-      ok: true,
-      piSessionId,
-      messageCount: newCount,
-      summary: result.summary,
-      firstKeptEntryId: result.firstKeptEntryId,
-      tokensBefore: result.tokensBefore,
-    };
+      this.log(
+        `compacted pi session ${piSessionId} at entry ${result.firstKeptEntryId} (${result.tokensBefore} tokens before; messages now ${newCount})`,
+      );
+      return {
+        ok: true as const,
+        piSessionId,
+        messageCount: newCount,
+        summary: result.summary,
+        firstKeptEntryId: result.firstKeptEntryId,
+        tokensBefore: result.tokensBefore,
+      };
+    } finally {
+      managed.queue.resume();
+    }
   }
 
   async pruneStreamHistory(

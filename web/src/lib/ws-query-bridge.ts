@@ -11,7 +11,7 @@ import {
 import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
 import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
-import type { ChatTimelineMessage } from "~/lib/types";
+import type { ChatTimelineMessage, StatusQueryData } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
 
@@ -57,6 +57,28 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
+    if (message.type === "compaction_start" || message.type === "compaction_end") {
+      const isCompacting = message.type === "compaction_start";
+      void queryClient.invalidateQueries({ queryKey: ["status"] });
+      queryClient.setQueryData<StatusQueryData>(["status"], (status) => {
+        if (!status?.piAgent) return status;
+        if (!message.piSessionId) return status;
+        return {
+          ...status,
+          piAgent: {
+            ...status.piAgent,
+            default:
+              status.piAgent.default?.piSessionId === message.piSessionId
+                ? { ...status.piAgent.default, isCompacting }
+                : status.piAgent.default,
+            orchestrators: status.piAgent.orchestrators.map((session) =>
+              session.piSessionId === message.piSessionId ? { ...session, isCompacting } : session,
+            ),
+          },
+        };
+      });
+    }
+
     if (message.type === "sessions_changed") {
       queryClient.invalidateQueries({
         queryKey: ["streams-downstream-sessions", message.piSessionId],
@@ -84,6 +106,7 @@ export function setupWsQueryBridge(deps: {
     if (!piSessionId || recovering.has(piSessionId)) return;
 
     if (message.type === "conversation_reset") {
+      void queryClient.invalidateQueries({ queryKey: ["status"] });
       void reloadHistory(piSessionId, message.position);
       return;
     }

@@ -53,10 +53,17 @@ export function setupWsRouteSubscriptions(
   wsClient: FlitterbotWsClient,
 ): () => void {
   let activeTarget: SubscriptionTarget | null = null;
+  let hasAppliedRoute = false;
 
   const apply = () => {
     const nextTarget = resolveSubscriptionTarget(router);
-    if (sameTarget(activeTarget, nextTarget)) return;
+    if (sameTarget(activeTarget, nextTarget)) {
+      hasAppliedRoute = true;
+      return;
+    }
+
+    const shouldRefreshStatus =
+      hasAppliedRoute && nextTarget !== null && nextTarget.piSessionId !== "*";
 
     if (activeTarget && activeTarget.piSessionId !== "*") {
       conversationState.clear(activeTarget.piSessionId);
@@ -74,6 +81,10 @@ export function setupWsRouteSubscriptions(
     } else {
       wsClient.clearSessionSubscription();
     }
+    if (shouldRefreshStatus) {
+      void queryClient.invalidateQueries({ queryKey: ["status"] });
+    }
+    hasAppliedRoute = true;
   };
 
   apply();

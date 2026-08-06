@@ -94,6 +94,7 @@ export class TurnQueue {
   private steering = false;
   private steeringEnabled = false;
   private stopped = false;
+  private paused = false;
   private currentItem?: QueueItem;
 
   constructor(options: TurnQueueOptions) {
@@ -110,7 +111,7 @@ export class TurnQueue {
     }
 
     this.items.push(item);
-    if (this.processing) {
+    if (this.processing && !this.paused) {
       if (item.source !== "hook" && this.steeringEnabled) void this.steerPending();
     } else {
       void this.pump();
@@ -155,10 +156,22 @@ export class TurnQueue {
     this.stopped = true;
   }
 
+  pause(): boolean {
+    if (this.processing || this.stopped || this.paused) return false;
+    this.paused = true;
+    return true;
+  }
+
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    void this.pump();
+  }
+
   private async pump(): Promise<void> {
-    if (this.processing || this.stopped) return;
+    if (this.processing || this.stopped || this.paused) return;
     this.processing = true;
-    while (!this.stopped && this.items.length > 0) {
+    while (!this.stopped && !this.paused && this.items.length > 0) {
       const item = this.drainNextAt(0);
       this.currentItem = item;
       this.steeringEnabled = false;
@@ -177,12 +190,12 @@ export class TurnQueue {
   }
 
   private async steerPending(): Promise<void> {
-    if (this.steering || this.stopped) return;
+    if (this.steering || this.stopped || this.paused) return;
     this.steering = true;
     await Promise.resolve();
     try {
       let index = this.items.findIndex((item) => item.source !== "hook");
-      while (this.processing && !this.stopped && this.canSteer() && index !== -1) {
+      while (this.processing && !this.stopped && !this.paused && this.canSteer() && index !== -1) {
         const item = this.drainNextAt(index);
         try {
           await this.steerItem(item);
@@ -197,6 +210,7 @@ export class TurnQueue {
       if (
         this.processing &&
         !this.stopped &&
+        !this.paused &&
         this.canSteer() &&
         this.items.some((item) => item.source !== "hook")
       ) {
