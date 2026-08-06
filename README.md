@@ -20,15 +20,22 @@ node installer/install.mjs
 pnpm --dir web dev
 ```
 
-Step by step: copying `.env.example` gives you a file in which to set `GROQ_API_KEY`; `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default. The last two steps are optional — `flitterbot-wa auth` links WhatsApp, and `pnpm --dir web dev` starts the web UI on port 3188.
+Step by step: copying `.env.example` gives you a file for model provider keys and the optional `GROQ_API_KEY`; `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default. The last two steps are optional — `flitterbot-wa auth` links WhatsApp, and `pnpm --dir web dev` starts the web UI on port 3188.
 
 Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 
-## Model login
+## Get started
 
-`GROQ_API_KEY` in `.env` powers message classification. The Pi agents that run Flitterbot use separate model credentials. For API-key providers, set the standard provider environment variable, such as `ANTHROPIC_API_KEY`. For subscription or other OAuth providers, open *Settings → Accounts & Model providers* in the web UI. A ChatGPT Plus/Pro Codex subscription can run Flitterbot's default agent and work-stream orchestrators themselves.
+1. Open [http://127.0.0.1:3188](http://127.0.0.1:3188).
+2. Select the settings cog in the top-right corner.
+3. Sign in to OpenAI Codex or another OAuth model provider.
+4. Open the first active stream, *flitterbot*.
+5. Select a model in the message input.
+6. Send your first message.
 
-Flitterbot does not expose Pi's interactive `/login` command. The web OAuth flow stores credentials in `~/.flitterbot/control-surface/agent/auth.json`; it does not rely on Pi CLI credentials in `~/.pi/agent/auth.json`. Claude Code and Codex downstream harnesses must also be authenticated in their own CLIs.
+To use an API key, add the standard Pi environment variable to `.env`, such as `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Restart Flitterbot. When the model appears in the model selector, it is ready to use.
+
+`GROQ_API_KEY` is optional. Set it if you want to use WhatsApp or the Surface at [http://127.0.0.1:3188/](http://127.0.0.1:3188/). Groq routes messages from these inputs to the correct stream. Direct messages at `/streams/<pi-session-id>` do not require Groq.
 
 ## Config
 
