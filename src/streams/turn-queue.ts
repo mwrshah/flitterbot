@@ -19,7 +19,6 @@ export type QueueItem = {
 export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.sender !== "user") return false;
   if (item.source !== "web" && item.source !== "whatsapp") return false;
-  if (item.images && item.images.length > 0) return false;
   return true;
 }
 
@@ -41,6 +40,7 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     if (it.metadata) Object.assign(metadata, it.metadata);
   }
   metadata.coalescedFrom = items.map((it) => it.id);
+  const images = items.flatMap((item) => item.images ?? []);
   return {
     id: `coalesced:${first.id}+${items.length - 1}`,
     source: first.source,
@@ -49,7 +49,7 @@ export function coalesceUserItems(items: QueueItem[]): QueueItem {
     metadata,
     receivedAt: first.receivedAt,
     webClientId: last.webClientId,
-    images: undefined,
+    images: images.length > 0 ? images : undefined,
     streamId: first.streamId,
     streamName: first.streamName,
     serverMessageId: last.serverMessageId,
