@@ -55,3 +55,7 @@ node ~/.flitterbot/uninstall.mjs [--meta]
 - *WhatsApp auth errors* — re-run `flitterbot-wa auth`.
 - *Hooks not firing* — check `~/.claude/settings.json`, `~/.flitterbot/logs/hooks-errors.log`. Async, 15s timeout.
 - *Runtime restarts after stop* — scheduler installed; run uninstaller.
+
+## License
+
+[MIT](LICENSE)
