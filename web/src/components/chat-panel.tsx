@@ -595,7 +595,12 @@ export function ChatPanel({
 
     const buttons: MessageInputHoverButton[] = [
       streamHasWorktree
-        ? { id: "close-merge", label: "close (merge)", insertText: "ship it" }
+        ? {
+            id: "close-merge",
+            label: "close (merge)",
+            insertText:
+              "Ship it (run close_stream with the merge option, which commits worktree changes, merges into this repo's flitterbot configured base branch, pushes base branch, then closes this stream)",
+          }
         : {
             id: "close-stream",
             label: "close stream",
@@ -607,7 +612,7 @@ export function ChatPanel({
       buttons.push({
         id: "close-no-git-ops",
         label: "close (no git ops)",
-        insertText: "close stream with the no-op option",
+        insertText: "close stream with the no-op option (i.e. no bundled git operations)",
       });
       if (worktree?.worktreePath && worktree.branch && worktree.baseBranch) {
         buttons.push({
