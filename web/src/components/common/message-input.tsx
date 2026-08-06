@@ -2,7 +2,7 @@ import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -1006,23 +1006,25 @@ export const MessageInput = memo(function MessageInput({
     >
       <div className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}>
         {pendingImages.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] gap-2 p-2">
             {pendingImages.map((img, i) => (
               <div
                 key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
-                className="relative group"
+                className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-background-muted"
               >
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
-                  alt="Pending attachment"
-                  className="size-16 object-cover rounded-lg border border-border"
+                  alt={`Pending attachment ${i + 1}`}
+                  className="block h-auto w-full"
                 />
                 <button
                   type="button"
                   onClick={() => onRemoveImage(i)}
-                  className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-status-crashed-muted text-xs text-status-crashed opacity-0 transition-opacity group-hover:opacity-100"
+                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background/90 text-status-crashed shadow-sm transition-colors hover:bg-status-crashed-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+                  aria-label={`Remove pending attachment ${i + 1}`}
+                  title="Remove attachment"
                 >
-                  &times;
+                  <XIcon className="size-4" aria-hidden="true" />
                 </button>
               </div>
             ))}
