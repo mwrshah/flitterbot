@@ -81,7 +81,7 @@ const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: Chat
       className="ml-auto shrink-0 text-xs text-text-muted tabular-nums"
       title="Latest request. Pi reports cache reuse, but not cache misses, age, or expiry time."
     >
-      cache: {cacheRead}/{contextTokens} tokens
+      cache: {cacheRead}/{contextTokens}
     </span>
   );
 });
@@ -665,7 +665,7 @@ export function ChatPanel({
     <div className="flex flex-col h-full">
       <div
         ref={cwdPickerHeaderRef}
-        className="relative flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3"
+        className="relative flex items-center py-2 pr-4 pl-6 border-b border-border shrink-0 min-h-11 gap-3"
       >
         <div className="flex min-w-0 flex-1 items-center gap-2 @container">
           <h1 className="min-w-0 truncate text-sm font-semibold text-text">
