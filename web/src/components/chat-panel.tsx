@@ -689,13 +689,13 @@ export function ChatPanel({
                   onCopy={() =>
                     cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"))
                   }
-                  className="text-text-muted"
+                  className="min-w-0 text-text-muted"
                 />
                 <ShortcutHint
                   label={cwdShortcutLabel}
                   actionActive={cwdCopy.copied}
                   actionText="Copied"
-                  className="ml-1"
+                  className="min-w-0 shrink-[9999] overflow-hidden"
                 />
               </span>
             </>
