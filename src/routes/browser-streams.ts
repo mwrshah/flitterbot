@@ -130,7 +130,12 @@ async function handleBrowserStreamsHistoryRouteInner(
       }),
     );
 
-    const body: StreamsHistoryResponse = { items };
+    const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
+    if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
+    const body: StreamsHistoryResponse = {
+      items: page.items,
+      olderPageCursor: page.olderPageCursor,
+    };
     return sendJson(response, 200, body);
   }
 

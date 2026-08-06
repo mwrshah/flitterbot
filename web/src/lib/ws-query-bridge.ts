@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+  createSurfaceLiveUpdater,
   historyQueryKey,
   latestHistoryPosition,
   surfaceQueryKey,
@@ -9,6 +10,7 @@ import {
 } from "~/lib/conversation-history";
 import { conversationState } from "~/lib/conversation-state";
 import { streamingUiDebug } from "~/lib/debug-log";
+import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
 import type { ChatTimelineMessage } from "~/lib/types";
 import type { FlitterbotWsClient } from "~/lib/ws";
 import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
@@ -20,6 +22,9 @@ export function setupWsQueryBridge(deps: {
 }): () => void {
   const { queryClient, wsClient, router } = deps;
   const recovering = new Set<string>();
+  const surfaceLiveUpdater = createSurfaceLiveUpdater(queryClient, () =>
+    queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions()),
+  );
 
   const reloadHistory = async (piSessionId: string, resumePosition?: ConversationEventPosition) => {
     if (recovering.has(piSessionId)) return;
@@ -121,13 +126,7 @@ export function setupWsQueryBridge(deps: {
         streamName: message.message.streamName ?? message.streamName,
       };
       if (!surfacedMessage.content.trim() && !surfacedMessage.images?.length) return;
-      queryClient.setQueryData<ChatTimelineMessage[]>(surfaceQueryKey, (old) => {
-        const index = old?.findIndex((item) => item.id === surfacedMessage.id) ?? -1;
-        if (index < 0) return [...(old ?? []), surfacedMessage];
-        const next = [...(old ?? [])];
-        next[index] = surfacedMessage;
-        return next;
-      });
+      void surfaceLiveUpdater.update(surfacedMessage);
       return;
     }
 
@@ -187,6 +186,7 @@ export function setupWsQueryBridge(deps: {
   });
 
   return () => {
+    surfaceLiveUpdater.dispose();
     unsubscribeMessages();
     unsubscribeConnection();
   };

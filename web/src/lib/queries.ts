@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "~/lib/api";
 import { historyQueryKey, surfaceQueryKey } from "~/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
@@ -110,13 +110,24 @@ export function userConfigQueryOptions() {
   };
 }
 
-export function surfaceTimelineQueryOptions() {
-  return {
+export function surfaceTimelineInfiniteQueryOptions() {
+  return infiniteQueryOptions({
     queryKey: surfaceQueryKey,
-    queryFn: async () => (await fetchStreamsHistory({ data: { surface: "input" } })).items,
-    staleTime: 0, // WS writes reset dataUpdatedAt while viewing
-    structuralSharing: replaceEqualDeep,
-  };
+    queryFn: async ({ pageParam }) =>
+      fetchStreamsHistory({
+        data: {
+          surface: "input",
+          limit: pageParam
+            ? STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT
+            : STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT,
+          ...(pageParam ? { before: pageParam } : {}),
+        },
+      }),
+    initialPageParam: undefined as string | undefined,
+    getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
+    getNextPageParam: () => undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 }
 
 export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
