@@ -98,8 +98,10 @@ function StreamContextMenu({
     if (!editing) return;
     focusSettledRef.current = false;
     const raf = requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      const input = inputRef.current;
+      input?.focus();
+      input?.setSelectionRange(0, input.value.length, "backward");
+      if (input) input.scrollLeft = 0;
       focusSettledRef.current = true;
     });
     return () => cancelAnimationFrame(raf);
@@ -134,7 +136,7 @@ function StreamContextMenu({
         }
       }}
       onClick={(e) => e.preventDefault()}
-      className="min-w-0 flex-1 select-text border-b border-border outline-none focus:border-border-pop"
+      className="min-w-0 flex-1 select-text border-0 bg-transparent outline-none shadow-[inset_0_-1px_0_var(--border)] focus:shadow-[inset_0_-1px_0_var(--border-pop)]"
     />
   ) : (
     <span className="truncate flex-1">{stream.name}</span>
