@@ -146,7 +146,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   const namespace = `markdown-${useId().replaceAll(":", "")}`;
   return (
     <MarkdownFootnoteNamespace.Provider value={namespace}>
-      <div className="markdown-content break-words text-sm text-text">
+      <div className="markdown-content break-words text-text">
         <Markdown
           allowHtml={false}
           frontmatter={false}
