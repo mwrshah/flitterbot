@@ -1006,16 +1006,16 @@ export const MessageInput = memo(function MessageInput({
     >
       <div className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}>
         {pendingImages.length > 0 && (
-          <div className="grid w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] gap-2 p-2">
+          <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
             {pendingImages.map((img, i) => (
               <div
                 key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
-                className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-background-muted"
+                className="relative max-h-48 max-w-[min(24rem,100%)]"
               >
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
                   alt={`Pending attachment ${i + 1}`}
-                  className="block h-auto w-full"
+                  className="block h-auto max-h-48 w-auto max-w-full rounded-lg border border-border object-contain"
                 />
                 <button
                   type="button"
