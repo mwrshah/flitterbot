@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import { Button } from "~/components/common/button";
 import { ShortcutHint } from "~/components/common/kbd";
 import { ModelSelector } from "~/components/model-selector";
@@ -32,6 +33,48 @@ import type { DirectoryCompletionItem, ImageAttachment, SkillPickerItem } from "
 import { cn } from "~/lib/utils";
 
 const draftStore = new Map<string, string>();
+const pendingAttachmentStore = new Map<string, ImageAttachment[]>();
+const pendingAttachmentListeners = new Map<string, Set<(images: ImageAttachment[]) => void>>();
+const MAX_PENDING_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+const PENDING_ATTACHMENT_LIMIT_MESSAGE =
+  "Pending image limit reached (50 MB). Remove an attachment and try again.";
+
+function attachmentBytes(images: ImageAttachment[]): number {
+  return images.reduce((total, image) => total + image.data.length, 0);
+}
+
+function storedAttachmentBytes(): number {
+  let total = 0;
+  for (const images of pendingAttachmentStore.values()) total += attachmentBytes(images);
+  return total;
+}
+
+function publishStoredAttachments(lane: string, images: ImageAttachment[]): void {
+  for (const listener of pendingAttachmentListeners.get(lane) ?? []) listener(images);
+}
+
+function appendStoredAttachments(
+  lane: string,
+  images: ImageAttachment[],
+): ImageAttachment[] | null {
+  if (storedAttachmentBytes() + attachmentBytes(images) > MAX_PENDING_ATTACHMENT_BYTES) return null;
+  const next = [...(pendingAttachmentStore.get(lane) ?? []), ...images];
+  pendingAttachmentStore.set(lane, next);
+  publishStoredAttachments(lane, next);
+  return next;
+}
+
+function readImageAttachment(file: File): Promise<ImageAttachment | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = typeof reader.result === "string" ? reader.result.split(",")[1] : undefined;
+      resolve(data ? { data, mimeType: file.type } : null);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
 
 export type MessageInputHoverButton = {
   id: string;
@@ -361,10 +404,7 @@ function MessageInputHoverButtons({
 
 type MessageInputProps = {
   isSending: boolean;
-  onSubmit: (text: string) => void;
-  pendingImages: ImageAttachment[];
-  onAddImages: (files: FileList | File[]) => void;
-  onRemoveImage: (index: number) => void;
+  onSubmit: (text: string, images?: ImageAttachment[]) => Promise<void>;
   placeholder?: string;
   rows?: number;
   autoFocus?: boolean;
@@ -376,7 +416,6 @@ type MessageInputProps = {
   selectedModelId?: string;
   selectedThinkingLevel?: ModelThinkingLevel;
   isSessionBusy?: boolean;
-  attachmentsDisabled?: boolean;
   onInterrupt?: () => void;
   isInterruptPending?: boolean;
   recoveryKind?: "closed" | "dead";
@@ -391,9 +430,6 @@ const rootRouteApi = getRouteApi("__root__");
 export const MessageInput = memo(function MessageInput({
   isSending,
   onSubmit,
-  pendingImages,
-  onAddImages,
-  onRemoveImage,
   placeholder = "Press i to jump here · / for skills · @ for paths",
   rows = 2,
   autoFocus = false,
@@ -405,7 +441,6 @@ export const MessageInput = memo(function MessageInput({
   selectedModelId,
   selectedThinkingLevel,
   isSessionBusy = false,
-  attachmentsDisabled = false,
   onInterrupt,
   isInterruptPending = false,
   recoveryKind,
@@ -414,7 +449,7 @@ export const MessageInput = memo(function MessageInput({
   internalCommandScope,
   isRecoverPending = false,
 }: MessageInputProps) {
-  useWhyDidYouRender("MessageInput", { isSending, pendingImages, placeholder });
+  useWhyDidYouRender("MessageInput", { isSending, placeholder });
   const { apiClient } = rootRouteApi.useRouteContext();
   const { data: baseSkills } = useQuery(skillsQueryOptions(apiClient));
   const skills = useMemo(() => {
@@ -428,12 +463,15 @@ export const MessageInput = memo(function MessageInput({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const draftKeyRef = useRef(draftKey);
+  const mountedRef = useRef(true);
   const [recoveryButtonWidth, setRecoveryButtonWidth] = useState<number | null>(null);
   const [draft, setDraft] = useState(() => (draftKey ? (draftStore.get(draftKey) ?? "") : ""));
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>(() =>
+    draftKey ? (pendingAttachmentStore.get(draftKey) ?? []) : [],
+  );
   const [isDraftBlank, setIsDraftBlank] = useState(() =>
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
-  const imagesDisabled = isSessionBusy || attachmentsDisabled;
   const [hoverSendAction, setHoverSendAction] = useState<HoverSendAction | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
@@ -464,6 +502,26 @@ export const MessageInput = memo(function MessageInput({
     return () => registerComposerFocusTarget(null);
   }, []);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const listener = (images: ImageAttachment[]) => setPendingImages(images);
+    const listeners = pendingAttachmentListeners.get(draftKey) ?? new Set();
+    listeners.add(listener);
+    pendingAttachmentListeners.set(draftKey, listeners);
+    listener(pendingAttachmentStore.get(draftKey) ?? []);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) pendingAttachmentListeners.delete(draftKey);
+    };
+  }, [draftKey]);
+
   const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
   useEffect(() => {
     const id = setTimeout(() => setDebouncedAtFilter(atPickerFilter), 150);
@@ -488,12 +546,59 @@ export const MessageInput = memo(function MessageInput({
 
   const draftRef = useRef(draft);
   const onSubmitRef = useRef(onSubmit);
-  const onAddImagesRef = useRef(onAddImages);
   useEffect(() => {
     draftRef.current = draft;
     onSubmitRef.current = onSubmit;
-    onAddImagesRef.current = onAddImages;
   });
+
+  const setPendingImagesAndStore = useCallback(
+    (update: (current: ImageAttachment[]) => ImageAttachment[]) => {
+      const lane = draftKeyRef.current;
+      if (!lane) {
+        setPendingImages(update);
+        return;
+      }
+      const next = update(pendingAttachmentStore.get(lane) ?? []);
+      if (next.length > 0) pendingAttachmentStore.set(lane, next);
+      else pendingAttachmentStore.delete(lane);
+      publishStoredAttachments(lane, next);
+    },
+    [],
+  );
+
+  const addImageFiles = useCallback((files: FileList | File[]) => {
+    const lane = draftKeyRef.current;
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const batchBytes = imageFiles.reduce((total, file) => total + 4 * Math.ceil(file.size / 3), 0);
+    if (lane && storedAttachmentBytes() + batchBytes > MAX_PENDING_ATTACHMENT_BYTES) {
+      toast.error(PENDING_ATTACHMENT_LIMIT_MESSAGE);
+      return;
+    }
+
+    void Promise.all(imageFiles.map(readImageAttachment)).then((results) => {
+      const images = results.filter((image): image is ImageAttachment => image !== null);
+      if (images.length === 0) return;
+
+      if (!lane) {
+        if (mountedRef.current) setPendingImages((current) => [...current, ...images]);
+        return;
+      }
+
+      const next = appendStoredAttachments(lane, images);
+      if (!next) {
+        toast.error(PENDING_ATTACHMENT_LIMIT_MESSAGE);
+        return;
+      }
+    });
+  }, []);
+
+  const removeImage = useCallback(
+    (index: number) => {
+      setPendingImagesAndStore((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    },
+    [setPendingImagesAndStore],
+  );
 
   const setDraftAndStore = useCallback((value: string) => {
     const nextIsDraftBlank = isBlankDraft(value);
@@ -749,13 +854,23 @@ export const MessageInput = memo(function MessageInput({
   );
 
   const submitCurrentDraft = useCallback(() => {
-    if (isSending || recoveryKind || (imagesDisabled && pendingImages.length > 0)) return;
+    if (isSending || recoveryKind) return;
     const text = draftRef.current.trim();
     if (!text && pendingImages.length === 0) return;
-    onSubmitRef.current(text);
+    const submittedImages = pendingImages;
+    void onSubmitRef.current(text, submittedImages.length > 0 ? submittedImages : undefined).then(
+      () => {
+        setPendingImagesAndStore((current) =>
+          current === submittedImages
+            ? []
+            : current.filter((image) => !submittedImages.includes(image)),
+        );
+      },
+      () => undefined,
+    );
     setHoverSendAction(null);
     setDraftAndStore("");
-  }, [imagesDisabled, isSending, pendingImages.length, recoveryKind, setDraftAndStore]);
+  }, [isSending, pendingImages, recoveryKind, setDraftAndStore, setPendingImagesAndStore]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -860,31 +975,26 @@ export const MessageInput = memo(function MessageInput({
       const imageFiles: File[] = [];
       for (const item of items) {
         if (item.type.startsWith("image/")) {
-          if (imagesDisabled) {
-            event.preventDefault();
-            return;
-          }
           const file = item.getAsFile();
           if (file) imageFiles.push(file);
         }
       }
       if (imageFiles.length) {
         event.preventDefault();
-        onAddImagesRef.current(imageFiles);
+        addImageFiles(imageFiles);
       }
     },
-    [imagesDisabled],
+    [addImageFiles],
   );
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      if (imagesDisabled) return;
       if (event.dataTransfer?.files?.length) {
-        onAddImagesRef.current(Array.from(event.dataTransfer.files));
+        addImageFiles(Array.from(event.dataTransfer.files));
       }
     },
-    [imagesDisabled],
+    [addImageFiles],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -955,8 +1065,7 @@ export const MessageInput = memo(function MessageInput({
     [setDraftAndStore, submitCurrentDraft],
   );
 
-  const canSend =
-    (!isDraftBlank || pendingImages.length > 0) && !(imagesDisabled && pendingImages.length > 0);
+  const canSend = !isDraftBlank || pendingImages.length > 0;
 
   useLayoutEffect(() => {
     if (recoveryKind) return;
@@ -1006,20 +1115,20 @@ export const MessageInput = memo(function MessageInput({
     >
       <div className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}>
         {pendingImages.length > 0 && (
-          <div className="grid w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] gap-2 p-2">
+          <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
             {pendingImages.map((img, i) => (
               <div
                 key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
-                className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-background-muted"
+                className="relative max-h-48 max-w-[min(24rem,100%)]"
               >
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
                   alt={`Pending attachment ${i + 1}`}
-                  className="block h-auto w-full"
+                  className="block h-auto max-h-48 w-auto max-w-full rounded-lg border border-border object-contain"
                 />
                 <button
                   type="button"
-                  onClick={() => onRemoveImage(i)}
+                  onClick={() => removeImage(i)}
                   className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background/90 text-status-crashed shadow-sm transition-colors hover:bg-status-crashed-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
                   aria-label={`Remove pending attachment ${i + 1}`}
                   title="Remove attachment"
@@ -1035,10 +1144,9 @@ export const MessageInput = memo(function MessageInput({
           type="file"
           accept="image/*"
           multiple
-          disabled={imagesDisabled}
           className="hidden"
           onChange={(e) => {
-            if (!imagesDisabled && e.target.files?.length) onAddImages(Array.from(e.target.files));
+            if (e.target.files?.length) addImageFiles(Array.from(e.target.files));
             e.target.value = "";
           }}
         />
@@ -1082,12 +1190,9 @@ export const MessageInput = memo(function MessageInput({
           <button
             type="button"
             tabIndex={-1}
-            disabled={imagesDisabled}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-text-muted"
-            title={
-              imagesDisabled ? "Images can't be queued while the session is busy" : "Attach image"
-            }
+            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text"
+            title="Attach image"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

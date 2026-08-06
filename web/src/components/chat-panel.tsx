@@ -418,8 +418,6 @@ export function ChatPanel({
 
   const recoverMutation = useReopenStream();
 
-  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
-
   const [isSending, setIsSending] = useState(false);
   const [busyQueuedText, setBusyQueuedText] = useState("");
   const busyQueuedTextRef = useRef("");
@@ -524,34 +522,8 @@ export function ChatPanel({
     });
   }, [pruneTarget, pruneMutation]);
 
-  const addImageFiles = useCallback((files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (!imageFiles.length) return;
-    for (const file of imageFiles) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(",")[1];
-        if (base64) {
-          setPendingImages((prev) => [...prev, { data: base64, mimeType: file.type }]);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const removeImage = useCallback((index: number) => {
-    setPendingImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const pendingImagesRef = useRef(pendingImages);
-  useEffect(() => {
-    pendingImagesRef.current = pendingImages;
-  });
-
   const handleSubmit = useCallback(
-    async (text: string) => {
-      const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
+    async (text: string, images?: ImageAttachment[]) => {
       if (!text && !images?.length) return;
 
       const clientMessageId = crypto.randomUUID();
@@ -560,18 +532,16 @@ export function ChatPanel({
       const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
 
       if (queueBehindBusy) {
-        if (images?.length) return;
-
         setIsSending(true);
         try {
-          await onSendMessage(displayText, { clientMessageId });
+          await onSendMessage(displayText, { images, clientMessageId });
           busyQueuedClearClientMessageIdRef.current = clientMessageId;
           appendBusyQueuedText(displayText);
-          setPendingImages([]);
         } catch (error) {
           pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
           toast.error("Failed to queue message");
           console.error("handleSubmit queue failed:", error);
+          throw error;
         } finally {
           setIsSending(false);
         }
@@ -586,12 +556,12 @@ export function ChatPanel({
 
       try {
         await onSendMessage(displayText, { images, clientMessageId });
-        setPendingImages([]);
       } catch (error) {
         pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
         queryClient.invalidateQueries({ queryKey: ["status"] });
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);
+        throw error;
       } finally {
         setIsSending(false);
       }
@@ -782,9 +752,6 @@ export function ChatPanel({
             draftKey={streamId ?? piSessionId ?? "__chat__"}
             isSending={isSending}
             onSubmit={handleSubmit}
-            pendingImages={pendingImages}
-            onAddImages={addImageFiles}
-            onRemoveImage={removeImage}
             fillHeight
             autoFocus
             streamId={streamId}
@@ -792,7 +759,6 @@ export function ChatPanel({
             selectedModelId={selectedModelId}
             selectedThinkingLevel={selectedThinkingLevel}
             isSessionBusy={isSessionBusy}
-            attachmentsDisabled={busyQueuedText.length > 0}
             onInterrupt={() => interruptMutation.mutate()}
             isInterruptPending={interruptMutation.isPending}
             recoveryKind={effectiveRecoveryKind}

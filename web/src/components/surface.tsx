@@ -247,7 +247,6 @@ export function Surface() {
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const [isSending, setIsSending] = useState(false);
 
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
@@ -313,37 +312,11 @@ export function Surface() {
 
   const items = virtualizer.getVirtualItems();
 
-  const addImageFiles = useCallback((files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (!imageFiles.length) return;
-    for (const file of imageFiles) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(",")[1];
-        if (base64) {
-          setPendingImages((prev) => [...prev, { data: base64, mimeType: file.type }]);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const removeImage = useCallback((index: number) => {
-    setPendingImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
-  const pendingImagesRef = useRef(pendingImages);
-  useEffect(() => {
-    pendingImagesRef.current = pendingImages;
-  });
-
   const handleSubmit = useCallback(
-    async (text: string) => {
-      const images = pendingImagesRef.current.length ? [...pendingImagesRef.current] : undefined;
+    async (text: string, images?: ImageAttachment[]) => {
       if (!text && !images?.length) return;
 
       virtualizer.scrollToEnd();
@@ -351,10 +324,10 @@ export function Surface() {
       setIsSending(true);
       try {
         await sendMessage(text || "(image)", { images });
-        setPendingImages([]);
       } catch (error) {
         toast.error("Failed to send message");
         console.error("handleSubmit send failed:", error);
+        throw error;
       } finally {
         setIsSending(false);
       }
@@ -447,9 +420,6 @@ export function Surface() {
             draftKey="__surface__"
             isSending={isSending}
             onSubmit={handleSubmit}
-            pendingImages={pendingImages}
-            onAddImages={addImageFiles}
-            onRemoveImage={removeImage}
             fillHeight
             showModelSelector={false}
             internalCommandScope="surface"
