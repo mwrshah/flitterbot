@@ -43,6 +43,8 @@ const REPLAYED_EVENT_TYPES = new Set([
   "turn_end",
   "agent_start",
   "agent_end",
+  "compaction_start",
+  "compaction_end",
   "history_rewritten",
 ]);
 

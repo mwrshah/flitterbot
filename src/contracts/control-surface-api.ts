@@ -48,6 +48,7 @@ export interface PiSessionRuntimeStatus {
   messageCount: number;
   lastPromptAt: string | null;
   busy: boolean;
+  isCompacting: boolean;
   model?: PiSessionModelInfo;
 }
 
@@ -80,6 +81,7 @@ export interface PiOrchestratorStatus {
   streamName: string | null;
   messageCount: number;
   busy: boolean;
+  isCompacting: boolean;
 }
 
 export interface PiMultiSessionStatus {

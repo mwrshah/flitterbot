@@ -330,7 +330,43 @@ export function subscribeToPiSession(
         break;
       }
       case "compaction_start":
+        wsHub.broadcast({
+          type: "compaction_start",
+          piSessionId: session.sessionId,
+          reason: event.reason,
+        });
+        queueMicrotask(() => {
+          wsHub.broadcast({
+            type: "status_changed",
+            subsystem: "pi",
+            timestamp: new Date().toISOString(),
+          });
+        });
+        break;
       case "compaction_end":
+        wsHub.broadcast({
+          type: "compaction_end",
+          piSessionId: session.sessionId,
+          reason: event.reason,
+          aborted: event.aborted,
+          willRetry: event.willRetry,
+          ...(event.errorMessage ? { errorMessage: event.errorMessage } : {}),
+        });
+        if (event.result && !event.aborted) {
+          wsHub.broadcastHistoryCommit({
+            type: "history_rewritten",
+            piSessionId: session.sessionId,
+            reason: "compact",
+          });
+        }
+        queueMicrotask(() => {
+          wsHub.broadcast({
+            type: "status_changed",
+            subsystem: "pi",
+            timestamp: new Date().toISOString(),
+          });
+        });
+        break;
       case "auto_retry_start":
       case "auto_retry_end":
         console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);

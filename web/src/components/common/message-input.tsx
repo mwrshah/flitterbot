@@ -416,6 +416,7 @@ type MessageInputProps = {
   selectedModelId?: string;
   selectedThinkingLevel?: ModelThinkingLevel;
   isSessionBusy?: boolean;
+  isCompacting?: boolean;
   onInterrupt?: () => void;
   isInterruptPending?: boolean;
   recoveryKind?: "closed" | "dead";
@@ -441,6 +442,7 @@ export const MessageInput = memo(function MessageInput({
   selectedModelId,
   selectedThinkingLevel,
   isSessionBusy = false,
+  isCompacting = false,
   onInterrupt,
   isInterruptPending = false,
   recoveryKind,
@@ -854,7 +856,7 @@ export const MessageInput = memo(function MessageInput({
   );
 
   const submitCurrentDraft = useCallback(() => {
-    if (isSending || recoveryKind) return;
+    if (isSending || isCompacting || recoveryKind) return;
     const text = draftRef.current.trim();
     if (!text && pendingImages.length === 0) return;
     const submittedImages = pendingImages;
@@ -870,10 +872,22 @@ export const MessageInput = memo(function MessageInput({
     );
     setHoverSendAction(null);
     setDraftAndStore("");
-  }, [isSending, pendingImages, recoveryKind, setDraftAndStore, setPendingImagesAndStore]);
+  }, [
+    isCompacting,
+    isSending,
+    pendingImages,
+    recoveryKind,
+    setDraftAndStore,
+    setPendingImagesAndStore,
+  ]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isCompacting && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (event.key === "Escape") {
         if (closeActivePicker()) {
           event.preventDefault();
@@ -965,11 +979,13 @@ export const MessageInput = memo(function MessageInput({
       pathPickerVisible,
       skillPickerVisible,
       submitCurrentDraft,
+      isCompacting,
     ],
   );
 
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      if (isCompacting) return;
       const items = event.clipboardData?.items;
       if (!items) return;
       const imageFiles: File[] = [];
@@ -984,17 +1000,18 @@ export const MessageInput = memo(function MessageInput({
         addImageFiles(imageFiles);
       }
     },
-    [addImageFiles],
+    [addImageFiles, isCompacting],
   );
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      if (isCompacting) return;
       if (event.dataTransfer?.files?.length) {
         addImageFiles(Array.from(event.dataTransfer.files));
       }
     },
-    [addImageFiles],
+    [addImageFiles, isCompacting],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -1006,6 +1023,7 @@ export const MessageInput = memo(function MessageInput({
     pendingImages.length === 0 &&
     !isSending &&
     !isSessionBusy &&
+    !isCompacting &&
     !recoveryKind;
   const hoverSendSourceExists =
     hoverSendAction !== null &&
@@ -1128,8 +1146,9 @@ export const MessageInput = memo(function MessageInput({
                 />
                 <button
                   type="button"
+                  disabled={isCompacting}
                   onClick={() => removeImage(i)}
-                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={`Remove pending attachment ${i + 1}`}
                   title="Remove attachment"
                 >
@@ -1190,8 +1209,9 @@ export const MessageInput = memo(function MessageInput({
           <button
             type="button"
             tabIndex={-1}
+            disabled={isCompacting}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text"
+            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             title="Attach image"
           >
             <svg
@@ -1221,13 +1241,32 @@ export const MessageInput = memo(function MessageInput({
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
             {!recoveryKind && showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
-                disabled={isSending}
+                disabled={isSending || isCompacting}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
                 selectedThinkingLevel={selectedThinkingLevel}
               />
             )}
-            {recoveryKind ? (
+            {isCompacting ? (
+              <>
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="text-xs font-medium text-text-muted"
+                >
+                  Compacting…
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled
+                  aria-label="Send unavailable while compacting"
+                  className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+                >
+                  <ArrowRightIcon className="size-4" />
+                </Button>
+              </>
+            ) : recoveryKind ? (
               <Button
                 type="button"
                 variant="subtle"

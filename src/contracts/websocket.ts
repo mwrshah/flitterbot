@@ -210,12 +210,17 @@ export interface TurnStartWebSocketEvent {
 
 export interface CompactionStartWebSocketEvent {
   type: "compaction_start";
-  piSessionId?: string;
+  piSessionId: string;
+  reason: "manual" | "threshold" | "overflow";
 }
 
 export interface CompactionEndWebSocketEvent {
   type: "compaction_end";
-  piSessionId?: string;
+  piSessionId: string;
+  reason: "manual" | "threshold" | "overflow";
+  aborted: boolean;
+  willRetry: boolean;
+  errorMessage?: string;
 }
 
 export interface AutoRetryStartWebSocketEvent {

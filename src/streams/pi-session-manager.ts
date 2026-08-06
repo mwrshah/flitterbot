@@ -39,6 +39,7 @@ export interface ManagedPiSession {
     thinkingLevel: ModelThinkingLevel;
   };
   unsubscribe: () => void;
+  activation?: Promise<void>;
   pendingDestroy?: boolean;
   lastSurfacedAssistantMessage?: ChatTimelineMessage;
   whatsappRemoteJid?: string;
@@ -301,6 +302,21 @@ export class PiSessionManager {
     customTools?: FlitterbotTool[],
   ): Promise<void> {
     if (managed.runtime) return;
+    if (managed.activation) return managed.activation;
+
+    const activation = this.activateStreamSessionOnce(managed, customTools);
+    managed.activation = activation;
+    try {
+      await activation;
+    } finally {
+      if (managed.activation === activation) managed.activation = undefined;
+    }
+  }
+
+  private async activateStreamSessionOnce(
+    managed: ManagedPiSession,
+    customTools?: FlitterbotTool[],
+  ): Promise<void> {
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
     if (managed.role === "default") throw new Error("Default session is not stream-backed");
 
