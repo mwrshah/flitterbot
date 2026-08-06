@@ -112,6 +112,7 @@ export interface StatusResponse {
   piAgent: PiMultiSessionStatus;
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
+  groqConfigured: boolean;
   streams?: StreamSummary[];
   shortcuts?: ShortcutBindingsConfig;
 }

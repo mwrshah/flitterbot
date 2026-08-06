@@ -12,7 +12,7 @@ import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { surfaceTimelineQueryOptions } from "~/lib/queries";
+import { statusQueryOptions, surfaceTimelineQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
@@ -242,7 +242,7 @@ function EntryRow({
 }
 
 export function Surface() {
-  const { sendMessage } = rootApi.useRouteContext();
+  const { apiClient, sendMessage } = rootApi.useRouteContext();
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
 
@@ -250,7 +250,9 @@ export function Surface() {
   const [isSending, setIsSending] = useState(false);
 
   const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
+  const { data: status } = useQuery(statusQueryOptions(apiClient));
   const entries = useMemo(() => timelineToEntries(timeline), [timeline]);
+  const surfaceInputDisabled = status?.groqConfigured === false;
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -416,14 +418,21 @@ export function Surface() {
         <HorizontalResizeHandle />
 
         <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
-          <MessageInput
-            draftKey="__surface__"
-            isSending={isSending}
-            onSubmit={handleSubmit}
-            fillHeight
-            showModelSelector={false}
-            internalCommandScope="surface"
-          />
+          {surfaceInputDisabled ? (
+            <div className="flex h-full items-center justify-center px-4 text-center text-sm text-text-muted">
+              Set <code className="mx-1 text-text">GROQ_API_KEY</code> and restart Flitterbot to
+              send messages from the Surface.
+            </div>
+          ) : (
+            <MessageInput
+              draftKey="__surface__"
+              isSending={isSending}
+              onSubmit={handleSubmit}
+              fillHeight
+              showModelSelector={false}
+              internalCommandScope="surface"
+            />
+          )}
         </Panel>
       </PanelGroup>
     </div>

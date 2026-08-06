@@ -44,6 +44,7 @@ export type OfflineStatus = {
   uptime: 0;
   piAgent?: never;
   blackboard: "";
+  groqConfigured?: never;
   whatsapp: {
     status: "disconnected";
     pid?: never;

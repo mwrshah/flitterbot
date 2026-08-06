@@ -44,6 +44,7 @@ import {
   updateStreamRepoPath,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
+import { resolveGroqApiKey } from "./classifier/groq-client.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
@@ -888,6 +889,7 @@ export class ControlSurfaceRuntime {
         requiresManualAuth: whatsapp.requiresManualAuth,
       },
       blackboard: blackboardStatus,
+      groqConfigured: Boolean(resolveGroqApiKey()?.trim()),
       streams: [
         ...openStreams.map(({ stream: ws, piSessionId }) => {
           const managed = this.sessionManager.getByStream(ws.id);
