@@ -337,7 +337,7 @@ export function Surface() {
       <div className="flex items-center justify-between px-6 py-1.5 border-b border-border shrink-0">
         <div>
           <h1 className="text-sm font-semibold text-text">Surface</h1>
-          <p className="text-[10px] text-text-muted">Highlights from all streams</p>
+          <p className="text-[10px] text-text-muted">Highlights from all swimlanes</p>
         </div>
         <div className="flex items-center gap-2">
           <RuntimeHealthIndicator />

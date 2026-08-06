@@ -19,7 +19,7 @@ export function useCreateStream() {
     },
     onError: (error) => {
       toast.error(
-        `Failed to create stream: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create swimlane: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });

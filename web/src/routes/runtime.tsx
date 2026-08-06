@@ -54,7 +54,7 @@ function RuntimePage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Streams Agent</CardTitle>
+                <CardTitle>flitterbot</CardTitle>
                 <Badge variant={status.piAgent?.default?.busy ? "active" : "info"}>
                   {status.piAgent?.default?.busy ? "active" : "idle"}
                 </Badge>
@@ -78,7 +78,7 @@ function RuntimePage() {
           {(status.piAgent?.orchestrators?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Streams Orchestrators</CardTitle>
+                <CardTitle>swimlanes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">

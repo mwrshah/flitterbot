@@ -330,7 +330,7 @@ export function ChatPanel({
 
   const switchCwdMutation = useMutation({
     mutationFn: (cwd: string) => {
-      if (!streamId) throw new Error("No stream selected");
+      if (!streamId) throw new Error("No swimlane selected");
       return setStreamCwd({ data: { streamId, cwd } });
     },
     onSuccess: async () => {
@@ -437,11 +437,11 @@ export function ChatPanel({
   const forkMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.forkStream(piSessionId, entryId),
     onSuccess: (result) => {
-      toast.success(`Forked into new stream: ${result.streamName}`);
+      toast.success(`Forked into new swimlane: ${result.streamName}`);
     },
     onError: (error) => {
       toast.error(
-        `Failed to fork stream: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to fork swimlane: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });
@@ -603,7 +603,7 @@ export function ChatPanel({
           }
         : {
             id: "close-stream",
-            label: "close stream",
+            label: "close swimlane",
             insertText: "close stream with the no-op option",
           },
     ];

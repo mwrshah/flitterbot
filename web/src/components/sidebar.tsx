@@ -162,19 +162,19 @@ function StreamContextMenu({
             setEditing(true);
           }}
         >
-          Rename stream
+          Rename swimlane
         </ContextMenuItem>
         <ContextMenuItem disabled={disabled} onClick={onTogglePinned}>
-          {stream.pinned ? "Unpin stream" : "Pin stream"}
+          {stream.pinned ? "Unpin swimlane" : "Pin swimlane"}
         </ContextMenuItem>
         {onReopen && (
           <ContextMenuItem disabled={disabled} onClick={onReopen}>
-            Reopen stream
+            Reopen swimlane
           </ContextMenuItem>
         )}
         {onClose && (
           <ContextMenuItem disabled={disabled} onClick={onClose}>
-            Close stream
+            Close swimlane
           </ContextMenuItem>
         )}
       </ContextMenuContent>
@@ -211,7 +211,7 @@ export const Sidebar = memo(function Sidebar() {
     },
     onError: (error) => {
       toast.error(
-        `Failed to update stream pin: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to update swimlane pin: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });
@@ -224,7 +224,7 @@ export const Sidebar = memo(function Sidebar() {
     },
     onError: (error) => {
       toast.error(
-        `Failed to rename stream: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to rename swimlane: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });
@@ -236,7 +236,7 @@ export const Sidebar = memo(function Sidebar() {
     },
     onError: (error) => {
       toast.error(
-        `Failed to close stream: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to close swimlane: ${error instanceof Error ? error.message : String(error)}`,
       );
     },
   });
@@ -280,7 +280,7 @@ export const Sidebar = memo(function Sidebar() {
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
           to={lastStreamPath}
-          label="Streams"
+          label="Swimlanes"
           icon={
             <>
               <img src={logoBlack} alt="" className="size-4 object-contain dark:hidden" />
@@ -297,7 +297,7 @@ export const Sidebar = memo(function Sidebar() {
             <>
               <div className="flex items-center justify-between mb-2 ml-2">
                 <p className="pt-2 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-                  Active streams
+                  Active swimlanes
                 </p>
                 <div
                   className="group px-2 pt-2 pb-1 pl-4"
@@ -308,9 +308,11 @@ export const Sidebar = memo(function Sidebar() {
                   <button
                     type="button"
                     disabled={createStreamMutation.isPending}
-                    aria-label="New stream"
+                    aria-label="New swimlane"
                     title={
-                      newStreamShortcutHint ? `New stream (${newStreamShortcutHint})` : "New stream"
+                      newStreamShortcutHint
+                        ? `New swimlane (${newStreamShortcutHint})`
+                        : "New swimlane"
                     }
                     className="flex size-4 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -397,7 +399,7 @@ export const Sidebar = memo(function Sidebar() {
                           {ws.pinned && (
                             <button
                               type="button"
-                              aria-label="Unpin stream"
+                              aria-label="Unpin swimlane"
                               className={cn(
                                 "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex",
                                 !streamShortcuts.has(ws.id) && "ml-auto",
@@ -433,7 +435,7 @@ export const Sidebar = memo(function Sidebar() {
                           {ws.pinned && (
                             <button
                               type="button"
-                              aria-label="Unpin stream"
+                              aria-label="Unpin swimlane"
                               className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex"
                               onClick={() => {
                                 pinStreamMutation.mutate({ streamId: ws.id, pinned: false });
@@ -492,7 +494,7 @@ export const Sidebar = memo(function Sidebar() {
                           {ws.pinned && (
                             <button
                               type="button"
-                              aria-label="Unpin stream"
+                              aria-label="Unpin swimlane"
                               className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-text-muted hover:text-text"
                               onClick={(event) => {
                                 event.preventDefault();

@@ -70,7 +70,7 @@ function statusDotColor(status: DownstreamSessionItem["status"]): string {
 }
 
 function sessionDescription(session: DownstreamSessionItem): string {
-  return session.taskDescription ?? session.project ?? session.streamName ?? "no stream";
+  return session.taskDescription ?? session.project ?? session.streamName ?? "no swimlane";
 }
 
 function tmuxShortcutHintLabel(tmuxSession: string): string {

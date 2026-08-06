@@ -23,7 +23,7 @@ export const INTERNAL_COMMANDS: SkillPickerItem[] = [
   },
   {
     name: "fork",
-    description: "Clone this session into a new stream",
+    description: "Clone this session into a new swimlane",
     disableModelInvocation: true,
     kind: "command",
   },
@@ -31,7 +31,7 @@ export const INTERNAL_COMMANDS: SkillPickerItem[] = [
 
 const NEW_STREAM_COMMAND: SkillPickerItem = {
   name: "new-stream",
-  description: "Start a new work stream",
+  description: "Start a new work swimlane",
   disableModelInvocation: true,
   kind: "command",
 };
