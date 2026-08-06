@@ -20,9 +20,12 @@ node installer/install.mjs
 pnpm --dir web dev
 ```
 
-Step by step: copying `.env.example` gives you a file for model provider keys and the optional `GROQ_API_KEY`; `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default. The last two steps are optional — `flitterbot-wa auth` links WhatsApp, and `pnpm --dir web dev` starts the web UI on port 3188.
+Step by step: 
+- copying `.env.example` gives you a file for model provider keys and the optional `GROQ_API_KEY`; 
+- `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default. 
+- `flitterbot-wa auth` links WhatsApp and is optional 
+- `pnpm --dir web dev` starts the web UI on port 3188.
 
-Installer flags: `--dry-run` preview, `--with-scheduler` launchd/systemd cron.
 
 ## Get started
 
