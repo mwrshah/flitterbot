@@ -2,7 +2,7 @@ import type http from "node:http";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { requireBearer, sendJson } from "./_shared.ts";
 
-export async function handleCloseStreamNoopRoute(
+export async function handleCloseSwimlaneNoopRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -13,7 +13,7 @@ export async function handleCloseStreamNoopRoute(
   }
 
   try {
-    const result = await runtime.closeStreamNoop(streamId);
+    const result = await runtime.closeSwimlaneNoop(streamId);
     return sendJson(res, 200, result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

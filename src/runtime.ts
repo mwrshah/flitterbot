@@ -66,7 +66,7 @@ import type {
   StreamType,
   TranscriptPageResponse,
 } from "./contracts/index.ts";
-import { executeCloseStream } from "./custom-tools/close-stream.ts";
+import { executeCloseSwimlane } from "./custom-tools/close-swimlane.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
 import { createPiModelRuntime } from "./pi-auth.ts";
@@ -978,7 +978,7 @@ export class ControlSurfaceRuntime {
     return { ok: true, streamId, name: stream.name };
   }
 
-  async closeStreamNoop(
+  async closeSwimlaneNoop(
     streamId: string,
   ): Promise<{ ok: true; streamId: string; message: string }> {
     const managed = this.sessionManager.getByStream(streamId);
@@ -989,7 +989,7 @@ export class ControlSurfaceRuntime {
     if (!piSessionId) {
       throw new Error(`No pi session found for stream ${streamId}`);
     }
-    const result = await executeCloseStream(
+    const result = await executeCloseSwimlane(
       this.blackboard,
       piSessionId,
       streamId,
@@ -2420,12 +2420,12 @@ export class ControlSurfaceRuntime {
         },
       });
 
-      const closeStreamId = streamId;
+      const closeSwimlaneId = streamId;
       tools.push({
-        name: "close_stream",
-        label: "Close Stream",
+        name: "close_swimlane",
+        label: "Close Swimlane",
         description:
-          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_stream again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
+          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_swimlane again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
         parameters: {
           type: "object",
           properties: {
@@ -2457,8 +2457,8 @@ export class ControlSurfaceRuntime {
             commit_message: string;
             base_branch?: string;
           };
-          const managed = closeStreamId
-            ? this.sessionManager.getByStream(closeStreamId)
+          const managed = closeSwimlaneId
+            ? this.sessionManager.getByStream(closeSwimlaneId)
             : undefined;
           const streamsSessId = managed?.piSessionId;
           if (!streamsSessId) {
@@ -2467,7 +2467,7 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseStream(
+          const result = await executeCloseSwimlane(
             this.blackboard,
             streamsSessId,
             stream_id,

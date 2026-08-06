@@ -230,8 +230,8 @@ export const Sidebar = memo(function Sidebar() {
     },
   });
 
-  const closeStreamMutation = useMutation({
-    mutationFn: (streamId: string) => apiClient.closeStream(streamId),
+  const closeSwimlaneMutation = useMutation({
+    mutationFn: (streamId: string) => apiClient.closeSwimlane(streamId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["status"] });
     },
@@ -395,7 +395,7 @@ export const Sidebar = memo(function Sidebar() {
                     }
                     onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
                     onReopen={onReopen}
-                    onClose={() => closeStreamMutation.mutate(ws.id)}
+                    onClose={() => closeSwimlaneMutation.mutate(ws.id)}
                     renderTrigger={(label) => (
                       <Link
                         to="/streams/$piSessionId"
@@ -455,7 +455,7 @@ export const Sidebar = memo(function Sidebar() {
                     }
                     onRename={(name) => renameStreamMutation.mutate({ streamId: ws.id, name })}
                     onReopen={onReopen}
-                    onClose={() => closeStreamMutation.mutate(ws.id)}
+                    onClose={() => closeSwimlaneMutation.mutate(ws.id)}
                     renderTrigger={(label) => (
                       <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted">
                         <span className={cn("shrink-0 size-2 rounded-full", "bg-status-ended")} />

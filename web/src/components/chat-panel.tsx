@@ -564,12 +564,12 @@ export function ChatPanel({
             id: "close-merge",
             label: "close (merge)",
             insertText:
-              "Ship it (run close_stream with the merge option, which commits worktree changes, merges into this repo's flitterbot configured base branch, pushes base branch, then closes this stream)",
+              "Ship it (run close_swimlane with the merge option, which commits worktree changes, merges into this repo's flitterbot configured base branch, pushes base branch, then closes this stream)",
           }
         : {
-            id: "close-stream",
+            id: "close-swimlane",
             label: "close swimlane",
-            insertText: "close stream with the no-op option",
+            insertText: "close swimlane with the no-op option",
           },
     ];
 
@@ -577,7 +577,7 @@ export function ChatPanel({
       buttons.push({
         id: "close-no-git-ops",
         label: "close (no git ops)",
-        insertText: "close stream with the no-op option (i.e. no bundled git operations)",
+        insertText: "close swimlane with the no-op option (i.e. no bundled git operations)",
       });
       if (worktree?.worktreePath && worktree.branch && worktree.baseBranch) {
         buttons.push({

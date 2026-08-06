@@ -29,7 +29,7 @@ import {
   handleBrowserUserConfigGetRoute,
   handleBrowserUserConfigPutRoute,
 } from "./routes/browser-user-config.ts";
-import { handleCloseStreamNoopRoute } from "./routes/close-stream.ts";
+import { handleCloseSwimlaneNoopRoute } from "./routes/close-swimlane.ts";
 import { handleCompactPiSessionRoute } from "./routes/compact-pi-session.ts";
 import { handleCreateStreamRoute } from "./routes/create-stream.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
@@ -334,7 +334,7 @@ async function routeRequest(
     segments[2] &&
     segments[3] === "close"
   ) {
-    return handleCloseStreamNoopRoute(runtime, req, res, decodeURIComponent(segments[2]));
+    return handleCloseSwimlaneNoopRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "PUT" &&

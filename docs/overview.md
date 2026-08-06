@@ -23,7 +23,7 @@ Each Pi session has its own FIFO turn queue; all agents process concurrently.
 
 Default agent creates streams via `create_stream` — inserts a SQLite row, spawns a bound orchestrator, and by default passes relevant user context through to the new stream. Stream insertion and rename share one case-insensitive collision contract: the first requested `name` stays `name`, then collisions become `2name`, `3name`, and so on. Forking uses that same insertion contract, while persisted historical names remain unchanged. For normal single-stream creation, the runtime looks at up to 10 recent default-surface real user messages (`web`/`whatsapp`, `sender=user`, no `stream_id`) after the previous stream creation boundary, asks a Groq relevance classifier which messages belong in the new stream, forces the current user message in if missing, and formats those messages as the orchestrator's initial prompt. The relevance classifier sees the stream name, the default agent's optional `message` as the stream purpose/agent context, and the candidate user messages; it is instructed to omit vague default-agent orchestration prompts unless that purpose makes the concrete task clear. If relevance classification fails, it falls back to the current user message only. `skipUserMessage=true` is reserved for batch-created streams where the default agent supplies a targeted full prompt in `message`; that mode skips user-message passthrough entirely.
 
-The orchestrator enriches the stream (repo, git worktree via `set_up_worktree`), launches Claude Code sessions in tmux, and coordinates waves through prompt-based delegation. On completion, `close_stream` merges to the confirmed base branch, pushes when permitted by the close flow, closes the row, and the runtime destroys the orchestrator.
+The orchestrator enriches the stream (repo, git worktree via `set_up_worktree`), launches Claude Code sessions in tmux, and coordinates waves through prompt-based delegation. On completion, `close_swimlane` merges to the confirmed base branch, pushes when permitted by the close flow, closes the row, and the runtime destroys the orchestrator.
 
 Soft-deleted: `status` flips to `closed` with `closed_at`. Closed streams remain visible in the sidebar for 7 days, while pinned streams remain visible there regardless of age. Aggregated Surface history retains the 7-day cutoff.
 
@@ -105,7 +105,7 @@ Stream-backed roles with tailored system prompts and role-gated tools:
 
 **Default streams** — per non-default WhatsApp user streams (`streams.type = "defaultStream"`). They use the same default-agent prompt and tools as the real default session, and new default streams are seeded with `defaultAgentFirstMessage`.
 
-**Orchestrators** — ephemeral work sessions, one per work stream. Manage Claude Code sessions. Tools: `set_up_worktree` (inspect/apply stream worktree setup), `close_stream` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
+**Orchestrators** — ephemeral work sessions, one per work stream. Manage Claude Code sessions. Tools: `set_up_worktree` (inspect/apply stream worktree setup), `close_swimlane` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
 
 Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
 

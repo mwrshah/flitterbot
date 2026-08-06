@@ -451,7 +451,7 @@ export class PiSessionManager {
       (lastAssistantMessage) => {
         managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
-          this.destroyStreamSession(managed.streamId, "close_stream");
+          this.destroyStreamSession(managed.streamId, "close_swimlane");
         }
       },
       () => managed.queue.steerPendingHooks(),
@@ -707,7 +707,7 @@ export class PiSessionManager {
       (lastAssistantMessage) => {
         managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
         if (managed.pendingDestroy && managed.streamId) {
-          this.destroyStreamSession(managed.streamId, "close_stream");
+          this.destroyStreamSession(managed.streamId, "close_swimlane");
         }
       },
       () => managed.queue.steerPendingHooks(),
