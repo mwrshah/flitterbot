@@ -81,7 +81,7 @@ const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: Chat
       className="ml-auto shrink-0 text-xs text-text-muted tabular-nums"
       title="Latest request. Pi reports cache reuse, but not cache misses, age, or expiry time."
     >
-      cache reuse: {cacheRead}/{contextTokens} tokens
+      cache: {cacheRead}/{contextTokens} tokens
     </span>
   );
 });
@@ -667,12 +667,14 @@ export function ChatPanel({
         ref={cwdPickerHeaderRef}
         className="relative flex items-center px-6 py-2 border-b border-border shrink-0 min-h-11 gap-3"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-text truncate">{streamName ?? "flitterbot"}</h1>
+        <div className="flex min-w-0 flex-1 items-center gap-2 @container">
+          <h1 className="min-w-0 truncate text-sm font-semibold text-text">
+            {streamName ?? "flitterbot"}
+          </h1>
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-text-muted text-sm shrink-0">|</span>
-              <span ref={cwdPickerAnchorRef} className="relative flex items-center min-w-0 gap-1">
+              <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={streamId ? openCwdPicker : undefined}
@@ -695,7 +697,7 @@ export function ChatPanel({
                   label={cwdShortcutLabel}
                   actionActive={cwdCopy.copied}
                   actionText="Copied"
-                  className="min-w-0 shrink-[9999] overflow-hidden"
+                  className="hidden shrink-0 @[30rem]:inline-grid"
                 />
               </span>
             </>
