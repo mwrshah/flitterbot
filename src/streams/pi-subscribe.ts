@@ -4,7 +4,7 @@ import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type { ChatTimelineMessage, ChatTimelineTool } from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { ensureConversationMessageId, findConversationEntry } from "./conversation-identity.ts";
-import { piMessageToTimelineItems } from "./history.ts";
+import { flitterbotHookToTimelineMessage, piMessageToTimelineItems } from "./history.ts";
 import type { PiSessionState } from "./pi-session-state.ts";
 import type { ToolDisplayContextCache } from "./tool-display.ts";
 
@@ -146,6 +146,19 @@ export function subscribeToPiSession(
         break;
       }
       case "message_end": {
+        const customMessage = flitterbotHookToTimelineMessage(event.message, {
+          fallbackId: ensureConversationMessageId(event.message),
+          fallbackTimestamp: now,
+        });
+        if (customMessage) {
+          wsHub.broadcastHistoryCommit({
+            type: "message_end",
+            piSessionId: session.sessionId,
+            items: [customMessage],
+          });
+          break;
+        }
+
         const anyRole = extractAnyMessageRole(event.message);
         if (!anyRole) break;
 

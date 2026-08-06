@@ -68,6 +68,42 @@ function firstText(value: unknown): string | undefined {
     .find((item): item is string => Boolean(item));
 }
 
+export function flitterbotHookToTimelineMessage(
+  value: unknown,
+  {
+    fallbackId,
+    fallbackTimestamp,
+    piEntryId,
+  }: { fallbackId?: string; fallbackTimestamp: string; piEntryId?: string },
+): ChatTimelineMessage | undefined {
+  const record = asRecord(value);
+  const isCustomMessage = record.role === "custom" || record.type === "custom_message";
+  if (!isCustomMessage || record.customType !== "flitterbot-hook") return undefined;
+
+  const content = firstText(record.content);
+  if (!content) return undefined;
+
+  const details = asRecord(record.details);
+  const queueItemId = details.queueItemId;
+  const id =
+    typeof queueItemId === "string" && queueItemId.trim()
+      ? queueItemId
+      : typeof record.id === "string" && record.id.trim()
+        ? record.id
+        : fallbackId;
+  if (!id) return undefined;
+
+  return {
+    id,
+    ...(piEntryId ? { piEntryId } : {}),
+    kind: "message",
+    role: "user",
+    content,
+    source: "hook",
+    createdAt: isoTimestamp(record.timestamp, fallbackTimestamp),
+  };
+}
+
 function pushMessage(
   items: ChatTimelineItem[],
   id: string,
@@ -369,21 +405,12 @@ function entriesToTimeline(entries: SessionEntry[]): ChatTimelineItem[] {
       continue;
     }
     if (entry.type === "custom_message") {
-      const record = asRecord(entry);
-      if (record.customType === "flitterbot-hook") {
-        const content = firstText(record.content);
-        if (content) {
-          items.push({
-            id: entry.id,
-            piEntryId: entry.id,
-            kind: "message",
-            role: "user",
-            content,
-            source: "hook",
-            createdAt: isoTimestamp(record.timestamp, entry.timestamp),
-          });
-        }
-      }
+      const message = flitterbotHookToTimelineMessage(entry, {
+        fallbackId: entry.id,
+        fallbackTimestamp: entry.timestamp,
+        piEntryId: entry.id,
+      });
+      if (message) items.push(message);
       continue;
     }
     if (entry.type !== "message") continue;
