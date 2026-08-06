@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "~/components/common/badge";
 import { Button } from "~/components/common/button";
 import {
   Dialog,
@@ -135,27 +134,31 @@ function ProviderRow({
   const isConnected = provider.connected;
 
   return (
-    <li className="rounded-lg border border-border bg-background-muted px-3 py-2">
+    <li className="rounded-lg border border-border-muted bg-background-muted px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-text">{provider.name}</span>
-            {isConnected && (
-              <Badge variant="active" className="shrink-0">
-                Connected
-              </Badge>
-            )}
-          </div>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-sm font-medium text-text">{provider.name}</span>
+          {isConnected && (
+            <span className="size-2.5 shrink-0 rounded-full bg-status-active" title="Connected">
+              <span className="sr-only">Connected</span>
+            </span>
+          )}
         </div>
         {isConnected && (
-          <Button variant="subtle" size="sm" onClick={onLogout} disabled={busy}>
+          <Button
+            variant="subtle"
+            size="sm"
+            className="shrink-0 whitespace-nowrap"
+            onClick={onLogout}
+            disabled={busy}
+          >
             Sign out
           </Button>
         )}
       </div>
 
-      <div className="mt-2">
-        <Button variant="subtle" size="sm" disabled={busy} onClick={onLogin}>
+      <div className="mt-2 flex justify-end">
+        <Button variant="pop" size="sm" disabled={busy} onClick={onLogin}>
           {provider.loginLabel ?? `Sign in with ${provider.oauthName}`}
         </Button>
       </div>

@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { Settings as SettingsIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
+import { SettingsDrawer } from "~/components/settings-drawer";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -112,12 +114,16 @@ function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {
 export function DownstreamSessionsPanel({
   piSessionId,
   piSessionStatus,
+  showSettings = false,
 }: {
   piSessionId: string | undefined;
   piSessionStatus?: PiSessionStatus;
+  showSettings?: boolean;
 }) {
-  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus });
+  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, showSettings });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const statusBanner = piStatusBanner(piSessionStatus);
 
   const { data, isPending, isError } = useQuery(
     streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
@@ -270,16 +276,25 @@ export function DownstreamSessionsPanel({
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
-        {(() => {
-          const banner = piStatusBanner(piSessionStatus);
-          return banner ? (
-            <div className={cn("px-3 py-1.5 rounded-md text-xs font-medium", banner.colorClass)}>
-              {banner.label}
-            </div>
-          ) : (
-            <div />
-          );
-        })()}
+        {showSettings ? (
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="flex size-8 items-center justify-center rounded-lg text-text-muted outline-none hover:bg-background-hover hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <SettingsIcon className="size-4" aria-hidden="true" />
+          </button>
+        ) : statusBanner ? (
+          <div
+            className={cn("px-3 py-1.5 rounded-md text-xs font-medium", statusBanner.colorClass)}
+          >
+            {statusBanner.label}
+          </div>
+        ) : (
+          <div />
+        )}
         <ToggleGroup
           value={[panelView]}
           onValueChange={(newValue) => {
@@ -324,6 +339,8 @@ export function DownstreamSessionsPanel({
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
+
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {showDiff && hasWorktree ? (
         <div className="relative flex-1 min-h-0">

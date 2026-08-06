@@ -10,7 +10,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     "bg-background-contrast text-text-contrast hover:bg-background-contrast-muted hover:text-text-contrast-muted",
   subtle: "border border-border bg-background-muted text-text hover:bg-background-hover",
   selected: "border border-border bg-background-selected text-text",
-  pop: "border border-border-pop bg-background-pop text-text hover:bg-background-hover",
+  pop: "border border-border-pop bg-background-pop text-text-pop hover:bg-background-hover",
   danger: "bg-status-crashed-muted text-status-crashed hover:bg-background-hover",
 };
 

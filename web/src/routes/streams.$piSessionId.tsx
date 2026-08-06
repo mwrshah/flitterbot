@@ -146,6 +146,7 @@ function PiSessionRoute() {
           key={effectivePiSessionId}
           piSessionId={effectivePiSessionId}
           piSessionStatus={isDefaultSession ? undefined : stream?.piSessionStatus}
+          showSettings={isDefaultSession}
         />
       </Panel>
     </PanelGroup>
