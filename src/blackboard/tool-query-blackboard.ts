@@ -42,7 +42,7 @@ SCHEMA — every table, column, type, and key:
 
 streams
   id TEXT PK, name TEXT, type TEXT ('work'|'defaultStream'), repo_path TEXT, worktree_path TEXT,
-  base_branch TEXT (branch this stream was forked from; required for close_stream merge mode),
+  base_branch TEXT (branch this stream was forked from; required for close_swimlane merge mode),
   pinned BOOLEAN, status TEXT ('open'|'closed'), created_at DATETIME, closed_at TEXT
 
 sessions

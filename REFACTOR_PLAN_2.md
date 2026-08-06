@@ -81,7 +81,7 @@ At each edge, ask: runtime shape, owner, invariant, source mutability, and avail
     - Review targets: source session/stream identity repeatedly resolved and projected; fork result wrappers.
 
 14. **Close stream → commit/merge/push → agent destruction**
-    - Path: `close_stream` tool → preview/confirmation → git status/diff/log → optional commit → base worktree merge/push → blackboard close → pending Pi destruction after `agent_end` → UI status events.
+    - Path: `close_swimlane` tool → preview/confirmation → git status/diff/log → optional commit → base worktree merge/push → blackboard close → pending Pi destruction after `agent_end` → UI status events.
     - Legitimate changes: tool request → validated git operation plan/result.
     - Excess: custom-tool and runtime close result contracts; repeated stream lookup and status broadcasts; git command wrappers with one caller.
 

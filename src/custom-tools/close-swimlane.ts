@@ -4,12 +4,12 @@ import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { endPiSession } from "../blackboard/pi-sessions.ts";
 import { markSessionEnded } from "../blackboard/query-sessions.ts";
-import { closeStream, getStreamById } from "../blackboard/query-streams.ts";
+import { closeSwimlane, getStreamById } from "../blackboard/query-streams.ts";
 import { killTmuxSession } from "../tmux-sessions/tmux.ts";
 
 const execPromise = promisify(cpExec);
 
-type CloseStreamResult = {
+type CloseSwimlaneResult = {
   ok: boolean;
   streamId: string;
   message: string;
@@ -173,14 +173,14 @@ async function pushBranch(cwd: string, targetBranch: string): Promise<boolean> {
   }
 }
 
-export async function executeCloseStream(
+export async function executeCloseSwimlane(
   blackboard: BlackboardDatabase,
   piSessionId: string,
   streamId: string,
   mode: "merge" | "noop",
   commitMessage: string,
   baseBranchOverride?: string,
-): Promise<CloseStreamResult> {
+): Promise<CloseSwimlaneResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
     return { ok: false, streamId, message: `Stream ${streamId} not found` };
@@ -200,7 +200,7 @@ export async function executeCloseStream(
       needsConfirmation: true,
       currentBranch,
       resolvedBaseBranch,
-      message: `Preview: would merge ${currentBranch ?? "(unknown)"} → ${resolvedBaseBranch ?? "(none recorded)"}. Confirm by calling close_stream again with explicit base_branch.`,
+      message: `Preview: would merge ${currentBranch ?? "(unknown)"} → ${resolvedBaseBranch ?? "(none recorded)"}. Confirm by calling close_swimlane again with explicit base_branch.`,
     };
   }
 
@@ -235,14 +235,14 @@ export async function executeCloseStream(
         ok: false,
         streamId,
         message:
-          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use set_up_worktree with mode:apply, path, and base_ref for an existing worktree, or mode:apply to create one fresh) and try again, or call close_stream with mode:noop to close without merging.",
+          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use set_up_worktree with mode:apply, path, and base_ref for an existing worktree, or mode:apply to create one fresh) and try again, or call close_swimlane with mode:noop to close without merging.",
       };
     }
     if (!fs.existsSync(worktreePath)) {
       return {
         ok: false,
         streamId,
-        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via set_up_worktree with mode:apply, path, and base_ref) and try again, or call close_stream with mode:noop to close without merging.`,
+        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via set_up_worktree with mode:apply, path, and base_ref) and try again, or call close_swimlane with mode:noop to close without merging.`,
       };
     }
 
@@ -251,7 +251,7 @@ export async function executeCloseStream(
       return {
         ok: false,
         streamId,
-        message: `Could not determine current branch in worktree ${worktreePath} (detached HEAD or git failure). Restore the branch and try again, or call close_stream with mode:noop to close without merging.`,
+        message: `Could not determine current branch in worktree ${worktreePath} (detached HEAD or git failure). Restore the branch and try again, or call close_swimlane with mode:noop to close without merging.`,
       };
     }
 
@@ -261,7 +261,7 @@ export async function executeCloseStream(
         ok: false,
         streamId,
         message:
-          "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_stream, or call close_stream with mode:noop.",
+          "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_swimlane, or call close_swimlane with mode:noop.",
       };
     }
     resolvedTargetBranch = targetBranch;
@@ -278,7 +278,7 @@ export async function executeCloseStream(
       return {
         ok: false,
         streamId,
-        message: `${mergeResult.message}. Resolve conflicts there, then call close_stream again.`,
+        message: `${mergeResult.message}. Resolve conflicts there, then call close_swimlane again.`,
         conflicts: mergeResult.conflicts,
       };
     }
@@ -287,7 +287,7 @@ export async function executeCloseStream(
     pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
   }
 
-  closeStream(blackboard, streamId);
+  closeSwimlane(blackboard, streamId);
   endPiSession(blackboard, piSessionId, "ended", "stream_closed");
 
   const parts = [`Stream "${stream.name}" closed.`];

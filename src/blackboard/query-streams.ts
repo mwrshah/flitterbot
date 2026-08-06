@@ -178,7 +178,7 @@ export function getStreamForPiSession(
   return row ?? null;
 }
 
-export function closeStream(db: BlackboardDatabase, streamId: string): void {
+export function closeSwimlane(db: BlackboardDatabase, streamId: string): void {
   db.prepare(
     `UPDATE streams
 		 SET status = 'closed', closed_at = datetime('now')
