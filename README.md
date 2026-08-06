@@ -1,6 +1,7 @@
 # Flitterbot
 
 Orchestration runtime for Claude Code. Routes WhatsApp/web messages to concurrent Pi agents that supervise Claude Code sessions in git worktrees.
+<img width="1500" height="896" alt="image" src="https://github.com/user-attachments/assets/88ba376b-2688-4de5-8836-9910736a8dd6" />
 
 Architecture: [`docs/overview.md`](docs/overview.md). Deep dives: [`docs/<feature>/FEATURE.md`](docs/).
 
