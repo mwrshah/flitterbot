@@ -61,7 +61,7 @@ function NavItem({
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
         active
-          ? "bg-background-selected font-medium text-text"
+          ? "bg-background-selected text-text"
           : "text-text-muted hover:bg-background-hover hover:text-text",
       )}
     >
@@ -327,7 +327,7 @@ export const Sidebar = memo(function Sidebar() {
                       "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                       currentPiSessionId === defaultPiSessionId ||
                         (pathname === "/streams" && !currentPiSessionId)
-                        ? "bg-background-selected font-medium text-text"
+                        ? "bg-background-selected text-text"
                         : "text-text-muted hover:bg-background-hover hover:text-text",
                     )}
                   >
@@ -374,7 +374,7 @@ export const Sidebar = memo(function Sidebar() {
                           className={cn(
                             "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
-                              ? "bg-background-selected font-medium text-text"
+                              ? "bg-background-selected text-text"
                               : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
                           )}
                         >
@@ -482,7 +482,7 @@ export const Sidebar = memo(function Sidebar() {
                           className={cn(
                             "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
                             currentPiSessionId === piSessionId
-                              ? "bg-background-selected font-medium text-text"
+                              ? "bg-background-selected text-text"
                               : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
                           )}
                         >
