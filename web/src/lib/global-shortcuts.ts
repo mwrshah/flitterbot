@@ -149,7 +149,7 @@ export const SHORTCUT_ACTIONS = {
   streamCopyTmuxAttach: "stream.copy-tmux-attach",
   streamCopyWorktreePath: "stream.copy-worktree-path",
   streamCopyRepoPath: "stream.copy-repo-path",
-  streamCopyCurrentDirectory: "stream.copy-current-directory",
+  streamEditCurrentDirectory: "stream.edit-current-directory",
   streamCopyBranch: "stream.copy-branch",
   streamCopyTargetBranch: "stream.copy-target-branch",
   scrollSmallDown: "scroll.small-down",
@@ -744,7 +744,7 @@ function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyRepoPath, {
     defaultBindings: [{ spec: "c r", when: "no-input-focus" }],
   });
-  defineShortcutAction(SHORTCUT_ACTIONS.streamCopyCurrentDirectory, {
+  defineShortcutAction(SHORTCUT_ACTIONS.streamEditCurrentDirectory, {
     defaultBindings: [{ spec: "c d", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.streamCopyBranch, {

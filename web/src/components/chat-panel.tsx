@@ -17,7 +17,6 @@ import {
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "~/components/common/button";
-import { CopyableCode } from "~/components/common/copyable-code";
 import { ShortcutHint } from "~/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
@@ -37,7 +36,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -314,14 +312,14 @@ export function ChatPanel({
   const messageListRef = useRef<StreamsMessageListHandle>(null);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
-  const cwdCopy = useCopyToClipboard(600);
   const cwdShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyCurrentDirectory, { compact: true }) ||
+    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamEditCurrentDirectory, { compact: true }) ||
     "c then d";
   const [cwdPickerOpen, setCwdPickerOpen] = useState(false);
   const [cwdPickerValue, setCwdPickerValue] = useState("@");
   const cwdPickerHeaderRef = useRef<HTMLDivElement>(null);
   const cwdPickerAnchorRef = useRef<HTMLSpanElement>(null);
+  const cwdPickerButtonRef = useRef<HTMLButtonElement>(null);
   const cwdPickerRef = useRef<HTMLDivElement>(null);
   const [cwdPickerStyle, setCwdPickerStyle] = useState<CSSProperties>();
   const cwdPickerQuery = cwdPickerValue.replace(/^@/, "").trimStart();
@@ -471,16 +469,16 @@ export function ChatPanel({
   useEffect(() => {
     return registerShortcutHandlers([
       {
-        actionId: SHORTCUT_ACTIONS.streamCopyCurrentDirectory,
+        actionId: SHORTCUT_ACTIONS.streamEditCurrentDirectory,
         priority: 20,
         handler: () => {
-          if (!cwdAbsolute) return false;
-          void cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"));
+          if (!streamId || !cwdAbsolute) return false;
+          openCwdPicker();
           return true;
         },
       },
     ]);
-  }, [cwdAbsolute, cwdCopy.copy]);
+  }, [cwdAbsolute, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
@@ -674,31 +672,28 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-text-muted text-sm shrink-0">|</span>
-              <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
+              <span ref={cwdPickerAnchorRef} className="relative grid min-w-0">
                 <button
+                  ref={cwdPickerButtonRef}
                   type="button"
-                  onClick={streamId ? openCwdPicker : undefined}
+                  onClick={openCwdPicker}
                   disabled={!streamId}
-                  className="inline-flex shrink-0 items-center gap-1 rounded bg-background-muted px-1 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-text-muted"
-                  title={streamId ? `switch cwd from ${cwdAbsolute}` : cwdAbsolute}
+                  aria-label={`Edit path. Current path: ${cwdAbsolute}`}
+                  aria-expanded={cwdPickerOpen}
+                  className="grid min-w-0 max-w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
+                  title={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
                   <FolderPenIcon className="size-3.5" aria-hidden="true" />
+                  <span className="whitespace-nowrap">Edit path</span>
+                  <span className="min-w-0 truncate font-mono text-text" aria-hidden="true">
+                    {worktree.cwd}
+                  </span>
+                  <ShortcutHint
+                    label={cwdShortcutLabel}
+                    className="hidden shrink-0 @[30rem]:inline-grid"
+                    aria-hidden="true"
+                  />
                 </button>
-                <CopyableCode
-                  text={cwdAbsolute}
-                  displayText={worktree.cwd}
-                  copied={cwdCopy.copied}
-                  onCopy={() =>
-                    cwdCopy.copy(cwdAbsolute).catch(() => toast.error("Failed to copy"))
-                  }
-                  className="min-w-0 text-text-muted"
-                />
-                <ShortcutHint
-                  label={cwdShortcutLabel}
-                  actionActive={cwdCopy.copied}
-                  actionText="Copied"
-                  className="hidden shrink-0 @[30rem]:inline-grid"
-                />
               </span>
             </>
           )}
@@ -714,7 +709,10 @@ export function ChatPanel({
           onValueChange={setCwdPickerValue}
           onDrill={drillCwdPicker}
           onCommit={commitCwdPicker}
-          onEscape={() => setCwdPickerOpen(false)}
+          onEscape={() => {
+            setCwdPickerOpen(false);
+            cwdPickerButtonRef.current?.focus();
+          }}
         />
       </div>
 

@@ -124,7 +124,7 @@ export function useGlobalShortcuts({
     return true;
   });
 
-  const copyCurrentDirectoryFallback = useEffectEvent(() => {
+  const editCurrentDirectoryFallback = useEffectEvent(() => {
     toast.error("No current directory available");
     return true;
   });
@@ -164,8 +164,8 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath, handler: () => copyWorktreeFallback() },
       { actionId: SHORTCUT_ACTIONS.streamCopyRepoPath, handler: () => copyRepoFallback() },
       {
-        actionId: SHORTCUT_ACTIONS.streamCopyCurrentDirectory,
-        handler: () => copyCurrentDirectoryFallback(),
+        actionId: SHORTCUT_ACTIONS.streamEditCurrentDirectory,
+        handler: () => editCurrentDirectoryFallback(),
       },
       { actionId: SHORTCUT_ACTIONS.streamCopyBranch, handler: () => copyBranchFallback() },
       {
