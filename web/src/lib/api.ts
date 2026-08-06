@@ -1,7 +1,6 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type {
   AuthFlowSnapshot,
-  AuthProviderMethod,
   AuthProvidersResponse,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
@@ -155,10 +154,10 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     listAuthProviders: () => request<AuthProvidersResponse>("/api/auth/providers"),
 
-    startAuthLogin: (providerId: string, authType: AuthProviderMethod["type"]) =>
+    startAuthLogin: (providerId: string) =>
       request<AuthFlowSnapshot>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ providerId, authType }),
+        body: JSON.stringify({ providerId }),
       }),
 
     getAuthFlow: (flowId: string) =>

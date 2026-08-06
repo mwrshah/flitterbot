@@ -84,6 +84,8 @@ export const SettingsDrawer = memo(function SettingsDrawer({
             </div>
           </section>
 
+          <AuthProvidersSection />
+
           <section className="space-y-3">
             <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
               Control Surface
@@ -125,8 +127,6 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               <span className="text-xs">Use stub fallback when localhost unavailable</span>
             </label>
           </section>
-
-          <AuthProvidersSection />
         </div>
 
         <div className="px-5 py-4 border-t border-border">

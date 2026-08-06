@@ -1,5 +1,4 @@
 import type http from "node:http";
-import type { AuthType } from "@earendil-works/pi-ai";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
@@ -18,19 +17,12 @@ export async function handleAuthLoginRoute(
   res: http.ServerResponse,
 ): Promise<void> {
   if (!authorized(runtime, req, res)) return;
-  const body = await readJsonBody<{ providerId?: unknown; authType?: unknown }>(req);
+  const body = await readJsonBody<{ providerId?: unknown }>(req);
   if (typeof body.providerId !== "string" || !body.providerId.trim()) {
     return sendJson(res, 400, { ok: false, error: "providerId (string) is required" });
   }
-  if (!isProviderAuthType(body.authType)) {
-    return sendJson(res, 400, { ok: false, error: "authType must be oauth or api_key" });
-  }
   try {
-    sendJson(
-      res,
-      202,
-      await runtime.providerAuth.startLogin(body.providerId.trim(), body.authType),
-    );
+    sendJson(res, 202, await runtime.providerAuth.startLogin(body.providerId.trim()));
   } catch (error) {
     sendJson(res, 400, { ok: false, error: errorMessage(error) });
   }
@@ -108,10 +100,6 @@ function authorized(
   if (requireBearer(req, runtime.config.controlSurfaceToken)) return true;
   sendJson(res, 401, { ok: false, error: "unauthorized" });
   return false;
-}
-
-function isProviderAuthType(value: unknown): value is AuthType {
-  return value === "oauth" || value === "api_key";
 }
 
 function errorMessage(error: unknown): string {

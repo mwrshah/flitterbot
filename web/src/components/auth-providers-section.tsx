@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
-import type { AuthFlowSnapshot, AuthProvider, AuthProviderMethod } from "~/lib/types";
+import type { AuthFlowSnapshot, AuthProvider } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
 
@@ -30,15 +30,10 @@ export const AuthProvidersSection = memo(function AuthProvidersSection() {
 
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [logoutTarget, setLogoutTarget] = useState<AuthProvider | null>(null);
+  const [providerQuery, setProviderQuery] = useState("");
 
   const loginMutation = useMutation({
-    mutationFn: ({
-      providerId,
-      authType,
-    }: {
-      providerId: string;
-      authType: AuthProviderMethod["type"];
-    }) => apiClient.startAuthLogin(providerId, authType),
+    mutationFn: (providerId: string) => apiClient.startAuthLogin(providerId),
     onSuccess: (snapshot) => setActiveFlowId(snapshot.id),
     onError: (err) => toast.error(`Login failed: ${messageOf(err)}`),
   });
@@ -55,38 +50,50 @@ export const AuthProvidersSection = memo(function AuthProvidersSection() {
   });
 
   const providers = data?.providers ?? [];
+  const normalizedQuery = providerQuery.trim().toLowerCase();
+  const filteredProviders = normalizedQuery
+    ? providers.filter((provider) => provider.searchText.includes(normalizedQuery))
+    : providers;
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-          Accounts &amp; Model providers
-        </h3>
-        {isError && (
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="text-xs text-text-muted transition-colors hover:text-text"
-          >
-            Retry
-          </button>
-        )}
-      </div>
+      <Input
+        type="search"
+        name="provider-search"
+        placeholder="Search…"
+        aria-label="Search providers"
+        autoComplete="off"
+        value={providerQuery}
+        onChange={(event) => setProviderQuery(event.target.value)}
+      />
 
       {isLoading ? (
         <p className="text-xs text-text-muted">Loading providers…</p>
       ) : isError ? (
-        <p className="text-xs text-status-crashed">Failed to load providers: {messageOf(error)}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-status-crashed">
+            Failed to load providers: {messageOf(error)}
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="shrink-0 text-xs text-text-muted transition-colors hover:text-text focus-visible:text-text"
+          >
+            Retry
+          </button>
+        </div>
       ) : providers.length === 0 ? (
         <p className="text-xs text-text-muted">No model providers available.</p>
+      ) : filteredProviders.length === 0 ? (
+        <p className="text-xs text-text-muted">No providers match “{providerQuery.trim()}”.</p>
       ) : (
         <ul className="space-y-1.5">
-          {providers.map((provider) => (
+          {filteredProviders.map((provider) => (
             <ProviderRow
               key={provider.id}
               provider={provider}
               busy={loginMutation.isPending || logoutMutation.isPending}
-              onLogin={(authType) => loginMutation.mutate({ providerId: provider.id, authType })}
+              onLogin={() => loginMutation.mutate(provider.id)}
               onLogout={() => setLogoutTarget(provider)}
             />
           ))}
@@ -122,10 +129,10 @@ function ProviderRow({
 }: {
   provider: AuthProvider;
   busy: boolean;
-  onLogin: (authType: AuthProviderMethod["type"]) => void;
+  onLogin: () => void;
   onLogout: () => void;
 }) {
-  const isConnected = Boolean(provider.credentialType);
+  const isConnected = provider.connected;
 
   return (
     <li className="rounded-lg border border-border bg-background-muted px-3 py-2">
@@ -135,7 +142,7 @@ function ProviderRow({
             <span className="truncate text-sm font-medium text-text">{provider.name}</span>
             {isConnected && (
               <Badge variant="active" className="shrink-0">
-                {provider.credentialType}
+                Connected
               </Badge>
             )}
           </div>
@@ -147,28 +154,13 @@ function ProviderRow({
         )}
       </div>
 
-      {provider.methods.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {provider.methods.map((method) => (
-            <Button
-              key={`${method.type}:${method.name}`}
-              variant="subtle"
-              size="sm"
-              disabled={busy}
-              onClick={() => onLogin(method.type)}
-            >
-              {loginLabel(method)}
-            </Button>
-          ))}
-        </div>
-      )}
+      <div className="mt-2">
+        <Button variant="subtle" size="sm" disabled={busy} onClick={onLogin}>
+          {provider.loginLabel ?? `Sign in with ${provider.oauthName}`}
+        </Button>
+      </div>
     </li>
   );
-}
-
-function loginLabel(method: AuthProviderMethod): string {
-  if (method.loginLabel) return method.loginLabel;
-  return method.type === "oauth" ? `Sign in with ${method.name}` : `Add ${method.name} key`;
 }
 
 function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => void }) {

@@ -5,7 +5,6 @@ export type {
   AuthFlowPrompt,
   AuthFlowSnapshot,
   AuthProvider,
-  AuthProviderMethod,
   AuthProvidersResponse,
   DirectoryCompletionItem,
   DirectoryCompletionsResponse,

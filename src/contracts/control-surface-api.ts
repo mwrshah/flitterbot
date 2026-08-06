@@ -1,4 +1,4 @@
-import type { AuthEvent, AuthPrompt, AuthType, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { AuthEvent, AuthPrompt, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { Skill } from "@earendil-works/pi-coding-agent";
 import type {
   ClaudeSessionStatus,
@@ -253,17 +253,13 @@ export interface DirectoryCompletionsResponse {
   query: string;
 }
 
-export interface AuthProviderMethod {
-  type: AuthType;
-  name: string;
-  loginLabel?: string;
-}
-
 export interface AuthProvider {
   id: string;
   name: string;
-  methods: AuthProviderMethod[];
-  credentialType?: AuthType;
+  oauthName: string;
+  loginLabel?: string;
+  searchText: string;
+  connected: boolean;
 }
 
 export interface AuthProvidersResponse {
@@ -278,7 +274,6 @@ export interface AuthFlowSnapshot {
   id: string;
   status: "running" | "succeeded" | "failed" | "cancelled";
   providerId: string;
-  authType: AuthType;
   events: AuthEvent[];
   prompt?: AuthFlowPrompt;
   error?: string;

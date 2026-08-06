@@ -1,4 +1,4 @@
-import type { AuthEvent, AuthPrompt, AuthType } from "@earendil-works/pi-ai";
+import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type {
   AuthFlowPrompt,
@@ -20,7 +20,6 @@ type AuthFlow = {
   id: string;
   status: AuthFlowSnapshot["status"];
   providerId: string;
-  authType: AuthType;
   events: AuthEvent[];
   controller: AbortController;
   prompt?: PendingPrompt;
@@ -31,10 +30,7 @@ type AuthFlow = {
 export class ProviderAuthManager {
   private readonly getRuntime: () => Promise<ModelRuntime>;
   private readonly flows = new Map<string, AuthFlow>();
-  private readonly loginStarts = new Map<
-    string,
-    { authType: AuthType; promise: Promise<AuthFlowSnapshot> }
-  >();
+  private readonly loginStarts = new Map<string, Promise<AuthFlowSnapshot>>();
   private stopped = false;
 
   constructor(getRuntime: () => Promise<ModelRuntime>) {
@@ -43,36 +39,30 @@ export class ProviderAuthManager {
 
   async listProviders(): Promise<AuthProvidersResponse> {
     const runtime = await this.createRuntime();
-    const credentials = new Map(
-      (await runtime.listCredentials()).map((credential) => [
-        credential.providerId,
-        credential.type,
-      ]),
+    const connectedProviders = new Set(
+      (await runtime.listCredentials()).map((credential) => credential.providerId),
     );
     const providers: AuthProvider[] = runtime
       .getProviders()
       .flatMap((provider) => {
-        const methods: AuthProvider["methods"] = [];
-        if (provider.auth.oauth) {
-          methods.push({
-            type: "oauth",
-            name: provider.auth.oauth.name,
-            ...(provider.auth.oauth.loginLabel
-              ? { loginLabel: provider.auth.oauth.loginLabel }
-              : {}),
-          });
-        }
-        if (provider.auth.apiKey?.login) {
-          methods.push({ type: "api_key", name: provider.auth.apiKey.name });
-        }
-        if (methods.length === 0) return [];
-        const credentialType = credentials.get(provider.id);
+        const oauth = provider.auth.oauth;
+        if (!oauth) return [];
         return [
           {
             id: provider.id,
             name: provider.name,
-            methods,
-            ...(credentialType ? { credentialType } : {}),
+            oauthName: oauth.name,
+            ...(oauth.loginLabel ? { loginLabel: oauth.loginLabel } : {}),
+            searchText: [
+              provider.id,
+              provider.name,
+              oauth.name,
+              oauth.loginLabel ?? "",
+              ...provider.getModels().flatMap((model) => [model.id, model.name]),
+            ]
+              .join("\n")
+              .toLowerCase(),
+            connected: connectedProviders.has(provider.id),
           },
         ];
       })
@@ -80,50 +70,36 @@ export class ProviderAuthManager {
     return { providers };
   }
 
-  startLogin(providerId: string, authType: AuthType): Promise<AuthFlowSnapshot> {
+  startLogin(providerId: string): Promise<AuthFlowSnapshot> {
     if (this.stopped) return Promise.reject(new Error("Provider authentication is stopped"));
     const existing = [...this.flows.values()].find(
       (flow) => flow.providerId === providerId && flow.status === "running",
     );
-    if (existing) {
-      return existing.authType === authType
-        ? Promise.resolve(this.snapshot(existing))
-        : Promise.reject(
-            new Error(`Authentication is already running for provider "${providerId}"`),
-          );
-    }
+    if (existing) return Promise.resolve(this.snapshot(existing));
 
     const pending = this.loginStarts.get(providerId);
-    if (pending) {
-      return pending.authType === authType
-        ? pending.promise
-        : Promise.reject(
-            new Error(`Authentication is already starting for provider "${providerId}"`),
-          );
-    }
+    if (pending) return pending;
 
-    const started = this.createLogin(providerId, authType);
+    const started = this.createLogin(providerId);
     const tracked = started.finally(() => {
-      if (this.loginStarts.get(providerId)?.promise === tracked) {
-        this.loginStarts.delete(providerId);
-      }
+      if (this.loginStarts.get(providerId) === tracked) this.loginStarts.delete(providerId);
     });
-    this.loginStarts.set(providerId, { authType, promise: tracked });
+    this.loginStarts.set(providerId, tracked);
     return tracked;
   }
 
-  private async createLogin(providerId: string, authType: AuthType): Promise<AuthFlowSnapshot> {
+  private async createLogin(providerId: string): Promise<AuthFlowSnapshot> {
     const runtime = await this.createRuntime();
     if (this.stopped) throw new Error("Provider authentication is stopped");
     const provider = runtime.getProvider(providerId);
-    const method = authType === "oauth" ? provider?.auth.oauth : provider?.auth.apiKey?.login;
-    if (!method) throw new Error(`Provider "${providerId}" does not support ${authType} login`);
+    if (!provider?.auth.oauth) {
+      throw new Error(`Provider "${providerId}" does not support OAuth login`);
+    }
 
     const flow: AuthFlow = {
       id: crypto.randomUUID(),
       status: "running",
       providerId,
-      authType,
       events: [],
       controller: new AbortController(),
     };
@@ -193,7 +169,7 @@ export class ProviderAuthManager {
 
   private async runLogin(runtime: ModelRuntime, flow: AuthFlow): Promise<void> {
     try {
-      await runtime.login(flow.providerId, flow.authType, {
+      await runtime.login(flow.providerId, "oauth", {
         signal: flow.controller.signal,
         notify: (event) => {
           if (flow.status !== "running") return;
@@ -260,7 +236,6 @@ export class ProviderAuthManager {
       id: flow.id,
       status: flow.status,
       providerId: flow.providerId,
-      authType: flow.authType,
       events: [...flow.events],
       ...(flow.prompt ? { prompt: flow.prompt.prompt } : {}),
       ...(flow.error ? { error: flow.error } : {}),

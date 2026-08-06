@@ -116,7 +116,7 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
   }
 
   const cls =
-    "mb-1 inline-block rounded bg-status-info-muted px-1.5 py-0.5 text-[10px] font-medium text-status-info";
+    "mb-1 inline-block rounded bg-status-info-muted px-1.5 py-0.5 text-[10px] font-medium text-text-pop";
   if (!piSessionId) return <span className={cls}>{streamName}</span>;
 
   return (
@@ -195,7 +195,7 @@ function EntryRow({
   const sourceLabel = isInbound ? (isWhatsApp ? "WhatsApp" : "Web") : "Agent";
 
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-2 items-start">
       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-16">
         <span className="text-[10px] text-text-muted">{formatTime(entry.timestamp)}</span>
         <div className="flex items-center gap-1.5">
@@ -369,7 +369,7 @@ export function Surface() {
           <div
             ref={scrollRef}
             data-scroll-container="main"
-            className="h-full overflow-auto px-6 py-4"
+            className="h-full overflow-auto py-4 pl-2 pr-6"
             style={{ contain: "strict", overflowAnchor: "none" }}
           >
             {entries.length === 0 ? (
