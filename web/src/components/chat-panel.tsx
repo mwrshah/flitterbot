@@ -73,16 +73,15 @@ function formatTokens(n: number): string {
 
 const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: ChatTimelineItem[] }) {
   const usage = useMemo(() => latestMeasuredContextUsage(timeline), [timeline]);
-  const cacheWrite = usage ? formatTokens(usage.cacheWrite) : "—";
   const cacheRead = usage ? formatTokens(usage.cacheRead) : "—";
   const contextTokens = usage ? formatTokens(usage.totalTokens) : "—";
 
   return (
     <span
       className="ml-auto shrink-0 text-xs text-text-muted tabular-nums"
-      title="Latest request. Pi reports cache reads and writes, but not cache misses, age, or expiry time."
+      title="Latest request. Pi reports cache reuse, but not cache misses, age, or expiry time."
     >
-      cache write: {cacheWrite} tokens · cache reuse: {cacheRead}/{contextTokens} tokens
+      cache reuse: {cacheRead}/{contextTokens} tokens
     </span>
   );
 });
