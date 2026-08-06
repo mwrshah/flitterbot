@@ -18,7 +18,7 @@ export type QueueItem = {
 
 export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.sender !== "user") return false;
-  if (item.source !== "whatsapp") return false;
+  if (item.source !== "web" && item.source !== "whatsapp") return false;
   if (item.images && item.images.length > 0) return false;
   return true;
 }
