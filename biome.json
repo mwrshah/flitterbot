@@ -11,6 +11,7 @@
       "src/**/*.ts",
       "web/src/**/*.ts",
       "web/src/**/*.tsx",
+      "web/tests/**/*.ts",
       "!web/src/routeTree.gen.ts",
       "!web/src/components/ui/**"
     ]

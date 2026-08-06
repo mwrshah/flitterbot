@@ -1,8 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { CopyIcon, SettingsIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "~/components/common/markdown-content";
@@ -12,41 +12,17 @@ import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
 import { SettingsDrawer } from "~/components/settings-drawer";
 import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { surfaceTimelineQueryOptions } from "~/lib/queries";
+import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
 import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "~/lib/types";
 
 const rootApi = getRouteApi("__root__");
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
-const SCROLL_STATE_KEY = "surface:scroll-state";
 const ROW_GAP = 12;
+const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const READ_MORE_CLAMP_PX = 480;
 const IMAGE_MAX_HEIGHT = 200;
-
-type SavedScrollState = {
-  offset: number;
-  snapshot: VirtualItem[];
-  expandedIds: string[];
-};
-
-function readSavedScrollState(): SavedScrollState | null {
-  try {
-    const raw = sessionStorage.getItem(SCROLL_STATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<SavedScrollState>;
-    if (
-      typeof parsed?.offset !== "number" ||
-      !Array.isArray(parsed.snapshot) ||
-      !Array.isArray(parsed.expandedIds)
-    ) {
-      return null;
-    }
-    return parsed as SavedScrollState;
-  } catch {
-    return null;
-  }
-}
 
 const LIKELY_OVERFLOWS_CHAR_THRESHOLD = 1200;
 
@@ -249,32 +225,31 @@ export function Surface() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const { data: timeline = [] } = useQuery(surfaceTimelineQueryOptions());
+  const { data, fetchPreviousPage, hasPreviousPage, isFetching, isFetchPreviousPageError } =
+    useInfiniteQuery(surfaceTimelineInfiniteQueryOptions());
+  const timeline = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
   const entries = useMemo(() => timelineToEntries(timeline), [timeline]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const savedRef = useRef<SavedScrollState | null | undefined>(undefined);
-  if (savedRef.current === undefined) savedRef.current = readSavedScrollState();
-
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set(savedRef.current?.expandedIds ?? []),
+  const didFinishInitialFillRef = useRef(false);
+  const expandedLastIndexRef = useRef<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const lastEntryId = entries.at(-1)?.id;
+  const toggleExpanded = useCallback(
+    (id: string) => {
+      if (id === lastEntryId && !expandedIds.has(id)) {
+        expandedLastIndexRef.current = entries.length - 1;
+      }
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    [entries.length, expandedIds, lastEntryId],
   );
-  const toggleExpanded = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  const lastEntryId = entries[entries.length - 1]?.id;
-  const isLastExpanded = lastEntryId !== undefined && expandedIds.has(lastEntryId);
-
-  const expandedIdsRef = useRef(expandedIds);
-  useEffect(() => {
-    expandedIdsRef.current = expandedIds;
-  });
+  const getItemKey = useCallback((index: number) => entries[index]?.id ?? index, [entries]);
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -282,33 +257,49 @@ export function Surface() {
     estimateSize: () => 120,
     overscan: 6,
     gap: ROW_GAP,
-    getItemKey: (index) => entries[index]?.id ?? index,
-    anchorTo: isLastExpanded ? "start" : "end",
-    followOnAppend: !isLastExpanded,
+    getItemKey,
+    anchorTo: "end",
+    followOnAppend: true,
     scrollEndThreshold: 32,
-    initialMeasurementsCache: savedRef.current?.snapshot ?? [],
-    initialOffset: savedRef.current?.offset,
+    onChange: (instance, sync) => {
+      if (!didFinishInitialFillRef.current || !sync || instance.scrollDirection !== "backward") {
+        return;
+      }
+      const firstVisibleIndex = instance.getVirtualItems()[0]?.index;
+      if (
+        firstVisibleIndex !== undefined &&
+        firstVisibleIndex <= LOAD_PREVIOUS_ROW_THRESHOLD &&
+        hasPreviousPage &&
+        !isFetching
+      ) {
+        void fetchPreviousPage({ cancelRefetch: false });
+      }
+    },
   });
 
   useLayoutEffect(() => {
-    if (savedRef.current) return;
-    virtualizer.scrollToEnd();
-  }, [virtualizer]);
+    const index = expandedLastIndexRef.current;
+    if (index === null) return;
+    expandedLastIndexRef.current = null;
+    virtualizer.scrollToIndex(index, { align: "start" });
+  }, [expandedIds, virtualizer]);
 
-  useEffect(() => {
-    return () => {
-      const snapshot = virtualizer.takeSnapshot();
-      if (snapshot.length === 0) return;
-      sessionStorage.setItem(
-        SCROLL_STATE_KEY,
-        JSON.stringify({
-          offset: virtualizer.scrollOffset ?? 0,
-          snapshot,
-          expandedIds: Array.from(expandedIdsRef.current),
-        }),
-      );
-    };
-  }, [virtualizer]);
+  useLayoutEffect(() => {
+    if (didFinishInitialFillRef.current || virtualizer.getVirtualItems().length === 0) return;
+
+    virtualizer.scrollToEnd();
+
+    const viewportHeight = scrollRef.current?.clientHeight ?? 0;
+    if (
+      virtualizer.getTotalSize() >= viewportHeight ||
+      !hasPreviousPage ||
+      isFetchPreviousPageError
+    ) {
+      didFinishInitialFillRef.current = true;
+    } else if (!isFetching) {
+      void fetchPreviousPage({ cancelRefetch: false });
+    }
+  });
 
   const items = virtualizer.getVirtualItems();
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Surface } from "~/components/surface";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { surfaceTimelineQueryOptions } from "~/lib/queries";
+import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
 
 export const Route = createFileRoute("/")({
   staticData: {
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({
   pendingMs: 0,
   loader: async ({ context }) => {
     try {
-      await context.queryClient.ensureQueryData(surfaceTimelineQueryOptions());
+      await context.queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions());
     } catch {}
   },
   head: () => ({

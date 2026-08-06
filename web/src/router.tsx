@@ -39,7 +39,8 @@ export function getRouter() {
     defaultPreload: "intent",
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
-    scrollRestoration: ({ location }) => !location.pathname.startsWith("/streams"), // replays stale offsets onto chat viewport
+    scrollRestoration: ({ location }) =>
+      location.pathname !== "/" && !location.pathname.startsWith("/streams"),
   });
 
   setupRouterSsrQueryIntegration({

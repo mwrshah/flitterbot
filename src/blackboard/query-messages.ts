@@ -173,7 +173,7 @@ export function getInputSurfaceHistory(
      WHERE ((m.source IN ('web', 'whatsapp') AND m.direction = 'inbound')
             OR (m.source = 'stream_outbound' AND m.direction = 'outbound'))
        AND m.pi_session_id IN (${placeholders})
-     ORDER BY m.created_at ASC`,
+     ORDER BY m.created_at ASC, m.id ASC`,
     ...piSessionIds,
   );
 }
