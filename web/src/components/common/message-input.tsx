@@ -1129,7 +1129,7 @@ export const MessageInput = memo(function MessageInput({
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
-                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background/90 text-status-crashed shadow-sm transition-colors hover:bg-status-crashed-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
                   aria-label={`Remove pending attachment ${i + 1}`}
                   title="Remove attachment"
                 >
