@@ -650,7 +650,7 @@ export function ChatPanel({
                   disabled={!streamId}
                   aria-label={`Edit path. Current path: ${cwdAbsolute}`}
                   aria-expanded={cwdPickerOpen}
-                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded-md bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
+                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
                   title={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
                   <FolderPenIcon className="size-3.5" aria-hidden="true" />
