@@ -3,11 +3,3 @@ name = "flitterbot"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = []
-
-[dependency-groups]
-dev = [
-    "codedecorum",
-]
-
-[tool.uv.sources]
-codedecorum = { git = "https://github.com/mwrshah/codedecorum.git", rev = "85b537a79f935183c27124a82eb1eaf0d2f603db" }
