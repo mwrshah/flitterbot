@@ -4,6 +4,9 @@ const lastStreamPath: { current: string | null } = { current: null };
 
 export function useLastStreamPath(): string {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (typeof window === "undefined") {
+    return pathname.startsWith("/streams/") ? pathname : "/streams";
+  }
   if (pathname.startsWith("/streams/")) {
     lastStreamPath.current = pathname;
   }

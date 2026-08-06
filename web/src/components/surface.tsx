@@ -280,6 +280,10 @@ export function Surface() {
   });
 
   useLayoutEffect(() => {
+    didFinishInitialFillRef.current = false;
+  }, []);
+
+  useLayoutEffect(() => {
     const index = expandedLastIndexRef.current;
     if (index === null) return;
     expandedLastIndexRef.current = null;
