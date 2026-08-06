@@ -672,7 +672,7 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-text-muted text-sm shrink-0">|</span>
-              <span ref={cwdPickerAnchorRef} className="relative grid min-w-0">
+              <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
                 <button
                   ref={cwdPickerButtonRef}
                   type="button"
@@ -680,20 +680,19 @@ export function ChatPanel({
                   disabled={!streamId}
                   aria-label={`Edit path. Current path: ${cwdAbsolute}`}
                   aria-expanded={cwdPickerOpen}
-                  className="grid min-w-0 max-w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
+                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
                   title={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}
                 >
                   <FolderPenIcon className="size-3.5" aria-hidden="true" />
-                  <span className="whitespace-nowrap">Edit path</span>
-                  <span className="min-w-0 truncate font-mono text-text" aria-hidden="true">
+                  <span className="min-w-0 truncate text-text" aria-hidden="true">
                     {worktree.cwd}
                   </span>
-                  <ShortcutHint
-                    label={cwdShortcutLabel}
-                    className="hidden shrink-0 @[30rem]:inline-grid"
-                    aria-hidden="true"
-                  />
                 </button>
+                <ShortcutHint
+                  label={cwdShortcutLabel}
+                  className="hidden shrink-0 @[30rem]:inline-grid"
+                  aria-hidden="true"
+                />
               </span>
             </>
           )}
