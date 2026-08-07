@@ -139,6 +139,7 @@ export const SHORTCUT_ACTIONS = {
   navStreamNext: "nav.stream.next",
   navStreamPrevious: "nav.stream.previous",
   swimlaneCreate: "swimlane.create",
+  swimlaneSearch: "swimlane.search",
   scrollHalfPageDown: "scroll.half-page-down",
   scrollHalfPageUp: "scroll.half-page-up",
   scrollFullPageDown: "scroll.full-page-down",
@@ -696,6 +697,12 @@ function registerBuiltInShortcutDefinitions() {
   });
   defineShortcutAction(SHORTCUT_ACTIONS.swimlaneCreate, {
     defaultBindings: [{ spec: "Alt+KeyN", when: "always" }],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.swimlaneSearch, {
+    defaultBindings: [
+      { spec: "Slash", when: "no-input-focus" },
+      { spec: "Alt+KeyF", when: "always" },
+    ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageDown, {
     defaultBindings: [

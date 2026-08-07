@@ -17,7 +17,11 @@ import { useCreateSwimlane } from "~/hooks/use-create-swimlane";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { SHORTCUT_ACTIONS, useShortcutBindingLabel } from "~/lib/global-shortcuts";
+import {
+  registerShortcutHandlers,
+  SHORTCUT_ACTIONS,
+  useShortcutBindingLabel,
+} from "~/lib/global-shortcuts";
 import { statusQueryOptions } from "~/lib/queries";
 import { getStreamRecoveryKind } from "~/lib/stream-recovery";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
@@ -198,6 +202,23 @@ export const Sidebar = memo(function Sidebar() {
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(
+    () =>
+      registerShortcutHandlers([
+        {
+          actionId: SHORTCUT_ACTIONS.swimlaneSearch,
+          handler: () => {
+            const input = searchInputRef.current;
+            if (!input) return false;
+            input.focus();
+            return true;
+          },
+        },
+      ]),
+    [],
+  );
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
@@ -307,6 +328,7 @@ export const Sidebar = memo(function Sidebar() {
           <div className="flex items-center justify-between mb-0.5">
             <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">
               <input
+                ref={searchInputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
