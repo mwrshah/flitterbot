@@ -1237,10 +1237,13 @@ export class ControlSurfaceRuntime {
   }
 
   private deliverQueueItem(session: AgentSession, item: QueueItem, text: string): Promise<void> {
-    const content = item.images?.length ? [{ type: "text" as const, text }, ...item.images] : text;
     if (item.source !== "hook") {
-      return session.sendUserMessage(content, { deliverAs: "steer" });
+      return session.prompt(text, {
+        streamingBehavior: "steer",
+        images: item.images,
+      });
     }
+    const content = item.images?.length ? [{ type: "text" as const, text }, ...item.images] : text;
     return session.sendCustomMessage(
       {
         customType: "flitterbot-hook",
