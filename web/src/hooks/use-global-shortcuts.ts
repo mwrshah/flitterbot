@@ -13,7 +13,7 @@ import {
 } from "~/lib/global-shortcuts";
 import { getAdjacentStreamPath } from "~/lib/stream-route-targets";
 import type { ShortcutBindingsConfig } from "~/lib/types";
-import { useCreateStream } from "./use-create-stream";
+import { useCreateSwimlane } from "./use-create-swimlane";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 
 type UseGlobalShortcutsOptions = {
@@ -27,7 +27,7 @@ export function useGlobalShortcuts({
 }: UseGlobalShortcutsOptions = {}) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const createStreamMutation = useCreateStream();
+  const createSwimlaneMutation = useCreateSwimlane();
   useLastStreamPath();
 
   const navigateHome = useEffectEvent(() => {
@@ -54,9 +54,9 @@ export function useGlobalShortcuts({
     return true;
   });
 
-  const createStream = useEffectEvent(() => {
-    if (createStreamMutation.isPending) return false;
-    createStreamMutation.mutate();
+  const createSwimlane = useEffectEvent(() => {
+    if (createSwimlaneMutation.isPending) return false;
+    createSwimlaneMutation.mutate();
     return true;
   });
 
@@ -150,7 +150,7 @@ export function useGlobalShortcuts({
       { actionId: SHORTCUT_ACTIONS.navLastStream, handler: () => navigateLastStream() },
       { actionId: SHORTCUT_ACTIONS.navStreamNext, handler: () => navigateAdjacentStream(1) },
       { actionId: SHORTCUT_ACTIONS.navStreamPrevious, handler: () => navigateAdjacentStream(-1) },
-      { actionId: SHORTCUT_ACTIONS.streamCreate, handler: () => createStream() },
+      { actionId: SHORTCUT_ACTIONS.swimlaneCreate, handler: () => createSwimlane() },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageDown, handler: () => scrollByPage("half-down") },
       { actionId: SHORTCUT_ACTIONS.scrollHalfPageUp, handler: () => scrollByPage("half-up") },
       { actionId: SHORTCUT_ACTIONS.scrollFullPageDown, handler: () => scrollByPage("full-down") },

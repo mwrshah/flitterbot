@@ -138,7 +138,7 @@ export const SHORTCUT_ACTIONS = {
   navLastStream: "nav.last-stream",
   navStreamNext: "nav.stream.next",
   navStreamPrevious: "nav.stream.previous",
-  streamCreate: "stream.create",
+  swimlaneCreate: "swimlane.create",
   scrollHalfPageDown: "scroll.half-page-down",
   scrollHalfPageUp: "scroll.half-page-up",
   scrollFullPageDown: "scroll.full-page-down",
@@ -694,7 +694,7 @@ function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.navStreamPrevious, {
     defaultBindings: [{ spec: "Alt+ArrowUp", when: "always" }],
   });
-  defineShortcutAction(SHORTCUT_ACTIONS.streamCreate, {
+  defineShortcutAction(SHORTCUT_ACTIONS.swimlaneCreate, {
     defaultBindings: [{ spec: "Alt+KeyN", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageDown, {

@@ -31,7 +31,7 @@ import {
 } from "./routes/browser-user-config.ts";
 import { handleCloseSwimlaneNoopRoute } from "./routes/close-swimlane.ts";
 import { handleCompactPiSessionRoute } from "./routes/compact-pi-session.ts";
-import { handleCreateStreamRoute } from "./routes/create-stream.ts";
+import { handleCreateSwimlaneRoute } from "./routes/create-swimlane.ts";
 import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleForkStreamRoute } from "./routes/fork-stream.ts";
@@ -364,7 +364,7 @@ async function routeRequest(
     return handleSetStreamCwdRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (method === "POST" && segments[0] === "api" && segments[1] === "streams" && !segments[2]) {
-    return handleCreateStreamRoute(runtime, req, res);
+    return handleCreateSwimlaneRoute(runtime, req, res);
   }
   if (
     method === "POST" &&

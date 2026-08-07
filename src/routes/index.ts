@@ -6,7 +6,7 @@ export { handleBrowserSkillsRoute } from "./browser-skills.ts";
 export { handleBrowserStreamsHistoryRoute } from "./browser-streams.ts";
 export { handleBrowserTranscriptRoute } from "./browser-transcript.ts";
 export { handleCompactPiSessionRoute } from "./compact-pi-session.ts";
-export { handleCreateStreamRoute } from "./create-stream.ts";
+export { handleCreateSwimlaneRoute } from "./create-swimlane.ts";
 export { handleCronTickRoute } from "./cron-tick.ts";
 export { handleDirectSessionMessageRoute } from "./direct-session-message.ts";
 export { handleForkStreamRoute } from "./fork-stream.ts";

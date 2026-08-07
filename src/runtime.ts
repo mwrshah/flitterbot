@@ -1348,7 +1348,7 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  async createStreamProgrammatic(input?: {
+  async createSwimlaneProgrammatic(input?: {
     name?: string;
     cwd?: string;
   }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
@@ -1367,7 +1367,7 @@ export class ControlSurfaceRuntime {
     }
 
     const effectiveCwd = input?.cwd ?? this.config.projectsDir;
-    this.log(`programmatic stream create requested name="${name}" cwd=${effectiveCwd}`);
+    this.log(`programmatic swimlane create requested name="${name}" cwd=${effectiveCwd}`);
 
     const result = await this.spawnStreamWithSession({
       name,
@@ -1377,7 +1377,7 @@ export class ControlSurfaceRuntime {
     if (!result.ok) {
       throw result.spawnError;
     }
-    this.log(`programmatic stream created "${result.streamName}" (${result.streamId})`);
+    this.log(`programmatic swimlane created "${result.streamName}" (${result.streamId})`);
     return {
       ok: true,
       streamId: result.streamId,
@@ -1915,32 +1915,32 @@ export class ControlSurfaceRuntime {
 
     if (role === "default") {
       tools.push({
-        name: "create_stream",
-        label: "Create Stream",
+        name: "create_swimlane",
+        label: "Create Swimlane",
         description:
-          "Create a new stream and spawn a dedicated orchestrator for it. Use when the user requests any work (features, bugs, investigations, even web research) that might benefit from a dedicated session.",
+          "Create a new swimlane and spawn a dedicated orchestrator for it. Use when the user requests any work (features, bugs, investigations, even web research) that might benefit from a dedicated session.",
         parameters: {
           type: "object",
           properties: {
             suggested_name: {
               type: "string",
               description:
-                "Your suggested name for the stream — 2-4 words, lowercase, dash-separated. Prefix it with intent: 'i-' for investigations, 'wr-' for web research, 'bug-' or 'fix-' for bug fixes, 'bs-' for repo brainstorms (e.g. 'i-wu-lifecycle', 'fix-auth-token-refresh'). The tool normalizes this into a canonical name by stripping the leading intent prefix, so the stored stream name, worktree dir, and branch stay tight. The canonical name is returned in the response — use it for any subsequent references.",
+                "Your suggested name for the swimlane — 2-4 words, lowercase, dash-separated. Prefix it with intent: 'i-' for investigations, 'wr-' for web research, 'bug-' or 'fix-' for bug fixes, 'bs-' for repo brainstorms (e.g. 'i-wu-lifecycle', 'fix-auth-token-refresh'). The tool normalizes this into a canonical name by stripping the leading intent prefix, so the stored swimlane name, worktree dir, and branch stay tight. The canonical name is returned in the response — use it for any subsequent references.",
             },
             message: {
               type: "string",
               description:
-                "Optional agent-authored context appended after the passed-through user message. Use for interpretation, constraints, repo/spec paths, or batch-created stream instructions. Do not duplicate the user's request here during normal single-stream creation — the runtime passes the user's message through automatically.",
+                "Optional agent-authored context appended after the passed-through user message. Use for interpretation, constraints, repo/spec paths, or batch-created swimlane instructions. Do not duplicate the user's request here during normal single-swimlane creation — the runtime passes the user's message through automatically.",
             },
             cwd: {
               type: "string",
               description:
-                "Absolute path to use as the working directory for new stream's orchestrator and agents.",
+                "Absolute path to use as the working directory for the new swimlane's orchestrator and agents.",
             },
             skipUserMessage: {
               type: "boolean",
               description:
-                "Set true only when batch-creating multiple new streams and the message field contains the targeted full prompt for this stream. Leave false/omitted for normal stream creation so the runtime can pass through the relevant user messages.",
+                "Set true only when batch-creating multiple new swimlanes and the message field contains the targeted full prompt for this swimlane. Leave false/omitted for normal swimlane creation so the runtime can pass through the relevant user messages.",
             },
           },
           required: ["suggested_name", "cwd"],
@@ -1965,7 +1965,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: "Error: skipUserMessage=true is only valid when message contains the targeted batch prompt for this stream.",
+                  text: "Error: skipUserMessage=true is only valid when message contains the targeted batch prompt for this swimlane.",
                 },
               ],
               details: { error: true },
@@ -1987,7 +1987,7 @@ export class ControlSurfaceRuntime {
 
           const nameTrace =
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
-          this.log(`default agent creating stream ${nameTrace} cwd=${effectiveCwd}`);
+          this.log(`default agent creating swimlane ${nameTrace} cwd=${effectiveCwd}`);
 
           const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
           const streamUser =
@@ -2006,8 +2006,8 @@ export class ControlSurfaceRuntime {
                 {
                   type: "text",
                   text: spawn.streamId
-                    ? `Stream "${spawn.streamName}" created (ID: ${spawn.streamId}, canonical name: "${spawn.streamName}") but orchestrator failed to spawn: ${spawn.spawnError.message}`
-                    : `Stream creation failed before orchestrator spawn: ${spawn.spawnError.message}`,
+                    ? `Swimlane "${spawn.streamName}" created (ID: ${spawn.streamId}, canonical name: "${spawn.streamName}") but orchestrator failed to spawn: ${spawn.spawnError.message}`
+                    : `Swimlane creation failed before orchestrator spawn: ${spawn.spawnError.message}`,
                 },
               ],
               details: {
@@ -2117,7 +2117,7 @@ export class ControlSurfaceRuntime {
                 this.wsHub.broadcast({
                   type: "error",
                   message:
-                    "Context classification failed — stream context limited to current message.",
+                    "Context classification failed — swimlane context limited to current message.",
                 });
                 prompt = this.sessionManager.buildStreamPrompt(
                   currentUserText,
@@ -2140,7 +2140,7 @@ export class ControlSurfaceRuntime {
                 },
                 receivedAt: new Date().toISOString(),
               });
-              this.log(`enqueued original user message onto stream "${ws.name}" (${ws.id})`);
+              this.log(`enqueued original user message onto swimlane "${ws.name}" (${ws.id})`);
             } else if (skipUserMessage && agentMessage) {
               const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
               const prompt = formatStreamPrompt(
@@ -2163,7 +2163,7 @@ export class ControlSurfaceRuntime {
                 receivedAt: new Date().toISOString(),
               });
               this.log(
-                `enqueued agent-only message onto stream "${ws.name}" (${ws.id}) [batch mode]`,
+                `enqueued agent-only message onto swimlane "${ws.name}" (${ws.id}) [batch mode]`,
               );
             }
 
@@ -2182,7 +2182,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Stream created (ID: ${ws.id}, canonical name: "${ws.name}"). Orchestrator spawned${passthroughNote}.${normalizationNote} Use the canonical name for any subsequent references.`,
+                  text: `Swimlane created (ID: ${ws.id}, canonical name: "${ws.name}"). Orchestrator spawned${passthroughNote}.${normalizationNote} Use the canonical name for any subsequent references.`,
                 },
               ],
               details: {
@@ -2197,7 +2197,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Stream "${ws.name}" (ID: ${ws.id}) created and orchestrator spawned, but bootstrap prompt enqueue failed: ${error instanceof Error ? error.message : String(error)}`,
+                  text: `Swimlane "${ws.name}" (ID: ${ws.id}) created and orchestrator spawned, but bootstrap prompt enqueue failed: ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
               details: {
@@ -2216,7 +2216,7 @@ export class ControlSurfaceRuntime {
         name: "enqueue_message",
         label: "Enqueue Message",
         description:
-          "Send a message to an existing orchestrator or stream. Use ONLY when the intended target is clearly the existing stream based on context, or explicit call out. Can be used to nudge an orchestrator or provide additional context that was missing the first time around. Note that even for connected matters, the user's intent is likely to create a stream or spawn an orchestrator — use create_stream for that. You can default to creating a new stream unless it is very clearly meant for the same stream",
+          "Send a message to an existing orchestrator or stream. Use ONLY when the intended target is clearly the existing stream based on context, or explicit call out. Can be used to nudge an orchestrator or provide additional context that was missing the first time around. Note that even for connected matters, the user's intent is likely to create a stream or spawn an orchestrator — use create_swimlane for that. You can default to creating a new swimlane unless it is very clearly meant for the same stream",
         parameters: {
           type: "object",
           properties: {
