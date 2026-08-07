@@ -2,12 +2,12 @@ import type http from "node:http";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
-type CreateStreamRequest = {
+type CreateSwimlaneRequest = {
   name?: string;
   cwd?: string;
 };
 
-export async function handleCreateStreamRoute(
+export async function handleCreateSwimlaneRoute(
   runtime: ControlSurfaceRuntime,
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -16,16 +16,16 @@ export async function handleCreateStreamRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  let body: CreateStreamRequest;
+  let body: CreateSwimlaneRequest;
   try {
-    body = await readJsonBody<CreateStreamRequest>(req);
+    body = await readJsonBody<CreateSwimlaneRequest>(req);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return sendJson(res, 400, { ok: false, error: `invalid JSON body: ${message}` });
   }
 
   try {
-    const result = await runtime.createStreamProgrammatic({
+    const result = await runtime.createSwimlaneProgrammatic({
       name: typeof body.name === "string" ? body.name : undefined,
       cwd: typeof body.cwd === "string" ? body.cwd : undefined,
     });

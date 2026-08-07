@@ -6,7 +6,7 @@ This applies to **orchestrator streams**, not the default agent (whose cwd is fi
 
 ## Where cwd lives
 
-A stream's working directory is stored in `streams.repo_path`. When `create_stream` runs, `createStreamProgrammatic` resolves `effectiveCwd = input.cwd ?? config.projectsDir`, `enrichStream` writes it to `streams.repo_path` (`worktree_path` stays `NULL`), and `createOrchestrator` binds the pi session's cwd to that same path. `worktree_path` is independent and usually null — the switcher only re-points `repo_path` and does not touch worktree/merge state. (If a stream has a real git worktree, its repo_path/worktree_path are coupled by git; switching cwd elsewhere is out of scope.)
+A stream's working directory is stored in `streams.repo_path`. When `create_swimlane` runs, `createSwimlaneProgrammatic` resolves `effectiveCwd = input.cwd ?? config.projectsDir`, `enrichStream` writes it to `streams.repo_path` (`worktree_path` stays `NULL`), and `createOrchestrator` binds the pi session's cwd to that same path. `worktree_path` is independent and usually null — the switcher only re-points `repo_path` and does not touch worktree/merge state. (If a stream has a real git worktree, its repo_path/worktree_path are coupled by git; switching cwd elsewhere is out of scope.)
 
 The cwd is reflected in four places that must stay in sync:
 

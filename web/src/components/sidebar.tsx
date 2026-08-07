@@ -13,7 +13,7 @@ import {
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import { useModifierLabel } from "~/hooks/platform";
-import { useCreateStream } from "~/hooks/use-create-stream";
+import { useCreateSwimlane } from "~/hooks/use-create-swimlane";
 import { useLastStreamPath } from "~/hooks/use-last-stream-path";
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
@@ -242,7 +242,7 @@ export const Sidebar = memo(function Sidebar() {
     },
   });
 
-  const createStreamMutation = useCreateStream();
+  const createSwimlaneMutation = useCreateSwimlane();
   const reopenStreamMutation = useReopenStream();
 
   const status = statusQuery.data;
@@ -281,7 +281,7 @@ export const Sidebar = memo(function Sidebar() {
   const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
     altLabel: mod,
   });
-  const newStreamShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCreate, {
+  const newSwimlaneShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneCreate, {
     altLabel: mod,
   });
 
@@ -322,15 +322,17 @@ export const Sidebar = memo(function Sidebar() {
             <div
               className="group pl-4 pr-3 pb-2 -mr-2 -mb-2"
               onClick={() => {
-                if (!createStreamMutation.isPending) createStreamMutation.mutate();
+                if (!createSwimlaneMutation.isPending) createSwimlaneMutation.mutate();
               }}
             >
               <button
                 type="button"
-                disabled={createStreamMutation.isPending}
+                disabled={createSwimlaneMutation.isPending}
                 aria-label="New swimlane"
                 title={
-                  newStreamShortcutHint ? `New swimlane (${newStreamShortcutHint})` : "New swimlane"
+                  newSwimlaneShortcutHint
+                    ? `New swimlane (${newSwimlaneShortcutHint})`
+                    : "New swimlane"
                 }
                 className="flex size-6 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
               >
