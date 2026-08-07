@@ -72,8 +72,8 @@ At each edge, ask: runtime shape, owner, invariant, source mutability, and avail
     - Path: runtime start → blackboard reconciliation → `createFlitterbotAgent`/dormant managed session → model/resource load → `ManagedPiSession` maps → lazy activation → SDK subscription.
     - Review targets: `ManagedPiSession` mirrors SDK runtime/session fields; model info projection; default/workstream creation paths.
 
-12. **Create stream → orchestrator bootstrap**
-    - Path: custom `create_stream` tool/programmatic request → name collision resolution → stream insert → Pi session spawn → optional context relevance classification → initial queue item → websocket status events.
+12. **Create swimlane → orchestrator bootstrap**
+    - Path: custom `create_swimlane` tool/programmatic request → name collision resolution → stream insert → Pi session spawn → optional context relevance classification → initial queue item → websocket status events.
     - Excess: success/failure unions carry overlapping stream fields; bootstrap queue items are built in separate normal/batch branches; dynamic imports and repeated broadcast/persist blocks.
 
 13. **Fork stream/session**

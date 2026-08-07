@@ -87,7 +87,7 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ name }),
       }),
 
-    createStream: (body?: { name?: string; cwd?: string }) =>
+    createSwimlane: (body?: { name?: string; cwd?: string }) =>
       request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
         "/api/streams",
         {
