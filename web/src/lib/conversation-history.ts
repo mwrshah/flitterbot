@@ -19,6 +19,22 @@ export function latestHistoryPosition(
   return position ? { ...position } : undefined;
 }
 
+export async function refreshHistorySnapshot(
+  queryClient: QueryClient,
+  sessionId: string,
+): Promise<void> {
+  const queryKey = historyQueryKey(sessionId);
+  queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    queryKey,
+    (current) => {
+      const newestPage = current?.pages.at(-1);
+      if (!newestPage) return current;
+      return { pages: [newestPage], pageParams: [undefined] };
+    },
+  );
+  await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true });
+}
+
 function updateNewestHistoryPage(
   queryClient: QueryClient,
   sessionId: string,

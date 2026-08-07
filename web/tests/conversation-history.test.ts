@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { type InfiniteData, infiniteQueryOptions, QueryClient } from "@tanstack/react-query";
-import { createSurfaceLiveUpdater, surfaceQueryKey } from "../src/lib/conversation-history.ts";
+import {
+  createSurfaceLiveUpdater,
+  historyQueryKey,
+  refreshHistorySnapshot,
+  surfaceQueryKey,
+} from "../src/lib/conversation-history.ts";
 import type { ChatTimelineMessage, StreamsHistoryResponse } from "../src/lib/types.ts";
 
 function message(id: string, content = id): ChatTimelineMessage {
@@ -13,6 +18,74 @@ function message(id: string, content = id): ChatTimelineMessage {
     createdAt: "2026-08-06T00:00:00.000Z",
   };
 }
+
+test("history recovery preserves an in-flight initial query", async () => {
+  const sessionId = "session";
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let resolveRequest: ((data: StreamsHistoryResponse) => void) | undefined;
+  let requestCount = 0;
+  const options = infiniteQueryOptions({
+    queryKey: historyQueryKey(sessionId),
+    queryFn: ({ signal }) =>
+      new Promise<StreamsHistoryResponse>((resolve, reject) => {
+        requestCount++;
+        resolveRequest = resolve;
+        signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+      }),
+    initialPageParam: undefined as string | undefined,
+    getPreviousPageParam: () => undefined,
+  });
+
+  const initialLoad = queryClient.ensureInfiniteQueryData(options);
+  await waitFor(() => requestCount === 1);
+  const recovery = refreshHistorySnapshot(queryClient, sessionId);
+  resolveRequest?.({
+    items: [message("loaded")],
+    historyPosition: { incarnation: "runtime", sequence: 1 },
+  });
+
+  await Promise.all([initialLoad, recovery]);
+  assert.equal(requestCount, 1);
+  assert.equal(queryClient.getQueryState(historyQueryKey(sessionId))?.status, "success");
+  queryClient.clear();
+});
+
+test("history recovery discards old pagination before refreshing the newest snapshot", async () => {
+  const sessionId = "session";
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let newestVersion = 0;
+  const options = infiniteQueryOptions({
+    queryKey: historyQueryKey(sessionId),
+    queryFn: async () => ({
+      items: [message(`newest-${++newestVersion}`)],
+      historyPosition: { incarnation: "runtime", sequence: newestVersion },
+      olderPageCursor: "older",
+    }),
+    initialPageParam: undefined as string | undefined,
+    getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
+  });
+  const initial = await queryClient.ensureInfiniteQueryData(options);
+  queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    historyQueryKey(sessionId),
+    {
+      pages: [{ items: [message("older")] }, initial.pages[0]!],
+      pageParams: ["older", undefined],
+    },
+  );
+
+  await refreshHistorySnapshot(queryClient, sessionId);
+
+  const result = queryClient.getQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    historyQueryKey(sessionId),
+  )!;
+  assert.deepEqual(
+    result.pages.map((page) => page.items.map((item) => item.id)),
+    [["newest-2"]],
+  );
+  assert.deepEqual(result.pageParams, [undefined]);
+  assert.deepEqual(result.pages[0]?.historyPosition, { incarnation: "runtime", sequence: 2 });
+  queryClient.clear();
+});
 
 test("surface live events survive an initial-query race without duplication", async () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

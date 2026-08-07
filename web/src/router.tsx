@@ -58,7 +58,6 @@ export function getRouter() {
     const stopWsQueryBridge = setupWsQueryBridge({
       queryClient,
       wsClient,
-      router,
     });
 
     const stopWsRouteSubscriptions = setupWsRouteSubscriptions(router, queryClient, wsClient);

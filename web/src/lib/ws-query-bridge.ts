@@ -1,10 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { AnyRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   createSurfaceLiveUpdater,
-  historyQueryKey,
   latestHistoryPosition,
+  refreshHistorySnapshot,
   surfaceQueryKey,
   upsertNewestHistoryItems,
 } from "~/lib/conversation-history";
@@ -18,9 +17,8 @@ import type { ConversationEventPosition } from "../../../src/contracts/websocket
 export function setupWsQueryBridge(deps: {
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;
-  router: AnyRouter;
 }): () => void {
-  const { queryClient, wsClient, router } = deps;
+  const { queryClient, wsClient } = deps;
   const recovering = new Set<string>();
   const surfaceLiveUpdater = createSurfaceLiveUpdater(queryClient, () =>
     queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions()),
@@ -31,10 +29,9 @@ export function setupWsQueryBridge(deps: {
     recovering.add(piSessionId);
     wsClient.pauseSessionSubscription(piSessionId);
     conversationState.clear(piSessionId);
-    queryClient.removeQueries({ queryKey: historyQueryKey(piSessionId), exact: true });
 
     try {
-      await router.invalidate();
+      await refreshHistorySnapshot(queryClient, piSessionId);
       if (wsClient.activeSubscriptionPiSessionId() !== piSessionId) return;
       wsClient.setResumePosition(
         piSessionId,
