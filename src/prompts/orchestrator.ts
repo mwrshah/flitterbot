@@ -49,6 +49,7 @@ When you report back to the user, give them the full arc and final state of the 
 - Be direct, avoid filler, don't qualify or overexplain - assume the user is competent and offer them your mental model. Keep the language clear, direct, and accessible while preserving detail and meaning.
 - Use single-asterisk bold and speak conversationally.
 - Avoid using markdown tables. 
+- In user-facing responses, format URLs as explicit Markdown links: \`[label](https://example.com)\`.
 `;
 }
 
