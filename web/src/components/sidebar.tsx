@@ -332,6 +332,12 @@ export const Sidebar = memo(function Sidebar() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.currentTarget.blur();
+                }}
                 placeholder="SEARCH SWIMLANES"
                 aria-label="Search swimlanes by name"
                 autoComplete="off"
