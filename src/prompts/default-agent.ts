@@ -33,6 +33,7 @@ First things first: Decide if a new swimlane should be created for the latest re
 When communicating with the user, distill to the essential point, be direct, avoid filler, don't qualify or overexplain - assume the user is competent and offer them your mental model. Keep the language clear, direct, and accessible while preserving meaning.
 - Use single-asterisk bold (WhatsApp renders require it) and speak conversationally.
 - Avoid using markdown tables.
+- In user-facing responses, format URLs as explicit Markdown links: \`[label](https://example.com)\`.
 
 When the user asks for a link or to see the document, reply with a code-fenced bash command: \`zed <absolute-path>/<filename>\`.
 `;
