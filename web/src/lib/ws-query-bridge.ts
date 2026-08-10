@@ -66,10 +66,12 @@ export function setupWsQueryBridge(deps: {
             ...status.piAgent,
             default:
               status.piAgent.default?.piSessionId === message.piSessionId
-                ? { ...status.piAgent.default, isCompacting }
+                ? { ...status.piAgent.default, isCompacting, contextUsage: null }
                 : status.piAgent.default,
             orchestrators: status.piAgent.orchestrators.map((session) =>
-              session.piSessionId === message.piSessionId ? { ...session, isCompacting } : session,
+              session.piSessionId === message.piSessionId
+                ? { ...session, isCompacting, contextUsage: null }
+                : session,
             ),
           },
         };

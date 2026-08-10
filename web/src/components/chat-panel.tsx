@@ -39,7 +39,6 @@ import {
 import { useReopenStream } from "~/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
 import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { latestMeasuredContextUsage } from "~/lib/context-usage";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
@@ -53,6 +52,7 @@ import type {
   DirectoryCompletionItem,
   ImageAttachment,
   StreamSummary,
+  TokenUsage,
 } from "~/lib/types";
 import { setStreamCwd } from "~/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -68,8 +68,7 @@ function formatTokens(n: number): string {
   return `${n}`;
 }
 
-const ContextTicker = memo(function ContextTicker({ timeline }: { timeline: ChatTimelineItem[] }) {
-  const usage = useMemo(() => latestMeasuredContextUsage(timeline), [timeline]);
+const ContextTicker = memo(function ContextTicker({ usage }: { usage: TokenUsage | null }) {
   const cacheRead = usage ? formatTokens(usage.cacheRead) : "—";
   const contextTokens = usage ? formatTokens(usage.totalTokens) : "—";
 
@@ -88,6 +87,7 @@ type ChatPanelProps = {
   timeline: ChatTimelineItem[];
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
+  contextUsage: TokenUsage | null;
   onSendMessage: (
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
@@ -254,6 +254,7 @@ export function ChatPanel({
   timeline,
   isSessionBusy,
   isSessionCompacting,
+  contextUsage,
   onSendMessage,
   onLoadPrevious,
   hasPreviousPage,
@@ -637,7 +638,7 @@ export function ChatPanel({
             </>
           )}
         </div>
-        <ContextTicker timeline={timeline} />
+        <ContextTicker usage={contextUsage} />
         <CwdPicker
           pickerRef={cwdPickerRef}
           pickerStyle={cwdPickerStyle}

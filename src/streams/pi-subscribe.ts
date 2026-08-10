@@ -251,6 +251,13 @@ export function subscribeToPiSession(
             piSessionId: session.sessionId,
             items: committedItems.map((item) => ({ ...item, piEntryId: entry.id })),
           });
+          if (role === "assistant") {
+            wsHub.broadcast({
+              type: "status_changed",
+              subsystem: "pi",
+              timestamp: new Date().toISOString(),
+            });
+          }
         });
         break;
       }

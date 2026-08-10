@@ -35,6 +35,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
   })();
   const isSessionBusy = sessionStatus?.busy ?? false;
   const isSessionCompacting = sessionStatus?.isCompacting ?? false;
+  const contextUsage = sessionStatus?.contextUsage ?? null;
 
   const effectivePiSessionId = piSessionId ?? "default";
 
@@ -61,6 +62,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     effectivePiSessionId,
     isSessionBusy,
     isSessionCompacting,
+    contextUsage,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,

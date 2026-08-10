@@ -6,7 +6,7 @@ import type {
   StreamStatus,
   StreamType,
 } from "./blackboard.ts";
-import type { ChatTimelineItem, MessageSource } from "./timeline.ts";
+import type { ChatTimelineItem, MessageSource, TokenUsage } from "./timeline.ts";
 import type {
   SendMessageToTmuxSessionFailureReason,
   TmuxDeliveryMethod,
@@ -49,6 +49,7 @@ export interface PiSessionRuntimeStatus {
   lastPromptAt: string | null;
   busy: boolean;
   isCompacting: boolean;
+  contextUsage: TokenUsage | null;
   model?: PiSessionModelInfo;
 }
 
@@ -82,6 +83,7 @@ export interface PiOrchestratorStatus {
   messageCount: number;
   busy: boolean;
   isCompacting: boolean;
+  contextUsage: TokenUsage | null;
 }
 
 export interface PiMultiSessionStatus {

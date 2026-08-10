@@ -77,6 +77,7 @@ import {
   resolveTmuxBootstrapMessage,
   stripInjectedDatetimeBlocks,
 } from "./streams/format-stream-prompt.ts";
+import { latestMeasuredContextUsage } from "./streams/history.ts";
 import { type ManagedPiSession, PiSessionManager } from "./streams/pi-session-manager.ts";
 import { stripStreamNamePrefix } from "./streams/strip-name-prefix.ts";
 import type { QueueItem, QueueSource } from "./streams/turn-queue.ts";
@@ -844,6 +845,10 @@ export class ControlSurfaceRuntime {
         messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
         busy: snap.busy,
         isCompacting: o.runtime?.session?.isCompacting ?? false,
+        contextUsage:
+          o.runtime?.session && !o.runtime.session.isCompacting
+            ? latestMeasuredContextUsage(o.runtime.session.sessionManager.getBranch())
+            : null,
       };
     });
 
@@ -886,6 +891,10 @@ export class ControlSurfaceRuntime {
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
               busy: defSnapshot.busy,
               isCompacting: def!.runtime?.session?.isCompacting ?? false,
+              contextUsage:
+                def!.runtime?.session && !def!.runtime.session.isCompacting
+                  ? latestMeasuredContextUsage(def!.runtime.session.sessionManager.getBranch())
+                  : null,
               model: this.toPiSessionModelInfo(def!.modelInfo),
             }
           : null,

@@ -1176,6 +1176,15 @@ export const MessageInput = memo(function MessageInput({
             fillHeight ? "flex-1 flex flex-col min-h-0" : "h-full",
           )}
         >
+          {isCompacting && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="absolute right-2 top-2 z-10 text-xs font-medium text-text-muted"
+            >
+              Compacting…
+            </span>
+          )}
           <SkillPicker
             open={skillPickerVisible}
             items={filteredSkills}
@@ -1202,7 +1211,8 @@ export const MessageInput = memo(function MessageInput({
             rows={fillHeight ? undefined : rows}
             placeholder={placeholder}
             className={cn(
-              "w-full resize-none bg-transparent pl-10 pr-4 pt-3 text-sm text-text placeholder:text-text-muted focus:outline-none",
+              "w-full resize-none bg-transparent pl-10 pt-3 text-sm text-text placeholder:text-text-muted focus:outline-none",
+              isCompacting ? "pr-28" : "pr-4",
               fillHeight && "flex-1 min-h-0",
             )}
           />
@@ -1248,24 +1258,15 @@ export const MessageInput = memo(function MessageInput({
               />
             )}
             {isCompacting ? (
-              <>
-                <span
-                  role="status"
-                  aria-live="polite"
-                  className="text-xs font-medium text-text-muted"
-                >
-                  Compacting…
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled
-                  aria-label="Send unavailable while compacting"
-                  className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
-                >
-                  <ArrowRightIcon className="size-4" />
-                </Button>
-              </>
+              <Button
+                type="button"
+                size="sm"
+                disabled
+                aria-label="Send unavailable while compacting"
+                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
+              >
+                <ArrowRightIcon className="size-4" />
+              </Button>
             ) : recoveryKind ? (
               <Button
                 type="button"
