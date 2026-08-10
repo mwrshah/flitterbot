@@ -110,7 +110,6 @@ type EnqueueInput = {
 const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
 
 export class ControlSurfaceRuntime {
-  readonly config: FlitterbotConfig;
   readonly blackboard: BlackboardDatabase;
   readonly runtimeInstanceId = crypto.randomUUID();
   readonly startedAt = Date.now();
@@ -136,15 +135,14 @@ export class ControlSurfaceRuntime {
     return this.config.whatsappEnabled;
   }
 
-  constructor(config: FlitterbotConfig = loadConfig()) {
-    this.config = config;
+  constructor() {
+    const config = loadConfig();
     if (!config.whatsappEnabled) {
       this.whatsappStatusCache = { status: "disabled", managedByControlSurface: true };
     }
     this.blackboard = openBlackboard(config.blackboardPath);
     this.wsHub = new WebSocketHub(this.handleWebSocketMessage.bind(this));
     this.sessionManager = new PiSessionManager(
-      config,
       this.blackboard,
       this.wsHub,
       this.runtimeInstanceId,
@@ -153,6 +151,10 @@ export class ControlSurfaceRuntime {
       this.log.bind(this),
     );
     this.providerAuth = new ProviderAuthManager(() => this.resolveModelRuntime());
+  }
+
+  get config(): FlitterbotConfig {
+    return loadConfig();
   }
 
   attachServer(server: http.Server): void {
@@ -761,7 +763,6 @@ export class ControlSurfaceRuntime {
   }
 
   private persistDefaultModel(modelId: string): void {
-    this.config.defaultModel = modelId;
     persistModelsToConfigFile({
       models: this.config.models,
       defaultModel: modelId,
@@ -818,7 +819,6 @@ export class ControlSurfaceRuntime {
     );
 
     if (this.sessionManager.getDefault()?.piSessionId === piSessionId) {
-      this.config.defaultThinkingLevel = thinkingLevel;
       persistModelsToConfigFile({
         models: this.config.models,
         defaultThinkingLevel: thinkingLevel,

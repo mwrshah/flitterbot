@@ -9,7 +9,7 @@ import {
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import { getStreamById } from "../blackboard/query-streams.ts";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import { type FlitterbotConfig, loadConfig } from "../config/load-config.ts";
 import type { ApiError, MessageMetadata } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
@@ -70,7 +70,6 @@ export class PiSessionManager {
   private defaultSession?: ManagedPiSession;
   private readonly streamSessions = new Map<string, ManagedPiSession>();
   private readonly byPiSessionId = new Map<string, ManagedPiSession>();
-  private readonly config: FlitterbotConfig;
   private readonly blackboard: BlackboardDatabase;
   private readonly wsHub: WebSocketHub;
   private readonly runtimeInstanceId: string;
@@ -80,7 +79,6 @@ export class PiSessionManager {
   readonly toolDisplayCache: ToolDisplayContextCache;
 
   constructor(
-    config: FlitterbotConfig,
     blackboard: BlackboardDatabase,
     wsHub: WebSocketHub,
     runtimeInstanceId: string,
@@ -88,7 +86,6 @@ export class PiSessionManager {
     processCallback: ProcessQueueItemCallback,
     log: (message: string) => void,
   ) {
-    this.config = config;
     this.blackboard = blackboard;
     this.wsHub = wsHub;
     this.runtimeInstanceId = runtimeInstanceId;
@@ -96,6 +93,10 @@ export class PiSessionManager {
     this.processCallback = processCallback;
     this.log = log;
     this.toolDisplayCache = createToolDisplayContextCache(blackboard);
+  }
+
+  private get config(): FlitterbotConfig {
+    return loadConfig();
   }
 
   getDefault(): ManagedPiSession | undefined {
@@ -121,7 +122,6 @@ export class PiSessionManager {
     reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
 
     const created = await createFlitterbotAgent({
-      config: this.config,
       customTools,
       role: "default",
       resumeSessionFile,
@@ -198,7 +198,6 @@ export class PiSessionManager {
     if (existing) return existing;
 
     const created = await createFlitterbotAgent({
-      config: this.config,
       customTools: customTools ?? [],
       role: agentRole,
       orchestratorContext:
@@ -344,7 +343,6 @@ export class PiSessionManager {
     }
 
     const created = await createFlitterbotAgent({
-      config: this.config,
       customTools: customTools ?? [],
       role: agentRole,
       orchestratorContext:

@@ -38,7 +38,8 @@ export async function handleBrowserModelsPinRoute(
   const id = body.id.trim();
   const userLabel = typeof body.label === "string" ? body.label.trim() : "";
 
-  const current = runtime.config.models;
+  const config = runtime.config;
+  const current = config.models;
   let nextList: ModelConfigEntry[];
 
   if (body.pin) {
@@ -66,13 +67,11 @@ export async function handleBrowserModelsPinRoute(
     }
   }
 
-  let nextDefault = runtime.config.defaultModel;
-  if (!body.pin && runtime.config.defaultModel === id && !id.includes("/")) {
+  let nextDefault = config.defaultModel;
+  if (!body.pin && config.defaultModel === id && !id.includes("/")) {
     nextDefault = nextList[0]!.id;
   }
 
-  runtime.config.models = nextList;
-  runtime.config.defaultModel = nextDefault;
   persistModelsToConfigFile({ models: nextList, defaultModel: nextDefault });
   runtime.log(
     `models: ${body.pin ? "pinned" : "unpinned"} id=${id}; total=${nextList.length}; default=${nextDefault}`,
@@ -85,7 +84,8 @@ export async function buildModelsListResponse(
   runtime: ControlSurfaceRuntime,
 ): Promise<ModelsListResponse> {
   const registry = await getModelRegistry(runtime);
-  const pinned = runtime.config.models.map((entry) => buildPinnedModelItem(entry, registry));
+  const config = runtime.config;
+  const pinned = config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
   const all: ModelListItem[] = [];
 
@@ -97,8 +97,8 @@ export async function buildModelsListResponse(
   return {
     pinned,
     all,
-    defaultModel: runtime.config.defaultModel,
-    defaultThinkingLevel: runtime.config.defaultThinkingLevel,
+    defaultModel: config.defaultModel,
+    defaultThinkingLevel: config.defaultThinkingLevel,
   };
 }
 

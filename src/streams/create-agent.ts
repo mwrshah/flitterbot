@@ -9,7 +9,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import { loadConfig } from "../config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "../config/models.ts";
 import { createPiModelRuntime } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
@@ -25,7 +25,6 @@ process.env.PI_CACHE_RETENTION = "long";
 type StreamsRole = "default" | "orchestrator";
 
 type CreateFlitterbotAgentOptions = {
-  config: FlitterbotConfig;
   customTools: FlitterbotTool[];
   role: StreamsRole;
   orchestratorContext?: OrchestratorInput;
@@ -34,51 +33,58 @@ type CreateFlitterbotAgentOptions = {
 };
 
 export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
-  const { config, customTools, role, orchestratorContext, resumeSessionFile, cwd } = options;
-  const workingDir = cwd ?? config.projectsDir;
+  const { customTools, role, orchestratorContext, resumeSessionFile, cwd } = options;
+  const initialConfig = loadConfig();
+  const workingDir = cwd ?? initialConfig.projectsDir;
 
   const sessionManager = resumeSessionFile
-    ? SessionManager.open(resumeSessionFile, config.controlSurfaceSessionsDir)
-    : SessionManager.create(workingDir, config.controlSurfaceSessionsDir);
+    ? SessionManager.open(resumeSessionFile, initialConfig.controlSurfaceSessionsDir)
+    : SessionManager.create(workingDir, initialConfig.controlSurfaceSessionsDir);
 
-  const agentDir = config.piAgentDir;
-  const modelRuntime = await createPiModelRuntime(config.controlSurfaceAgentDir);
-  const settingsManager = SettingsManager.inMemory({
-    compaction: { keepRecentTokens: 30_000 },
-  });
-  settingsManager.setTransport(config.piTransport);
-  const builtInSkillPaths = [path.join(HOME, ".claude", "skills")];
-  const resourceMessages: string[] = [];
-  const additionalSkillPaths: string[] = [];
-  if (fs.existsSync(config.flitterbotSkillsDir)) {
-    additionalSkillPaths.push(config.flitterbotSkillsDir);
-  } else {
-    resourceMessages.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
-  }
-  additionalSkillPaths.push(...builtInSkillPaths.filter((entry) => fs.existsSync(entry)));
-  for (const entry of config.extraSkillPaths) {
-    if (fs.existsSync(entry)) {
-      additionalSkillPaths.push(entry);
-    } else {
-      resourceMessages.push(`extraSkillPaths: missing directory skipped: ${entry}`);
-    }
-  }
-
-  const modelEntry = resumeSessionFile ? undefined : resolveModelEntry(config);
-  const model = modelEntry
-    ? modelRuntime.getModel(modelEntry.provider, modelEntry.modelId)
-    : undefined;
-  if (modelEntry && !model) {
-    throw new Error(
-      `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id}). ` +
-        `Not in the built-in catalog or ~/.flitterbot/control-surface/agent/models.json.`,
-    );
-  }
-  const effectiveThinkingLevel = modelEntry
-    ? (modelEntry.thinkingLevel ?? config.defaultThinkingLevel)
-    : undefined;
+  const agentDir = initialConfig.piAgentDir;
+  let resourceMessages: string[] = [];
 
   const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
+    const config = loadConfig();
+    const modelRuntime = await createPiModelRuntime(config.controlSurfaceAgentDir);
+    const settingsManager = SettingsManager.inMemory({
+      compaction: { keepRecentTokens: 30_000 },
+    });
+    settingsManager.setTransport(config.piTransport);
+
+    const additionalSkillPaths: string[] = [];
+    resourceMessages = [];
+    if (fs.existsSync(config.flitterbotSkillsDir)) {
+      additionalSkillPaths.push(config.flitterbotSkillsDir);
+    } else {
+      resourceMessages.push(`bundled skills directory missing: ${config.flitterbotSkillsDir}`);
+    }
+    const builtInSkillPaths = [path.join(HOME, ".claude", "skills")];
+    additionalSkillPaths.push(...builtInSkillPaths.filter((entry) => fs.existsSync(entry)));
+    for (const entry of config.extraSkillPaths) {
+      if (fs.existsSync(entry)) {
+        additionalSkillPaths.push(entry);
+      } else {
+        resourceMessages.push(`extraSkillPaths: missing directory skipped: ${entry}`);
+      }
+    }
+
+    const useConfiguredDefault =
+      factoryOpts.sessionStartEvent?.reason === "new" ||
+      (!resumeSessionFile && factoryOpts.sessionStartEvent === undefined);
+    const modelEntry = useConfiguredDefault ? resolveModelEntry(config) : undefined;
+    const model = modelEntry
+      ? modelRuntime.getModel(modelEntry.provider, modelEntry.modelId)
+      : undefined;
+    if (modelEntry && !model) {
+      throw new Error(
+        `Unable to resolve Pi model: provider=${modelEntry.provider} modelId=${modelEntry.modelId} (entry id=${modelEntry.id}). ` +
+          `Not in the built-in catalog or ~/.flitterbot/control-surface/agent/models.json.`,
+      );
+    }
+    const effectiveThinkingLevel = modelEntry
+      ? (modelEntry.thinkingLevel ?? config.defaultThinkingLevel)
+      : undefined;
     const piSessionId = factoryOpts.sessionManager.getSessionId();
     const rolePrompt =
       role === "orchestrator"
@@ -95,7 +101,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     const memory = readMemory(config.memoryPath);
     const services = await createAgentSessionServices({
       cwd: factoryOpts.cwd,
-      agentDir: factoryOpts.agentDir,
+      agentDir: config.piAgentDir,
       settingsManager,
       modelRuntime,
       resourceLoaderOptions: {
@@ -155,7 +161,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     modelInfo: {
       provider: currentModel.provider,
       id: currentModel.id,
-      entryId: resolveModelEntryId(config, currentModel.provider, currentModel.id),
+      entryId: resolveModelEntryId(loadConfig(), currentModel.provider, currentModel.id),
       thinkingLevel: runtime.session.thinkingLevel,
     },
     resourceMessages,
