@@ -21,8 +21,7 @@ import {
   streamsWorktreeQueryOptions,
 } from "~/lib/queries";
 import { getStreamRecoveryKind } from "~/lib/stream-recovery";
-import { getBestStreamPiSessionId, isKnownStreamPiSession } from "~/lib/stream-route-targets";
-import type { StatusQueryData } from "~/lib/types";
+import { isKnownStreamPiSession } from "~/lib/stream-route-targets";
 
 export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {
@@ -31,7 +30,8 @@ export const Route = createFileRoute("/streams/$piSessionId")({
   loader: async ({ params, context }) => {
     const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
     if (!isKnownStreamPiSession(status, params.piSessionId)) {
-      redirectToBestStream(status);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      throw redirect({ to: "/streams/default" });
     }
 
     await Promise.all([
@@ -153,12 +153,4 @@ function PiSessionRoute() {
       </Panel>
     </PanelGroup>
   );
-}
-
-function redirectToBestStream(status: StatusQueryData): never {
-  const piSessionId = getBestStreamPiSessionId(status);
-  if (piSessionId) {
-    throw redirect({ to: "/streams/$piSessionId", params: { piSessionId } });
-  }
-  throw redirect({ to: "/" });
 }
