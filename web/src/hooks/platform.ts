@@ -8,5 +8,5 @@ function getModifier(): string {
 const emptySubscribe = () => () => {};
 
 export function useModifierLabel(): string {
-  return useSyncExternalStore(emptySubscribe, getModifier, () => "");
+  return useSyncExternalStore(emptySubscribe, getModifier, () => "Opt");
 }

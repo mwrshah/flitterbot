@@ -364,6 +364,8 @@ export const Sidebar = memo(function Sidebar() {
       stream,
     });
   }
+  const hasNoSearchResults =
+    !!normalizedQuery && visibleOpenRows.length === 0 && visibleClosedRows.length === 0;
   const searchCandidates = [...visibleOpenRows, ...visibleClosedRows].filter(
     (row): row is SidebarSwimlaneRow & { piSessionId: string } => !!row.piSessionId,
   );
@@ -402,6 +404,10 @@ export const Sidebar = memo(function Sidebar() {
   const newSwimlaneShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneCreate, {
     altLabel: mod,
   });
+  const swimlaneSearchShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneSearch, {
+    altLabel: mod,
+  });
+  const swimlaneSearchPlaceholder = `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`;
 
   const renderSwimlaneRow = (row: SidebarSwimlaneRow) => {
     const searchSelected = searchInputFocused && selectedSearchCandidate?.key === row.key;
@@ -662,7 +668,7 @@ export const Sidebar = memo(function Sidebar() {
                     });
                   }
                 }}
-                placeholder="SEARCH SWIMLANES"
+                placeholder={swimlaneSearchPlaceholder}
                 aria-label="Search swimlanes by name"
                 autoComplete="off"
                 autoCorrect="off"
@@ -674,7 +680,9 @@ export const Sidebar = memo(function Sidebar() {
             <span className="sr-only" aria-live="polite" aria-atomic="true">
               {searchInputFocused && selectedSearchCandidate
                 ? `${selectedSearchCandidate.name}, ${selectedSearchIndex + 1} of ${searchCandidates.length}`
-                : ""}
+                : hasNoSearchResults
+                  ? `No swimlanes match “${query.trim()}”.`
+                  : ""}
             </span>
             <div
               className="group pl-4 pr-3 pb-2 -mr-2 -mb-2"
@@ -709,14 +717,11 @@ export const Sidebar = memo(function Sidebar() {
             </div>
           )}
 
-          {normalizedQuery &&
-            !showDefaultStream &&
-            filteredOpenStreams.length === 0 &&
-            filteredClosedStreams.length === 0 && (
-              <p role="status" className="ml-2 mt-2 text-[11px] text-text-muted">
-                No swimlanes match “{query.trim()}”.
-              </p>
-            )}
+          {hasNoSearchResults && (
+            <p className="ml-2 mt-2 text-[11px] text-text-muted">
+              No swimlanes match “{query.trim()}”.
+            </p>
+          )}
         </div>
       )}
 

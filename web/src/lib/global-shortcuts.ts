@@ -700,8 +700,8 @@ function registerBuiltInShortcutDefinitions() {
   });
   defineShortcutAction(SHORTCUT_ACTIONS.swimlaneSearch, {
     defaultBindings: [
-      { spec: "Slash", when: "no-input-focus" },
       { spec: "Alt+KeyF", when: "always" },
+      { spec: "Slash", when: "no-input-focus" },
     ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageDown, {
