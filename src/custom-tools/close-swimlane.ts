@@ -2,10 +2,7 @@ import { exec as cpExec } from "node:child_process";
 import fs from "node:fs";
 import { promisify } from "node:util";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { endPiSession } from "../blackboard/pi-sessions.ts";
-import { markSessionEnded } from "../blackboard/query-sessions.ts";
-import { closeSwimlane, getStreamById } from "../blackboard/query-streams.ts";
-import { killTmuxSession } from "../tmux-sessions/tmux.ts";
+import { getStreamById } from "../blackboard/query-streams.ts";
 
 const execPromise = promisify(cpExec);
 
@@ -175,7 +172,6 @@ async function pushBranch(cwd: string, targetBranch: string): Promise<boolean> {
 
 export async function executeCloseSwimlane(
   blackboard: BlackboardDatabase,
-  piSessionId: string,
   streamId: string,
   mode: "merge" | "noop",
   commitMessage: string,
@@ -202,24 +198,6 @@ export async function executeCloseSwimlane(
       resolvedBaseBranch,
       message: `Preview: would merge ${currentBranch ?? "(unknown)"} → ${resolvedBaseBranch ?? "(none recorded)"}. Confirm by calling close_swimlane again with explicit base_branch.`,
     };
-  }
-
-  const activeSessions = blackboard
-    .prepare(
-      `SELECT session_id, tmux_session
-       FROM sessions
-       WHERE stream_id = ?
-         AND status IN ('working', 'idle')`,
-    )
-    .all(streamId) as { session_id: string; tmux_session: string | null }[];
-
-  let sessionsKilled = 0;
-  for (const session of activeSessions) {
-    if (session.tmux_session) {
-      await killTmuxSession(session.tmux_session);
-    }
-    markSessionEnded(blackboard, session.session_id, "stream_closed");
-    sessionsKilled++;
   }
 
   let merged = false;
@@ -285,13 +263,18 @@ export async function executeCloseSwimlane(
     merged = true;
 
     pushed = await pushBranch(mergeResult.mergedAt, targetBranch);
+    if (!pushed) {
+      return {
+        ok: false,
+        streamId,
+        message: `Branch merged to ${targetBranch}, but push to origin failed. The stream remains open; retry close after the push succeeds.`,
+        merged: true,
+        pushed: false,
+      };
+    }
   }
 
-  closeSwimlane(blackboard, streamId);
-  endPiSession(blackboard, piSessionId, "ended", "stream_closed");
-
-  const parts = [`Stream "${stream.name}" closed.`];
-  if (sessionsKilled > 0) parts.push(`${sessionsKilled} active session(s) terminated.`);
+  const parts = [`Stream "${stream.name}" close prepared.`];
   if (mode === "noop") parts.push("Git operations skipped (noop mode).");
   if (merged && resolvedTargetBranch) parts.push(`Branch merged to ${resolvedTargetBranch}.`);
   if (pushed) parts.push("Pushed to origin.");

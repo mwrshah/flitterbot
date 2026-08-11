@@ -29,13 +29,76 @@ type CreateFlitterbotAgentOptions = {
   role: StreamsRole;
   orchestratorContext?: OrchestratorInput;
   resumeSessionFile?: string;
+  expectedPiSessionId?: string;
   cwd?: string;
 };
 
+export function readPiSessionHeaderId(sessionFile: string): string {
+  const maxHeaderBytes = 1024 * 1024;
+  const buffer = Buffer.allocUnsafe(maxHeaderBytes);
+  const descriptor = fs.openSync(sessionFile, "r");
+  let bytesRead: number;
+  try {
+    bytesRead = fs.readSync(descriptor, buffer, 0, buffer.length, 0);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  const newline = buffer.subarray(0, bytesRead).indexOf(0x0a);
+  if (newline === -1 && bytesRead === maxHeaderBytes) {
+    throw new Error(`Session file header exceeds ${maxHeaderBytes} bytes: ${sessionFile}`);
+  }
+  const firstLine = buffer.subarray(0, newline === -1 ? bytesRead : newline).toString("utf8");
+  if (!firstLine.trim()) throw new Error(`Session file has no header: ${sessionFile}`);
+  let header: Record<string, unknown>;
+  try {
+    header = JSON.parse(firstLine) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(
+      `Session file has an invalid JSON header: ${sessionFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (header.type !== "session" || typeof header.id !== "string" || !header.id) {
+    throw new Error(`Session file header is not a valid Pi session: ${sessionFile}`);
+  }
+  return header.id;
+}
+
+function validateStreamResumeFile(
+  sessionFile: string,
+  sessionsDir: string,
+  expectedPiSessionId: string,
+): void {
+  const resolvedFile = path.resolve(sessionFile);
+  if (path.dirname(resolvedFile) !== path.resolve(sessionsDir)) {
+    throw new Error(`Stream session file must be restored before activation: ${sessionFile}`);
+  }
+  if (!fs.existsSync(resolvedFile)) {
+    throw new Error(`Stream session file does not exist: ${sessionFile}`);
+  }
+  const headerPiSessionId = readPiSessionHeaderId(resolvedFile);
+  if (headerPiSessionId !== expectedPiSessionId) {
+    throw new Error(
+      `Stream session file identity mismatch: expected ${expectedPiSessionId}, found ${headerPiSessionId}`,
+    );
+  }
+}
+
 export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
-  const { customTools, role, orchestratorContext, resumeSessionFile, cwd } = options;
+  const { customTools, role, orchestratorContext, resumeSessionFile, expectedPiSessionId, cwd } =
+    options;
   const initialConfig = loadConfig();
   const workingDir = cwd ?? initialConfig.projectsDir;
+
+  if (expectedPiSessionId) {
+    if (!resumeSessionFile) {
+      throw new Error(`Pi session ${expectedPiSessionId} has no materialized session file`);
+    }
+    validateStreamResumeFile(
+      resumeSessionFile,
+      initialConfig.controlSurfaceSessionsDir,
+      expectedPiSessionId,
+    );
+  }
 
   const sessionManager = resumeSessionFile
     ? SessionManager.open(resumeSessionFile, initialConfig.controlSurfaceSessionsDir)

@@ -83,24 +83,6 @@ function PiSessionRoute() {
   }, [defaultPiSessionId, navigate, piSessionId]);
 
   const stream = status?.streams?.find((ws) => ws.piSessionId === piSessionId);
-  const previousStreamIdRef = useRef<string | undefined>(stream?.id);
-
-  useEffect(() => {
-    if (stream?.id) previousStreamIdRef.current = stream.id;
-  }, [stream?.id]);
-
-  useEffect(() => {
-    if (isDefaultSession || stream || !status) return;
-    const replacementPiSessionId = previousStreamIdRef.current
-      ? status.streams?.find((ws) => ws.id === previousStreamIdRef.current)?.piSessionId
-      : undefined;
-    if (!replacementPiSessionId || replacementPiSessionId === piSessionId) return;
-    navigate({
-      to: "/streams/$piSessionId",
-      params: { piSessionId: replacementPiSessionId },
-      replace: true,
-    });
-  }, [isDefaultSession, navigate, piSessionId, status, stream]);
 
   const recoveryKind = isDefaultSession ? undefined : getStreamRecoveryKind(stream);
   const selectedModel = isDefaultSession ? status?.piAgent?.default?.model : stream?.model;
@@ -142,6 +124,7 @@ function PiSessionRoute() {
           selectedModelId={selectedModel?.id}
           selectedThinkingLevel={selectedModel?.thinkingLevel}
           recoveryKind={recoveryKind}
+          messageInputDisabled={!isDefaultSession && !stream}
         />
       </Panel>
       <ResizeHandle />

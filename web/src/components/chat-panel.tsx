@@ -102,6 +102,7 @@ type ChatPanelProps = {
   selectedModelId?: string;
   selectedThinkingLevel?: ModelThinkingLevel;
   recoveryKind?: StreamRecoveryKind;
+  messageInputDisabled: boolean;
 };
 
 function QueuedBusyOverlay({ text }: { text: string }) {
@@ -266,6 +267,7 @@ export function ChatPanel({
   selectedModelId,
   selectedThinkingLevel,
   recoveryKind,
+  messageInputDisabled,
 }: ChatPanelProps) {
   useWhyDidYouRender("ChatPanel", {
     piSessionId,
@@ -274,6 +276,7 @@ export function ChatPanel({
     isSessionCompacting,
     streamId,
     recoveryKind,
+    messageInputDisabled,
   });
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);
@@ -492,7 +495,7 @@ export function ChatPanel({
 
   const handleSubmit = useCallback(
     async (text: string, images?: ImageAttachment[]) => {
-      if (!text && !images?.length) return;
+      if (messageInputDisabled || (!text && !images?.length)) return;
 
       const clientMessageId = crypto.randomUUID();
       pendingPostedScrollClientMessageIdsRef.current.add(clientMessageId);
@@ -533,6 +536,7 @@ export function ChatPanel({
     [
       appendBusyQueuedText,
       isSessionBusy,
+      messageInputDisabled,
       onSendMessage,
       piSessionId,
       queryClient,
@@ -544,13 +548,22 @@ export function ChatPanel({
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
 
   const inputHoverButtons = useMemo<MessageInputHoverButton[]>(() => {
-    if (!streamId || streamType === "defaultStream") {
+    if (!streamId) {
       return [
         {
           id: "clear-session",
           label: "clear session",
           insertText: "/clear ",
         },
+        {
+          id: "compact-session",
+          label: "compact session",
+          insertText: "/compact ",
+        },
+      ];
+    }
+    if (streamType === "defaultStream") {
+      return [
         {
           id: "compact-session",
           label: "compact session",
@@ -719,6 +732,7 @@ export function ChatPanel({
             key={streamId ?? piSessionId ?? "__chat__"}
             draftKey={streamId ?? piSessionId ?? "__chat__"}
             isSending={isSending}
+            disabled={messageInputDisabled}
             onSubmit={handleSubmit}
             fillHeight
             autoFocus
@@ -738,7 +752,11 @@ export function ChatPanel({
             }}
             hoverButtons={inputHoverButtons}
             internalCommandScope={
-              !streamId || streamType === "defaultStream" ? "default-stream" : "work-stream"
+              !streamId
+                ? "surface"
+                : streamType === "defaultStream"
+                  ? "default-stream"
+                  : "work-stream"
             }
             isRecoverPending={recoverMutation.isPending}
           />

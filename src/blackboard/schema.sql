@@ -1,4 +1,4 @@
--- Flitterbot blackboard schema (v20)
+-- Flitterbot blackboard schema (v24)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS streams (
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     closed_at TEXT,
     base_branch TEXT,
-    pinned BOOLEAN NOT NULL DEFAULT 0
+    pinned BOOLEAN NOT NULL DEFAULT 0,
+    stream_user TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -66,10 +67,20 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
     ended_at DATETIME,
     end_reason TEXT,
     stream_id TEXT REFERENCES streams(id) ON DELETE SET NULL,
-    last_datetime_reported_at DATETIME
+    last_datetime_reported_at DATETIME,
+    session_user TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pi_sessions_one_per_stream
+    ON pi_sessions(stream_id) WHERE stream_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS trg_pi_sessions_immutable_stream
+    BEFORE UPDATE OF stream_id ON pi_sessions
+    WHEN NEW.stream_id IS NOT NULL
+     AND OLD.stream_id IS NOT NEW.stream_id
+BEGIN
+    SELECT RAISE(ABORT, 'Pi session stream ownership is immutable');
+END;
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

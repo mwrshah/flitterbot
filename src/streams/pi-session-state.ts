@@ -23,7 +23,8 @@ export class PiSessionState {
 
   initialize(piSessionId: string, sessionFile: string | undefined, messageCount: number): void {
     this.steeredItems.length = 0;
-    this.currentItemAwaitingUserMessage = false;
+    this.currentItemAwaitingUserMessage =
+      this.snapshot.busy && this.snapshot.currentItem?.source !== "hook";
     this.snapshot.piSessionId = piSessionId;
     this.snapshot.sessionFile = sessionFile;
     this.snapshot.messageCount = messageCount;
