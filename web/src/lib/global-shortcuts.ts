@@ -135,8 +135,8 @@ let bindingOverrides: ShortcutBindingsConfig = {};
 export const SHORTCUT_ACTIONS = {
   navSurface: "nav.surface",
   navLastStream: "nav.last-stream",
-  navStreamNext: "nav.stream.next",
-  navStreamPrevious: "nav.stream.previous",
+  streamPickerNext: "nav.stream.next",
+  streamPickerPrevious: "nav.stream.previous",
   swimlaneCreate: "swimlane.create",
   swimlaneSearch: "swimlane.search",
   scrollHalfPageDown: "scroll.half-page-down",
@@ -688,10 +688,10 @@ function registerBuiltInShortcutDefinitions() {
   defineShortcutAction(SHORTCUT_ACTIONS.navLastStream, {
     defaultBindings: [{ spec: "Alt+KeyT", when: "always" }],
   });
-  defineShortcutAction(SHORTCUT_ACTIONS.navStreamNext, {
+  defineShortcutAction(SHORTCUT_ACTIONS.streamPickerNext, {
     defaultBindings: [{ spec: "Alt+ArrowDown", when: "always" }],
   });
-  defineShortcutAction(SHORTCUT_ACTIONS.navStreamPrevious, {
+  defineShortcutAction(SHORTCUT_ACTIONS.streamPickerPrevious, {
     defaultBindings: [{ spec: "Alt+ArrowUp", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.swimlaneCreate, {

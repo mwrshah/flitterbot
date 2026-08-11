@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { PinIcon, PinOffIcon, PlusIcon } from "lucide-react";
 import {
   type MouseEvent,
@@ -8,6 +8,8 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -212,6 +214,26 @@ type SidebarSwimlaneRow =
       stream: StreamSummary;
     };
 
+type PickerCandidate = SidebarSwimlaneRow & { piSessionId: string };
+
+type PickerCursor = {
+  originPath?: string;
+  selectedKey?: string;
+  selectedElement: HTMLElement | null;
+  scrollFrame?: number;
+};
+
+const pickerSelectedRowClass =
+  "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text";
+
+function getAdjacentIndex(current: number, direction: 1 | -1, length: number): number {
+  return Math.max(0, Math.min(current + direction, length - 1));
+}
+
+function getPiSessionId(pathname: string): string | undefined {
+  return pathname.startsWith("/streams/") ? pathname.split("/")[2] : undefined;
+}
+
 const icons = {
   surface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="size-4">
@@ -228,17 +250,53 @@ export const Sidebar = memo(function Sidebar() {
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [searchInputFocused, setSearchInputFocused] = useState(false);
-  const [selectedSearchKey, setSelectedSearchKey] = useState<string>();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const swimlaneListRef = useRef<HTMLDivElement>(null);
+  const liveRegionRef = useRef<HTMLSpanElement>(null);
+  const pickerCursorRef = useRef<PickerCursor>({ selectedElement: null });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const setPickerSelection = useCallback(
+    (candidates: readonly PickerCandidate[] = [], index = -1, deferDomUpdate = false) => {
+      const cursor = pickerCursorRef.current;
+      if (cursor.scrollFrame !== undefined) cancelAnimationFrame(cursor.scrollFrame);
+      cursor.selectedElement?.removeAttribute("data-search-selected");
+      cursor.scrollFrame = undefined;
+      cursor.selectedElement = null;
+
+      const candidate = candidates[index];
+      cursor.selectedKey = candidate?.key;
+      if (liveRegionRef.current) liveRegionRef.current.textContent = "";
+      if (!candidate || deferDomUpdate) return;
+
+      const element = swimlaneListRef.current?.querySelector<HTMLElement>(
+        `[data-search-key="${CSS.escape(candidate.key)}"]`,
+      );
+      if (!element) return;
+
+      cursor.selectedElement = element;
+      element.setAttribute("data-search-selected", "true");
+      const frame = requestAnimationFrame(() => {
+        element.scrollIntoView({ block: "nearest" });
+        if (cursor.scrollFrame === frame) cursor.scrollFrame = undefined;
+      });
+      cursor.scrollFrame = frame;
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = `${candidate.name}, ${index + 1} of ${candidates.length}`;
+      }
+    },
+    [],
+  );
+  const clearPickerCursor = useCallback(() => {
+    setPickerSelection();
+    pickerCursorRef.current.originPath = undefined;
+  }, [setPickerSelection]);
   const resetSearch = useCallback(() => {
     setQuery("");
-    setSelectedSearchKey(undefined);
+    clearPickerCursor();
     searchInputRef.current?.blur();
-  }, []);
+  }, [clearPickerCursor]);
   const handleSwimlaneLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -250,22 +308,6 @@ export const Sidebar = memo(function Sidebar() {
   );
 
   useEffect(() => resetSearch(), [pathname, resetSearch]);
-
-  useEffect(
-    () =>
-      registerShortcutHandlers([
-        {
-          actionId: SHORTCUT_ACTIONS.swimlaneSearch,
-          handler: () => {
-            const input = searchInputRef.current;
-            if (!input) return false;
-            input.focus();
-            return true;
-          },
-        },
-      ]),
-    [],
-  );
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
@@ -323,18 +365,9 @@ export const Sidebar = memo(function Sidebar() {
     if (stream.status === "closed") closedStreams.push(stream);
   }
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredOpenStreams = normalizedQuery
-    ? openStreams.filter((s) => s.name.toLowerCase().includes(normalizedQuery))
-    : openStreams;
-  const filteredClosedStreams = normalizedQuery
-    ? closedStreams.filter((s) => s.name.toLowerCase().includes(normalizedQuery))
-    : closedStreams;
-  const showDefaultStream =
-    !!defaultPiSessionId && (!normalizedQuery || "flitterbot".includes(normalizedQuery));
-  const visibleOpenRows: SidebarSwimlaneRow[] = [];
-  if (defaultPiSessionId && showDefaultStream) {
-    visibleOpenRows.push({
+  const openRows: SidebarSwimlaneRow[] = [];
+  if (defaultPiSessionId) {
+    openRows.push({
       key: "default",
       kind: "default",
       section: "open",
@@ -342,8 +375,8 @@ export const Sidebar = memo(function Sidebar() {
       piSessionId: defaultPiSessionId,
     });
   }
-  for (const stream of filteredOpenStreams) {
-    visibleOpenRows.push({
+  for (const stream of openStreams) {
+    openRows.push({
       key: `stream-${stream.id}`,
       kind: "stream",
       section: "open",
@@ -352,10 +385,10 @@ export const Sidebar = memo(function Sidebar() {
       stream,
     });
   }
-  const visibleClosedRows: SidebarSwimlaneRow[] = [];
-  for (const stream of filteredClosedStreams) {
+  const closedRows: SidebarSwimlaneRow[] = [];
+  for (const stream of closedStreams) {
     if (!stream.piSessionId) continue;
-    visibleClosedRows.push({
+    closedRows.push({
       key: `stream-${stream.id}`,
       kind: "stream",
       section: "closed",
@@ -364,27 +397,79 @@ export const Sidebar = memo(function Sidebar() {
       stream,
     });
   }
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchesQuery = (row: SidebarSwimlaneRow) =>
+    row.name.toLowerCase().includes(normalizedQuery);
+  const visibleOpenRows = normalizedQuery ? openRows.filter(matchesQuery) : openRows;
+  const visibleClosedRows = normalizedQuery ? closedRows.filter(matchesQuery) : closedRows;
   const hasNoSearchResults =
     !!normalizedQuery && visibleOpenRows.length === 0 && visibleClosedRows.length === 0;
-  const searchCandidates = [...visibleOpenRows, ...visibleClosedRows].filter(
-    (row): row is SidebarSwimlaneRow & { piSessionId: string } => !!row.piSessionId,
+  const allSearchCandidates = [...openRows, ...closedRows].filter(
+    (row): row is PickerCandidate => !!row.piSessionId,
   );
-  const selectedSearchCandidate =
-    searchCandidates.find((row) => row.key === selectedSearchKey) ?? searchCandidates[0];
-  const selectedSearchIndex = selectedSearchCandidate
-    ? searchCandidates.findIndex((row) => row.key === selectedSearchCandidate.key)
-    : -1;
-  const selectedSearchCandidateKey = selectedSearchCandidate?.key;
+  const searchCandidates = normalizedQuery
+    ? allSearchCandidates.filter(matchesQuery)
+    : allSearchCandidates;
+  const currentPiSessionId = getPiSessionId(pathname);
+
+  useLayoutEffect(() => {
+    const input = searchInputRef.current;
+    const cursor = pickerCursorRef.current;
+    if (
+      document.activeElement !== input ||
+      cursor.selectedElement?.isConnected ||
+      searchCandidates.length === 0
+    ) {
+      return;
+    }
+    const selectedIndex = cursor.selectedKey
+      ? searchCandidates.findIndex((row) => row.key === cursor.selectedKey)
+      : -1;
+    cursor.originPath = router.state.location.pathname;
+    setPickerSelection(searchCandidates, selectedIndex === -1 ? 0 : selectedIndex);
+  }, [searchCandidates, setPickerSelection]);
+
+  const openStreamPicker = useEffectEvent((direction?: 1 | -1) => {
+    const input = searchInputRef.current;
+    if (!input) return false;
+    if (direction) {
+      const cursor = pickerCursorRef.current;
+      const currentPathname = router.state.location.pathname;
+      const continuing =
+        document.activeElement === input &&
+        cursor.originPath === currentPathname &&
+        cursor.selectedKey !== undefined;
+      const currentIndex = continuing
+        ? allSearchCandidates.findIndex((row) => row.key === cursor.selectedKey)
+        : allSearchCandidates.findIndex(
+            (row) => row.piSessionId === getPiSessionId(currentPathname),
+          );
+      const selectedIndex =
+        currentIndex === -1
+          ? direction === 1
+            ? 0
+            : allSearchCandidates.length - 1
+          : getAdjacentIndex(currentIndex, direction, allSearchCandidates.length);
+      setQuery("");
+      setPickerSelection(allSearchCandidates, selectedIndex, !!normalizedQuery);
+      cursor.originPath = currentPathname;
+    }
+    input.focus();
+    return true;
+  });
 
   useEffect(() => {
-    if (!searchInputFocused || !selectedSearchCandidateKey) return;
-    const frame = requestAnimationFrame(() => {
-      swimlaneListRef.current
-        ?.querySelector<HTMLElement>("[data-search-selected=true]")
-        ?.scrollIntoView({ block: "nearest" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [searchInputFocused, selectedSearchCandidateKey]);
+    const unregister = registerShortcutHandlers([
+      { actionId: SHORTCUT_ACTIONS.swimlaneSearch, handler: () => openStreamPicker() },
+      { actionId: SHORTCUT_ACTIONS.streamPickerNext, handler: () => openStreamPicker(1) },
+      { actionId: SHORTCUT_ACTIONS.streamPickerPrevious, handler: () => openStreamPicker(-1) },
+    ]);
+    return () => {
+      unregister();
+      clearPickerCursor();
+    };
+  }, [clearPickerCursor]);
 
   let nextShortcut = 1;
   const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
@@ -394,7 +479,6 @@ export const Sidebar = memo(function Sidebar() {
       streamShortcuts.set(ws.id, nextShortcut++);
     }
   }
-  const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
   const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
     altLabel: mod,
   });
@@ -410,10 +494,6 @@ export const Sidebar = memo(function Sidebar() {
   const swimlaneSearchPlaceholder = `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`;
 
   const renderSwimlaneRow = (row: SidebarSwimlaneRow) => {
-    const searchSelected = searchInputFocused && selectedSearchCandidate?.key === row.key;
-    const searchSelectedClass =
-      "bg-background-hover text-text shadow-[inset_2px_0_0_var(--border-pop)]";
-
     if (row.kind === "default") {
       return (
         <StreamContextMenu
@@ -426,15 +506,14 @@ export const Sidebar = memo(function Sidebar() {
               params={{ piSessionId: row.piSessionId }}
               preload={false}
               onClick={handleSwimlaneLinkClick}
-              data-search-selected={searchSelected || undefined}
+              data-search-key={row.key}
               className={cn(
                 "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                searchSelected
-                  ? searchSelectedClass
-                  : currentPiSessionId === row.piSessionId ||
-                      (pathname === "/streams" && !currentPiSessionId)
-                    ? "bg-background-selected text-text"
-                    : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+                pickerSelectedRowClass,
+                currentPiSessionId === row.piSessionId ||
+                  (pathname === "/streams" && !currentPiSessionId)
+                  ? "bg-background-selected text-text"
+                  : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
               )}
             >
               <span
@@ -511,14 +590,13 @@ export const Sidebar = memo(function Sidebar() {
               params={{ piSessionId }}
               preload={false}
               onClick={handleSwimlaneLinkClick}
-              data-search-selected={searchSelected || undefined}
+              data-search-key={row.key}
               className={cn(
                 "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
-                searchSelected
-                  ? searchSelectedClass
-                  : currentPiSessionId === piSessionId
-                    ? "bg-background-selected text-text"
-                    : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+                pickerSelectedRowClass,
+                currentPiSessionId === piSessionId
+                  ? "bg-background-selected text-text"
+                  : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
               )}
             >
               {label}
@@ -555,14 +633,13 @@ export const Sidebar = memo(function Sidebar() {
             params={{ piSessionId }}
             preload={false}
             onClick={handleSwimlaneLinkClick}
-            data-search-selected={searchSelected || undefined}
+            data-search-key={row.key}
             className={cn(
               "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-              searchSelected
-                ? searchSelectedClass
-                : currentPiSessionId === piSessionId
-                  ? "bg-background-selected text-text"
-                  : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+              pickerSelectedRowClass,
+              currentPiSessionId === piSessionId
+                ? "bg-background-selected text-text"
+                : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
             )}
           >
             <span
@@ -632,11 +709,16 @@ export const Sidebar = memo(function Sidebar() {
                 type="text"
                 value={query}
                 onChange={(event) => {
+                  clearPickerCursor();
                   setQuery(event.target.value);
-                  setSelectedSearchKey(undefined);
                 }}
-                onFocus={() => setSearchInputFocused(true)}
-                onBlur={() => setSearchInputFocused(false)}
+                onFocus={() => {
+                  pickerCursorRef.current.originPath = router.state.location.pathname;
+                  if (!pickerCursorRef.current.selectedKey) {
+                    setPickerSelection(searchCandidates, 0);
+                  }
+                }}
+                onBlur={clearPickerCursor}
                 onKeyDown={(event) => {
                   if (event.nativeEvent.isComposing) return;
                   if (event.key === "Escape") {
@@ -645,19 +727,35 @@ export const Sidebar = memo(function Sidebar() {
                     resetSearch();
                     return;
                   }
-                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                    if (!selectedSearchCandidate) return;
+                  if (
+                    (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+                    !event.altKey &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.shiftKey
+                  ) {
+                    if (searchCandidates.length === 0) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    const offset = event.key === "ArrowDown" ? 1 : -1;
-                    const nextIndex = Math.max(
-                      0,
-                      Math.min(selectedSearchIndex + offset, searchCandidates.length - 1),
+                    const direction = event.key === "ArrowDown" ? 1 : -1;
+                    const selectedIndex = searchCandidates.findIndex(
+                      (row) => row.key === pickerCursorRef.current.selectedKey,
                     );
-                    setSelectedSearchKey(searchCandidates[nextIndex]?.key);
+                    const currentIndex = selectedIndex === -1 ? 0 : selectedIndex;
+                    const nextIndex = getAdjacentIndex(
+                      currentIndex,
+                      direction,
+                      searchCandidates.length,
+                    );
+                    setPickerSelection(searchCandidates, nextIndex);
                     return;
                   }
-                  if (event.key === "Enter" && selectedSearchCandidate) {
+                  if (event.key === "Enter") {
+                    const selectedSearchCandidate =
+                      searchCandidates.find(
+                        (row) => row.key === pickerCursorRef.current.selectedKey,
+                      ) ?? searchCandidates[0];
+                    if (!selectedSearchCandidate) return;
                     event.preventDefault();
                     event.stopPropagation();
                     const piSessionId = selectedSearchCandidate.piSessionId;
@@ -677,12 +775,8 @@ export const Sidebar = memo(function Sidebar() {
                 className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:shadow-[inset_0_-1px_0_var(--border-pop)] focus:placeholder:opacity-0"
               />
             </div>
-            <span className="sr-only" aria-live="polite" aria-atomic="true">
-              {searchInputFocused && selectedSearchCandidate
-                ? `${selectedSearchCandidate.name}, ${selectedSearchIndex + 1} of ${searchCandidates.length}`
-                : hasNoSearchResults
-                  ? `No swimlanes match “${query.trim()}”.`
-                  : ""}
+            <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
+              {hasNoSearchResults ? `No swimlanes match “${query.trim()}”.` : ""}
             </span>
             <div
               className="group pl-4 pr-3 pb-2 -mr-2 -mb-2"
