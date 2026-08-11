@@ -121,6 +121,7 @@ Provider links live on `externalLinks[]`. One entry per system.
 - **Linear**: per-project. Only local projects whose `externalLinks` contain `{system:"linear", teamId}` sync. Without a team link, Linear is silently inert for that project.
 - Local project name is appended to outbound Linear issue descriptions as `[proj_name-<local project>]`.
 - Linear status mapping: local `active` ↔ first `unstarted` Linear state; local `done` ↔ first `completed` state. Inbound `completed`/`canceled` → local `done`; everything else → local `active`.
+- Linear creates active issues assigned to the API user.
 - Linear outbound never creates new issues for tasks already `done` locally. Todoist recurring-task completion sync-out is disabled — complete recurring tasks in Todoist, then run `periodic_sync_and_cleanup`.
 
 ## Response Style
