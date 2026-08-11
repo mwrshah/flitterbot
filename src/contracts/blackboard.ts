@@ -1,4 +1,4 @@
-export const BLACKBOARD_SCHEMA_VERSION = 22;
+export const BLACKBOARD_SCHEMA_VERSION = 24;
 
 export type MessageMetadata = {
   router_action?: string;
@@ -261,6 +261,15 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pi_sessions_one_per_stream
+    ON pi_sessions(stream_id) WHERE stream_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS trg_pi_sessions_immutable_stream
+    BEFORE UPDATE OF stream_id ON pi_sessions
+    WHEN NEW.stream_id IS NOT NULL
+     AND OLD.stream_id IS NOT NEW.stream_id
+BEGIN
+    SELECT RAISE(ABORT, 'Pi session stream ownership is immutable');
+END;
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

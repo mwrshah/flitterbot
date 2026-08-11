@@ -2,7 +2,7 @@ import type http from "node:http";
 import { getInputSurfaceHistory } from "../blackboard/query-messages.ts";
 import {
   CLOSED_STREAM_LOOKBACK_HOURS,
-  getLatestPiSessionId,
+  getStreamPiSessionId,
   listClosedStreams,
 } from "../blackboard/query-streams.ts";
 import type {
@@ -113,7 +113,7 @@ async function handleBrowserStreamsHistoryRouteInner(
       false,
     );
     for (const ws of closedStreams) {
-      const wsSessionId = getLatestPiSessionId(runtime.blackboard, ws.id);
+      const wsSessionId = getStreamPiSessionId(runtime.blackboard, ws.id);
       if (wsSessionId && !piSessionIds.includes(wsSessionId)) piSessionIds.push(wsSessionId);
     }
     const rows = getInputSurfaceHistory(runtime.blackboard, piSessionIds);

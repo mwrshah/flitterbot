@@ -121,6 +121,7 @@ export type FlitterbotConfig = {
   claudeCliCommand: string;
   controlSurfaceDir: string;
   controlSurfaceSessionsDir: string;
+  controlSurfaceArchivedSessionsDir: string;
   controlSurfaceAgentDir: string;
   piAgentDir: string;
   memoryPath: string;
@@ -349,6 +350,7 @@ export function loadConfig(): FlitterbotConfig {
   const raw = readRequiredJsonFile(CONFIG_PATH);
   const controlSurfaceDir = path.join(FLITTERBOT_DIR, "control-surface");
   const sessionsDir = path.join(controlSurfaceDir, "sessions");
+  const archivedSessionsDir = path.join(controlSurfaceDir, "archived-sessions");
   const controlSurfaceAgentDir = path.join(controlSurfaceDir, "agent");
   const piAgentDir = path.join(os.homedir(), ".agents");
   const memoryPath = path.join(FLITTERBOT_DIR, "data", "MEMORY.md");
@@ -388,6 +390,7 @@ export function loadConfig(): FlitterbotConfig {
 
     controlSurfaceDir,
     controlSurfaceSessionsDir: sessionsDir,
+    controlSurfaceArchivedSessionsDir: archivedSessionsDir,
     controlSurfaceAgentDir,
     piAgentDir,
     memoryPath,
@@ -398,6 +401,7 @@ export function loadConfig(): FlitterbotConfig {
   ensureDir(config.projectsDir);
   ensureDir(controlSurfaceDir);
   ensureDir(sessionsDir);
+  ensureDir(archivedSessionsDir);
   ensureDir(controlSurfaceAgentDir);
   fs.chmodSync(controlSurfaceAgentDir, 0o700);
   ensureDir(piAgentDir);

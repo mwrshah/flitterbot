@@ -64,6 +64,24 @@ export function upsertPiSession(db: BlackboardDatabase, input: UpsertPiSessionIn
   });
 }
 
+export function replaceDefaultPiSession(
+  db: BlackboardDatabase,
+  oldPiSessionId: string,
+  input: UpsertPiSessionInput,
+  end: { status: "ended" | "crashed"; endedAt: string; endReason: string },
+): void {
+  if (input.streamId) throw new Error("Stream-backed Pi session identity is immutable");
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    closePiSession(db, oldPiSessionId, end);
+    upsertPiSession(db, input);
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
 export function touchPiPrompt(
   db: BlackboardDatabase,
   piSessionId: string,

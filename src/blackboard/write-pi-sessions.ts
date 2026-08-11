@@ -22,14 +22,25 @@ type PiSessionRecord = {
 };
 
 export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
+  const existing = db.get<{ stream_id: string | null }>(
+    "SELECT stream_id FROM pi_sessions WHERE pi_session_id = ?",
+    session.pi_session_id,
+  );
+  const requestedStreamId = session.stream_id ?? null;
+  if (existing && existing.stream_id !== requestedStreamId) {
+    throw new Error(
+      `Pi session ${session.pi_session_id} ownership is immutable: existing ${existing.stream_id ?? "none"}, requested ${requestedStreamId ?? "none"}`,
+    );
+  }
   const sessionUser = session.stream_id
     ? (db.get<{ stream_user: string | null }>(
         "SELECT stream_user FROM streams WHERE id = ?",
         session.stream_id,
       )?.stream_user ?? null)
     : null;
-  db.prepare(
-    `INSERT INTO pi_sessions (
+  const result = db
+    .prepare(
+      `INSERT INTO pi_sessions (
        pi_session_id,
        role,
        status,
@@ -68,28 +79,34 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
        end_reason = COALESCE(excluded.end_reason, pi_sessions.end_reason),
        stream_id = COALESCE(excluded.stream_id, pi_sessions.stream_id),
        session_user = COALESCE(excluded.session_user, pi_sessions.session_user),
-       last_datetime_reported_at = COALESCE(pi_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)`,
-  ).run(
-    session.pi_session_id,
-    session.role,
-    session.status ?? "active",
-    session.runtime_instance_id ?? null,
-    session.pid ?? null,
-    session.session_file ?? null,
-    session.cwd,
-    session.agent_dir ?? null,
-    session.model_provider ?? null,
-    session.model_id ?? null,
-    session.thinking_level ?? null,
-    session.started_at,
-    session.last_prompt_at ?? null,
-    session.last_event_at,
-    session.ended_at ?? null,
-    session.end_reason ?? null,
-    session.stream_id ?? null,
-    sessionUser,
-    session.started_at,
-  );
+       last_datetime_reported_at = COALESCE(pi_sessions.last_datetime_reported_at, excluded.last_datetime_reported_at)
+     WHERE excluded.stream_id IS NULL
+        OR pi_sessions.stream_id = excluded.stream_id`,
+    )
+    .run(
+      session.pi_session_id,
+      session.role,
+      session.status ?? "active",
+      session.runtime_instance_id ?? null,
+      session.pid ?? null,
+      session.session_file ?? null,
+      session.cwd,
+      session.agent_dir ?? null,
+      session.model_provider ?? null,
+      session.model_id ?? null,
+      session.thinking_level ?? null,
+      session.started_at,
+      session.last_prompt_at ?? null,
+      session.last_event_at,
+      session.ended_at ?? null,
+      session.end_reason ?? null,
+      session.stream_id ?? null,
+      sessionUser,
+      session.started_at,
+    );
+  if (result.changes !== 1) {
+    throw new Error(`Pi session ${session.pi_session_id} stream ownership is immutable`);
+  }
 }
 
 export function markPreviousPiSessionsInactive(
@@ -227,4 +244,24 @@ export function closePiSession(
     options.endedAt,
     piSessionId,
   );
+}
+
+export function updatePiSessionFile(
+  db: BlackboardDatabase,
+  piSessionId: string,
+  streamId: string,
+  sessionFile: string,
+): void {
+  const result = db
+    .prepare(
+      `UPDATE pi_sessions
+       SET session_file = ?
+       WHERE pi_session_id = ? AND stream_id = ?`,
+    )
+    .run(sessionFile, piSessionId, streamId);
+  if (result.changes !== 1) {
+    throw new Error(
+      `Pi session identity changed while updating its file: stream=${streamId} piSessionId=${piSessionId}`,
+    );
+  }
 }

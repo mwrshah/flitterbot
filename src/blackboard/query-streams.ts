@@ -138,12 +138,42 @@ export function updateStreamRepoPath(
   db.prepare(`UPDATE streams SET repo_path = ? WHERE id = ?`).run(repoPath, streamId);
 }
 
-export function getActivePiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
-  const row = db.get<{ pi_session_id: string }>(
-    `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? AND status != 'ended' ORDER BY started_at DESC LIMIT 1`,
-    streamId,
+export type StreamPiSessionRow = {
+  pi_session_id: string;
+  role: "default" | "orchestrator";
+  session_file: string | null;
+  cwd: string;
+  started_at: string;
+  model_provider: string | null;
+  model_id: string | null;
+  status: PiSessionStatus;
+  ended_at: string | null;
+  end_reason: string | null;
+  last_event_at: string;
+};
+
+export function getStreamPiSessionRow(
+  db: BlackboardDatabase,
+  streamId: string,
+): StreamPiSessionRow | null {
+  return (
+    db.get<StreamPiSessionRow>(
+      `SELECT pi_session_id, role, session_file, cwd, started_at, model_provider, model_id, status,
+              ended_at, end_reason, last_event_at
+       FROM pi_sessions
+       WHERE stream_id = ?
+       LIMIT 1`,
+      streamId,
+    ) ?? null
   );
-  return row?.pi_session_id;
+}
+
+export function getActiveStreamPiSessionId(
+  db: BlackboardDatabase,
+  streamId: string,
+): string | undefined {
+  const session = getStreamPiSessionRow(db, streamId);
+  return session?.status !== "ended" ? session?.pi_session_id : undefined;
 }
 
 export function getPiSessionStatus(
@@ -157,12 +187,8 @@ export function getPiSessionStatus(
   return row?.status;
 }
 
-export function getLatestPiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
-  const row = db.get<{ pi_session_id: string }>(
-    `SELECT pi_session_id FROM pi_sessions WHERE stream_id = ? ORDER BY started_at DESC LIMIT 1`,
-    streamId,
-  );
-  return row?.pi_session_id;
+export function getStreamPiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
+  return getStreamPiSessionRow(db, streamId)?.pi_session_id;
 }
 
 export function getStreamForPiSession(
@@ -178,17 +204,118 @@ export function getStreamForPiSession(
   return row ?? null;
 }
 
-export function closeSwimlane(db: BlackboardDatabase, streamId: string): void {
-  db.prepare(
-    `UPDATE streams
-		 SET status = 'closed', closed_at = datetime('now')
-		 WHERE id = ? AND status = 'open'`,
-  ).run(streamId);
+export function finalizeStreamCloseRows(
+  db: BlackboardDatabase,
+  streamId: string,
+  piSessionId: string,
+  endedAt: string,
+  endReason = "stream_closed",
+): StreamRow | null {
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    const streamUpdate = db
+      .prepare(
+        `UPDATE streams
+         SET status = 'closed', closed_at = ?
+         WHERE id = ?`,
+      )
+      .run(endedAt, streamId);
+    if (streamUpdate.changes !== 1) throw new Error(`Cannot close missing stream ${streamId}`);
+    const piSessionUpdate = db
+      .prepare(
+        `UPDATE pi_sessions
+       SET status = 'ended',
+           ended_at = ?,
+           end_reason = ?,
+           last_event_at = MAX(last_event_at, ?)
+       WHERE pi_session_id = ? AND stream_id = ?`,
+      )
+      .run(endedAt, endReason, endedAt, piSessionId, streamId);
+    if (piSessionUpdate.changes !== 1) {
+      throw new Error(`Cannot close stream ${streamId}: Pi session ${piSessionId} is not linked`);
+    }
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+  return getStreamById(db, streamId);
 }
 
-export function reopenStream(db: BlackboardDatabase, streamId: string): StreamRow | null {
-  db.prepare(`UPDATE streams SET status = 'open', closed_at = NULL WHERE id = ?`).run(streamId);
+export function reopenStreamRows(
+  db: BlackboardDatabase,
+  streamId: string,
+  piSessionId: string,
+  reopenedAt: string,
+): StreamRow | null {
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    const streamUpdate = db
+      .prepare(`UPDATE streams SET status = 'open', closed_at = NULL WHERE id = ?`)
+      .run(streamId);
+    if (streamUpdate.changes !== 1) throw new Error(`Cannot reopen missing stream ${streamId}`);
+    const piSessionUpdate = db
+      .prepare(
+        `UPDATE pi_sessions
+         SET status = 'waiting_for_user',
+             ended_at = NULL,
+             end_reason = NULL,
+             last_event_at = MAX(last_event_at, ?)
+         WHERE pi_session_id = ? AND stream_id = ?`,
+      )
+      .run(reopenedAt, piSessionId, streamId);
+    if (piSessionUpdate.changes !== 1) {
+      throw new Error(`Cannot reopen stream ${streamId}: Pi session ${piSessionId} is not linked`);
+    }
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
   return getStreamById(db, streamId);
+}
+
+export function rollbackStreamReopenRows(
+  db: BlackboardDatabase,
+  stream: Pick<StreamRow, "id" | "status" | "closed_at">,
+  piSession: {
+    piSessionId: string;
+    status: PiSessionStatus;
+    endedAt: string | null;
+    endReason: string | null;
+    lastEventAt: string;
+  },
+): void {
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    const streamUpdate = db
+      .prepare("UPDATE streams SET status = ?, closed_at = ? WHERE id = ?")
+      .run(stream.status, stream.closed_at, stream.id);
+    if (streamUpdate.changes !== 1) throw new Error(`Cannot roll back missing stream ${stream.id}`);
+    const piSessionUpdate = db
+      .prepare(
+        `UPDATE pi_sessions
+         SET status = ?, ended_at = ?, end_reason = ?, last_event_at = ?
+         WHERE pi_session_id = ? AND stream_id = ?`,
+      )
+      .run(
+        piSession.status,
+        piSession.endedAt,
+        piSession.endReason,
+        piSession.lastEventAt,
+        piSession.piSessionId,
+        stream.id,
+      );
+    if (piSessionUpdate.changes !== 1) {
+      throw new Error(
+        `Cannot roll back stream ${stream.id}: Pi session ${piSession.piSessionId} is not linked`,
+      );
+    }
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
 }
 
 export function deleteStream(db: BlackboardDatabase, streamId: string): void {

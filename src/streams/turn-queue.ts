@@ -91,9 +91,13 @@ export class TurnQueue {
   private readonly onItemStart?: TurnQueueOptions["onItemStart"];
   private readonly onItemEnd?: TurnQueueOptions["onItemEnd"];
   private processing = false;
-  private steering = false;
+  private steeringTask?: Promise<void>;
+  private readonly steeringChildren = new Set<Promise<void>>();
+  private readonly idleWaiters = new Set<() => void>();
   private steeringEnabled = false;
   private stopped = false;
+  private admissionFreezeDepth = 0;
+  private drainAcceptedAfterStop = false;
   private paused = false;
   private currentItem?: QueueItem;
 
@@ -105,11 +109,13 @@ export class TurnQueue {
     this.onItemEnd = options.onItemEnd;
   }
 
-  enqueue(item: QueueItem): void {
-    if (this.stopped) {
-      throw new Error("turn queue is stopped");
-    }
+  assertAccepting(): void {
+    if (this.stopped) throw new Error("turn queue is stopped");
+    if (this.admissionFreezeDepth > 0) throw new Error("turn queue admission is frozen");
+  }
 
+  enqueue(item: QueueItem): void {
+    this.assertAccepting();
     this.items.push(item);
     if (this.processing && !this.paused) {
       if (item.source !== "hook" && this.steeringEnabled) void this.steerPending();
@@ -126,34 +132,60 @@ export class TurnQueue {
     return this.processing;
   }
 
+  isStopped(): boolean {
+    return this.stopped;
+  }
+
   getCurrentItem(): QueueItem | undefined {
     return this.currentItem;
   }
 
   enableSteering(): void {
-    if (!this.processing || this.stopped) return;
+    if (!this.processing || !this.canProcessAcceptedItems()) return;
     this.steeringEnabled = true;
-    void this.steerPending();
+    this.steerPending();
   }
 
   steerPendingHooks(): void {
-    if (!this.processing || this.stopped || !this.canSteer()) return;
+    if (!this.processing || !this.canProcessAcceptedItems() || !this.canSteer()) return;
     const hooks = this.items.filter((item) => item.source === "hook");
     if (hooks.length === 0) return;
     this.items.splice(0, this.items.length, ...this.items.filter((item) => item.source !== "hook"));
     const item = coalesceHookItems(hooks);
-    void this.steerItem(item).then(
-      () => this.onItemEnd?.(item, undefined, true),
-      (error) => this.onItemEnd?.(item, error, true),
-    );
+    void this.deliverSteeringItem(item);
   }
 
   getPendingItems(): QueueItem[] {
     return [...this.items];
   }
 
-  stop(): void {
+  waitForIdle(): Promise<void> {
+    if (this.isIdle()) return Promise.resolve();
+    return new Promise((resolve) => this.idleWaiters.add(resolve));
+  }
+
+  freezeAdmission(): void {
+    if (this.stopped) throw new Error("turn queue is stopped");
+    this.admissionFreezeDepth++;
+  }
+
+  restoreAdmission(): void {
+    if (!this.stopped && this.admissionFreezeDepth > 0) this.admissionFreezeDepth--;
+  }
+
+  async stopAndWait(): Promise<void> {
     this.stopped = true;
+    this.admissionFreezeDepth++;
+    this.drainAcceptedAfterStop = true;
+    this.paused = false;
+
+    if (this.processing) {
+      if (this.steeringEnabled) this.steerPending();
+    } else {
+      void this.pump();
+    }
+
+    await this.waitForIdle();
   }
 
   pause(): boolean {
@@ -169,54 +201,118 @@ export class TurnQueue {
   }
 
   private async pump(): Promise<void> {
-    if (this.processing || this.stopped || this.paused) return;
+    if (this.processing || !this.canProcessAcceptedItems() || this.paused) return;
     this.processing = true;
-    while (!this.stopped && !this.paused && this.items.length > 0) {
-      const item = this.drainNextAt(0);
-      this.currentItem = item;
-      this.steeringEnabled = false;
-      this.onItemStart?.(item);
-      try {
-        await this.processItem(item);
-        this.onItemEnd?.(item);
-      } catch (error) {
-        this.onItemEnd?.(item, error);
-      } finally {
-        this.currentItem = undefined;
-      }
-    }
-    this.processing = false;
-    this.steeringEnabled = false;
-  }
-
-  private async steerPending(): Promise<void> {
-    if (this.steering || this.stopped || this.paused) return;
-    this.steering = true;
-    await Promise.resolve();
     try {
-      let index = this.items.findIndex((item) => item.source !== "hook");
-      while (this.processing && !this.stopped && !this.paused && this.canSteer() && index !== -1) {
-        const item = this.drainNextAt(index);
+      while (this.canProcessAcceptedItems() && !this.paused && this.items.length > 0) {
+        const item = this.drainNextAt(0);
+        this.currentItem = item;
+        this.steeringEnabled = false;
+        this.onItemStart?.(item);
         try {
-          await this.steerItem(item);
-          this.onItemEnd?.(item, undefined, true);
-        } catch (error) {
-          this.onItemEnd?.(item, error, true);
+          let itemError: unknown;
+          try {
+            await this.processItem(item);
+          } catch (error) {
+            itemError = error;
+          }
+
+          while (this.hasActiveSteering()) {
+            await Promise.allSettled([
+              ...(this.steeringTask ? [this.steeringTask] : []),
+              ...this.steeringChildren,
+            ]);
+          }
+
+          this.onItemEnd?.(item, itemError);
+        } finally {
+          this.currentItem = undefined;
         }
-        index = this.items.findIndex((item) => item.source !== "hook");
       }
     } finally {
-      this.steering = false;
-      if (
-        this.processing &&
-        !this.stopped &&
-        !this.paused &&
-        this.canSteer() &&
-        this.items.some((item) => item.source !== "hook")
-      ) {
-        void this.steerPending();
-      }
+      this.processing = false;
+      this.steeringEnabled = false;
+      this.resolveIdleWaiters();
     }
+  }
+
+  private steerPending(): void {
+    if (this.steeringTask || !this.canProcessAcceptedItems() || this.paused) return;
+    const task = this.runSteering();
+    this.steeringTask = task;
+    void task.then(
+      () => this.finishSteering(task),
+      () => this.finishSteering(task),
+    );
+  }
+
+  private async runSteering(): Promise<void> {
+    await Promise.resolve();
+    let index = this.items.findIndex((item) => item.source !== "hook");
+    while (
+      this.processing &&
+      this.canProcessAcceptedItems() &&
+      !this.paused &&
+      this.canSteer() &&
+      index !== -1
+    ) {
+      const item = this.drainNextAt(index);
+      await this.deliverSteeringItem(item);
+      index = this.items.findIndex((item) => item.source !== "hook");
+    }
+  }
+
+  private finishSteering(task: Promise<void>): void {
+    if (this.steeringTask !== task) return;
+    this.steeringTask = undefined;
+    if (
+      this.processing &&
+      this.canProcessAcceptedItems() &&
+      !this.paused &&
+      this.canSteer() &&
+      this.items.some((item) => item.source !== "hook")
+    ) {
+      this.steerPending();
+    }
+    this.resolveIdleWaiters();
+  }
+
+  private deliverSteeringItem(item: QueueItem): Promise<void> {
+    const delivery = this.runSteeringItem(item);
+    this.steeringChildren.add(delivery);
+    const remove = () => {
+      this.steeringChildren.delete(delivery);
+      this.resolveIdleWaiters();
+    };
+    void delivery.then(remove, remove);
+    return delivery;
+  }
+
+  private async runSteeringItem(item: QueueItem): Promise<void> {
+    try {
+      await this.steerItem(item);
+      this.onItemEnd?.(item, undefined, true);
+    } catch (error) {
+      this.onItemEnd?.(item, error, true);
+    }
+  }
+
+  private canProcessAcceptedItems(): boolean {
+    return !this.stopped || this.drainAcceptedAfterStop;
+  }
+
+  private hasActiveSteering(): boolean {
+    return Boolean(this.steeringTask) || this.steeringChildren.size > 0;
+  }
+
+  private isIdle(): boolean {
+    return this.items.length === 0 && !this.processing && !this.hasActiveSteering();
+  }
+
+  private resolveIdleWaiters(): void {
+    if (!this.isIdle()) return;
+    for (const resolve of this.idleWaiters) resolve();
+    this.idleWaiters.clear();
   }
 
   private drainNextAt(index: number): QueueItem {

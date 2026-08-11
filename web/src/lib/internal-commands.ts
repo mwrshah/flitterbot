@@ -4,12 +4,6 @@ export type InternalCommandScope = "default-stream" | "work-stream" | "surface";
 
 export const INTERNAL_COMMANDS: SkillPickerItem[] = [
   {
-    name: "clear",
-    description: "Reset the current session",
-    disableModelInvocation: true,
-    kind: "command",
-  },
-  {
     name: "reload",
     description: "Reload skills, prompts, and system prompt from disk",
     disableModelInvocation: true,
@@ -29,6 +23,13 @@ export const INTERNAL_COMMANDS: SkillPickerItem[] = [
   },
 ];
 
+const CLEAR_COMMAND: SkillPickerItem = {
+  name: "clear",
+  description: "Reset the current session",
+  disableModelInvocation: true,
+  kind: "command",
+};
+
 const NEW_STREAM_COMMAND: SkillPickerItem = {
   name: "new-stream",
   description: "Start a new work swimlane",
@@ -39,7 +40,7 @@ const NEW_STREAM_COMMAND: SkillPickerItem = {
 const CONTEXTUAL_COMMANDS: Record<InternalCommandScope, SkillPickerItem[]> = {
   "default-stream": [NEW_STREAM_COMMAND],
   "work-stream": [],
-  surface: [NEW_STREAM_COMMAND],
+  surface: [CLEAR_COMMAND, NEW_STREAM_COMMAND],
 };
 
 export function getInternalCommandsForScope(scope: InternalCommandScope): SkillPickerItem[] {

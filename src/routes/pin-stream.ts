@@ -17,7 +17,7 @@ export async function handlePinStreamRoute(
     if (typeof body.pinned !== "boolean") {
       return sendJson(res, 400, { ok: false, error: "pinned must be a boolean" });
     }
-    return sendJson(res, 200, runtime.setStreamPinned(streamId, body.pinned));
+    return sendJson(res, 200, await runtime.setStreamPinned(streamId, body.pinned));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return sendJson(res, 400, { ok: false, error: message });

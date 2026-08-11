@@ -404,6 +404,7 @@ function MessageInputHoverButtons({
 
 type MessageInputProps = {
   isSending: boolean;
+  disabled?: boolean;
   onSubmit: (text: string, images?: ImageAttachment[]) => Promise<void>;
   placeholder?: string;
   rows?: number;
@@ -430,6 +431,7 @@ const rootRouteApi = getRouteApi("__root__");
 
 export const MessageInput = memo(function MessageInput({
   isSending,
+  disabled = false,
   onSubmit,
   placeholder = "Press i to jump here · / for skills · @ for paths",
   rows = 2,
@@ -856,7 +858,7 @@ export const MessageInput = memo(function MessageInput({
   );
 
   const submitCurrentDraft = useCallback(() => {
-    if (isSending || isCompacting || recoveryKind) return;
+    if (disabled || isSending || isCompacting || recoveryKind) return;
     const text = draftRef.current.trim();
     if (!text && pendingImages.length === 0) return;
     const submittedImages = pendingImages;
@@ -873,6 +875,7 @@ export const MessageInput = memo(function MessageInput({
     setHoverSendAction(null);
     setDraftAndStore("");
   }, [
+    disabled,
     isCompacting,
     isSending,
     pendingImages,
@@ -985,7 +988,7 @@ export const MessageInput = memo(function MessageInput({
 
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLTextAreaElement>) => {
-      if (isCompacting) return;
+      if (disabled || isCompacting) return;
       const items = event.clipboardData?.items;
       if (!items) return;
       const imageFiles: File[] = [];
@@ -1000,18 +1003,18 @@ export const MessageInput = memo(function MessageInput({
         addImageFiles(imageFiles);
       }
     },
-    [addImageFiles, isCompacting],
+    [addImageFiles, disabled, isCompacting],
   );
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      if (isCompacting) return;
+      if (disabled || isCompacting) return;
       if (event.dataTransfer?.files?.length) {
         addImageFiles(Array.from(event.dataTransfer.files));
       }
     },
-    [addImageFiles, isCompacting],
+    [addImageFiles, disabled, isCompacting],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -1024,6 +1027,7 @@ export const MessageInput = memo(function MessageInput({
     !isSending &&
     !isSessionBusy &&
     !isCompacting &&
+    !disabled &&
     !recoveryKind;
   const hoverSendSourceExists =
     hoverSendAction !== null &&
@@ -1083,7 +1087,7 @@ export const MessageInput = memo(function MessageInput({
     [setDraftAndStore, submitCurrentDraft],
   );
 
-  const canSend = !isDraftBlank || pendingImages.length > 0;
+  const canSend = !disabled && (!isDraftBlank || pendingImages.length > 0);
 
   useLayoutEffect(() => {
     if (recoveryKind) return;
@@ -1161,6 +1165,7 @@ export const MessageInput = memo(function MessageInput({
         <input
           ref={fileInputRef}
           type="file"
+          disabled={disabled}
           accept="image/*"
           multiple
           className="hidden"
@@ -1205,6 +1210,7 @@ export const MessageInput = memo(function MessageInput({
           <textarea
             ref={textareaRef}
             value={draft}
+            disabled={disabled}
             onChange={(e) => handleDraftChange(e.target.value, e.nativeEvent as InputEvent)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
@@ -1219,7 +1225,7 @@ export const MessageInput = memo(function MessageInput({
           <button
             type="button"
             tabIndex={-1}
-            disabled={isCompacting}
+            disabled={disabled || isCompacting}
             onClick={() => fileInputRef.current?.click()}
             className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             title="Attach image"
@@ -1251,7 +1257,7 @@ export const MessageInput = memo(function MessageInput({
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
             {!recoveryKind && showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
-                disabled={isSending || isCompacting}
+                disabled={disabled || isSending || isCompacting}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
                 selectedThinkingLevel={selectedThinkingLevel}
@@ -1293,7 +1299,7 @@ export const MessageInput = memo(function MessageInput({
                 type="button"
                 variant="danger"
                 size="sm"
-                disabled={isInterruptPending || !onInterrupt}
+                disabled={disabled || isInterruptPending || !onInterrupt}
                 onClick={() => onInterrupt?.()}
                 className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
                 title="Stop"
@@ -1304,7 +1310,7 @@ export const MessageInput = memo(function MessageInput({
               <Button
                 type="button"
                 size="sm"
-                disabled={isSending || !canSend}
+                disabled={disabled || isSending || !canSend}
                 onClick={submitCurrentDraft}
                 className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
               >

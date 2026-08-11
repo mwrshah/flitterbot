@@ -15,25 +15,21 @@ export async function handlePiSessionInterruptRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  const managed = runtime.sessionManager.getByPiSessionId(piSessionId);
-  if (!managed) {
+  let interrupt: { bashAborted: boolean } | null;
+  try {
+    interrupt = await runtime.sessionManager.interruptPiSession(piSessionId);
+  } catch (error) {
+    const body: PiSessionInterruptResponse = {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return sendJson(res, 409, body);
+  }
+  if (!interrupt) {
     const body: PiSessionInterruptResponse = { ok: false, error: "pi session not found" };
     return sendJson(res, 404, body);
   }
-
-  let bashAborted = false;
-  const session = managed.runtime?.session;
-  if (session) {
-    try {
-      session.abort?.();
-    } catch {}
-    try {
-      if (session.isBashRunning) {
-        session.abortBash?.();
-        bashAborted = true;
-      }
-    } catch {}
-  }
+  const { bashAborted } = interrupt;
 
   const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, piSessionId);
   let signaledSessions = 0;

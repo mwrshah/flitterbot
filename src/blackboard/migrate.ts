@@ -5,6 +5,18 @@ type MigrationTableRow = { name: string };
 type MigrationColumnRow = { name: string };
 type MigrationVersionRow = { version: number };
 type MigrationCountRow = { count: number };
+type DuplicateStreamPiSessionsRow = { stream_id: string; count: number };
+
+const IMMUTABLE_PI_SESSION_STREAM_TRIGGER_SQL = `
+  DROP TRIGGER IF EXISTS trg_pi_sessions_immutable_stream;
+  CREATE TRIGGER trg_pi_sessions_immutable_stream
+  BEFORE UPDATE OF stream_id ON pi_sessions
+  WHEN NEW.stream_id IS NOT NULL
+   AND OLD.stream_id IS NOT NEW.stream_id
+  BEGIN
+    SELECT RAISE(ABORT, 'Pi session stream ownership is immutable');
+  END;
+`;
 
 const LATEST_BLACKBOARD_SCHEMA_VERSION = BLACKBOARD_SCHEMA_VERSION;
 
@@ -828,9 +840,14 @@ export function migrateBlackboard(db: DatabaseSync): number {
 
   if (version < 22) {
     applyV22Migration(db);
+    version = getSchemaVersion(db);
   }
   if (version < 23) {
     applyV23Migration(db);
+    version = getSchemaVersion(db);
+  }
+  if (version < 24) {
+    applyV24Migration(db);
   }
 
   ensureCurrentSchemaInvariants(db);
@@ -846,6 +863,7 @@ function ensureCurrentSchemaInvariants(db: DatabaseSync): void {
   try {
     ensureStreamsTypeColumn(db);
     db.exec("UPDATE streams SET type = 'defaultStream' WHERE name LIKE 'flitterbot:%';");
+    if (hasTable(db, "pi_sessions")) db.exec(IMMUTABLE_PI_SESSION_STREAM_TRIGGER_SQL);
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");
@@ -1268,6 +1286,37 @@ function applyV23Migration(db: DatabaseSync): void {
       "UPDATE pi_sessions SET session_user = (SELECT stream_user FROM streams WHERE streams.id = pi_sessions.stream_id) WHERE session_user IS NULL AND stream_id IS NOT NULL;",
     );
     db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (23);");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function applyV24Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+
+  try {
+    const duplicate = db
+      .prepare(
+        `SELECT stream_id, COUNT(*) AS count
+         FROM pi_sessions
+         WHERE stream_id IS NOT NULL
+         GROUP BY stream_id
+         HAVING COUNT(*) > 1
+         LIMIT 1`,
+      )
+      .get() as DuplicateStreamPiSessionsRow | undefined;
+    if (duplicate) {
+      throw new Error(
+        `Stream ${duplicate.stream_id} has ${duplicate.count} Pi sessions; resolve the legacy duplicate before startup`,
+      );
+    }
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_pi_sessions_one_per_stream ON pi_sessions(stream_id) WHERE stream_id IS NOT NULL;",
+    );
+    db.exec(IMMUTABLE_PI_SESSION_STREAM_TRIGGER_SQL);
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (24);");
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");

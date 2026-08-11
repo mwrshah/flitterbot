@@ -336,6 +336,9 @@ export function subscribeToPiSession(
         onAgentEnd?.(pendingSurface);
         break;
       }
+      case "agent_settled":
+        console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        break;
       case "compaction_start":
         wsHub.broadcast({
           type: "compaction_start",

@@ -29,19 +29,17 @@ import {
 } from "./blackboard/query-sessions.ts";
 import {
   CLOSED_STREAM_LOOKBACK_HOURS,
-  getActivePiSessionId,
-  getLatestPiSessionId,
+  getActiveStreamPiSessionId,
   getPiSessionStatus,
   getStreamById,
   getStreamByName,
+  getStreamPiSessionId,
+  getStreamPiSessionRow,
   listClosedStreams,
   listOpenStreams,
-  reopenStream as reopenStreamRow,
   resetClosedStreams,
   setStreamName,
-  setStreamPinned,
   setStreamType,
-  updateStreamRepoPath,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
 import { resolveGroqApiKey } from "./classifier/groq-client.ts";
@@ -71,6 +69,7 @@ import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
 import { createPiModelRuntime } from "./pi-auth.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
+import { readPiSessionHeaderId } from "./streams/create-agent.ts";
 import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import {
@@ -175,6 +174,8 @@ export class ControlSurfaceRuntime {
       allowModelNetwork: true,
     });
 
+    this.sessionManager.reconcileAllStreamSessionFiles();
+
     const defaultUser = loadWhatsAppConfig().defaultUser;
     if (defaultUser) {
       const adopted = this.blackboard
@@ -209,22 +210,14 @@ export class ControlSurfaceRuntime {
 
     const openStreams = listOpenStreams(this.blackboard);
     for (const ws of openStreams) {
-      const streamsRow = this.blackboard.get<{
-        pi_session_id: string;
-        session_file: string | null;
-        started_at: string;
-        model_provider: string | null;
-        model_id: string | null;
-      }>(
-        `SELECT pi_session_id, session_file, started_at, model_provider, model_id
-         FROM pi_sessions
-         WHERE stream_id = ? AND role = 'orchestrator'
-           AND status NOT IN ('ended', 'crashed')
-         ORDER BY started_at DESC LIMIT 1`,
-        ws.id,
-      );
+      const latest = getStreamPiSessionRow(this.blackboard, ws.id);
+      const streamsRow =
+        latest?.role === "orchestrator" && latest.status !== "ended" && latest.status !== "crashed"
+          ? latest
+          : null;
 
       if (streamsRow) {
+        this.sessionManager.requireRestorableStreamPiSession(ws.id);
         this.sessionManager.rehydrateStreamSession(
           ws.id,
           ws.name,
@@ -266,7 +259,7 @@ export class ControlSurfaceRuntime {
     if (this.maintenanceTimer) clearInterval(this.maintenanceTimer);
     this.unwatchWhatsAppStatusSignal();
     this.providerAuth.stop();
-    this.sessionManager.disposeAll();
+    await this.sessionManager.disposeAll();
     try {
       await this.stopWhatsAppDaemon();
       await this.refreshWhatsAppStatus();
@@ -311,30 +304,17 @@ export class ControlSurfaceRuntime {
       const target = targetSessionId
         ? this.sessionManager.getByPiSessionId(targetSessionId)
         : undefined;
-      const targetStreamId = target?.streamId ?? undefined;
+      const routedStreamId =
+        typeof input.metadata?.stream_id === "string" ? input.metadata.stream_id.trim() : "";
+      const targetStreamId = (target?.streamId ?? routedStreamId) || undefined;
       const targetStream = targetStreamId ? getStreamById(this.blackboard, targetStreamId) : null;
 
-      if (targetSessionId && target && targetStreamId && targetStream) {
-        this.log(`/clear: resetting ${targetStream.type} stream session ${targetSessionId}`);
-        void (async () => {
-          try {
-            if (!target.runtime) {
-              await this.sessionManager.activateStreamSession(
-                target,
-                this.createStreamSessionTools(targetStreamId),
-              );
-            }
-            await this.sessionManager.resetStreamSession(targetStreamId);
-            if (targetStream.type === "defaultStream") {
-              this.enqueueDefaultStreamFirstMessage(target);
-            }
-          } catch (error) {
-            this.log(
-              `/clear stream reset failed: ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
-        })();
-        return { ok: true, cleared: true };
+      if (targetStreamId && targetStream) {
+        const streamPiSessionId =
+          targetSessionId ?? getStreamPiSessionId(this.blackboard, targetStreamId);
+        throw new Error(
+          `/clear is unavailable for stream-backed Pi sessions; stream ${targetStreamId} keeps immutable Pi identity ${streamPiSessionId ?? "unknown"}`,
+        );
       }
 
       const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
@@ -426,6 +406,7 @@ export class ControlSurfaceRuntime {
 
     const target = this.resolveTargetSession(input, item);
     if (!target) throw new Error("No target session available");
+    target.queue.assertAccepting();
 
     persistInboundMessage(this.blackboard, {
       id: messageUuid,
@@ -436,10 +417,6 @@ export class ControlSurfaceRuntime {
       piSessionId: target.piSessionId,
       metadata: input.metadata,
     });
-
-    if (item.source === "web" || item.source === "whatsapp") {
-      item.text = this.maybeInjectDatetime(target.piSessionId, item.text);
-    }
 
     item.streamId = target.streamId ?? undefined;
     item.streamName = target.streamName ?? undefined;
@@ -472,25 +449,40 @@ export class ControlSurfaceRuntime {
         return { ok: true, filtered: true };
       }
       const cwd = pickString(payload, ["cwd"]);
-      let piSessionIdValue = pickString(payload, [
+      const piSessionIdValue = pickString(payload, [
         "pi_session_id",
         "piSessionId",
         "FLITTERBOT_PI_SESSION_ID",
       ]);
       let streamIdValue = pickString(payload, ["stream_id", "streamId", "FLITTERBOT_STREAM_ID"]);
-      if (cwd && !piSessionIdValue && !streamIdValue) {
-        const openStreams = listOpenStreams(this.blackboard);
-        const matchingStream = openStreams.find(
-          (ws) => ws.worktree_path && cwd.startsWith(ws.worktree_path),
-        );
-        if (matchingStream) {
-          const orchestrator = this.sessionManager.getByStream(matchingStream.id);
-          if (orchestrator) {
-            piSessionIdValue = orchestrator.piSessionId;
-            streamIdValue = matchingStream.id;
-          }
+      if (piSessionIdValue && !streamIdValue) {
+        streamIdValue =
+          this.sessionManager.getByPiSessionId(piSessionIdValue)?.streamId ??
+          this.blackboard.get<{ stream_id: string | null }>(
+            "SELECT stream_id FROM pi_sessions WHERE pi_session_id = ?",
+            piSessionIdValue,
+          )?.stream_id ??
+          undefined;
+      }
+      let terminateStartedSession = !piSessionIdValue;
+      if (streamIdValue) {
+        try {
+          this.sessionManager.assertDownstreamSessionStartAdmission(
+            streamIdValue,
+            piSessionIdValue,
+          );
+        } catch (error) {
+          terminateStartedSession = true;
+          this.log(
+            `hook session-start terminating for stream ${streamIdValue}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
+      const tmuxSession = pickString(payload, [
+        "tmux_session",
+        "tmuxSession",
+        "FLITTERBOT_TMUX_SESSION",
+      ]);
       insertSession(this.blackboard, {
         session_id: sessionId,
         cwd,
@@ -499,11 +491,7 @@ export class ControlSurfaceRuntime {
         source: pickString(payload, ["source"]),
         transcript_path: pickString(payload, ["transcript_path", "transcriptPath"]),
         agent_managed: agentManaged,
-        tmux_session: pickString(payload, [
-          "tmux_session",
-          "tmuxSession",
-          "FLITTERBOT_TMUX_SESSION",
-        ]),
+        tmux_session: tmuxSession,
         task_description: pickString(payload, [
           "task_description",
           "taskDescription",
@@ -523,6 +511,25 @@ export class ControlSurfaceRuntime {
           piSessionId: piSessionIdValue,
           reason: "registered",
         });
+      }
+      if (terminateStartedSession) {
+        void (async () => {
+          try {
+            if (tmuxSession) await killTmuxSession(tmuxSession);
+            markSessionEnded(this.blackboard, sessionId, "stream_closing");
+            if (piSessionIdValue) {
+              this.wsHub.broadcast({
+                type: "sessions_changed",
+                piSessionId: piSessionIdValue,
+                reason: "ended",
+              });
+            }
+          } catch (error) {
+            this.log(
+              `failed to terminate late session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        })();
       }
     } else {
       if (!isOwnPiSession) {
@@ -620,8 +627,9 @@ export class ControlSurfaceRuntime {
       streamName: targetQueue.streamName ?? undefined,
     };
 
+    targetQueue.queue.assertAccepting();
     try {
-      persistInboundMessage(this.blackboard, {
+      const persisted = persistInboundMessage(this.blackboard, {
         source: "hook",
         content: text,
         sender: "system",
@@ -629,6 +637,7 @@ export class ControlSurfaceRuntime {
         piSessionId: targetQueue.piSessionId,
         metadata: { event: normalized, ...payload },
       });
+      hookItem.serverMessageId = persisted.id;
     } catch (error) {
       this.log(`message persist failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -689,14 +698,21 @@ export class ControlSurfaceRuntime {
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
-
-    if (!managed.runtime && managed.role !== "default" && managed.streamId) {
-      await this.sessionManager.activateStreamSession(
-        managed,
+    if (managed.streamId) {
+      return this.sessionManager.withIdleActiveStreamOperation(
+        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
         this.createStreamSessionTools(managed.streamId),
+        (active) => this.setManagedPiSessionModel(active, modelId),
       );
     }
+    return this.setManagedPiSessionModel(managed, modelId);
+  }
 
+  private async setManagedPiSessionModel(
+    managed: ManagedPiSession,
+    modelId: string,
+  ): Promise<PiSessionModelInfo> {
+    const piSessionId = managed.piSessionId;
     const session = managed.runtime?.session;
     if (!session) {
       throw new Error(`Pi session is not active: ${piSessionId}`);
@@ -779,14 +795,21 @@ export class ControlSurfaceRuntime {
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
-
-    if (!managed.runtime && managed.role !== "default" && managed.streamId) {
-      await this.sessionManager.activateStreamSession(
-        managed,
+    if (managed.streamId) {
+      return this.sessionManager.withIdleActiveStreamOperation(
+        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
         this.createStreamSessionTools(managed.streamId),
+        (active) => this.setManagedPiSessionThinkingLevel(active, thinkingLevel),
       );
     }
+    return this.setManagedPiSessionThinkingLevel(managed, thinkingLevel);
+  }
 
+  private setManagedPiSessionThinkingLevel(
+    managed: ManagedPiSession,
+    thinkingLevel: ModelThinkingLevel,
+  ): PiSessionModelInfo {
+    const piSessionId = managed.piSessionId;
     const session = managed.runtime?.session;
     if (!session) {
       throw new Error(`Pi session is not active: ${piSessionId}`);
@@ -854,7 +877,7 @@ export class ControlSurfaceRuntime {
 
     const openStreams = listOpenStreams(this.blackboard).map((stream) => ({
       stream,
-      piSessionId: getActivePiSessionId(this.blackboard, stream.id),
+      piSessionId: getActiveStreamPiSessionId(this.blackboard, stream.id),
     }));
     const closedStreams = listClosedStreams(
       this.blackboard,
@@ -862,7 +885,7 @@ export class ControlSurfaceRuntime {
       true,
     ).map((stream) => ({
       stream,
-      piSessionId: getLatestPiSessionId(this.blackboard, stream.id),
+      piSessionId: getStreamPiSessionId(this.blackboard, stream.id),
     }));
     const persistedModelByPiSession = this.getPersistedPiSessionModels([
       ...openStreams.map(({ piSessionId }) => piSessionId),
@@ -952,21 +975,17 @@ export class ControlSurfaceRuntime {
     };
   }
 
-  setStreamPinned(
+  async setStreamPinned(
     streamId: string,
     pinned: boolean,
-  ): { ok: true; streamId: string; pinned: boolean } {
-    const stream = setStreamPinned(this.blackboard, streamId, pinned);
-    if (!stream) {
-      throw new Error(`Stream not found: ${streamId}`);
-    }
-    this.wsHub.broadcast({
-      type: "streams_changed",
-      reason: "pinned",
-      streamId,
-      streamName: stream.name,
-    });
-    return { ok: true, streamId, pinned: Boolean(stream.pinned) };
+  ): Promise<{ ok: true; streamId: string; pinned: boolean }> {
+    return this.sessionManager.setStreamPinned(
+      {
+        streamId,
+        expectedPiSessionId: this.sessionManager.getExpectedPiSessionId(streamId),
+      },
+      pinned,
+    );
   }
 
   setStreamName(streamId: string, name: string): { ok: true; streamId: string; name: string } {
@@ -990,32 +1009,23 @@ export class ControlSurfaceRuntime {
   async closeSwimlaneNoop(
     streamId: string,
   ): Promise<{ ok: true; streamId: string; message: string }> {
-    const managed = this.sessionManager.getByStream(streamId);
-    const piSessionId =
-      managed?.piSessionId ??
-      getActivePiSessionId(this.blackboard, streamId) ??
-      getLatestPiSessionId(this.blackboard, streamId);
+    const piSessionId = this.sessionManager.getExpectedPiSessionId(streamId);
     if (!piSessionId) {
       throw new Error(`No pi session found for stream ${streamId}`);
     }
-    const result = await executeCloseSwimlane(
-      this.blackboard,
-      piSessionId,
-      streamId,
-      "noop",
-      "closing: noop close from context menu",
+    const result = await this.sessionManager.closeStreamSession(
+      { streamId, expectedPiSessionId: piSessionId },
+      async () => {
+        const prepared = await executeCloseSwimlane(
+          this.blackboard,
+          streamId,
+          "noop",
+          "closing: noop close from context menu",
+        );
+        if (!prepared.ok) throw new Error(prepared.message);
+        return prepared;
+      },
     );
-    if (!result.ok) {
-      throw new Error(result.message);
-    }
-    if (managed) {
-      managed.pendingDestroy = true;
-    }
-    this.wsHub.broadcast({
-      type: "streams_changed",
-      reason: "closed",
-      streamId,
-    });
     return { ok: true, streamId, message: result.message };
   }
 
@@ -1102,8 +1112,7 @@ export class ControlSurfaceRuntime {
 
     const targetSessionId = meta?._targetSessionId as string | undefined;
     if (targetSessionId) {
-      const target = this.sessionManager.getByPiSessionId(targetSessionId);
-      if (target) return target;
+      return this.sessionManager.getByPiSessionId(targetSessionId);
     }
 
     if (input.source === "cron") {
@@ -1126,7 +1135,6 @@ export class ControlSurfaceRuntime {
     if (steered) return this.steerQueueItem(managed, item);
 
     await this.sessionReloads.get(managed.piSessionId);
-
     if (!managed.runtime && managed.role !== "default" && managed.streamId) {
       this.log(`activating dormant stream session for stream ${managed.streamId}`);
       await this.sessionManager.activateStreamSession(
@@ -1139,6 +1147,9 @@ export class ControlSurfaceRuntime {
     if (!session) throw new Error("pi session not initialized");
 
     const piSessionId = session.sessionId;
+    if (item.source === "web" || item.source === "whatsapp") {
+      item.text = this.maybeInjectDatetime(piSessionId, item.text);
+    }
     const itemRemoteJid = extractRemoteJid(item.metadata);
 
     this.log(
@@ -1234,6 +1245,9 @@ export class ControlSurfaceRuntime {
     const session = managed.runtime?.session;
     if (!session?.isStreaming) throw new Error("pi session is not available for steering");
 
+    if (item.source === "web" || item.source === "whatsapp") {
+      item.text = this.maybeInjectDatetime(session.sessionId, item.text);
+    }
     if (item.source !== "hook") managed.state.addSteeredItem(item);
     try {
       const delivery = this.deliverQueueItem(session, item, formatPromptWithContext(item));
@@ -1293,10 +1307,9 @@ export class ControlSurfaceRuntime {
     worktreePath?: string;
     baseBranch?: string;
     resumeSessionFile?: string;
-    rollbackOnSpawnFailure: boolean;
   }): Promise<
     | { ok: true; streamId: string; streamName: string; managed: ManagedPiSession }
-    | { ok: false; streamId: string | null; streamName: string; spawnError: Error }
+    | { ok: false; streamId: null; streamName: string; spawnError: Error }
   > {
     const { insertStream, enrichStream, deleteStream } = await import(
       "./blackboard/query-streams.ts"
@@ -1340,23 +1353,18 @@ export class ControlSurfaceRuntime {
       return { ok: true, streamId: ws.id, streamName: ws.name, managed };
     } catch (error) {
       const spawnError = error instanceof Error ? error : new Error(String(error));
-      if (opts.rollbackOnSpawnFailure) {
-        try {
-          deleteStream(this.blackboard, ws.id);
-          this.log(
-            `${opts.type ?? "work"} stream session spawn failed for "${ws.name}" (${ws.id}); rolled back stream row: ${spawnError.message}`,
-          );
-        } catch (cleanupError) {
-          this.log(
-            `${opts.type ?? "work"} stream session spawn failed and rollback failed for "${ws.name}" (${ws.id}): spawn=${spawnError.message} cleanup=${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-          );
-        }
-        return { ok: false, streamId: null, streamName: ws.name, spawnError };
+      try {
+        deleteStream(this.blackboard, ws.id);
+        this.log(
+          `${opts.type ?? "work"} stream session spawn failed for "${ws.name}" (${ws.id}); rolled back stream row: ${spawnError.message}`,
+        );
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [spawnError, cleanupError],
+          `${opts.type ?? "work"} stream session spawn failed and rollback failed for "${ws.name}" (${ws.id})`,
+        );
       }
-      this.log(
-        `${opts.type ?? "work"} stream session spawn failed for "${ws.name}" (${ws.id}); leaving orphan stream row for caller: ${spawnError.message}`,
-      );
-      return { ok: false, streamId: ws.id, streamName: ws.name, spawnError };
+      return { ok: false, streamId: null, streamName: ws.name, spawnError };
     }
   }
 
@@ -1384,7 +1392,6 @@ export class ControlSurfaceRuntime {
     const result = await this.spawnStreamWithSession({
       name,
       cwd: effectiveCwd,
-      rollbackOnSpawnFailure: true,
     });
     if (!result.ok) {
       throw result.spawnError;
@@ -1417,40 +1424,11 @@ export class ControlSurfaceRuntime {
       throw new Error("Cannot switch cwd while session is busy");
     if (managed.role !== "orchestrator")
       throw new Error("cwd switch is only supported for work streams");
-    if (!managed.runtime) {
-      this.log(`activating dormant orchestrator for cwd switch stream=${streamId}`);
-      await this.sessionManager.activateStreamSession(
-        managed,
-        this.createCustomTools("orchestrator", streamId),
-      );
-    }
-
-    const switched = await this.sessionManager.switchStreamCwd(streamId, cwd);
-    updateStreamRepoPath(this.blackboard, streamId, cwd);
-    this.blackboard
-      .prepare(
-        `UPDATE pi_sessions
-         SET cwd = ?, last_event_at = ?
-         WHERE pi_session_id = ?`,
-      )
-      .run(cwd, new Date().toISOString(), switched.piSessionId);
-
-    this.wsHub.broadcast({
-      type: "streams_changed",
-      reason: "cwd_changed",
+    const switched = await this.sessionManager.switchStreamCwd(
       streamId,
-      streamName: ws.name,
-    });
-    this.wsHub.broadcast({
-      type: "worktree_changed",
-      piSessionId: switched.piSessionId,
-      streamId,
-    });
-    this.wsHub.broadcast({
-      type: "status_changed",
-      subsystem: "pi_session",
-      timestamp: new Date().toISOString(),
-    });
+      cwd,
+      this.createCustomTools("orchestrator", streamId),
+    );
     this.log(`stream cwd switched "${ws.name}" (${streamId}) → ${cwd}`);
     return { ok: true, streamId, cwd, piSessionId: switched.piSessionId };
   }
@@ -1471,30 +1449,13 @@ export class ControlSurfaceRuntime {
   }
 
   async reopenStream(streamId: string): Promise<{ ok: boolean; streamId: string }> {
-    const { reopenStream, getStreamById } = await import("./blackboard/query-streams.ts");
-
     const ws = getStreamById(this.blackboard, streamId);
     if (!ws) throw new Error("Stream not found");
 
-    const hasDeadPiSession =
-      ws.status === "open" &&
-      !!this.blackboard.get<{ pi_session_id: string }>(
-        `SELECT pi_session_id FROM pi_sessions
-         WHERE stream_id = ? AND role = 'orchestrator'
-           AND status IN ('ended', 'crashed')
-         ORDER BY started_at DESC LIMIT 1`,
-        streamId,
-      );
-
-    if (ws.status !== "closed" && !hasDeadPiSession) {
-      throw new Error("Stream is not closed and has no recoverable pi-session");
-    }
-
-    if (ws.status === "closed") {
-      reopenStream(this.blackboard, streamId);
-    }
-    const managed = this.sessionManager.getByStream(streamId);
-    if (managed) managed.pendingDestroy = false;
+    await this.sessionManager.reopenStreamSession({
+      streamId,
+      expectedPiSessionId: this.sessionManager.getExpectedPiSessionId(streamId),
+    });
 
     if (shouldReconcileWorktreeOnRecovery(ws.status)) {
       const reconciled = clearWorktreePathIfStale(this.blackboard, ws);
@@ -1504,50 +1465,6 @@ export class ControlSurfaceRuntime {
         );
       }
     }
-
-    const streamsRow = this.blackboard.get<{
-      pi_session_id: string;
-      session_file: string | null;
-      started_at: string;
-      model_provider: string | null;
-      model_id: string | null;
-    }>(
-      `SELECT pi_session_id, session_file, started_at, model_provider, model_id
-       FROM pi_sessions
-       WHERE stream_id = ? AND role = 'orchestrator'
-       ORDER BY started_at DESC LIMIT 1`,
-      streamId,
-    );
-
-    if (streamsRow) {
-      this.blackboard
-        .prepare(
-          `UPDATE pi_sessions
-           SET status = 'waiting_for_user',
-               ended_at = NULL,
-               end_reason = NULL,
-               last_event_at = ?
-           WHERE pi_session_id = ?`,
-        )
-        .run(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), streamsRow.pi_session_id);
-
-      this.sessionManager.rehydrateStreamSession(
-        streamId,
-        ws.name,
-        streamsRow.pi_session_id,
-        streamsRow.session_file,
-        streamsRow.started_at,
-        streamsRow.model_provider,
-        streamsRow.model_id,
-      );
-    }
-
-    this.wsHub.broadcast({
-      type: "streams_changed",
-      reason: "reopened",
-      streamId,
-      streamName: ws.name,
-    });
 
     const reopenReason =
       ws.status === "closed" ? "reopened closed stream" : "recovered dead pi-session for stream";
@@ -1581,10 +1498,23 @@ export class ControlSurfaceRuntime {
         continue;
       }
 
-      const reload = (async () => {
-        await Promise.resolve();
-        await session.reload();
-      })();
+      const reload = managed.streamId
+        ? this.sessionManager.withStreamOperation(
+            { streamId: managed.streamId, expectedPiSessionId: piSessionId },
+            async () => {
+              const current = this.sessionManager.getByStream(managed.streamId!);
+              if (current !== managed || !current.runtime) {
+                throw new Error("Stream session changed before reload");
+              }
+              if (!current.queue.pause()) throw new Error("Pi session is busy");
+              try {
+                await current.runtime.session.reload();
+              } finally {
+                current.queue.resume();
+              }
+            },
+          )
+        : session.reload();
       const gate = reload.catch(() => {});
       this.sessionReloads.set(piSessionId, gate);
       try {
@@ -1631,6 +1561,21 @@ export class ControlSurfaceRuntime {
   }> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) throw new Error("Pi session not found");
+    if (managed.streamId) {
+      return this.sessionManager.withActiveStreamOperation(
+        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
+        this.createStreamSessionTools(managed.streamId),
+        (active) => this.compactClaimedPiSession(active, active.piSessionId, customInstructions),
+      );
+    }
+    return this.compactClaimedPiSession(managed, piSessionId, customInstructions);
+  }
+
+  private async compactClaimedPiSession(
+    managed: ManagedPiSession,
+    piSessionId: string,
+    customInstructions?: string,
+  ) {
     if (this.compactionClaims.has(managed)) throw new Error("Pi session is already compacting");
     this.compactionClaims.add(managed);
     try {
@@ -1647,18 +1592,6 @@ export class ControlSurfaceRuntime {
   ) {
     if (!managed.queue.pause()) throw new Error("Pi session is busy");
     try {
-      if (!managed.runtime) {
-        if (managed.role !== "default" && managed.streamId) {
-          this.log(`activating dormant stream session for compact stream=${managed.streamId}`);
-          await this.sessionManager.activateStreamSession(
-            managed,
-            this.createStreamSessionTools(managed.streamId),
-          );
-        } else {
-          throw new Error("Pi session is not active and cannot be activated for compact");
-        }
-      }
-
       const session = managed.runtime?.session;
       if (!session) throw new Error("Pi session failed to activate");
       if (session.isCompacting) throw new Error("Pi session is already compacting");
@@ -1691,52 +1624,59 @@ export class ControlSurfaceRuntime {
   ): Promise<{ ok: true; piSessionId: string; messageCount: number }> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) throw new Error("Pi session not found");
+    if (managed.streamId) {
+      return this.sessionManager.withActiveStreamOperation(
+        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
+        this.createStreamSessionTools(managed.streamId),
+        (active) => this.pruneManagedStreamHistory(active, active.piSessionId, entryId),
+      );
+    }
+    return this.pruneManagedStreamHistory(managed, piSessionId, entryId);
+  }
 
-    if (!managed.runtime) {
-      if (managed.role !== "default" && managed.streamId) {
-        this.log(`activating dormant stream session for prune stream=${managed.streamId}`);
-        await this.sessionManager.activateStreamSession(
-          managed,
-          this.createStreamSessionTools(managed.streamId),
-        );
-      } else {
-        throw new Error("Pi session is not active and cannot be activated for prune");
+  private async pruneManagedStreamHistory(
+    managed: ManagedPiSession,
+    piSessionId: string,
+    entryId: string,
+  ): Promise<{ ok: true; piSessionId: string; messageCount: number }> {
+    if (!managed.queue.pause()) throw new Error("Pi session is busy");
+    try {
+      const session = managed.runtime?.session;
+      if (!session) throw new Error("Pi session failed to activate");
+
+      const sessionManager = session.sessionManager;
+      const target = sessionManager.getEntry(entryId);
+      if (!target) throw new Error(`Session entry ${entryId} not found`);
+      if (target.type !== "message" || target.message.role !== "user") {
+        throw new Error(`Entry ${entryId} is not a user message (type=${target.type})`);
       }
+
+      const navResult = await session.navigateTree(entryId);
+      if (navResult.cancelled) {
+        throw new Error("navigateTree cancelled (extension veto)");
+      }
+
+      sessionManager.appendCustomEntry("flitterbot:prune_anchor", {
+        prunedEntryId: entryId,
+        prunedAt: new Date().toISOString(),
+      });
+
+      const newCount = session.messages.length;
+      managed.state.noteEvent(newCount);
+
+      this.wsHub.broadcastHistoryCommit({
+        type: "history_rewritten",
+        piSessionId,
+        reason: "prune",
+      });
+
+      this.log(
+        `pruned history for pi session ${piSessionId} at entry ${entryId} (messages now ${newCount})`,
+      );
+      return { ok: true, piSessionId, messageCount: newCount };
+    } finally {
+      managed.queue.resume();
     }
-
-    const session = managed.runtime?.session;
-    if (!session) throw new Error("Pi session failed to activate");
-
-    const sessionManager = session.sessionManager;
-    const target = sessionManager.getEntry(entryId);
-    if (!target) throw new Error(`Session entry ${entryId} not found`);
-    if (target.type !== "message" || target.message.role !== "user") {
-      throw new Error(`Entry ${entryId} is not a user message (type=${target.type})`);
-    }
-
-    const navResult = await session.navigateTree(entryId);
-    if (navResult.cancelled) {
-      throw new Error("navigateTree cancelled (extension veto)");
-    }
-
-    sessionManager.appendCustomEntry("flitterbot:prune_anchor", {
-      prunedEntryId: entryId,
-      prunedAt: new Date().toISOString(),
-    });
-
-    const newCount = session.messages.length;
-    managed.state.noteEvent(newCount);
-
-    this.wsHub.broadcastHistoryCommit({
-      type: "history_rewritten",
-      piSessionId,
-      reason: "prune",
-    });
-
-    this.log(
-      `pruned history for pi session ${piSessionId} at entry ${entryId} (messages now ${newCount})`,
-    );
-    return { ok: true, piSessionId, messageCount: newCount };
   }
 
   async forkStream(
@@ -1745,7 +1685,33 @@ export class ControlSurfaceRuntime {
   ): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
     const managed = this.sessionManager.getByPiSessionId(sourcePiSessionId);
     if (!managed) throw new Error("Pi session not found");
+    if (managed.streamId) {
+      return this.sessionManager.withStreamOperation(
+        { streamId: managed.streamId, expectedPiSessionId: sourcePiSessionId },
+        () => this.forkManagedStream(managed, sourcePiSessionId, entryId),
+      );
+    }
+    return this.forkManagedStream(managed, sourcePiSessionId, entryId);
+  }
 
+  private async forkManagedStream(
+    managed: ManagedPiSession,
+    sourcePiSessionId: string,
+    entryId?: string,
+  ): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
+    if (!managed.queue.pause()) throw new Error("Pi session is busy");
+    try {
+      return await this.forkManagedStreamWhilePaused(managed, sourcePiSessionId, entryId);
+    } finally {
+      managed.queue.resume();
+    }
+  }
+
+  private async forkManagedStreamWhilePaused(
+    managed: ManagedPiSession,
+    sourcePiSessionId: string,
+    entryId?: string,
+  ): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
     const sourceStream = managed.streamId ? getStreamById(this.blackboard, managed.streamId) : null;
     const row = this.blackboard.get<{ session_file: string | null; cwd: string | null }>(
       "SELECT session_file, cwd FROM pi_sessions WHERE pi_session_id = ?",
@@ -1754,6 +1720,12 @@ export class ControlSurfaceRuntime {
     const sourceFile = managed.state.getSnapshot().sessionFile ?? row?.session_file ?? undefined;
     if (!sourceFile || !fs.existsSync(sourceFile)) {
       throw new Error("Source session file not found");
+    }
+    const sourceHeaderPiSessionId = readPiSessionHeaderId(sourceFile);
+    if (sourceHeaderPiSessionId !== sourcePiSessionId) {
+      throw new Error(
+        `Source session file identity mismatch: expected ${sourcePiSessionId}, found ${sourceHeaderPiSessionId}`,
+      );
     }
 
     const forkManager = SessionManager.open(sourceFile, this.config.controlSurfaceSessionsDir);
@@ -1787,7 +1759,6 @@ export class ControlSurfaceRuntime {
       ...(sourceStream?.worktree_path ? { worktreePath: sourceStream.worktree_path } : {}),
       ...(sourceStream?.base_branch ? { baseBranch: sourceStream.base_branch } : {}),
       resumeSessionFile: forkedFile,
-      rollbackOnSpawnFailure: true,
     });
     if (!result.ok) throw result.spawnError;
 
@@ -1812,11 +1783,15 @@ export class ControlSurfaceRuntime {
       const streamName = `flitterbot: ${userId}`;
       let stream = getStreamByName(this.blackboard, streamName);
 
+      if (stream && stream.type !== "defaultStream") {
+        stream = setStreamType(this.blackboard, stream.id, "defaultStream") ?? stream;
+      }
+
       if (stream?.status === "closed") {
-        stream = reopenStreamRow(this.blackboard, stream.id);
-        if (stream) {
+        await this.reopenStream(stream.id);
+        stream = getStreamById(this.blackboard, stream.id);
+        if (stream)
           this.log(`reopened WhatsApp default stream for user "${userId}" (${stream.id})`);
-        }
       }
 
       if (!stream) {
@@ -1825,16 +1800,24 @@ export class ControlSurfaceRuntime {
         continue;
       }
 
-      if (stream.type !== "defaultStream") {
-        stream = setStreamType(this.blackboard, stream.id, "defaultStream") ?? stream;
-      }
       if (!stream.stream_user) {
         this.blackboard
           .prepare("UPDATE streams SET stream_user = ? WHERE id = ?")
           .run(userId, stream.id);
       }
 
-      const managed = this.sessionManager.getByStream(stream.id);
+      let managed = this.sessionManager.getByStream(stream.id);
+      if (!managed) {
+        const latestPiSessionId = getStreamPiSessionId(this.blackboard, stream.id);
+        const latestStatus = latestPiSessionId
+          ? getPiSessionStatus(this.blackboard, latestPiSessionId)
+          : undefined;
+        if (latestStatus === "ended" || latestStatus === "crashed") {
+          await this.reopenStream(stream.id);
+          managed = this.sessionManager.getByStream(stream.id);
+          this.log(`recovered WhatsApp default stream for user "${userId}" (${stream.id})`);
+        }
+      }
       if (managed) continue;
 
       this.log(`creating missing WhatsApp default stream session for user "${userId}"`);
@@ -1856,7 +1839,6 @@ export class ControlSurfaceRuntime {
       cwd: this.config.projectsDir,
       type: "defaultStream",
       streamUser,
-      rollbackOnSpawnFailure: true,
     });
     if (!spawn.ok) throw spawn.spawnError;
     this.enqueueDefaultStreamFirstMessage(spawn.managed);
@@ -2009,7 +1991,6 @@ export class ControlSurfaceRuntime {
             name,
             cwd: effectiveCwd,
             streamUser,
-            rollbackOnSpawnFailure: false,
           });
 
           if (!spawn.ok) {
@@ -2017,9 +1998,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: spawn.streamId
-                    ? `Swimlane "${spawn.streamName}" created (ID: ${spawn.streamId}, canonical name: "${spawn.streamName}") but orchestrator failed to spawn: ${spawn.spawnError.message}`
-                    : `Swimlane creation failed before orchestrator spawn: ${spawn.spawnError.message}`,
+                  text: `Swimlane creation failed before orchestrator spawn: ${spawn.spawnError.message}`,
                 },
               ],
               details: {
@@ -2276,6 +2255,19 @@ export class ControlSurfaceRuntime {
           }
 
           try {
+            orchestrator.queue.assertAccepting();
+            const persisted = persistInboundMessage(this.blackboard, {
+              source: "agent",
+              content: message,
+              sender: "system",
+              streamId: ws.id,
+              piSessionId: orchestrator.piSessionId,
+              metadata: {
+                stream_id: ws.id,
+                stream_name: ws.name,
+                enqueued_by: "enqueue_message_tool",
+              },
+            });
             orchestrator.queue.enqueue({
               id: `enq-msg-${crypto.randomUUID()}`,
               text: message,
@@ -2286,6 +2278,7 @@ export class ControlSurfaceRuntime {
                 stream_name: ws.name,
               },
               receivedAt: new Date().toISOString(),
+              serverMessageId: persisted.id,
             });
           } catch (enqueueError) {
             return {
@@ -2297,25 +2290,6 @@ export class ControlSurfaceRuntime {
               ],
               details: { error: true },
             };
-          }
-
-          try {
-            persistInboundMessage(this.blackboard, {
-              source: "agent",
-              content: message,
-              sender: "system",
-              streamId: ws.id,
-              piSessionId: this.sessionManager.getByStream(ws.id)?.piSessionId,
-              metadata: {
-                stream_id: ws.id,
-                stream_name: ws.name,
-                enqueued_by: "enqueue_message_tool",
-              },
-            });
-          } catch (error) {
-            this.log(
-              `enqueue_message persist failed: ${error instanceof Error ? error.message : String(error)}`,
-            );
           }
 
           this.log(
@@ -2390,13 +2364,9 @@ export class ControlSurfaceRuntime {
             };
           }
           const stream_id = streamId;
-          const orchestratorRow = this.blackboard.get<{ cwd: string | null }>(
-            `SELECT cwd FROM pi_sessions
-             WHERE stream_id = ? AND role = 'orchestrator'
-             ORDER BY started_at DESC LIMIT 1`,
-            stream_id,
-          );
-          const orchestratorCwd = orchestratorRow?.cwd;
+          const latestPiSession = getStreamPiSessionRow(this.blackboard, stream_id);
+          const orchestratorCwd =
+            latestPiSession?.role === "orchestrator" ? latestPiSession.cwd : undefined;
           if (!orchestratorCwd) {
             return {
               content: [
@@ -2441,7 +2411,6 @@ export class ControlSurfaceRuntime {
         parameters: {
           type: "object",
           properties: {
-            stream_id: { type: "string", description: "ID of the stream to close" },
             mode: {
               type: "string",
               enum: ["merge", "noop"],
@@ -2459,19 +2428,22 @@ export class ControlSurfaceRuntime {
                 "Target branch to merge into. Supersedes the stream's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
             },
           },
-          required: ["stream_id", "mode", "commit_message"],
+          required: ["mode", "commit_message"],
           additionalProperties: false,
         },
         execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-          const { stream_id, mode, commit_message, base_branch } = params as {
-            stream_id: string;
+          const { mode, commit_message, base_branch } = params as {
             mode: "merge" | "noop";
             commit_message: string;
             base_branch?: string;
           };
-          const managed = closeSwimlaneId
-            ? this.sessionManager.getByStream(closeSwimlaneId)
-            : undefined;
+          if (!closeSwimlaneId) {
+            return {
+              content: [{ type: "text", text: "Error: close_swimlane is not bound to a stream" }],
+              details: { ok: false },
+            };
+          }
+          const managed = this.sessionManager.getByStream(closeSwimlaneId);
           const streamsSessId = managed?.piSessionId;
           if (!streamsSessId) {
             return {
@@ -2479,25 +2451,31 @@ export class ControlSurfaceRuntime {
               details: {},
             };
           }
-          const result = await executeCloseSwimlane(
-            this.blackboard,
-            streamsSessId,
-            stream_id,
-            mode,
-            commit_message,
-            base_branch,
-          );
-          if (result.ok) {
-            if (managed) {
-              managed.pendingDestroy = true;
-            }
-            this.wsHub.broadcast({
-              type: "streams_changed",
-              reason: "closed",
-              streamId: stream_id,
-            });
+          if (managed.closeRequested) {
+            return {
+              content: [{ type: "text", text: "Stream close is already in progress" }],
+              details: { ok: false, streamId: closeSwimlaneId },
+            };
           }
-          return { content: [{ type: "text", text: result.message }], details: result };
+          managed.queue.freezeAdmission();
+          try {
+            const result = await executeCloseSwimlane(
+              this.blackboard,
+              closeSwimlaneId,
+              mode,
+              commit_message,
+              base_branch,
+            );
+            if (result.ok) {
+              this.sessionManager.requestStreamClose(closeSwimlaneId, streamsSessId, "tool");
+            } else {
+              managed.queue.restoreAdmission();
+            }
+            return { content: [{ type: "text", text: result.message }], details: result };
+          } catch (error) {
+            managed.queue.restoreAdmission();
+            throw error;
+          }
         },
       });
     }
