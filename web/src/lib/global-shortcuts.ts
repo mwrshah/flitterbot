@@ -88,7 +88,6 @@ const STREAM_SLOT_HOME_ROW_CODES = [
 export const MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS = [
   "a",
   "s",
-  "f",
   "g",
   "w",
   "r",
