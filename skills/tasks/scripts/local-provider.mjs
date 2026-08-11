@@ -313,20 +313,17 @@ async function propagateInboundTaskChanges(store, idx, syncContext) {
     const baseline = syncContext.baselineTasks.get(recordId) ?? cloneTaskRecord(task);
     for (const provider of providers) {
       if (provider.system === sourceProvider) continue;
-      const beforeLink = getExternalLink(task, provider.system);
       const patch = { ...cloneTaskRecord(task), project, externalLinks: task.externalLinks.map(cloneExternalLink) };
+      let outcome;
       try {
-        await provider.updateTask({ store, idx, task: baseline, patch, force: true });
+        outcome = await provider.updateTask({ store, idx, task: baseline, patch, force: true });
       } catch (error) {
         throw new Error(formatOutboundPropagationError(error, { task, baseline, project, sourceProvider, targetProvider: provider.system }));
       }
-      const afterLink = getExternalLink({ externalLinks: patch.externalLinks }, provider.system);
       task.externalLinks = patch.externalLinks;
       indexTaskExternalLinks(idx, task);
-      const neverASyncCandidateForProvider = !beforeLink && !afterLink;
-      if (neverASyncCandidateForProvider) continue;
-      if (afterLink && !beforeLink) outbound[provider.system].created++;
-      else outbound[provider.system].updated++;
+      if (outcome === "created") outbound[provider.system].created++;
+      if (outcome === "updated") outbound[provider.system].updated++;
     }
   }
   return outbound;

@@ -129,7 +129,7 @@ export function createTodoistProvider(config, deps) {
         });
         deps.setExternalLink(patch.externalLinks, todoistTaskLink(created, remoteProject, deps));
         if (patch.status === "done") await todoist.completeTask(created.id);
-        return;
+        return "created";
       }
 
       const remote = await todoist.getTask(todoistLinkId(link));
@@ -140,23 +140,32 @@ export function createTodoistProvider(config, deps) {
         throw new Error(`Todoist task "${task.description}" is recurring; sync-out completion is disabled. Complete it in Todoist, then run periodic_sync_and_cleanup after Todoist advances it.`);
       }
 
+      let updatedRemote = false;
       if (patch.project.id !== task.projectId) {
         const remoteProject = await ensureTodoistProject(todoist, store, idx, patch.project, deps);
         await todoist.moveTask(remote.id, { project_id: remoteProject.id });
+        updatedRemote = true;
       }
 
       const update = {};
       if (patch.description !== task.description) update.content = patch.description;
       if ((patch.details ?? "") !== (task.details ?? "")) update.description = patch.details ?? "";
       if (patch.dueAt !== task.dueAt) Object.assign(update, todoistDuePayload(patch.dueAt, deps));
-      if (Object.keys(update).length > 0) await todoist.updateTask(remote.id, update);
+      if (Object.keys(update).length > 0) {
+        await todoist.updateTask(remote.id, update);
+        updatedRemote = true;
+      }
 
-      if (patch.status === "done" && task.status !== "done") await todoist.completeTask(remote.id);
+      if (patch.status === "done" && task.status !== "done") {
+        await todoist.completeTask(remote.id);
+        updatedRemote = true;
+      }
       if (patch.status === "active" && task.status === "done") throw new Error("Restoring completed Todoist tasks from local state is not supported yet; run periodic_sync_and_cleanup and restore in Todoist if needed.");
 
       const nextRemote = patch.status === "done" ? { ...remote, checked: true, completed_at: deps.nowIso(), updated_at: deps.nowIso() } : await todoist.getTask(remote.id);
       link = todoistTaskLink(nextRemote, undefined, deps);
       deps.setExternalLink(patch.externalLinks, link);
+      return updatedRemote ? "updated" : undefined;
     },
   };
 }

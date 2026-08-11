@@ -66,6 +66,7 @@ export function createLinearProvider(config, deps) {
         stateId: stateIdForLocalTask(states, { status: "active" }),
       });
       deps.setExternalLink(links, linearIssueLink(issue));
+      return "created";
     },
 
     async updateTask({ task, patch, force = false }) {
@@ -75,22 +76,12 @@ export function createLinearProvider(config, deps) {
 
       if (!linearIssueId(existingLink)) {
         if (patch.status === "done") return;
-        await this.createTask({
+        return this.createTask({
           project: patch.project,
           description: patch.description,
           details: patch.details,
           links: patch.externalLinks,
         });
-        if (patch.status === "done") {
-          const createdLink = deps.getExternalLink({ externalLinks: patch.externalLinks }, LINEAR_SYSTEM);
-          if (linearIssueId(createdLink)) {
-            const created = await client.getIssue(linearIssueId(createdLink));
-            const states = await statesForTeam(client, teamStateCache, created.team.id);
-            const updated = await client.updateIssue(created.id, { stateId: stateIdForLocalTask(states, patch) });
-            deps.setExternalLink(patch.externalLinks, linearIssueLink(updated));
-          }
-        }
-        return;
       }
 
       const titleChanged = patch.description !== task.description;
@@ -111,6 +102,7 @@ export function createLinearProvider(config, deps) {
       }
       const updated = await client.updateIssue(remote.id, update);
       deps.setExternalLink(patch.externalLinks, linearIssueLink(updated));
+      return "updated";
     },
   };
 }
