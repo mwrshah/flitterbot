@@ -203,6 +203,9 @@ export const Sidebar = memo(function Sidebar() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => setQuery(""), [pathname]);
 
   useEffect(
     () =>
@@ -294,7 +297,6 @@ export const Sidebar = memo(function Sidebar() {
       streamShortcuts.set(ws.id, nextShortcut++);
     }
   }
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const currentPiSessionId = pathname.startsWith("/streams/") ? pathname.split("/")[2] : null;
   const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
     altLabel: mod,
@@ -332,11 +334,11 @@ export const Sidebar = memo(function Sidebar() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onBlur={() => setQuery("")}
                 onKeyDown={(event) => {
                   if (event.key !== "Escape") return;
                   event.preventDefault();
                   event.stopPropagation();
+                  setQuery("");
                   event.currentTarget.blur();
                 }}
                 placeholder="SEARCH SWIMLANES"
