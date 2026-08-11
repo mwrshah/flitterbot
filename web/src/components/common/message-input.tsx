@@ -1137,12 +1137,12 @@ export const MessageInput = memo(function MessageInput({
             {pendingImages.map((img, i) => (
               <div
                 key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
-                className="relative max-h-48 max-w-[min(24rem,100%)]"
+                className="relative max-h-24 max-w-[min(24rem,100%)]"
               >
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
                   alt={`Pending attachment ${i + 1}`}
-                  className="block h-auto max-h-48 w-auto max-w-full rounded-lg border border-border object-contain"
+                  className="block h-auto max-h-24 w-auto max-w-full rounded-lg border border-border object-contain"
                 />
                 <button
                   type="button"
