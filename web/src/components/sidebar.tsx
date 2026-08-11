@@ -228,8 +228,8 @@ type PickerCursor = {
 const pickerSelectedRowClass =
   "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text";
 
-function getAdjacentIndex(current: number, direction: 1 | -1, length: number): number {
-  return Math.max(0, Math.min(current + direction, length - 1));
+function getAdjacentPickerIndex(current: number, direction: 1 | -1, length: number): number {
+  return Math.max(-1, Math.min(current + direction, length - 1));
 }
 
 function getPiSessionId(pathname: string): string | undefined {
@@ -565,6 +565,15 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     },
     [],
   );
+  const selectPickerIndex = useCallback(
+    (candidates: readonly PickerCandidate[], index: number, deferDomUpdate = false) => {
+      setPickerSelection(candidates, index, deferDomUpdate);
+      if (index === -1 && liveRegionRef.current) {
+        liveRegionRef.current.textContent = "Search swimlanes";
+      }
+    },
+    [setPickerSelection],
+  );
   const clearPickerCursor = useCallback(() => {
     setPickerSelection();
     pickerCursorRef.current.originPath = undefined;
@@ -717,6 +726,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     if (
       document.activeElement !== input ||
       cursor.selectedElement?.isConnected ||
+      (cursor.originPath !== undefined && cursor.selectedKey === undefined) ||
       displayedSearchCandidates.length === 0
     ) {
       return;
@@ -736,8 +746,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
       const currentPathname = router.state.location.pathname;
       const inputFocused = document.activeElement === input;
       const candidates = inputFocused ? currentSearchCandidates : allSearchCandidates;
-      const continuing =
-        inputFocused && cursor.originPath === currentPathname && cursor.selectedKey !== undefined;
+      const continuing = inputFocused && cursor.originPath === currentPathname;
       const currentIndex = continuing
         ? candidates.findIndex((row) => row.key === cursor.selectedKey)
         : candidates.findIndex((row) => row.piSessionId === getPiSessionId(currentPathname));
@@ -746,9 +755,9 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
           ? direction === 1
             ? 0
             : candidates.length - 1
-          : getAdjacentIndex(currentIndex, direction, candidates.length);
+          : getAdjacentPickerIndex(currentIndex, direction, candidates.length);
       if (!inputFocused) setQuery("");
-      setPickerSelection(candidates, selectedIndex, !inputFocused && !!normalizedDeferredQuery);
+      selectPickerIndex(candidates, selectedIndex, !inputFocused && !!normalizedDeferredQuery);
       cursor.originPath = currentPathname;
     }
     input.focus();
@@ -800,8 +809,10 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
               setPickerSelection(nextCandidates, 0);
             }}
             onFocus={() => {
-              pickerCursorRef.current.originPath = router.state.location.pathname;
-              if (!pickerCursorRef.current.selectedKey) {
+              const cursor = pickerCursorRef.current;
+              const hasPickerPosition = cursor.originPath !== undefined;
+              cursor.originPath = router.state.location.pathname;
+              if (!cursor.selectedKey && !hasPickerPosition) {
                 setPickerSelection(currentSearchCandidates, 0);
               }
             }}
@@ -828,20 +839,20 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
                 const selectedIndex = currentSearchCandidates.findIndex(
                   (row) => row.key === pickerCursorRef.current.selectedKey,
                 );
-                const currentIndex = selectedIndex === -1 ? 0 : selectedIndex;
-                const nextIndex = getAdjacentIndex(
-                  currentIndex,
+                const nextIndex = getAdjacentPickerIndex(
+                  selectedIndex,
                   direction,
                   currentSearchCandidates.length,
                 );
-                setPickerSelection(currentSearchCandidates, nextIndex);
+                selectPickerIndex(currentSearchCandidates, nextIndex);
                 return;
               }
               if (event.key === "Enter") {
-                const selectedSearchCandidate =
-                  currentSearchCandidates.find(
-                    (row) => row.key === pickerCursorRef.current.selectedKey,
-                  ) ?? currentSearchCandidates[0];
+                const selectedKey = pickerCursorRef.current.selectedKey;
+                if (!selectedKey) return;
+                const selectedSearchCandidate = currentSearchCandidates.find(
+                  (row) => row.key === selectedKey,
+                );
                 if (!selectedSearchCandidate) return;
                 event.preventDefault();
                 event.stopPropagation();
