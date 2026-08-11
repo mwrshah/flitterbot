@@ -7,9 +7,11 @@ import {
   type ReactElement,
   type ReactNode,
   useCallback,
+  useDeferredValue,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -34,7 +36,7 @@ import {
   useShortcutBindingLabel,
 } from "~/lib/global-shortcuts";
 import { statusQueryOptions } from "~/lib/queries";
-import { getStreamRecoveryKind } from "~/lib/stream-recovery";
+import { getStreamRecoveryKind, type StreamRecoveryKind } from "~/lib/stream-recovery";
 import type { PiSessionStatus, StreamSummary } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -234,6 +236,284 @@ function getPiSessionId(pathname: string): string | undefined {
   return pathname.startsWith("/streams/") ? pathname.split("/")[2] : undefined;
 }
 
+function filterRows<T extends SidebarSwimlaneRow>(
+  rows: readonly T[],
+  normalizedQuery: string,
+): readonly T[] {
+  return normalizedQuery
+    ? rows.filter((row) => row.name.toLowerCase().includes(normalizedQuery))
+    : rows;
+}
+
+type PinStream = (variables: { streamId: string; pinned: boolean }) => void;
+type RenameStream = (variables: { streamId: string; name: string }) => void;
+type ReopenStream = (variables: { streamId: string; recoveryKind: StreamRecoveryKind }) => void;
+type CloseStream = (streamId: string) => void;
+
+const SwimlaneRow = memo(function SwimlaneRow({
+  row,
+  active,
+  defaultBusy,
+  shortcut,
+  actionsDisabled,
+  onLinkClick,
+  pinStream,
+  renameStream,
+  reopenStream,
+  closeStream,
+}: {
+  row: SidebarSwimlaneRow;
+  active: boolean;
+  defaultBusy: boolean;
+  shortcut?: number | null;
+  actionsDisabled: boolean;
+  onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+  pinStream: PinStream;
+  renameStream: RenameStream;
+  reopenStream: ReopenStream;
+  closeStream: CloseStream;
+}) {
+  if (row.kind === "default") {
+    return (
+      <StreamContextMenu
+        name={row.name}
+        disabled={actionsDisabled}
+        renderTrigger={() => (
+          <Link
+            to="/streams/$piSessionId"
+            params={{ piSessionId: row.piSessionId }}
+            preload={false}
+            onClick={onLinkClick}
+            data-search-key={row.key}
+            className={cn(
+              "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+              pickerSelectedRowClass,
+              active
+                ? "bg-background-selected text-text"
+                : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+            )}
+          >
+            <span
+              className={cn(
+                "shrink-0 size-2 rounded-full",
+                defaultBusy ? "bg-status-active" : "bg-status-ended",
+              )}
+            />
+            <span className="truncate flex-1">{row.name}</span>
+            {shortcut && (
+              <ShortcutHint label={String(shortcut)} className="ml-2 shrink-0" kbdSize="compact" />
+            )}
+          </Link>
+        )}
+      />
+    );
+  }
+
+  const stream = row.stream;
+  const recoveryKind = getStreamRecoveryKind(stream);
+  const onReopen = recoveryKind
+    ? () => reopenStream({ streamId: stream.id, recoveryKind })
+    : undefined;
+  const menuProps = {
+    name: stream.name,
+    pinned: stream.pinned,
+    disabled: actionsDisabled,
+    onTogglePinned: () => pinStream({ streamId: stream.id, pinned: !stream.pinned }),
+    onRename: (name: string) => renameStream({ streamId: stream.id, name }),
+    onReopen,
+  };
+
+  if (!row.piSessionId) {
+    return (
+      <StreamContextMenu
+        {...menuProps}
+        onClose={() => closeStream(stream.id)}
+        renderTrigger={(label) => (
+          <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted">
+            <span className="shrink-0 size-2 rounded-full bg-status-ended" />
+            {label}
+            {stream.pinned && (
+              <button
+                type="button"
+                aria-label="Unpin swimlane"
+                className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex"
+                onClick={() => pinStream({ streamId: stream.id, pinned: false })}
+              >
+                <PinIcon className="size-3 group-hover/pin:hidden" />
+                <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+              </button>
+            )}
+          </div>
+        )}
+      />
+    );
+  }
+
+  const piSessionId = row.piSessionId;
+  if (row.section === "closed") {
+    return (
+      <StreamContextMenu
+        {...menuProps}
+        renderTrigger={(label) => (
+          <Link
+            to="/streams/$piSessionId"
+            params={{ piSessionId }}
+            preload={false}
+            onClick={onLinkClick}
+            data-search-key={row.key}
+            className={cn(
+              "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
+              pickerSelectedRowClass,
+              active
+                ? "bg-background-selected text-text"
+                : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+            )}
+          >
+            {label}
+            {stream.pinned && (
+              <button
+                type="button"
+                aria-label="Unpin swimlane"
+                className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-text-muted hover:text-text"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  pinStream({ streamId: stream.id, pinned: false });
+                }}
+              >
+                <PinIcon className="size-3 group-hover/pin:hidden" />
+                <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+              </button>
+            )}
+          </Link>
+        )}
+      />
+    );
+  }
+
+  return (
+    <StreamContextMenu
+      {...menuProps}
+      onClose={() => closeStream(stream.id)}
+      renderTrigger={(label) => (
+        <Link
+          to="/streams/$piSessionId"
+          params={{ piSessionId }}
+          preload={false}
+          onClick={onLinkClick}
+          data-search-key={row.key}
+          className={cn(
+            "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+            pickerSelectedRowClass,
+            active
+              ? "bg-background-selected text-text"
+              : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
+          )}
+        >
+          <span
+            className={cn("shrink-0 size-2 rounded-full", piStatusDotClass(stream.piSessionStatus))}
+          />
+          {label}
+          {shortcut && (
+            <ShortcutHint
+              label={String(shortcut)}
+              className={cn("ml-2 shrink-0", stream.pinned && "group-hover:hidden")}
+              kbdSize="compact"
+            />
+          )}
+          {stream.pinned && (
+            <button
+              type="button"
+              aria-label="Unpin swimlane"
+              className={cn(
+                "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex",
+                !shortcut && "ml-auto",
+              )}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                pinStream({ streamId: stream.id, pinned: false });
+              }}
+            >
+              <PinIcon className="size-3 group-hover/pin:hidden" />
+              <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+            </button>
+          )}
+        </Link>
+      )}
+    />
+  );
+});
+
+const SwimlaneRows = memo(function SwimlaneRows({
+  openRows,
+  closedRows,
+  emptyQuery,
+  currentPiSessionId,
+  defaultRouteActive,
+  defaultBusy,
+  defaultShortcut,
+  streamShortcuts,
+  actionsDisabled,
+  onLinkClick,
+  pinStream,
+  renameStream,
+  reopenStream,
+  closeStream,
+}: {
+  openRows: readonly SidebarSwimlaneRow[];
+  closedRows: readonly SidebarSwimlaneRow[];
+  emptyQuery?: string;
+  currentPiSessionId?: string;
+  defaultRouteActive: boolean;
+  defaultBusy: boolean;
+  defaultShortcut: number | null;
+  streamShortcuts: ReadonlyMap<string, number>;
+  actionsDisabled: boolean;
+  onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+  pinStream: PinStream;
+  renameStream: RenameStream;
+  reopenStream: ReopenStream;
+  closeStream: CloseStream;
+}) {
+  const renderRow = (row: SidebarSwimlaneRow) => (
+    <SwimlaneRow
+      key={row.key}
+      row={row}
+      active={
+        currentPiSessionId === row.piSessionId || (row.kind === "default" && defaultRouteActive)
+      }
+      defaultBusy={row.kind === "default" && defaultBusy}
+      shortcut={row.kind === "default" ? defaultShortcut : streamShortcuts.get(row.stream.id)}
+      actionsDisabled={actionsDisabled}
+      onLinkClick={onLinkClick}
+      pinStream={pinStream}
+      renameStream={renameStream}
+      reopenStream={reopenStream}
+      closeStream={closeStream}
+    />
+  );
+
+  return (
+    <>
+      {openRows.length > 0 && <div>{openRows.map(renderRow)}</div>}
+
+      {closedRows.length > 0 && (
+        <div className={openRows.length > 0 ? "mt-6" : ""}>
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+            Recently closed
+          </p>
+          <div>{closedRows.map(renderRow)}</div>
+        </div>
+      )}
+
+      {emptyQuery && (
+        <p className="ml-2 mt-2 text-[11px] text-text-muted">No swimlanes match “{emptyQuery}”.</p>
+      )}
+    </>
+  );
+});
+
 const icons = {
   surface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="size-4">
@@ -242,10 +522,7 @@ const icons = {
   ),
 };
 
-export const Sidebar = memo(function Sidebar() {
-  const mod = useModifierLabel();
-  const lastStreamPath = useLastStreamPath();
-  useWhyDidYouRender("Sidebar", {});
+function SidebarSwimlanes({ mod }: { mod: string }) {
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
@@ -357,60 +634,79 @@ export const Sidebar = memo(function Sidebar() {
 
   const status = statusQuery.data;
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
-  const allStreams = status?.streams ?? [];
-  const openStreams: StreamSummary[] = [];
-  const closedStreams: StreamSummary[] = [];
-  for (const stream of allStreams) {
-    if (stream.status === "open") openStreams.push(stream);
-    if (stream.status === "closed") closedStreams.push(stream);
-  }
+  const allStreams = status?.streams;
+  const { openRows, closedRows, allSearchCandidates, defaultShortcut, streamShortcuts } =
+    useMemo(() => {
+      const openRows: SidebarSwimlaneRow[] = [];
+      if (defaultPiSessionId) {
+        openRows.push({
+          key: "default",
+          kind: "default",
+          section: "open",
+          name: "flitterbot",
+          piSessionId: defaultPiSessionId,
+        });
+      }
 
-  const openRows: SidebarSwimlaneRow[] = [];
-  if (defaultPiSessionId) {
-    openRows.push({
-      key: "default",
-      kind: "default",
-      section: "open",
-      name: "flitterbot",
-      piSessionId: defaultPiSessionId,
-    });
-  }
-  for (const stream of openStreams) {
-    openRows.push({
-      key: `stream-${stream.id}`,
-      kind: "stream",
-      section: "open",
-      name: stream.name,
-      piSessionId: stream.piSessionId,
-      stream,
-    });
-  }
-  const closedRows: SidebarSwimlaneRow[] = [];
-  for (const stream of closedStreams) {
-    if (!stream.piSessionId) continue;
-    closedRows.push({
-      key: `stream-${stream.id}`,
-      kind: "stream",
-      section: "closed",
-      name: stream.name,
-      piSessionId: stream.piSessionId,
-      stream,
-    });
-  }
+      const closedRows: SidebarSwimlaneRow[] = [];
+      for (const stream of allStreams ?? []) {
+        if (stream.status === "open") {
+          openRows.push({
+            key: `stream-${stream.id}`,
+            kind: "stream",
+            section: "open",
+            name: stream.name,
+            piSessionId: stream.piSessionId,
+            stream,
+          });
+        } else if (stream.status === "closed" && stream.piSessionId) {
+          closedRows.push({
+            key: `stream-${stream.id}`,
+            kind: "stream",
+            section: "closed",
+            name: stream.name,
+            piSessionId: stream.piSessionId,
+            stream,
+          });
+        }
+      }
 
+      const allSearchCandidates = [...openRows, ...closedRows].filter(
+        (row): row is PickerCandidate => !!row.piSessionId,
+      );
+      let nextShortcut = 1;
+      const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
+      const streamShortcuts = new Map<string, number>();
+      for (const row of openRows) {
+        if (row.kind === "stream" && row.piSessionId && nextShortcut <= 9) {
+          streamShortcuts.set(row.stream.id, nextShortcut++);
+        }
+      }
+
+      return { openRows, closedRows, allSearchCandidates, defaultShortcut, streamShortcuts };
+    }, [allStreams, defaultPiSessionId]);
+
+  const deferredQuery = useDeferredValue(query);
   const normalizedQuery = query.trim().toLowerCase();
-  const matchesQuery = (row: SidebarSwimlaneRow) =>
-    row.name.toLowerCase().includes(normalizedQuery);
-  const visibleOpenRows = normalizedQuery ? openRows.filter(matchesQuery) : openRows;
-  const visibleClosedRows = normalizedQuery ? closedRows.filter(matchesQuery) : closedRows;
-  const hasNoSearchResults =
-    !!normalizedQuery && visibleOpenRows.length === 0 && visibleClosedRows.length === 0;
-  const allSearchCandidates = [...openRows, ...closedRows].filter(
-    (row): row is PickerCandidate => !!row.piSessionId,
+  const normalizedDeferredQuery = deferredQuery.trim().toLowerCase();
+  const visibleOpenRows = useMemo(
+    () => filterRows(openRows, normalizedDeferredQuery),
+    [normalizedDeferredQuery, openRows],
   );
-  const searchCandidates = normalizedQuery
-    ? allSearchCandidates.filter(matchesQuery)
-    : allSearchCandidates;
+  const visibleClosedRows = useMemo(
+    () => filterRows(closedRows, normalizedDeferredQuery),
+    [closedRows, normalizedDeferredQuery],
+  );
+  const hasNoSearchResults =
+    !!normalizedDeferredQuery && visibleOpenRows.length === 0 && visibleClosedRows.length === 0;
+  const currentSearchCandidates = useMemo(
+    () => filterRows(allSearchCandidates, normalizedQuery),
+    [allSearchCandidates, normalizedQuery],
+  );
+  const displayedSearchCandidates = useMemo(
+    () => filterRows(allSearchCandidates, normalizedDeferredQuery),
+    [allSearchCandidates, normalizedDeferredQuery],
+  );
   const currentPiSessionId = getPiSessionId(pathname);
 
   useLayoutEffect(() => {
@@ -419,16 +715,16 @@ export const Sidebar = memo(function Sidebar() {
     if (
       document.activeElement !== input ||
       cursor.selectedElement?.isConnected ||
-      searchCandidates.length === 0
+      displayedSearchCandidates.length === 0
     ) {
       return;
     }
     const selectedIndex = cursor.selectedKey
-      ? searchCandidates.findIndex((row) => row.key === cursor.selectedKey)
+      ? displayedSearchCandidates.findIndex((row) => row.key === cursor.selectedKey)
       : -1;
     cursor.originPath = router.state.location.pathname;
-    setPickerSelection(searchCandidates, selectedIndex === -1 ? 0 : selectedIndex);
-  }, [searchCandidates, setPickerSelection]);
+    setPickerSelection(displayedSearchCandidates, selectedIndex === -1 ? 0 : selectedIndex);
+  }, [displayedSearchCandidates, setPickerSelection]);
 
   const openStreamPicker = useEffectEvent((direction?: 1 | -1) => {
     const input = searchInputRef.current;
@@ -452,7 +748,7 @@ export const Sidebar = memo(function Sidebar() {
             : allSearchCandidates.length - 1
           : getAdjacentIndex(currentIndex, direction, allSearchCandidates.length);
       setQuery("");
-      setPickerSelection(allSearchCandidates, selectedIndex, !!normalizedQuery);
+      setPickerSelection(allSearchCandidates, selectedIndex, !!normalizedDeferredQuery);
       cursor.originPath = currentPathname;
     }
     input.focus();
@@ -471,20 +767,6 @@ export const Sidebar = memo(function Sidebar() {
     };
   }, [clearPickerCursor]);
 
-  let nextShortcut = 1;
-  const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
-  const streamShortcuts = new Map<string, number>();
-  for (const ws of openStreams) {
-    if (ws.piSessionId && nextShortcut <= 9) {
-      streamShortcuts.set(ws.id, nextShortcut++);
-    }
-  }
-  const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
-    altLabel: mod,
-  });
-  const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
-    altLabel: mod,
-  });
   const newSwimlaneShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneCreate, {
     altLabel: mod,
   });
@@ -493,192 +775,146 @@ export const Sidebar = memo(function Sidebar() {
   });
   const swimlaneSearchPlaceholder = `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`;
 
-  const renderSwimlaneRow = (row: SidebarSwimlaneRow) => {
-    if (row.kind === "default") {
-      return (
-        <StreamContextMenu
-          key={row.key}
-          name={row.name}
-          disabled={pinStreamMutation.isPending || reopenStreamMutation.isPending}
-          renderTrigger={() => (
-            <Link
-              to="/streams/$piSessionId"
-              params={{ piSessionId: row.piSessionId }}
-              preload={false}
-              onClick={handleSwimlaneLinkClick}
-              data-search-key={row.key}
-              className={cn(
-                "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                pickerSelectedRowClass,
-                currentPiSessionId === row.piSessionId ||
-                  (pathname === "/streams" && !currentPiSessionId)
-                  ? "bg-background-selected text-text"
-                  : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
-              )}
-            >
-              <span
-                className={cn(
-                  "shrink-0 size-2 rounded-full",
-                  status?.piAgent?.default?.busy ? "bg-status-active" : "bg-status-ended",
-                )}
-              />
-              <span className="truncate flex-1">{row.name}</span>
-              {defaultShortcut && (
-                <ShortcutHint
-                  label={String(defaultShortcut)}
-                  className="ml-2 shrink-0"
-                  kbdSize="compact"
-                />
-              )}
-            </Link>
-          )}
-        />
-      );
-    }
+  if (!defaultPiSessionId && !allStreams?.length) return <div className="flex-1" />;
 
-    const stream = row.stream;
-    const recoveryKind = getStreamRecoveryKind(stream);
-    const onReopen = recoveryKind
-      ? () => reopenStreamMutation.mutate({ streamId: stream.id, recoveryKind })
-      : undefined;
-    const menuProps = {
-      name: stream.name,
-      pinned: stream.pinned,
-      disabled: pinStreamMutation.isPending || reopenStreamMutation.isPending,
-      onTogglePinned: () =>
-        pinStreamMutation.mutate({ streamId: stream.id, pinned: !stream.pinned }),
-      onRename: (name: string) => renameStreamMutation.mutate({ streamId: stream.id, name }),
-      onReopen,
-    };
-
-    if (!row.piSessionId) {
-      return (
-        <StreamContextMenu
-          key={row.key}
-          {...menuProps}
-          onClose={() => closeSwimlaneMutation.mutate(stream.id)}
-          renderTrigger={(label) => (
-            <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-muted">
-              <span className="shrink-0 size-2 rounded-full bg-status-ended" />
-              {label}
-              {stream.pinned && (
-                <button
-                  type="button"
-                  aria-label="Unpin swimlane"
-                  className="group/pin ml-auto mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex"
-                  onClick={() => pinStreamMutation.mutate({ streamId: stream.id, pinned: false })}
-                >
-                  <PinIcon className="size-3 group-hover/pin:hidden" />
-                  <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-                </button>
-              )}
-            </div>
-          )}
-        />
-      );
-    }
-
-    const piSessionId = row.piSessionId;
-    if (row.section === "closed") {
-      return (
-        <StreamContextMenu
-          key={row.key}
-          {...menuProps}
-          renderTrigger={(label) => (
-            <Link
-              to="/streams/$piSessionId"
-              params={{ piSessionId }}
-              preload={false}
-              onClick={handleSwimlaneLinkClick}
-              data-search-key={row.key}
-              className={cn(
-                "group flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
-                pickerSelectedRowClass,
-                currentPiSessionId === piSessionId
-                  ? "bg-background-selected text-text"
-                  : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
-              )}
-            >
-              {label}
-              {stream.pinned && (
-                <button
-                  type="button"
-                  aria-label="Unpin swimlane"
-                  className="group/pin ml-2 mr-0.5 flex size-3 shrink-0 items-center justify-center text-text-muted hover:text-text"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    pinStreamMutation.mutate({ streamId: stream.id, pinned: false });
-                  }}
-                >
-                  <PinIcon className="size-3 group-hover/pin:hidden" />
-                  <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-                </button>
-              )}
-            </Link>
-          )}
-        />
-      );
-    }
-
-    const shortcut = streamShortcuts.get(stream.id);
-    return (
-      <StreamContextMenu
-        key={row.key}
-        {...menuProps}
-        onClose={() => closeSwimlaneMutation.mutate(stream.id)}
-        renderTrigger={(label) => (
-          <Link
-            to="/streams/$piSessionId"
-            params={{ piSessionId }}
-            preload={false}
-            onClick={handleSwimlaneLinkClick}
-            data-search-key={row.key}
-            className={cn(
-              "group flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-              pickerSelectedRowClass,
-              currentPiSessionId === piSessionId
-                ? "bg-background-selected text-text"
-                : "text-text-muted hover:bg-background-hover hover:text-text data-popup-open:bg-background-hover data-popup-open:text-text",
-            )}
+  return (
+    <div
+      ref={swimlaneListRef}
+      className="min-h-0 flex-1 overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-2"
+    >
+      <div className="flex items-center justify-between mb-0.5">
+        <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={query}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              const nextCandidates = filterRows(
+                allSearchCandidates,
+                nextQuery.trim().toLowerCase(),
+              );
+              clearPickerCursor();
+              setQuery(nextQuery);
+              pickerCursorRef.current.originPath = router.state.location.pathname;
+              setPickerSelection(nextCandidates, 0);
+            }}
+            onFocus={() => {
+              pickerCursorRef.current.originPath = router.state.location.pathname;
+              if (!pickerCursorRef.current.selectedKey) {
+                setPickerSelection(currentSearchCandidates, 0);
+              }
+            }}
+            onBlur={clearPickerCursor}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                resetSearch();
+                return;
+              }
+              if (
+                (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+                !event.altKey &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.shiftKey
+              ) {
+                if (currentSearchCandidates.length === 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                const selectedIndex = currentSearchCandidates.findIndex(
+                  (row) => row.key === pickerCursorRef.current.selectedKey,
+                );
+                const currentIndex = selectedIndex === -1 ? 0 : selectedIndex;
+                const nextIndex = getAdjacentIndex(
+                  currentIndex,
+                  direction,
+                  currentSearchCandidates.length,
+                );
+                setPickerSelection(currentSearchCandidates, nextIndex);
+                return;
+              }
+              if (event.key === "Enter") {
+                const selectedSearchCandidate =
+                  currentSearchCandidates.find(
+                    (row) => row.key === pickerCursorRef.current.selectedKey,
+                  ) ?? currentSearchCandidates[0];
+                if (!selectedSearchCandidate) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const piSessionId = selectedSearchCandidate.piSessionId;
+                resetSearch();
+                void navigate({
+                  to: "/streams/$piSessionId",
+                  params: { piSessionId },
+                });
+              }
+            }}
+            placeholder={swimlaneSearchPlaceholder}
+            aria-label="Search swimlanes by name"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:shadow-[inset_0_-1px_0_var(--border-pop)] focus:placeholder:opacity-0"
+          />
+        </div>
+        <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
+          {hasNoSearchResults ? `No swimlanes match “${deferredQuery.trim()}”.` : ""}
+        </span>
+        <div
+          className="group pl-4 pr-3 pb-2 -mr-2 -mb-2"
+          onClick={() => {
+            if (!createSwimlaneMutation.isPending) createSwimlaneMutation.mutate();
+          }}
+        >
+          <button
+            type="button"
+            disabled={createSwimlaneMutation.isPending}
+            aria-label="New swimlane"
+            title={
+              newSwimlaneShortcutHint ? `New swimlane (${newSwimlaneShortcutHint})` : "New swimlane"
+            }
+            className="flex size-6 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <span
-              className={cn(
-                "shrink-0 size-2 rounded-full",
-                piStatusDotClass(stream.piSessionStatus),
-              )}
-            />
-            {label}
-            {shortcut && (
-              <ShortcutHint
-                label={String(shortcut)}
-                className={cn("ml-2 shrink-0", stream.pinned && "group-hover:hidden")}
-                kbdSize="compact"
-              />
-            )}
-            {stream.pinned && (
-              <button
-                type="button"
-                aria-label="Unpin swimlane"
-                className={cn(
-                  "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex",
-                  !shortcut && "ml-auto",
-                )}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  pinStreamMutation.mutate({ streamId: stream.id, pinned: false });
-                }}
-              >
-                <PinIcon className="size-3 group-hover/pin:hidden" />
-                <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-              </button>
-            )}
-          </Link>
-        )}
+            <PlusIcon className="size-3" aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      <SwimlaneRows
+        openRows={visibleOpenRows}
+        closedRows={visibleClosedRows}
+        emptyQuery={hasNoSearchResults ? deferredQuery.trim() : undefined}
+        currentPiSessionId={currentPiSessionId}
+        defaultRouteActive={pathname === "/streams" && !currentPiSessionId}
+        defaultBusy={status?.piAgent?.default?.busy ?? false}
+        defaultShortcut={defaultShortcut}
+        streamShortcuts={streamShortcuts}
+        actionsDisabled={pinStreamMutation.isPending || reopenStreamMutation.isPending}
+        onLinkClick={handleSwimlaneLinkClick}
+        pinStream={pinStreamMutation.mutate}
+        renameStream={renameStreamMutation.mutate}
+        reopenStream={reopenStreamMutation.mutate}
+        closeStream={closeSwimlaneMutation.mutate}
       />
-    );
-  };
+    </div>
+  );
+}
+
+export const Sidebar = memo(function Sidebar() {
+  const mod = useModifierLabel();
+  const lastStreamPath = useLastStreamPath();
+  useWhyDidYouRender("Sidebar", {});
+  const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
+    altLabel: mod,
+  });
+  const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
+    altLabel: mod,
+  });
 
   return (
     <aside className="flex h-full min-h-0 select-none flex-col overflow-hidden border-r border-border bg-background">
@@ -696,130 +932,7 @@ export const Sidebar = memo(function Sidebar() {
           shortcutHint={streamsShortcutHint}
         />
       </nav>
-
-      {(defaultPiSessionId || allStreams.length > 0) && (
-        <div
-          ref={swimlaneListRef}
-          className="min-h-0 flex-1 overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-2"
-        >
-          <div className="flex items-center justify-between mb-0.5">
-            <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={query}
-                onChange={(event) => {
-                  clearPickerCursor();
-                  setQuery(event.target.value);
-                }}
-                onFocus={() => {
-                  pickerCursorRef.current.originPath = router.state.location.pathname;
-                  if (!pickerCursorRef.current.selectedKey) {
-                    setPickerSelection(searchCandidates, 0);
-                  }
-                }}
-                onBlur={clearPickerCursor}
-                onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing) return;
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    resetSearch();
-                    return;
-                  }
-                  if (
-                    (event.key === "ArrowDown" || event.key === "ArrowUp") &&
-                    !event.altKey &&
-                    !event.ctrlKey &&
-                    !event.metaKey &&
-                    !event.shiftKey
-                  ) {
-                    if (searchCandidates.length === 0) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const direction = event.key === "ArrowDown" ? 1 : -1;
-                    const selectedIndex = searchCandidates.findIndex(
-                      (row) => row.key === pickerCursorRef.current.selectedKey,
-                    );
-                    const currentIndex = selectedIndex === -1 ? 0 : selectedIndex;
-                    const nextIndex = getAdjacentIndex(
-                      currentIndex,
-                      direction,
-                      searchCandidates.length,
-                    );
-                    setPickerSelection(searchCandidates, nextIndex);
-                    return;
-                  }
-                  if (event.key === "Enter") {
-                    const selectedSearchCandidate =
-                      searchCandidates.find(
-                        (row) => row.key === pickerCursorRef.current.selectedKey,
-                      ) ?? searchCandidates[0];
-                    if (!selectedSearchCandidate) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const piSessionId = selectedSearchCandidate.piSessionId;
-                    resetSearch();
-                    void navigate({
-                      to: "/streams/$piSessionId",
-                      params: { piSessionId },
-                    });
-                  }
-                }}
-                placeholder={swimlaneSearchPlaceholder}
-                aria-label="Search swimlanes by name"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:shadow-[inset_0_-1px_0_var(--border-pop)] focus:placeholder:opacity-0"
-              />
-            </div>
-            <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
-              {hasNoSearchResults ? `No swimlanes match “${query.trim()}”.` : ""}
-            </span>
-            <div
-              className="group pl-4 pr-3 pb-2 -mr-2 -mb-2"
-              onClick={() => {
-                if (!createSwimlaneMutation.isPending) createSwimlaneMutation.mutate();
-              }}
-            >
-              <button
-                type="button"
-                disabled={createSwimlaneMutation.isPending}
-                aria-label="New swimlane"
-                title={
-                  newSwimlaneShortcutHint
-                    ? `New swimlane (${newSwimlaneShortcutHint})`
-                    : "New swimlane"
-                }
-                className="flex size-6 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <PlusIcon className="size-3" aria-hidden />
-              </button>
-            </div>
-          </div>
-
-          {visibleOpenRows.length > 0 && <div>{visibleOpenRows.map(renderSwimlaneRow)}</div>}
-
-          {visibleClosedRows.length > 0 && (
-            <div className={visibleOpenRows.length > 0 ? "mt-6" : ""}>
-              <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-                Recently closed
-              </p>
-              <div>{visibleClosedRows.map(renderSwimlaneRow)}</div>
-            </div>
-          )}
-
-          {hasNoSearchResults && (
-            <p className="ml-2 mt-2 text-[11px] text-text-muted">
-              No swimlanes match “{query.trim()}”.
-            </p>
-          )}
-        </div>
-      )}
-
-      {!defaultPiSessionId && allStreams.length === 0 && <div className="flex-1" />}
+      <SidebarSwimlanes mod={mod} />
     </aside>
   );
 });
