@@ -911,7 +911,8 @@ export const MessageInput = memo(function MessageInput({
         event.preventDefault();
         const value = draftRef.current;
         const cursor = textareaRef.current?.selectionStart ?? value.length;
-        if (cursor === 0) return;
+        const selectionEnd = textareaRef.current?.selectionEnd ?? cursor;
+        if (cursor === 0 && selectionEnd === 0) return;
         let i = cursor;
         const isDelim = (ch: string) => ch === "/" || ch === "@";
         const beforeWS = i;
@@ -927,7 +928,7 @@ export const MessageInput = memo(function MessageInput({
         } else {
           while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
         }
-        const newValue = value.slice(0, i) + value.slice(cursor);
+        const newValue = value.slice(0, i) + value.slice(selectionEnd);
         handleDraftChange(newValue);
         requestAnimationFrame(() => {
           textareaRef.current?.setSelectionRange(i, i);
