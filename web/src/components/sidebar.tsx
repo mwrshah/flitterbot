@@ -572,7 +572,9 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   const resetSearch = useCallback(() => {
     setQuery("");
     clearPickerCursor();
-    searchInputRef.current?.blur();
+    const input = searchInputRef.current;
+    if (input) input.value = "";
+    input?.blur();
   }, [clearPickerCursor]);
   const handleSwimlaneLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
@@ -732,23 +734,21 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     if (direction) {
       const cursor = pickerCursorRef.current;
       const currentPathname = router.state.location.pathname;
+      const inputFocused = document.activeElement === input;
+      const candidates = inputFocused ? currentSearchCandidates : allSearchCandidates;
       const continuing =
-        document.activeElement === input &&
-        cursor.originPath === currentPathname &&
-        cursor.selectedKey !== undefined;
+        inputFocused && cursor.originPath === currentPathname && cursor.selectedKey !== undefined;
       const currentIndex = continuing
-        ? allSearchCandidates.findIndex((row) => row.key === cursor.selectedKey)
-        : allSearchCandidates.findIndex(
-            (row) => row.piSessionId === getPiSessionId(currentPathname),
-          );
+        ? candidates.findIndex((row) => row.key === cursor.selectedKey)
+        : candidates.findIndex((row) => row.piSessionId === getPiSessionId(currentPathname));
       const selectedIndex =
         currentIndex === -1
           ? direction === 1
             ? 0
-            : allSearchCandidates.length - 1
-          : getAdjacentIndex(currentIndex, direction, allSearchCandidates.length);
-      setQuery("");
-      setPickerSelection(allSearchCandidates, selectedIndex, !!normalizedDeferredQuery);
+            : candidates.length - 1
+          : getAdjacentIndex(currentIndex, direction, candidates.length);
+      if (!inputFocused) setQuery("");
+      setPickerSelection(candidates, selectedIndex, !inputFocused && !!normalizedDeferredQuery);
       cursor.originPath = currentPathname;
     }
     input.focus();
