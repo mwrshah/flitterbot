@@ -116,8 +116,8 @@ Expected:
 - Todoist task is created first, then local stores Todoist external ID.
 - Linear issue is created first, then local stores Linear external ID.
 - Local task is written only after successful provider creation.
-- Linear issue starts in the first `unstarted` workflow state.
-- Local due date maps to Todoist due date and Linear `dueDate`.
+- Linear issue starts in the first `unstarted` workflow state and is assigned to the authenticated Linear user.
+- Local due date maps to the Todoist due date; the Linear issue has no due date.
 
 ### 5. Local update existing task
 
@@ -130,7 +130,7 @@ Action:
 
 Expected:
 - Todoist is updated remote-first.
-- Linear is updated remote-first.
+- Linear-owned fields are updated remote-first; due-date-only changes make no Linear request.
 - Local task is updated after providers succeed.
 - Local `updatedAt` advances.
 - Provider links remain minimal.
@@ -435,7 +435,7 @@ Action:
 Expected:
 - Active task uses first Linear `unstarted` state, falling back to `backlog` only if no unstarted state exists.
 - Done task uses first Linear `completed` state.
-- Due date remains a due date only; no special `Today` state behavior.
+- Linear due date remains unset.
 
 ### 27. Todoist status mapping
 

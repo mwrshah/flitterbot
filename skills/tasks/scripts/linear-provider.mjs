@@ -1,4 +1,4 @@
-// ponytail: share provider conflict/date helpers with Todoist instead of duplicating them per provider.
+// ponytail: share provider conflict helpers with Todoist instead of duplicating them per provider.
 const LINEAR_API = "https://api.linear.app/graphql";
 const LINEAR_SYSTEM = "linear";
 
@@ -49,20 +49,23 @@ export function createLinearProvider(config, deps) {
       return;
     },
 
-    async createTask({ project, description, details, dueAt, links }) {
+    async createTask({ project, description, details, links }) {
       const mapping = mappingForProject(project);
       if (!mapping?.teamId) return;
 
-      const states = await statesForTeam(client, teamStateCache, mapping.teamId);
+      const [states, viewer] = await Promise.all([
+        statesForTeam(client, teamStateCache, mapping.teamId),
+        client.viewer(),
+      ]);
       const issue = await client.createIssue({
         teamId: mapping.teamId,
         projectId: mapping.projectId,
+        assigneeId: viewer.id,
         title: description,
         description: linearDescription(details, project.name),
-        dueDate: localDueDate(dueAt, deps),
-        stateId: stateIdForLocalTask(states, { status: "active", dueAt }),
+        stateId: stateIdForLocalTask(states, { status: "active" }),
       });
-      deps.setExternalLink(links, linearIssueLink(issue, project, deps));
+      deps.setExternalLink(links, linearIssueLink(issue));
     },
 
     async updateTask({ task, patch, force = false }) {
@@ -76,7 +79,6 @@ export function createLinearProvider(config, deps) {
           project: patch.project,
           description: patch.description,
           details: patch.details,
-          dueAt: patch.dueAt,
           links: patch.externalLinks,
         });
         if (patch.status === "done") {
@@ -85,24 +87,30 @@ export function createLinearProvider(config, deps) {
             const created = await client.getIssue(linearIssueId(createdLink));
             const states = await statesForTeam(client, teamStateCache, created.team.id);
             const updated = await client.updateIssue(created.id, { stateId: stateIdForLocalTask(states, patch) });
-            deps.setExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
+            deps.setExternalLink(patch.externalLinks, linearIssueLink(updated));
           }
         }
         return;
       }
 
+      const titleChanged = patch.description !== task.description;
+      const detailsChanged = (patch.details ?? null) !== (task.details ?? null);
+      const projectChanged = patch.project.id !== task.projectId;
+      const statusChanged = patch.status !== task.status;
+      if (!titleChanged && !detailsChanged && !projectChanged && !statusChanged) return;
+
       const remote = await client.getIssue(linearIssueId(existingLink));
       if (!force) assertLinearNotAhead(existingLink, task, remote.updatedAt, `Linear issue "${remote.identifier}" changed upstream; run periodic_sync_and_cleanup before mutating it locally.`);
-      const states = await statesForTeam(client, teamStateCache, remote.team.id);
-      const update = {
-        title: patch.description,
-        description: linearDescription(patch.details, patch.project.name),
-        dueDate: localDueDate(patch.dueAt, deps),
-        stateId: stateIdForLocalTask(states, patch),
-      };
+      const update = {};
+      if (titleChanged) update.title = patch.description;
+      if (detailsChanged || projectChanged) update.description = linearDescription(patch.details, patch.project.name);
       if (mapping?.projectId) update.projectId = mapping.projectId;
+      if (statusChanged) {
+        const states = await statesForTeam(client, teamStateCache, remote.team.id);
+        update.stateId = stateIdForLocalTask(states, patch);
+      }
       const updated = await client.updateIssue(remote.id, update);
-      deps.setExternalLink(patch.externalLinks, linearIssueLink(updated, patch.project, deps));
+      deps.setExternalLink(patch.externalLinks, linearIssueLink(updated));
     },
   };
 }
@@ -192,17 +200,14 @@ function reconcileLinearTask({ task, issue, project, nextStatus, deps, idx, inbo
 
   const nextProjectId = project?.id ?? task.projectId;
   const nextDetails = stripLocalMetadata(issue.description ?? null);
-  const nextDueAt = linearDueToLocalDueAt(issue.dueDate, deps);
   const wasDone = task.status === "done";
   const changed = task.projectId !== nextProjectId
     || task.description !== issue.title
     || (task.details ?? null) !== nextDetails
-    || task.dueAt !== nextDueAt
     || task.status !== nextStatus;
   task.projectId = nextProjectId;
   task.description = issue.title;
   task.details = nextDetails;
-  task.dueAt = nextDueAt;
   task.status = nextStatus;
   if (changed) task.updatedAt = deps.nowIso();
   if (created || changed || linked) deps.markInboundApplied(task, LINEAR_SYSTEM);
@@ -227,7 +232,7 @@ function createLocalTaskFromLinear(store, idx, issue, project, deps) {
     projectId: project.id,
     description: issue.title,
     details: stripLocalMetadata(issue.description ?? null),
-    dueAt: linearDueToLocalDueAt(issue.dueDate, deps),
+    dueAt: deps.localTodayStartIso(),
     status: issueStateToLocalStatus(issue.state),
     externalLinks: [],
     createdAt: deps.normalizeMaybeDate(issue.createdAt, now),
@@ -301,17 +306,9 @@ function stripLocalMetadata(description) {
   return cleaned || null;
 }
 
-function localDueDate(dueAt, deps) {
-  const date = new Date(dueAt);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return deps.localDateKey(date);
-}
-
-function linearDueToLocalDueAt(dueDate, deps) {
-  return dueDate ? deps.normalizeMaybeDate(dueDate, deps.localTodayStartIso()) : deps.localTodayStartIso();
-}
-
 function linearClient(apiKey) {
+  let viewerPromise;
+
   async function request(query, variables = {}) {
     const response = await fetch(LINEAR_API, {
       method: "POST",
@@ -335,7 +332,6 @@ function linearClient(apiKey) {
     title
     description
     priority
-    dueDate
     url
     createdAt
     updatedAt
@@ -347,8 +343,9 @@ function linearClient(apiKey) {
   `;
 
   return {
-    async viewer() {
-      return (await request(`query Viewer { viewer { id name email } }`)).viewer;
+    viewer() {
+      viewerPromise ??= request(`query Viewer { viewer { id name email } }`).then((data) => data.viewer);
+      return viewerPromise;
     },
 
     async teamStates(teamId) {
