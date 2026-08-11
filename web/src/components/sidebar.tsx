@@ -332,6 +332,7 @@ export const Sidebar = memo(function Sidebar() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onBlur={() => setQuery("")}
                 onKeyDown={(event) => {
                   if (event.key !== "Escape") return;
                   event.preventDefault();
