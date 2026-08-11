@@ -66,8 +66,11 @@ source and destination both exist with the same inode
 source and destination both exist with different inodes
   => refuse to overwrite and report corruption
 
-neither exists
-  => classify as an unmaterialized or missing session; never manufacture history
+neither exists and session_file is materialized
+  => create an empty Pi session at the desired path with the persisted ID, cwd, and start time
+
+session_file is null
+  => classify as unmaterialized and fail because there is no safe managed filename
 
 path outside the two managed directories
   => refuse relocation
@@ -79,7 +82,7 @@ The two directories share a parent, so movement stays on one filesystem. File mo
 
 Every lifecycle operation validates its expected Pi ID after acquiring the gate. Activation and reopen also validate that a materialized JSONL header ID equals `pi_sessions.pi_session_id`.
 
-`pi_sessions.stream_id` is unique when non-null, so SQLite enforces one Pi session per stream. Stream creation rolls back its stream row if Pi creation fails, and startup enumerates every stream so a legacy zero-Pi stream hard-fails reconciliation. Once inserted, a Pi row cannot acquire or change stream ownership; detaching a row cannot make it assignable to another stream. A stream Pi identity never changes. Activation and reopen hard-fail when `session_file` is null, the file is absent, or the JSONL header identity differs. They never open a missing path and never create a successor. Existing databases with duplicate stream-linked Pi rows fail startup with a migration error until the legacy duplicate is resolved explicitly.
+`pi_sessions.stream_id` is unique when non-null, so SQLite enforces one Pi session per stream. Stream creation rolls back its stream row if Pi creation fails, and startup enumerates every stream so a legacy zero-Pi stream hard-fails reconciliation. Once inserted, a Pi row cannot acquire or change stream ownership; detaching a row cannot make it assignable to another stream. A stream Pi identity never changes. When a materialized file is absent from both managed directories, reconciliation hydrates a valid empty Pi JSONL with the persisted identity rather than creating a successor; the lost conversation history cannot be recovered. Activation and reopen still hard-fail when `session_file` is null or an existing JSONL header has the wrong identity. Existing databases with duplicate stream-linked Pi rows fail startup with a migration error until the legacy duplicate is resolved explicitly.
 
 The `close_swimlane` tool uses its bound stream ID. A model-supplied stream ID cannot close or terminate another stream.
 

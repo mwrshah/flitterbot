@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { CURRENT_SESSION_VERSION, type SessionHeader } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { updatePiSessionFile } from "../blackboard/write-pi-sessions.ts";
 
@@ -11,7 +12,12 @@ export type SessionFileRecord = {
   sessionFile: string | null;
 };
 
-type SessionFilePlacementStatus = "already-placed" | "moved" | "recovered";
+type MaterializedSessionFileRecord = SessionFileRecord & {
+  cwd: string;
+  startedAt: string;
+};
+
+type SessionFilePlacementStatus = "already-placed" | "hydrated" | "moved" | "recovered";
 
 type SessionFilePlacementResult = {
   piSessionId: string;
@@ -36,6 +42,8 @@ type PiSessionFileRow = {
   pi_session_id: string;
   stream_id: string;
   session_file: string | null;
+  cwd: string;
+  started_at: string;
 };
 
 type ManagedSessionPaths = {
@@ -135,9 +143,24 @@ function updateSessionFile(
   updatePiSessionFile(blackboard, record.piSessionId, record.streamId, sessionFile);
 }
 
+function hydrateSessionFile(record: MaterializedSessionFileRecord, sessionFile: string): void {
+  const header = {
+    type: "session",
+    version: CURRENT_SESSION_VERSION,
+    id: record.piSessionId,
+    timestamp: record.startedAt,
+    cwd: record.cwd,
+  } satisfies SessionHeader;
+  fs.writeFileSync(sessionFile, `${JSON.stringify(header)}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+}
+
 function placeSessionFile(
   blackboard: BlackboardDatabase,
-  record: SessionFileRecord,
+  record: MaterializedSessionFileRecord,
   placement: SessionFilePlacement,
   sessionsDir: string,
   archivedSessionsDir: string,
@@ -180,7 +203,14 @@ function placeSessionFile(
   }
 
   if (!otherExists) {
-    throw new Error(`Pi session file is missing for ${record.piSessionId}: ${record.sessionFile}`);
+    hydrateSessionFile(record, desiredPath);
+    updateSessionFile(blackboard, record, desiredPath);
+    return {
+      piSessionId: record.piSessionId,
+      previousSessionFile: record.sessionFile,
+      sessionFile: desiredPath,
+      status: "hydrated",
+    };
   }
 
   try {
@@ -218,7 +248,7 @@ export function reconcileStreamSessionFiles(
   const placement: SessionFilePlacement =
     stream.status === "open" || stream.pinned ? "active" : "archived";
   const row = blackboard.get<PiSessionFileRow>(
-    `SELECT pi_session_id, stream_id, session_file
+    `SELECT pi_session_id, stream_id, session_file, cwd, started_at
      FROM pi_sessions
      WHERE stream_id = ?`,
     streamId,
@@ -230,6 +260,8 @@ export function reconcileStreamSessionFiles(
       piSessionId: row.pi_session_id,
       streamId: row.stream_id,
       sessionFile: row.session_file,
+      cwd: row.cwd,
+      startedAt: row.started_at,
     },
     placement,
     sessionsDir,
