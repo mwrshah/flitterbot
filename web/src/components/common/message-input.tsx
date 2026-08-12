@@ -1228,7 +1228,7 @@ export const MessageInput = memo(function MessageInput({
             tabIndex={-1}
             disabled={disabled || isCompacting}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3.5 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute left-2.5 top-3 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             title="Attach image"
           >
             <svg
@@ -1238,7 +1238,7 @@ export const MessageInput = memo(function MessageInput({
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.75"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
