@@ -226,7 +226,7 @@ type PickerCursor = {
 };
 
 const pickerSelectedRowClass =
-  "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop";
+  "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text";
 
 function getAdjacentPickerIndex(current: number, direction: 1 | -1, length: number): number {
   const next = current + direction;
@@ -570,13 +570,15 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   );
   const selectPickerIndex = useCallback(
     (candidates: readonly PickerCandidate[], index: number, deferDomUpdate = false) => {
+      const input = searchInputRef.current;
+      input?.removeAttribute("data-search-selected");
       setPickerSelection(candidates, index, deferDomUpdate);
       if (index === -1) {
         const cursor = pickerCursorRef.current;
-        const input = searchInputRef.current;
+        input?.setAttribute("data-search-selected", "true");
         if (input) {
           const frame = requestAnimationFrame(() => {
-            input.scrollIntoView({ block: "nearest" });
+            swimlaneListRef.current?.scrollTo({ top: 0 });
             if (cursor.scrollFrame === frame) cursor.scrollFrame = undefined;
           });
           cursor.scrollFrame = frame;
@@ -588,6 +590,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   );
   const clearPickerCursor = useCallback(() => {
     setPickerSelection();
+    searchInputRef.current?.removeAttribute("data-search-selected");
     pickerCursorRef.current.originPath = undefined;
   }, [setPickerSelection]);
   const resetSearch = useCallback(() => {
@@ -882,7 +885,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="h-full min-w-0 flex-1 rounded-sm border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-border-pop focus:placeholder:opacity-0"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:shadow-[inset_0_-1px_0_var(--border-pop)] focus:placeholder:opacity-0 data-[search-selected=true]:rounded-sm data-[search-selected=true]:shadow-none data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop"
           />
         </div>
         <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
