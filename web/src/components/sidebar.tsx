@@ -229,7 +229,10 @@ const pickerSelectedRowClass =
   "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text";
 
 function getAdjacentPickerIndex(current: number, direction: 1 | -1, length: number): number {
-  return Math.max(-1, Math.min(current + direction, length - 1));
+  const next = current + direction;
+  if (next < -1) return length - 1;
+  if (next >= length) return -1;
+  return next;
 }
 
 function getPiSessionId(pathname: string): string | undefined {
@@ -568,8 +571,17 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   const selectPickerIndex = useCallback(
     (candidates: readonly PickerCandidate[], index: number, deferDomUpdate = false) => {
       setPickerSelection(candidates, index, deferDomUpdate);
-      if (index === -1 && liveRegionRef.current) {
-        liveRegionRef.current.textContent = "Search swimlanes";
+      if (index === -1) {
+        const cursor = pickerCursorRef.current;
+        const input = searchInputRef.current;
+        if (input) {
+          const frame = requestAnimationFrame(() => {
+            input.scrollIntoView({ block: "nearest" });
+            if (cursor.scrollFrame === frame) cursor.scrollFrame = undefined;
+          });
+          cursor.scrollFrame = frame;
+        }
+        if (liveRegionRef.current) liveRegionRef.current.textContent = "Search swimlanes";
       }
     },
     [setPickerSelection],
@@ -751,7 +763,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
         ? candidates.findIndex((row) => row.key === cursor.selectedKey)
         : candidates.findIndex((row) => row.piSessionId === getPiSessionId(currentPathname));
       const selectedIndex =
-        currentIndex === -1
+        !continuing && currentIndex === -1
           ? direction === 1
             ? 0
             : candidates.length - 1
