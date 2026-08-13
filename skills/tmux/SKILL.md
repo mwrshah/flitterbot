@@ -24,6 +24,8 @@ All commands run via `/bin/bash scripts/sessions.sh <command>` relative to the s
 
 ### Rules
 
+When deciding to launch multiple tmux sessions, consider whether the work can split naturally into independent, scoped questions or slices; otherwise, keep it in the current session.
+
 1. **Launch the agent with `sessions.sh launch`** — never raw tmux. The script sets required env vars (`FLITTERBOT_AGENT_MANAGED=1` etc.). Without them, stop hooks won't fire. If launch fails, report the error.
 
 2. **Send prompts with `message`, not `send`.** `message` verifies the agent started inferring and retries if needed. Use `send` only for raw keystrokes (bare Enter to accept a prompt, typing a shell command).
