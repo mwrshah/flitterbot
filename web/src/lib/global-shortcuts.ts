@@ -74,17 +74,6 @@ const STREAM_SLOT_DIGIT_CODES = [
   "Digit8",
   "Digit9",
 ] as const;
-const STREAM_SLOT_HOME_ROW_CODES = [
-  "KeyM",
-  "Comma",
-  "Period",
-  "KeyJ",
-  "KeyK",
-  "KeyL",
-  "KeyU",
-  "KeyI",
-  "KeyO",
-] as const;
 export const MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS = [
   "a",
   "s",
@@ -765,10 +754,7 @@ function registerBuiltInShortcutDefinitions() {
 
   for (let slot = 0; slot < STREAM_SLOT_DIGIT_CODES.length; slot++) {
     defineShortcutAction(getStreamSlotShortcutActionId(slot + 1), {
-      defaultBindings: [
-        { spec: `Alt+${STREAM_SLOT_DIGIT_CODES[slot]}`, when: "always" },
-        { spec: `Alt+${STREAM_SLOT_HOME_ROW_CODES[slot]}`, when: "always" },
-      ],
+      defaultBindings: [{ spec: `Alt+${STREAM_SLOT_DIGIT_CODES[slot]}`, when: "always" }],
     });
   }
 
