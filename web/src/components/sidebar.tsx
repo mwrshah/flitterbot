@@ -16,29 +16,29 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import logoBlack from "~/assets/flitterbot_logo_black_small.png";
-import logoWhite from "~/assets/flitterbot_logo_white_small.png";
-import { ShortcutHint } from "~/components/common/kbd";
+import logoBlack from "@/assets/flitterbot_logo_black_small.png";
+import logoWhite from "@/assets/flitterbot_logo_white_small.png";
+import { ShortcutHint } from "@/components/common/kbd";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "~/components/ui/context-menu";
-import { useModifierLabel } from "~/hooks/platform";
-import { useCreateSwimlane } from "~/hooks/use-create-swimlane";
-import { useLastStreamPath } from "~/hooks/use-last-stream-path";
-import { useReopenStream } from "~/hooks/use-reopen-stream";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+} from "@/components/ui/context-menu";
+import { useModifierLabel } from "@/hooks/platform";
+import { useCreateSwimlane } from "@/hooks/use-create-swimlane";
+import { useLastStreamPath } from "@/hooks/use-last-stream-path";
+import { useReopenStream } from "@/hooks/use-reopen-stream";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
-} from "~/lib/global-shortcuts";
-import { statusQueryOptions } from "~/lib/queries";
-import { getStreamRecoveryKind, type StreamRecoveryKind } from "~/lib/stream-recovery";
-import type { PiSessionStatus, StreamSummary } from "~/lib/types";
-import { cn } from "~/lib/utils";
+} from "@/lib/global-shortcuts";
+import { statusQueryOptions } from "@/lib/queries";
+import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
+import type { PiSessionStatus, StreamSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function piStatusDotClass(status: PiSessionStatus | undefined): string {
   switch (status) {

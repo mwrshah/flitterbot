@@ -1,14 +1,14 @@
 import { infiniteQueryOptions, keepPreviousData } from "@tanstack/react-query";
-import type { FlitterbotApiClient } from "~/lib/api";
-import { historyQueryKey, surfaceQueryKey } from "~/lib/conversation-history";
-import { INTERNAL_COMMANDS } from "~/lib/internal-commands";
+import type { FlitterbotApiClient } from "@/lib/api";
+import { historyQueryKey, surfaceQueryKey } from "@/lib/conversation-history";
+import { INTERNAL_COMMANDS } from "@/lib/internal-commands";
 import type {
   DirectoryCompletionsResponse,
   DownstreamSessionItem,
   SkillPickerItem,
   StatusQueryData,
-} from "~/lib/types";
-import { fetchDirectoryCompletions } from "~/server/directory-completions";
+} from "@/lib/types";
+import { fetchDirectoryCompletions } from "@/server/directory-completions";
 import {
   type DiffResult,
   fetchDownstreamSessions,
@@ -16,8 +16,8 @@ import {
   fetchStreamsHistory,
   fetchStreamsWorktree,
   type StreamInfo,
-} from "~/server/streams";
-import { fetchUserConfig } from "~/server/user-config";
+} from "@/server/streams";
+import { fetchUserConfig } from "@/server/user-config";
 
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {

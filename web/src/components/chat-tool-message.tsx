@@ -1,10 +1,10 @@
 import { Check, Code, Copy, FolderOpen, MessageSquare, Search, SquareTerminal } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { CodeBlock } from "~/components/common/code-block";
-import { MarkdownContent } from "~/components/common/markdown-content";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
-import { type ActiveToolState, useConversationToolState } from "~/lib/conversation-state";
-import type { ChatTimelineTool } from "~/lib/types";
+import { CodeBlock } from "@/components/common/code-block";
+import { MarkdownContent } from "@/components/common/markdown-content";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
+import type { ChatTimelineTool } from "@/lib/types";
 
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =

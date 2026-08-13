@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, CircleAlert, Info, Monitor, Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
-import { type Theme, useTheme } from "~/hooks/use-theme";
+import { type Theme, useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/theme")({
   head: () => ({

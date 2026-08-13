@@ -13,8 +13,8 @@ import {
   useContext,
   useId,
 } from "react";
-import { CodeBlock } from "~/components/common/code-block";
-import { namespacedFootnoteId, safeMarkdownUrl } from "~/lib/markdown";
+import { CodeBlock } from "@/components/common/code-block";
+import { namespacedFootnoteId, safeMarkdownUrl } from "@/lib/markdown";
 
 const MarkdownFootnoteNamespace = createContext("");
 

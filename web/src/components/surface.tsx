@@ -5,15 +5,15 @@ import { CopyIcon, SettingsIcon } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
-import { MarkdownContent } from "~/components/common/markdown-content";
-import { MessageInput } from "~/components/common/message-input";
-import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
-import { RuntimeHealthIndicator } from "~/components/runtime-health-indicator";
-import { SettingsDrawer } from "~/components/settings-drawer";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
-import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { statusQueryOptions, surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
-import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "~/lib/types";
+import { MarkdownContent } from "@/components/common/markdown-content";
+import { MessageInput } from "@/components/common/message-input";
+import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
+import { RuntimeHealthIndicator } from "@/components/runtime-health-indicator";
+import { SettingsDrawer } from "@/components/settings-drawer";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
+import { statusQueryOptions, surfaceTimelineInfiniteQueryOptions } from "@/lib/queries";
+import type { ChatTimelineItem, ImageAttachment, StatusQueryData } from "@/lib/types";
 
 const rootApi = getRouteApi("__root__");
 

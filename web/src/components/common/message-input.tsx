@@ -15,22 +15,23 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { Button } from "~/components/common/button";
-import { ShortcutHint } from "~/components/common/kbd";
-import { ModelSelector } from "~/components/model-selector";
-import { PathPicker } from "~/components/path-picker";
-import { SkillPicker } from "~/components/skill-picker";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { Button } from "@/components/common/button";
+import { ShortcutHint } from "@/components/common/kbd";
+import { ModelSelector } from "@/components/model-selector";
+import { PathPicker } from "@/components/path-picker";
+import { SkillPicker } from "@/components/skill-picker";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   getMessageInputButtonShortcutActionId,
   MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS,
   registerComposerFocusTarget,
   registerShortcutHandlers,
-} from "~/lib/global-shortcuts";
-import { getInternalCommandsForScope, type InternalCommandScope } from "~/lib/internal-commands";
-import { directoryCompletionsQueryOptions, skillsQueryOptions } from "~/lib/queries";
-import type { DirectoryCompletionItem, ImageAttachment, SkillPickerItem } from "~/lib/types";
-import { cn } from "~/lib/utils";
+} from "@/lib/global-shortcuts";
+import { getInternalCommandsForScope, type InternalCommandScope } from "@/lib/internal-commands";
+import { directoryCompletionsQueryOptions, skillsQueryOptions } from "@/lib/queries";
+import { getTokenDeleteEdit } from "@/lib/text-input";
+import type { DirectoryCompletionItem, ImageAttachment, SkillPickerItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const draftStore = new Map<string, string>();
 const pendingAttachmentStore = new Map<string, ImageAttachment[]>();
@@ -129,7 +130,7 @@ function isBlankDraft(value: string) {
 }
 
 function autoExpandedDuplicateSlashIndex(filter: string) {
-  if (filter.startsWith("~//")) return 2;
+  if (filter.startsWith("@//")) return 2;
   if (filter.startsWith("..//")) return 3;
 
   const nestedDotDot = "/..//";
@@ -730,7 +731,7 @@ export const MessageInput = memo(function MessageInput({
           atPositionRef.current = atIdx;
           computeSlashLeft(newValue, atIdx);
           setAtPickerOpen(true);
-          setAtPickerFilter("~/");
+          setAtPickerFilter("@/");
           slashPositionRef.current = -1;
           setPickerOpen(false);
           requestAnimationFrame(() => {
@@ -901,37 +902,15 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      if (
-        event.ctrlKey &&
-        (event.key === "w" || event.key === "Backspace") &&
-        !event.shiftKey &&
-        !event.altKey &&
-        !event.metaKey
-      ) {
+      const value = draftRef.current;
+      const selectionStart = textareaRef.current?.selectionStart ?? value.length;
+      const selectionEnd = textareaRef.current?.selectionEnd ?? selectionStart;
+      const tokenDeleteEdit = getTokenDeleteEdit(event, value, selectionStart, selectionEnd);
+      if (tokenDeleteEdit) {
         event.preventDefault();
-        const value = draftRef.current;
-        const cursor = textareaRef.current?.selectionStart ?? value.length;
-        const selectionEnd = textareaRef.current?.selectionEnd ?? cursor;
-        if (cursor === 0 && selectionEnd === 0) return;
-        let i = cursor;
-        const isDelim = (ch: string) => ch === "/" || ch === "@";
-        const beforeWS = i;
-        while (i > 0 && /\s/.test(value[i - 1]!)) i--;
-        const skippedWhitespace = i < beforeWS;
-        if (i > 0 && isDelim(value[i - 1]!)) {
-          if (skippedWhitespace) {
-            while (i > 0 && isDelim(value[i - 1]!)) i--;
-          } else {
-            while (i > 0 && isDelim(value[i - 1]!)) i--;
-            while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
-          }
-        } else {
-          while (i > 0 && !/\s/.test(value[i - 1]!) && !isDelim(value[i - 1]!)) i--;
-        }
-        const newValue = value.slice(0, i) + value.slice(selectionEnd);
-        handleDraftChange(newValue);
+        handleDraftChange(tokenDeleteEdit.value);
         requestAnimationFrame(() => {
-          textareaRef.current?.setSelectionRange(i, i);
+          textareaRef.current?.setSelectionRange(tokenDeleteEdit.cursor, tokenDeleteEdit.cursor);
         });
         return;
       }

@@ -1,4 +1,4 @@
-import type { StatusQueryData } from "~/lib/types";
+import type { StatusQueryData } from "@/lib/types";
 
 export function isKnownStreamPiSession(status: StatusQueryData, piSessionId: string): boolean {
   if (status.piAgent?.default?.piSessionId === piSessionId) return true;

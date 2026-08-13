@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { userConfigQueryOptions } from "~/lib/queries";
-import { saveUserConfig } from "~/server/user-config";
+import { userConfigQueryOptions } from "@/lib/queries";
+import { saveUserConfig } from "@/server/user-config";
 
 export function useUserConfig() {
   const queryClient = useQueryClient();

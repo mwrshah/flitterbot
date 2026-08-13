@@ -10,8 +10,8 @@ import {
   SHORTCUT_ACTIONS,
   setActiveScrollContainer,
   setShortcutBindingOverrides,
-} from "~/lib/global-shortcuts";
-import type { ShortcutBindingsConfig } from "~/lib/types";
+} from "@/lib/global-shortcuts";
+import type { ShortcutBindingsConfig } from "@/lib/types";
 import { useCreateSwimlane } from "./use-create-swimlane";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
 

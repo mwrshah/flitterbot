@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { toast } from "sonner";
-import type { StreamRecoveryKind } from "~/lib/stream-recovery";
+import type { StreamRecoveryKind } from "@/lib/stream-recovery";
 
 type ReopenStreamVariables = {
   streamId: string;

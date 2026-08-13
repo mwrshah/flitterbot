@@ -1,19 +1,19 @@
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useState } from "react";
-import { ToolMessage } from "~/components/chat-tool-message";
-import { MarkdownContent } from "~/components/common/markdown-content";
-import { MessageActionsMenu } from "~/components/message-actions-menu";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { ToolMessage } from "@/components/chat-tool-message";
+import { MarkdownContent } from "@/components/common/markdown-content";
+import { MessageActionsMenu } from "@/components/message-actions-menu";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
   buildConversationContentParts,
   type ConversationRow,
   type ConversationToolBlock,
-} from "~/lib/conversation-rows";
+} from "@/lib/conversation-rows";
 import {
   type ConversationStreamingState,
   useConversationStreaming,
-} from "~/lib/conversation-state";
-import type { ChatTimelineMessage } from "~/lib/types";
+} from "@/lib/conversation-state";
+import type { ChatTimelineMessage } from "@/lib/types";
 
 const SINGLE_LINE_TOLERANCE_PX = 3;
 

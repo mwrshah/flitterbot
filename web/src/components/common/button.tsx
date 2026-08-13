@@ -1,6 +1,6 @@
 import type * as React from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { cn } from "~/lib/utils";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { cn } from "@/lib/utils";
 
 type ButtonVariant = "default" | "subtle" | "selected" | "pop" | "danger";
 type ButtonSize = "default" | "sm" | "icon" | "icon-sm";

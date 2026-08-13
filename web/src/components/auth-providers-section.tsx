@@ -2,16 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "~/components/common/button";
+import { Button } from "@/components/common/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import type { AuthFlowSnapshot, AuthProvider } from "~/lib/types";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import type { AuthFlowSnapshot, AuthProvider } from "@/lib/types";
 
 const rootApi = getRouteApi("__root__");
 

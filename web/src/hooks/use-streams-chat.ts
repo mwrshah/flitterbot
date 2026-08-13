@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
-import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "~/lib/queries";
-import type { ImageAttachment } from "~/lib/types";
-import { useWsConnectionState } from "~/lib/ws-connection-store";
+import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "@/lib/queries";
+import type { ImageAttachment } from "@/lib/types";
+import { useWsConnectionState } from "@/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
   images?: ImageAttachment[];

@@ -9,20 +9,20 @@ import {
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
-import { AppShell } from "~/components/app-shell";
-import { DefaultCatchBoundary } from "~/components/default-catch-boundary";
-import { NotFound } from "~/components/not-found";
-import { useGlobalShortcuts } from "~/hooks/use-global-shortcuts";
-import { useTheme } from "~/hooks/use-theme";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { FlitterbotApiClient } from "~/lib/api";
-import { skillsQueryOptions, statusQueryOptions, userConfigQueryOptions } from "~/lib/queries";
-import type { SettingsStore } from "~/lib/settings-store";
-import type { StatusQueryData } from "~/lib/types";
-import type { FlitterbotWsClient } from "~/lib/ws";
-import type { WsConnectionStore } from "~/lib/ws-connection-store";
-import appCss from "~/styles.css?url";
-import { seo } from "~/utils/seo";
+import { AppShell } from "@/components/app-shell";
+import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
+import { NotFound } from "@/components/not-found";
+import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts";
+import { useTheme } from "@/hooks/use-theme";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import type { FlitterbotApiClient } from "@/lib/api";
+import { skillsQueryOptions, statusQueryOptions, userConfigQueryOptions } from "@/lib/queries";
+import type { SettingsStore } from "@/lib/settings-store";
+import type { StatusQueryData } from "@/lib/types";
+import type { FlitterbotWsClient } from "@/lib/ws";
+import type { WsConnectionStore } from "@/lib/ws-connection-store";
+import appCss from "@/styles.css?url";
+import { seo } from "@/utils/seo";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;

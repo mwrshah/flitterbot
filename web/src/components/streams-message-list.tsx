@@ -16,10 +16,10 @@
  */
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from "react";
-import { ChatMessageRow, StreamingAssistantRow } from "~/components/chat-message-row";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { buildConversationRows } from "~/lib/conversation-rows";
-import type { ChatTimelineItem } from "~/lib/types";
+import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { buildConversationRows } from "@/lib/conversation-rows";
+import type { ChatTimelineItem } from "@/lib/types";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;

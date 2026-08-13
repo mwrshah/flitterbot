@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { statusQueryOptions } from "~/lib/queries";
+import { statusQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/streams/default")({
   loader: async ({ context }) => {

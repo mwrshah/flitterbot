@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import type { ConnectionState } from "~/lib/types";
-import type { FlitterbotWsClient } from "~/lib/ws";
+import type { ConnectionState } from "@/lib/types";
+import type { FlitterbotWsClient } from "@/lib/ws";
 
 type Listener = () => void;
 

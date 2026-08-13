@@ -9,10 +9,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
-import { Command, CommandEmpty, CommandItem, CommandList } from "~/components/ui/command";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { DirectoryCompletionItem } from "~/lib/types";
+import { CaretPickerPositioner } from "@/components/common/caret-picker-positioner";
+import { Command, CommandEmpty, CommandItem, CommandList } from "@/components/ui/command";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import type { DirectoryCompletionItem } from "@/lib/types";
 
 function dirFromPath(path: string, name: string): string {
   const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;

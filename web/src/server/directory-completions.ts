@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { DirectoryCompletionsResponse } from "~/lib/types";
+import type { DirectoryCompletionsResponse } from "@/lib/types";
 
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";

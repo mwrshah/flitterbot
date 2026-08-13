@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { statusQueryOptions } from "~/lib/queries";
-import { useWsConnectionState } from "~/lib/ws-connection-store";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { statusQueryOptions } from "@/lib/queries";
+import { useWsConnectionState } from "@/lib/ws-connection-store";
 
 function statusDotColor(status: string): string {
   switch (status) {

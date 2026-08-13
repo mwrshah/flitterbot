@@ -6,12 +6,12 @@ import {
   refreshHistorySnapshot,
   surfaceQueryKey,
   upsertNewestHistoryItems,
-} from "~/lib/conversation-history";
-import { conversationState } from "~/lib/conversation-state";
-import { streamingUiDebug } from "~/lib/debug-log";
-import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
-import type { ChatTimelineMessage, StatusQueryData } from "~/lib/types";
-import type { FlitterbotWsClient } from "~/lib/ws";
+} from "@/lib/conversation-history";
+import { conversationState } from "@/lib/conversation-state";
+import { streamingUiDebug } from "@/lib/debug-log";
+import { surfaceTimelineInfiniteQueryOptions } from "@/lib/queries";
+import type { ChatTimelineMessage, StatusQueryData } from "@/lib/types";
+import type { FlitterbotWsClient } from "@/lib/ws";
 import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
 
 export function setupWsQueryBridge(deps: {

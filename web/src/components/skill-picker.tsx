@@ -8,10 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { CaretPickerPositioner } from "~/components/common/caret-picker-positioner";
-import { Command, CommandItem, CommandList } from "~/components/ui/command";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { SkillPickerItem } from "~/lib/types";
+import { CaretPickerPositioner } from "@/components/common/caret-picker-positioner";
+import { Command, CommandItem, CommandList } from "@/components/ui/command";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import type { SkillPickerItem } from "@/lib/types";
 
 type SkillPickerProps = {
   open: boolean;

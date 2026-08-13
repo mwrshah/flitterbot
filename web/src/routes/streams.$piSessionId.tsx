@@ -8,20 +8,20 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
-import { ChatPanel } from "~/components/chat-panel";
-import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
-import { DownstreamSessionsPanel } from "~/components/downstream-sessions-panel";
-import { useStreamsChat } from "~/hooks/use-streams-chat";
-import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { ChatPanel } from "@/components/chat-panel";
+import { Panel, PanelGroup, ResizeHandle } from "@/components/common/resizable";
+import { DownstreamSessionsPanel } from "@/components/downstream-sessions-panel";
+import { useStreamsChat } from "@/hooks/use-streams-chat";
+import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   statusQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsHistoryInfiniteQueryOptions,
   streamsWorktreeQueryOptions,
-} from "~/lib/queries";
-import { getStreamRecoveryKind } from "~/lib/stream-recovery";
-import { isKnownStreamPiSession } from "~/lib/stream-route-targets";
+} from "@/lib/queries";
+import { getStreamRecoveryKind } from "@/lib/stream-recovery";
+import { isKnownStreamPiSession } from "@/lib/stream-route-targets";
 
 export const Route = createFileRoute("/streams/$piSessionId")({
   staticData: {

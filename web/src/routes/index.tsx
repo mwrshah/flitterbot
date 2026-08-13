@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Surface } from "~/components/surface";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { surfaceTimelineInfiniteQueryOptions } from "~/lib/queries";
+import { Surface } from "@/components/surface";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { surfaceTimelineInfiniteQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/")({
   staticData: {

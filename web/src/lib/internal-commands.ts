@@ -1,4 +1,4 @@
-import type { SkillPickerItem } from "~/lib/types";
+import type { SkillPickerItem } from "@/lib/types";
 
 export type InternalCommandScope = "default-stream" | "work-stream" | "surface";
 

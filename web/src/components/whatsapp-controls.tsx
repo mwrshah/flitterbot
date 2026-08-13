@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { Badge } from "~/components/common/badge";
-import { Button } from "~/components/common/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/common/card";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import type { StatusQueryData } from "~/lib/types";
+import { Badge } from "@/components/common/badge";
+import { Button } from "@/components/common/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/common/card";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import type { StatusQueryData } from "@/lib/types";
 
 function statusVariant(status: string): "active" | "waiting" | "ended" | "info" {
   switch (status) {

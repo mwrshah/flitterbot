@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { cn } from "~/lib/utils";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { cn } from "@/lib/utils";
 
 type BadgeVariant = "info" | "ended" | "crashed" | "active" | "waiting";
 

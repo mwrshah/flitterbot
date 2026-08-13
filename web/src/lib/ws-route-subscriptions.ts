@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
-import type { FlitterbotWsClient } from "~/lib/ws";
+import type { FlitterbotWsClient } from "@/lib/ws";
 import { latestHistoryPosition } from "./conversation-history.ts";
 import { conversationState } from "./conversation-state.ts";
 

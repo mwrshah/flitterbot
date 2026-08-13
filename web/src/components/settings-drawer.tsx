@@ -1,12 +1,12 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { Monitor, Moon, Sun, X } from "lucide-react";
 import { memo } from "react";
-import { AuthProvidersSection } from "~/components/auth-providers-section";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import { type Theme, useTheme } from "~/hooks/use-theme";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
-import { useSettings } from "~/lib/settings-store";
+import { AuthProvidersSection } from "@/components/auth-providers-section";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { type Theme, useTheme } from "@/hooks/use-theme";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import { useSettings } from "@/lib/settings-store";
 
 const rootApi = getRouteApi("__root__");
 

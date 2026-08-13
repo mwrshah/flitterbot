@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { useUserConfig } from "~/hooks/use-user-config";
+import { useUserConfig } from "@/hooks/use-user-config";
 
 export type Theme = "light" | "dark" | "system";
 

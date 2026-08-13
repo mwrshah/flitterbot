@@ -16,17 +16,17 @@ import {
 } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
-import { Button } from "~/components/common/button";
-import { ShortcutHint } from "~/components/common/kbd";
-import { MessageInput, type MessageInputHoverButton } from "~/components/common/message-input";
-import { HorizontalResizeHandle, Panel, PanelGroup } from "~/components/common/resizable";
+import { Button } from "@/components/common/button";
+import { ShortcutHint } from "@/components/common/kbd";
+import { MessageInput, type MessageInputHoverButton } from "@/components/common/message-input";
+import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
 import {
   Command,
   CommandEmpty,
   CommandInput,
   CommandItem,
   CommandList,
-} from "~/components/ui/command";
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogClose,
@@ -35,17 +35,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { useReopenStream } from "~/hooks/use-reopen-stream";
-import { parsePanelLayout, useUserConfig } from "~/hooks/use-user-config";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+} from "@/components/ui/dialog";
+import { useReopenStream } from "@/hooks/use-reopen-stream";
+import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
-} from "~/lib/global-shortcuts";
-import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "~/lib/queries";
-import type { StreamRecoveryKind } from "~/lib/stream-recovery";
+} from "@/lib/global-shortcuts";
+import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "@/lib/queries";
+import type { StreamRecoveryKind } from "@/lib/stream-recovery";
+import { getTokenDeleteEdit } from "@/lib/text-input";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -53,8 +54,8 @@ import type {
   ImageAttachment,
   StreamSummary,
   TokenUsage,
-} from "~/lib/types";
-import { setStreamCwd } from "~/server/streams";
+} from "@/lib/types";
+import { setStreamCwd } from "@/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
@@ -168,6 +169,26 @@ function CwdPicker({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement) {
+        const selectionStart = input.selectionStart ?? value.length;
+        const tokenDeleteEdit = getTokenDeleteEdit(
+          event,
+          value,
+          selectionStart,
+          input.selectionEnd ?? selectionStart,
+        );
+        if (tokenDeleteEdit) {
+          event.preventDefault();
+          event.stopPropagation();
+          handleValueChange(tokenDeleteEdit.value);
+          requestAnimationFrame(() => {
+            const cursor = Math.max(1, tokenDeleteEdit.cursor);
+            input.setSelectionRange(cursor, cursor);
+          });
+          return;
+        }
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -180,7 +201,7 @@ function CwdPicker({
         onCommit();
       }
     },
-    [items.length, onCommit, onEscape, value],
+    [handleValueChange, items.length, onCommit, onEscape, value],
   );
 
   if (!open) return null;

@@ -9,7 +9,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import htmlLanguage from "highlight.js/lib/languages/xml";
 import { Check, Copy } from "lucide-react";
 import { useMemo } from "react";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("typescript", typescript);

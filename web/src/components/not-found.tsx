@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function NotFound({ children }: { children?: ReactNode }) {
   useWhyDidYouRender("NotFound", { children });

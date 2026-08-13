@@ -14,7 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Button } from "~/components/common/button";
+import { Button } from "@/components/common/button";
 import {
   Command,
   CommandEmpty,
@@ -23,9 +23,9 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "~/components/ui/command";
-import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "~/lib/types";
-import { cn } from "~/lib/utils";
+} from "@/components/ui/command";
+import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 

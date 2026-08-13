@@ -1,4 +1,4 @@
-import type { StreamSummary } from "~/lib/types";
+import type { StreamSummary } from "@/lib/types";
 
 export type StreamRecoveryKind = "closed" | "dead";
 

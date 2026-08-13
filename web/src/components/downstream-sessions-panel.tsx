@@ -4,26 +4,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
-import { CopyableCode } from "~/components/common/copyable-code";
-import { ShortcutHint } from "~/components/common/kbd";
-import { SettingsDrawer } from "~/components/settings-drawer";
-import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import { useCopyToClipboard } from "~/hooks/use-copy-to-clipboard";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { CopyableCode } from "@/components/common/copyable-code";
+import { ShortcutHint } from "@/components/common/kbd";
+import { SettingsDrawer } from "@/components/settings-drawer";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   getTmuxAttachShortcutActionId,
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   setActiveScrollContainer,
   useShortcutBindingLabel,
-} from "~/lib/global-shortcuts";
+} from "@/lib/global-shortcuts";
 import {
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsWorktreeQueryOptions,
-} from "~/lib/queries";
-import type { DownstreamSessionItem, PiSessionStatus } from "~/lib/types";
-import { cn } from "~/lib/utils";
+} from "@/lib/queries";
+import type { DownstreamSessionItem, PiSessionStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function piStatusBanner(
   status: PiSessionStatus | undefined,

@@ -1,6 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
-import { Panel, PanelGroup, ResizeHandle } from "~/components/common/resizable";
-import { useWhyDidYouRender } from "~/hooks/use-why-did-you-render";
+import { Panel, PanelGroup, ResizeHandle } from "@/components/common/resizable";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { Sidebar } from "./sidebar";
 
 export function AppShell() {
