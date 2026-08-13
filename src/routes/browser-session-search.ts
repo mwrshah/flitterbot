@@ -16,8 +16,14 @@ export async function handleBrowserSessionSearchRoute(
     sendJson(res, 200, { matches: [] } satisfies SessionSearchResponse);
     return;
   }
-
-  runtime.log(`[jsonl] query="${query}"`);
+  const patterns = [...new Set(query.toLowerCase().split(/\s+/))].filter(
+    (pattern) => pattern.length >= 2,
+  );
+  runtime.log(`[jsonl] patterns: ${patterns.map((pattern) => JSON.stringify(pattern)).join(" ")}`);
+  if (patterns.length === 0) {
+    sendJson(res, 200, { matches: [] } satisfies SessionSearchResponse);
+    return;
+  }
   const result = await withFileFinder(
     runtime.config.controlSurfaceSessionsDir,
     async (finder) => {
@@ -27,7 +33,7 @@ export async function handleBrowserSessionSearchRoute(
         runtime.blackboard,
         finder,
         runtime.config.controlSurfaceSessionsDir,
-        query,
+        patterns,
       );
     },
     (sessionsDir) => runtime.log(`[jsonl] index mount dir=${sessionsDir}`),

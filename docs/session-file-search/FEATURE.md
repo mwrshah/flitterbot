@@ -17,11 +17,11 @@ Sidebar name search cannot find a swimlane from terms inside its raw Pi session.
 
 ## Architecture
 
-FFF indexes `controlSurfaceSessionsDir` directly. The shared FileFinder manager permits files up to 32 MiB for every indexed root. The route awaits FFF's lazy initial scan, then calls `multiGrep()` with the user's single literal pattern separate from its `*.jsonl` constraint and up to 20 matches per file. It accepts FFF's default first page of up to 50 matched files and resolves those paths to `pi_sessions` rows through the blackboard.
+FFF indexes `controlSurfaceSessionsDir` directly. The shared FileFinder manager permits files up to 32 MiB for every indexed root. The route awaits FFF's lazy initial scan, then normalizes the query into unique whitespace-delimited patterns of at least two characters. It logs those exact patterns and skips content search when none remain. The search calls `multiGrep()` with the patterns separate from its `*.jsonl` constraint and up to 20 matches per file, follows every FFF cursor page, and resolves the complete matched path set to `pi_sessions` rows through the blackboard.
 
 The session lifecycle keeps open streams, pinned closed streams, and the current default in `sessions/`. Existing stream placement policy remains unchanged. Default-session creation records `session_user`, ends every prior live non-stream default for that user in one transaction, leaves Pi in sole control of the new session file, and moves only predecessors still recorded in `sessions/` to `archived-sessions/`.
 
-The sidebar sends one normalized query after the existing 150 ms picker debounce. Name filtering remains immediate. One completed FFF response adds up to 50 related sessions after name matches and ranks them by matched-line count. Search failures leave name matching usable.
+The sidebar sends one normalized query after the existing 150 ms picker debounce. Name filtering remains immediate, including when content search skips a query with no pattern of at least two characters. One completed paginated FFF search adds related sessions after name matches and ranks them by matched-line count. Search failures leave name matching usable.
 
 ## Pseudocode Contracts and Call Graph
 
@@ -30,13 +30,23 @@ interface SessionSearchResponse {
   matches: Array<{ piSessionId: string; matchCount: number }>;
 }
 
-searchSessionFiles(blackboard, finder, sessionsDir, query): SessionFileSearchResult
-  multiGrep({
-    patterns: [query],
-    constraints: "*.jsonl",
-    maxMatchesPerFile: 20,
-  })
-  accept FFF's default first page
+GET /api/session-search?query=...
+  normalize unique whitespace-delimited patterns with length >= 2
+  log the exact patterns
+  return no content matches when patterns is empty
+
+searchSessionFiles(blackboard, finder, sessionsDir, patterns): SessionFileSearchResult
+  cursor = null
+  do
+    multiGrep({
+      patterns,
+      constraints: "*.jsonl",
+      maxMatchesPerFile: 20,
+      cursor,
+    })
+    accumulate matched lines by resident file
+    cursor = nextCursor
+  while cursor
   resolve exact resident file paths through pi_sessions
   return related IDs and match counts
 

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { FileFinder } from "@ff-labs/fff-node";
+import type { FileFinder, GrepCursor } from "@ff-labs/fff-node";
 import type { BlackboardDatabase } from "./blackboard/db.ts";
 import { FILE_FINDER_MAX_FILE_SIZE } from "./file-finder/manager.ts";
 
@@ -11,24 +11,28 @@ export function searchSessionFiles(
   blackboard: BlackboardDatabase,
   finder: FileFinder,
   sessionsDir: string,
-  query: string,
+  patterns: string[],
 ): SessionFileSearchResult {
-  const patterns = [...new Set(query.trim().split(/\s+/))].filter(Boolean);
   if (patterns.length === 0) return { matches: [] };
 
-  const result = finder.multiGrep({
-    patterns,
-    constraints: "*.jsonl",
-    maxFileSize: FILE_FINDER_MAX_FILE_SIZE,
-    maxMatchesPerFile: 20,
-  });
-  if (!result.ok) throw new Error(`FFF session search failed: ${result.error}`);
-
   const matchCountByFile = new Map<string, number>();
-  for (const match of result.value.items) {
-    const sessionFile = path.resolve(sessionsDir, match.relativePath);
-    matchCountByFile.set(sessionFile, (matchCountByFile.get(sessionFile) ?? 0) + 1);
-  }
+  let cursor: GrepCursor | null = null;
+  do {
+    const result = finder.multiGrep({
+      patterns,
+      constraints: "*.jsonl",
+      maxFileSize: FILE_FINDER_MAX_FILE_SIZE,
+      maxMatchesPerFile: 20,
+      cursor,
+    });
+    if (!result.ok) throw new Error(`FFF session search failed: ${result.error}`);
+
+    for (const match of result.value.items) {
+      const sessionFile = path.resolve(sessionsDir, match.relativePath);
+      matchCountByFile.set(sessionFile, (matchCountByFile.get(sessionFile) ?? 0) + 1);
+    }
+    cursor = result.value.nextCursor;
+  } while (cursor);
 
   const sessionFiles = [...matchCountByFile.keys()];
   if (sessionFiles.length === 0) return { matches: [] };
