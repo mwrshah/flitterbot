@@ -14,7 +14,6 @@ import {
   getTmuxAttachShortcutActionId,
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
-  setActiveScrollContainer,
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
 import {
@@ -160,13 +159,11 @@ export function DownstreamSessionsPanel({
 
   const showInfoPanel = useCallback(() => {
     (document.activeElement as HTMLElement)?.blur?.();
-    setActiveScrollContainer("main");
     setPanelView("info");
   }, []);
 
   const showDiffPanel = useCallback(() => {
     (document.activeElement as HTMLElement)?.blur?.();
-    setActiveScrollContainer("diff");
     setPanelView("diff");
   }, []);
 
@@ -300,7 +297,6 @@ export function DownstreamSessionsPanel({
           onValueChange={(newValue) => {
             const val = newValue[newValue.length - 1];
             if (val === "info" || val === "diff") {
-              setActiveScrollContainer(val === "diff" ? "diff" : "main");
               setPanelView(val);
             }
           }}
