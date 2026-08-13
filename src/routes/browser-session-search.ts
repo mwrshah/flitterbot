@@ -17,15 +17,20 @@ export async function handleBrowserSessionSearchRoute(
     return;
   }
 
-  const result = await withFileFinder(runtime.config.controlSurfaceSessionsDir, async (finder) => {
-    const scan = await finder.waitForScan(5_000);
-    if (!scan.ok || !scan.value) throw new Error("FFF session index did not become ready");
-    return searchSessionFiles(
-      runtime.blackboard,
-      finder,
-      runtime.config.controlSurfaceSessionsDir,
-      query,
-    );
-  });
+  runtime.log(`[jsonl] query="${query}"`);
+  const result = await withFileFinder(
+    runtime.config.controlSurfaceSessionsDir,
+    async (finder) => {
+      const scan = await finder.waitForScan(5_000);
+      if (!scan.ok || !scan.value) throw new Error("FFF session index did not become ready");
+      return searchSessionFiles(
+        runtime.blackboard,
+        finder,
+        runtime.config.controlSurfaceSessionsDir,
+        query,
+      );
+    },
+    (sessionsDir) => runtime.log(`[jsonl] index mount dir=${sessionsDir}`),
+  );
   sendJson(res, 200, result satisfies SessionSearchResponse);
 }

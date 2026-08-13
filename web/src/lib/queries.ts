@@ -155,6 +155,7 @@ export function sessionSearchQueryOptions(
     queryKey: ["session-search", query] as const,
     queryFn: () => apiClient.searchSessions(query),
     enabled,
+    placeholderData: keepPreviousData,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

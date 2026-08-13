@@ -20,7 +20,10 @@ export function isFileFinderExcludedPath(candidatePath: string): boolean {
     .some((segment) => isFileFinderExcludedName(segment));
 }
 
-export function getOrCreate(basePath: string): FileFinder {
+export function getOrCreate(
+  basePath: string,
+  onCreateStart?: (basePath: string) => void,
+): FileFinder {
   const normalized = path.resolve(basePath);
 
   const existing = instances.get(normalized);
@@ -30,6 +33,7 @@ export function getOrCreate(basePath: string): FileFinder {
     return existing;
   }
 
+  onCreateStart?.(normalized);
   const result = FileFinder.create({
     basePath: normalized,
     aiMode: true,
@@ -49,11 +53,12 @@ export function getOrCreate(basePath: string): FileFinder {
 export async function withFileFinder<T>(
   basePath: string,
   operation: (finder: FileFinder) => Promise<T>,
+  onCreateStart?: (basePath: string) => void,
 ): Promise<T> {
   const normalized = path.resolve(basePath);
   leaseCounts.set(normalized, (leaseCounts.get(normalized) ?? 0) + 1);
   try {
-    return await operation(getOrCreate(normalized));
+    return await operation(getOrCreate(normalized, onCreateStart));
   } finally {
     const remaining = (leaseCounts.get(normalized) ?? 1) - 1;
     if (remaining === 0) leaseCounts.delete(normalized);

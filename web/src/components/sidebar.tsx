@@ -727,28 +727,22 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   const deferredQuery = useDeferredValue(query);
   const normalizedDeferredQuery = deferredQuery.trim().toLowerCase();
   const currentSessionMatchCounts =
-    debouncedSearchQuery === normalizedQuery &&
-    sessionSearchQuery.data &&
-    !sessionSearchQuery.isError
-      ? sessionMatchCounts
-      : EMPTY_SESSION_MATCH_COUNTS;
-  const displayedSessionMatchCounts =
-    debouncedSearchQuery === normalizedDeferredQuery &&
-    sessionSearchQuery.data &&
-    !sessionSearchQuery.isError
+    sessionSearchQuery.data && !sessionSearchQuery.isError
       ? sessionMatchCounts
       : EMPTY_SESSION_MATCH_COUNTS;
   const visibleOpenRows = useMemo(
-    () => projectSidebarRows(openRows, normalizedDeferredQuery, displayedSessionMatchCounts),
-    [displayedSessionMatchCounts, normalizedDeferredQuery, openRows],
+    () => projectSidebarRows(openRows, normalizedDeferredQuery, currentSessionMatchCounts),
+    [currentSessionMatchCounts, normalizedDeferredQuery, openRows],
   );
   const visibleClosedRows = useMemo(
-    () => projectSidebarRows(closedRows, normalizedDeferredQuery, displayedSessionMatchCounts),
-    [closedRows, displayedSessionMatchCounts, normalizedDeferredQuery],
+    () => projectSidebarRows(closedRows, normalizedDeferredQuery, currentSessionMatchCounts),
+    [closedRows, currentSessionMatchCounts, normalizedDeferredQuery],
   );
   const contentSearchFinished =
     sessionSearchQuery.isError ||
-    (debouncedSearchQuery === normalizedDeferredQuery && !!sessionSearchQuery.data);
+    (debouncedSearchQuery === normalizedDeferredQuery &&
+      !!sessionSearchQuery.data &&
+      !sessionSearchQuery.isPlaceholderData);
   const hasNoSearchResults =
     !!normalizedDeferredQuery &&
     contentSearchFinished &&
@@ -852,9 +846,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
               const nextQuery = event.target.value;
               const normalizedNextQuery = nextQuery.trim().toLowerCase();
               const nextSessionMatchCounts =
-                debouncedSearchQuery === normalizedNextQuery &&
-                sessionSearchQuery.data &&
-                !sessionSearchQuery.isError
+                sessionSearchQuery.data && !sessionSearchQuery.isError
                   ? sessionMatchCounts
                   : EMPTY_SESSION_MATCH_COUNTS;
               const nextCandidates = [
