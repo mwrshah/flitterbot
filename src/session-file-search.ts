@@ -13,11 +13,11 @@ export function searchSessionFiles(
   sessionsDir: string,
   query: string,
 ): SessionFileSearchResult {
-  const pattern = query.trim();
-  if (!pattern) return { matches: [] };
+  const patterns = [...new Set(query.trim().split(/\s+/))].filter(Boolean);
+  if (patterns.length === 0) return { matches: [] };
 
   const result = finder.multiGrep({
-    patterns: [pattern],
+    patterns,
     constraints: "*.jsonl",
     maxFileSize: FILE_FINDER_MAX_FILE_SIZE,
     maxMatchesPerFile: 20,
