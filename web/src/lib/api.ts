@@ -7,6 +7,7 @@ import type {
   ModelsListResponse,
   ModelsMutationResponse,
   SessionDetailResponse,
+  SessionSearchResponse,
   SessionsListResponse,
   SkillsListResponse,
   StatusResponse,
@@ -45,6 +46,9 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     getSessionDetail: (sessionId: string) =>
       request<SessionDetailResponse>(`/api/sessions/${sessionId}`),
+
+    searchSessions: (query: string) =>
+      request<SessionSearchResponse>(`/api/session-search?${new URLSearchParams({ query })}`),
 
     getTranscript: (sessionId: string, cursor?: string, limit = 25) => {
       const params = new URLSearchParams({ limit: String(limit) });

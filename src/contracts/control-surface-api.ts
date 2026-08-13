@@ -258,6 +258,10 @@ export interface DirectoryCompletionsResponse {
   query: string;
 }
 
+export interface SessionSearchResponse {
+  matches: Array<{ piSessionId: string; matchCount: number }>;
+}
+
 export interface AuthProvider {
   id: string;
   name: string;
@@ -407,6 +411,11 @@ export const CONTROL_SURFACE_ENDPOINTS = {
   directoryCompletions: {
     method: "GET",
     path: "/api/directory-completions",
+    auth: "none",
+  },
+  sessionSearch: {
+    method: "GET",
+    path: "/api/session-search",
     auth: "none",
   },
   streamsPrune: {

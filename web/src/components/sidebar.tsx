@@ -35,7 +35,8 @@ import {
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
-import { statusQueryOptions } from "@/lib/queries";
+import { sessionSearchQueryOptions, statusQueryOptions } from "@/lib/queries";
+import { projectSidebarRows } from "@/lib/sidebar-search";
 import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
 import type { PiSessionStatus, StreamSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -220,13 +221,14 @@ type PickerCandidate = SidebarSwimlaneRow & { piSessionId: string };
 
 type PickerCursor = {
   originPath?: string;
-  selectedKey?: string;
+  selectedKey?: string | null;
   selectedElement: HTMLElement | null;
   scrollFrame?: number;
 };
 
 const pickerSelectedRowClass =
   "data-[search-selected=true]:bg-background-hover data-[search-selected=true]:text-text";
+const EMPTY_SESSION_MATCH_COUNTS = new Map<string, number>();
 
 function getAdjacentPickerIndex(current: number, direction: 1 | -1, length: number): number {
   const next = current + direction;
@@ -237,15 +239,6 @@ function getAdjacentPickerIndex(current: number, direction: 1 | -1, length: numb
 
 function getPiSessionId(pathname: string): string | undefined {
   return pathname.startsWith("/streams/") ? pathname.split("/")[2] : undefined;
-}
-
-function filterRows<T extends SidebarSwimlaneRow>(
-  rows: readonly T[],
-  normalizedQuery: string,
-): readonly T[] {
-  return normalizedQuery
-    ? rows.filter((row) => row.name.toLowerCase().includes(normalizedQuery))
-    : rows;
 }
 
 type PinStream = (variables: { streamId: string; pinned: boolean }) => void;
@@ -532,6 +525,12 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   const navigate = useNavigate();
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearchQuery(normalizedQuery), 150);
+    return () => clearTimeout(id);
+  }, [normalizedQuery]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const swimlaneListRef = useRef<HTMLDivElement>(null);
   const liveRegionRef = useRef<HTMLSpanElement>(null);
@@ -546,7 +545,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
       cursor.selectedElement = null;
 
       const candidate = candidates[index];
-      cursor.selectedKey = candidate?.key;
+      cursor.selectedKey = index === -1 ? null : candidate?.key;
       if (liveRegionRef.current) liveRegionRef.current.textContent = "";
       if (!candidate || deferDomUpdate) return;
 
@@ -616,6 +615,19 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     ...statusQueryOptions(apiClient),
     retry: 1,
   });
+  const sessionSearchQuery = useQuery(
+    sessionSearchQueryOptions(apiClient, debouncedSearchQuery, !!debouncedSearchQuery),
+  );
+  const sessionMatchCounts = useMemo(
+    () =>
+      new Map(
+        sessionSearchQuery.data?.matches.map(({ piSessionId, matchCount }) => [
+          piSessionId,
+          matchCount,
+        ]) ?? [],
+      ),
+    [sessionSearchQuery.data],
+  );
 
   const pinStreamMutation = useMutation({
     mutationFn: ({ streamId, pinned }: { streamId: string; pinned: boolean }) =>
@@ -713,25 +725,49 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     }, [allStreams, defaultPiSessionId]);
 
   const deferredQuery = useDeferredValue(query);
-  const normalizedQuery = query.trim().toLowerCase();
   const normalizedDeferredQuery = deferredQuery.trim().toLowerCase();
+  const currentSessionMatchCounts =
+    debouncedSearchQuery === normalizedQuery &&
+    sessionSearchQuery.data &&
+    !sessionSearchQuery.isError
+      ? sessionMatchCounts
+      : EMPTY_SESSION_MATCH_COUNTS;
+  const displayedSessionMatchCounts =
+    debouncedSearchQuery === normalizedDeferredQuery &&
+    sessionSearchQuery.data &&
+    !sessionSearchQuery.isError
+      ? sessionMatchCounts
+      : EMPTY_SESSION_MATCH_COUNTS;
   const visibleOpenRows = useMemo(
-    () => filterRows(openRows, normalizedDeferredQuery),
-    [normalizedDeferredQuery, openRows],
+    () => projectSidebarRows(openRows, normalizedDeferredQuery, displayedSessionMatchCounts),
+    [displayedSessionMatchCounts, normalizedDeferredQuery, openRows],
   );
   const visibleClosedRows = useMemo(
-    () => filterRows(closedRows, normalizedDeferredQuery),
-    [closedRows, normalizedDeferredQuery],
+    () => projectSidebarRows(closedRows, normalizedDeferredQuery, displayedSessionMatchCounts),
+    [closedRows, displayedSessionMatchCounts, normalizedDeferredQuery],
   );
+  const contentSearchFinished =
+    sessionSearchQuery.isError ||
+    (debouncedSearchQuery === normalizedDeferredQuery && !!sessionSearchQuery.data);
   const hasNoSearchResults =
-    !!normalizedDeferredQuery && visibleOpenRows.length === 0 && visibleClosedRows.length === 0;
+    !!normalizedDeferredQuery &&
+    contentSearchFinished &&
+    visibleOpenRows.length === 0 &&
+    visibleClosedRows.length === 0;
   const currentSearchCandidates = useMemo(
-    () => filterRows(allSearchCandidates, normalizedQuery),
-    [allSearchCandidates, normalizedQuery],
+    () =>
+      [
+        ...projectSidebarRows(openRows, normalizedQuery, currentSessionMatchCounts),
+        ...projectSidebarRows(closedRows, normalizedQuery, currentSessionMatchCounts),
+      ].filter((row): row is PickerCandidate => !!row.piSessionId),
+    [closedRows, currentSessionMatchCounts, normalizedQuery, openRows],
   );
   const displayedSearchCandidates = useMemo(
-    () => filterRows(allSearchCandidates, normalizedDeferredQuery),
-    [allSearchCandidates, normalizedDeferredQuery],
+    () =>
+      [...visibleOpenRows, ...visibleClosedRows].filter(
+        (row): row is PickerCandidate => !!row.piSessionId,
+      ),
+    [visibleClosedRows, visibleOpenRows],
   );
   const currentPiSessionId = getPiSessionId(pathname);
 
@@ -741,7 +777,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     if (
       document.activeElement !== input ||
       cursor.selectedElement?.isConnected ||
-      (cursor.originPath !== undefined && cursor.selectedKey === undefined) ||
+      cursor.selectedKey === null ||
       displayedSearchCandidates.length === 0
     ) {
       return;
@@ -814,10 +850,17 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
             value={query}
             onChange={(event) => {
               const nextQuery = event.target.value;
-              const nextCandidates = filterRows(
-                allSearchCandidates,
-                nextQuery.trim().toLowerCase(),
-              );
+              const normalizedNextQuery = nextQuery.trim().toLowerCase();
+              const nextSessionMatchCounts =
+                debouncedSearchQuery === normalizedNextQuery &&
+                sessionSearchQuery.data &&
+                !sessionSearchQuery.isError
+                  ? sessionMatchCounts
+                  : EMPTY_SESSION_MATCH_COUNTS;
+              const nextCandidates = [
+                ...projectSidebarRows(openRows, normalizedNextQuery, nextSessionMatchCounts),
+                ...projectSidebarRows(closedRows, normalizedNextQuery, nextSessionMatchCounts),
+              ].filter((row): row is PickerCandidate => !!row.piSessionId);
               clearPickerCursor();
               setQuery(nextQuery);
               pickerCursorRef.current.originPath = router.state.location.pathname;
@@ -880,7 +923,7 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
               }
             }}
             placeholder={swimlaneSearchPlaceholder}
-            aria-label="Search swimlanes by name"
+            aria-label="Search swimlanes"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"

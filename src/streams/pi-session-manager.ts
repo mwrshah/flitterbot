@@ -5,7 +5,6 @@ import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   endPiSession,
   reassociateOrphanedSessions,
-  reconcilePreviousPiSessions,
   replaceDefaultPiSession,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
@@ -32,6 +31,7 @@ import { subscribeToPiSession } from "./pi-subscribe.ts";
 import {
   classifySessionFileTopology,
   reconcileAllStreamSessionFiles,
+  reconcilePiSessionFile,
   reconcileStreamSessionFiles,
 } from "./session-file-placement.ts";
 import { terminateDownstreamSessions } from "./terminate-downstream-sessions.ts";
@@ -501,7 +501,6 @@ export class PiSessionManager {
     const topology = classifySessionFileTopology(
       {
         piSessionId: row.pi_session_id,
-        streamId: "reopen-validation",
         sessionFile: row.session_file,
       },
       this.config.controlSurfaceSessionsDir,
@@ -645,14 +644,11 @@ export class PiSessionManager {
 
   async createDefault(
     customTools: FlitterbotTool[],
-    resumeSessionFile?: string,
+    sessionUser: string | null,
   ): Promise<ManagedPiSession> {
-    reconcilePreviousPiSessions(this.blackboard, "default", this.runtimeInstanceId, "restart");
-
     const created = await createFlitterbotAgent({
       customTools,
       role: "default",
-      resumeSessionFile,
     });
 
     const session = created.runtime.session;
@@ -662,22 +658,30 @@ export class PiSessionManager {
     const managed = this.buildManagedSession(created, state, "default", null, null);
 
     let reassociated: number;
+    let previousPiSessionIds: string[];
     try {
-      upsertPiSession(this.blackboard, {
-        piSessionId: session.sessionId,
-        role: "default",
-        status: "waiting_for_user",
-        runtimeInstanceId: this.runtimeInstanceId,
-        pid: process.pid,
-        sessionFile: session.sessionFile,
-        cwd: this.config.projectsDir,
-        agentDir: this.config.piAgentDir,
-        modelProvider: created.modelInfo.provider,
-        modelId: created.modelInfo.id,
-        thinkingLevel: created.modelInfo.thinkingLevel,
-        startedAt: new Date(this.startedAt).toISOString(),
-        lastEventAt: new Date().toISOString(),
-      });
+      const now = new Date().toISOString();
+      previousPiSessionIds = replaceDefaultPiSession(
+        this.blackboard,
+        {
+          piSessionId: session.sessionId,
+          role: "default",
+          status: "waiting_for_user",
+          runtimeInstanceId: this.runtimeInstanceId,
+          pid: process.pid,
+          sessionFile: session.sessionFile,
+          cwd: this.config.projectsDir,
+          agentDir: this.config.piAgentDir,
+          modelProvider: created.modelInfo.provider,
+          modelId: created.modelInfo.id,
+          thinkingLevel: created.modelInfo.thinkingLevel,
+          startedAt: new Date(this.startedAt).toISOString(),
+          lastEventAt: now,
+          sessionUser,
+        },
+        { status: "ended", endedAt: now, endReason: "restart" },
+        this.config.controlSurfaceSessionsDir,
+      );
       reassociated = reassociateOrphanedSessions(this.blackboard, managed.piSessionId);
     } catch (error) {
       await this.disposeUnpublishedManaged(managed);
@@ -691,6 +695,7 @@ export class PiSessionManager {
     this.defaultSession = managed;
     this.byPiSessionId.set(managed.piSessionId, managed);
     this.logResourceMessages("default", created.resourceMessages);
+    this.archiveDefaultSessionFiles(previousPiSessionIds);
     return managed;
   }
 
@@ -1114,10 +1119,15 @@ export class PiSessionManager {
       thinkingLevel: newSession.thinkingLevel,
     };
 
+    let previousPiSessionIds: string[];
     try {
-      replaceDefaultPiSession(
+      const sessionUser =
+        this.blackboard.get<{ session_user: string | null }>(
+          "SELECT session_user FROM pi_sessions WHERE pi_session_id = ?",
+          oldPiSessionId,
+        )?.session_user ?? null;
+      previousPiSessionIds = replaceDefaultPiSession(
         this.blackboard,
-        oldPiSessionId,
         {
           piSessionId: newPiSessionId,
           role: "default",
@@ -1132,8 +1142,10 @@ export class PiSessionManager {
           thinkingLevel: newModelInfo.thinkingLevel,
           startedAt: now,
           lastEventAt: now,
+          sessionUser,
         },
         { status: "ended", endedAt: now, endReason: "clear" },
+        this.config.controlSurfaceSessionsDir,
       );
     } catch (error) {
       await this.discardManagedAfterFailedReset(managed, oldPiSessionId, now);
@@ -1158,6 +1170,7 @@ export class PiSessionManager {
       timestamp: new Date().toISOString(),
     });
 
+    this.archiveDefaultSessionFiles(previousPiSessionIds);
     return { oldPiSessionId, newPiSessionId };
   }
 
@@ -1388,6 +1401,24 @@ export class PiSessionManager {
       () => managed.queue.steerPendingHooks(),
       () => managed.queue.enableSteering(),
     );
+  }
+
+  private archiveDefaultSessionFiles(previousPiSessionIds: readonly string[]): void {
+    for (const piSessionId of previousPiSessionIds) {
+      try {
+        reconcilePiSessionFile(
+          this.blackboard,
+          piSessionId,
+          "archived",
+          this.config.controlSurfaceSessionsDir,
+          this.config.controlSurfaceArchivedSessionsDir,
+        );
+      } catch (error) {
+        this.log(
+          `failed to archive prior default Pi session ${piSessionId}; next default creation will retry: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 
   private async disposeUnpublishedManaged(managed: ManagedPiSession): Promise<void> {

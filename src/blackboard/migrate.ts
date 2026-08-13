@@ -848,6 +848,10 @@ export function migrateBlackboard(db: DatabaseSync): number {
   }
   if (version < 24) {
     applyV24Migration(db);
+    version = getSchemaVersion(db);
+  }
+  if (version < 25) {
+    applyV25Migration(db);
   }
 
   ensureCurrentSchemaInvariants(db);
@@ -1317,6 +1321,22 @@ function applyV24Migration(db: DatabaseSync): void {
     );
     db.exec(IMMUTABLE_PI_SESSION_STREAM_TRIGGER_SQL);
     db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (24);");
+    db.exec("COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function applyV25Migration(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_pi_sessions_file ON pi_sessions(session_file);");
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_pi_sessions_default_owner_file
+       ON pi_sessions(role, stream_id, session_user, session_file);`,
+    );
+    db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (25);");
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");

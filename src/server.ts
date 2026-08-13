@@ -18,6 +18,7 @@ import { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./routes/
 import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
 import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
 import { handleBrowserPiSessionsRoute } from "./routes/browser-pi-sessions.ts";
+import { handleBrowserSessionSearchRoute } from "./routes/browser-session-search.ts";
 import {
   handleBrowserSessionDetailRoute,
   handleBrowserSessionsRoute,
@@ -246,6 +247,12 @@ async function routeRequest(
     pathname === CONTROL_SURFACE_ENDPOINTS.directoryCompletions.path
   ) {
     return handleBrowserDirectoryCompletionsRoute(runtime, req, res);
+  }
+  if (
+    method === CONTROL_SURFACE_ENDPOINTS.sessionSearch.method &&
+    pathname === CONTROL_SURFACE_ENDPOINTS.sessionSearch.path
+  ) {
+    return handleBrowserSessionSearchRoute(runtime, req, res);
   }
   if (
     method === "GET" &&

@@ -189,6 +189,16 @@ export class ControlSurfaceRuntime {
           .run(defaultUser, defaultUser);
         this.log(`adopted ${adopted.changes} legacy work stream(s) to owner "${defaultUser}"`);
       }
+      const adoptedDefaults = this.blackboard
+        .prepare(
+          "UPDATE pi_sessions SET session_user = ? WHERE role = 'default' AND stream_id IS NULL AND session_user IS NULL",
+        )
+        .run(defaultUser);
+      if (adoptedDefaults.changes > 0) {
+        this.log(
+          `adopted ${adoptedDefaults.changes} legacy default session(s) to owner "${defaultUser}"`,
+        );
+      }
     }
 
     if (this.config.wipeStreamsOnStart) {
@@ -197,15 +207,7 @@ export class ControlSurfaceRuntime {
         this.log(`wiped ${closed} closed stream(s) on startup (wipeStreamsOnStart=true)`);
     }
 
-    const resumeDefaultSessionFile =
-      process.env.FLITTERBOT_RESUME_DEFAULT_SESSION?.trim() || undefined;
-    if (resumeDefaultSessionFile) {
-      this.log(`resuming default session from ${resumeDefaultSessionFile}`);
-    }
-    await this.sessionManager.createDefault(
-      this.createCustomTools("default"),
-      resumeDefaultSessionFile,
-    );
+    await this.sessionManager.createDefault(this.createCustomTools("default"), defaultUser ?? null);
     fireAndForgetPeriodicTaskSync(this.config, this.log.bind(this));
 
     const openStreams = listOpenStreams(this.blackboard);
@@ -247,9 +249,7 @@ export class ControlSurfaceRuntime {
       `runtime started on ${this.config.controlSurfaceHost}:${this.config.controlSurfacePort}`,
     );
 
-    if (!resumeDefaultSessionFile) {
-      this.enqueueDefaultAgentFirstMessage("startup");
-    }
+    this.enqueueDefaultAgentFirstMessage("startup");
   }
 
   async stop(reason: string = "shutdown", _crash: boolean = false): Promise<void> {

@@ -16,6 +16,7 @@ export type {
   PiSessionModelInfo,
   RuntimeWhatsAppControlResponse,
   SessionDetailResponse,
+  SessionSearchResponse,
   SessionsListResponse,
   ShortcutBindingsConfig,
   SkillsListResponse,

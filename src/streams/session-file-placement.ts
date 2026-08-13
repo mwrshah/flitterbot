@@ -4,11 +4,10 @@ import { CURRENT_SESSION_VERSION, type SessionHeader } from "@earendil-works/pi-
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { updatePiSessionFile } from "../blackboard/write-pi-sessions.ts";
 
-type SessionFilePlacement = "active" | "archived";
+export type SessionFilePlacement = "active" | "archived";
 
 export type SessionFileRecord = {
   piSessionId: string;
-  streamId: string;
   sessionFile: string | null;
 };
 
@@ -17,7 +16,7 @@ type MaterializedSessionFileRecord = SessionFileRecord & {
   startedAt: string;
 };
 
-type SessionFilePlacementStatus = "already-placed" | "hydrated" | "moved" | "recovered";
+type SessionFilePlacementStatus = "already-placed" | "hydrated" | "missing" | "moved" | "recovered";
 
 type SessionFilePlacementResult = {
   piSessionId: string;
@@ -40,7 +39,6 @@ type StreamPlacementRow = {
 
 type PiSessionFileRow = {
   pi_session_id: string;
-  stream_id: string;
   session_file: string | null;
   cwd: string;
   started_at: string;
@@ -140,7 +138,7 @@ function updateSessionFile(
   record: SessionFileRecord,
   sessionFile: string,
 ): void {
-  updatePiSessionFile(blackboard, record.piSessionId, record.streamId, sessionFile);
+  updatePiSessionFile(blackboard, record.piSessionId, sessionFile);
 }
 
 function hydrateSessionFile(record: MaterializedSessionFileRecord, sessionFile: string): void {
@@ -164,6 +162,7 @@ function placeSessionFile(
   placement: SessionFilePlacement,
   sessionsDir: string,
   archivedSessionsDir: string,
+  hydrateMissing: boolean,
 ): SessionFilePlacementResult {
   if (record.sessionFile === null) {
     throw new Error(`Pi session ${record.piSessionId} has no materialized session file`);
@@ -203,6 +202,15 @@ function placeSessionFile(
   }
 
   if (!otherExists) {
+    if (!hydrateMissing) {
+      updateSessionFile(blackboard, record, desiredPath);
+      return {
+        piSessionId: record.piSessionId,
+        previousSessionFile: record.sessionFile,
+        sessionFile: desiredPath,
+        status: "missing",
+      };
+    }
     hydrateSessionFile(record, desiredPath);
     updateSessionFile(blackboard, record, desiredPath);
     return {
@@ -233,6 +241,54 @@ function placeSessionFile(
   };
 }
 
+function placePiSessionRow(
+  blackboard: BlackboardDatabase,
+  row: PiSessionFileRow,
+  placement: SessionFilePlacement,
+  sessionsDir: string,
+  archivedSessionsDir: string,
+  hydrateMissing: boolean,
+): SessionFilePlacementResult {
+  return placeSessionFile(
+    blackboard,
+    {
+      piSessionId: row.pi_session_id,
+      sessionFile: row.session_file,
+      cwd: row.cwd,
+      startedAt: row.started_at,
+    },
+    placement,
+    sessionsDir,
+    archivedSessionsDir,
+    hydrateMissing,
+  );
+}
+
+export function reconcilePiSessionFile(
+  blackboard: BlackboardDatabase,
+  piSessionId: string,
+  placement: SessionFilePlacement,
+  sessionsDir: string,
+  archivedSessionsDir: string,
+  options: { hydrateMissing?: boolean } = {},
+): SessionFilePlacementResult {
+  const row = blackboard.get<PiSessionFileRow>(
+    `SELECT pi_session_id, session_file, cwd, started_at
+     FROM pi_sessions
+     WHERE pi_session_id = ?`,
+    piSessionId,
+  );
+  if (!row) throw new Error(`Cannot reconcile missing Pi session: ${piSessionId}`);
+  return placePiSessionRow(
+    blackboard,
+    row,
+    placement,
+    sessionsDir,
+    archivedSessionsDir,
+    options.hydrateMissing ?? false,
+  );
+}
+
 export function reconcileStreamSessionFiles(
   blackboard: BlackboardDatabase,
   streamId: string,
@@ -248,24 +304,19 @@ export function reconcileStreamSessionFiles(
   const placement: SessionFilePlacement =
     stream.status === "open" || stream.pinned ? "active" : "archived";
   const row = blackboard.get<PiSessionFileRow>(
-    `SELECT pi_session_id, stream_id, session_file, cwd, started_at
+    `SELECT pi_session_id, session_file, cwd, started_at
      FROM pi_sessions
      WHERE stream_id = ?`,
     streamId,
   );
   if (!row) throw new Error(`Cannot reconcile stream without a Pi session: ${streamId}`);
-  const file = placeSessionFile(
+  const file = placePiSessionRow(
     blackboard,
-    {
-      piSessionId: row.pi_session_id,
-      streamId: row.stream_id,
-      sessionFile: row.session_file,
-      cwd: row.cwd,
-      startedAt: row.started_at,
-    },
+    row,
     placement,
     sessionsDir,
     archivedSessionsDir,
+    true,
   );
 
   return { streamId, placement, file };

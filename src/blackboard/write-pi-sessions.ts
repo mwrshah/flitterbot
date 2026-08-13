@@ -19,11 +19,12 @@ type PiSessionRecord = {
   ended_at?: string;
   end_reason?: string;
   stream_id?: string;
+  session_user?: string | null;
 };
 
 export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord): void {
-  const existing = db.get<{ stream_id: string | null }>(
-    "SELECT stream_id FROM pi_sessions WHERE pi_session_id = ?",
+  const existing = db.get<{ stream_id: string | null; session_user: string | null }>(
+    "SELECT stream_id, session_user FROM pi_sessions WHERE pi_session_id = ?",
     session.pi_session_id,
   );
   const requestedStreamId = session.stream_id ?? null;
@@ -37,7 +38,12 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
         "SELECT stream_user FROM streams WHERE id = ?",
         session.stream_id,
       )?.stream_user ?? null)
-    : null;
+    : (session.session_user ?? null);
+  if (existing && existing.session_user !== null && existing.session_user !== sessionUser) {
+    throw new Error(
+      `Pi session ${session.pi_session_id} user ownership is immutable: existing ${existing.session_user}, requested ${sessionUser ?? "none"}`,
+    );
+  }
   const result = db
     .prepare(
       `INSERT INTO pi_sessions (
@@ -107,40 +113,6 @@ export function upsertPiSession(db: BlackboardDatabase, session: PiSessionRecord
   if (result.changes !== 1) {
     throw new Error(`Pi session ${session.pi_session_id} stream ownership is immutable`);
   }
-}
-
-export function markPreviousPiSessionsInactive(
-  db: BlackboardDatabase,
-  options: {
-    role: string;
-    runtimeInstanceId?: string;
-    endedAt: string;
-    endReason: string;
-    status?: Extract<PiSessionStatus, "ended" | "crashed">;
-  },
-): number {
-  const result = db
-    .prepare(
-      `UPDATE pi_sessions
-     SET status = ?,
-         ended_at = ?,
-         end_reason = ?,
-         last_event_at = MAX(last_event_at, ?)
-     WHERE role = ?
-       AND status IN ('active', 'waiting_for_user', 'waiting_for_sessions')
-       AND (? IS NULL OR runtime_instance_id != ?)`,
-    )
-    .run(
-      options.status ?? "ended",
-      options.endedAt,
-      options.endReason,
-      options.endedAt,
-      options.role,
-      options.runtimeInstanceId ?? null,
-      options.runtimeInstanceId ?? null,
-    );
-
-  return Number(result.changes ?? 0);
 }
 
 export function touchPiSessionPrompt(
@@ -249,19 +221,16 @@ export function closePiSession(
 export function updatePiSessionFile(
   db: BlackboardDatabase,
   piSessionId: string,
-  streamId: string,
   sessionFile: string,
 ): void {
   const result = db
     .prepare(
       `UPDATE pi_sessions
        SET session_file = ?
-       WHERE pi_session_id = ? AND stream_id = ?`,
+       WHERE pi_session_id = ?`,
     )
-    .run(sessionFile, piSessionId, streamId);
+    .run(sessionFile, piSessionId);
   if (result.changes !== 1) {
-    throw new Error(
-      `Pi session identity changed while updating its file: stream=${streamId} piSessionId=${piSessionId}`,
-    );
+    throw new Error(`Pi session disappeared while updating its file: ${piSessionId}`);
   }
 }

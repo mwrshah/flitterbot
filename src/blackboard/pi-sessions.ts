@@ -1,8 +1,8 @@
+import path from "node:path";
 import type { PiSessionStatus as PersistedPiSessionStatus } from "../contracts/index.ts";
 import type { BlackboardDatabase } from "./db.ts";
 import {
   closePiSession,
-  markPreviousPiSessionsInactive,
   reassociateOrphanedSessions as reassociateOrphanedSessionsWrite,
   touchPiSessionEvent,
   touchPiSessionPrompt,
@@ -26,23 +26,8 @@ type UpsertPiSessionInput = {
   lastEventAt: string;
   lastPromptAt?: string;
   streamId?: string;
+  sessionUser?: string | null;
 };
-
-export function reconcilePreviousPiSessions(
-  db: BlackboardDatabase,
-  role: string,
-  runtimeInstanceId: string,
-  reason: string = "replaced",
-  status: Extract<PersistedPiSessionStatus, "ended" | "crashed"> = "ended",
-): number {
-  return markPreviousPiSessionsInactive(db, {
-    role,
-    runtimeInstanceId,
-    endedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-    endReason: reason,
-    status,
-  });
-}
 
 export function upsertPiSession(db: BlackboardDatabase, input: UpsertPiSessionInput): void {
   writePiSession(db, {
@@ -61,21 +46,61 @@ export function upsertPiSession(db: BlackboardDatabase, input: UpsertPiSessionIn
     last_prompt_at: input.lastPromptAt,
     last_event_at: input.lastEventAt,
     stream_id: input.streamId,
+    session_user: input.sessionUser,
   });
 }
 
 export function replaceDefaultPiSession(
   db: BlackboardDatabase,
-  oldPiSessionId: string,
-  input: UpsertPiSessionInput,
+  input: UpsertPiSessionInput & { sessionUser: string | null },
   end: { status: "ended" | "crashed"; endedAt: string; endReason: string },
-): void {
-  if (input.streamId) throw new Error("Stream-backed Pi session identity is immutable");
+  sessionsDir: string,
+): string[] {
+  if (input.streamId || input.role !== "default") {
+    throw new Error("Default Pi session replacement requires a non-stream default session");
+  }
+  const pathPrefix = `${path.resolve(sessionsDir)}${path.sep}`;
+  const pathUpperBound = `${pathPrefix}\uffff`;
   db.exec("BEGIN IMMEDIATE;");
   try {
-    closePiSession(db, oldPiSessionId, end);
+    const previousPiSessionIds = db
+      .all<{ pi_session_id: string }>(
+        `SELECT pi_session_id
+         FROM pi_sessions
+         WHERE role = 'default'
+           AND stream_id IS NULL
+           AND session_user IS ?
+           AND pi_session_id != ?
+           AND session_file >= ?
+           AND session_file < ?`,
+        input.sessionUser,
+        input.piSessionId,
+        pathPrefix,
+        pathUpperBound,
+      )
+      .map((session) => session.pi_session_id);
+    db.prepare(
+      `UPDATE pi_sessions
+       SET status = ?, ended_at = ?, end_reason = ?, last_event_at = MAX(last_event_at, ?)
+       WHERE role = 'default'
+         AND stream_id IS NULL
+         AND session_user IS ?
+         AND pi_session_id != ?
+         AND status IN ('active', 'waiting_for_user', 'waiting_for_sessions')`,
+    ).run(
+      end.status,
+      end.endedAt,
+      end.endReason,
+      end.endedAt,
+      input.sessionUser,
+      input.piSessionId,
+    );
     upsertPiSession(db, input);
+    db.prepare(
+      "UPDATE pi_sessions SET ended_at = NULL, end_reason = NULL WHERE pi_session_id = ?",
+    ).run(input.piSessionId);
     db.exec("COMMIT;");
+    return previousPiSessionIds;
   } catch (error) {
     db.exec("ROLLBACK;");
     throw error;

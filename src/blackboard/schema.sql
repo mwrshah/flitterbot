@@ -1,4 +1,4 @@
--- Flitterbot blackboard schema (v24)
+-- Flitterbot blackboard schema (v25)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS pi_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_sessions_stream ON pi_sessions(stream_id);
+CREATE INDEX IF NOT EXISTS idx_pi_sessions_file ON pi_sessions(session_file);
+CREATE INDEX IF NOT EXISTS idx_pi_sessions_default_owner_file
+    ON pi_sessions(role, stream_id, session_user, session_file);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pi_sessions_one_per_stream
     ON pi_sessions(stream_id) WHERE stream_id IS NOT NULL;
 CREATE TRIGGER IF NOT EXISTS trg_pi_sessions_immutable_stream

@@ -146,6 +146,21 @@ export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
   };
 }
 
+export function sessionSearchQueryOptions(
+  apiClient: FlitterbotApiClient,
+  query: string,
+  enabled: boolean,
+) {
+  return {
+    queryKey: ["session-search", query] as const,
+    queryFn: () => apiClient.searchSessions(query),
+    enabled,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  };
+}
+
 export function directoryCompletionsQueryOptions(
   query: string,
   enabled: boolean,
