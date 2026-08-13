@@ -51,18 +51,20 @@ Example value: `{ "nav.surface": "Alt+KeyH", "scroll.top": "Home" }`.
 | `panel.view.diff` | `Ctrl+K` | Switch to Diff panel view |
 | `nav.stream.slot.{1-9}` | `Alt+{1-9}`, `Alt+{m,comma,period,j,k,l,u,i,o}` | Navigate to stream by slot |
 
-## Scroll Target Switching
+## Scroll Target Resolution
 
-When `Ctrl+K` activates the diff panel, scroll shortcuts (`Ctrl+D/U`, bare `d/u/j/k`, `g g`, `Shift+G`) retarget to the diff panel's scrollable area. `Ctrl+I` or `i` (composer focus) restores the scroll target to the main message list. Implementation uses a value-based approach: scrollable containers are marked with `data-scroll-container="main"` or `data-scroll-container="diff"`, and a module-level JS variable selects the active target. No DOM mutation on switch — `querySelector` runs at scroll time against the current value.
+Scroll shortcuts (`Ctrl+D/U`, bare `d/u/j/k`, `g g`, `Shift+G`) resolve their target from the mounted DOM each time they run. A mounted `[data-scroll-container="diff"]` wins; otherwise they target `[data-scroll-container="main"]`. The Diff container is rendered only while the Diff panel is active, so its mount lifecycle is the source of truth and no separate active-target state or cleanup reset is needed.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `web/src/lib/global-shortcuts.ts` | Core engine: definitions, parsing, matching, dispatch |
-| `web/src/hooks/use-global-shortcuts.ts` | React hook: wires handlers + keydown listener at root |
+| `web/src/lib/global-shortcuts.ts` | Core engine plus mounted-DOM scroll target resolver |
+| `web/src/hooks/use-global-shortcuts.ts` | React hook: wires root handlers, including scroll dispatch, plus keydown listener |
 | `web/src/lib/types.ts` | `ShortcutBindingsConfig` type, part of `AppConfig` |
 | `web/src/components/sidebar.tsx` | Displays shortcut labels in navigation |
-| `web/src/components/downstream-sessions-panel.tsx` | Registers stream-specific shortcut handlers |
+| `web/src/components/surface.tsx` | Mounts the Surface's Main scroll container |
+| `web/src/components/streams-message-list.tsx` | Mounts a stream's Main scroll container |
+| `web/src/components/downstream-sessions-panel.tsx` | Registers stream-specific handlers and mounts the conditional Diff scroll container |
 | `web/src/components/common/message-input.tsx` | Registers composer focus target |
 | `web/src/routes/__root.tsx` | Calls `useGlobalShortcuts` at root level |
