@@ -3,4 +3,4 @@ pre-commit:
     audit-ts:
       run: pnpm run audit:ts
     codedecorum:
-      run: uvx --no-cache --from https://github.com/mwrshah/codedecorum/archive/refs/heads/main.tar.gz codedecorum .
+      run: uvx --no-cache codedecorum .
