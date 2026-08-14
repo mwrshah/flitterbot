@@ -6,8 +6,9 @@
 # Each session runs in its own terminal window (tiled by the WM).
 # NOTE: Callers must NEVER sleep/poll to wait for session completion — rely on user prompt or hook callback.
 # Subcommands and their arguments are documented in ../SKILL.md.
-# Harness (claude/codex) is chosen via --harness or config.json "harness" (default claude). Codex launches
-# with --yolo --dangerously-bypass-hook-trust; its "working" state is the "esc to interrupt" status line;
+# Harness (claude/codex) is chosen via --harness or config.json "harness" (default claude). An optional
+# --agent-command selects a shell alias/function/wrapper while Flitterbot retains the harness flags and env.
+# Codex launches with --yolo --dangerously-bypass-hook-trust; its "working" state is the "esc to interrupt" status line;
 # its session id is read from the newest ~/.codex rollout matching the pane cwd (not shown on screen).
 # ponytail: this duplicates TypeScript tmux UI detection; keep one implementation or generate one from the other.
 
@@ -111,13 +112,13 @@ cmd_status() {
 }
 
 _agent_launch_cmd() {
-  local harness="$1" session="$2" stream_id="$3" pi_session_id="$4" args="$5"
-  local envp="env -u CLAUDECODE FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_HARNESS=$harness FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
-  local cmd
+  local harness="$1" session="$2" stream_id="$3" pi_session_id="$4" args="$5" agent_command="$6"
+  local envp="unset CLAUDECODE; FLITTERBOT_AGENT_MANAGED=1 FLITTERBOT_HARNESS=$harness FLITTERBOT_TMUX_SESSION=$session FLITTERBOT_STREAM_ID=${stream_id} FLITTERBOT_PI_SESSION_ID=${pi_session_id}"
+  local cmd command="${agent_command:-$harness}"
   if [ "$harness" = "codex" ]; then
-    cmd="$envp codex --yolo --dangerously-bypass-hook-trust"
+    cmd="$envp $command --yolo --dangerously-bypass-hook-trust"
   else
-    cmd="$envp claude --dangerously-skip-permissions"
+    cmd="$envp $command --dangerously-skip-permissions"
   fi
   if [ -n "$args" ]; then
     cmd="$cmd $args"
@@ -129,12 +130,21 @@ cmd_launch() {
   local stream_id="${FLITTERBOT_STREAM_ID:-}"
   local pi_session_id="${FLITTERBOT_PI_SESSION_ID:-}"
   local harness_arg=""
+  local agent_command=""
   local remaining=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --stream-id) stream_id="$2"; shift 2 ;;
       --pi-session-id) pi_session_id="$2"; shift 2 ;;
       --harness) harness_arg="$2"; shift 2 ;;
+      --agent-command)
+        if [ -z "${2:-}" ]; then
+          echo "ERROR: --agent-command requires a command"
+          return 1
+        fi
+        agent_command="$2"
+        shift 2
+        ;;
       *) remaining+=("$1"); shift ;;
     esac
   done
@@ -225,7 +235,7 @@ cmd_launch() {
   fi
 
   local cmd
-  cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args")
+  cmd=$(_agent_launch_cmd "$harness" "$session" "$stream_id" "$pi_session_id" "$args" "$agent_command")
   tmux send-keys -t "$session" "$cmd" Enter
   sleep "$SHELL_FORK_GRACE_SECONDS"
 
