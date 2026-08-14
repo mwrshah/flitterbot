@@ -47,8 +47,8 @@ export function buildConversationFindIndex(rows: ConversationRow[]): string[][] 
       .flatMap((part) => {
         if (part.type === "text") return [part.text];
         if (part.type !== "tool") return [];
-        const { start, end } = part.tool;
-        return [start.tool, jsonSource(start.displayArgs ?? start.args), jsonSource(end?.result)];
+        const { start } = part.tool;
+        return [start.tool, jsonSource(start.displayArgs ?? start.args)];
       })
       .filter(Boolean)
       .map((segment) => segment.toLowerCase()),
