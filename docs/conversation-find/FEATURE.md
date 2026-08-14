@@ -14,6 +14,7 @@ Native browser find sees only the rows that TanStack Virtual mounts. Conversatio
 - Streaming text becomes searchable after it commits.
 - Search is case-insensitive and counts non-overlapping occurrences.
 - The bar shows the selected occurrence and total, such as `12/30`.
+- During rapid typing, the previous count, selected occurrence, and row marker remain visible until the deferred search commits the new results together.
 - Enter and Arrow Down select the next occurrence. Shift+Enter and Arrow Up select the previous occurrence. Navigation wraps.
 - The virtualizer mounts and centers the selected row.
 - The whole selected row receives a background and border marker. Individual text is not highlighted.

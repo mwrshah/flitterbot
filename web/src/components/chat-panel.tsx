@@ -470,15 +470,14 @@ export function ChatPanel({
     enabled: findHistoryRequested,
   });
   const [findValue, setFindValue] = useState("");
-  const [findMatchIndex, setFindMatchIndex] = useState(0);
+  const [findSelection, setFindSelection] = useState({ query: "", matchIndex: 0 });
   const deferredFindValue = useDeferredValue(findValue);
   const mergedTimeline = useMemo(
     () => mergeFindTimeline(findHistoryQuery.data?.items, timeline),
     [findHistoryQuery.data?.items, timeline],
   );
   const conversationRows = useMemo(() => buildConversationRows(mergedTimeline), [mergedTimeline]);
-  const findQueryPending = deferredFindValue !== findValue;
-  const findReady = Boolean(findHistoryQuery.data) && !findQueryPending;
+  const findReady = Boolean(findHistoryQuery.data);
   const findResults = useMemo(
     () =>
       findOpen && findReady
@@ -486,6 +485,7 @@ export function ChatPanel({
         : EMPTY_CONVERSATION_FIND_RESULTS,
     [conversationRows, deferredFindValue, findOpen, findReady],
   );
+  const findMatchIndex = findSelection.query === deferredFindValue ? findSelection.matchIndex : 0;
   const selectedFindMatchIndex = findResults.matchCount
     ? findMatchIndex % findResults.matchCount
     : 0;
@@ -673,16 +673,20 @@ export function ChatPanel({
 
   const moveConversationFind = useCallback(
     (delta: -1 | 1) => {
-      setFindMatchIndex((current) =>
-        moveConversationFindSelection(current, findResults.matchCount, delta),
-      );
+      setFindSelection((current) => ({
+        query: deferredFindValue,
+        matchIndex: moveConversationFindSelection(
+          current.query === deferredFindValue ? current.matchIndex : 0,
+          findResults.matchCount,
+          delta,
+        ),
+      }));
     },
-    [findResults.matchCount],
+    [deferredFindValue, findResults.matchCount],
   );
 
   const changeConversationFindValue = useCallback((value: string) => {
     setFindValue(value);
-    setFindMatchIndex(0);
   }, []);
 
   useLayoutEffect(() => {
@@ -695,7 +699,7 @@ export function ChatPanel({
     setFindSessionId(undefined);
     setFindHistorySessionId(undefined);
     setFindValue("");
-    setFindMatchIndex(0);
+    setFindSelection({ query: "", matchIndex: 0 });
     findPreviousFocusRef.current = null;
   }, [piSessionId]);
 
@@ -985,7 +989,7 @@ export function ChatPanel({
                 value={findValue}
                 matchIndex={selectedFindMatchIndex}
                 matchCount={findResults.matchCount}
-                loading={findHistoryQuery.isFetching || findQueryPending}
+                loading={findHistoryQuery.isFetching && !findHistoryQuery.data}
                 error={findHistoryQuery.error}
                 onValueChange={changeConversationFindValue}
                 onMove={moveConversationFind}
