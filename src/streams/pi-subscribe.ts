@@ -83,8 +83,6 @@ export function subscribeToPiSession(
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
   onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
-  onTurnEnd?: () => void,
-  onAgentStart?: () => void,
 ): () => void {
   let currentStreamingMessageId: string | null = null;
 
@@ -308,7 +306,6 @@ export function subscribeToPiSession(
       case "turn_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
         currentStreamingMessageId = null;
-        onTurnEnd?.();
 
         wsHub.broadcast({
           type: "turn_end",
@@ -319,7 +316,6 @@ export function subscribeToPiSession(
       }
       case "agent_start":
         touchPiEvent(blackboard, session.sessionId, now, "active");
-        onAgentStart?.();
         lastAssistantMessage = null;
         messageEndFired = false;
         break;

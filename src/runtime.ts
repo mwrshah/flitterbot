@@ -1090,18 +1090,32 @@ export class ControlSurfaceRuntime {
 
   private static readonly DATETIME_INJECTION_INTERVAL_MS = 60 * 60 * 1000;
 
-  private maybeInjectDatetime(piSessionId: string, text: string): string {
+  private prepareDatetimeInjection(
+    piSessionId: string,
+    text: string,
+  ): { text: string; reportedAt?: string } {
     const lastReportedAt = getLastDatetimeReportedAt(this.blackboard, piSessionId);
     const now = Date.now();
     const lastMs = lastReportedAt ? new Date(lastReportedAt).getTime() : 0;
     if (now - lastMs < ControlSurfaceRuntime.DATETIME_INJECTION_INTERVAL_MS) {
-      return text;
+      return { text };
     }
 
-    const nowIso = new Date(now).toISOString();
-    touchDatetimeReportedAt(this.blackboard, piSessionId, nowIso);
+    return {
+      text: `${text}\n\n${formatDatetimeBlock()}`,
+      reportedAt: new Date(now).toISOString(),
+    };
+  }
 
-    return `${text}\n\n${formatDatetimeBlock()}`;
+  private recordDatetimeInjection(piSessionId: string, reportedAt?: string): void {
+    if (!reportedAt) return;
+    try {
+      touchDatetimeReportedAt(this.blackboard, piSessionId, reportedAt);
+    } catch (error) {
+      this.log(
+        `failed to persist datetime injection for ${piSessionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private resolveTargetSession(
@@ -1131,6 +1145,7 @@ export class ControlSurfaceRuntime {
     managed: ManagedPiSession,
     item: QueueItem,
     steered = false,
+    onAccepted?: () => void,
   ): Promise<void> {
     if (steered) return this.steerQueueItem(managed, item);
 
@@ -1147,9 +1162,10 @@ export class ControlSurfaceRuntime {
     if (!session) throw new Error("pi session not initialized");
 
     const piSessionId = session.sessionId;
-    if (item.source === "web" || item.source === "whatsapp") {
-      item.text = this.maybeInjectDatetime(piSessionId, item.text);
-    }
+    const datetimeInjection =
+      item.source === "web" || item.source === "whatsapp"
+        ? this.prepareDatetimeInjection(piSessionId, item.text)
+        : { text: item.text };
     const itemRemoteJid = extractRemoteJid(item.metadata);
 
     this.log(
@@ -1160,9 +1176,17 @@ export class ControlSurfaceRuntime {
     touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
     this.broadcastStatusChanged("pi_session");
 
-    const promptText = formatPromptWithContext(item);
+    const promptText = formatPromptWithContext({ ...item, text: datetimeInjection.text });
+    let datetimeCommitted = false;
+    const acceptPrompt = () => {
+      onAccepted?.();
+      if (!datetimeInjection.reportedAt || datetimeCommitted) return;
+      datetimeCommitted = true;
+      this.recordDatetimeInjection(piSessionId, datetimeInjection.reportedAt);
+    };
 
-    await this.deliverQueueItem(session, item, promptText);
+    await this.deliverQueueItem(session, item, promptText, acceptPrompt);
+    acceptPrompt();
 
     this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
 
@@ -1245,28 +1269,54 @@ export class ControlSurfaceRuntime {
     const session = managed.runtime?.session;
     if (!session?.isStreaming) throw new Error("pi session is not available for steering");
 
-    if (item.source === "web" || item.source === "whatsapp") {
-      item.text = this.maybeInjectDatetime(session.sessionId, item.text);
-    }
+    const datetimeInjection =
+      item.source === "web" || item.source === "whatsapp"
+        ? this.prepareDatetimeInjection(session.sessionId, item.text)
+        : { text: item.text };
     if (item.source !== "hook") managed.state.addSteeredItem(item);
     try {
-      const delivery = this.deliverQueueItem(session, item, formatPromptWithContext(item));
-      this.log(`queue item ${item.id} delivered as steering guidance`);
-      await delivery;
+      const text = formatPromptWithContext({ ...item, text: datetimeInjection.text });
+      if (item.source === "hook") {
+        const content = item.images?.length
+          ? [{ type: "text" as const, text }, ...item.images]
+          : text;
+        await session.sendCustomMessage(
+          {
+            customType: "flitterbot-hook",
+            content,
+            display: true,
+            details: { queueItemId: item.id, metadata: item.metadata },
+          },
+          { deliverAs: "steer", triggerTurn: true },
+        );
+      } else {
+        await session.steer(text, item.images);
+      }
+      this.recordDatetimeInjection(session.sessionId, datetimeInjection.reportedAt);
+      this.log(`queue item ${item.id} admitted as steering guidance`);
     } catch (error) {
       managed.state.removeSteeredItem(item);
       throw error;
     }
   }
 
-  private deliverQueueItem(session: AgentSession, item: QueueItem, text: string): Promise<void> {
+  private deliverQueueItem(
+    session: AgentSession,
+    item: QueueItem,
+    text: string,
+    onAccepted?: () => void,
+  ): Promise<void> {
     if (item.source !== "hook") {
       return session.prompt(text, {
         streamingBehavior: "steer",
         images: item.images,
+        preflightResult: (success) => {
+          if (success) onAccepted?.();
+        },
       });
     }
     const content = item.images?.length ? [{ type: "text" as const, text }, ...item.images] : text;
+    onAccepted?.();
     return session.sendCustomMessage(
       {
         customType: "flitterbot-hook",
@@ -2743,7 +2793,7 @@ export class ControlSurfaceRuntime {
           text: payload.text,
           source: "web",
           metadata: { via: "ws", ...routerMeta },
-          webClientId: client.id,
+          webClientId: serverMessageId,
           images: Array.isArray(payload.images) ? payload.images : undefined,
           serverMessageId,
         });

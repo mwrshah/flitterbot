@@ -22,6 +22,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     if (data.pages.length === 1) return data.pages[0]!.items;
     return data.pages.flatMap((page) => page.items);
   }, [data]);
+  const turnQueue = data?.pages.at(-1)?.turnQueue ?? { version: 0, items: [] };
   const loadPreviousPage = useCallback(() => {
     void fetchPreviousPage();
   }, [fetchPreviousPage]);
@@ -57,6 +58,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
 
   return {
     timeline,
+    turnQueue,
     connectionState,
     onSendMessage,
     effectivePiSessionId,

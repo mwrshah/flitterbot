@@ -46,6 +46,7 @@ const REPLAYED_EVENT_TYPES = new Set([
   "compaction_start",
   "compaction_end",
   "history_rewritten",
+  "turn_queue_changed",
 ]);
 
 export class WebSocketHub {

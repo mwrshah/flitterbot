@@ -89,6 +89,7 @@ function PiSessionRoute() {
 
   const {
     timeline,
+    turnQueue,
     onSendMessage,
     effectivePiSessionId,
     isSessionBusy,
@@ -110,6 +111,7 @@ function PiSessionRoute() {
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
+          turnQueue={turnQueue}
           isSessionBusy={isSessionBusy}
           isSessionCompacting={isSessionCompacting}
           contextUsage={contextUsage}

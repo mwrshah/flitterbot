@@ -1,5 +1,8 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
-import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
+import type {
+  ConversationEventPosition,
+  TurnQueueSnapshot,
+} from "../../../src/contracts/websocket.ts";
 import type { ChatTimelineItem, StreamsHistoryResponse } from "./types";
 
 export const surfaceQueryKey = ["surface-timeline"] as const;
@@ -50,6 +53,25 @@ export async function invalidateHistorySnapshot(
 ): Promise<void> {
   resetFindHistorySnapshot(queryClient, sessionId);
   await queryClient.invalidateQueries({ queryKey: historyQueryKey(sessionId), exact: true });
+}
+
+export function applyTurnQueueSnapshot(
+  queryClient: QueryClient,
+  sessionId: string,
+  snapshot: TurnQueueSnapshot,
+): void {
+  queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    historyQueryKey(sessionId),
+    (current) => {
+      if (!current?.pages.length) return current;
+      const newestIndex = current.pages.length - 1;
+      const newestPage = current.pages[newestIndex]!;
+      if (snapshot.version <= (newestPage.turnQueue?.version ?? -1)) return current;
+      const pages = [...current.pages];
+      pages[newestIndex] = { ...newestPage, turnQueue: snapshot };
+      return { pages, pageParams: current.pageParams };
+    },
+  );
 }
 
 function updateNewestHistoryPage(

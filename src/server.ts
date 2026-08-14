@@ -59,6 +59,7 @@ import { handleRuntimeWhatsAppRoute } from "./routes/runtime-whatsapp.ts";
 import { handleSetStreamCwdRoute } from "./routes/set-stream-cwd.ts";
 import { handleStatusRoute } from "./routes/status.ts";
 import { handleStopRoute } from "./routes/stop.ts";
+import { handleRemoveTurnQueueItemRoute } from "./routes/turn-queue.ts";
 import { ControlSurfaceRuntime } from "./runtime.ts";
 import { errorDetail, errorMessage, formatStartupFailure } from "./startup-error.ts";
 
@@ -306,6 +307,23 @@ async function routeRequest(
     segments[3] === "interrupt"
   ) {
     return handlePiSessionInterruptRoute(runtime, req, res, decodeURIComponent(segments[2]));
+  }
+  if (
+    method === "DELETE" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "turn-queue" &&
+    segments[4] &&
+    !segments[5]
+  ) {
+    return handleRemoveTurnQueueItemRoute(
+      runtime,
+      req,
+      res,
+      decodeURIComponent(segments[2]),
+      decodeURIComponent(segments[4]),
+    );
   }
   if (
     method === "PUT" &&

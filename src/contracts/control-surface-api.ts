@@ -12,7 +12,7 @@ import type {
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
-import type { ConversationEventPosition } from "./websocket.ts";
+import type { ConversationEventPosition, TurnQueueSnapshot } from "./websocket.ts";
 
 export type BlackboardHealth = "ok" | "error";
 export type WhatsAppDaemonStatus =
@@ -212,8 +212,14 @@ export type StreamsHistoryLimit = number | "all";
 export interface StreamsHistoryResponse {
   items: ChatTimelineItem[];
   historyPosition?: ConversationEventPosition;
+  turnQueue?: TurnQueueSnapshot;
   olderPageCursor?: string | null;
 }
+
+export type RemoveTurnQueueItemResponse = TurnQueueSnapshot & {
+  removed: boolean;
+  accepting: boolean;
+};
 
 export interface DirectSessionMessageRequest {
   text: string;
