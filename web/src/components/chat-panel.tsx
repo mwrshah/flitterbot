@@ -58,6 +58,7 @@ import { invalidateHistorySnapshot } from "@/lib/conversation-history";
 import { buildConversationRows } from "@/lib/conversation-rows";
 import {
   focusComposerInput,
+  isShortcutInput,
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
@@ -169,8 +170,24 @@ function ConversationFindBar({
       ? `${matchCount ? matchIndex + 1 : 0}/${matchCount}`
       : "";
   const canMove = !loading && !error && matchCount > 0;
+  const [showFocusHint, setShowFocusHint] = useState(false);
   const navigationButtonClass =
     "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-35 sm:size-7";
+
+  useEffect(() => {
+    const updateFocusHint = (target: EventTarget | null) => {
+      setShowFocusHint(!isShortcutInput(target));
+    };
+    const handleFocusIn = (event: globalThis.FocusEvent) => updateFocusHint(event.target);
+    const handleFocusOut = (event: globalThis.FocusEvent) => updateFocusHint(event.relatedTarget);
+
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
 
   return (
     <form
@@ -186,26 +203,33 @@ function ConversationFindBar({
       className="absolute top-2 right-2 z-20 flex h-11 w-[min(28rem,calc(100%-1rem))] items-center gap-1 rounded-lg border border-border bg-background px-2 shadow-md focus-within:ring-2 focus-within:ring-border-pop sm:h-9"
     >
       <SearchIcon className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        name="conversation-find"
-        type="search"
-        autoComplete="off"
-        spellCheck={false}
-        value={value}
-        placeholder="Find…"
-        aria-label="Find in conversation"
-        onChange={(event) => onValueChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            event.stopPropagation();
-            onMove(event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey) ? -1 : 1);
-          }
-        }}
-        className="min-w-0 flex-1 bg-transparent text-base text-text outline-none placeholder:text-text-muted sm:text-sm"
-      />
+      <div className="flex min-w-0 flex-1 items-center">
+        <input
+          ref={inputRef}
+          name="conversation-find"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          placeholder="Find…"
+          aria-label="Find in conversation"
+          onChange={(event) => onValueChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
+            if (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              event.stopPropagation();
+              onMove(event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey) ? -1 : 1);
+            }
+          }}
+          className="min-w-0 flex-1 bg-transparent text-base text-text outline-none placeholder:text-text-muted sm:text-sm"
+        />
+        {showFocusHint && (
+          <span className="shrink-0 pl-2 text-xs text-text-muted" aria-hidden="true">
+            Press f to jump here
+          </span>
+        )}
+      </div>
       {error && !loading ? (
         <>
           <span id="conversation-find-error" role="alert" className="sr-only">
@@ -736,15 +760,13 @@ export function ChatPanel({
         actionId: SHORTCUT_ACTIONS.conversationFind,
         priority: 20,
         handler: (event) => {
-          if (findOpen || event.isComposing || hasBlockingSurface()) {
-            return false;
-          }
+          if (event.isComposing || hasBlockingSurface()) return false;
           openConversationFind();
           return true;
         },
       },
     ]);
-  }, [cwdAbsolute, findOpen, openConversationFind, openCwdPicker, streamId]);
+  }, [cwdAbsolute, openConversationFind, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
