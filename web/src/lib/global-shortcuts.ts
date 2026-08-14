@@ -148,14 +148,17 @@ export const SHORTCUT_ACTIONS = {
   panelViewDiff: "panel.view.diff",
 } as const;
 
-function isInputFocused(): boolean {
-  const el = document.activeElement;
-  if (!el) return false;
-  const tag = el.tagName;
+export function isShortcutInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return true;
-  if ((el as HTMLElement).isContentEditable) return true;
-  if (el.getAttribute("role") === "textbox") return true;
+  if (target.isContentEditable) return true;
+  if (target.getAttribute("role") === "textbox") return true;
   return false;
+}
+
+function isInputFocused(): boolean {
+  return isShortcutInput(document.activeElement);
 }
 
 export function registerComposerFocusTarget(handler: (() => void) | null) {
@@ -694,6 +697,7 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [
       { spec: "Meta+KeyF", when: "always" },
       { spec: "Ctrl+KeyF", when: "always" },
+      { spec: "f", when: "no-input-focus" },
     ],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.scrollHalfPageDown, {
