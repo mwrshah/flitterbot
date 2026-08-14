@@ -728,7 +728,7 @@ export function ChatPanel({
         actionId: SHORTCUT_ACTIONS.conversationFind,
         priority: 20,
         handler: (event) => {
-          if (event.isComposing || hasBlockingSurface()) {
+          if (findOpen || event.isComposing || hasBlockingSurface()) {
             return false;
           }
           openConversationFind();
@@ -736,7 +736,7 @@ export function ChatPanel({
         },
       },
     ]);
-  }, [cwdAbsolute, openConversationFind, openCwdPicker, streamId]);
+  }, [cwdAbsolute, findOpen, openConversationFind, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
