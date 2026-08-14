@@ -38,7 +38,7 @@ When deciding to launch multiple tmux sessions, consider whether the work can sp
 
 4. **Respect an explicit harness override.** When the user specifies `--harness codex` or `--harness claude`, preserve that flag in the launch command; the explicit choice takes precedence over configuration. When the user does not specify a harness, omit `--harness` so the script uses the configured default automatically.
 
-5. **Respect a custom agent command.** When the user names a shell alias, function, or wrapper for the agent (for example, `codexy`), pass it as `--agent-command <command>` with the matching `--harness`. Ask which harness it wraps if that is ambiguous. Flitterbot still adds its managed environment and standard permission flags. Wrapper scripts must `exec` the underlying agent so session detection can find it.
+5. **Respect a custom agent command.** When the user names a shell alias, function, or wrapper for the agent (for example, `codexy`), pass it as `--agent-command <command>` with the matching `--harness`. Ask which harness it wraps if that is ambiguous. The custom command selects the executable and profile only; Flitterbot adds its managed environment and standard permission flags. Wrapper scripts must `exec` the underlying agent so session detection can find it.
 
 6. **Never sleep or poll to wait for a session to finish.** Rely on the user prompting you again or a hook callback delivering the completion notification.
 7. If a stopped tmux-launched agent says it launched or is waiting on a downstream/background agent/workflow (keywords like “running in the background”, “Dynamic Workflow”, or “background agent”), do nothing; let it finish and expect another stop hook with its result.
