@@ -1,18 +1,9 @@
+import { Popover } from "@base-ui/react/popover";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
-import {
-  type CSSProperties,
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { memo, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import {
@@ -142,69 +133,10 @@ export const ModelSelector = memo(function ModelSelector({
   );
 
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const popoverRef = useRef<HTMLDivElement | null>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const groupedAll = useMemo(() => groupByAuthKind(all), [all]);
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
-
-  const updatePopoverPosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const width = Math.min(420, window.innerWidth - 16);
-    const maxDesiredHeight = Math.min(512, window.innerHeight * 0.7);
-    const gap = 6;
-    const margin = 8;
-    const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
-    const spaceAbove = rect.top - gap - margin;
-    const opensAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
-    const availableHeight = opensAbove ? spaceAbove : spaceBelow;
-    const height = Math.max(220, Math.min(maxDesiredHeight, availableHeight));
-
-    setPopoverStyle({
-      position: "fixed",
-      top: opensAbove ? Math.max(margin, rect.top - gap - height) : rect.bottom + gap,
-      left: Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin),
-      width,
-      height,
-    });
-  }, []);
-
-  const updatePopoverPositionRef = useRef(updatePopoverPosition);
-  useEffect(() => {
-    updatePopoverPositionRef.current = updatePopoverPosition;
-  }, [updatePopoverPosition]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePopoverPosition();
-  }, [open, updatePopoverPosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleUpdatePopoverPosition = () => updatePopoverPositionRef.current();
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("resize", handleUpdatePopoverPosition);
-    window.addEventListener("scroll", handleUpdatePopoverPosition, true);
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("resize", handleUpdatePopoverPosition);
-      window.removeEventListener("scroll", handleUpdatePopoverPosition, true);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
 
   if (pinned.length === 0 && all.length === 0) {
     return null;
@@ -213,37 +145,48 @@ export const ModelSelector = memo(function ModelSelector({
   const triggerLabel = currentModel?.label ?? "Select model";
 
   return (
-    <>
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="subtle"
-        size="sm"
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
         disabled={disabled || !piSessionId}
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
-          compact ? "px-1.5" : "px-2",
-        )}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title={
-          currentModel
-            ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
-            : "Pick a model"
+        render={
+          <Button
+            type="button"
+            variant="subtle"
+            size="sm"
+            className={cn(
+              "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
+              compact ? "px-1.5" : "px-2",
+            )}
+            title={
+              currentModel
+                ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
+                : "Pick a model"
+            }
+          />
         }
       >
         <span className={cn("truncate max-w-[180px]", compact && "sr-only")}>{triggerLabel}</span>
         <ChevronDownIcon className="size-3 shrink-0" />
-      </Button>
-      {open &&
-        createPortal(
-          <div ref={popoverRef} className="z-50" style={popoverStyle}>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          className="z-50 w-[min(420px,calc(100vw-16px))]"
+        >
+          <Popover.Popup
+            initialFocus={searchInputRef}
+            aria-label="Select model"
+            className="h-[min(32rem,70vh,var(--available-height))] outline-none"
+          >
             <Command
               loop
+              label="Search models"
+              filter={filterModelCommand}
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              <CommandInput autoFocus placeholder="Search models…" />
+              <CommandInput ref={searchInputRef} placeholder="Search models…" />
               <CommandList className="max-h-none flex-1">
                 <CommandEmpty>No models match.</CommandEmpty>
                 <CommandGroup heading="Thinking level">
@@ -321,10 +264,10 @@ export const ModelSelector = memo(function ModelSelector({
                 ))}
               </CommandList>
             </Command>
-          </div>,
-          document.body,
-        )}
-    </>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 });
 
@@ -423,6 +366,17 @@ function ModelCommandItem({
       </button>
     </CommandItem>
   );
+}
+
+function filterModelCommand(value: string, search: string): number {
+  const normalizedValue = value.toLowerCase();
+  return search
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .every((term) => normalizedValue.includes(term))
+    ? 1
+    : 0;
 }
 
 function matchesModelId(
