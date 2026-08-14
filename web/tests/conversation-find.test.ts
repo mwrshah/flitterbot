@@ -41,7 +41,7 @@ test("conversation find counts, navigates, and merges route history", () => {
   );
 });
 
-test("conversation find indexes tool sources", () => {
+test("conversation find indexes tool names and arguments but not results", () => {
   const toolRow: ConversationRow = {
     key: "tool",
     tools: [
@@ -76,7 +76,7 @@ test("conversation find indexes tool sources", () => {
 
   assert.equal(findConversationMatches(index, "query_blackboard").matchCount, 1);
   assert.equal(findConversationMatches(index, "nested-argument").matchCount, 1);
-  assert.equal(findConversationMatches(index, "content-result").matchCount, 1);
-  assert.equal(findConversationMatches(index, "sibling-result").matchCount, 1);
+  assert.equal(findConversationMatches(index, "content-result").matchCount, 0);
+  assert.equal(findConversationMatches(index, "sibling-result").matchCount, 0);
   assert.equal(findConversationMatches(index, "/repo/file").matchCount, 0);
 });
