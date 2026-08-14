@@ -971,7 +971,6 @@ export function ChatPanel({
               ref={messageListRef}
               piSessionId={piSessionId}
               rows={conversationRows}
-              findOpen={findOpen}
               activeFindRowIndex={activeFindRowIndex}
               onPruneRequested={handlePruneRequested}
               onForkRequested={handleForkRequested}

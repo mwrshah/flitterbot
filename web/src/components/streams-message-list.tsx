@@ -32,7 +32,6 @@ export type StreamsMessageListHandle = {
 type StreamsMessageListProps = {
   piSessionId: string;
   rows: ConversationRow[];
-  findOpen?: boolean;
   activeFindRowIndex?: number;
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
@@ -46,7 +45,6 @@ type StreamsMessageListProps = {
 export const StreamsMessageList = memo(function StreamsMessageList({
   piSessionId,
   rows,
-  findOpen = false,
   activeFindRowIndex,
   onPruneRequested,
   onForkRequested,
@@ -77,7 +75,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     estimateSize: (index) => (index === rows.length ? 0 : ESTIMATED_ROW_HEIGHT),
     overscan: 2, // scroll-memory: initialOffset+cache go here
     rangeExtractor,
-    paddingStart: findOpen ? 64 : 16,
+    paddingStart: 16,
     paddingEnd: 16,
     anchorTo: "end",
     followOnAppend: true,
@@ -183,7 +181,6 @@ function areStreamsMessageListPropsEqual(
   return (
     prev.piSessionId === next.piSessionId &&
     prev.rows === next.rows &&
-    prev.findOpen === next.findOpen &&
     prev.activeFindRowIndex === next.activeFindRowIndex &&
     prev.isSessionBusy === next.isSessionBusy &&
     prev.onLoadPrevious === next.onLoadPrevious &&
