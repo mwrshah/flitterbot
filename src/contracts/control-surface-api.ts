@@ -207,6 +207,7 @@ export interface SessionDetailResponse {
 
 export const STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT = 30;
 export const STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT = 200;
+export type StreamsHistoryLimit = number | "all";
 
 export interface StreamsHistoryResponse {
   items: ChatTimelineItem[];

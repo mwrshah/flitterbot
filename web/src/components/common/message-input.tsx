@@ -165,7 +165,7 @@ function filterSkillsForPicker(skills: SkillPickerItem[], filter: string) {
     const aStarts = a.name.toLowerCase().startsWith(lower);
     const bStarts = b.name.toLowerCase().startsWith(lower);
     if (aStarts !== bStarts) return aStarts ? -1 : 1;
-    return a.name.localeCompare(b.name);
+    return a.name.length - b.name.length;
   };
   if (filter) {
     nonCommands.sort(cmp);

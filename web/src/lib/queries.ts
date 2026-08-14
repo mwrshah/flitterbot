@@ -1,6 +1,6 @@
-import { infiniteQueryOptions, keepPreviousData } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "@/lib/api";
-import { historyQueryKey, surfaceQueryKey } from "@/lib/conversation-history";
+import { findHistoryQueryKey, historyQueryKey, surfaceQueryKey } from "@/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "@/lib/internal-commands";
 import type {
   DirectoryCompletionsResponse,
@@ -65,6 +65,20 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
     enabled: piSessionId !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: STREAMS_HISTORY_GC_TIME_MS,
+  });
+}
+
+export function conversationFindHistoryQueryOptions(piSessionId: string) {
+  return queryOptions({
+    queryKey: findHistoryQueryKey(piSessionId),
+    queryFn: ({ signal }) =>
+      fetchStreamsHistory({
+        signal,
+        data: { piSessionId, surface: "agent", limit: "all" },
+      }),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 0,
+    retry: false,
   });
 }
 

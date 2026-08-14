@@ -1,10 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { DownstreamSessionItem, StreamsHistoryResponse } from "@/lib/types";
+import { getRequest } from "@tanstack/react-start/server";
+import type {
+  DownstreamSessionItem,
+  StreamsHistoryLimit,
+  StreamsHistoryResponse,
+} from "@/lib/types";
 
 const BASE_URL = process.env.VITE_FLITTERBOT_BASE_URL || "http://127.0.0.1:18820";
 const TOKEN = process.env.VITE_FLITTERBOT_TOKEN || "";
 
-async function streamsRequest(path: string, init?: RequestInit): Promise<unknown> {
+async function streamsRequest(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 8_000,
+): Promise<unknown> {
   const url = `${BASE_URL.replace(/\/$/, "")}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -12,16 +21,11 @@ async function streamsRequest(path: string, init?: RequestInit): Promise<unknown
     ...(init?.headers as Record<string, string> | undefined),
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-
-  try {
-    const res = await fetch(url, { ...init, headers, signal: controller.signal });
-    if (!res.ok) throw await responseError(res, path);
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  const res = await fetch(url, { ...init, headers, signal });
+  if (!res.ok) throw await responseError(res, path);
+  return res.json();
 }
 
 async function responseError(res: Response, path: string): Promise<Error> {
@@ -60,7 +64,7 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
       piSessionId?: string;
       surface?: "input" | "agent";
       before?: string;
-      limit?: number;
+      limit?: StreamsHistoryLimit;
     }) => input,
   )
   .handler(async ({ data }): Promise<StreamsHistoryResponse> => {
@@ -72,7 +76,11 @@ export const fetchStreamsHistory = createServerFn({ method: "GET" })
     ]).toString();
     const path = qs ? `/api/streams/history?${qs}` : "/api/streams/history";
     try {
-      return (await streamsRequest(path)) as StreamsHistoryResponse;
+      return (await streamsRequest(
+        path,
+        { signal: getRequest().signal },
+        data.limit === "all" ? 30_000 : 8_000,
+      )) as StreamsHistoryResponse;
     } catch (err) {
       console.error(
         "fetchStreamsHistory failed (piSessionId=%s, surface=%s):",

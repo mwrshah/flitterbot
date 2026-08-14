@@ -22,6 +22,7 @@ export type {
   SkillsListResponse,
   StatusResponse,
   StreamSummary,
+  StreamsHistoryLimit,
   StreamsHistoryResponse,
 } from "../../../src/contracts/control-surface-api.ts";
 export type {

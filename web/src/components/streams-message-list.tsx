@@ -14,12 +14,12 @@
  *    re-attaches a stale offset. Init is per attachment, not instance.
  * Scroll restoration is off for /streams (router.tsx).
  */
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { memo, type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from "react";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
+import { memo, type Ref, useCallback, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
-import { buildConversationRows } from "@/lib/conversation-rows";
-import type { ChatTimelineItem } from "@/lib/types";
+import type { ConversationRow } from "@/lib/conversation-rows";
+import { cn } from "@/lib/utils";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;
@@ -31,7 +31,9 @@ export type StreamsMessageListHandle = {
 
 type StreamsMessageListProps = {
   piSessionId: string;
-  timeline: ChatTimelineItem[];
+  rows: ConversationRow[];
+  findOpen?: boolean;
+  activeFindRowIndex?: number;
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
   isSessionBusy?: boolean;
@@ -43,7 +45,9 @@ type StreamsMessageListProps = {
 
 export const StreamsMessageList = memo(function StreamsMessageList({
   piSessionId,
-  timeline,
+  rows,
+  findOpen = false,
+  activeFindRowIndex,
   onPruneRequested,
   onForkRequested,
   isSessionBusy = false,
@@ -52,11 +56,19 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   isFetchingPreviousPage,
   ref,
 }: StreamsMessageListProps) {
-  useWhyDidYouRender("StreamsMessageList", { timeline, isSessionBusy });
-  const rows = useMemo(() => buildConversationRows(timeline), [timeline]);
+  useWhyDidYouRender("StreamsMessageList", { rows, isSessionBusy, activeFindRowIndex });
   const streamingRowKey = `${STREAMING_ROW_KEY}:${rows.at(-1)?.key ?? "empty"}`;
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
+  const rangeExtractor = useCallback(
+    (range: Parameters<typeof defaultRangeExtractor>[0]) => {
+      const indexes = defaultRangeExtractor(range);
+      return activeFindRowIndex === undefined || indexes.includes(activeFindRowIndex)
+        ? indexes
+        : [...indexes, activeFindRowIndex].sort((a, b) => a - b);
+    },
+    [activeFindRowIndex],
+  );
 
   const virtualizer = useVirtualizer({
     count: rows.length + 1,
@@ -64,7 +76,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     getItemKey: (index) => (index === rows.length ? streamingRowKey : rows[index]!.key),
     estimateSize: (index) => (index === rows.length ? 0 : ESTIMATED_ROW_HEIGHT),
     overscan: 2, // scroll-memory: initialOffset+cache go here
-    paddingStart: 16,
+    rangeExtractor,
+    paddingStart: findOpen ? 64 : 16,
     paddingEnd: 16,
     anchorTo: "end",
     followOnAppend: true,
@@ -103,6 +116,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     }
   }); // no deps: re-pins across each fill prepend
 
+  useLayoutEffect(() => {
+    if (activeFindRowIndex === undefined) return;
+    virtualizer.scrollToIndex(activeFindRowIndex, { align: "center", behavior: "auto" });
+  }, [activeFindRowIndex, virtualizer]);
+
   useImperativeHandle(ref, () => ({
     scrollToEnd() {
       virtualizer.scrollToEnd();
@@ -121,11 +139,14 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         >
           {virtualizer.getVirtualItems().map((virtualItem) => {
             const row = rows[virtualItem.index];
+            const active = virtualItem.index === activeFindRowIndex;
             return (
               <div
                 key={virtualItem.key}
                 data-index={virtualItem.index}
+                aria-current={active ? "true" : undefined}
                 ref={virtualizer.measureElement}
+                className={cn(active && "rounded-lg bg-background-selected ring-1 ring-border-pop")}
                 style={{
                   position: "absolute",
                   top: 0,
@@ -161,7 +182,9 @@ function areStreamsMessageListPropsEqual(
 ) {
   return (
     prev.piSessionId === next.piSessionId &&
-    prev.timeline === next.timeline &&
+    prev.rows === next.rows &&
+    prev.findOpen === next.findOpen &&
+    prev.activeFindRowIndex === next.activeFindRowIndex &&
     prev.isSessionBusy === next.isSessionBusy &&
     prev.onLoadPrevious === next.onLoadPrevious &&
     prev.hasPreviousPage === next.hasPreviousPage &&
