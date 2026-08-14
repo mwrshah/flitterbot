@@ -6,6 +6,7 @@ import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "
 import {
   type ClipboardEvent,
   type DragEvent,
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -1160,22 +1161,21 @@ export const MessageInput = memo(function MessageInput({
             aria-label="Queued turns"
             aria-live="polite"
             className={cn(
-              "mr-2 ml-auto flex max-w-[calc(100%-1rem)] flex-col gap-2",
+              "mr-2 ml-auto grid max-w-[calc(100%-1rem)] grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 text-xs text-text",
               pendingImages.length > 0 ? "mb-2" : "my-2",
             )}
           >
             {queuedTurns.map((turn) => {
               const removalPending = removingQueuedTurnId === turn.id;
               return (
-                <div
-                  key={turn.id}
-                  className="flex max-h-32 items-start gap-2 overflow-hidden rounded-lg border border-border-muted bg-background px-3 py-2 text-xs text-text shadow-lg"
-                >
-                  <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">{turn.text}</div>
+                <Fragment key={turn.id}>
+                  <div className="max-h-32 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
+                    {turn.text}
+                  </div>
                   <button
                     type="button"
                     aria-label="Remove queued turn"
-                    className="flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
+                    className="flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
                     disabled={turn.state === "accepting" || removalPending || !onRemoveQueuedTurn}
                     onClick={() => onRemoveQueuedTurn?.(turn.id)}
                   >
@@ -1185,7 +1185,7 @@ export const MessageInput = memo(function MessageInput({
                       <XIcon className="size-3.5" aria-hidden="true" />
                     )}
                   </button>
-                </div>
+                </Fragment>
               );
             })}
           </div>
