@@ -7,6 +7,7 @@ import {
 import {
   STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT,
   STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT,
+  type StreamsHistoryLimit,
 } from "../contracts/control-surface-api.ts";
 import type {
   ChatTimelineItem,
@@ -471,7 +472,8 @@ export function decodeHistoryCursor(raw: string): HistoryCursor | null {
   return { id: record.id, index: record.i };
 }
 
-export function clampVisibleRowLimit(raw: string | null): number {
+export function parseVisibleRowLimit(raw: string | null): StreamsHistoryLimit {
+  if (raw === "all") return "all";
   if (raw === null || raw.trim() === "") return STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return STREAMS_HISTORY_DEFAULT_VISIBLE_ROW_LIMIT;
@@ -489,7 +491,7 @@ type HistoryPage = {
 
 export function takePageEndingBeforeCursor(
   items: ChatTimelineItem[],
-  visibleRowLimit: number,
+  visibleRowLimit: StreamsHistoryLimit,
   cursor: HistoryCursor | null,
 ): HistoryPage | null {
   let endExclusive = items.length;
@@ -505,13 +507,15 @@ export function takePageEndingBeforeCursor(
   }
 
   let firstItemOfPage = 0;
-  let visibleRowsTaken = 0;
-  for (let i = endExclusive - 1; i >= 0; i--) {
-    if (!isVisibleRow(items[i]!)) continue;
-    visibleRowsTaken++;
-    if (visibleRowsTaken === visibleRowLimit) {
-      firstItemOfPage = i;
-      break;
+  if (visibleRowLimit !== "all") {
+    let visibleRowsTaken = 0;
+    for (let i = endExclusive - 1; i >= 0; i--) {
+      if (!isVisibleRow(items[i]!)) continue;
+      visibleRowsTaken++;
+      if (visibleRowsTaken === visibleRowLimit) {
+        firstItemOfPage = i;
+        break;
+      }
     }
   }
 

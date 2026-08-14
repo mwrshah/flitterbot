@@ -1,13 +1,21 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { FolderPenIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  FolderPenIcon,
+  Loader2Icon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import {
   type CSSProperties,
   type KeyboardEvent,
   memo,
   type RefObject,
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -40,11 +48,25 @@ import { useReopenStream } from "@/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
+  conversationFindRowAt,
+  EMPTY_CONVERSATION_FIND_RESULTS,
+  findConversationMatches,
+  mergeFindTimeline,
+  moveConversationFindSelection,
+} from "@/lib/conversation-find";
+import { invalidateHistorySnapshot } from "@/lib/conversation-history";
+import { buildConversationRows } from "@/lib/conversation-rows";
+import {
+  focusComposerInput,
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
-import { directoryCompletionsQueryOptions, streamsWorktreeQueryOptions } from "@/lib/queries";
+import {
+  conversationFindHistoryQueryOptions,
+  directoryCompletionsQueryOptions,
+  streamsWorktreeQueryOptions,
+} from "@/lib/queries";
 import type { StreamRecoveryKind } from "@/lib/stream-recovery";
 import { getTokenDeleteEdit } from "@/lib/text-input";
 import type {
@@ -62,6 +84,16 @@ const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
 
 const rootApi = getRouteApi("__root__");
+const BLOCKING_SURFACE_SELECTOR = [
+  '[data-slot="dialog-content"][data-open]',
+  '[data-slot="dropdown-menu-content"][data-open]',
+  '[data-slot="context-menu-content"][data-open]',
+  "[data-inline-command-picker]",
+].join(",");
+
+function hasBlockingSurface(): boolean {
+  return Boolean(document.querySelector(BLOCKING_SURFACE_SELECTOR));
+}
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -106,11 +138,134 @@ type ChatPanelProps = {
   messageInputDisabled: boolean;
 };
 
+type ConversationFindBarProps = {
+  inputRef: RefObject<HTMLInputElement | null>;
+  value: string;
+  matchIndex: number;
+  matchCount: number;
+  loading: boolean;
+  error: Error | null;
+  onValueChange: (value: string) => void;
+  onMove: (delta: -1 | 1) => void;
+  onRetry: () => void;
+  onClose: () => void;
+};
+
+function ConversationFindBar({
+  inputRef,
+  value,
+  matchIndex,
+  matchCount,
+  loading,
+  error,
+  onValueChange,
+  onMove,
+  onRetry,
+  onClose,
+}: ConversationFindBarProps) {
+  const status = loading
+    ? "Loading…"
+    : value
+      ? `${matchCount ? matchIndex + 1 : 0}/${matchCount}`
+      : "";
+  const canMove = !loading && !error && matchCount > 0;
+  const navigationButtonClass =
+    "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-35 sm:size-7";
+
+  return (
+    <form
+      role="search"
+      aria-label="Find in conversation"
+      onSubmit={(event) => event.preventDefault()}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
+      className="absolute top-2 right-2 z-20 flex h-11 w-[min(28rem,calc(100%-1rem))] items-center gap-1 rounded-lg border border-border bg-background px-2 shadow-md focus-within:ring-2 focus-within:ring-border-pop sm:h-9"
+    >
+      <SearchIcon className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        ref={inputRef}
+        name="conversation-find"
+        type="search"
+        autoComplete="off"
+        spellCheck={false}
+        value={value}
+        placeholder="Find…"
+        aria-label="Find in conversation"
+        onChange={(event) => onValueChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            event.stopPropagation();
+            onMove(event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey) ? -1 : 1);
+          }
+        }}
+        className="min-w-0 flex-1 bg-transparent text-base text-text outline-none placeholder:text-text-muted sm:text-sm"
+      />
+      {error && !loading ? (
+        <>
+          <span id="conversation-find-error" role="alert" className="sr-only">
+            Conversation history failed to load: {error.message}
+          </span>
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-describedby="conversation-find-error"
+            className="shrink-0 rounded px-1 text-xs text-status-crashed hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+          >
+            Retry
+          </button>
+        </>
+      ) : (
+        <span className="shrink-0 text-xs text-text-muted tabular-nums" aria-live="polite">
+          {loading && (
+            <Loader2Icon className="mr-1 inline size-3 animate-spin" aria-hidden="true" />
+          )}
+          {status}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={!canMove}
+        onClick={() => onMove(-1)}
+        className={navigationButtonClass}
+        aria-label="Previous match"
+        title="Previous match (Shift+Enter)"
+      >
+        <ChevronUpIcon className="size-4" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        disabled={!canMove}
+        onClick={() => onMove(1)}
+        className={navigationButtonClass}
+        aria-label="Next match"
+        title="Next match (Enter)"
+      >
+        <ChevronDownIcon className="size-4" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop sm:size-7"
+        aria-label="Close find"
+        title="Close find (Escape)"
+      >
+        <XIcon className="size-4" aria-hidden="true" />
+      </button>
+    </form>
+  );
+}
+
 function QueuedBusyOverlay({ text }: { text: string }) {
   if (!text) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-6 bottom-3 z-20 flex justify-end">
+    <div className="pointer-events-none absolute inset-x-6 bottom-3 z-10 flex justify-end">
       <div className="max-w-[min(44rem,100%)] rounded-lg border border-border-muted bg-background px-3 py-2 text-xs shadow-lg">
         <div className="font-medium text-text-muted">Queued:</div>
         <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-text">
@@ -304,6 +459,37 @@ export function ChatPanel({
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const findPreviousFocusRef = useRef<HTMLElement | null>(null);
+  const [findSessionId, setFindSessionId] = useState<string>();
+  const [findHistorySessionId, setFindHistorySessionId] = useState<string>();
+  const findOpen = findSessionId === piSessionId;
+  const findHistoryRequested = findHistorySessionId === piSessionId;
+  const findHistoryQuery = useQuery({
+    ...conversationFindHistoryQueryOptions(piSessionId),
+    enabled: findHistoryRequested,
+  });
+  const [findValue, setFindValue] = useState("");
+  const [findMatchIndex, setFindMatchIndex] = useState(0);
+  const deferredFindValue = useDeferredValue(findValue);
+  const mergedTimeline = useMemo(
+    () => mergeFindTimeline(findHistoryQuery.data?.items, timeline),
+    [findHistoryQuery.data?.items, timeline],
+  );
+  const conversationRows = useMemo(() => buildConversationRows(mergedTimeline), [mergedTimeline]);
+  const findQueryPending = deferredFindValue !== findValue;
+  const findReady = Boolean(findHistoryQuery.data) && !findQueryPending;
+  const findResults = useMemo(
+    () =>
+      findOpen && findReady
+        ? findConversationMatches(conversationRows, deferredFindValue)
+        : EMPTY_CONVERSATION_FIND_RESULTS,
+    [conversationRows, deferredFindValue, findOpen, findReady],
+  );
+  const selectedFindMatchIndex = findResults.matchCount
+    ? findMatchIndex % findResults.matchCount
+    : 0;
+  const activeFindRowIndex = conversationFindRowAt(findResults, selectedFindMatchIndex);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
   const cwdShortcutLabel =
@@ -419,7 +605,7 @@ export function ChatPanel({
   const pruneMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["streams-history", piSessionId] });
+      void invalidateHistorySnapshot(queryClient, piSessionId);
     },
     onError: (error) => {
       toast.error(
@@ -458,6 +644,75 @@ export function ChatPanel({
     clearBusyQueuedText();
   }, [clearBusyQueuedText, piSessionId]);
 
+  const retryConversationFind = useCallback(() => {
+    findInputRef.current?.focus();
+    void findHistoryQuery.refetch();
+  }, [findHistoryQuery.refetch]);
+
+  const openConversationFind = useCallback(() => {
+    if (!findOpen && document.activeElement instanceof HTMLElement) {
+      findPreviousFocusRef.current = document.activeElement;
+    }
+    setFindSessionId(piSessionId);
+    setFindHistorySessionId(piSessionId);
+    if (findOpen) {
+      findInputRef.current?.focus();
+      findInputRef.current?.select();
+    }
+  }, [findOpen, piSessionId]);
+
+  const closeConversationFind = useCallback(() => {
+    setFindSessionId(undefined);
+    const previousFocus = findPreviousFocusRef.current;
+    findPreviousFocusRef.current = null;
+    requestAnimationFrame(() => {
+      if (previousFocus?.isConnected) previousFocus.focus();
+      else focusComposerInput();
+    });
+  }, []);
+
+  const moveConversationFind = useCallback(
+    (delta: -1 | 1) => {
+      setFindMatchIndex((current) =>
+        moveConversationFindSelection(current, findResults.matchCount, delta),
+      );
+    },
+    [findResults.matchCount],
+  );
+
+  const changeConversationFindValue = useCallback((value: string) => {
+    setFindValue(value);
+    setFindMatchIndex(0);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!findOpen) return;
+    findInputRef.current?.focus();
+    findInputRef.current?.select();
+  }, [findOpen]);
+
+  useEffect(() => {
+    setFindSessionId(undefined);
+    setFindHistorySessionId(undefined);
+    setFindValue("");
+    setFindMatchIndex(0);
+    findPreviousFocusRef.current = null;
+  }, [piSessionId]);
+
+  useEffect(() => {
+    if (!findOpen) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || hasBlockingSurface()) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closeConversationFind();
+    };
+    window.addEventListener("keydown", closeOnEscape, true);
+    return () => window.removeEventListener("keydown", closeOnEscape, true);
+  }, [closeConversationFind, findOpen]);
+
   useEffect(() => {
     return registerShortcutHandlers([
       {
@@ -469,8 +724,19 @@ export function ChatPanel({
           return true;
         },
       },
+      {
+        actionId: SHORTCUT_ACTIONS.conversationFind,
+        priority: 20,
+        handler: (event) => {
+          if (event.isComposing || hasBlockingSurface()) {
+            return false;
+          }
+          openConversationFind();
+          return true;
+        },
+      },
     ]);
-  }, [cwdAbsolute, openCwdPicker, streamId]);
+  }, [cwdAbsolute, openConversationFind, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
@@ -699,19 +965,35 @@ export function ChatPanel({
         }
       >
         <Panel id="feed" defaultSize="85%" minSize="20%">
-          <div className="relative h-full">
+          <div className="relative isolate h-full">
             <StreamsMessageList
               key={piSessionId} // remount per session: re-arms initial pin
               ref={messageListRef}
               piSessionId={piSessionId}
-              timeline={timeline}
+              rows={conversationRows}
+              findOpen={findOpen}
+              activeFindRowIndex={activeFindRowIndex}
               onPruneRequested={handlePruneRequested}
               onForkRequested={handleForkRequested}
               isSessionBusy={isSessionBusy}
               onLoadPrevious={onLoadPrevious}
-              hasPreviousPage={hasPreviousPage}
+              hasPreviousPage={hasPreviousPage && !findHistoryQuery.data}
               isFetchingPreviousPage={isFetchingPreviousPage}
             />
+            {findOpen && (
+              <ConversationFindBar
+                inputRef={findInputRef}
+                value={findValue}
+                matchIndex={selectedFindMatchIndex}
+                matchCount={findResults.matchCount}
+                loading={findHistoryQuery.isFetching || findQueryPending}
+                error={findHistoryQuery.error}
+                onValueChange={changeConversationFindValue}
+                onMove={moveConversationFind}
+                onRetry={retryConversationFind}
+                onClose={closeConversationFind}
+              />
+            )}
             <QueuedBusyOverlay text={busyQueuedText} />
           </div>
         </Panel>

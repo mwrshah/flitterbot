@@ -17,7 +17,7 @@ export const CaretPickerPositioner = forwardRef<HTMLDivElement, CaretPickerPosit
     };
 
     return (
-      <div ref={ref} className={PICKER_CLASS} style={style}>
+      <div ref={ref} data-inline-command-picker className={PICKER_CLASS} style={style}>
         {children}
       </div>
     );

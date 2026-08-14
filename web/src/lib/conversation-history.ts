@@ -8,6 +8,14 @@ export function historyQueryKey(sessionId: string | undefined) {
   return ["streams-history", sessionId ?? "default", "agent"] as const;
 }
 
+export function findHistoryQueryKey(sessionId: string) {
+  return [...historyQueryKey(sessionId), "find"] as const;
+}
+
+function resetFindHistorySnapshot(queryClient: QueryClient, sessionId: string): void {
+  void queryClient.resetQueries({ queryKey: findHistoryQueryKey(sessionId), exact: true });
+}
+
 export function latestHistoryPosition(
   queryClient: QueryClient,
   sessionId: string,
@@ -32,7 +40,16 @@ export async function refreshHistorySnapshot(
       return { pages: [newestPage], pageParams: [undefined] };
     },
   );
+  resetFindHistorySnapshot(queryClient, sessionId);
   await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true });
+}
+
+export async function invalidateHistorySnapshot(
+  queryClient: QueryClient,
+  sessionId: string,
+): Promise<void> {
+  resetFindHistorySnapshot(queryClient, sessionId);
+  await queryClient.invalidateQueries({ queryKey: historyQueryKey(sessionId), exact: true });
 }
 
 function updateNewestHistoryPage(

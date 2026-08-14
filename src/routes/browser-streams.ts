@@ -8,13 +8,14 @@ import {
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  StreamsHistoryLimit,
   StreamsHistoryResponse,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import {
-  clampVisibleRowLimit,
   decodeHistoryCursor,
   type HistoryCursor,
+  parseVisibleRowLimit,
   readStreamsHistory,
   readStreamsHistoryFromSession,
   takePageEndingBeforeCursor,
@@ -66,7 +67,7 @@ export async function handleBrowserStreamsHistoryRoute(
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const historyMode = url.searchParams.get("surface") === "input" ? "input" : "agent";
   const piSessionId = url.searchParams.get("piSessionId");
-  const visibleRowLimit = clampVisibleRowLimit(url.searchParams.get("limit"));
+  const visibleRowLimit = parseVisibleRowLimit(url.searchParams.get("limit"));
   const beforeParam = url.searchParams.get("before");
 
   let cursor: HistoryCursor | null = null;
@@ -97,7 +98,7 @@ async function handleBrowserStreamsHistoryRouteInner(
   response: http.ServerResponse,
   historyMode: "input" | "agent",
   piSessionId: string | null,
-  visibleRowLimit: number,
+  visibleRowLimit: StreamsHistoryLimit,
   cursor: HistoryCursor | null,
 ) {
   if (historyMode === "input" && !piSessionId) {
