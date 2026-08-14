@@ -1,5 +1,5 @@
-import type { ConversationRow } from "./conversation-rows.ts";
-import type { ChatTimelineItem } from "./types.ts";
+import { buildConversationContentParts, type ConversationRow } from "./conversation-rows.ts";
+import type { ChatTimelineItem, JsonValue } from "./types.ts";
 
 export type ConversationFindResults = {
   rows: Array<{ rowIndex: number; firstMatchIndex: number; matchCount: number }>;
@@ -36,8 +36,27 @@ function countOccurrences(content: string, query: string): number {
   return count;
 }
 
+function jsonSource(value: JsonValue | undefined): string {
+  if (value === undefined) return "";
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+}
+
+export function buildConversationFindIndex(rows: ConversationRow[]): string[][] {
+  return rows.map((row) =>
+    buildConversationContentParts(row.message, row.tools)
+      .flatMap((part) => {
+        if (part.type === "text") return [part.text];
+        if (part.type !== "tool") return [];
+        const { start, end } = part.tool;
+        return [start.tool, jsonSource(start.displayArgs ?? start.args), jsonSource(end?.result)];
+      })
+      .filter(Boolean)
+      .map((segment) => segment.toLowerCase()),
+  );
+}
+
 export function findConversationMatches(
-  rows: ConversationRow[],
+  index: string[][],
   rawQuery: string,
 ): ConversationFindResults {
   const query = rawQuery.toLowerCase();
@@ -45,21 +64,17 @@ export function findConversationMatches(
 
   const matchingRows: ConversationFindResults["rows"] = [];
   let matchCount = 0;
-  for (const [rowIndex, row] of rows.entries()) {
-    const message = row.message;
-    if (!message) continue;
-    const segments =
-      message.role === "assistant"
-        ? (message.blocks ?? [{ type: "text" as const, text: message.content }]).flatMap((block) =>
-            block.type === "text" ? [block.text] : [],
-          )
-        : [message.content];
+  for (const [rowIndex, segments] of index.entries()) {
     const rowMatchCount = segments.reduce(
-      (count, segment) => count + countOccurrences(segment.toLowerCase(), query),
+      (count, segment) => count + countOccurrences(segment, query),
       0,
     );
     if (!rowMatchCount) continue;
-    matchingRows.push({ rowIndex, firstMatchIndex: matchCount, matchCount: rowMatchCount });
+    matchingRows.push({
+      rowIndex,
+      firstMatchIndex: matchCount,
+      matchCount: rowMatchCount,
+    });
     matchCount += rowMatchCount;
   }
   return { rows: matchingRows, matchCount };

@@ -9,8 +9,8 @@ Native browser find sees only the rows that TanStack Virtual mounts. Conversatio
 - `Cmd+F` and `Ctrl+F` open a conversation-local find bar on stream routes.
 - The first non-empty query on a route loads the complete current branch with one `limit=all` request. Opening an empty find bar leaves the rendered timeline unchanged.
 - Normal history retains 30-row initial loading and 10-row backward pagination.
-- Search covers committed user-role content, including visible compaction summaries, and committed assistant text blocks.
-- Assistant text uses raw Markdown source. Tools and thinking blocks are excluded.
+- Search covers committed user-role content, including visible compaction summaries, committed assistant text blocks, tool names, tool arguments, and committed tool results.
+- Assistant text uses raw Markdown source. Tool arguments use `displayArgs` when present and canonical arguments otherwise. Nested values in the selected argument payload and committed `result` remain searchable. Thinking blocks are excluded.
 - Streaming text becomes searchable after it commits.
 - Search is case-insensitive and counts non-overlapping occurrences.
 - The bar shows the selected occurrence and total, such as `12/30`.
@@ -44,7 +44,7 @@ A prune or branch rewrite starts a temporary-query reset before refreshing norma
 
 ## Components
 
-`ChatPanel` owns the find bar, query, selected occurrence, and temporary-query lifecycle. It merges the complete snapshot with current bounded items, builds canonical conversation rows, and searches committed source text. Results store one count per matching row and a cumulative first-match index.
+`ChatPanel` owns the find bar, query, selected occurrence, and temporary-query lifecycle. It merges the complete snapshot with current bounded items and builds canonical conversation rows. While find is open, ready, and non-empty, it builds lowercased message and tool search segments when those rows change. Query updates count matches against that index without serializing the timeline again, and closing find releases it. Results store one count per matching row and a cumulative first-match index.
 
 `StreamsMessageList` receives whether the bar is open and the selected row index. Its find responsibilities are limited to:
 
@@ -66,10 +66,10 @@ TanStack Virtual remains enabled. No Markdown projection, DOM text walker, offse
 ## Key Files
 
 - `src/contracts/control-surface-api.ts` — numeric-or-`all` history limit contract.
-- `src/streams/history.ts` — complete-history limit parsing and projection.
+- `src/streams/history.ts` — complete-history limit parsing and canonical tool-result projection.
 - `web/src/lib/queries.ts` — bounded and disposable complete query definitions.
 - `web/src/lib/conversation-history.ts` — normal-history updates and complete-query reset after rewrites.
-- `web/src/lib/conversation-find.ts` — timeline merge, committed source-text counting, and wrapped row selection.
+- `web/src/lib/conversation-find.ts` — timeline merge, committed source indexing and counting, and wrapped row selection.
 - `web/src/components/chat-panel.tsx` — find state, toolbar, search query, and route-lifetime complete timeline.
 - `web/src/components/streams-message-list.tsx` — selected-row mounting, centering, and marker.
 - `src/history-pagination.test.ts` — complete-history server contract.

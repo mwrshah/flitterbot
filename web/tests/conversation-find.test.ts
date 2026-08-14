@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildConversationFindIndex,
   conversationFindRowAt,
   findConversationMatches,
   mergeFindTimeline,
@@ -24,7 +25,7 @@ function row(id: string, content: string): ConversationRow {
 
 test("conversation find counts, navigates, and merges route history", () => {
   const results = findConversationMatches(
-    [row("first", "Alpha alpha"), row("second", "ALPHA")],
+    buildConversationFindIndex([row("first", "Alpha alpha"), row("second", "ALPHA")]),
     "alpha",
   );
   assert.equal(results.matchCount, 3);
@@ -38,4 +39,44 @@ test("conversation find counts, navigates, and merges route history", () => {
     ).map((item) => item.content),
     ["old", "current", "new"],
   );
+});
+
+test("conversation find indexes tool sources", () => {
+  const toolRow: ConversationRow = {
+    key: "tool",
+    tools: [
+      {
+        start: {
+          id: "tool-start",
+          kind: "tool",
+          tool: "query_blackboard",
+          phase: "start",
+          toolUseId: "call-1",
+          args: { path: "/repo/file", options: { cwd: "nested-argument" } },
+          displayArgs: { path: "~/file", options: { cwd: "nested-argument" } },
+          createdAt: "",
+        },
+        end: {
+          id: "tool-end",
+          kind: "tool",
+          tool: "query_blackboard",
+          phase: "end",
+          toolUseId: "call-1",
+          result: {
+            content: [{ value: "content-result" }],
+            summary: "sibling-result",
+          },
+          createdAt: "",
+        },
+      },
+    ],
+  };
+
+  const index = buildConversationFindIndex([toolRow]);
+
+  assert.equal(findConversationMatches(index, "query_blackboard").matchCount, 1);
+  assert.equal(findConversationMatches(index, "nested-argument").matchCount, 1);
+  assert.equal(findConversationMatches(index, "content-result").matchCount, 1);
+  assert.equal(findConversationMatches(index, "sibling-result").matchCount, 1);
+  assert.equal(findConversationMatches(index, "/repo/file").matchCount, 0);
 });

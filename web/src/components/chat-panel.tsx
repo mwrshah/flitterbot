@@ -48,6 +48,7 @@ import { useReopenStream } from "@/hooks/use-reopen-stream";
 import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
+  buildConversationFindIndex,
   conversationFindRowAt,
   EMPTY_CONVERSATION_FIND_RESULTS,
   findConversationMatches,
@@ -503,12 +504,18 @@ export function ChatPanel({
   );
   const conversationRows = useMemo(() => buildConversationRows(mergedTimeline), [mergedTimeline]);
   const findReady = Boolean(findHistoryQuery.data);
+  const hasFindQuery = Boolean(deferredFindValue);
+  const conversationFindIndex = useMemo(
+    () =>
+      findOpen && findReady && hasFindQuery ? buildConversationFindIndex(conversationRows) : [],
+    [conversationRows, findOpen, findReady, hasFindQuery],
+  );
   const findResults = useMemo(
     () =>
       findOpen && findReady
-        ? findConversationMatches(conversationRows, deferredFindValue)
+        ? findConversationMatches(conversationFindIndex, deferredFindValue)
         : EMPTY_CONVERSATION_FIND_RESULTS,
-    [conversationRows, deferredFindValue, findOpen, findReady],
+    [conversationFindIndex, deferredFindValue, findOpen, findReady],
   );
   const findMatchIndex = findSelection.query === deferredFindValue ? findSelection.matchIndex : 0;
   const selectedFindMatchIndex = findResults.matchCount
