@@ -673,56 +673,54 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   const status = statusQuery.data;
   const defaultPiSessionId = status?.piAgent?.default?.piSessionId;
   const allStreams = status?.streams;
-  const { openRows, closedRows, allSearchCandidates, defaultShortcut, streamShortcuts } =
-    useMemo(() => {
-      const openRows: SidebarSwimlaneRow[] = [];
-      if (defaultPiSessionId) {
+  const { allRows, allSearchCandidates, defaultShortcut, streamShortcuts } = useMemo(() => {
+    const openRows: SidebarSwimlaneRow[] = [];
+    if (defaultPiSessionId) {
+      openRows.push({
+        key: "default",
+        kind: "default",
+        section: "open",
+        name: "flitterbot",
+        piSessionId: defaultPiSessionId,
+      });
+    }
+
+    const closedRows: SidebarSwimlaneRow[] = [];
+    for (const stream of allStreams ?? []) {
+      if (stream.status === "open") {
         openRows.push({
-          key: "default",
-          kind: "default",
+          key: `stream-${stream.id}`,
+          kind: "stream",
           section: "open",
-          name: "flitterbot",
-          piSessionId: defaultPiSessionId,
+          name: stream.name,
+          piSessionId: stream.piSessionId,
+          stream,
+        });
+      } else if (stream.status === "closed" && stream.piSessionId) {
+        closedRows.push({
+          key: `stream-${stream.id}`,
+          kind: "stream",
+          section: "closed",
+          name: stream.name,
+          piSessionId: stream.piSessionId,
+          stream,
         });
       }
+    }
 
-      const closedRows: SidebarSwimlaneRow[] = [];
-      for (const stream of allStreams ?? []) {
-        if (stream.status === "open") {
-          openRows.push({
-            key: `stream-${stream.id}`,
-            kind: "stream",
-            section: "open",
-            name: stream.name,
-            piSessionId: stream.piSessionId,
-            stream,
-          });
-        } else if (stream.status === "closed" && stream.piSessionId) {
-          closedRows.push({
-            key: `stream-${stream.id}`,
-            kind: "stream",
-            section: "closed",
-            name: stream.name,
-            piSessionId: stream.piSessionId,
-            stream,
-          });
-        }
+    const allRows = [...openRows, ...closedRows];
+    const allSearchCandidates = allRows.filter((row): row is PickerCandidate => !!row.piSessionId);
+    let nextShortcut = 1;
+    const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
+    const streamShortcuts = new Map<string, number>();
+    for (const row of openRows) {
+      if (row.kind === "stream" && row.piSessionId && nextShortcut <= 9) {
+        streamShortcuts.set(row.stream.id, nextShortcut++);
       }
+    }
 
-      const allSearchCandidates = [...openRows, ...closedRows].filter(
-        (row): row is PickerCandidate => !!row.piSessionId,
-      );
-      let nextShortcut = 1;
-      const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
-      const streamShortcuts = new Map<string, number>();
-      for (const row of openRows) {
-        if (row.kind === "stream" && row.piSessionId && nextShortcut <= 9) {
-          streamShortcuts.set(row.stream.id, nextShortcut++);
-        }
-      }
-
-      return { openRows, closedRows, allSearchCandidates, defaultShortcut, streamShortcuts };
-    }, [allStreams, defaultPiSessionId]);
+    return { allRows, allSearchCandidates, defaultShortcut, streamShortcuts };
+  }, [allStreams, defaultPiSessionId]);
 
   const deferredQuery = useDeferredValue(query);
   const normalizedDeferredQuery = deferredQuery.trim().toLowerCase();
@@ -730,14 +728,17 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     sessionSearchQuery.data && !sessionSearchQuery.isError
       ? sessionMatchCounts
       : EMPTY_SESSION_MATCH_COUNTS;
-  const visibleOpenRows = useMemo(
-    () => projectSidebarRows(openRows, normalizedDeferredQuery, currentSessionMatchCounts),
-    [currentSessionMatchCounts, normalizedDeferredQuery, openRows],
-  );
-  const visibleClosedRows = useMemo(
-    () => projectSidebarRows(closedRows, normalizedDeferredQuery, currentSessionMatchCounts),
-    [closedRows, currentSessionMatchCounts, normalizedDeferredQuery],
-  );
+  const { visibleOpenRows, visibleClosedRows } = useMemo(() => {
+    const visibleRows = projectSidebarRows(
+      allRows,
+      normalizedDeferredQuery,
+      currentSessionMatchCounts,
+    );
+    return {
+      visibleOpenRows: visibleRows.filter((row) => row.section === "open"),
+      visibleClosedRows: visibleRows.filter((row) => row.section === "closed"),
+    };
+  }, [allRows, currentSessionMatchCounts, normalizedDeferredQuery]);
   const contentSearchFinished =
     sessionSearchQuery.isError ||
     (debouncedSearchQuery === normalizedDeferredQuery &&
@@ -750,11 +751,10 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
     visibleClosedRows.length === 0;
   const currentSearchCandidates = useMemo(
     () =>
-      [
-        ...projectSidebarRows(openRows, normalizedQuery, currentSessionMatchCounts),
-        ...projectSidebarRows(closedRows, normalizedQuery, currentSessionMatchCounts),
-      ].filter((row): row is PickerCandidate => !!row.piSessionId),
-    [closedRows, currentSessionMatchCounts, normalizedQuery, openRows],
+      projectSidebarRows(allRows, normalizedQuery, currentSessionMatchCounts).filter(
+        (row): row is PickerCandidate => !!row.piSessionId,
+      ),
+    [allRows, currentSessionMatchCounts, normalizedQuery],
   );
   const displayedSearchCandidates = useMemo(
     () =>
@@ -849,10 +849,11 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
                 sessionSearchQuery.data && !sessionSearchQuery.isError
                   ? sessionMatchCounts
                   : EMPTY_SESSION_MATCH_COUNTS;
-              const nextCandidates = [
-                ...projectSidebarRows(openRows, normalizedNextQuery, nextSessionMatchCounts),
-                ...projectSidebarRows(closedRows, normalizedNextQuery, nextSessionMatchCounts),
-              ].filter((row): row is PickerCandidate => !!row.piSessionId);
+              const nextCandidates = projectSidebarRows(
+                allRows,
+                normalizedNextQuery,
+                nextSessionMatchCounts,
+              ).filter((row): row is PickerCandidate => !!row.piSessionId);
               clearPickerCursor();
               setQuery(nextQuery);
               pickerCursorRef.current.originPath = router.state.location.pathname;
