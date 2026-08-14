@@ -7,7 +7,7 @@ Native browser find sees only the rows that TanStack Virtual mounts. Conversatio
 ## Behavior
 
 - `Cmd+F` and `Ctrl+F` open a conversation-local find bar on stream routes.
-- The first find on a route loads the complete current branch with one `limit=all` request.
+- The first non-empty query on a route loads the complete current branch with one `limit=all` request. Opening an empty find bar leaves the rendered timeline unchanged.
 - Normal history retains 30-row initial loading and 10-row backward pagination.
 - Search covers committed user-role content, including visible compaction summaries, and committed assistant text blocks.
 - Assistant text uses raw Markdown source. Tools and thinking blocks are excluded.

@@ -472,9 +472,10 @@ export function ChatPanel({
   const [findValue, setFindValue] = useState("");
   const [findSelection, setFindSelection] = useState({ query: "", matchIndex: 0 });
   const deferredFindValue = useDeferredValue(findValue);
+  const completeFindTimeline = findHistoryRequested ? findHistoryQuery.data?.items : undefined;
   const mergedTimeline = useMemo(
-    () => mergeFindTimeline(findHistoryQuery.data?.items, timeline),
-    [findHistoryQuery.data?.items, timeline],
+    () => mergeFindTimeline(completeFindTimeline, timeline),
+    [completeFindTimeline, timeline],
   );
   const conversationRows = useMemo(() => buildConversationRows(mergedTimeline), [mergedTimeline]);
   const findReady = Boolean(findHistoryQuery.data);
@@ -654,7 +655,6 @@ export function ChatPanel({
       findPreviousFocusRef.current = document.activeElement;
     }
     setFindSessionId(piSessionId);
-    setFindHistorySessionId(piSessionId);
     if (findOpen) {
       findInputRef.current?.focus();
       findInputRef.current?.select();
@@ -685,9 +685,13 @@ export function ChatPanel({
     [deferredFindValue, findResults.matchCount],
   );
 
-  const changeConversationFindValue = useCallback((value: string) => {
-    setFindValue(value);
-  }, []);
+  const changeConversationFindValue = useCallback(
+    (value: string) => {
+      setFindValue(value);
+      if (value) setFindHistorySessionId(piSessionId);
+    },
+    [piSessionId],
+  );
 
   useLayoutEffect(() => {
     if (!findOpen) return;
