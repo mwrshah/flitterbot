@@ -180,11 +180,13 @@ function messageInputButtonShortcutLabel(index: number) {
 
 function MessageInputHoverButtons({
   slots,
+  disabled,
   composerRef,
   toolbarRef,
   onSlotAction,
 }: {
   slots: MessageInputHoverButtonSlot[];
+  disabled: boolean;
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
   onSlotAction: (slot: MessageInputHoverButtonSlot, visibleBlockWidth: number) => void;
@@ -318,14 +320,14 @@ function MessageInputHoverButtons({
         priority: 10,
         handler: () => {
           const slotNode = slotRefs.current[index];
-          if (slot.ghost || !slotNode || slotNode.hidden) return false;
+          if (disabled || slot.ghost || !slotNode || slotNode.hidden) return false;
           onSlotAction(slot, currentVisibleBlockWidth());
           return true;
         },
       }));
     const cleanup = registerShortcutHandlers(handlers);
     return cleanup;
-  }, [slots, onSlotAction]);
+  }, [slots, disabled, onSlotAction]);
 
   if (slots.length === 0) return null;
 
@@ -365,7 +367,7 @@ function MessageInputHoverButtons({
               }}
               type="button"
               tabIndex={slot.ghost || isReservedSendSlot ? -1 : undefined}
-              disabled={slot.ghost || isReservedSendSlot}
+              disabled={disabled || slot.ghost || isReservedSendSlot}
               onClick={
                 slot.ghost || isReservedSendSlot
                   ? undefined
@@ -1017,7 +1019,7 @@ export const MessageInput = memo(function MessageInput({
     if (hoverSendAction && !hoverSendSourceExists) setHoverSendAction(null);
   }, [hoverSendAction, hoverSendSourceExists]);
 
-  const shouldShowHoverButtons = hoverControlsEnabled && isDraftBlank;
+  const shouldShowHoverButtons = hoverButtons.length > 0 && isDraftBlank;
   const shouldShowHoverSendAction =
     hoverControlsEnabled &&
     hoverSendAction !== null &&
@@ -1229,6 +1231,7 @@ export const MessageInput = memo(function MessageInput({
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
+              disabled={!hoverControlsEnabled}
               composerRef={containerRef}
               toolbarRef={toolbarRef}
               onSlotAction={handleHoverButtonSlotAction}
