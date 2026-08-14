@@ -1007,8 +1007,6 @@ export const MessageInput = memo(function MessageInput({
     hoverButtons.length > 0 &&
     pendingImages.length === 0 &&
     !isSending &&
-    !isSessionBusy &&
-    !isCompacting &&
     !disabled &&
     !recoveryKind;
   const hoverSendSourceExists =
@@ -1048,6 +1046,7 @@ export const MessageInput = memo(function MessageInput({
     (slot: MessageInputHoverButtonSlot, _visibleBlockWidth: number) => {
       if (slot.ghost) return;
       if (slot.action === "send") {
+        if (isSessionBusy || isCompacting) return;
         submitCurrentDraft();
         return;
       }
@@ -1066,7 +1065,7 @@ export const MessageInput = memo(function MessageInput({
         textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
       });
     },
-    [setDraftAndStore, submitCurrentDraft],
+    [isCompacting, isSessionBusy, setDraftAndStore, submitCurrentDraft],
   );
 
   const canSend = !disabled && (!isDraftBlank || pendingImages.length > 0);
