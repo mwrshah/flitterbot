@@ -1162,7 +1162,7 @@ export const MessageInput = memo(function MessageInput({
             aria-live="polite"
             className={cn(
               "mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 text-xs text-text",
-              pendingImages.length > 0 ? "mb-2" : "my-2",
+              pendingImages.length > 0 ? "mb-2" : "my-1.5",
             )}
           >
             {queuedTurns.map((turn) => {
@@ -1175,14 +1175,17 @@ export const MessageInput = memo(function MessageInput({
                   <button
                     type="button"
                     aria-label="Remove queued turn"
-                    className="flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
+                    className="-my-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
                     disabled={turn.state === "accepting" || removalPending || !onRemoveQueuedTurn}
                     onClick={() => onRemoveQueuedTurn?.(turn.id)}
                   >
                     {removalPending ? (
-                      <Loader2Icon className="size-3.5 animate-spin" aria-hidden="true" />
+                      <Loader2Icon
+                        className="-translate-y-px size-3.5 animate-spin"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <XIcon className="size-3.5" aria-hidden="true" />
+                      <XIcon className="-translate-y-px size-3.5" aria-hidden="true" />
                     )}
                   </button>
                 </Fragment>
