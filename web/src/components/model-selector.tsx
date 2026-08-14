@@ -243,7 +243,7 @@ export const ModelSelector = memo(function ModelSelector({
               loop
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              <CommandInput placeholder="Search models…" />
+              <CommandInput autoFocus placeholder="Search models…" />
               <CommandList className="max-h-none flex-1">
                 <CommandEmpty>No models match.</CommandEmpty>
                 <CommandGroup heading="Thinking level">
