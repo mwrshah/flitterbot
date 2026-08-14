@@ -14,6 +14,7 @@ export type {
   ModelsListResponse,
   ModelsMutationResponse,
   PiSessionModelInfo,
+  RemoveTurnQueueItemResponse,
   RuntimeWhatsAppControlResponse,
   SessionDetailResponse,
   SessionSearchResponse,
@@ -36,6 +37,10 @@ export type {
   TokenUsage,
 } from "../../../src/contracts/timeline.ts";
 export type { TranscriptPageResponse } from "../../../src/contracts/transcript.ts";
+export type {
+  TurnQueueItemSummary,
+  TurnQueueSnapshot,
+} from "../../../src/contracts/websocket.ts";
 
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
 

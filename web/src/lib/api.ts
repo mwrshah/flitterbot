@@ -6,6 +6,7 @@ import type {
   DirectSessionMessageResponse,
   ModelsListResponse,
   ModelsMutationResponse,
+  RemoveTurnQueueItemResponse,
   SessionDetailResponse,
   SessionSearchResponse,
   SessionsListResponse,
@@ -70,6 +71,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       request<{ ok: boolean }>(`/api/pi-sessions/${piSessionId}/interrupt`, {
         method: "POST",
       }),
+
+    removeTurnQueueItem: (piSessionId: string, itemId: string) =>
+      request<RemoveTurnQueueItemResponse>(
+        `/api/pi-sessions/${encodeURIComponent(piSessionId)}/turn-queue/${encodeURIComponent(itemId)}`,
+        { method: "DELETE" },
+      ),
 
     reopenStream: (streamId: string) =>
       request<{ ok: boolean }>(`/api/streams/${streamId}/reopen`, { method: "POST" }),

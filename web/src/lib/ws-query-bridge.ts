@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  applyTurnQueueSnapshot,
   createSurfaceLiveUpdater,
   latestHistoryPosition,
   refreshHistorySnapshot,
@@ -112,6 +113,11 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "history_rewritten") {
       void reloadHistory(piSessionId);
+      return;
+    }
+
+    if (message.type === "turn_queue_changed") {
+      applyTurnQueueSnapshot(queryClient, piSessionId, message);
       return;
     }
 

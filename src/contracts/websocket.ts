@@ -49,7 +49,7 @@ export interface ConnectedWebSocketEvent {
   clientId: string;
 }
 
-type QueuedTurnSummary = {
+export type QueuedTurnSummary = {
   id: string;
   source: MessageSource;
   text: string;
@@ -57,6 +57,23 @@ type QueuedTurnSummary = {
   receivedAt: string;
   webClientId?: string;
 };
+
+export type TurnQueueItemSummary = Pick<
+  QueuedTurnSummary,
+  "id" | "source" | "text" | "receivedAt" | "webClientId"
+> & {
+  state: "open" | "accepting";
+};
+
+export type TurnQueueSnapshot = {
+  version: number;
+  items: TurnQueueItemSummary[];
+};
+
+export interface TurnQueueChangedWebSocketEvent extends TurnQueueSnapshot {
+  type: "turn_queue_changed";
+  piSessionId: string;
+}
 
 export interface QueueItemStartWebSocketEvent {
   type: "queue_item_start";
@@ -250,6 +267,7 @@ type ControlSurfaceWebSocketServerEventPayload =
   | ConnectedWebSocketEvent
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
+  | TurnQueueChangedWebSocketEvent
   | TextDeltaWebSocketEvent
   | ThinkingStartWebSocketEvent
   | ThinkingDeltaWebSocketEvent
