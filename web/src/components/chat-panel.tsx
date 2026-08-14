@@ -761,12 +761,13 @@ export function ChatPanel({
         priority: 20,
         handler: (event) => {
           if (event.isComposing || hasBlockingSurface()) return false;
+          if (findOpen && (event.metaKey || event.ctrlKey)) return false;
           openConversationFind();
           return true;
         },
       },
     ]);
-  }, [cwdAbsolute, openConversationFind, openCwdPicker, streamId]);
+  }, [cwdAbsolute, findOpen, openConversationFind, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
     const clientMessageId = busyQueuedClearClientMessageIdRef.current;
