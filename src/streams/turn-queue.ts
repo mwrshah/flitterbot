@@ -16,10 +16,21 @@ export type QueueItem = {
   serverMessageId?: string;
 };
 
+export type TurnQueueItemState = "open" | "accepting";
+
+export type TurnQueueItem = Pick<
+  QueueItem,
+  "id" | "source" | "text" | "receivedAt" | "webClientId"
+> & { state: TurnQueueItemState };
+
+export type TurnQueueSnapshot = {
+  version: number;
+  items: TurnQueueItem[];
+};
+
 export function isCoalescableUserInput(item: QueueItem): boolean {
   if (item.sender !== "user") return false;
-  if (item.source !== "web" && item.source !== "whatsapp") return false;
-  return true;
+  return item.source === "web" || item.source === "whatsapp";
 }
 
 function queueItemRemoteJid(item: QueueItem): string | undefined {
@@ -31,21 +42,30 @@ function hasSameReplyTarget(a: QueueItem, b: QueueItem): boolean {
   return (queueItemRemoteJid(a) ?? null) === (queueItemRemoteJid(b) ?? null);
 }
 
+function canCoalesce(a: QueueItem, b: QueueItem): boolean {
+  return (
+    isCoalescableUserInput(a) &&
+    isCoalescableUserInput(b) &&
+    (a.streamId ?? null) === (b.streamId ?? null) &&
+    hasSameReplyTarget(a, b)
+  );
+}
+
 export function coalesceUserItems(items: QueueItem[]): QueueItem {
   if (items.length === 0) throw new Error("coalesceUserItems: empty group");
   const first = items[0]!;
   const last = items[items.length - 1]!;
   const metadata: MessageMetadata = {};
-  for (const it of items) {
-    if (it.metadata) Object.assign(metadata, it.metadata);
+  for (const item of items) {
+    if (item.metadata) Object.assign(metadata, item.metadata);
   }
-  metadata.coalescedFrom = items.map((it) => it.id);
+  metadata.coalescedFrom = items.map((item) => item.id);
   const images = items.flatMap((item) => item.images ?? []);
   return {
     id: `coalesced:${first.id}+${items.length - 1}`,
     source: first.source,
     sender: "user",
-    text: items.map((it) => it.text).join("\n"),
+    text: items.map((item) => item.text).join("\n"),
     metadata,
     receivedAt: first.receivedAt,
     webClientId: last.webClientId,
@@ -75,31 +95,38 @@ function coalesceHookItems(items: QueueItem[]): QueueItem {
   };
 }
 
+type QueueEntry = { item: QueueItem; state: TurnQueueItemState };
+
 type TurnQueueOptions = {
-  process: (item: QueueItem) => Promise<void>;
+  process: (item: QueueItem, onAccepted: () => void) => Promise<void>;
   steer: (item: QueueItem) => Promise<void>;
   canSteer: () => boolean;
   onItemStart?: (item: QueueItem) => void;
-  onItemEnd?: (item: QueueItem, error?: unknown, steered?: boolean) => void;
+  onItemEnd?: (item: QueueItem, error?: unknown, steered?: boolean, accepted?: boolean) => void;
+  onChanged?: (snapshot: TurnQueueSnapshot) => void;
+  initialVersion?: number;
 };
 
 export class TurnQueue {
-  private readonly items: QueueItem[] = [];
+  private readonly entries: QueueEntry[] = [];
   private readonly processItem: TurnQueueOptions["process"];
   private readonly steerItem: TurnQueueOptions["steer"];
   private readonly canSteer: TurnQueueOptions["canSteer"];
   private readonly onItemStart?: TurnQueueOptions["onItemStart"];
   private readonly onItemEnd?: TurnQueueOptions["onItemEnd"];
+  private readonly onChanged?: TurnQueueOptions["onChanged"];
   private processing = false;
-  private steeringTask?: Promise<void>;
-  private readonly steeringChildren = new Set<Promise<void>>();
+  private accepting = false;
   private readonly idleWaiters = new Set<() => void>();
-  private steeringEnabled = false;
+  private readonly settlementWaiters = new Set<() => void>();
   private stopped = false;
   private admissionFreezeDepth = 0;
   private drainAcceptedAfterStop = false;
   private paused = false;
   private currentItem?: QueueItem;
+  private version: number;
+  private holdAfterCurrent = false;
+  private resumeHeld = false;
 
   constructor(options: TurnQueueOptions) {
     this.processItem = options.process;
@@ -107,6 +134,8 @@ export class TurnQueue {
     this.canSteer = options.canSteer;
     this.onItemStart = options.onItemStart;
     this.onItemEnd = options.onItemEnd;
+    this.onChanged = options.onChanged;
+    this.version = options.initialVersion ?? 0;
   }
 
   assertAccepting(): void {
@@ -116,16 +145,17 @@ export class TurnQueue {
 
   enqueue(item: QueueItem): void {
     this.assertAccepting();
-    this.items.push(item);
-    if (this.processing && !this.paused) {
-      if (item.source !== "hook" && this.steeringEnabled) void this.steerPending();
-    } else {
-      void this.pump();
+    this.entries.push({ item, state: "open" });
+    this.changed();
+    if (this.holdAfterCurrent && item.sender === "user") {
+      if (this.processing) this.resumeHeld = true;
+      else this.holdAfterCurrent = false;
     }
+    if (!this.processing && !this.paused && !this.holdAfterCurrent) void this.pump();
   }
 
   getDepth(): number {
-    return this.items.length;
+    return this.entries.length;
   }
 
   isBusy(): boolean {
@@ -140,28 +170,120 @@ export class TurnQueue {
     return this.currentItem;
   }
 
-  enableSteering(): void {
-    if (!this.processing || !this.canProcessAcceptedItems()) return;
-    this.steeringEnabled = true;
-    this.steerPending();
+  getSnapshot(): TurnQueueSnapshot {
+    return {
+      version: this.version,
+      items: this.entries.map(({ item, state }) => ({
+        id: item.id,
+        source: item.source,
+        text: item.text,
+        receivedAt: item.receivedAt,
+        ...(item.webClientId ? { webClientId: item.webClientId } : {}),
+        state,
+      })),
+    };
   }
 
-  steerPendingHooks(): void {
-    if (!this.processing || !this.canProcessAcceptedItems() || !this.canSteer()) return;
-    const hooks = this.items.filter((item) => item.source === "hook");
-    if (hooks.length === 0) return;
-    this.items.splice(0, this.items.length, ...this.items.filter((item) => item.source !== "hook"));
-    const item = coalesceHookItems(hooks);
-    void this.deliverSteeringItem(item);
+  remove(itemId: string): {
+    removed: boolean;
+    accepting: boolean;
+    snapshot: TurnQueueSnapshot;
+  } {
+    const index = this.entries.findIndex(({ item }) => item.id === itemId);
+    if (index === -1) {
+      return {
+        removed: false,
+        accepting: false,
+        snapshot: this.getSnapshot(),
+      };
+    }
+    if (this.entries[index]!.state === "accepting") {
+      return {
+        removed: false,
+        accepting: true,
+        snapshot: this.getSnapshot(),
+      };
+    }
+    this.entries.splice(index, 1);
+    this.changed();
+    this.resolveWaiters();
+    return {
+      removed: true,
+      accepting: false,
+      snapshot: this.getSnapshot(),
+    };
   }
 
-  getPendingItems(): QueueItem[] {
-    return [...this.items];
+  holdPendingAfterCurrent(): void {
+    if (this.processing && !this.stopped) this.holdAfterCurrent = true;
+  }
+
+  async admitPendingSteering(): Promise<void> {
+    if (
+      this.accepting ||
+      !this.processing ||
+      !this.canProcessAcceptedItems() ||
+      this.paused ||
+      this.holdAfterCurrent ||
+      !this.canSteer()
+    ) {
+      return;
+    }
+
+    const firstIndex = this.entries.findIndex(({ state }) => state === "open");
+    if (firstIndex === -1) return;
+    const first = this.entries[firstIndex]!.item;
+    const leased: QueueEntry[] = [this.entries[firstIndex]!];
+    if (first.source === "hook") {
+      for (let index = firstIndex + 1; index < this.entries.length; index++) {
+        const entry = this.entries[index]!;
+        if (entry.state !== "open" || entry.item.source !== "hook") break;
+        leased.push(entry);
+      }
+    } else if (isCoalescableUserInput(first)) {
+      for (let index = firstIndex + 1; index < this.entries.length; index++) {
+        const entry = this.entries[index]!;
+        if (entry.state !== "open" || !canCoalesce(first, entry.item)) break;
+        leased.push(entry);
+      }
+    }
+
+    for (const entry of leased) entry.state = "accepting";
+    this.accepting = true;
+    this.changed();
+    const admittedItem =
+      first.source === "hook"
+        ? coalesceHookItems(leased.map(({ item }) => item))
+        : leased.length > 1
+          ? coalesceUserItems(leased.map(({ item }) => item))
+          : first;
+
+    try {
+      await this.steerItem(admittedItem);
+      const leasedIds = new Set(leased.map(({ item }) => item.id));
+      for (let index = this.entries.length - 1; index >= 0; index--) {
+        if (leasedIds.has(this.entries[index]!.item.id)) this.entries.splice(index, 1);
+      }
+      this.changed();
+      this.onItemEnd?.(admittedItem, undefined, true, true);
+    } catch (error) {
+      for (const entry of leased) entry.state = "open";
+      this.changed();
+      this.onItemEnd?.(admittedItem, error, true, false);
+    } finally {
+      this.accepting = false;
+      this.resolveWaiters();
+    }
   }
 
   waitForIdle(): Promise<void> {
     if (this.isIdle()) return Promise.resolve();
     return new Promise((resolve) => this.idleWaiters.add(resolve));
+  }
+
+  waitForSettlement(): Promise<void> {
+    if (this.isSettled()) return Promise.resolve();
+    return new Promise((resolve) => this.settlementWaiters.add(resolve));
   }
 
   freezeAdmission(): void {
@@ -178,18 +300,14 @@ export class TurnQueue {
     this.admissionFreezeDepth++;
     this.drainAcceptedAfterStop = true;
     this.paused = false;
-
-    if (this.processing) {
-      if (this.steeringEnabled) this.steerPending();
-    } else {
-      void this.pump();
-    }
-
+    this.holdAfterCurrent = false;
+    this.resumeHeld = false;
+    if (!this.processing) void this.pump();
     await this.waitForIdle();
   }
 
   pause(): boolean {
-    if (this.processing || this.stopped || this.paused) return false;
+    if (this.processing || this.stopped || this.paused || this.accepting) return false;
     this.paused = true;
     return true;
   }
@@ -197,103 +315,59 @@ export class TurnQueue {
   resume(): void {
     if (!this.paused) return;
     this.paused = false;
-    void this.pump();
+    if (!this.holdAfterCurrent) void this.pump();
   }
 
   private async pump(): Promise<void> {
     if (this.processing || !this.canProcessAcceptedItems() || this.paused) return;
     this.processing = true;
     try {
-      while (this.canProcessAcceptedItems() && !this.paused && this.items.length > 0) {
-        const item = this.drainNextAt(0);
+      while (this.canProcessAcceptedItems() && !this.paused && this.entries.length > 0) {
+        const entry = this.entries[0]!;
+        if (entry.state !== "open") break;
+        entry.state = "accepting";
+        this.changed();
+        const item = entry.item;
+        let accepted = false;
+        const markAccepted = () => {
+          if (accepted) return;
+          accepted = true;
+          const index = this.entries.indexOf(entry);
+          if (index !== -1) this.entries.splice(index, 1);
+          this.changed();
+        };
         this.currentItem = item;
-        this.steeringEnabled = false;
         this.onItemStart?.(item);
         try {
           let itemError: unknown;
           try {
-            await this.processItem(item);
+            await this.processItem(item, markAccepted);
           } catch (error) {
             itemError = error;
           }
-
-          while (this.hasActiveSteering()) {
-            await Promise.allSettled([
-              ...(this.steeringTask ? [this.steeringTask] : []),
-              ...this.steeringChildren,
-            ]);
+          if (!accepted) {
+            if (this.stopped) {
+              const index = this.entries.indexOf(entry);
+              if (index !== -1) this.entries.splice(index, 1);
+            } else {
+              entry.state = "open";
+              this.holdAfterCurrent = true;
+            }
+            this.changed();
           }
-
-          this.onItemEnd?.(item, itemError);
+          this.onItemEnd?.(item, itemError, false, accepted);
         } finally {
           this.currentItem = undefined;
+        }
+        if (this.holdAfterCurrent) {
+          if (!this.resumeHeld) break;
+          this.holdAfterCurrent = false;
+          this.resumeHeld = false;
         }
       }
     } finally {
       this.processing = false;
-      this.steeringEnabled = false;
-      this.resolveIdleWaiters();
-    }
-  }
-
-  private steerPending(): void {
-    if (this.steeringTask || !this.canProcessAcceptedItems() || this.paused) return;
-    const task = this.runSteering();
-    this.steeringTask = task;
-    void task.then(
-      () => this.finishSteering(task),
-      () => this.finishSteering(task),
-    );
-  }
-
-  private async runSteering(): Promise<void> {
-    await Promise.resolve();
-    let index = this.items.findIndex((item) => item.source !== "hook");
-    while (
-      this.processing &&
-      this.canProcessAcceptedItems() &&
-      !this.paused &&
-      this.canSteer() &&
-      index !== -1
-    ) {
-      const item = this.drainNextAt(index);
-      await this.deliverSteeringItem(item);
-      index = this.items.findIndex((item) => item.source !== "hook");
-    }
-  }
-
-  private finishSteering(task: Promise<void>): void {
-    if (this.steeringTask !== task) return;
-    this.steeringTask = undefined;
-    if (
-      this.processing &&
-      this.canProcessAcceptedItems() &&
-      !this.paused &&
-      this.canSteer() &&
-      this.items.some((item) => item.source !== "hook")
-    ) {
-      this.steerPending();
-    }
-    this.resolveIdleWaiters();
-  }
-
-  private deliverSteeringItem(item: QueueItem): Promise<void> {
-    const delivery = this.runSteeringItem(item);
-    this.steeringChildren.add(delivery);
-    const remove = () => {
-      this.steeringChildren.delete(delivery);
-      this.resolveIdleWaiters();
-    };
-    void delivery.then(remove, remove);
-    return delivery;
-  }
-
-  private async runSteeringItem(item: QueueItem): Promise<void> {
-    try {
-      await this.steerItem(item);
-      this.onItemEnd?.(item, undefined, true);
-    } catch (error) {
-      this.onItemEnd?.(item, error, true);
+      this.resolveWaiters();
     }
   }
 
@@ -301,31 +375,26 @@ export class TurnQueue {
     return !this.stopped || this.drainAcceptedAfterStop;
   }
 
-  private hasActiveSteering(): boolean {
-    return Boolean(this.steeringTask) || this.steeringChildren.size > 0;
+  private isSettled(): boolean {
+    return !this.processing && !this.accepting;
   }
 
   private isIdle(): boolean {
-    return this.items.length === 0 && !this.processing && !this.hasActiveSteering();
+    return this.entries.length === 0 && this.isSettled();
   }
 
-  private resolveIdleWaiters(): void {
+  private resolveWaiters(): void {
+    if (this.isSettled()) {
+      for (const resolve of this.settlementWaiters) resolve();
+      this.settlementWaiters.clear();
+    }
     if (!this.isIdle()) return;
     for (const resolve of this.idleWaiters) resolve();
     this.idleWaiters.clear();
   }
 
-  private drainNextAt(index: number): QueueItem {
-    const head = this.items.splice(index, 1)[0]!;
-    if (!isCoalescableUserInput(head)) return head;
-    const group: QueueItem[] = [head];
-    while (index < this.items.length) {
-      const next = this.items[index]!;
-      if (!isCoalescableUserInput(next)) break;
-      if ((next.streamId ?? null) !== (head.streamId ?? null)) break;
-      if (!hasSameReplyTarget(head, next)) break;
-      group.push(this.items.splice(index, 1)[0]!);
-    }
-    return group.length === 1 ? head : coalesceUserItems(group);
+  private changed(): void {
+    this.version++;
+    this.onChanged?.(this.getSnapshot());
   }
 }

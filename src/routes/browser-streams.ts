@@ -203,6 +203,7 @@ async function handleBrowserStreamsHistoryRouteInner(
   if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
   const body: StreamsHistoryResponse = {
     ...(historyPosition ? { historyPosition } : {}),
+    ...(!cursor ? { turnQueue: targetSession.queue.getSnapshot() } : {}),
     items: page.items,
     olderPageCursor: page.olderPageCursor,
   };

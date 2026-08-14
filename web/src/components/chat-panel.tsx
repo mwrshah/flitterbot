@@ -55,7 +55,7 @@ import {
   mergeFindTimeline,
   moveConversationFindSelection,
 } from "@/lib/conversation-find";
-import { invalidateHistorySnapshot } from "@/lib/conversation-history";
+import { applyTurnQueueSnapshot, invalidateHistorySnapshot } from "@/lib/conversation-history";
 import { buildConversationRows } from "@/lib/conversation-rows";
 import {
   focusComposerInput,
@@ -78,6 +78,7 @@ import type {
   ImageAttachment,
   StreamSummary,
   TokenUsage,
+  TurnQueueSnapshot,
 } from "@/lib/types";
 import { setStreamCwd } from "@/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -120,6 +121,7 @@ const ContextTicker = memo(function ContextTicker({ usage }: { usage: TokenUsage
 type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
+  turnQueue: TurnQueueSnapshot;
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
   contextUsage: TokenUsage | null;
@@ -286,21 +288,6 @@ function ConversationFindBar({
   );
 }
 
-function QueuedBusyOverlay({ text }: { text: string }) {
-  if (!text) return null;
-
-  return (
-    <div className="pointer-events-none absolute inset-x-6 bottom-3 z-10 flex justify-end">
-      <div className="max-w-[min(44rem,100%)] rounded-lg border border-border-muted bg-background px-3 py-2 text-xs shadow-lg">
-        <div className="font-medium text-text-muted">Queued:</div>
-        <div className="mt-1 max-h-32 overflow-hidden whitespace-pre-wrap break-words text-text">
-          {text}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function dirFromPath(path: string, name: string): string {
   const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
   if (cleanPath.endsWith(`/${name}`)) return cleanPath.slice(0, -(name.length + 1));
@@ -454,6 +441,7 @@ function CwdPicker({
 export function ChatPanel({
   piSessionId,
   timeline,
+  turnQueue,
   isSessionBusy,
   isSessionCompacting,
   contextUsage,
@@ -621,19 +609,36 @@ export function ChatPanel({
     return () => document.removeEventListener("pointerdown", handlePointerDown, true);
   }, [cwdPickerOpen]);
 
+  const pendingPostedScrollClientMessageIdsRef = useRef<Set<string>>(new Set());
   const interruptMutation = useMutation({
     mutationFn: () => apiClient.interruptPiSession(piSessionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["status"] }),
+  });
+  const removeQueuedTurnMutation = useMutation({
+    mutationFn: (itemId: string) => apiClient.removeTurnQueueItem(piSessionId, itemId),
+    onSuccess: (snapshot, itemId) => {
+      if (snapshot.removed) {
+        const webClientId = turnQueue.items.find((item) => item.id === itemId)?.webClientId;
+        if (webClientId) pendingPostedScrollClientMessageIdsRef.current.delete(webClientId);
+      } else if (snapshot.accepting) {
+        toast.info("Turn is already being accepted by Pi");
+      } else {
+        toast.info("Turn was already accepted or is no longer queued");
+      }
+      applyTurnQueueSnapshot(queryClient, piSessionId, snapshot);
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove queued turn: ${String(error)}`);
+    },
   });
 
   const recoverMutation = useReopenStream();
 
   const [isSending, setIsSending] = useState(false);
-  const [busyQueuedText, setBusyQueuedText] = useState("");
-  const busyQueuedTextRef = useRef("");
-  const busyQueuedClearClientMessageIdRef = useRef<string | null>(null);
-  const pendingPostedScrollClientMessageIdsRef = useRef<Set<string>>(new Set());
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
+  useEffect(() => {
+    pendingPostedScrollClientMessageIdsRef.current.clear();
+  }, [piSessionId]);
   const pruneMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),
     onSuccess: () => {
@@ -657,24 +662,6 @@ export function ChatPanel({
       );
     },
   });
-
-  const clearBusyQueuedText = useCallback(() => {
-    busyQueuedTextRef.current = "";
-    busyQueuedClearClientMessageIdRef.current = null;
-    setBusyQueuedText("");
-  }, []);
-
-  const appendBusyQueuedText = useCallback((text: string) => {
-    setBusyQueuedText((previous) => {
-      const next = previous ? `${previous}\n${text}` : text;
-      busyQueuedTextRef.current = next;
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    clearBusyQueuedText();
-  }, [clearBusyQueuedText, piSessionId]);
 
   const retryConversationFind = useCallback(() => {
     findInputRef.current?.focus();
@@ -777,27 +764,19 @@ export function ChatPanel({
   }, [cwdAbsolute, findOpen, openConversationFind, openCwdPicker, streamId]);
 
   useLayoutEffect(() => {
-    const clientMessageId = busyQueuedClearClientMessageIdRef.current;
     const pendingScrollIds = pendingPostedScrollClientMessageIdsRef.current;
     let shouldScrollToPostedMessage = false;
 
     for (const item of timeline) {
       if (item.kind !== "message") continue;
       const message = item as ChatTimelineMessage;
-      if (message.role !== "user") continue;
-
-      if (busyQueuedText && message.id === clientMessageId) {
-        clearBusyQueuedText();
-      }
-      if (pendingScrollIds.delete(message.id)) {
+      if (message.role === "user" && pendingScrollIds.delete(message.id)) {
         shouldScrollToPostedMessage = true;
       }
     }
 
-    if (shouldScrollToPostedMessage) {
-      messageListRef.current?.scrollToEnd();
-    }
-  }, [busyQueuedText, clearBusyQueuedText, timeline]);
+    if (shouldScrollToPostedMessage) messageListRef.current?.scrollToEnd();
+  }, [timeline]);
 
   const handlePruneRequested = useCallback((entryId: string) => {
     setPruneTarget(entryId);
@@ -825,25 +804,6 @@ export function ChatPanel({
       const clientMessageId = crypto.randomUUID();
       pendingPostedScrollClientMessageIdsRef.current.add(clientMessageId);
       const displayText = text || "(image)";
-      const queueBehindBusy = isSessionBusy || busyQueuedTextRef.current.length > 0;
-
-      if (queueBehindBusy) {
-        setIsSending(true);
-        try {
-          await onSendMessage(displayText, { images, clientMessageId });
-          busyQueuedClearClientMessageIdRef.current = clientMessageId;
-          appendBusyQueuedText(displayText);
-        } catch (error) {
-          pendingPostedScrollClientMessageIdsRef.current.delete(clientMessageId);
-          toast.error("Failed to queue message");
-          console.error("handleSubmit queue failed:", error);
-          throw error;
-        } finally {
-          setIsSending(false);
-        }
-        return;
-      }
-
       setIsSending(true);
 
       try {
@@ -858,16 +818,7 @@ export function ChatPanel({
         void queryClient.invalidateQueries({ queryKey: ["status"] });
       }
     },
-    [
-      appendBusyQueuedText,
-      isSessionBusy,
-      messageInputDisabled,
-      onSendMessage,
-      piSessionId,
-      queryClient,
-      streamId,
-      streamType,
-    ],
+    [messageInputDisabled, onSendMessage, queryClient],
   );
 
   const effectiveRecoveryKind = recoveryKind && streamId ? recoveryKind : undefined;
@@ -1031,7 +982,6 @@ export function ChatPanel({
                 onClose={closeConversationFind}
               />
             )}
-            <QueuedBusyOverlay text={busyQueuedText} />
           </div>
         </Panel>
 
@@ -1099,6 +1049,11 @@ export function ChatPanel({
                   : "work-stream"
             }
             isRecoverPending={recoverMutation.isPending}
+            queuedTurns={turnQueue.items}
+            onRemoveQueuedTurn={(itemId) => removeQueuedTurnMutation.mutate(itemId)}
+            removingQueuedTurnId={
+              removeQueuedTurnMutation.isPending ? removeQueuedTurnMutation.variables : undefined
+            }
           />
         </Panel>
       </PanelGroup>

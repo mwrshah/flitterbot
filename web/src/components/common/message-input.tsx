@@ -30,7 +30,12 @@ import {
 import { getInternalCommandsForScope, type InternalCommandScope } from "@/lib/internal-commands";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "@/lib/queries";
 import { getTokenDeleteEdit } from "@/lib/text-input";
-import type { DirectoryCompletionItem, ImageAttachment, SkillPickerItem } from "@/lib/types";
+import type {
+  DirectoryCompletionItem,
+  ImageAttachment,
+  SkillPickerItem,
+  TurnQueueItemSummary,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const draftStore = new Map<string, string>();
@@ -428,6 +433,9 @@ type MessageInputProps = {
   hoverButtons?: MessageInputHoverButton[];
   internalCommandScope: InternalCommandScope;
   isRecoverPending?: boolean;
+  queuedTurns?: TurnQueueItemSummary[];
+  onRemoveQueuedTurn?: (itemId: string) => void;
+  removingQueuedTurnId?: string;
 };
 
 const rootRouteApi = getRouteApi("__root__");
@@ -455,6 +463,9 @@ export const MessageInput = memo(function MessageInput({
   hoverButtons = EMPTY_HOVER_BUTTONS,
   internalCommandScope,
   isRecoverPending = false,
+  queuedTurns = [],
+  onRemoveQueuedTurn,
+  removingQueuedTurnId,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, placeholder });
   const { apiClient } = rootRouteApi.useRouteContext();
@@ -1141,6 +1152,42 @@ export const MessageInput = memo(function MessageInput({
                 </button>
               </div>
             ))}
+          </div>
+        )}
+        {queuedTurns.length > 0 && (
+          <div
+            role="status"
+            aria-label="Queued turns"
+            aria-live="polite"
+            className={cn(
+              "mr-2 ml-auto flex max-w-[calc(100%-1rem)] flex-col gap-2",
+              pendingImages.length > 0 ? "mb-2" : "my-2",
+            )}
+          >
+            {queuedTurns.map((turn) => {
+              const removalPending = removingQueuedTurnId === turn.id;
+              return (
+                <div
+                  key={turn.id}
+                  className="flex max-h-32 items-start gap-2 overflow-hidden rounded-lg border border-border-muted bg-background px-3 py-2 text-xs text-text shadow-lg"
+                >
+                  <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">{turn.text}</div>
+                  <button
+                    type="button"
+                    aria-label="Remove queued turn"
+                    className="flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
+                    disabled={turn.state === "accepting" || removalPending || !onRemoveQueuedTurn}
+                    onClick={() => onRemoveQueuedTurn?.(turn.id)}
+                  >
+                    {removalPending ? (
+                      <Loader2Icon className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <XIcon className="size-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         <input

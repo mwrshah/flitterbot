@@ -79,6 +79,7 @@ export type ProcessQueueItemCallback = (
   managed: ManagedPiSession,
   item: QueueItem,
   steered?: boolean,
+  onAccepted?: () => void,
 ) => Promise<void>;
 
 function rewriteSessionHeaderCwd(sessionFile: string, cwd: string): string | undefined {
@@ -203,6 +204,7 @@ export class PiSessionManager {
       let bashAborted = false;
       const session = managed.runtime?.session;
       if (session) {
+        managed.queue.holdPendingAfterCurrent();
         try {
           session.abort?.();
         } catch {}
@@ -319,7 +321,7 @@ export class PiSessionManager {
     operation: (managed: ManagedPiSession | undefined) => Promise<T>,
   ): Promise<T> {
     for (;;) {
-      await this.streamSessions.get(context.streamId)?.queue.waitForIdle();
+      await this.streamSessions.get(context.streamId)?.queue.waitForSettlement();
       const outcome = await this.withStreamOperation(context, async () => {
         const managed = this.streamSessions.get(context.streamId);
         if (managed && !managed.queue.pause() && !managed.queue.isStopped()) {
@@ -1048,20 +1050,7 @@ export class PiSessionManager {
     try {
       managed.unsubscribe();
     } catch {}
-    managed.unsubscribe = subscribeToPiSession(
-      session,
-      managed.state,
-      this.blackboard,
-      this.wsHub,
-      this.toolDisplayCache,
-      managed.streamId,
-      managed.streamName,
-      (lastAssistantMessage) => {
-        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
-      },
-      () => managed.queue.steerPendingHooks(),
-      () => managed.queue.enableSteering(),
-    );
+    managed.unsubscribe = this.subscribeManagedSession(managed, session, managed.state);
 
     this.toolDisplayCache.invalidatePiSession(managed.piSessionId);
     this.log(`switched cwd for stream "${managed.streamName}" (${streamId}) to ${cwd}`);
@@ -1299,10 +1288,19 @@ export class PiSessionManager {
     streamId: string | null,
   ): void {
     const processCallback = this.processCallback;
+    const previousVersion = managed.queue?.getSnapshot().version;
     managed.queue = new TurnQueue({
-      process: (item) => processCallback(managed, item),
+      initialVersion: previousVersion === undefined ? 0 : previousVersion + 1,
+      process: (item, onAccepted) => processCallback(managed, item, false, onAccepted),
       steer: (item) => processCallback(managed, item, true),
       canSteer: () => managed.runtime?.session.isStreaming ?? false,
+      onChanged: (snapshot) => {
+        this.wsHub.broadcast({
+          type: "turn_queue_changed",
+          piSessionId: managed.piSessionId,
+          ...snapshot,
+        });
+      },
       onItemStart: (item) => {
         state.setBusy(true, item);
         this.wsHub.broadcast({
@@ -1317,7 +1315,7 @@ export class PiSessionManager {
           ...(streamId ? { streamId } : {}),
         });
       },
-      onItemEnd: (item, error, steered) => {
+      onItemEnd: (item, error, steered, accepted) => {
         if (!steered) {
           state.setBusy(false);
           this.wsHub.broadcast({
@@ -1366,7 +1364,7 @@ export class PiSessionManager {
               },
             );
           });
-        } else if (error && !steered && managed.role !== "default" && streamId) {
+        } else if (error && !steered && accepted && managed.role !== "default" && streamId) {
           const expectedPiSessionId = managed.piSessionId;
           queueMicrotask(() => {
             void this.destroyStreamSession(streamId, expectedPiSessionId, "crashed").catch(
@@ -1380,6 +1378,13 @@ export class PiSessionManager {
         }
       },
     });
+    if (previousVersion !== undefined) {
+      this.wsHub.broadcast({
+        type: "turn_queue_changed",
+        piSessionId: managed.piSessionId,
+        ...managed.queue.getSnapshot(),
+      });
+    }
   }
 
   private subscribeManagedSession(
@@ -1387,7 +1392,7 @@ export class PiSessionManager {
     session: AgentSessionRuntime["session"],
     state: PiSessionState,
   ): () => void {
-    return subscribeToPiSession(
+    const unsubscribeSession = subscribeToPiSession(
       session,
       state,
       this.blackboard,
@@ -1398,9 +1403,19 @@ export class PiSessionManager {
       (lastAssistantMessage) => {
         managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
       },
-      () => managed.queue.steerPendingHooks(),
-      () => managed.queue.enableSteering(),
     );
+    const unsubscribeAdmission = session.agent.subscribe(async (event) => {
+      if (event.type !== "turn_end" || event.message.role !== "assistant") return;
+      if (event.message.stopReason === "error" || event.message.stopReason === "aborted") {
+        managed.queue.holdPendingAfterCurrent();
+        return;
+      }
+      await managed.queue.admitPendingSteering();
+    });
+    return () => {
+      unsubscribeAdmission();
+      unsubscribeSession();
+    };
   }
 
   private archiveDefaultSessionFiles(previousPiSessionIds: readonly string[]): void {
