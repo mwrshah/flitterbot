@@ -175,7 +175,6 @@ export const ModelSelector = memo(function ModelSelector({
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (
       (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
-      event.altKey ||
       event.ctrlKey ||
       event.metaKey ||
       event.shiftKey ||
@@ -354,7 +353,7 @@ export const ModelSelector = memo(function ModelSelector({
                       return (
                         <Fragment key={`all:${model.id}`}>
                           {showProviderHeading && (
-                            <div className="border-border-muted border-t px-2 pt-1 pb-0.5 text-xs font-medium text-text-pop truncate">
+                            <div className="border-border-muted border-t px-2 pt-1.25 text-xs font-medium text-text-pop truncate">
                               Provider: {model.provider}
                             </div>
                           )}
