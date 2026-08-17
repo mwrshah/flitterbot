@@ -104,7 +104,6 @@ export const ModelSelector = memo(function ModelSelector({
   const defaultModelId = data?.defaultModel ?? null;
   const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
   const activeModelId = selectedModelId ?? defaultModelId;
-  const activeThinkingLevel = selectedThinkingLevel ?? defaultThinkingLevel;
   const pinnedIds = useMemo(() => {
     const set = new Set<string>();
     for (const model of catalogPinned) {
@@ -145,15 +144,18 @@ export const ModelSelector = memo(function ModelSelector({
       if (!piSessionId) throw new Error("No Pi session selected");
       return apiClient.setPiSessionThinkingLevel(piSessionId, level);
     },
-    onSuccess: (result, level) => {
+    onSuccess: async (result, level) => {
       updateModelsCache(queryClient, result);
-      queryClient.invalidateQueries({ queryKey: ["status"] });
       toast.success(`Thinking level set to ${level}`);
+      await queryClient.invalidateQueries({ queryKey: ["status"] });
     },
     onError: (error) => {
       toast.error(`Set thinking failed: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
+  const activeThinkingLevel = thinkingMutation.isPending
+    ? thinkingMutation.variables
+    : (selectedThinkingLevel ?? defaultThinkingLevel);
 
   const currentModel = useMemo(() => {
     if (!activeModelId) return undefined;
