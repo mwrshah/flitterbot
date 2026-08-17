@@ -22,8 +22,8 @@ export function AppShell() {
         <Sidebar />
       </Panel>
       <ResizeHandle />
-      <Panel id="main" className="h-full min-h-0" minSize="0px">
-        <main className="flex h-full flex-col min-h-0 overflow-hidden">
+      <Panel id="main" className="h-full min-h-0" minSize="0px" style={{ overflow: "visible" }}>
+        <main className="flex h-full flex-col min-h-0 overflow-visible">
           <Outlet />
         </main>
       </Panel>

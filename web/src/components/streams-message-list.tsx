@@ -126,7 +126,11 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   }));
 
   return (
-    <div ref={scrollRef} data-scroll-container="main" className="h-full overflow-auto px-6">
+    <div
+      ref={scrollRef}
+      data-scroll-container="main"
+      className="h-full w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6"
+    >
       <div className="relative w-full" style={{ minHeight: "2rem" }}>
         <div
           ref={virtualizer.containerRef}

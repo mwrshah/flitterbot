@@ -104,10 +104,11 @@ function PiSessionRoute() {
     <PanelGroup
       orientation="horizontal"
       className="h-full"
+      style={{ overflow: "visible" }}
       defaultLayout={streamsLayout}
       onLayoutChanged={(layout: PanelLayout) => setConfig(STREAMS_MAIN_KEY, JSON.stringify(layout))}
     >
-      <Panel id="chat" defaultSize="50%" minSize="30%">
+      <Panel id="chat" defaultSize="50%" minSize="30%" style={{ overflow: "visible" }}>
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}

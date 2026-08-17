@@ -834,7 +834,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   return (
     <div
       ref={swimlaneListRef}
-      className="min-h-0 flex-1 overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-2"
+      className="min-h-0 w-[calc(100%+1px)] flex-1 overflow-x-hidden overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-2"
     >
       <div className="flex items-center justify-between mb-0.5">
         <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">
@@ -921,7 +921,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:shadow-[inset_0_-1px_0_var(--border-pop)] focus:placeholder:opacity-0 data-[search-selected=true]:rounded-sm data-[search-selected=true]:shadow-none data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop"
+            className="h-full min-w-0 flex-1 border-0 border-b-2 border-transparent bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:border-border-pop focus:placeholder:opacity-0 data-[search-selected=true]:rounded-sm data-[search-selected=true]:focus:border-transparent data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop"
           />
         </div>
         <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
@@ -979,7 +979,7 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex h-full min-h-0 select-none flex-col overflow-hidden border-r border-border bg-background">
+    <aside className="flex h-full min-h-0 select-none flex-col overflow-hidden bg-background">
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem

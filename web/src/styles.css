@@ -122,7 +122,7 @@
   --text-contrast-muted: var(--background-muted);
   --border: oklch(0.89 0.006 95);
   --border-muted: oklch(0.93 0.004 95);
-  --border-pop: rgba(250, 136, 0, 0.18);
+  --border-pop: rgba(250, 212, 168, 1);
 
   --status-active: oklch(0.74 0.15 145);
   --status-active-muted: color-mix(in oklab, var(--status-active) 22%, transparent);
@@ -228,7 +228,7 @@
   --text-contrast-muted: var(--background-muted);
   --border: oklch(0.38 0.006 130);
   --border-muted: oklch(0.3 0.005 130);
-  --border-pop: oklch(0.64 0.13 55 / 0.28);
+  --border-pop: rgb(77 47 24);
 
   --status-active: oklch(0.62 0.12 145);
   --status-active-muted: color-mix(in oklab, var(--status-active) 15%, transparent);

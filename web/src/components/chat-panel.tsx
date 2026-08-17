@@ -948,12 +948,13 @@ export function ChatPanel({
       <PanelGroup
         orientation="vertical"
         className="flex-1 min-h-0"
+        style={{ overflow: "visible" }}
         defaultLayout={chatLayout}
         onLayoutChanged={(layout: PanelLayout) =>
           setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
         }
       >
-        <Panel id="feed" defaultSize="85%" minSize="20%">
+        <Panel id="feed" defaultSize="85%" minSize="20%" style={{ overflow: "hidden" }}>
           <div className="relative isolate h-full">
             <StreamsMessageList
               key={piSessionId} // remount per session: re-arms initial pin
