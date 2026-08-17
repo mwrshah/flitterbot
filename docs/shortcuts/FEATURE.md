@@ -36,6 +36,7 @@ Example value: `{ "nav.surface": "Alt+KeyH", "scroll.top": "Home" }`.
 |---|---|---|
 | `nav.surface` | `Alt+R`, `r` | Navigate to home surface |
 | `nav.last-stream` | `Alt+T`, `t` | Navigate to last active stream |
+| `model.search` | `Alt+M` | Open and focus the active model selector |
 | `scroll.small-down` | `j` | Small scroll down (20% viewport) |
 | `scroll.small-up` | `k` | Small scroll up (20% viewport) |
 | `scroll.half-page-down` | `Ctrl+D`, `d` | Scroll half page down (60% viewport) |

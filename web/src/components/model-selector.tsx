@@ -3,9 +3,10 @@ import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
-import { Fragment, memo, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
+import { ShortcutHint } from "@/components/common/kbd";
 import {
   Command,
   CommandGroup,
@@ -13,6 +14,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useModifierLabel } from "@/hooks/platform";
+import {
+  registerShortcutHandlers,
+  SHORTCUT_ACTIONS,
+  useShortcutBindingLabel,
+} from "@/lib/global-shortcuts";
 import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -55,6 +62,7 @@ export const ModelSelector = memo(function ModelSelector({
   selectedThinkingLevel,
 }: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
+  const modifierLabel = useModifierLabel();
   const [search, setSearch] = useState("");
   const searchTerm = search.trim();
   const searching = searchTerm.length >= 2;
@@ -159,6 +167,30 @@ export const ModelSelector = memo(function ModelSelector({
     setOpen(nextOpen);
     if (!nextOpen) setSearch("");
   };
+  const openModelSearch = useCallback(() => {
+    if (disabled || !piSessionId || (catalogPinned.length === 0 && catalogAll.length === 0)) {
+      return false;
+    }
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    } else {
+      setOpen(true);
+    }
+    return true;
+  }, [catalogAll.length, catalogPinned.length, disabled, piSessionId]);
+  const modelSearchShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.modelSearch, {
+    altLabel: modifierLabel,
+  });
+  const searchPlaceholder = modelSearchShortcutHint
+    ? `Search (${modelSearchShortcutHint.replaceAll("+", " + ")})`
+    : "Search";
+  useEffect(
+    () =>
+      registerShortcutHandlers([
+        { actionId: SHORTCUT_ACTIONS.modelSearch, handler: openModelSearch },
+      ]),
+    [openModelSearch],
+  );
 
   if (catalogPinned.length === 0 && catalogAll.length === 0) {
     return null;
@@ -209,12 +241,24 @@ export const ModelSelector = memo(function ModelSelector({
               label="Search models"
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              <CommandInput
-                ref={searchInputRef}
-                value={search}
-                onValueChange={setSearch}
-                placeholder="Search models…"
-              />
+              <div className="flex items-center gap-1 pr-1.5">
+                <div className="min-w-0 flex-1">
+                  <CommandInput
+                    ref={searchInputRef}
+                    value={search}
+                    onValueChange={setSearch}
+                    placeholder={searchPlaceholder}
+                  />
+                </div>
+                {modelSearchShortcutHint && (
+                  <ShortcutHint
+                    label={modelSearchShortcutHint}
+                    className="shrink-0"
+                    kbdSize="compact"
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
               <CommandList className="max-h-none flex-1">
                 <CommandGroup heading="Thinking level">
                   <div className="flex flex-wrap gap-1 p-1">
