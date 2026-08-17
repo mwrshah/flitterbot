@@ -140,13 +140,13 @@ export interface ModelListItem {
   supportsMax?: boolean;
   name?: string;
   contextWindow?: number;
-  available?: boolean;
-  authKind?: "subscription" | "api_key" | "none";
+  authKind: "subscription" | "api_key" | "none";
 }
 
 export interface ModelsListResponse {
   pinned: ModelListItem[];
   all: ModelListItem[];
+  initialModelIds: string[];
   defaultModel: string;
   defaultThinkingLevel: ModelThinkingLevel;
 }

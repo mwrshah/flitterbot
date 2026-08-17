@@ -137,7 +137,7 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     listSkills: () => request<SkillsListResponse>("/api/skills"),
 
-    listModels: () => request<ModelsListResponse>("/api/models"),
+    listModels: (signal?: AbortSignal) => request<ModelsListResponse>("/api/models", { signal }),
 
     pinModel: (id: string, pin: boolean, label?: string) =>
       request<ModelsMutationResponse>("/api/models/pin", {

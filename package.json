@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "latest",
-    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.84.2",
     "@ff-labs/fff-node": "^0.7.2",
     "@whiskeysockets/baileys": "7.0.0-rc13",
     "dotenv": "^17.4.2",

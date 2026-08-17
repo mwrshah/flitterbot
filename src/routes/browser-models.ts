@@ -87,16 +87,22 @@ export async function buildModelsListResponse(
   const config = runtime.config;
   const pinned = config.models.map((entry) => buildPinnedModelItem(entry, registry));
   const pinnedCatalogKeys = new Set(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
-  const all: ModelListItem[] = [];
-
-  for (const model of registry.getAll()) {
-    if (pinnedCatalogKeys.has(`${model.provider}/${model.id}`)) continue;
-    all.push(buildCatalogModelItem(model, registry));
-  }
+  const catalog = registry.getAll();
+  const catalogItems = catalog.map((model) => buildCatalogModelItem(model, registry));
+  const catalogItemsById = new Map(catalogItems.map((model) => [model.id, model]));
+  const initialCatalogItems = selectInitialCatalogModels(catalog).flatMap((model) => {
+    const id = `${model.provider}/${model.id}`;
+    const item = catalogItemsById.get(id);
+    return item && !pinnedCatalogKeys.has(id) ? [item] : [];
+  });
+  const initialModelIds = [...pinned, ...initialCatalogItems]
+    .sort(compareModelAvailability)
+    .map((model) => model.id);
 
   return {
     pinned,
-    all,
+    all: catalogItems.filter((model) => !pinnedCatalogKeys.has(model.id)),
+    initialModelIds,
     defaultModel: config.defaultModel,
     defaultThinkingLevel: config.defaultThinkingLevel,
   };
@@ -115,6 +121,138 @@ async function getModelRegistry(runtime: ControlSurfaceRuntime): Promise<ModelRe
   return createPiModelRegistry(await runtime.resolveModelRuntime());
 }
 
+const INITIAL_PROVIDER_ORDER = [
+  "openai-codex",
+  "openai",
+  "anthropic",
+  "fireworks",
+  "groq",
+  "github-copilot",
+  "opencode",
+] as const;
+const INITIAL_PROVIDER_RANK = new Map<string, number>(
+  INITIAL_PROVIDER_ORDER.map((provider, index) => [provider, index]),
+);
+const INITIAL_ALL_MODEL_PROVIDERS = new Set(["openai-codex", "fireworks", "groq"]);
+const OPENAI_EXCLUDED_MODELS = new Set([
+  "gpt-4",
+  "gpt-4-turbo",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+  "gpt-4o-2024-05-13",
+  "gpt-4o-2024-08-06",
+  "gpt-4o-2024-11-20",
+  "gpt-5",
+  "gpt-5-chat-latest",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "gpt-5-pro",
+  "gpt-5.1",
+  "gpt-5.2",
+  "gpt-5.2-chat-latest",
+  "gpt-5.2-pro",
+  "gpt-5.3-chat-latest",
+  "gpt-5.3-codex",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+  "gpt-5.4-pro",
+  "gpt-5.5",
+  "gpt-5.5-pro",
+  "gpt-realtime-2.1",
+  "o1",
+  "o1-pro",
+  "o3",
+  "o3-mini",
+  "o3-pro",
+  "o4-mini",
+]);
+const ANTHROPIC_EXCLUDED_MODELS = new Set([
+  "claude-haiku-4-5-20251001",
+  "claude-opus-4-1",
+  "claude-opus-4-1-20250805",
+  "claude-opus-4-5",
+  "claude-opus-4-5-20251101",
+  "claude-sonnet-4-5",
+  "claude-sonnet-4-5-20250929",
+]);
+const COPILOT_INITIAL_MODELS = new Set([
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-opus-4.8",
+  "claude-fable-5",
+  "kimi-k2.7-code",
+]);
+const OPENCODE_INITIAL_MODELS = new Set([
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-fable-5",
+  "glm-5.2",
+  "deepseek-v4-flash",
+  "deepseek-v4-flash-free",
+  "deepseek-v4-pro",
+  "kimi-k2.5",
+  "kimi-k2.6",
+  "kimi-k2.7-code",
+]);
+
+type CatalogModel = Pick<Model<Api>, "id" | "name" | "provider">;
+
+function selectInitialCatalogModels<T extends CatalogModel>(models: T[]): T[] {
+  return models.filter(isInitialCatalogModel).sort(compareInitialCatalogModels);
+}
+
+function isInitialCatalogModel(model: CatalogModel): boolean {
+  if (INITIAL_ALL_MODEL_PROVIDERS.has(model.provider)) return true;
+  if (model.provider === "openai") return !OPENAI_EXCLUDED_MODELS.has(model.id);
+  if (model.provider === "anthropic") return !ANTHROPIC_EXCLUDED_MODELS.has(model.id);
+  if (model.provider === "github-copilot") return COPILOT_INITIAL_MODELS.has(model.id);
+  if (model.provider === "opencode") return OPENCODE_INITIAL_MODELS.has(model.id);
+  return false;
+}
+
+function compareInitialCatalogModels(a: CatalogModel, b: CatalogModel): number {
+  const provider =
+    (INITIAL_PROVIDER_RANK.get(a.provider) ?? Number.MAX_SAFE_INTEGER) -
+    (INITIAL_PROVIDER_RANK.get(b.provider) ?? Number.MAX_SAFE_INTEGER);
+  if (provider !== 0) return provider;
+  const version = compareModelVersionDesc(a, b);
+  if (version !== 0) return version;
+  return a.name.localeCompare(b.name);
+}
+
+function compareModelAvailability(a: ModelListItem, b: ModelListItem): number {
+  return Number(b.authKind !== "none") - Number(a.authKind !== "none");
+}
+
+function compareModelVersionDesc(a: CatalogModel, b: CatalogModel): number {
+  const aVersion = extractVersionParts(a);
+  const bVersion = extractVersionParts(b);
+  if (aVersion.length === 0 || bVersion.length === 0) return 0;
+  const length = Math.max(aVersion.length, bVersion.length);
+  for (let index = 0; index < length; index++) {
+    const difference = (bVersion[index] ?? 0) - (aVersion[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function extractVersionParts(model: CatalogModel): number[] {
+  const match =
+    /(?:gpt|claude|gemini|glm|llama|qwen|mistral|deepseek|kimi)[-\s]?([0-9]+(?:[.p-][0-9]+)*)/i.exec(
+      `${model.id} ${model.name}`,
+    );
+  if (!match?.[1]) return [];
+  return match[1].split(/[.p-]/).map((part) => Number(part));
+}
+
 function buildCatalogModelItem(model: Model<Api>, registry: ModelRegistry): ModelListItem {
   const authKind = resolveAuthKind(registry, model);
   return {
@@ -125,7 +263,6 @@ function buildCatalogModelItem(model: Model<Api>, registry: ModelRegistry): Mode
     name: model.name,
     contextWindow: model.contextWindow,
     ...modelThinkingCapabilities(model),
-    available: authKind !== "none",
     authKind,
   };
 }
@@ -140,7 +277,6 @@ function buildPinnedModelItem(entry: ModelConfigEntry, registry: ModelRegistry):
     modelId: entry.modelId,
     ...(entry.thinkingLevel ? { thinkingLevel: entry.thinkingLevel } : {}),
     ...(catalogModel ? modelThinkingCapabilities(catalogModel) : {}),
-    available: authKind !== "none",
     authKind,
   };
 }

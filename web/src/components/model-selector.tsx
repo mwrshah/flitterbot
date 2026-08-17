@@ -1,35 +1,25 @@
+import { Popover } from "@base-ui/react/popover";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
-import {
-  type CSSProperties,
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { memo, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
+import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
-export const MODELS_QUERY_KEY = ["models", "auth-kind-v2"] as const;
+export const MODELS_QUERY_KEY = ["models", "catalog-v3"] as const;
 const THINKING_LEVELS: ModelThinkingLevel[] = [
   "off",
   "minimal",
@@ -65,26 +55,46 @@ export const ModelSelector = memo(function ModelSelector({
   selectedThinkingLevel,
 }: ModelSelectorProps) {
   const { apiClient } = rootApi.useRouteContext();
+  const [search, setSearch] = useState("");
+  const searchTerm = search.trim();
+  const searching = searchTerm.length >= 2;
   const { data } = useQuery({
     queryKey: MODELS_QUERY_KEY,
-    queryFn: () => apiClient.listModels(),
+    queryFn: ({ signal }) => apiClient.listModels(signal),
     staleTime: 0,
   });
 
-  const pinned = data?.pinned ?? [];
-  const all = data?.all ?? [];
+  const catalogPinned = data?.pinned ?? [];
+  const catalogAll = data?.all ?? [];
+  const initialModelIds = data?.initialModelIds ?? [];
+  const initialModels = useMemo(() => {
+    const modelsById = new Map([...catalogPinned, ...catalogAll].map((model) => [model.id, model]));
+    return initialModelIds.flatMap((id) => {
+      const model = modelsById.get(id);
+      return model ? [model] : [];
+    });
+  }, [catalogPinned, catalogAll, initialModelIds]);
+  const searchIndex = useMemo(
+    () => createModelSearchIndex([...catalogPinned, ...catalogAll]),
+    [catalogPinned, catalogAll],
+  );
+  const searchResults = useMemo(
+    () => searchModelIndex(searchIndex, searchTerm),
+    [searchIndex, searchTerm],
+  );
+  const all = searching ? searchResults : initialModels;
   const defaultModelId = data?.defaultModel ?? null;
   const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
   const activeModelId = selectedModelId ?? defaultModelId;
   const activeThinkingLevel = selectedThinkingLevel ?? defaultThinkingLevel;
   const pinnedIds = useMemo(() => {
     const set = new Set<string>();
-    for (const m of pinned) {
-      set.add(m.id);
-      set.add(`${m.provider}/${m.modelId}`);
+    for (const model of catalogPinned) {
+      set.add(model.id);
+      set.add(`${model.provider}/${model.modelId}`);
     }
     return set;
-  }, [pinned]);
+  }, [catalogPinned]);
 
   const queryClient = useQueryClient();
   const pinMutation = useMutation({
@@ -92,7 +102,6 @@ export const ModelSelector = memo(function ModelSelector({
       apiClient.pinModel(id, pin, label),
     onSuccess: (result, vars) => {
       updateModelsCache(queryClient, result);
-      queryClient.invalidateQueries({ queryKey: MODELS_QUERY_KEY });
       toast.success(vars.pin ? "Pinned to config" : "Unpinned");
     },
     onError: (error) => {
@@ -131,121 +140,82 @@ export const ModelSelector = memo(function ModelSelector({
   const currentModel = useMemo(() => {
     if (!activeModelId) return undefined;
     return (
-      pinned.find((m) => matchesModelId(m, activeModelId)) ??
-      all.find((m) => matchesModelId(m, activeModelId)) ??
+      catalogPinned.find((model) => matchesModelId(model, activeModelId)) ??
+      catalogAll.find((model) => matchesModelId(model, activeModelId)) ??
       undefined
     );
-  }, [activeModelId, pinned, all]);
+  }, [activeModelId, catalogPinned, catalogAll]);
   const availableThinkingLevels = useMemo(
     () => getAvailableThinkingLevels(currentModel),
     [currentModel],
   );
 
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const popoverRef = useRef<HTMLDivElement | null>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
-  const groupedAll = useMemo(() => groupByAuthKind(all), [all]);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
+  const firstModel = all[0];
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) setSearch("");
+  };
 
-  const updatePopoverPosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const width = Math.min(420, window.innerWidth - 16);
-    const maxDesiredHeight = Math.min(512, window.innerHeight * 0.7);
-    const gap = 6;
-    const margin = 8;
-    const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
-    const spaceAbove = rect.top - gap - margin;
-    const opensAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
-    const availableHeight = opensAbove ? spaceAbove : spaceBelow;
-    const height = Math.max(220, Math.min(maxDesiredHeight, availableHeight));
-
-    setPopoverStyle({
-      position: "fixed",
-      top: opensAbove ? Math.max(margin, rect.top - gap - height) : rect.bottom + gap,
-      left: Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin),
-      width,
-      height,
-    });
-  }, []);
-
-  const updatePopoverPositionRef = useRef(updatePopoverPosition);
-  useEffect(() => {
-    updatePopoverPositionRef.current = updatePopoverPosition;
-  }, [updatePopoverPosition]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePopoverPosition();
-  }, [open, updatePopoverPosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleUpdatePopoverPosition = () => updatePopoverPositionRef.current();
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("resize", handleUpdatePopoverPosition);
-    window.addEventListener("scroll", handleUpdatePopoverPosition, true);
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("resize", handleUpdatePopoverPosition);
-      window.removeEventListener("scroll", handleUpdatePopoverPosition, true);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  if (pinned.length === 0 && all.length === 0) {
+  if (catalogPinned.length === 0 && catalogAll.length === 0) {
     return null;
   }
 
   const triggerLabel = currentModel?.label ?? "Select model";
 
   return (
-    <>
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="subtle"
-        size="sm"
+    <Popover.Root open={open} onOpenChange={handleOpenChange}>
+      <Popover.Trigger
         disabled={disabled || !piSessionId}
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
-          compact ? "px-1.5" : "px-2",
-        )}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title={
-          currentModel
-            ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
-            : "Pick a model"
+        render={
+          <Button
+            type="button"
+            variant="subtle"
+            size="sm"
+            className={cn(
+              "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
+              compact ? "px-1.5" : "px-2",
+            )}
+            title={
+              currentModel
+                ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
+                : "Pick a model"
+            }
+          />
         }
       >
         <span className={cn("truncate max-w-[180px]", compact && "sr-only")}>{triggerLabel}</span>
         <ChevronDownIcon className="size-3 shrink-0" />
-      </Button>
-      {open &&
-        createPortal(
-          <div ref={popoverRef} className="z-50" style={popoverStyle}>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          className="z-50 w-[min(420px,calc(100vw-16px))]"
+        >
+          <Popover.Popup
+            initialFocus={searchInputRef}
+            aria-label="Select model"
+            className="h-[min(32rem,70vh,var(--available-height))] outline-none"
+          >
             <Command
               loop
+              shouldFilter={false}
+              defaultValue={firstModel ? modelCommandValue(firstModel) : undefined}
+              label="Search models"
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              <CommandInput placeholder="Search models…" />
+              <CommandInput
+                ref={searchInputRef}
+                value={search}
+                onValueChange={setSearch}
+                placeholder="Search models…"
+              />
               <CommandList className="max-h-none flex-1">
-                <CommandEmpty>No models match.</CommandEmpty>
                 <CommandGroup heading="Thinking level">
                   <div className="flex flex-wrap gap-1 p-1">
                     {THINKING_LEVELS.map((level) => {
@@ -268,32 +238,14 @@ export const ModelSelector = memo(function ModelSelector({
                   </div>
                 </CommandGroup>
 
-                {pinned.length > 0 && (
-                  <>
-                    <CommandSeparator />
-                    <CommandGroup heading="Pinned">
-                      {pinned.map((model) => (
-                        <ModelCommandItem
-                          key={`pinned:${model.id}`}
-                          model={model}
-                          selected={activeModelId ? matchesModelId(model, activeModelId) : false}
-                          isPinned
-                          canUnpin={pinned.length > 1}
-                          onSelect={() => {
-                            modelMutation.mutate(model.id);
-                            setOpen(false);
-                          }}
-                          onTogglePin={() => pinMutation.mutate({ id: model.id, pin: false })}
-                          busy={modelBusy}
-                        />
-                      ))}
-                    </CommandGroup>
-                  </>
+                {searching && all.length === 0 && (
+                  <div className="px-3 py-6 text-center text-sm text-text-muted">
+                    No models match.
+                  </div>
                 )}
-
-                {groupedAll.map(([section, models]) => (
-                  <CommandGroup key={section} heading={section}>
-                    {models.map((model) => {
+                {all.length > 0 && (
+                  <CommandGroup heading={searching ? "Search results" : undefined}>
+                    {all.map((model) => {
                       const isPinned = pinnedIds.has(model.id);
                       return (
                         <ModelCommandItem
@@ -301,10 +253,10 @@ export const ModelSelector = memo(function ModelSelector({
                           model={model}
                           selected={activeModelId ? matchesModelId(model, activeModelId) : false}
                           isPinned={isPinned}
-                          canUnpin={pinned.length > 1}
+                          canUnpin={catalogPinned.length > 1}
                           onSelect={() => {
                             modelMutation.mutate(model.id);
-                            setOpen(false);
+                            handleOpenChange(false);
                           }}
                           onTogglePin={() =>
                             pinMutation.mutate({
@@ -318,13 +270,13 @@ export const ModelSelector = memo(function ModelSelector({
                       );
                     })}
                   </CommandGroup>
-                ))}
+                )}
               </CommandList>
             </Command>
-          </div>,
-          document.body,
-        )}
-    </>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 });
 
@@ -377,7 +329,7 @@ function ModelCommandItem({
   onTogglePin: () => void;
   busy: boolean;
 }) {
-  const available = model.available !== false;
+  const available = model.authKind !== "none";
   const pinDisabled = busy || (isPinned && !canUnpin);
   const pinTitle = isPinned
     ? canUnpin
@@ -387,10 +339,13 @@ function ModelCommandItem({
 
   return (
     <CommandItem
-      value={`${model.label} ${model.provider} ${model.modelId} ${model.name ?? ""}`}
+      value={modelCommandValue(model)}
       data-checked={selected}
       disabled={busy}
-      onSelect={onSelect}
+      aria-disabled={!available}
+      onSelect={() => {
+        if (available) onSelect();
+      }}
       className={cn(
         "items-start py-2 [&>svg]:hidden",
         "data-selected:bg-background-hover data-selected:text-text data-[checked=true]:bg-background-selected data-[checked=true]:text-text data-[checked=true]:data-selected:bg-background-selected",
@@ -423,6 +378,10 @@ function ModelCommandItem({
       </button>
     </CommandItem>
   );
+}
+
+function modelCommandValue(model: ModelListItem): string {
+  return `${model.label} ${model.provider} ${model.modelId} ${model.name ?? ""}`;
 }
 
 function matchesModelId(
@@ -463,60 +422,6 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   );
 }
 
-function groupByAuthKind(models: ModelListItem[]): Array<[string, ModelListItem[]]> {
-  const groups = new Map<string, ModelListItem[]>();
-  for (const m of models) {
-    const label = authSectionLabel(m.authKind);
-    const bucket = groups.get(label);
-    if (bucket) bucket.push(m);
-    else groups.set(label, [m]);
-  }
-  return AUTH_SECTION_ORDER.flatMap((label) => {
-    const modelsForSection = groups.get(label);
-    if (!modelsForSection?.length) return [];
-    return [[label, modelsForSection.sort(compareModelsForDisplay)] as [string, ModelListItem[]]];
-  });
-}
-
-const AUTH_SECTION_ORDER = ["Subscription/token auth", "API key auth", "No auth"] as const;
-
-function authSectionLabel(
-  authKind: ModelListItem["authKind"],
-): (typeof AUTH_SECTION_ORDER)[number] {
-  if (authKind === "subscription") return "Subscription/token auth";
-  if (authKind === "api_key") return "API key auth";
-  return "No auth";
-}
-
-function compareModelsForDisplay(a: ModelListItem, b: ModelListItem): number {
-  const version = compareModelVersionDesc(a, b);
-  if (version !== 0) return version;
-  const provider = a.provider.localeCompare(b.provider);
-  if (provider !== 0) return provider;
-  return a.label.localeCompare(b.label);
-}
-
-function compareModelVersionDesc(a: ModelListItem, b: ModelListItem): number {
-  const aVersion = extractVersionParts(a);
-  const bVersion = extractVersionParts(b);
-  if (aVersion.length === 0 || bVersion.length === 0) return 0;
-  const length = Math.max(aVersion.length, bVersion.length);
-  for (let i = 0; i < length; i++) {
-    const diff = (bVersion[i] ?? 0) - (aVersion[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
-function extractVersionParts(model: ModelListItem): number[] {
-  const text = `${model.modelId} ${model.label}`;
-  const match = /(?:gpt|claude|gemini|glm|llama|qwen|mistral)[-\s]?([0-9]+(?:[.-][0-9]+)*)/i.exec(
-    text,
-  );
-  if (!match?.[1]) return [];
-  return match[1].split(/[.-]/).map((part) => Number(part));
-}
-
 function getAvailableThinkingLevels(model: ModelListItem | undefined): ModelThinkingLevel[] {
   if (!model) return THINKING_LEVELS;
   if (!model.reasoning) return ["off"];
@@ -529,6 +434,7 @@ function updateModelsCache(queryClient: QueryClient, result: ModelsMutationRespo
   queryClient.setQueryData<ModelsListResponse>(MODELS_QUERY_KEY, {
     pinned: result.pinned,
     all: result.all,
+    initialModelIds: result.initialModelIds,
     defaultModel: result.defaultModel,
     defaultThinkingLevel: result.defaultThinkingLevel,
   });
