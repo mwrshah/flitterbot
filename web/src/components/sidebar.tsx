@@ -518,7 +518,7 @@ const icons = {
   ),
 };
 
-function SidebarSwimlanes({ mod }: { mod: string }) {
+function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
@@ -822,10 +822,10 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
   }, [clearPickerCursor]);
 
   const newSwimlaneShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneCreate, {
-    altLabel: mod,
+    altLabel: modifierLabel,
   });
   const swimlaneSearchShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneSearch, {
-    altLabel: mod,
+    altLabel: modifierLabel,
   });
   const swimlaneSearchPlaceholder = `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`;
 
@@ -968,14 +968,14 @@ function SidebarSwimlanes({ mod }: { mod: string }) {
 }
 
 export const Sidebar = memo(function Sidebar() {
-  const mod = useModifierLabel();
+  const modifierLabel = useModifierLabel();
   const lastStreamPath = useLastStreamPath();
   useWhyDidYouRender("Sidebar", {});
   const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
-    altLabel: mod,
+    altLabel: modifierLabel,
   });
   const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
-    altLabel: mod,
+    altLabel: modifierLabel,
   });
 
   return (
@@ -994,7 +994,7 @@ export const Sidebar = memo(function Sidebar() {
           shortcutHint={streamsShortcutHint}
         />
       </nav>
-      <SidebarSwimlanes mod={mod} />
+      <SidebarSwimlanes modifierLabel={modifierLabel} />
     </aside>
   );
 });

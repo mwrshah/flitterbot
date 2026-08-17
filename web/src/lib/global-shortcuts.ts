@@ -128,6 +128,7 @@ export const SHORTCUT_ACTIONS = {
   streamPickerPrevious: "nav.stream.previous",
   swimlaneCreate: "swimlane.create",
   swimlaneSearch: "swimlane.search",
+  modelSearch: "model.search",
   conversationFind: "conversation.find",
   scrollHalfPageDown: "scroll.half-page-down",
   scrollHalfPageUp: "scroll.half-page-up",
@@ -692,6 +693,9 @@ function registerBuiltInShortcutDefinitions() {
       { spec: "Alt+KeyF", when: "always" },
       { spec: "Slash", when: "no-input-focus" },
     ],
+  });
+  defineShortcutAction(SHORTCUT_ACTIONS.modelSearch, {
+    defaultBindings: [{ spec: "Alt+KeyM", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.conversationFind, {
     defaultBindings: [
