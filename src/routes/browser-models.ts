@@ -95,9 +95,9 @@ export async function buildModelsListResponse(
     const item = catalogItemsById.get(id);
     return item && !pinnedCatalogKeys.has(id) ? [item] : [];
   });
-  const initialModelIds = [...pinned, ...initialCatalogItems]
-    .sort(compareModelAvailability)
-    .map((model) => model.id);
+  const initialModelIds = [...pinned, ...initialCatalogItems.sort(compareModelAvailability)].map(
+    (model) => model.id,
+  );
 
   return {
     pinned,
@@ -133,7 +133,13 @@ const INITIAL_PROVIDER_ORDER = [
 const INITIAL_PROVIDER_RANK = new Map<string, number>(
   INITIAL_PROVIDER_ORDER.map((provider, index) => [provider, index]),
 );
-const INITIAL_ALL_MODEL_PROVIDERS = new Set(["openai-codex", "fireworks", "groq"]);
+const INITIAL_ALL_MODEL_PROVIDERS = new Set(["openai-codex", "groq"]);
+const FIREWORKS_EXCLUDED_MODELS = new Set([
+  "accounts/fireworks/models/gpt-oss-20b",
+  "accounts/fireworks/models/inkling",
+  "accounts/fireworks/models/minimax-m2p7",
+  "accounts/fireworks/models/qwen3p7-plus",
+]);
 const OPENAI_EXCLUDED_MODELS = new Set([
   "gpt-4",
   "gpt-4-turbo",
@@ -177,30 +183,76 @@ const ANTHROPIC_EXCLUDED_MODELS = new Set([
   "claude-sonnet-4-5",
   "claude-sonnet-4-5-20250929",
 ]);
-const COPILOT_INITIAL_MODELS = new Set([
-  "gpt-5.6-luna",
-  "gpt-5.6-sol",
-  "gpt-5.6-terra",
-  "claude-sonnet-5",
-  "claude-opus-4-8",
-  "claude-opus-4.8",
-  "claude-fable-5",
-  "kimi-k2.7-code",
+const COPILOT_EXCLUDED_MODELS = new Set([
+  "claude-haiku-4.5",
+  "claude-opus-4.5",
+  "claude-opus-4.6",
+  "claude-opus-4.7",
+  "claude-sonnet-4",
+  "claude-sonnet-4.5",
+  "claude-sonnet-4.6",
+  "gemini-3.1-pro-preview",
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gpt-4.1",
+  "gpt-5-mini",
+  "gpt-5.2",
+  "gpt-5.2-codex",
+  "gpt-5.3-codex",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+  "gpt-5.5",
+  "grok-4.5",
+  "mai-code-1-flash-picker",
+  "mai-code-1.1-flash",
 ]);
-const OPENCODE_INITIAL_MODELS = new Set([
-  "gpt-5.6-luna",
-  "gpt-5.6-sol",
-  "gpt-5.6-terra",
-  "claude-sonnet-5",
-  "claude-opus-4-8",
-  "claude-fable-5",
-  "glm-5.2",
-  "deepseek-v4-flash",
-  "deepseek-v4-flash-free",
-  "deepseek-v4-pro",
+const OPENCODE_EXCLUDED_MODELS = new Set([
+  "claude-haiku-4-5",
+  "claude-opus-4-5",
+  "claude-opus-4-6",
+  "claude-opus-4-7",
+  "claude-sonnet-4",
+  "claude-sonnet-4-5",
+  "claude-sonnet-4-6",
+  "qwen3.5-plus",
+  "qwen3.6-plus",
+  "gemini-3-flash",
+  "gemini-3.1-pro",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.6-flash",
+  "big-pickle",
+  "glm-5",
+  "glm-5.1",
+  "hy3-free",
   "kimi-k2.5",
   "kimi-k2.6",
-  "kimi-k2.7-code",
+  "laguna-s-2.1-free",
+  "mimo-v2.5-free",
+  "minimax-m2.5",
+  "minimax-m2.7",
+  "minimax-m3",
+  "nemotron-3-ultra-free",
+  "nemotron-3.5-lightning-free",
+  "gpt-5",
+  "gpt-5-codex",
+  "gpt-5-nano",
+  "gpt-5.1",
+  "gpt-5.1-codex",
+  "gpt-5.1-codex-max",
+  "gpt-5.1-codex-mini",
+  "gpt-5.2",
+  "gpt-5.2-codex",
+  "gpt-5.3-codex",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+  "gpt-5.4-pro",
+  "gpt-5.5",
+  "gpt-5.5-pro",
+  "grok-4.5",
+  "grok-build-0.1",
 ]);
 
 type CatalogModel = Pick<Model<Api>, "id" | "name" | "provider">;
@@ -211,10 +263,11 @@ function selectInitialCatalogModels<T extends CatalogModel>(models: T[]): T[] {
 
 function isInitialCatalogModel(model: CatalogModel): boolean {
   if (INITIAL_ALL_MODEL_PROVIDERS.has(model.provider)) return true;
+  if (model.provider === "fireworks") return !FIREWORKS_EXCLUDED_MODELS.has(model.id);
   if (model.provider === "openai") return !OPENAI_EXCLUDED_MODELS.has(model.id);
   if (model.provider === "anthropic") return !ANTHROPIC_EXCLUDED_MODELS.has(model.id);
-  if (model.provider === "github-copilot") return COPILOT_INITIAL_MODELS.has(model.id);
-  if (model.provider === "opencode") return OPENCODE_INITIAL_MODELS.has(model.id);
+  if (model.provider === "github-copilot") return !COPILOT_EXCLUDED_MODELS.has(model.id);
+  if (model.provider === "opencode") return !OPENCODE_EXCLUDED_MODELS.has(model.id);
   return false;
 }
 

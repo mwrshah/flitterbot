@@ -3,7 +3,7 @@ import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
-import { memo, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import {
@@ -245,28 +245,55 @@ export const ModelSelector = memo(function ModelSelector({
                 )}
                 {all.length > 0 && (
                   <CommandGroup heading={searching ? "Search results" : undefined}>
-                    {all.map((model) => {
+                    {all.map((model, index) => {
                       const isPinned = pinnedIds.has(model.id);
+                      const available = model.authKind !== "none";
+                      const previousModel = all[index - 1];
+                      const previousIsPinned = previousModel
+                        ? pinnedIds.has(previousModel.id)
+                        : false;
+                      const sectionChanged =
+                        !previousModel ||
+                        isPinned !== previousIsPinned ||
+                        (!isPinned &&
+                          !previousIsPinned &&
+                          available !== (previousModel.authKind !== "none"));
+                      const showSectionHeading = !searching && sectionChanged;
+                      const showProviderHeading =
+                        !searching &&
+                        !isPinned &&
+                        (sectionChanged || previousModel?.provider !== model.provider);
                       return (
-                        <ModelCommandItem
-                          key={`all:${model.id}`}
-                          model={model}
-                          selected={activeModelId ? matchesModelId(model, activeModelId) : false}
-                          isPinned={isPinned}
-                          canUnpin={catalogPinned.length > 1}
-                          onSelect={() => {
-                            modelMutation.mutate(model.id);
-                            handleOpenChange(false);
-                          }}
-                          onTogglePin={() =>
-                            pinMutation.mutate({
-                              id: model.id,
-                              pin: !isPinned,
-                              ...(isPinned ? {} : { label: model.name ?? model.label }),
-                            })
-                          }
-                          busy={modelBusy}
-                        />
+                        <Fragment key={`all:${model.id}`}>
+                          {showSectionHeading && (
+                            <div className="px-2 pb-1 pt-3 text-xs font-semibold text-text">
+                              {isPinned ? "Pinned" : available ? "Available" : "Unavailable"}
+                            </div>
+                          )}
+                          {showProviderHeading && (
+                            <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-text-muted">
+                              {model.provider}
+                            </div>
+                          )}
+                          <ModelCommandItem
+                            model={model}
+                            selected={activeModelId ? matchesModelId(model, activeModelId) : false}
+                            isPinned={isPinned}
+                            canUnpin={catalogPinned.length > 1}
+                            onSelect={() => {
+                              modelMutation.mutate(model.id);
+                              handleOpenChange(false);
+                            }}
+                            onTogglePin={() =>
+                              pinMutation.mutate({
+                                id: model.id,
+                                pin: !isPinned,
+                                ...(isPinned ? {} : { label: model.name ?? model.label }),
+                              })
+                            }
+                            busy={modelBusy}
+                          />
+                        </Fragment>
                       );
                     })}
                   </CommandGroup>
