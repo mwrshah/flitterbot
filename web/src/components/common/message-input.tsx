@@ -372,7 +372,7 @@ function MessageInputHoverButtons({
                 buttonRefs.current[index] = node;
               }}
               type="button"
-              tabIndex={slot.ghost || isReservedSendSlot ? -1 : undefined}
+              tabIndex={-1}
               disabled={disabled || slot.ghost || isReservedSendSlot}
               onClick={
                 slot.ghost || isReservedSendSlot
@@ -396,6 +396,7 @@ function MessageInputHoverButtons({
             {isReservedSendSlot && (
               <button
                 type="button"
+                tabIndex={-1}
                 onClick={() => onSlotAction(slot, currentVisibleBlockWidth())}
                 className={cn(buttonClassName, "absolute left-0 top-0")}
                 aria-label="Send inserted message"
