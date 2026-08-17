@@ -204,10 +204,27 @@ export const ModelSelector = memo(function ModelSelector({
     event.stopPropagation();
     thinkingMutation.mutate(nextLevel);
   };
-  const handleOpenChange = (nextOpen: boolean) => {
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) setSearch("");
-  };
+  }, []);
+  const handleModelSelect = useCallback(
+    (id: string) => {
+      modelMutation.mutate(id);
+      handleOpenChange(false);
+    },
+    [handleOpenChange, modelMutation.mutate],
+  );
+  const handleTogglePin = useCallback(
+    (model: ModelListItem, isPinned: boolean) => {
+      pinMutation.mutate({
+        id: model.id,
+        pin: !isPinned,
+        ...(isPinned ? {} : { label: model.name ?? model.label }),
+      });
+    },
+    [pinMutation.mutate],
+  );
   const openModelSearch = useCallback(() => {
     if (disabled || !piSessionId || (catalogPinned.length === 0 && catalogAll.length === 0)) {
       return false;
@@ -347,70 +364,88 @@ export const ModelSelector = memo(function ModelSelector({
                   </span>
                 </div>
               </CommandGroup>
-              <CommandList className="max-h-none flex-1">
-                {searching && all.length === 0 && (
-                  <div className="px-3 py-6 text-center text-sm text-text-muted">
-                    No models match.
-                  </div>
-                )}
-                {all.length > 0 && (
-                  <CommandGroup
-                    heading={searching ? "Search results" : undefined}
-                    className="pt-1 **:[[cmdk-group-heading]]:pt-1.5 **:[[cmdk-group-heading]]:pb-0.5"
-                  >
-                    {all.map((model, index) => {
-                      const isPinned = pinnedIds.has(model.id);
-                      const available = model.authKind !== "none";
-                      const previousModel = all[index - 1];
-                      const previousIsPinned = previousModel
-                        ? pinnedIds.has(previousModel.id)
-                        : false;
-                      const catalogueGroupChanged =
-                        !previousModel ||
-                        isPinned !== previousIsPinned ||
-                        (!isPinned &&
-                          !previousIsPinned &&
-                          available !== (previousModel.authKind !== "none"));
-                      const showProviderHeading =
-                        !searching &&
-                        !isPinned &&
-                        (catalogueGroupChanged || previousModel?.provider !== model.provider);
-                      return (
-                        <Fragment key={`all:${model.id}`}>
-                          {showProviderHeading && (
-                            <div className="border-border-muted border-t px-2 pt-1.25 text-xs font-medium text-text-pop truncate">
-                              Provider: {model.provider}
-                            </div>
-                          )}
-                          <ModelCommandItem
-                            model={model}
-                            selected={activeModelId ? matchesModelId(model, activeModelId) : false}
-                            isPinned={isPinned}
-                            canUnpin={catalogPinned.length > 1}
-                            onSelect={() => {
-                              modelMutation.mutate(model.id);
-                              handleOpenChange(false);
-                            }}
-                            onTogglePin={() =>
-                              pinMutation.mutate({
-                                id: model.id,
-                                pin: !isPinned,
-                                ...(isPinned ? {} : { label: model.name ?? model.label }),
-                              })
-                            }
-                            busy={modelBusy}
-                          />
-                        </Fragment>
-                      );
-                    })}
-                  </CommandGroup>
-                )}
-              </CommandList>
+              <ModelCommandList
+                models={all}
+                searching={searching}
+                pinnedIds={pinnedIds}
+                activeModelId={activeModelId}
+                canUnpin={catalogPinned.length > 1}
+                busy={modelBusy}
+                onSelectModel={handleModelSelect}
+                onTogglePin={handleTogglePin}
+              />
             </Command>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
     </Popover.Root>
+  );
+});
+
+const ModelCommandList = memo(function ModelCommandList({
+  models,
+  searching,
+  pinnedIds,
+  activeModelId,
+  canUnpin,
+  busy,
+  onSelectModel,
+  onTogglePin,
+}: {
+  models: ModelListItem[];
+  searching: boolean;
+  pinnedIds: Set<string>;
+  activeModelId: string | null;
+  canUnpin: boolean;
+  busy: boolean;
+  onSelectModel: (id: string) => void;
+  onTogglePin: (model: ModelListItem, isPinned: boolean) => void;
+}) {
+  return (
+    <CommandList className="max-h-none flex-1">
+      {searching && models.length === 0 && (
+        <div className="px-3 py-6 text-center text-sm text-text-muted">No models match.</div>
+      )}
+      {models.length > 0 && (
+        <CommandGroup
+          heading={searching ? "Search results" : undefined}
+          className="pt-1 **:[[cmdk-group-heading]]:pt-1.5 **:[[cmdk-group-heading]]:pb-0.5"
+        >
+          {models.map((model, index) => {
+            const isPinned = pinnedIds.has(model.id);
+            const available = model.authKind !== "none";
+            const previousModel = models[index - 1];
+            const previousIsPinned = previousModel ? pinnedIds.has(previousModel.id) : false;
+            const catalogueGroupChanged =
+              !previousModel ||
+              isPinned !== previousIsPinned ||
+              (!isPinned && !previousIsPinned && available !== (previousModel.authKind !== "none"));
+            const showProviderHeading =
+              !searching &&
+              !isPinned &&
+              (catalogueGroupChanged || previousModel?.provider !== model.provider);
+            return (
+              <Fragment key={`all:${model.id}`}>
+                {showProviderHeading && (
+                  <div className="border-border-muted border-t px-2 pt-1.25 text-xs font-medium text-text-pop truncate">
+                    Provider: {model.provider}
+                  </div>
+                )}
+                <ModelCommandItem
+                  model={model}
+                  selected={activeModelId ? matchesModelId(model, activeModelId) : false}
+                  isPinned={isPinned}
+                  canUnpin={canUnpin}
+                  onSelect={() => onSelectModel(model.id)}
+                  onTogglePin={() => onTogglePin(model, isPinned)}
+                  busy={busy}
+                />
+              </Fragment>
+            );
+          })}
+        </CommandGroup>
+      )}
+    </CommandList>
   );
 });
 
