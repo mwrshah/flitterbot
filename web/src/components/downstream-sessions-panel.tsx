@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Settings as SettingsIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { toast } from "sonner";
@@ -110,7 +110,7 @@ function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {
   );
 }
 
-export function DownstreamSessionsPanel({
+export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   piSessionId,
   piSessionStatus,
   showSettings = false,
@@ -122,6 +122,7 @@ export function DownstreamSessionsPanel({
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, showSettings });
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const statusBanner = piStatusBanner(piSessionStatus);
 
   const { data, isPending, isError } = useQuery(
@@ -336,7 +337,7 @@ export function DownstreamSessionsPanel({
         </ToggleGroup>
       </div>
 
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
 
       {showDiff && hasWorktree ? (
         <div className="relative flex-1 min-h-0">
@@ -550,4 +551,4 @@ export function DownstreamSessionsPanel({
       )}
     </div>
   );
-}
+});
