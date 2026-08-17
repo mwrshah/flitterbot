@@ -252,26 +252,26 @@ export const ModelSelector = memo(function ModelSelector({
                       const previousIsPinned = previousModel
                         ? pinnedIds.has(previousModel.id)
                         : false;
-                      const sectionChanged =
+                      const catalogueGroupChanged =
                         !previousModel ||
                         isPinned !== previousIsPinned ||
                         (!isPinned &&
                           !previousIsPinned &&
                           available !== (previousModel.authKind !== "none"));
-                      const showSectionHeading = !searching && sectionChanged;
+                      const showPinnedHeading = !searching && isPinned && !previousIsPinned;
                       const showProviderHeading =
                         !searching &&
                         !isPinned &&
-                        (sectionChanged || previousModel?.provider !== model.provider);
+                        (catalogueGroupChanged || previousModel?.provider !== model.provider);
                       return (
                         <Fragment key={`all:${model.id}`}>
-                          {showSectionHeading && (
+                          {showPinnedHeading && (
                             <div className="px-2 pb-1 pt-3 text-xs font-semibold text-text">
-                              {isPinned ? "Pinned" : available ? "Available" : "Unavailable"}
+                              Pinned
                             </div>
                           )}
                           {showProviderHeading && (
-                            <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-text-muted">
+                            <div className="mt-1 border-border-muted border-t px-2 pb-1 pt-2 text-[11px] font-medium text-text-muted">
                               {model.provider}
                             </div>
                           )}
