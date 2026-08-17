@@ -3,7 +3,16 @@ import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronDownIcon, StarIcon } from "lucide-react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
@@ -163,6 +172,36 @@ export const ModelSelector = memo(function ModelSelector({
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
   const firstModel = all[0];
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (
+      (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.repeat ||
+      thinkingDisabled ||
+      availableThinkingLevels.length < 2
+    ) {
+      return;
+    }
+
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const currentIndex = availableThinkingLevels.indexOf(activeThinkingLevel);
+    const nextIndex =
+      currentIndex < 0
+        ? direction > 0
+          ? 0
+          : availableThinkingLevels.length - 1
+        : (currentIndex + direction + availableThinkingLevels.length) %
+          availableThinkingLevels.length;
+    const nextLevel = availableThinkingLevels[nextIndex];
+    if (!nextLevel || nextLevel === activeThinkingLevel) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    thinkingMutation.mutate(nextLevel);
+  };
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) setSearch("");
@@ -235,33 +274,32 @@ export const ModelSelector = memo(function ModelSelector({
             className="h-[min(32rem,70vh,var(--available-height))] outline-none"
           >
             <Command
-              loop
               shouldFilter={false}
               defaultValue={firstModel ? modelCommandValue(firstModel) : undefined}
               label="Search models"
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              <div className="flex items-center gap-1 pr-1.5">
-                <div className="min-w-0 flex-1">
-                  <CommandInput
-                    ref={searchInputRef}
-                    value={search}
-                    onValueChange={setSearch}
-                    placeholder={searchPlaceholder}
-                  />
-                </div>
+              <div className="relative">
+                <CommandInput
+                  ref={searchInputRef}
+                  value={search}
+                  onValueChange={setSearch}
+                  placeholder={searchPlaceholder}
+                  className={modelSearchShortcutHint ? "pr-20" : undefined}
+                  onKeyDown={handleSearchKeyDown}
+                />
                 {modelSearchShortcutHint && (
                   <ShortcutHint
                     label={modelSearchShortcutHint}
-                    className="shrink-0"
+                    className="pointer-events-none absolute top-1 right-4 bottom-0 shrink-0"
                     kbdSize="compact"
                     aria-hidden="true"
                   />
                 )}
               </div>
-              <CommandList className="max-h-none flex-1">
-                <CommandGroup heading="Thinking level">
-                  <div className="flex flex-wrap gap-1 p-1">
+              <CommandGroup className="px-1 pt-1 pb-0">
+                <div className="flex items-center gap-2 px-1 pb-0">
+                  <div className="flex min-w-0 flex-1 flex-wrap gap-1">
                     {THINKING_LEVELS.map((level) => {
                       const levelAvailable = availableThinkingLevels.includes(level);
                       return (
@@ -280,15 +318,22 @@ export const ModelSelector = memo(function ModelSelector({
                       );
                     })}
                   </div>
-                </CommandGroup>
-
+                  <span className="mr-1.5 shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted">
+                    Thinking levels
+                  </span>
+                </div>
+              </CommandGroup>
+              <CommandList className="max-h-none flex-1">
                 {searching && all.length === 0 && (
                   <div className="px-3 py-6 text-center text-sm text-text-muted">
                     No models match.
                   </div>
                 )}
                 {all.length > 0 && (
-                  <CommandGroup heading={searching ? "Search results" : undefined}>
+                  <CommandGroup
+                    heading={searching ? "Search results" : undefined}
+                    className="pt-1 **:[[cmdk-group-heading]]:pt-1.5 **:[[cmdk-group-heading]]:pb-0.5"
+                  >
                     {all.map((model, index) => {
                       const isPinned = pinnedIds.has(model.id);
                       const available = model.authKind !== "none";
@@ -302,21 +347,15 @@ export const ModelSelector = memo(function ModelSelector({
                         (!isPinned &&
                           !previousIsPinned &&
                           available !== (previousModel.authKind !== "none"));
-                      const showPinnedHeading = !searching && isPinned && !previousIsPinned;
                       const showProviderHeading =
                         !searching &&
                         !isPinned &&
                         (catalogueGroupChanged || previousModel?.provider !== model.provider);
                       return (
                         <Fragment key={`all:${model.id}`}>
-                          {showPinnedHeading && (
-                            <div className="mt-2 mb-1 border-border-muted border-y py-0.5 pr-[10%] text-center text-[11px] font-medium text-text-muted truncate">
-                              pinned
-                            </div>
-                          )}
                           {showProviderHeading && (
-                            <div className="mt-2 mb-1 border-border-muted border-y py-0.5 pr-[10%] text-center text-[11px] font-medium text-text-muted truncate">
-                              {model.provider}
+                            <div className="border-border-muted border-t px-2 pt-1 pb-0.5 text-xs font-medium text-text-pop truncate">
+                              Provider: {model.provider}
                             </div>
                           )}
                           <ModelCommandItem
@@ -365,21 +404,22 @@ function ThinkingLevelCommandItem({
   onSelect: () => void;
 }) {
   return (
-    <CommandItem
-      value={`thinking ${level} ${THINKING_LEVEL_LABELS[level]}`}
+    <button
+      type="button"
       data-checked={selected}
+      aria-pressed={selected}
       disabled={disabled}
-      onSelect={onSelect}
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={onSelect}
       title={title}
       className={cn(
-        "w-auto rounded-md border border-border-muted px-2 py-1 text-[11px] leading-none text-text-muted [&>svg]:hidden",
-        "data-selected:border-border data-selected:bg-background-hover data-selected:text-text",
+        "w-auto cursor-default rounded-md border border-border-muted px-2 py-1 text-[11px] leading-none text-text-muted outline-none disabled:pointer-events-none disabled:opacity-50",
+        "hover:border-border hover:bg-background-hover hover:text-text focus-visible:border-border focus-visible:bg-background-hover focus-visible:text-text",
         "data-[checked=true]:border-border data-[checked=true]:bg-background-selected data-[checked=true]:text-text",
-        "data-[checked=true]:data-selected:border-border data-[checked=true]:data-selected:bg-background-selected data-[checked=true]:data-selected:text-text",
       )}
     >
       {THINKING_LEVEL_LABELS[level]}
-    </CommandItem>
+    </button>
   );
 }
 
