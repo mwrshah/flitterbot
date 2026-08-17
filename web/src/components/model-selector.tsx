@@ -173,7 +173,7 @@ export const ModelSelector = memo(function ModelSelector({
   const [open, setOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
-  const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
+  const thinkingDisabled = !piSessionId;
   const firstModel = all[0];
   const initialCommandModel =
     all.find((model) => activeModelId && matchesModelId(model, activeModelId)) ?? firstModel;
@@ -356,12 +356,14 @@ export const ModelSelector = memo(function ModelSelector({
                               ? `Set thinking level to ${level}`
                               : "Current model does not support this level"
                           }
-                          onSelect={() => thinkingMutation.mutate(level)}
+                          onSelect={() => {
+                            if (level !== activeThinkingLevel) thinkingMutation.mutate(level);
+                          }}
                         />
                       );
                     })}
                   </div>
-                  <span className="mr-1.5 shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted">
+                  <span className="mr-1.5 shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted">
                     Thinking levels
                   </span>
                 </div>
@@ -567,7 +569,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   if (model.authKind === "subscription") {
     return (
       <span
-        className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+        className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
         title={`Using subscription/OAuth token auth for provider "${model.provider}"`}
       >
         subscription
@@ -577,7 +579,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   if (model.authKind === "api_key") {
     return (
       <span
-        className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+        className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
         title={`Using API key auth for provider "${model.provider}"`}
       >
         api key
@@ -586,7 +588,7 @@ function AuthBadge({ model }: { model: ModelListItem }) {
   }
   return (
     <span
-      className="shrink-0 self-center rounded bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+      className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
       title={`No auth configured for provider "${model.provider}"`}
     >
       no auth
