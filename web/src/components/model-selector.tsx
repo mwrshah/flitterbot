@@ -24,6 +24,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useModifierLabel } from "@/hooks/platform";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   registerShortcutHandlers,
   SHORTCUT_ACTIONS,
@@ -224,6 +225,26 @@ export const ModelSelector = memo(function ModelSelector({
   const searchPlaceholder = modelSearchShortcutHint
     ? `Search (${modelSearchShortcutHint.replaceAll("+", " + ")})`
     : "Search";
+  useWhyDidYouRender("ModelSelector", {
+    compact,
+    disabled,
+    piSessionId,
+    selectedModelId,
+    selectedThinkingLevel,
+    apiClient,
+    modifierLabel,
+    data,
+    search,
+    searching,
+    open,
+    all,
+    activeModelId,
+    activeThinkingLevel,
+    availableThinkingLevels,
+    modelBusy,
+    thinkingDisabled,
+    initialCommandValue: initialCommandModel ? modelCommandValue(initialCommandModel) : undefined,
+  });
   useEffect(
     () =>
       registerShortcutHandlers([
