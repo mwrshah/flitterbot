@@ -266,12 +266,12 @@ export const ModelSelector = memo(function ModelSelector({
                       return (
                         <Fragment key={`all:${model.id}`}>
                           {showPinnedHeading && (
-                            <div className="px-2 pb-1 pt-3 text-xs font-semibold text-text">
-                              Pinned
+                            <div className="mt-2 mb-1 border-border-muted border-y py-0.5 pr-[10%] text-center text-[11px] font-medium text-text-muted truncate">
+                              pinned
                             </div>
                           )}
                           {showProviderHeading && (
-                            <div className="mt-1 border-border-muted border-t px-2 pb-1 pt-2 text-[11px] font-medium text-text-muted">
+                            <div className="mt-2 mb-1 border-border-muted border-y py-0.5 pr-[10%] text-center text-[11px] font-medium text-text-muted truncate">
                               {model.provider}
                             </div>
                           )}
