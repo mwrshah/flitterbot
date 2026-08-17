@@ -172,6 +172,8 @@ export const ModelSelector = memo(function ModelSelector({
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = thinkingMutation.isPending || !piSessionId;
   const firstModel = all[0];
+  const initialCommandModel =
+    all.find((model) => activeModelId && matchesModelId(model, activeModelId)) ?? firstModel;
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (
       (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
@@ -274,7 +276,9 @@ export const ModelSelector = memo(function ModelSelector({
           >
             <Command
               shouldFilter={false}
-              defaultValue={firstModel ? modelCommandValue(firstModel) : undefined}
+              defaultValue={
+                initialCommandModel ? modelCommandValue(initialCommandModel) : undefined
+              }
               label="Search models"
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
