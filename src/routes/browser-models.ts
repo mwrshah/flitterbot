@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import type http from "node:http";
+import path from "node:path";
 import { type Api, getSupportedThinkingLevels, type Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { ModelConfigEntry } from "../config/load-config.ts";
@@ -91,13 +93,27 @@ export async function buildModelsListResponse(
   const catalogItems = catalog.map((model) => buildCatalogModelItem(model, registry));
   const catalogItemsById = new Map(catalogItems.map((model) => [model.id, model]));
   const initialCatalogItems = selectInitialCatalogModels(catalog).flatMap((model) => {
-    const id = `${model.provider}/${model.id}`;
-    const item = catalogItemsById.get(id);
-    return item && !pinnedCatalogKeys.has(id) ? [item] : [];
+    const item = catalogItemsById.get(`${model.provider}/${model.id}`);
+    return item ? [item] : [];
   });
-  const initialModelIds = [...pinned, ...initialCatalogItems.sort(compareModelAvailability)].map(
-    (model) => model.id,
+  const seen = new Set<string>(pinned.map((entry) => `${entry.provider}/${entry.modelId}`));
+  const initialAgentItems = (await readAgentModelIds(config.controlSurfaceAgentDir)).flatMap(
+    (id) => {
+      const item = catalogItemsById.get(id);
+      if (!item) return [];
+      const key = `${item.provider}/${item.modelId}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [item.id];
+    },
   );
+  const curatedIds = initialCatalogItems.sort(compareModelAvailability).flatMap((item) => {
+    const key = `${item.provider}/${item.modelId}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [item.id];
+  });
+  const initialModelIds = [...pinned.map((model) => model.id), ...initialAgentItems, ...curatedIds];
 
   return {
     pinned,
@@ -119,6 +135,31 @@ export async function buildModelsMutationResponse(
 
 async function getModelRegistry(runtime: ControlSurfaceRuntime): Promise<ModelRegistry> {
   return createPiModelRegistry(await runtime.resolveModelRuntime());
+}
+
+async function readAgentModelIds(agentDir: string): Promise<string[]> {
+  try {
+    const content = await readFile(path.join(agentDir, "models.json"), "utf8");
+    const parsed = JSON.parse(stripJsonCommentsAndTrailingCommas(content)) as {
+      providers?: Record<string, { models?: Array<{ id?: unknown }> }>;
+    };
+    return Object.entries(parsed.providers ?? {}).flatMap(([provider, config]) =>
+      (config.models ?? []).flatMap(({ id }) =>
+        typeof id === "string" ? [`${provider}/${id}`] : [],
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function stripJsonCommentsAndTrailingCommas(input: string): string {
+  return input
+    .replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/g, (match) => (match[0] === '"' ? match : ""))
+    .replace(
+      /"(?:\\.|[^"\\])*"|,(\s*[}\]])/g,
+      (match, tail: string | undefined) => tail ?? (match[0] === '"' ? match : ""),
+    );
 }
 
 const INITIAL_PROVIDER_ORDER = [

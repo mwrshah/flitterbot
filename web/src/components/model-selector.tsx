@@ -85,25 +85,52 @@ export const ModelSelector = memo(function ModelSelector({
   const catalogPinned = data?.pinned ?? [];
   const catalogAll = data?.all ?? [];
   const initialModelIds = data?.initialModelIds ?? [];
-  const initialModels = useMemo(() => {
-    const modelsById = new Map([...catalogPinned, ...catalogAll].map((model) => [model.id, model]));
-    return initialModelIds.flatMap((id) => {
-      const model = modelsById.get(id);
-      return model ? [model] : [];
-    });
-  }, [catalogPinned, catalogAll, initialModelIds]);
-  const searchIndex = useMemo(
-    () => createModelSearchIndex([...catalogPinned, ...catalogAll]),
-    [catalogPinned, catalogAll],
+  const defaultModelId = data?.defaultModel ?? null;
+  const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
+  const activeModelId = selectedModelId ?? defaultModelId;
+  const catalog = useMemo(() => [...catalogPinned, ...catalogAll], [catalogPinned, catalogAll]);
+  const modelsById = useMemo(() => {
+    const map = new Map<string, ModelListItem>();
+    for (const model of catalogAll) map.set(model.id, model);
+    for (const model of catalogPinned) map.set(model.id, model);
+    return map;
+  }, [catalogAll, catalogPinned]);
+  const currentModel = useMemo(
+    () =>
+      activeModelId
+        ? (modelsById.get(activeModelId) ??
+          catalog.find((model) => matchesModelId(model, activeModelId)))
+        : undefined,
+    [activeModelId, catalog, modelsById],
   );
+  const initialModels = useMemo(() => {
+    const models: ModelListItem[] = [];
+    const includedIds = new Set<string>();
+    const includedKeys = new Set<string>();
+    for (const id of initialModelIds) {
+      const model = modelsById.get(id);
+      if (!model || includedIds.has(model.id)) continue;
+      includedIds.add(model.id);
+      includedKeys.add(`${model.provider}/${model.modelId}`);
+      models.push(model);
+    }
+    const currentKey = currentModel && `${currentModel.provider}/${currentModel.modelId}`;
+    if (
+      currentModel &&
+      currentKey &&
+      !includedIds.has(currentModel.id) &&
+      !includedKeys.has(currentKey)
+    ) {
+      models.push(currentModel);
+    }
+    return models;
+  }, [currentModel, initialModelIds, modelsById]);
+  const searchIndex = useMemo(() => createModelSearchIndex(catalog), [catalog]);
   const searchResults = useMemo(
     () => searchModelIndex(searchIndex, searchTerm),
     [searchIndex, searchTerm],
   );
   const all = searching ? searchResults : initialModels;
-  const defaultModelId = data?.defaultModel ?? null;
-  const defaultThinkingLevel = data?.defaultThinkingLevel ?? "high";
-  const activeModelId = selectedModelId ?? defaultModelId;
   const pinnedIds = useMemo(() => {
     const set = new Set<string>();
     for (const model of catalogPinned) {
@@ -157,14 +184,6 @@ export const ModelSelector = memo(function ModelSelector({
     ? thinkingMutation.variables
     : (selectedThinkingLevel ?? defaultThinkingLevel);
 
-  const currentModel = useMemo(() => {
-    if (!activeModelId) return undefined;
-    return (
-      catalogPinned.find((model) => matchesModelId(model, activeModelId)) ??
-      catalogAll.find((model) => matchesModelId(model, activeModelId)) ??
-      undefined
-    );
-  }, [activeModelId, catalogPinned, catalogAll]);
   const availableThinkingLevels = useMemo(
     () => getAvailableThinkingLevels(currentModel),
     [currentModel],
@@ -175,8 +194,7 @@ export const ModelSelector = memo(function ModelSelector({
   const modelBusy = pinMutation.isPending || modelMutation.isPending;
   const thinkingDisabled = !piSessionId;
   const firstModel = all[0];
-  const initialCommandModel =
-    all.find((model) => activeModelId && matchesModelId(model, activeModelId)) ?? firstModel;
+  const initialCommandModel = currentModel ?? firstModel;
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (
       (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
@@ -572,7 +590,7 @@ function ModelCommandItem({
 }
 
 function modelCommandValue(model: ModelListItem): string {
-  return `${model.label} ${model.provider} ${model.modelId} ${model.name ?? ""}`;
+  return `${model.id} ${model.provider}/${model.modelId} ${model.label}`.trim();
 }
 
 function matchesModelId(
