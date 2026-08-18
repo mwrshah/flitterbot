@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -11,6 +12,11 @@ export default defineConfig({
   },
   resolve: {
     tsconfigPaths: true,
+    alias: {
+      "@tanstack/react-router": fileURLToPath(import.meta.resolve("speedy-router")),
+      "@tanstack/router-core": fileURLToPath(import.meta.resolve("speedy-router-core")),
+      "@tanstack/history": fileURLToPath(import.meta.resolve("speedy-router-history")),
+    },
   },
   plugins: [
     tailwindcss(),

@@ -65,6 +65,15 @@ importers:
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      speedy-router:
+        specifier: 0.1.2
+        version: 0.1.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      speedy-router-core:
+        specifier: 0.1.2
+        version: 0.1.2
+      speedy-router-history:
+        specifier: 0.1.2
+        version: 0.1.2
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -2360,6 +2369,21 @@ packages:
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
+
+  speedy-router-core@0.1.2:
+    resolution: {integrity: sha512-epeTg/of2YBOzngVgcuzR6np2yACEYY2FeBEAgUy6QzUwV1tU4zrWPqDppS8SoKsrk1TrFwb9JBXs8RLHQOvTw==}
+    engines: {node: '>=24'}
+
+  speedy-router-history@0.1.2:
+    resolution: {integrity: sha512-xk4HcBslYfpbVv2LlZv99sLezNC/DcSQUUIiHc5nBkBWka0vDtlyBRBvE1f1uLfTXJKnLGGRhKven6ib2xa2vg==}
+    engines: {node: '>=24'}
+
+  speedy-router@0.1.2:
+    resolution: {integrity: sha512-z50uVviDRmmlzWUH2J+jUmJ5F8G6nWIMtVy0hW07V0zgjI8Sfuvmv0Fe3JbM7NTQ19YtakIJ4O+SiQB8G/ofLw==}
+    engines: {node: '>=24'}
+    peerDependencies:
+      react: ~19.2.0
+      react-dom: ~19.2.0
 
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
@@ -5013,6 +5037,22 @@ snapshots:
   source-map-js@1.2.1: {}
 
   source-map@0.6.1: {}
+
+  speedy-router-core@0.1.2:
+    dependencies:
+      cookie-es: 3.1.1
+      seroval: 1.6.2
+      seroval-plugins: 1.6.2(seroval@1.6.2)
+      speedy-router-history: 0.1.2
+
+  speedy-router-history@0.1.2: {}
+
+  speedy-router@0.1.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      speedy-router-core: 0.1.2
+      speedy-router-history: 0.1.2
 
   statuses@2.0.2: {}
 
