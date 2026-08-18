@@ -226,7 +226,7 @@ export function Surface() {
   const [isSending, setIsSending] = useState(false);
 
   const { data, fetchPreviousPage, hasPreviousPage, isFetching, isFetchPreviousPageError } =
-    useInfiniteQuery(surfaceTimelineInfiniteQueryOptions());
+    useInfiniteQuery(surfaceTimelineInfiniteQueryOptions(apiClient));
   const timeline = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
   const { data: status } = useQuery(statusQueryOptions(apiClient));
   const entries = useMemo(() => timelineToEntries(timeline), [timeline]);

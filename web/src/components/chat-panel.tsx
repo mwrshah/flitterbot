@@ -80,7 +80,6 @@ import type {
   TokenUsage,
   TurnQueueSnapshot,
 } from "@/lib/types";
-import { setStreamCwd } from "@/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
@@ -479,7 +478,7 @@ export function ChatPanel({
   const findOpen = findSessionId === piSessionId;
   const findHistoryRequested = findHistorySessionId === piSessionId;
   const findHistoryQuery = useQuery({
-    ...conversationFindHistoryQueryOptions(piSessionId),
+    ...conversationFindHistoryQueryOptions(apiClient, piSessionId),
     enabled: findHistoryRequested,
   });
   const [findValue, setFindValue] = useState("");
@@ -510,7 +509,7 @@ export function ChatPanel({
     ? findMatchIndex % findResults.matchCount
     : 0;
   const activeFindRowIndex = conversationFindRowAt(findResults, selectedFindMatchIndex);
-  const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
+  const { data: worktree } = useQuery(streamsWorktreeQueryOptions(apiClient, piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
   const cwdShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamEditCurrentDirectory, { compact: true }) ||
@@ -524,14 +523,16 @@ export function ChatPanel({
   const [cwdPickerStyle, setCwdPickerStyle] = useState<CSSProperties>();
   const cwdPickerQuery = cwdPickerValue.replace(/^@/, "").trimStart();
   const { data: cwdPickerResult } = useQuery(
-    directoryCompletionsQueryOptions(cwdPickerQuery, cwdPickerOpen, { directoriesOnly: true }),
+    directoryCompletionsQueryOptions(apiClient, cwdPickerQuery, cwdPickerOpen, {
+      directoriesOnly: true,
+    }),
   );
   const cwdPickerItems = cwdPickerResult?.items ?? [];
 
   const switchCwdMutation = useMutation({
     mutationFn: (cwd: string) => {
       if (!streamId) throw new Error("No swimlane selected");
-      return setStreamCwd({ data: { streamId, cwd } });
+      return apiClient.setStreamCwd(streamId, cwd);
     },
     onSuccess: async () => {
       toast.success("cwd switched");

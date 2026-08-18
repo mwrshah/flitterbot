@@ -11,17 +11,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ThemeRouteImport } from './routes/theme'
-import { Route as RuntimeRouteImport } from './routes/runtime'
-import { Route as StreamsRouteRouteImport } from './routes/streams.route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as StreamsIndexRouteImport } from './routes/streams.index'
-import { Route as StreamsDefaultRouteImport } from './routes/streams.default'
-import { Route as StreamsPiSessionIdRouteImport } from './routes/streams.$piSessionId'
+import { Route as RuntimeRouteImport } from './routes/runtime'
+import { Route as StreamsRouteRouteImport } from './routes/streams/route'
+import { Route as ThemeRouteImport } from './routes/theme'
+import { Route as StreamsIndexRouteImport } from './routes/streams/index'
+import { Route as StreamsPiSessionIdRouteImport } from './routes/streams/$piSessionId'
+import { Route as StreamsDefaultRouteImport } from './routes/streams/default'
 
-const ThemeRoute = ThemeRouteImport.update({
-  id: '/theme',
-  path: '/theme',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RuntimeRoute = RuntimeRouteImport.update({
@@ -34,9 +34,9 @@ const StreamsRouteRoute = StreamsRouteRouteImport.update({
   path: '/streams',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ThemeRoute = ThemeRouteImport.update({
+  id: '/theme',
+  path: '/theme',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StreamsIndexRoute = StreamsIndexRouteImport.update({
@@ -44,14 +44,14 @@ const StreamsIndexRoute = StreamsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => StreamsRouteRoute,
 } as any)
-const StreamsDefaultRoute = StreamsDefaultRouteImport.update({
-  id: '/default',
-  path: '/default',
-  getParentRoute: () => StreamsRouteRoute,
-} as any)
 const StreamsPiSessionIdRoute = StreamsPiSessionIdRouteImport.update({
   id: '/$piSessionId',
   path: '/$piSessionId',
+  getParentRoute: () => StreamsRouteRoute,
+} as any)
+const StreamsDefaultRoute = StreamsDefaultRouteImport.update({
+  id: '/default',
+  path: '/default',
   getParentRoute: () => StreamsRouteRoute,
 } as any)
 
@@ -120,11 +120,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/theme': {
-      id: '/theme'
-      path: '/theme'
-      fullPath: '/theme'
-      preLoaderRoute: typeof ThemeRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/runtime': {
@@ -141,11 +141,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/theme': {
+      id: '/theme'
+      path: '/theme'
+      fullPath: '/theme'
+      preLoaderRoute: typeof ThemeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/streams/': {
@@ -155,18 +155,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamsIndexRouteImport
       parentRoute: typeof StreamsRouteRoute
     }
-    '/streams/default': {
-      id: '/streams/default'
-      path: '/default'
-      fullPath: '/streams/default'
-      preLoaderRoute: typeof StreamsDefaultRouteImport
-      parentRoute: typeof StreamsRouteRoute
-    }
     '/streams/$piSessionId': {
       id: '/streams/$piSessionId'
       path: '/$piSessionId'
       fullPath: '/streams/$piSessionId'
       preLoaderRoute: typeof StreamsPiSessionIdRouteImport
+      parentRoute: typeof StreamsRouteRoute
+    }
+    '/streams/default': {
+      id: '/streams/default'
+      path: '/default'
+      fullPath: '/streams/default'
+      preLoaderRoute: typeof StreamsDefaultRouteImport
       parentRoute: typeof StreamsRouteRoute
     }
   }
@@ -197,12 +197,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

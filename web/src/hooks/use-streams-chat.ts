@@ -16,7 +16,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
 
   const { data, error, fetchPreviousPage, hasPreviousPage, isFetchingPreviousPage } =
-    useInfiniteQuery(streamsHistoryInfiniteQueryOptions(piSessionId));
+    useInfiniteQuery(streamsHistoryInfiniteQueryOptions(apiClient, piSessionId));
   const timeline = useMemo(() => {
     if (!data?.pages.length) return [];
     if (data.pages.length === 1) return data.pages[0]!.items;

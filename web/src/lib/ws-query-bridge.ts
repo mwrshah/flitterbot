@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { FlitterbotApiClient } from "@/lib/api";
 import {
   applyTurnQueueSnapshot,
   createSurfaceLiveUpdater,
@@ -16,13 +17,14 @@ import type { FlitterbotWsClient } from "@/lib/ws";
 import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
 
 export function setupWsQueryBridge(deps: {
+  apiClient: FlitterbotApiClient;
   queryClient: QueryClient;
   wsClient: FlitterbotWsClient;
 }): () => void {
-  const { queryClient, wsClient } = deps;
+  const { apiClient, queryClient, wsClient } = deps;
   const recovering = new Set<string>();
   const surfaceLiveUpdater = createSurfaceLiveUpdater(queryClient, () =>
-    queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions()),
+    queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions(apiClient)),
   );
 
   const reloadHistory = async (piSessionId: string, resumePosition?: ConversationEventPosition) => {

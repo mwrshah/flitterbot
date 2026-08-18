@@ -549,7 +549,7 @@ export const MessageInput = memo(function MessageInput({
   }, [atPickerFilter]);
 
   const { data: pathResult } = useQuery(
-    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen, { streamId }),
+    directoryCompletionsQueryOptions(apiClient, debouncedAtFilter, atPickerOpen, { streamId }),
   );
   const filteredSkills = useMemo(
     () => filterSkillsForPicker(skills, pickerFilter),
@@ -561,8 +561,8 @@ export const MessageInput = memo(function MessageInput({
 
   const queryClient = useQueryClient();
   useEffect(() => {
-    queryClient.prefetchQuery(directoryCompletionsQueryOptions("", true, { streamId }));
-  }, [queryClient, streamId]);
+    queryClient.prefetchQuery(directoryCompletionsQueryOptions(apiClient, "", true, { streamId }));
+  }, [apiClient, queryClient, streamId]);
 
   const draftRef = useRef(draft);
   const onSubmitRef = useRef(onSubmit);

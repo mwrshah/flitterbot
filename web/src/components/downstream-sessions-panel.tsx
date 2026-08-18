@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { Settings as SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
@@ -23,6 +24,8 @@ import {
 } from "@/lib/queries";
 import type { DownstreamSessionItem, PiSessionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const rootApi = getRouteApi("__root__");
 
 function piStatusBanner(
   status: PiSessionStatus | undefined,
@@ -120,21 +123,24 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   showSettings?: boolean;
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, showSettings });
+  const { apiClient } = rootApi.useRouteContext();
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const statusBanner = piStatusBanner(piSessionStatus);
 
   const { data, isPending, isError } = useQuery(
-    streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
+    streamsDownstreamSessionsQueryOptions(apiClient, piSessionId ?? ""),
   );
 
-  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
+  const worktreeQuery = useQuery(streamsWorktreeQueryOptions(apiClient, piSessionId ?? ""));
   const worktree = worktreeQuery.data;
   const hasWorktree = !!worktree?.worktreePath;
   const showDiff = panelView === "diff";
 
-  const diffQuery = useQuery(streamsDiffQueryOptions(piSessionId ?? "", showDiff && hasWorktree));
+  const diffQuery = useQuery(
+    streamsDiffQueryOptions(apiClient, piSessionId ?? "", showDiff && hasWorktree),
+  );
 
   const currentWorktreePath = worktree?.worktreePath ?? null;
   const currentRepoPath = worktree?.repoPath ?? null;

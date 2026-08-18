@@ -10,7 +10,9 @@ export const Route = createFileRoute("/")({
   pendingMs: 0,
   loader: async ({ context }) => {
     try {
-      await context.queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions());
+      await context.queryClient.ensureInfiniteQueryData(
+        surfaceTimelineInfiniteQueryOptions(context.apiClient),
+      );
     } catch {}
   },
   head: () => ({

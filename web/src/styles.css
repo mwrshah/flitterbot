@@ -267,14 +267,20 @@
     @apply border-border outline-border-pop;
   }
 
-  html {
+  html,
+  body,
+  #root {
     height: 100%;
+    min-height: 0;
+  }
+
+  body,
+  #root {
+    overflow: hidden;
   }
 
   body {
     margin: 0;
-    height: 100%;
-    overflow: hidden;
     font-size: 16px;
     @apply bg-background text-text font-sans antialiased;
   }

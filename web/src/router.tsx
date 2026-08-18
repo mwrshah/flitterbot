@@ -1,6 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
-import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { DefaultCatchBoundary } from "./components/default-catch-boundary";
 import { NotFound } from "./components/not-found";
 import { createFlitterbotApiClient } from "./lib/api";
@@ -15,9 +14,9 @@ export function getRouter() {
   const queryClient = new QueryClient();
   let startRealtime = () => () => {};
 
-  const settingsStore = createSettingsStore((_settings) => {
-    wsClient.reconnect();
-    queryClient.invalidateQueries({ queryKey: ["user-config"] });
+  const settingsStore = createSettingsStore(() => {
+    wsClient.disconnect();
+    void queryClient.resetQueries().finally(() => wsClient.connect());
   });
 
   const apiClient = createFlitterbotApiClient(() => settingsStore.get());
@@ -43,11 +42,6 @@ export function getRouter() {
       location.pathname !== "/" && !location.pathname.startsWith("/streams"),
   });
 
-  setupRouterSsrQueryIntegration({
-    router,
-    queryClient,
-  });
-
   let stopRealtime = () => {};
 
   startRealtime = () => {
@@ -56,6 +50,7 @@ export function getRouter() {
     stopRealtime();
 
     const stopWsQueryBridge = setupWsQueryBridge({
+      apiClient,
       queryClient,
       wsClient,
     });

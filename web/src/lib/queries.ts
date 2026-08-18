@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
-import type { FlitterbotApiClient } from "@/lib/api";
+import type { DiffResult, FlitterbotApiClient, StreamInfo } from "@/lib/api";
 import { findHistoryQueryKey, historyQueryKey, surfaceQueryKey } from "@/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "@/lib/internal-commands";
 import type {
@@ -8,16 +8,6 @@ import type {
   SkillPickerItem,
   StatusQueryData,
 } from "@/lib/types";
-import { fetchDirectoryCompletions } from "@/server/directory-completions";
-import {
-  type DiffResult,
-  fetchDownstreamSessions,
-  fetchStreamsDiff,
-  fetchStreamsHistory,
-  fetchStreamsWorktree,
-  type StreamInfo,
-} from "@/server/streams";
-import { fetchUserConfig } from "@/server/user-config";
 
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
@@ -44,12 +34,15 @@ const STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT = 30;
 const STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT = 10;
 const STREAMS_HISTORY_GC_TIME_MS = 30_000;
 
-export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
+export function streamsHistoryInfiniteQueryOptions(
+  apiClient: FlitterbotApiClient,
+  piSessionId: string | undefined,
+) {
   return infiniteQueryOptions({
     queryKey: historyQueryKey(piSessionId),
-    queryFn: async ({ pageParam }) => {
-      return fetchStreamsHistory({
-        data: {
+    queryFn: async ({ pageParam, signal }) => {
+      return apiClient.getStreamsHistory(
+        {
           ...(piSessionId ? { piSessionId } : {}),
           surface: "agent",
           limit: pageParam
@@ -57,7 +50,8 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
             : STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT,
           ...(pageParam ? { before: pageParam } : {}),
         },
-      });
+        signal,
+      );
     },
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
@@ -68,54 +62,73 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
   });
 }
 
-export function conversationFindHistoryQueryOptions(piSessionId: string) {
+export function conversationFindHistoryQueryOptions(
+  apiClient: FlitterbotApiClient,
+  piSessionId: string,
+) {
   return queryOptions({
     queryKey: findHistoryQueryKey(piSessionId),
     queryFn: ({ signal }) =>
-      fetchStreamsHistory({
-        signal,
-        data: { piSessionId, surface: "agent", limit: "all" },
-      }),
+      apiClient.getStreamsHistory({ piSessionId, surface: "agent", limit: "all" }, signal),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 0,
     retry: false,
   });
 }
 
-export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
+export function streamsDownstreamSessionsQueryOptions(
+  apiClient: FlitterbotApiClient,
+  piSessionId: string,
+) {
   return {
     queryKey: ["streams-downstream-sessions", piSessionId] as const,
-    queryFn: (): Promise<DownstreamSessionItem[]> =>
-      fetchDownstreamSessions({ data: { piSessionId } }),
+    queryFn: ({ signal }: { signal: AbortSignal }): Promise<DownstreamSessionItem[]> =>
+      apiClient.getDownstreamSessions(piSessionId, signal),
     enabled: !!piSessionId,
     staleTime: 30_000,
   };
 }
 
-export function streamsWorktreeQueryOptions(piSessionId: string) {
+export function streamsWorktreeQueryOptions(apiClient: FlitterbotApiClient, piSessionId: string) {
   return {
     queryKey: ["streams-worktree", piSessionId] as const,
-    queryFn: (): Promise<StreamInfo | null> => fetchStreamsWorktree({ data: { piSessionId } }),
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<StreamInfo | null> => {
+      try {
+        return await apiClient.getStream(piSessionId, signal);
+      } catch {
+        return null;
+      }
+    },
     enabled: !!piSessionId,
     staleTime: 30_000,
   };
 }
 
-export function streamsDiffQueryOptions(piSessionId: string, enabled: boolean) {
+export function streamsDiffQueryOptions(
+  apiClient: FlitterbotApiClient,
+  piSessionId: string,
+  enabled: boolean,
+) {
   return {
     queryKey: ["streams-diff", piSessionId] as const,
-    queryFn: (): Promise<DiffResult | null> => fetchStreamsDiff({ data: { piSessionId } }),
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<DiffResult | null> => {
+      try {
+        return (await apiClient.getStreamDiff(piSessionId, signal)) ?? null;
+      } catch {
+        return null;
+      }
+    },
     enabled: !!piSessionId && enabled,
     staleTime: 10_000,
   };
 }
 
-export function userConfigQueryOptions() {
+export function userConfigQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["user-config"] as const,
     queryFn: async () => {
       try {
-        return await fetchUserConfig();
+        return (await apiClient.getUserConfig("default_user")).config;
       } catch {
         return {};
       }
@@ -124,19 +137,20 @@ export function userConfigQueryOptions() {
   };
 }
 
-export function surfaceTimelineInfiniteQueryOptions() {
+export function surfaceTimelineInfiniteQueryOptions(apiClient: FlitterbotApiClient) {
   return infiniteQueryOptions({
     queryKey: surfaceQueryKey,
-    queryFn: async ({ pageParam }) =>
-      fetchStreamsHistory({
-        data: {
+    queryFn: async ({ pageParam, signal }) =>
+      apiClient.getStreamsHistory(
+        {
           surface: "input",
           limit: pageParam
             ? STREAMS_HISTORY_PAGE_VISIBLE_ROW_LIMIT
             : STREAMS_HISTORY_INITIAL_VISIBLE_ROW_LIMIT,
           ...(pageParam ? { before: pageParam } : {}),
         },
-      }),
+        signal,
+      ),
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,
     getNextPageParam: () => undefined,
@@ -177,6 +191,7 @@ export function sessionSearchQueryOptions(
 }
 
 export function directoryCompletionsQueryOptions(
+  apiClient: FlitterbotApiClient,
   query: string,
   enabled: boolean,
   opts?: { streamId?: string; directoriesOnly?: boolean },
@@ -185,10 +200,8 @@ export function directoryCompletionsQueryOptions(
   const directoriesOnly = opts?.directoriesOnly ?? false;
   return {
     queryKey: ["directory-completions", query, streamId ?? "", directoriesOnly] as const,
-    queryFn: (): Promise<DirectoryCompletionsResponse> =>
-      fetchDirectoryCompletions({
-        data: { query, streamId, directoriesOnly },
-      }),
+    queryFn: ({ signal }: { signal: AbortSignal }): Promise<DirectoryCompletionsResponse> =>
+      apiClient.getDirectoryCompletions({ query, streamId, directoriesOnly }, signal),
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 5_000,

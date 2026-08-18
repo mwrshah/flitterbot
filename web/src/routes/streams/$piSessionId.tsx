@@ -36,10 +36,14 @@ export const Route = createFileRoute("/streams/$piSessionId")({
 
     await Promise.all([
       context.queryClient.ensureInfiniteQueryData(
-        streamsHistoryInfiniteQueryOptions(params.piSessionId),
+        streamsHistoryInfiniteQueryOptions(context.apiClient, params.piSessionId),
       ),
-      context.queryClient.prefetchQuery(streamsDownstreamSessionsQueryOptions(params.piSessionId)),
-      context.queryClient.prefetchQuery(streamsWorktreeQueryOptions(params.piSessionId)),
+      context.queryClient.prefetchQuery(
+        streamsDownstreamSessionsQueryOptions(context.apiClient, params.piSessionId),
+      ),
+      context.queryClient.prefetchQuery(
+        streamsWorktreeQueryOptions(context.apiClient, params.piSessionId),
+      ),
     ]);
   },
   head: () => ({

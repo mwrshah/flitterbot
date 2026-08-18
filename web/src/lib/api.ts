@@ -4,6 +4,7 @@ import type {
   AuthProvidersResponse,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
+  DownstreamSessionItem,
   ModelsListResponse,
   ModelsMutationResponse,
   RemoveTurnQueueItemResponse,
@@ -12,8 +13,29 @@ import type {
   SessionsListResponse,
   SkillsListResponse,
   StatusResponse,
+  StreamsHistoryLimit,
+  StreamsHistoryResponse,
   TranscriptPageResponse,
 } from "./types";
+
+export type StreamInfo = {
+  streamId: string | null;
+  name: string | null;
+  repoPath: string | null;
+  repo: string | null;
+  worktreePath: string | null;
+  branch: string | null;
+  baseBranch: string | null;
+  cwd: string | null;
+  cwdAbsolute: string | null;
+  copyPaths: string[];
+  postCreate: string[];
+  configuredBaseRef: string | null;
+};
+
+export type DiffResult =
+  | { mode: "diff"; diff: string }
+  | { mode: "summary"; stat: string; files: number; insertions: number; deletions: number };
 
 export type ControlSurfaceSettings = {
   baseUrl: string;
@@ -24,7 +46,7 @@ export type ControlSurfaceSettings = {
 export type FlitterbotApiClient = ReturnType<typeof createFlitterbotApiClient>;
 
 export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSettings) {
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  async function request<T>(path: string, init?: RequestInit, timeoutMs = 8_000): Promise<T> {
     const { baseUrl, token } = getSettings();
     const url = `${baseUrl.replace(/\/$/, "")}${path}`;
     const headers: Record<string, string> = {
@@ -33,10 +55,18 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       ...(init?.headers as Record<string, string> | undefined),
     };
 
-    const response = await fetch(url, { ...init, headers });
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+    const response = await fetch(url, { ...init, headers, signal });
     if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
+      let message = `${response.status} ${response.statusText}`;
+      try {
+        const body = (await response.clone().json()) as { error?: unknown };
+        if (typeof body.error === "string" && body.error) message = body.error;
+      } catch {}
+      throw new Error(message);
     }
+    if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
 
@@ -157,10 +187,72 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ level }),
       }),
 
-    getDirectoryCompletions: (path: string, piSessionId?: string) => {
-      const params = new URLSearchParams({ path });
-      if (piSessionId) params.set("piSessionId", piSessionId);
-      return request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`);
+    getStreamsHistory: (
+      input: {
+        piSessionId?: string;
+        surface?: "input" | "agent";
+        before?: string;
+        limit?: StreamsHistoryLimit;
+      },
+      signal?: AbortSignal,
+    ) => {
+      const params = new URLSearchParams();
+      if (input.piSessionId) params.set("piSessionId", input.piSessionId);
+      if (input.surface) params.set("surface", input.surface);
+      if (input.before) params.set("before", input.before);
+      if (input.limit) params.set("limit", String(input.limit));
+      const query = params.toString();
+      return request<StreamsHistoryResponse>(
+        `/api/streams/history${query ? `?${query}` : ""}`,
+        { signal },
+        input.limit === "all" ? 30_000 : 8_000,
+      );
+    },
+
+    getDownstreamSessions: async (piSessionId: string, signal?: AbortSignal) => {
+      const response = await request<{ items: DownstreamSessionItem[] }>(
+        `/api/pi-sessions/${encodeURIComponent(piSessionId)}/sessions`,
+        { signal },
+      );
+      return response.items;
+    },
+
+    setStreamCwd: (streamId: string, cwd: string) =>
+      request<{ ok: true; streamId: string; cwd: string; piSessionId: string }>(
+        `/api/streams/${encodeURIComponent(streamId)}/cwd`,
+        { method: "POST", body: JSON.stringify({ cwd }) },
+      ),
+
+    getStream: (piSessionId: string, signal?: AbortSignal) =>
+      request<StreamInfo>(`/api/pi-sessions/${encodeURIComponent(piSessionId)}/stream`, { signal }),
+
+    getStreamDiff: (piSessionId: string, signal?: AbortSignal) =>
+      request<DiffResult | undefined>(
+        `/api/pi-sessions/${encodeURIComponent(piSessionId)}/diff`,
+        { signal },
+        15_000,
+      ),
+
+    getDirectoryCompletions: async (
+      input: {
+        query: string;
+        piSessionId?: string;
+        streamId?: string;
+        directoriesOnly?: boolean;
+      },
+      signal?: AbortSignal,
+    ) => {
+      const params = new URLSearchParams({ query: input.query });
+      if (input.piSessionId) params.set("piSessionId", input.piSessionId);
+      if (input.streamId) params.set("streamId", input.streamId);
+      if (input.directoriesOnly) params.set("directoriesOnly", "true");
+      try {
+        return await request<DirectoryCompletionsResponse>(`/api/directory-completions?${params}`, {
+          signal,
+        });
+      } catch {
+        return { items: [], cwd: "", query: input.query };
+      }
     },
 
     listAuthProviders: () => request<AuthProvidersResponse>("/api/auth/providers"),

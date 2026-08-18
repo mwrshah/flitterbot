@@ -4,9 +4,7 @@ import {
   createRootRouteWithContext,
   type ErrorComponentProps,
   HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
-import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -21,8 +19,6 @@ import type { SettingsStore } from "@/lib/settings-store";
 import type { StatusQueryData } from "@/lib/types";
 import type { FlitterbotWsClient } from "@/lib/ws";
 import type { WsConnectionStore } from "@/lib/ws-connection-store";
-import appCss from "@/styles.css?url";
-import { seo } from "@/utils/seo";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -36,47 +32,13 @@ export const Route = createRootRouteWithContext<{
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
-      context.queryClient.ensureQueryData(userConfigQueryOptions()).catch(() => ({})),
+      context.queryClient
+        .ensureQueryData(userConfigQueryOptions(context.apiClient))
+        .catch(() => ({})),
       context.queryClient.ensureQueryData(skillsQueryOptions(context.apiClient)).catch(() => []),
     ]);
   },
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      ...seo({
-        title: "Flitterbot",
-        description: "Orchestration layer for Claude Code.",
-      }),
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      {
-        rel: "apple-touch-icon",
-        sizes: "180x180",
-        href: "/apple-touch-icon.png",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "32x32",
-        href: "/favicon-32x32.png",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "16x16",
-        href: "/favicon-16x16.png",
-      },
-      { rel: "manifest", href: "/site.webmanifest" },
-      { rel: "icon", href: "/favicon.ico" },
-    ],
-  }),
-  errorComponent: (props: ErrorComponentProps) => (
-    <RootDocument>
-      <DefaultCatchBoundary {...props} />
-    </RootDocument>
-  ),
+  errorComponent: (props: ErrorComponentProps) => <DefaultCatchBoundary {...props} />,
   notFoundComponent: () => <NotFound />,
   component: RootComponent,
 });
@@ -102,8 +64,10 @@ function useStreamPaths(
     if (status?.piAgent?.default?.piSessionId) {
       paths.push(`/streams/${status.piAgent.default.piSessionId}`);
     }
-    for (const s of status?.streams ?? []) {
-      if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
+    for (const stream of status?.streams ?? []) {
+      if (stream.status === "open" && stream.piSessionId) {
+        paths.push(`/streams/${stream.piSessionId}`);
+      }
     }
     return paths;
   }, [status?.piAgent, status?.streams]);
@@ -120,57 +84,26 @@ function RootComponent() {
   useEffect(() => startRealtime(), [startRealtime]);
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      void import("react-grab");
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
 
-  const children = useMemo(
-    () => (
-      <>
-        <AppShell />
-      </>
-    ),
-    [],
-  );
-
-  return <RootDocument resolvedTheme={resolvedTheme}>{children}</RootDocument>;
-}
-
-function RootDocument({
-  children,
-  resolvedTheme = "light",
-}: {
-  children: React.ReactNode;
-  resolvedTheme?: "light" | "dark";
-}) {
-  useWhyDidYouRender("RootDocument", { children });
   return (
-    <html
-      lang="en"
-      className={resolvedTheme === "dark" ? "dark" : ""}
-      style={{ colorScheme: resolvedTheme }}
-      suppressHydrationWarning
-    >
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Toaster
-          theme={resolvedTheme}
-          duration={4000}
-          toastOptions={{
-            style: {
-              background: "var(--background)",
-              color: "var(--text)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-            },
-          }}
-        />
-        <Scripts />
-      </body>
-    </html>
+    <>
+      <HeadContent />
+      <AppShell />
+      <Toaster
+        theme={resolvedTheme}
+        duration={4000}
+        toastOptions={{
+          style: {
+            background: "var(--background)",
+            color: "var(--text)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+          },
+        }}
+      />
+    </>
   );
 }
