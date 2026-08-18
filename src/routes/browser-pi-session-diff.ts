@@ -11,8 +11,7 @@ import { getStreamForPiSession } from "../blackboard/query-streams.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
-const MAX_FILES = 50;
-const MAX_CHANGED_LINES = 5000;
+const MAX_CHANGED_LINES = 10_000;
 
 type GitExecOpts = {
   cwd: string;
@@ -150,7 +149,7 @@ export async function handleBrowserPiSessionDiffRoute(
 
     const { files, insertions, deletions } = parseStatSummary(stat);
 
-    if (files > MAX_FILES || insertions + deletions > MAX_CHANGED_LINES) {
+    if (insertions + deletions > MAX_CHANGED_LINES) {
       return sendJson(response, 200, {
         mode: "summary",
         stat,
