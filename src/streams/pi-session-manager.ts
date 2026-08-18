@@ -204,7 +204,6 @@ export class PiSessionManager {
       let bashAborted = false;
       const session = managed.runtime?.session;
       if (session) {
-        managed.queue.holdPendingAfterCurrent();
         try {
           session.abort?.();
         } catch {}
@@ -1406,10 +1405,11 @@ export class PiSessionManager {
     );
     const unsubscribeAdmission = session.agent.subscribe(async (event) => {
       if (event.type !== "turn_end" || event.message.role !== "assistant") return;
-      if (event.message.stopReason === "error" || event.message.stopReason === "aborted") {
+      if (event.message.stopReason === "error") {
         managed.queue.holdPendingAfterCurrent();
         return;
       }
+      if (event.message.stopReason === "aborted") return;
       await managed.queue.admitPendingSteering();
     });
     return () => {
