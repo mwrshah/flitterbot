@@ -176,7 +176,7 @@ function StreamContextMenu({
           setEditing(true);
         }}
       />
-      <ContextMenuContent>
+      <ContextMenuContent data-sidebar-interaction>
         <ContextMenuItem
           disabled={!onRename}
           onClick={() => {
@@ -595,21 +595,41 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   const resetSearch = useCallback(() => {
     setQuery("");
     clearPickerCursor();
-    const input = searchInputRef.current;
-    if (input) input.value = "";
-    input?.blur();
+    searchInputRef.current?.blur();
   }, [clearPickerCursor]);
+  const resetSearchOnOutsidePointer = useEffectEvent((ownerDocument: Document) => {
+    const input = searchInputRef.current;
+    if (query || ownerDocument.activeElement === input) resetSearch();
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const ownerDocument = document;
+    const ElementConstructor = ownerDocument.defaultView?.Element;
+    if (!ElementConstructor) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof ElementConstructor && target.closest("[data-sidebar-interaction]")) {
+        return;
+      }
+      resetSearchOnOutsidePointer(ownerDocument);
+    };
+
+    ownerDocument.addEventListener("pointerdown", handlePointerDown, true);
+    return () => ownerDocument.removeEventListener("pointerdown", handlePointerDown, true);
+  }, []);
+
   const handleSwimlaneLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
       }
-      resetSearch();
+      clearPickerCursor();
     },
-    [resetSearch],
+    [clearPickerCursor],
   );
-
-  useEffect(() => resetSearch(), [pathname, resetSearch]);
 
   const statusQuery = useQuery({
     ...statusQueryOptions(apiClient),
@@ -908,7 +928,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
                 event.preventDefault();
                 event.stopPropagation();
                 const piSessionId = selectedSearchCandidate.piSessionId;
-                resetSearch();
+                clearPickerCursor();
                 void navigate({
                   to: "/streams/$piSessionId",
                   params: { piSessionId },
@@ -979,7 +999,10 @@ export const Sidebar = memo(function Sidebar() {
   });
 
   return (
-    <aside className="flex h-full min-h-0 select-none flex-col overflow-hidden bg-background">
+    <aside
+      data-sidebar-interaction
+      className="flex h-full min-h-0 select-none flex-col overflow-hidden bg-background"
+    >
       <nav className="shrink-0 p-3 space-y-0.5">
         <NavItem to="/" label="Surface" icon={icons.surface} shortcutHint={surfaceShortcutHint} />
         <NavItem
