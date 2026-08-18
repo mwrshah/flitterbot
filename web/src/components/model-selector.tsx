@@ -2,7 +2,7 @@ import { Popover } from "@base-ui/react/popover";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { ChevronDownIcon, StarIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon, StarIcon } from "lucide-react";
 import {
   Fragment,
   type KeyboardEvent,
@@ -363,9 +363,26 @@ export const ModelSelector = memo(function ModelSelector({
                       );
                     })}
                   </div>
-                  <span className="mr-1.5 shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted">
-                    Thinking levels
-                  </span>
+                  <div
+                    className="mr-1.5 flex shrink-0 items-center gap-1 self-center"
+                    aria-label="Use Left Arrow or Right Arrow to switch thinking level"
+                  >
+                    <span className="text-[10px] text-text-muted" aria-hidden="true">
+                      switch
+                    </span>
+                    <kbd
+                      className="inline-flex size-4 items-center justify-center rounded border border-border-muted bg-background-muted text-text-muted"
+                      aria-hidden="true"
+                    >
+                      <ArrowLeftIcon className="size-2.5" />
+                    </kbd>
+                    <kbd
+                      className="inline-flex size-4 items-center justify-center rounded border border-border-muted bg-background-muted text-text-muted"
+                      aria-hidden="true"
+                    >
+                      <ArrowRightIcon className="size-2.5" />
+                    </kbd>
+                  </div>
                 </div>
               </CommandGroup>
               <ModelCommandList
