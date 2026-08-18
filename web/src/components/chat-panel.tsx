@@ -833,7 +833,7 @@ export function ChatPanel({
         },
         {
           id: "compact-session",
-          label: "compact session",
+          label: "compact",
           insertText: "/compact ",
         },
       ];
@@ -842,7 +842,7 @@ export function ChatPanel({
       return [
         {
           id: "compact-session",
-          label: "compact session",
+          label: "compact",
           insertText: "/compact ",
         },
       ];
@@ -878,7 +878,7 @@ export function ChatPanel({
       }
     }
 
-    buttons.push({ id: "compact-session", label: "compact session", insertText: "/compact " });
+    buttons.push({ id: "compact-session", label: "compact", insertText: "/compact " });
     return buttons;
   }, [
     streamHasWorktree,
