@@ -1,6 +1,6 @@
 ---
 name: tmux
-description: Manage Claude Code or Codex across up to 50 tmux sessions (one per terminal window, tiled by WM)
+description: Manage Claude Code or Codex across up to 50 tmux sessions (one per terminal window, tiled by WM). Installed at ~/.flitterbot/skills/tmux/SKILL.md.
 argument-hint: "[status|launch|quit|send|message] [session] [args] [--agent-command command]"
 ---
 

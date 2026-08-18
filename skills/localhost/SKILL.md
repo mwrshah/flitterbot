@@ -1,6 +1,6 @@
 ---
 name: localhost
-description: Configure and run repository-local localhost services from any registered worktree
+description: Configure and run repository-local localhost services from any registered worktree. Installed at ~/.flitterbot/skills/localhost/SKILL.md.
 argument-hint: "[setup|start|stop|status|list] [worktree] [--port service=port]"
 ---
 

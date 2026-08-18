@@ -1,6 +1,6 @@
 ---
 name: notes
-description: Read and maintain local notes stored under ~/.flitterbot/data/notes
+description: Read and maintain local notes stored under ~/.flitterbot/data/notes. Installed at ~/.flitterbot/skills/notes/SKILL.md.
 argument-hint: "[note request]"
 disable-model-invocation: false
 ---

@@ -1,6 +1,6 @@
 ---
 name: learnings
-description: Save a learning to the running learnings note, classified under a 2-char situation code
+description: Save a learning to the running learnings note, classified under a 2-char situation code. Installed at ~/.flitterbot/skills/learnings/SKILL.md.
 argument-hint: "<the learning to capture>"
 ---
 
