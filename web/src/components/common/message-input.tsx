@@ -902,11 +902,6 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (isCompacting && event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
       if (event.key === "Escape") {
         if (closeActivePicker()) {
           event.preventDefault();
@@ -977,7 +972,6 @@ export const MessageInput = memo(function MessageInput({
       pathPickerVisible,
       skillPickerVisible,
       submitCurrentDraft,
-      isCompacting,
     ],
   );
 
