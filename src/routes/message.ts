@@ -1,5 +1,5 @@
 import type http from "node:http";
-import { getActiveStreamPiSessionId, getStreamByName } from "../blackboard/query-streams.ts";
+import { getResumableStreamPiSessionId, getStreamByName } from "../blackboard/query-streams.ts";
 import { classifyMessage } from "../classifier/classify.ts";
 import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type {
@@ -91,7 +91,8 @@ async function routeMessage(
         stream_name: userDefaultStream.name,
       };
       defaultPiSessionId =
-        getActiveStreamPiSessionId(runtime.blackboard, userDefaultStream.id) ?? defaultPiSessionId;
+        getResumableStreamPiSessionId(runtime.blackboard, userDefaultStream.id) ??
+        defaultPiSessionId;
     }
   }
 
