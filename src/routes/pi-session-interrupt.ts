@@ -15,9 +15,9 @@ export async function handlePiSessionInterruptRoute(
     return sendJson(res, 401, { ok: false, error: "unauthorized" });
   }
 
-  let interrupt: { bashAborted: boolean } | null;
+  let interrupt: { bashAborted: boolean; settlement: Promise<void> } | null;
   try {
-    interrupt = await runtime.sessionManager.interruptPiSession(piSessionId);
+    interrupt = runtime.sessionManager.interruptPiSession(piSessionId);
   } catch (error) {
     const body: PiSessionInterruptResponse = {
       ok: false,
@@ -33,14 +33,23 @@ export async function handlePiSessionInterruptRoute(
 
   const ccSessions = getActiveManagedSessionsByPi(runtime.blackboard, piSessionId);
   let signaledSessions = 0;
-  for (const ccSession of ccSessions) {
-    if (ccSession.tmuxSession) {
-      try {
-        await sendEscapeToTmuxSession(ccSession.tmuxSession);
-        signaledSessions++;
-      } catch {}
-    }
-  }
+  const downstreamSignals = ccSessions.flatMap((ccSession) =>
+    ccSession.tmuxSession
+      ? [
+          sendEscapeToTmuxSession(ccSession.tmuxSession)
+            .then(() => {
+              signaledSessions++;
+            })
+            .catch(() => {}),
+        ]
+      : [],
+  );
+  void interrupt.settlement.catch((error) => {
+    runtime.log(
+      `pi-session interrupt settlement failed for ${piSessionId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
+  await Promise.all(downstreamSignals);
 
   runtime.log(
     `pi-session interrupt: aborted turn for ${piSessionId}${bashAborted ? " (bash killed)" : ""}, signaled ${signaledSessions} CC session(s)`,

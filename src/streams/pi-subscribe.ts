@@ -43,6 +43,19 @@ function reportMissingPersistedMessage(
 
 type BroadcastRole = "user" | "assistant";
 type AnyMessageRole = BroadcastRole | "toolResult";
+type AgentOutcomeMessage = { role: string; stopReason?: string };
+
+export function selectCompletedAssistantMessage(
+  messages: readonly AgentOutcomeMessage[],
+  pending: ChatTimelineMessage | null,
+): ChatTimelineMessage | null {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message?.role !== "assistant") continue;
+    return message.stopReason !== "error" && message.stopReason !== "aborted" ? pending : null;
+  }
+  return null;
+}
 
 function extractMessageRole(message: unknown): BroadcastRole | undefined {
   const role = extractAnyMessageRole(message);
@@ -74,6 +87,11 @@ function extractTimestamp(message: unknown, fallback: string): string {
   return fallback;
 }
 
+type PiSessionLifecycleCallbacks = {
+  onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void;
+  onAgentSettled?: () => void;
+};
+
 export function subscribeToPiSession(
   session: AgentSession,
   state: PiSessionState,
@@ -82,7 +100,7 @@ export function subscribeToPiSession(
   toolDisplayCache: ToolDisplayContextCache,
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
-  onAgentEnd?: (lastAssistantMessage: ChatTimelineMessage | null) => void,
+  lifecycle: PiSessionLifecycleCallbacks = {},
 ): () => void {
   let currentStreamingMessageId: string | null = null;
 
@@ -318,6 +336,11 @@ export function subscribeToPiSession(
         touchPiEvent(blackboard, session.sessionId, now, "active");
         lastAssistantMessage = null;
         messageEndFired = false;
+        wsHub.broadcast({
+          type: "status_changed",
+          subsystem: "pi_session",
+          timestamp: now,
+        });
         break;
       case "agent_end": {
         touchPiEvent(blackboard, session.sessionId, now, "active");
@@ -326,14 +349,18 @@ export function subscribeToPiSession(
           piSessionId: session.sessionId,
           ...(messageEndFired ? {} : { aborted: true }),
         });
-        const pendingSurface = lastAssistantMessage;
+        const pendingSurface = selectCompletedAssistantMessage(
+          event.messages,
+          lastAssistantMessage,
+        );
         lastAssistantMessage = null;
         messageEndFired = false;
-        onAgentEnd?.(pendingSurface);
+        lifecycle.onAgentEnd?.(pendingSurface);
         break;
       }
       case "agent_settled":
         console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
+        lifecycle.onAgentSettled?.();
         break;
       case "compaction_start":
         wsHub.broadcast({

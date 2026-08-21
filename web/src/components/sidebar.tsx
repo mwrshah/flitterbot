@@ -97,6 +97,7 @@ function StreamContextMenu({
   onTogglePinned,
   onRename,
   onReopen,
+  reopenLabel = "Reopen",
   onClose,
   renderTrigger,
 }: {
@@ -106,6 +107,7 @@ function StreamContextMenu({
   onTogglePinned?: () => void;
   onRename?: (name: string) => void;
   onReopen?: () => void;
+  reopenLabel?: "Reopen" | "Recover";
   onClose?: () => void;
   renderTrigger: (label: ReactNode) => ReactElement;
 }) {
@@ -190,7 +192,7 @@ function StreamContextMenu({
           {pinned ? "Unpin" : "Pin"}
         </ContextMenuItem>
         <ContextMenuItem disabled={disabled || !onReopen} onClick={onReopen}>
-          Reopen
+          {reopenLabel}
         </ContextMenuItem>
         <ContextMenuItem disabled={disabled || !onClose} onClick={onClose}>
           Close
@@ -317,6 +319,7 @@ const SwimlaneRow = memo(function SwimlaneRow({
     onTogglePinned: () => pinStream({ streamId: stream.id, pinned: !stream.pinned }),
     onRename: (name: string) => renameStream({ streamId: stream.id, name }),
     onReopen,
+    reopenLabel: recoveryKind === "dead" ? ("Recover" as const) : ("Reopen" as const),
   };
 
   if (!row.piSessionId) {

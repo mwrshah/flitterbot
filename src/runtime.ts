@@ -4,7 +4,7 @@ import type http from "node:http";
 import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import type { AssistantMessage, ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentSession, CompactionResult, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { ProviderAuthManager } from "./auth/provider-auth.ts";
@@ -14,7 +14,6 @@ import {
   touchDatetimeReportedAt,
   touchPiPrompt,
   updatePiSessionModelMirror,
-  updatePiSessionStatus,
 } from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
 import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
@@ -29,12 +28,11 @@ import {
 } from "./blackboard/query-sessions.ts";
 import {
   CLOSED_STREAM_LOOKBACK_HOURS,
-  getActiveStreamPiSessionId,
-  getPiSessionStatus,
   getStreamById,
   getStreamByName,
   getStreamPiSessionId,
   getStreamPiSessionRow,
+  isTerminalStreamPiSession,
   listClosedStreams,
   listOpenStreams,
   resetClosedStreams,
@@ -214,9 +212,7 @@ export class ControlSurfaceRuntime {
     for (const ws of openStreams) {
       const latest = getStreamPiSessionRow(this.blackboard, ws.id);
       const streamsRow =
-        latest?.role === "orchestrator" && latest.status !== "ended" && latest.status !== "crashed"
-          ? latest
-          : null;
+        latest?.role === "orchestrator" && !isTerminalStreamPiSession(latest) ? latest : null;
 
       if (streamsRow) {
         this.sessionManager.requireRestorableStreamPiSession(ws.id);
@@ -866,7 +862,7 @@ export class ControlSurfaceRuntime {
         streamId: o.streamId!,
         streamName: o.streamName,
         messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
-        busy: snap.busy,
+        busy: o.runtime?.session.isStreaming ?? false,
         isCompacting: o.runtime?.session?.isCompacting ?? false,
         contextUsage:
           o.runtime?.session && !o.runtime.session.isCompacting
@@ -877,7 +873,7 @@ export class ControlSurfaceRuntime {
 
     const openStreams = listOpenStreams(this.blackboard).map((stream) => ({
       stream,
-      piSessionId: getActiveStreamPiSessionId(this.blackboard, stream.id),
+      piSession: getStreamPiSessionRow(this.blackboard, stream.id),
     }));
     const closedStreams = listClosedStreams(
       this.blackboard,
@@ -885,11 +881,11 @@ export class ControlSurfaceRuntime {
       true,
     ).map((stream) => ({
       stream,
-      piSessionId: getStreamPiSessionId(this.blackboard, stream.id),
+      piSession: getStreamPiSessionRow(this.blackboard, stream.id),
     }));
     const persistedModelByPiSession = this.getPersistedPiSessionModels([
-      ...openStreams.map(({ piSessionId }) => piSessionId),
-      ...closedStreams.map(({ piSessionId }) => piSessionId),
+      ...openStreams.map(({ piSession }) => piSession?.pi_session_id),
+      ...closedStreams.map(({ piSession }) => piSession?.pi_session_id),
     ]);
     const sessionCountByStream = new Map<string, number>();
     for (const session of this.getSessionList()) {
@@ -912,7 +908,7 @@ export class ControlSurfaceRuntime {
               sessionFile: defSnapshot.sessionFile ?? null,
               messageCount: def!.runtime?.session?.messages?.length ?? defSnapshot.messageCount,
               lastPromptAt: defSnapshot.lastPromptAt ?? null,
-              busy: defSnapshot.busy,
+              busy: def!.runtime?.session.isStreaming ?? false,
               isCompacting: def!.runtime?.session?.isCompacting ?? false,
               contextUsage:
                 def!.runtime?.session && !def!.runtime.session.isCompacting
@@ -932,8 +928,9 @@ export class ControlSurfaceRuntime {
       blackboard: blackboardStatus,
       groqConfigured: Boolean(resolveGroqApiKey()?.trim()),
       streams: [
-        ...openStreams.map(({ stream: ws, piSessionId }) => {
+        ...openStreams.map(({ stream: ws, piSession }) => {
           const managed = this.sessionManager.getByStream(ws.id);
+          const piSessionId = piSession?.pi_session_id;
           return {
             id: ws.id,
             name: ws.name,
@@ -943,9 +940,7 @@ export class ControlSurfaceRuntime {
             repoPath: ws.repo_path ?? undefined,
             worktreePath: ws.worktree_path ?? undefined,
             piSessionId,
-            piSessionStatus: piSessionId
-              ? getPiSessionStatus(this.blackboard, piSessionId)
-              : undefined,
+            piSessionStatus: piSession?.status,
             model: managed
               ? this.toPiSessionModelInfo(managed.modelInfo)
               : persistedModelByPiSession.get(piSessionId ?? ""),
@@ -953,23 +948,24 @@ export class ControlSurfaceRuntime {
             createdAt: ws.created_at,
           };
         }),
-        ...closedStreams.map(({ stream: ws, piSessionId }) => ({
-          id: ws.id,
-          name: ws.name,
-          type: ws.type,
-          status: "closed" as const,
-          pinned: Boolean(ws.pinned),
-          closedAt: ws.closed_at ?? undefined,
-          repoPath: ws.repo_path ?? undefined,
-          worktreePath: ws.worktree_path ?? undefined,
-          piSessionId,
-          piSessionStatus: piSessionId
-            ? getPiSessionStatus(this.blackboard, piSessionId)
-            : undefined,
-          model: persistedModelByPiSession.get(piSessionId ?? ""),
-          sessionCount: sessionCountByStream.get(ws.id) ?? 0,
-          createdAt: ws.created_at,
-        })),
+        ...closedStreams.map(({ stream: ws, piSession }) => {
+          const piSessionId = piSession?.pi_session_id;
+          return {
+            id: ws.id,
+            name: ws.name,
+            type: ws.type,
+            status: "closed" as const,
+            pinned: Boolean(ws.pinned),
+            closedAt: ws.closed_at ?? undefined,
+            repoPath: ws.repo_path ?? undefined,
+            worktreePath: ws.worktree_path ?? undefined,
+            piSessionId,
+            piSessionStatus: piSession?.status,
+            model: persistedModelByPiSession.get(piSessionId ?? ""),
+            sessionCount: sessionCountByStream.get(ws.id) ?? 0,
+            createdAt: ws.created_at,
+          };
+        }),
       ],
       shortcuts: this.config.shortcuts,
     };
@@ -1172,44 +1168,29 @@ export class ControlSurfaceRuntime {
       `processing queue item ${item.id} source=${item.source} role=${managed.role}${managed.streamId ? ` ws=${managed.streamId}` : ""} text=${item.text.slice(0, 80)}...`,
     );
 
-    const promptAt = managed.state.notePrompt(session.messages.length);
-    touchPiPrompt(this.blackboard, piSessionId, promptAt, "active");
-    this.broadcastStatusChanged("pi_session");
-
+    managed.pendingAssistantMessage = undefined;
     const promptText = formatPromptWithContext({ ...item, text: datetimeInjection.text });
-    let datetimeCommitted = false;
+    let promptAccepted = false;
     const acceptPrompt = () => {
+      if (promptAccepted) return;
+      promptAccepted = true;
+      const promptAt = managed.state.notePrompt(session.messages.length);
+      touchPiPrompt(this.blackboard, piSessionId, promptAt);
+      this.broadcastStatusChanged("pi_session");
       onAccepted?.();
-      if (!datetimeInjection.reportedAt || datetimeCommitted) return;
-      datetimeCommitted = true;
       this.recordDatetimeInjection(piSessionId, datetimeInjection.reportedAt);
     };
 
     await this.deliverQueueItem(session, item, promptText, acceptPrompt);
     acceptPrompt();
 
-    this.log(`queue item ${item.id} prompt completed, messages=${session.messages.length}`);
-
-    const lastMsg = session.messages[session.messages.length - 1];
-    if (lastMsg?.role === "assistant") {
-      const assistantMsg = lastMsg as AssistantMessage;
-      if (assistantMsg.stopReason === "error") {
-        this.log(`queue item ${item.id} API error: ${assistantMsg.errorMessage ?? "unknown"}`);
-        throw new Error(
-          `pi session API error: ${assistantMsg.errorMessage ?? assistantMsg.stopReason}`,
-        );
-      }
-    }
-
+    this.log(`queue item ${item.id} prompt settled, messages=${session.messages.length}`);
     managed.state.noteEvent(session.messages.length);
 
-    this.transitionStreamsAfterTurn(piSessionId);
-
-    const finalAssistant = extractFinalAssistantMessage(session);
-    const pendingSurface = managed.lastSurfacedAssistantMessage;
-    managed.lastSurfacedAssistantMessage = undefined;
-    if (finalAssistant) {
-      const { text: finalText, messageId: finalMessageId } = finalAssistant;
+    const pendingSurface = takePendingAssistantMessage(managed);
+    const finalText = pendingSurface?.content.trim();
+    if (pendingSurface && finalText) {
+      const finalMessageId = pendingSurface.id;
 
       let persistedId: string | undefined;
       try {
@@ -1326,26 +1307,6 @@ export class ControlSurfaceRuntime {
       },
       { deliverAs: "steer", triggerTurn: true },
     );
-  }
-
-  private transitionStreamsAfterTurn(piSessionId: string): void {
-    try {
-      const row = this.blackboard
-        .prepare(
-          `SELECT COUNT(*) as count FROM sessions
-				 WHERE pi_session_id = ? AND status = 'working' AND agent_managed = 1`,
-        )
-        .get(piSessionId) as { count: number } | undefined;
-      const activeCount = row?.count ?? 0;
-
-      const nextStatus = activeCount > 0 ? "waiting_for_sessions" : "waiting_for_user";
-      updatePiSessionStatus(this.blackboard, piSessionId, nextStatus);
-      this.broadcastStatusChanged("pi_session");
-    } catch (error) {
-      this.log(
-        `streams state transition failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
   }
 
   private async spawnStreamWithSession(opts: {
@@ -1858,11 +1819,8 @@ export class ControlSurfaceRuntime {
 
       let managed = this.sessionManager.getByStream(stream.id);
       if (!managed) {
-        const latestPiSessionId = getStreamPiSessionId(this.blackboard, stream.id);
-        const latestStatus = latestPiSessionId
-          ? getPiSessionStatus(this.blackboard, latestPiSessionId)
-          : undefined;
-        if (latestStatus === "ended" || latestStatus === "crashed") {
+        const latestPiSession = getStreamPiSessionRow(this.blackboard, stream.id);
+        if (latestPiSession && isTerminalStreamPiSession(latestPiSession)) {
           await this.reopenStream(stream.id);
           managed = this.sessionManager.getByStream(stream.id);
           this.log(`recovered WhatsApp default stream for user "${userId}" (${stream.id})`);
@@ -2827,23 +2785,10 @@ export class ControlSurfaceRuntime {
   }
 }
 
-function extractFinalAssistantMessage(
-  session: AgentSession,
-): { text: string; messageId?: string } | undefined {
-  if (!session.messages.length) return undefined;
-  for (let i = session.messages.length - 1; i >= 0; i--) {
-    const msg = session.messages[i];
-    if (msg?.role !== "assistant") continue;
-    const assistantMsg = msg as AssistantMessage;
-    const messageId = assistantMsg.responseId?.trim() || undefined;
-    const textParts = assistantMsg.content
-      .filter((block): block is TextContent => block.type === "text")
-      .map((block) => block.text)
-      .join("");
-    if (textParts.trim()) return { text: textParts.trim(), messageId };
-    return undefined;
-  }
-  return undefined;
+function takePendingAssistantMessage(managed: ManagedPiSession) {
+  const message = managed.pendingAssistantMessage;
+  managed.pendingAssistantMessage = undefined;
+  return message;
 }
 
 function formatHookMessage(eventName: string, payload: Record<string, unknown>): string {

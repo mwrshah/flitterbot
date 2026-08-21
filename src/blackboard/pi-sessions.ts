@@ -86,7 +86,7 @@ export function replaceDefaultPiSession(
          AND stream_id IS NULL
          AND session_user IS ?
          AND pi_session_id != ?
-         AND status IN ('active', 'waiting_for_user', 'waiting_for_sessions')`,
+         AND ended_at IS NULL`,
     ).run(
       end.status,
       end.endedAt,
@@ -111,12 +111,8 @@ export function touchPiPrompt(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<
-    PersistedPiSessionStatus,
-    "active" | "waiting_for_user" | "waiting_for_sessions"
-  > = "active",
 ): void {
-  touchPiSessionPrompt(db, piSessionId, timestamp, status);
+  touchPiSessionPrompt(db, piSessionId, timestamp);
 }
 
 export function touchPiEvent(
@@ -134,14 +130,15 @@ export function touchPiEvent(
 export function updatePiSessionStatus(
   db: BlackboardDatabase,
   piSessionId: string,
-  status: PersistedPiSessionStatus,
+  status: Extract<PersistedPiSessionStatus, "active" | "waiting_for_user" | "waiting_for_sessions">,
 ): void {
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   db.prepare(
     `UPDATE pi_sessions
      SET status = ?,
          last_event_at = MAX(last_event_at, ?)
-     WHERE pi_session_id = ?`,
+     WHERE pi_session_id = ?
+       AND ended_at IS NULL`,
   ).run(status, now, piSessionId);
 }
 

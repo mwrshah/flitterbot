@@ -6,6 +6,7 @@ import {
   endPiSession,
   reassociateOrphanedSessions,
   replaceDefaultPiSession,
+  updatePiSessionStatus,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
 import {
@@ -13,6 +14,7 @@ import {
   getStreamById,
   getStreamPiSessionId,
   getStreamPiSessionRow,
+  isTerminalStreamPiSession,
   reopenStreamRows,
   rollbackStreamReopenRows,
   type StreamPiSessionRow,
@@ -22,6 +24,7 @@ import {
 import { type FlitterbotConfig, loadConfig } from "../config/load-config.ts";
 import type { ApiError, MessageMetadata, StreamRow } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
+import { InterruptRetryGuard } from "../interrupt-retry-guard.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { createFlitterbotAgent, readPiSessionHeaderId } from "./create-agent.ts";
 import type { FlitterbotTool } from "./flitterbot-extension.ts";
@@ -71,7 +74,8 @@ export interface ManagedPiSession {
   };
   unsubscribe: () => void;
   closeRequested?: CloseRequest;
-  lastSurfacedAssistantMessage?: ChatTimelineMessage;
+  pendingAssistantMessage?: ChatTimelineMessage;
+  interruptRetryGuard: InterruptRetryGuard;
   whatsappRemoteJid?: string;
 }
 
@@ -197,30 +201,25 @@ export class PiSessionManager {
     }
   }
 
-  async interruptPiSession(piSessionId: string): Promise<{ bashAborted: boolean } | null> {
+  interruptPiSession(
+    piSessionId: string,
+  ): { bashAborted: boolean; settlement: Promise<void> } | null {
     const managed = this.byPiSessionId.get(piSessionId);
     if (!managed) return null;
-    const interrupt = () => {
-      let bashAborted = false;
-      const session = managed.runtime?.session;
-      if (session) {
-        try {
-          session.abort?.();
-        } catch {}
-        try {
-          if (session.isBashRunning) {
-            session.abortBash?.();
-            bashAborted = true;
-          }
-        } catch {}
+
+    const session = managed.runtime?.session;
+    if (!session) return { bashAborted: false, settlement: Promise.resolve() };
+
+    managed.interruptRetryGuard.suppress(session);
+    const settlement = session.abort().finally(() => managed.interruptRetryGuard.restore(session));
+    let bashAborted = false;
+    try {
+      if (session.isBashRunning) {
+        session.abortBash();
+        bashAborted = true;
       }
-      return { bashAborted };
-    };
-    if (!managed.streamId) return interrupt();
-    return this.withStreamOperation(
-      { streamId: managed.streamId, expectedPiSessionId: piSessionId },
-      async () => interrupt(),
-    );
+    } catch {}
+    return { bashAborted, settlement };
   }
 
   async withActiveStreamOperation<T>(
@@ -407,11 +406,7 @@ export class PiSessionManager {
       if (!stream) throw new Error(`Stream not found: ${context.streamId}`);
 
       const sessionRow = this.requireRestorableStreamPiSession(context.streamId);
-      const hasDeadPiSession =
-        stream.status === "open" &&
-        sessionRow.status !== "active" &&
-        sessionRow.status !== "waiting_for_user" &&
-        sessionRow.status !== "waiting_for_sessions";
+      const hasDeadPiSession = stream.status === "open" && isTerminalStreamPiSession(sessionRow);
       if (stream.status !== "closed" && !hasDeadPiSession) {
         throw new Error("Stream is not closed and has no recoverable pi-session");
       }
@@ -826,6 +821,7 @@ export class PiSessionManager {
         thinkingLevel: this.config.defaultThinkingLevel,
       },
       unsubscribe: () => {},
+      interruptRetryGuard: new InterruptRetryGuard(),
       whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
     };
 
@@ -925,35 +921,15 @@ export class PiSessionManager {
     }
   }
 
-  async destroyStreamSession(
+  private async shutdownStreamSession(
     streamId: string,
     expectedPiSessionId: string,
-    reason: string,
   ): Promise<void> {
     await this.withPausedStreamOperation({ streamId, expectedPiSessionId }, async (managed) => {
       if (!managed) return;
-
       await this.quiesceManagedSession(managed);
-      if (reason !== "shutdown") {
-        const status = reason === "crashed" ? "crashed" : "ended";
-        endPiSession(
-          this.blackboard,
-          managed.piSessionId,
-          status,
-          reason,
-          new Date().toISOString(),
-        );
-        this.wsHub.broadcast({
-          type: "status_changed",
-          subsystem: "pi_session",
-          timestamp: new Date().toISOString(),
-        });
-      }
-
       this.removeManagedStreamSession(managed);
-      this.log(
-        `${managed.role} destroyed for stream "${managed.streamName}" (${streamId}): ${reason}`,
-      );
+      this.log(`${managed.role} shut down for stream "${managed.streamName}" (${streamId})`);
     });
   }
 
@@ -1212,7 +1188,7 @@ export class PiSessionManager {
   async disposeAll(): Promise<void> {
     await Promise.all(
       Array.from(this.streamSessions.entries()).map(([streamId, managed]) =>
-        this.destroyStreamSession(streamId, managed.piSessionId, "shutdown"),
+        this.shutdownStreamSession(streamId, managed.piSessionId),
       ),
     );
 
@@ -1314,7 +1290,7 @@ export class PiSessionManager {
           ...(streamId ? { streamId } : {}),
         });
       },
-      onItemEnd: (item, error, steered, accepted) => {
+      onItemEnd: (item, error, steered) => {
         if (!steered) {
           state.setBusy(false);
           this.wsHub.broadcast({
@@ -1363,17 +1339,6 @@ export class PiSessionManager {
               },
             );
           });
-        } else if (error && !steered && accepted && managed.role !== "default" && streamId) {
-          const expectedPiSessionId = managed.piSessionId;
-          queueMicrotask(() => {
-            void this.destroyStreamSession(streamId, expectedPiSessionId, "crashed").catch(
-              (destroyError) => {
-                this.log(
-                  `crashed stream disposal failed for ${streamId}: ${destroyError instanceof Error ? destroyError.message : String(destroyError)}`,
-                );
-              },
-            );
-          });
         }
       },
     });
@@ -1399,23 +1364,50 @@ export class PiSessionManager {
       this.toolDisplayCache,
       managed.streamId,
       managed.streamName,
-      (lastAssistantMessage) => {
-        managed.lastSurfacedAssistantMessage = lastAssistantMessage ?? undefined;
+      {
+        onAgentEnd: (lastAssistantMessage) => {
+          managed.pendingAssistantMessage = lastAssistantMessage ?? undefined;
+        },
+        onAgentSettled: () => {
+          managed.interruptRetryGuard.restore(session);
+          this.transitionAfterAgentSettlement(managed);
+        },
       },
     );
-    const unsubscribeAdmission = session.agent.subscribe(async (event) => {
-      if (event.type !== "turn_end" || event.message.role !== "assistant") return;
-      if (event.message.stopReason === "error") {
-        managed.queue.holdPendingAfterCurrent();
+    const unsubscribeAdmission = session.agent.subscribe(async (event, signal) => {
+      if (event.type === "agent_start") {
+        managed.interruptRetryGuard.restoreForRun(session, signal);
         return;
       }
-      if (event.message.stopReason === "aborted") return;
+      if (event.type !== "turn_end" || event.message.role !== "assistant") return;
       await managed.queue.admitPendingSteering();
     });
     return () => {
       unsubscribeAdmission();
       unsubscribeSession();
     };
+  }
+
+  private transitionAfterAgentSettlement(managed: ManagedPiSession): void {
+    try {
+      const row = this.blackboard
+        .prepare(
+          `SELECT COUNT(*) as count FROM sessions
+           WHERE pi_session_id = ? AND status = 'working' AND agent_managed = 1`,
+        )
+        .get(managed.piSessionId) as { count: number } | undefined;
+      const status = (row?.count ?? 0) > 0 ? "waiting_for_sessions" : "waiting_for_user";
+      updatePiSessionStatus(this.blackboard, managed.piSessionId, status);
+      this.wsHub.broadcast({
+        type: "status_changed",
+        subsystem: "pi_session",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.log(
+        `Pi settlement transition failed for ${managed.piSessionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private archiveDefaultSessionFiles(previousPiSessionIds: readonly string[]): void {
@@ -1463,6 +1455,7 @@ export class PiSessionManager {
       createdAt: new Date().toISOString(),
       modelInfo: created.modelInfo,
       unsubscribe: null!,
+      interruptRetryGuard: new InterruptRetryGuard(),
       whatsappRemoteJid: this.findLatestWhatsAppRemoteJid(streamId),
     };
 

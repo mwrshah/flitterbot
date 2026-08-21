@@ -119,20 +119,14 @@ export function touchPiSessionPrompt(
   db: BlackboardDatabase,
   piSessionId: string,
   timestamp: string,
-  status: Extract<
-    PiSessionStatus,
-    "active" | "waiting_for_user" | "waiting_for_sessions"
-  > = "active",
 ): void {
   db.prepare(
     `UPDATE pi_sessions
      SET last_prompt_at = ?,
-         last_event_at = MAX(last_event_at, ?),
-         status = ?,
-         ended_at = NULL,
-         end_reason = NULL
-     WHERE pi_session_id = ?`,
-  ).run(timestamp, timestamp, status, piSessionId);
+         last_event_at = MAX(last_event_at, ?)
+     WHERE pi_session_id = ?
+       AND ended_at IS NULL`,
+  ).run(timestamp, timestamp, piSessionId);
 }
 
 export function touchPiSessionEvent(
@@ -147,10 +141,9 @@ export function touchPiSessionEvent(
   db.prepare(
     `UPDATE pi_sessions
      SET last_event_at = MAX(last_event_at, ?),
-         status = ?,
-         ended_at = NULL,
-         end_reason = NULL
-     WHERE pi_session_id = ?`,
+         status = ?
+     WHERE pi_session_id = ?
+       AND ended_at IS NULL`,
   ).run(timestamp, status, piSessionId);
 }
 
@@ -185,7 +178,7 @@ export function reassociateOrphanedSessions(
          AND pi_session_id IS NOT NULL
          AND pi_session_id != ?
          AND pi_session_id IN (
-           SELECT pi_session_id FROM pi_sessions WHERE status IN ('ended', 'crashed')
+           SELECT pi_session_id FROM pi_sessions WHERE ended_at IS NOT NULL
          )`,
     )
     .run(newPiSessionId, newPiSessionId);
