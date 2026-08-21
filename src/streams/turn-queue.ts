@@ -102,7 +102,7 @@ type TurnQueueOptions = {
   steer: (item: QueueItem) => Promise<void>;
   canSteer: () => boolean;
   onItemStart?: (item: QueueItem) => void;
-  onItemEnd?: (item: QueueItem, error?: unknown, steered?: boolean, accepted?: boolean) => void;
+  onItemEnd?: (item: QueueItem, error?: unknown, steered?: boolean) => void;
   onChanged?: (snapshot: TurnQueueSnapshot) => void;
   initialVersion?: number;
 };
@@ -126,7 +126,6 @@ export class TurnQueue {
   private currentItem?: QueueItem;
   private version: number;
   private holdAfterCurrent = false;
-  private resumeHeld = false;
 
   constructor(options: TurnQueueOptions) {
     this.processItem = options.process;
@@ -146,10 +145,7 @@ export class TurnQueue {
   enqueue(item: QueueItem): void {
     this.assertAccepting();
     this.entries.push({ item, state: "open" });
-    if (this.holdAfterCurrent && item.sender === "user") {
-      if (this.processing) this.resumeHeld = true;
-      else this.holdAfterCurrent = false;
-    }
+    if (this.holdAfterCurrent && item.sender === "user") this.holdAfterCurrent = false;
     if (!this.processing && !this.paused && !this.holdAfterCurrent) void this.pump();
     else this.changed();
   }
@@ -220,10 +216,6 @@ export class TurnQueue {
     };
   }
 
-  holdPendingAfterCurrent(): void {
-    if (this.processing && !this.stopped) this.holdAfterCurrent = true;
-  }
-
   async admitPendingSteering(): Promise<void> {
     if (
       this.accepting ||
@@ -271,11 +263,11 @@ export class TurnQueue {
         if (leasedIds.has(this.entries[index]!.item.id)) this.entries.splice(index, 1);
       }
       this.changed();
-      this.onItemEnd?.(admittedItem, undefined, true, true);
+      this.onItemEnd?.(admittedItem, undefined, true);
     } catch (error) {
       for (const entry of leased) entry.state = "open";
       this.changed();
-      this.onItemEnd?.(admittedItem, error, true, false);
+      this.onItemEnd?.(admittedItem, error, true);
     } finally {
       this.accepting = false;
       this.resolveWaiters();
@@ -307,7 +299,6 @@ export class TurnQueue {
     this.drainAcceptedAfterStop = true;
     this.paused = false;
     this.holdAfterCurrent = false;
-    this.resumeHeld = false;
     if (!this.processing) void this.pump();
     await this.waitForIdle();
   }
@@ -362,16 +353,12 @@ export class TurnQueue {
             }
             publishAfterCurrent = true;
           }
-          this.onItemEnd?.(item, itemError, false, accepted);
+          this.onItemEnd?.(item, itemError, false);
         } finally {
           this.currentItem = undefined;
           if (publishAfterCurrent) this.changed();
         }
-        if (this.holdAfterCurrent) {
-          if (!this.resumeHeld) break;
-          this.holdAfterCurrent = false;
-          this.resumeHeld = false;
-        }
+        if (this.holdAfterCurrent) break;
       }
     } finally {
       this.processing = false;

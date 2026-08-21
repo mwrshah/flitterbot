@@ -17,7 +17,7 @@ Routing after classification:
 
 Router classifier context is deliberately small and visible in logs. For each run, the control surface logs the exact classifier system prompt and user prompt. The user prompt contains all open streams, the last 4 messages per open stream (no time-window filter), and the last 4 default-agent messages after the most recent stream creation boundary. That boundary prevents default-agent context that led to an already-created stream from leaking into later routing decisions. The current user message is always included separately.
 
-Each Pi session has its own FIFO turn queue; all agents process concurrently.
+Each Pi session has a Flitterbot FIFO admission queue for cross-channel metadata and UI projection. Once admitted through `prompt`, `steer`, or `followUp`, Pi owns execution, retry, cancellation, queued continuation, and settlement. All agents process concurrently.
 
 ### Workstream Lifecycle
 
@@ -111,7 +111,7 @@ Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`
 
 Delivery: `followUp` (queue append) or `steer` (bypass queue, interrupt via `streamingBehavior: "steer"`; two-layer bypass at runtime and TurnQueue level).
 
-On startup: creates the real default agent first, rehydrates open stream sessions as dormant shells (`session: null`), then ensures every non-default WhatsApp user has an open default stream. Live SDK agents are created lazily on first incoming message via `activateStreamSession()`, deriving the prompt/tool set from `streams.type`. Crashed stream sessions are excluded from rehydration and replaced with fresh ones. Closed workstreams can be reopened — flips status back to `open`, revives the pi_session, rehydrates the stream session.
+On startup: creates the real default agent first, rehydrates open nonterminal stream sessions as dormant shells (`session: null`), then ensures every non-default WhatsApp user has an open default stream. Live SDK agents are created lazily on first incoming message via `activateStreamSession()`, deriving the prompt/tool set from `streams.type`. Terminal stream sessions are excluded from startup rehydration; recovery clears their terminal fields and restores the existing Pi session. Closed workstreams can be reopened.
 
 ### Blackboard (SQLite)
 
@@ -227,7 +227,7 @@ Installer → Blackboard → WhatsApp Channel ──┐
 
 ### Pi sessions
 
-`active` (processing turn) · `waiting_for_user` (universal idle) · `waiting_for_sessions` (CC sessions running) · `ended` · `crashed`. All transitions runtime-managed.
+`active` (Pi run active) · `waiting_for_user` (Pi settled) · `waiting_for_sessions` (Pi settled with CC sessions running) · `ended` · `crashed`. Flitterbot projects active and waiting states from Pi lifecycle events. Only unusable runtimes become terminal `crashed`; terminal rows always have `ended_at`. Provider errors and intentional cancellation settle back to a waiting state.
 
 ### Workstreams
 

@@ -168,23 +168,16 @@ export function getStreamPiSessionRow(
   );
 }
 
-export function getActiveStreamPiSessionId(
+export function isTerminalStreamPiSession(session: Pick<StreamPiSessionRow, "ended_at">): boolean {
+  return session.ended_at !== null;
+}
+
+export function getResumableStreamPiSessionId(
   db: BlackboardDatabase,
   streamId: string,
 ): string | undefined {
   const session = getStreamPiSessionRow(db, streamId);
-  return session?.status !== "ended" ? session?.pi_session_id : undefined;
-}
-
-export function getPiSessionStatus(
-  db: BlackboardDatabase,
-  piSessionId: string,
-): PiSessionStatus | undefined {
-  const row = db.get<{ status: PiSessionStatus }>(
-    `SELECT status FROM pi_sessions WHERE pi_session_id = ?`,
-    piSessionId,
-  );
-  return row?.status;
+  return session && !isTerminalStreamPiSession(session) ? session.pi_session_id : undefined;
 }
 
 export function getStreamPiSessionId(db: BlackboardDatabase, streamId: string): string | undefined {
