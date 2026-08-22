@@ -39,26 +39,6 @@ export function parseUsage(value: unknown): TokenUsage | undefined {
 
 type StreamsHistoryMode = "agent" | "input";
 
-function contextTokenTotal(usage: TokenUsage): number {
-  return usage.totalTokens || usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-}
-
-export function latestMeasuredContextUsage(entries: SessionEntry[]): TokenUsage | null {
-  for (let index = entries.length - 1; index >= 0; index--) {
-    const entry = entries[index]!;
-    if (entry.type === "compaction") return null; // leaf: stale until next turn
-    if (entry.type !== "message") continue;
-    const message = asRecord(entry.message);
-    if (message.role !== "assistant") continue;
-    if (message.stopReason === "aborted" || message.stopReason === "error") continue; // skip failed turns
-    const usage = parseUsage(message.usage);
-    if (!usage) continue;
-    const total = contextTokenTotal(usage);
-    if (total > 0) return { ...usage, totalTokens: total };
-  }
-  return null;
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
