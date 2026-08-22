@@ -3,7 +3,7 @@ import type { QueueItem } from "./turn-queue.ts";
 
 type PiSessionRuntimeSnapshot = Omit<
   PiSessionRuntimeStatus,
-  "piSessionId" | "sessionFile" | "lastPromptAt" | "isCompacting" | "contextUsage"
+  "piSessionId" | "sessionFile" | "lastPromptAt" | "isCompacting"
 > & {
   piSessionId?: string;
   sessionFile?: string;
