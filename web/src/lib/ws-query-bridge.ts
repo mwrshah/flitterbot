@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   applyTurnQueueSnapshot,
   createSurfaceLiveUpdater,
+  invalidateHistorySnapshot,
   latestHistoryPosition,
   refreshHistorySnapshot,
   surfaceQueryKey,
@@ -92,6 +93,10 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "error") {
+      if (message.piSessionId && wsClient.activeSubscriptionPiSessionId() !== message.piSessionId) {
+        void invalidateHistorySnapshot(queryClient, message.piSessionId);
+        return;
+      }
       if (message.piSessionId) void reloadHistory(message.piSessionId);
       toast.error(message.message);
       return;
