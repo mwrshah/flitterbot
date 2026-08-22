@@ -121,23 +121,29 @@ export function setupWsQueryBridge(deps: {
       return;
     }
 
-    if (message.type === "text_delta") {
-      conversationState.textDelta(piSessionId, message.messageId, message.delta);
+    if (message.type === "assistant_message_snapshot") {
+      conversationState.messageSnapshot(piSessionId, message.messageId, message.blocks);
       return;
     }
 
-    if (message.type === "thinking_start") {
-      conversationState.thinkingStart(piSessionId, message.messageId);
+    if (message.type === "assistant_block_set") {
+      conversationState.blockSet(piSessionId, {
+        messageId: message.messageId,
+        contentIndex: message.contentIndex,
+        block: message.block,
+        tool: message.tool,
+        active: message.active,
+      });
       return;
     }
 
-    if (message.type === "thinking_delta") {
-      conversationState.thinkingDelta(piSessionId, message.messageId, message.delta);
-      return;
-    }
-
-    if (message.type === "thinking_end") {
-      conversationState.thinkingEnd(piSessionId, message.messageId);
+    if (message.type === "assistant_block_delta") {
+      conversationState.blockDelta(piSessionId, {
+        messageId: message.messageId,
+        contentIndex: message.contentIndex,
+        blockType: message.blockType,
+        delta: message.delta,
+      });
       return;
     }
 

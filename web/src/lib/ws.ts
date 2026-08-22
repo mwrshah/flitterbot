@@ -84,7 +84,13 @@ export class FlitterbotWsClient {
       this.resetHeartbeatTimeout();
       try {
         const message = JSON.parse(event.data as string) as ControlSurfaceWebSocketServerEvent;
-        if (message.type === "pong" || !this.acceptPositionedMessage(message)) return;
+        if (
+          message.type === "pong" ||
+          !this.acceptsActiveSubscription(message) ||
+          !this.acceptPositionedMessage(message)
+        ) {
+          return;
+        }
         for (const fn of this.subscribers) fn(message);
       } catch {}
     };
@@ -318,6 +324,15 @@ export class FlitterbotWsClient {
       this.activeSessionSubscription.piSessionId,
       this.activeSessionSubscription.eventTypes,
     );
+  }
+
+  private acceptsActiveSubscription(message: ControlSurfaceWebSocketServerEvent): boolean {
+    const piSessionId = "piSessionId" in message ? message.piSessionId : undefined;
+    if (!piSessionId) return true;
+    const active = this.activeSessionSubscription;
+    if (!active) return false;
+    if (active.piSessionId !== "*" && active.piSessionId !== piSessionId) return false;
+    return active.eventTypes === undefined || active.eventTypes.includes(message.type);
   }
 
   private acceptPositionedMessage(message: ControlSurfaceWebSocketServerEvent): boolean {

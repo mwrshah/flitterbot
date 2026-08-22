@@ -1,9 +1,4 @@
-import type {
-  ChatTimelineItem,
-  ChatTimelineMessage,
-  ChatTimelineMessageBlock,
-  ChatTimelineTool,
-} from "./types";
+import type { ChatTimelineItem, ChatTimelineMessage, ChatTimelineTool } from "./types";
 
 export type ConversationToolBlock = {
   start: ChatTimelineTool;
@@ -19,30 +14,76 @@ export type ConversationRow = {
 };
 
 export type ConversationContentPart =
-  | Exclude<ChatTimelineMessageBlock, { type: "tool" }>
+  | { type: "text"; text: string; streaming: boolean }
+  | { type: "thinking"; thinking: string; streaming: boolean }
   | { type: "tool"; tool: ConversationToolBlock };
 
 export function buildConversationContentParts(
   message: ChatTimelineMessage | undefined,
   tools: ConversationToolBlock[],
+  activeContentIndexes?: ReadonlySet<number>,
 ): ConversationContentPart[] {
   const blocks =
     message?.blocks ?? (message ? [{ type: "text" as const, text: message.content }] : []);
   const toolsById = new Map(tools.map((tool) => [tool.start.toolUseId, tool]));
   const renderedTools = new Set<ConversationToolBlock>();
   const parts: ConversationContentPart[] = [];
+  let textRun: Extract<ConversationContentPart, { type: "text" }> | undefined;
+  let thinkingRun: Extract<ConversationContentPart, { type: "thinking" }> | undefined;
 
-  for (const block of blocks) {
-    if (block.type !== "tool") {
-      parts.push(block);
+  const flushText = () => {
+    if (textRun) parts.push(textRun);
+    textRun = undefined;
+  };
+  const flushThinking = () => {
+    if (thinkingRun) parts.push(thinkingRun);
+    thinkingRun = undefined;
+  };
+
+  for (const [contentIndex, block] of blocks.entries()) {
+    if (block.type === "thinking") {
+      if (!block.thinking.trim()) continue;
+      flushText();
+      if (thinkingRun) {
+        thinkingRun.thinking += `\n\n${block.thinking}`;
+        thinkingRun.streaming ||= activeContentIndexes?.has(contentIndex) ?? false;
+      } else {
+        thinkingRun = {
+          type: "thinking",
+          thinking: block.thinking,
+          streaming: activeContentIndexes?.has(contentIndex) ?? false,
+        };
+      }
       continue;
     }
+
+    if (block.type === "text") {
+      if (!block.text.trim()) continue;
+      flushThinking();
+      if (textRun) {
+        textRun.text += block.text;
+        textRun.streaming ||= activeContentIndexes?.has(contentIndex) ?? false;
+      } else {
+        textRun = {
+          type: "text",
+          text: block.text,
+          streaming: activeContentIndexes?.has(contentIndex) ?? false,
+        };
+      }
+      continue;
+    }
+
+    flushText();
+    flushThinking();
     const tool = toolsById.get(block.toolUseId);
     if (tool && !renderedTools.has(tool)) {
       renderedTools.add(tool);
       parts.push({ type: "tool", tool });
     }
   }
+
+  flushText();
+  flushThinking();
   for (const tool of tools) {
     if (!renderedTools.has(tool)) parts.push({ type: "tool", tool });
   }

@@ -1,4 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
+import type { AssistantBlockSnapshot } from "../../../src/contracts/websocket.ts";
+import type { ChatTimelineMessageBlock, ChatTimelineTool } from "./types.ts";
 
 export type ActiveToolState = Readonly<{
   toolUseId: string;
@@ -7,11 +9,11 @@ export type ActiveToolState = Readonly<{
   isError?: boolean;
 }>;
 
+export type ConversationStreamingBlock = Readonly<AssistantBlockSnapshot>;
+
 export type ConversationStreamingState = Readonly<{
   messageId: string;
-  text: string;
-  thinking: string;
-  thinkingActive: boolean;
+  blocks: ReadonlyMap<number, ConversationStreamingBlock>;
 }>;
 
 type ConversationListener = () => void;
@@ -26,10 +28,26 @@ type ConversationSession = {
 };
 
 type ConversationAction =
-  | { type: "text_delta"; messageId: string; delta: string }
-  | { type: "thinking_start"; messageId: string }
-  | { type: "thinking_delta"; messageId: string; delta: string }
-  | { type: "thinking_end"; messageId: string }
+  | {
+      type: "message_snapshot";
+      messageId: string;
+      blocks: AssistantBlockSnapshot[];
+    }
+  | {
+      type: "block_set";
+      messageId: string;
+      contentIndex: number;
+      block: ChatTimelineMessageBlock;
+      tool?: ChatTimelineTool;
+      active: boolean;
+    }
+  | {
+      type: "block_delta";
+      messageId: string;
+      contentIndex: number;
+      blockType: "text" | "thinking";
+      delta: string;
+    }
   | {
       type: "tool";
       toolUseId: string;
@@ -58,7 +76,7 @@ function sessionFor(sessionId: string): ConversationSession {
 
 function streamFor(session: ConversationSession, messageId: string): ConversationStreamingState {
   if (session.streaming?.messageId === messageId) return session.streaming;
-  const streaming = { messageId, text: "", thinking: "", thinkingActive: false };
+  const streaming = { messageId, blocks: new Map<number, ConversationStreamingBlock>() };
   session.streaming = streaming;
   return streaming;
 }
@@ -119,30 +137,37 @@ function deleteSessionIfEmpty(sessionId: string, session: ConversationSession): 
 function reduce(sessionId: string, action: ConversationAction): void {
   const session = sessionFor(sessionId);
   switch (action.type) {
-    case "text_delta": {
-      const streaming = streamFor(session, action.messageId);
-      session.streaming = { ...streaming, text: streaming.text + action.delta };
+    case "message_snapshot": {
+      session.streaming = {
+        messageId: action.messageId,
+        blocks: new Map(action.blocks.map((block, contentIndex) => [contentIndex, block])),
+      };
       scheduleStreamingPublish(session);
       return;
     }
-    case "thinking_start": {
+    case "block_set": {
       const streaming = streamFor(session, action.messageId);
-      if (streaming.thinkingActive) return;
-      session.streaming = { ...streaming, thinkingActive: true };
+      const blocks = new Map(streaming.blocks);
+      blocks.set(action.contentIndex, {
+        block: action.block,
+        ...(action.tool ? { tool: action.tool } : {}),
+        active: action.active,
+      });
+      session.streaming = { ...streaming, blocks };
       scheduleStreamingPublish(session);
       return;
     }
-    case "thinking_delta": {
+    case "block_delta": {
       const streaming = streamFor(session, action.messageId);
-      session.streaming = { ...streaming, thinking: streaming.thinking + action.delta };
-      scheduleStreamingPublish(session);
-      return;
-    }
-    case "thinking_end": {
-      if (session.streaming?.messageId !== action.messageId || !session.streaming.thinkingActive) {
-        return;
-      }
-      session.streaming = { ...session.streaming, thinkingActive: false };
+      const current = streaming.blocks.get(action.contentIndex);
+      if (!current || current.block.type !== action.blockType) return;
+      const block =
+        current.block.type === "text"
+          ? { ...current.block, text: current.block.text + action.delta }
+          : { ...current.block, thinking: current.block.thinking + action.delta };
+      const blocks = new Map(streaming.blocks);
+      blocks.set(action.contentIndex, { ...current, block, active: true });
+      session.streaming = { ...streaming, blocks };
       scheduleStreamingPublish(session);
       return;
     }
@@ -182,17 +207,20 @@ function reduce(sessionId: string, action: ConversationAction): void {
 }
 
 export const conversationState = {
-  textDelta(sessionId: string, messageId: string, delta: string): void {
-    reduce(sessionId, { type: "text_delta", messageId, delta });
+  messageSnapshot(sessionId: string, messageId: string, blocks: AssistantBlockSnapshot[]): void {
+    reduce(sessionId, { type: "message_snapshot", messageId, blocks });
   },
-  thinkingStart(sessionId: string, messageId: string): void {
-    reduce(sessionId, { type: "thinking_start", messageId });
+  blockSet(
+    sessionId: string,
+    action: Omit<Extract<ConversationAction, { type: "block_set" }>, "type">,
+  ): void {
+    reduce(sessionId, { type: "block_set", ...action });
   },
-  thinkingDelta(sessionId: string, messageId: string, delta: string): void {
-    reduce(sessionId, { type: "thinking_delta", messageId, delta });
-  },
-  thinkingEnd(sessionId: string, messageId: string): void {
-    reduce(sessionId, { type: "thinking_end", messageId });
+  blockDelta(
+    sessionId: string,
+    action: Omit<Extract<ConversationAction, { type: "block_delta" }>, "type">,
+  ): void {
+    reduce(sessionId, { type: "block_delta", ...action });
   },
   tool(
     sessionId: string,
