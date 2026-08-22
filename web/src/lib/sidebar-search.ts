@@ -1,6 +1,24 @@
 const MAX_OPEN_CONTENT_MATCHES = 4;
 const MAX_CONTENT_MATCHES = 7;
 
+type SidebarPickerCandidate = { key: string; piSessionId: string };
+
+export function resolveSidebarPickerIndex(
+  candidates: readonly SidebarPickerCandidate[],
+  currentPiSessionId?: string,
+  selectedKey?: string | null,
+): number {
+  if (selectedKey === null) return -1;
+  const currentIndex = currentPiSessionId
+    ? candidates.findIndex((candidate) => candidate.piSessionId === currentPiSessionId)
+    : -1;
+  if (currentIndex !== -1) return currentIndex;
+  const selectedIndex = selectedKey
+    ? candidates.findIndex((candidate) => candidate.key === selectedKey)
+    : -1;
+  return selectedIndex === -1 ? 0 : selectedIndex;
+}
+
 export function projectSidebarRows<
   T extends { name: string; piSessionId?: string; section: "open" | "closed" },
 >(

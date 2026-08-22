@@ -36,7 +36,7 @@ import {
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
 import { sessionSearchQueryOptions, statusQueryOptions } from "@/lib/queries";
-import { projectSidebarRows } from "@/lib/sidebar-search";
+import { projectSidebarRows, resolveSidebarPickerIndex } from "@/lib/sidebar-search";
 import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
 import type { PiSessionStatus, StreamSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -540,7 +540,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   const pickerCursorRef = useRef<PickerCursor>({ selectedElement: null });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const setPickerSelection = useCallback(
-    (candidates: readonly PickerCandidate[] = [], index = -1, deferDomUpdate = false) => {
+    (candidates: readonly PickerCandidate[] = [], index = 0, deferDomUpdate = false) => {
       const cursor = pickerCursorRef.current;
       if (cursor.scrollFrame !== undefined) cancelAnimationFrame(cursor.scrollFrame);
       cursor.selectedElement?.removeAttribute("data-search-selected");
@@ -793,31 +793,35 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
     const cursor = pickerCursorRef.current;
     if (
       document.activeElement !== input ||
-      cursor.selectedElement?.isConnected ||
       cursor.selectedKey === null ||
       displayedSearchCandidates.length === 0
     ) {
       return;
     }
-    const selectedIndex = cursor.selectedKey
-      ? displayedSearchCandidates.findIndex((row) => row.key === cursor.selectedKey)
-      : -1;
+    const selectedIndex = resolveSidebarPickerIndex(
+      displayedSearchCandidates,
+      currentPiSessionId,
+      cursor.selectedKey,
+    );
+    const selectedKey = displayedSearchCandidates[selectedIndex]?.key;
+    if (cursor.selectedElement?.isConnected && cursor.selectedKey === selectedKey) return;
     cursor.originPath = router.state.location.pathname;
-    setPickerSelection(displayedSearchCandidates, selectedIndex === -1 ? 0 : selectedIndex);
-  }, [displayedSearchCandidates, setPickerSelection]);
+    setPickerSelection(displayedSearchCandidates, selectedIndex);
+  }, [currentPiSessionId, displayedSearchCandidates, setPickerSelection]);
 
   const openStreamPicker = useEffectEvent((direction?: 1 | -1) => {
     const input = searchInputRef.current;
     if (!input) return false;
+    const cursor = pickerCursorRef.current;
+    const currentPathname = router.state.location.pathname;
+    const activePiSessionId = getPiSessionId(currentPathname);
+    const inputFocused = document.activeElement === input;
     if (direction) {
-      const cursor = pickerCursorRef.current;
-      const currentPathname = router.state.location.pathname;
-      const inputFocused = document.activeElement === input;
       const candidates = inputFocused ? currentSearchCandidates : allSearchCandidates;
       const continuing = inputFocused && cursor.originPath === currentPathname;
       const currentIndex = continuing
         ? candidates.findIndex((row) => row.key === cursor.selectedKey)
-        : candidates.findIndex((row) => row.piSessionId === getPiSessionId(currentPathname));
+        : candidates.findIndex((row) => row.piSessionId === activePiSessionId);
       const selectedIndex =
         !continuing && currentIndex === -1
           ? direction === 1
@@ -827,6 +831,12 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
       if (!inputFocused) setQuery("");
       selectPickerIndex(candidates, selectedIndex, !inputFocused && !!normalizedDeferredQuery);
       cursor.originPath = currentPathname;
+    } else if (!inputFocused) {
+      cursor.originPath = currentPathname;
+      setPickerSelection(
+        currentSearchCandidates,
+        resolveSidebarPickerIndex(currentSearchCandidates, activePiSessionId),
+      );
     }
     input.focus();
     return true;
@@ -877,17 +887,30 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
                 normalizedNextQuery,
                 nextSessionMatchCounts,
               ).filter((row): row is PickerCandidate => !!row.piSessionId);
+              const selectedKey = pickerCursorRef.current.selectedKey ?? undefined;
               clearPickerCursor();
               setQuery(nextQuery);
-              pickerCursorRef.current.originPath = router.state.location.pathname;
-              setPickerSelection(nextCandidates, 0);
+              const cursor = pickerCursorRef.current;
+              const currentPathname = router.state.location.pathname;
+              cursor.originPath = currentPathname;
+              setPickerSelection(
+                nextCandidates,
+                resolveSidebarPickerIndex(
+                  nextCandidates,
+                  getPiSessionId(currentPathname),
+                  selectedKey,
+                ),
+              );
             }}
             onFocus={() => {
               const cursor = pickerCursorRef.current;
               const hasPickerPosition = cursor.originPath !== undefined;
               cursor.originPath = router.state.location.pathname;
               if (!cursor.selectedKey && !hasPickerPosition) {
-                setPickerSelection(currentSearchCandidates, 0);
+                setPickerSelection(
+                  currentSearchCandidates,
+                  resolveSidebarPickerIndex(currentSearchCandidates, currentPiSessionId),
+                );
               }
             }}
             onBlur={clearPickerCursor}
