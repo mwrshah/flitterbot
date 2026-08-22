@@ -1,7 +1,13 @@
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { touchPiEvent } from "../blackboard/pi-sessions.ts";
-import type { ChatTimelineMessage, ChatTimelineTool } from "../contracts/index.ts";
+import type {
+  ChatTimelineMessage,
+  ChatTimelineMessageBlock,
+  ChatTimelineTool,
+  JsonValue,
+} from "../contracts/index.ts";
 import type { WebSocketHub } from "../ws/hub.ts";
 import { ensureConversationMessageId, findConversationEntry } from "./conversation-identity.ts";
 import { flitterbotHookToTimelineMessage, piMessageToTimelineItems } from "./history.ts";
@@ -39,6 +45,35 @@ function reportMissingPersistedMessage(
   const message = `Pi persisted-message lookup failed${detail}`;
   console.error("%s (piSessionId=%s)", message, piSessionId);
   wsHub.broadcast({ type: "error", message, piSessionId });
+}
+
+function timelineBlock(content: AssistantMessage["content"][number]): ChatTimelineMessageBlock {
+  switch (content.type) {
+    case "text":
+      return { type: "text", text: content.text };
+    case "thinking":
+      return { type: "thinking", thinking: content.thinking };
+    case "toolCall":
+      return { type: "tool", toolUseId: content.id };
+  }
+}
+
+function timelineTool(
+  toolCall: ToolCall,
+  createdAt: string,
+  displayArgs?: JsonValue,
+): ChatTimelineTool | undefined {
+  if (!toolCall.id.trim() || !toolCall.name.trim()) return undefined;
+  return {
+    id: `tool-${toolCall.id}-start`,
+    kind: "tool",
+    tool: toolCall.name,
+    phase: "start",
+    toolUseId: toolCall.id,
+    args: structuredClone(toolCall.arguments) as JsonValue,
+    ...(displayArgs ? { displayArgs } : {}),
+    createdAt,
+  };
 }
 
 type BroadcastRole = "user" | "assistant";
@@ -103,11 +138,41 @@ export function subscribeToPiSession(
   lifecycle: PiSessionLifecycleCallbacks = {},
 ): () => void {
   let currentStreamingMessageId: string | null = null;
+  let currentStreamingMessage: AssistantMessage | null = null;
+  const activeContentIndexes = new Set<number>();
 
   let lastAssistantMessage: ChatTimelineMessage | null = null;
   let messageEndFired = false;
 
-  return session.subscribe((event) => {
+  const removeSnapshotProvider = wsHub.setConversationSnapshotProvider(session.sessionId, () => {
+    if (!currentStreamingMessageId || !currentStreamingMessage) return undefined;
+    const createdAt = extractTimestamp(currentStreamingMessage, new Date().toISOString());
+    return {
+      type: "assistant_message_snapshot",
+      piSessionId: session.sessionId,
+      messageId: currentStreamingMessageId,
+      blocks: currentStreamingMessage.content.map((content, contentIndex) => {
+        const active = activeContentIndexes.has(contentIndex);
+        const displayArgs =
+          content.type === "toolCall"
+            ? toolDisplayCache.displayArgsForTool(
+                session.sessionId,
+                content.name,
+                content.arguments,
+              )
+            : undefined;
+        const tool =
+          content.type === "toolCall" ? timelineTool(content, createdAt, displayArgs) : undefined;
+        return {
+          block: timelineBlock(content),
+          ...(tool ? { tool } : {}),
+          active,
+        };
+      }),
+    };
+  });
+
+  const unsubscribe = session.subscribe((event) => {
     const now = state.noteEvent(session.messages.length);
 
     switch (event.type) {
@@ -118,46 +183,118 @@ export function subscribeToPiSession(
         const messageId = ensureConversationMessageId(event.message, preferredId);
         if (role === "assistant") {
           currentStreamingMessageId = messageId ?? null;
+          currentStreamingMessage = event.message as AssistantMessage;
+          activeContentIndexes.clear();
         }
         break;
       }
       case "message_update": {
+        const messageId = currentStreamingMessageId;
+        if (!messageId) break;
         const ame = event.assistantMessageEvent;
+        if ("partial" in ame) currentStreamingMessage = ame.partial;
 
-        if (
-          ame.type === "text_delta" &&
-          typeof ame.delta === "string" &&
-          currentStreamingMessageId
-        ) {
-          wsHub.broadcast({
-            type: "text_delta",
-            piSessionId: session.sessionId,
-            messageId: currentStreamingMessageId,
-            delta: ame.delta,
-          });
-        } else if (ame.type === "thinking_start" && currentStreamingMessageId) {
-          wsHub.broadcast({
-            type: "thinking_start",
-            piSessionId: session.sessionId,
-            messageId: currentStreamingMessageId,
-          });
-        } else if (
-          ame.type === "thinking_delta" &&
-          typeof ame.delta === "string" &&
-          currentStreamingMessageId
-        ) {
-          wsHub.broadcast({
-            type: "thinking_delta",
-            piSessionId: session.sessionId,
-            messageId: currentStreamingMessageId,
-            delta: ame.delta,
-          });
-        } else if (ame.type === "thinking_end" && currentStreamingMessageId) {
-          wsHub.broadcast({
-            type: "thinking_end",
-            piSessionId: session.sessionId,
-            messageId: currentStreamingMessageId,
-          });
+        switch (ame.type) {
+          case "text_start":
+          case "thinking_start":
+          case "toolcall_start": {
+            const content = ame.partial.content[ame.contentIndex];
+            if (!content) break;
+            activeContentIndexes.add(ame.contentIndex);
+            const displayArgs =
+              content.type === "toolCall"
+                ? toolDisplayCache.displayArgsForTool(
+                    session.sessionId,
+                    content.name,
+                    content.arguments,
+                  )
+                : undefined;
+            const tool =
+              content.type === "toolCall" ? timelineTool(content, now, displayArgs) : undefined;
+            wsHub.broadcast({
+              type: "assistant_block_set",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              block: timelineBlock(content),
+              ...(tool ? { tool } : {}),
+              active: true,
+            });
+            break;
+          }
+          case "text_delta":
+          case "thinking_delta":
+            wsHub.broadcast({
+              type: "assistant_block_delta",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              blockType: ame.type === "text_delta" ? "text" : "thinking",
+              delta: ame.delta,
+            });
+            break;
+          case "toolcall_delta": {
+            const content = ame.partial.content[ame.contentIndex];
+            if (content?.type !== "toolCall") break;
+            activeContentIndexes.add(ame.contentIndex);
+            const displayArgs = toolDisplayCache.displayArgsForTool(
+              session.sessionId,
+              content.name,
+              content.arguments,
+            );
+            const tool = timelineTool(content, now, displayArgs);
+            wsHub.broadcast({
+              type: "assistant_block_set",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              block: timelineBlock(content),
+              ...(tool ? { tool } : {}),
+              active: true,
+            });
+            break;
+          }
+          case "text_end":
+            activeContentIndexes.delete(ame.contentIndex);
+            wsHub.broadcast({
+              type: "assistant_block_set",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              block: { type: "text", text: ame.content },
+              active: false,
+            });
+            break;
+          case "thinking_end":
+            activeContentIndexes.delete(ame.contentIndex);
+            wsHub.broadcast({
+              type: "assistant_block_set",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              block: { type: "thinking", thinking: ame.content },
+              active: false,
+            });
+            break;
+          case "toolcall_end": {
+            activeContentIndexes.delete(ame.contentIndex);
+            const displayArgs = toolDisplayCache.displayArgsForTool(
+              session.sessionId,
+              ame.toolCall.name,
+              ame.toolCall.arguments,
+            );
+            const tool = timelineTool(ame.toolCall, now, displayArgs);
+            wsHub.broadcast({
+              type: "assistant_block_set",
+              piSessionId: session.sessionId,
+              messageId,
+              contentIndex: ame.contentIndex,
+              block: timelineBlock(ame.toolCall),
+              ...(tool ? { tool } : {}),
+              active: false,
+            });
+            break;
+          }
         }
         break;
       }
@@ -189,6 +326,8 @@ export function subscribeToPiSession(
         const capturedMessageId = ensureConversationMessageId(capturedMessage, preferredId);
         const capturedTimestamp = extractTimestamp(event.message, now);
         currentStreamingMessageId = null;
+        currentStreamingMessage = null;
+        activeContentIndexes.clear();
 
         if (!capturedMessageId) {
           reportMissingPersistedMessage(wsHub, session.sessionId, capturedMessageId);
@@ -230,7 +369,18 @@ export function subscribeToPiSession(
         const message = timelineItems.find(
           (item): item is ChatTimelineMessage => item.kind === "message",
         );
-        if (!message) break;
+        if (!message) {
+          if (role === "assistant") {
+            lastAssistantMessage = null;
+            messageEndFired = true;
+            wsHub.broadcastHistoryCommit({
+              type: "message_end",
+              piSessionId: session.sessionId,
+              items: [],
+            });
+          }
+          break;
+        }
         const timelineMessage: ChatTimelineMessage = {
           ...message,
           source: currentItem?.source,
@@ -413,4 +563,9 @@ export function subscribeToPiSession(
         break;
     }
   });
+
+  return () => {
+    unsubscribe();
+    removeSnapshotProvider();
+  };
 }

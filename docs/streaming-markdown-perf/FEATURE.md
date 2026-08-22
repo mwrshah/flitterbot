@@ -6,33 +6,64 @@ The chat renders valid Markdown while an assistant response grows. Streaming upd
 
 ## Architecture
 
-`conversation-state.ts` accumulates text and thinking snapshots by `messageId`. Only `StreamingAssistantRow` subscribes to the streaming snapshot with `useSyncExternalStore`; `ChatPanel`, the virtual list, and committed rows do not subscribe to token deltas.
+`conversation-state.ts` stores each incomplete assistant block in a `Map` keyed by Pi's `contentIndex`. Each text or thinking delta updates only its indexed block, and each block owns its active lifecycle because blocks can interleave. Only `StreamingAssistantRow` subscribes through `useSyncExternalStore`; `ChatPanel`, the virtual list, and committed rows do not subscribe to content deltas.
 
-`conversation-state.ts` appends every delta immediately but publishes at most one immutable streaming snapshot per animation frame. The first snapshot for a new `messageId` publishes immediately so stale content cannot flash. `MarkdownContent` uses `@tanstack/markdown` with its streaming extension, which keeps incomplete block syntax renderable. The parser still receives the accumulated message, but frame-level publication bounds parsing and React reconciliation to the browser paint cadence.
+The store applies every event immediately but publishes at most one immutable streaming snapshot per animation frame. The first snapshot for a new `messageId` publishes immediately so stale content cannot flash. `MarkdownContent` uses `@tanstack/markdown` with its streaming extension, which keeps incomplete block syntax renderable. The parser receives each grouped content run, while frame-level publication bounds parsing and React reconciliation to the browser paint cadence.
 
 Committed messages use the same `MarkdownContent` component without the streaming extension. Fenced code uses `highlight.js` after commit. During streaming, code fences render escaped plain text and skip syntax highlighting. Copy controls always use the original code string.
 
-## Data Flow
+## Pseudocode Contracts and Call Graph
+
+```ts
+type StreamingBlock = {
+  block: ChatTimelineMessageBlock
+  tool?: ChatTimelineTool
+  active: boolean
+}
+
+type StreamingMessage = {
+  messageId: string
+  blocks: ReadonlyMap<number, StreamingBlock>
+}
+```
 
 ```text
-text_delta / thinking_delta
-  → conversationState immutable per-session snapshot
-    → animation-frame streaming snapshot
+assistant_block_set / assistant_block_delta
+  → conversationState.blocks.get(contentIndex)
+    → animation-frame snapshot
       → useConversationStreaming(piSessionId)
         → StreamingAssistantRow
-          → MarkdownContent(streaming=true)
-          → @tanstack/markdown streaming extension
+          → buildConversationContentParts
+            → MarkdownContent(streaming=partHasActiveBlock)
+
+assistant_message_snapshot
+  → replace the complete indexed in-flight message after subscription or reset
 
 message_end
-  → canonical ChatTimelineMessage in TanStack Query
-  → conversationState clears the streaming snapshot
-  → ChatMessageRow renders committed Markdown and highlighted code
+  → authoritative ChatTimelineMessage in TanStack Query
+  → clear the incomplete snapshot
+  → ChatMessageRow uses the same buildConversationContentParts projection
+```
+
+## Component Tree
+
+```text
+StreamsMessageList
+  ├─ ChatMessageRow
+  │   └─ AssistantContents
+  │       └─ MarkdownContent
+  └─ StreamingAssistantRow [only content-delta subscriber]
+      └─ AssistantContents
+          └─ MarkdownContent(streaming per active indexed run)
 ```
 
 ## Rendering Invariants
 
-- A new `messageId` replaces the previous streaming accumulation.
-- Token deltas rerender only the transient assistant row.
+- A new `messageId` replaces the previous incomplete message.
+- `contentIndex` identifies blocks across text, thinking, and tool-call content; event contiguity is never assumed.
+- Content deltas rerender only the incomplete assistant row.
+- Empty or encrypted-only thinking blocks produce no disclosure.
+- Adjacent readable thinking blocks share one disclosure; nonempty text and tool blocks terminate the run.
 - Committed rows consume `ChatTimelineItem` directly and never convert to Pi message types.
 - Raw HTML stays escaped.
 - Links and images accept only root-relative paths, same-document fragments, and `http`, `https`, `mailto`, or `tel` URLs.
@@ -43,10 +74,11 @@ message_end
 
 ## Key Files
 
-- `web/src/lib/conversation-state.ts` — immutable streaming snapshots and localized subscriptions.
-- `web/src/components/chat-message-row.tsx` — transient assistant row and ordered message rendering.
+- `src/streams/pi-subscribe.ts` — indexed Pi block events, tool-call snapshots, and authoritative in-flight snapshot provider.
+- `src/ws/hub.ts` — positioned replay followed by the current unpositioned in-flight snapshot.
+- `web/src/lib/conversation-state.ts` — sparse-safe indexed block state, frame-bound snapshots, and localized subscriptions.
+- `web/src/lib/conversation-rows.ts` — shared grouping for live and committed content.
+- `web/src/components/chat-message-row.tsx` — incomplete assistant row and ordered message rendering.
 - `web/src/components/common/markdown-content.tsx` — TanStack Markdown configuration, URL policy, streaming extension, and footnote namespace.
 - `web/src/components/common/code-block.tsx` — committed highlighting and code copy behavior.
 - `web/src/components/streams-message-list.tsx` — measured virtual rows and end anchoring.
-- `web/tests/chat-rendering.test.tsx` — server-rendered mixed-block, Markdown safety, footnote, code, and active-tool contracts.
-- `web/tests/conversation-state.test.ts` — publication cadence, keyed subscriptions, and snapshot ordering.

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type http from "node:http";
 import type net from "node:net";
 import {
+  type AssistantMessageSnapshotWebSocketEvent,
   CONTROL_SURFACE_WS_PATH,
   type ConnectedWebSocketEvent,
   type ControlSurfaceWebSocketClientEvent,
@@ -28,12 +29,12 @@ type ReplayEvent = {
   payload: ControlSurfaceWebSocketServerEvent;
 };
 
+type ConversationSnapshotProvider = () => AssistantMessageSnapshotWebSocketEvent | undefined;
+
 const REPLAY_LIMIT = 5_000;
 const REPLAYED_EVENT_TYPES = new Set([
-  "text_delta",
-  "thinking_start",
-  "thinking_delta",
-  "thinking_end",
+  "assistant_block_set",
+  "assistant_block_delta",
   "message_end",
   "tool_execution_start",
   "tool_execution_update",
@@ -55,6 +56,7 @@ export class WebSocketHub {
   private readonly incarnation = crypto.randomUUID();
   private readonly sequenceBySession = new Map<string, number>();
   private readonly historySequenceBySession = new Map<string, number>();
+  private readonly conversationSnapshotProviders = new Map<string, ConversationSnapshotProvider>();
   private replayEvents: ReplayEvent[] = [];
   private replayStart = 0;
 
@@ -130,6 +132,18 @@ export class WebSocketHub {
     return {
       incarnation: this.incarnation,
       sequence: this.historySequenceBySession.get(piSessionId) ?? 0,
+    };
+  }
+
+  setConversationSnapshotProvider(
+    piSessionId: string,
+    provider: ConversationSnapshotProvider,
+  ): () => void {
+    this.conversationSnapshotProviders.set(piSessionId, provider);
+    return () => {
+      if (this.conversationSnapshotProviders.get(piSessionId) === provider) {
+        this.conversationSnapshotProviders.delete(piSessionId);
+      }
     };
   }
 
@@ -221,6 +235,8 @@ export class WebSocketHub {
       if (filter && !filter.has(event.payload.type)) continue;
       this.safeWrite(client, encodeFrame(JSON.stringify(event.payload)));
     }
+    const snapshot = this.conversationSnapshotProviders.get(piSessionId)?.();
+    if (snapshot && (!filter || filter.has(snapshot.type))) this.send(clientId, snapshot);
   }
 
   unsubscribeClient(clientId: string, piSessionId: string): void {

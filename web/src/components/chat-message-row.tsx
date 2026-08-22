@@ -112,27 +112,29 @@ function AssistantContents({
   message,
   tools,
   piSessionId,
-  streaming = false,
-  thinkingStreaming = false,
+  activeContentIndexes,
 }: {
   message?: ChatTimelineMessage;
   tools: ConversationToolBlock[];
   piSessionId: string;
-  streaming?: boolean;
-  thinkingStreaming?: boolean;
+  activeContentIndexes?: ReadonlySet<number>;
 }) {
   const content: ReactNode[] = [];
-  for (const [index, block] of buildConversationContentParts(message, tools).entries()) {
-    if (block.type === "text" && block.text.trim()) {
+  for (const [index, block] of buildConversationContentParts(
+    message,
+    tools,
+    activeContentIndexes,
+  ).entries()) {
+    if (block.type === "text") {
       content.push(
-        <MarkdownContent key={`text:${index}`} content={block.text} streaming={streaming} />,
+        <MarkdownContent key={`text:${index}`} content={block.text} streaming={block.streaming} />,
       );
-    } else if (block.type === "thinking" && (block.thinking.trim() || streaming)) {
+    } else if (block.type === "thinking") {
       content.push(
         <ThinkingBlock
           key={`thinking:${index}`}
           content={block.thinking}
-          streaming={thinkingStreaming}
+          streaming={block.streaming}
         />,
       );
     } else if (block.type === "tool") {
@@ -251,17 +253,31 @@ function StreamingAssistantContents({
   streaming: ConversationStreamingState;
   piSessionId: string;
 }) {
+  const indexedBlocks = [...streaming.blocks.entries()].sort(([a], [b]) => a - b);
+  const blocks = indexedBlocks.map(([, { block }]) => block);
+  const tools = indexedBlocks.flatMap(([, { tool }]) => (tool ? [{ start: tool }] : []));
+  const activeContentIndexes = new Set(
+    indexedBlocks.flatMap(([, block], contentIndex) => (block.active ? [contentIndex] : [])),
+  );
+  if (
+    !blocks.some(
+      (block) =>
+        (block.type === "text" && block.text.trim()) ||
+        (block.type === "thinking" && block.thinking.trim()),
+    ) &&
+    tools.length === 0
+  ) {
+    return null;
+  }
+
   const message: ChatTimelineMessage = {
     id: streaming.messageId,
     kind: "message",
     role: "assistant",
-    content: streaming.text,
-    blocks: [
-      ...(streaming.thinking || streaming.thinkingActive
-        ? [{ type: "thinking" as const, thinking: streaming.thinking }]
-        : []),
-      ...(streaming.text ? [{ type: "text" as const, text: streaming.text }] : []),
-    ],
+    content: blocks
+      .flatMap((block) => (block.type === "text" && block.text.trim() ? [block.text] : []))
+      .join("\n\n"),
+    blocks,
     createdAt: new Date(0).toISOString(),
   };
   return (
@@ -269,10 +285,9 @@ function StreamingAssistantContents({
       <div className="mt-2 flex flex-col gap-1 px-4 pr-6">
         <AssistantContents
           message={message}
-          tools={[]}
+          tools={tools}
           piSessionId={piSessionId}
-          streaming
-          thinkingStreaming={streaming.thinkingActive}
+          activeContentIndexes={activeContentIndexes}
         />
       </div>
     </div>

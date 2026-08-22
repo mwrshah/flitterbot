@@ -1,6 +1,7 @@
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
+  ChatTimelineMessageBlock,
   ChatTimelineTool,
   ImageAttachment,
   MessageSource,
@@ -90,10 +91,32 @@ export interface QueueItemEndWebSocketEvent {
   streamId?: string;
 }
 
-export interface TextDeltaWebSocketEvent {
-  type: "text_delta";
+export type AssistantBlockSnapshot = {
+  block: ChatTimelineMessageBlock;
+  tool?: ChatTimelineTool;
+  active: boolean;
+};
+
+export interface AssistantBlockSetWebSocketEvent extends AssistantBlockSnapshot {
+  type: "assistant_block_set";
   piSessionId?: string;
   messageId: string;
+  contentIndex: number;
+}
+
+export interface AssistantMessageSnapshotWebSocketEvent {
+  type: "assistant_message_snapshot";
+  piSessionId: string;
+  messageId: string;
+  blocks: AssistantBlockSnapshot[];
+}
+
+export interface AssistantBlockDeltaWebSocketEvent {
+  type: "assistant_block_delta";
+  piSessionId?: string;
+  messageId: string;
+  contentIndex: number;
+  blockType: "text" | "thinking";
   delta: string;
 }
 
@@ -121,25 +144,6 @@ export interface ToolExecutionEndWebSocketEvent {
   result: unknown;
   isError: boolean;
   timestamp: string;
-}
-
-export interface ThinkingStartWebSocketEvent {
-  type: "thinking_start";
-  piSessionId?: string;
-  messageId: string;
-}
-
-export interface ThinkingDeltaWebSocketEvent {
-  type: "thinking_delta";
-  piSessionId?: string;
-  messageId: string;
-  delta: string;
-}
-
-export interface ThinkingEndWebSocketEvent {
-  type: "thinking_end";
-  piSessionId?: string;
-  messageId: string;
 }
 
 export interface ToolExecutionUpdateWebSocketEvent {
@@ -268,10 +272,9 @@ type ControlSurfaceWebSocketServerEventPayload =
   | QueueItemStartWebSocketEvent
   | QueueItemEndWebSocketEvent
   | TurnQueueChangedWebSocketEvent
-  | TextDeltaWebSocketEvent
-  | ThinkingStartWebSocketEvent
-  | ThinkingDeltaWebSocketEvent
-  | ThinkingEndWebSocketEvent
+  | AssistantBlockSetWebSocketEvent
+  | AssistantBlockDeltaWebSocketEvent
+  | AssistantMessageSnapshotWebSocketEvent
   | MessageEndWebSocketEvent
   | ToolExecutionStartWebSocketEvent
   | ToolExecutionUpdateWebSocketEvent
