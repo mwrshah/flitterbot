@@ -36,7 +36,20 @@ export function useStreamsChat(piSessionId: string | undefined) {
   })();
   const isSessionBusy = sessionStatus?.busy ?? false;
   const isSessionCompacting = sessionStatus?.isCompacting ?? false;
-  const contextUsage = sessionStatus?.contextUsage ?? null;
+  const contextUsage = useMemo(() => {
+    for (let index = timeline.length - 1; index >= 0; index--) {
+      const item = timeline[index];
+      if (
+        item?.kind === "message" &&
+        item.role === "assistant" &&
+        item.usage &&
+        item.usage.totalTokens > 0
+      ) {
+        return item.usage;
+      }
+    }
+    return null;
+  }, [timeline]);
 
   const effectivePiSessionId = piSessionId ?? "default";
 
