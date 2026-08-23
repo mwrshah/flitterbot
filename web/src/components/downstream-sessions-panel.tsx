@@ -180,7 +180,9 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
         priority: 10,
         handler: () => {
           if (!currentWorktreePath) return false;
-          void worktreeCopy.copy(currentWorktreePath).catch(() => toast.error("Failed to copy"));
+          void worktreeCopy
+            .copy(`${currentWorktreePath}/`)
+            .catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
@@ -189,7 +191,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
         priority: 10,
         handler: () => {
           if (!currentRepoPath) return false;
-          void repoCopy.copy(currentRepoPath).catch(() => toast.error("Failed to copy"));
+          void repoCopy.copy(`${currentRepoPath}/`).catch(() => toast.error("Failed to copy"));
           return true;
         },
       },
@@ -449,7 +451,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                       text={currentRepoPath}
                       displayText={worktree.repo ?? currentRepoPath}
                       copied={repoCopy.copied}
-                      onCopy={() => repoCopy.copy(currentRepoPath)}
+                      onCopy={() => repoCopy.copy(`${currentRepoPath}/`)}
                     />
                   )}
                   {repoCopy.copied ? (
@@ -494,7 +496,9 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                       return `../${leaf}`;
                     })()}
                     copied={worktreeCopy.copied}
-                    onCopy={() => worktreeCopy.copy(worktree.worktreePath ?? "")}
+                    onCopy={() =>
+                      currentWorktreePath && worktreeCopy.copy(`${currentWorktreePath}/`)
+                    }
                   />
                   {worktreeCopy.copied ? (
                     <span className="text-text-muted text-[10px]">Copied!</span>
