@@ -302,7 +302,7 @@ function PreparedLaunchCard({
   return (
     <form onSubmit={submit}>
       <div className="relative">
-        <label className="block min-w-0">
+        <label className="relative block min-w-0 before:pointer-events-none before:absolute before:inset-0 before:z-10 before:rounded-xl before:border-2 before:border-border-pop before:opacity-0 before:content-[''] focus-within:before:opacity-100">
           <span className="sr-only">Swimlane launch arguments</span>
           <textarea
             value={json}
@@ -320,7 +320,7 @@ function PreparedLaunchCard({
               if (!create.isPending && !launched) event.currentTarget.form?.requestSubmit();
             }}
             spellCheck={false}
-            className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:pr-12 md:text-xs"
+            className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none md:pr-12 md:text-xs"
           />
         </label>
         <button
@@ -328,15 +328,12 @@ function PreparedLaunchCard({
           disabled={create.isPending || launched}
           aria-label={launched ? "Swimlane launched" : "Launch prepared swimlane"}
           title={launched ? "Swimlane launched" : "Launch prepared swimlane"}
-          className="group absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed md:size-8"
+          className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 hover:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:hover:text-text-muted md:size-8"
         >
           {launched ? (
             <Check className="size-4" aria-hidden="true" />
           ) : (
-            <ArrowRight
-              className="size-4 transition-colors group-hover:text-text-pop"
-              aria-hidden="true"
-            />
+            <ArrowRight className="size-4" aria-hidden="true" />
           )}
         </button>
       </div>
