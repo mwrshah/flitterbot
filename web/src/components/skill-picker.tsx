@@ -93,7 +93,7 @@ export const SkillPicker = memo(function SkillPicker({
                   className="flex items-baseline gap-2 rounded-md px-3 py-1.5 text-sm cursor-pointer data-selected:bg-background-hover [&>svg]:!hidden"
                 >
                   <span
-                    className={`shrink-0 font-mono text-xs ${isCommand ? "font-semibold text-text-pop" : "text-text"}`}
+                    className={`shrink-0 font-mono text-xs ${isCommand ? "text-text-pop" : "text-text"}`}
                   >
                     /{skill.name}
                   </span>
