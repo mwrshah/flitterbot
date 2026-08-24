@@ -4,7 +4,7 @@ import makeWASocket, {
   Browsers,
   type ConnectionState,
   DisconnectReason,
-  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   type WASocket,
@@ -183,7 +183,7 @@ class WhatsAppDaemon {
     }
 
     const { state, saveCreds } = authState;
-    const { version } = await fetchLatestBaileysVersion();
+    const { version } = await fetchLatestWaWebVersion();
 
     this.socket = makeWASocket({
       version,
