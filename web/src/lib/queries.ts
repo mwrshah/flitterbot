@@ -179,15 +179,22 @@ export function sessionSearchQueryOptions(
 export function directoryCompletionsQueryOptions(
   query: string,
   enabled: boolean,
-  opts?: { streamId?: string; directoriesOnly?: boolean },
+  opts?: { streamId?: string; baseCwd?: string; directoriesOnly?: boolean },
 ) {
   const streamId = opts?.streamId;
+  const baseCwd = opts?.baseCwd;
   const directoriesOnly = opts?.directoriesOnly ?? false;
   return {
-    queryKey: ["directory-completions", query, streamId ?? "", directoriesOnly] as const,
+    queryKey: [
+      "directory-completions",
+      query,
+      streamId ?? "",
+      baseCwd ?? "",
+      directoriesOnly,
+    ] as const,
     queryFn: (): Promise<DirectoryCompletionsResponse> =>
       fetchDirectoryCompletions({
-        data: { query, streamId, directoriesOnly },
+        data: { query, streamId, baseCwd, directoriesOnly },
       }),
     enabled,
     placeholderData: keepPreviousData,

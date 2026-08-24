@@ -1968,7 +1968,11 @@ export class ControlSurfaceRuntime {
                 type: "object",
                 properties: {
                   name: { type: "string" },
-                  cwd: { type: "string" },
+                  cwd: {
+                    type: "string",
+                    description:
+                      "Absolute working directory prefixed with @, for example @/Users/name/project.",
+                  },
                   message: { type: "string" },
                 },
                 required: ["name", "cwd", "message"],

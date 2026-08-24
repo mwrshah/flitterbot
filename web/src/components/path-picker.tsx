@@ -3,13 +3,15 @@ import {
   type KeyboardEvent,
   memo,
   type Ref,
+  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { CaretPickerPositioner } from "@/components/common/caret-picker-positioner";
+import type { FloatingCommandPickerPlacement } from "@/components/common/floating-command-picker";
+import { FloatingCommandPicker } from "@/components/common/floating-command-picker";
 import { Command, CommandEmpty, CommandItem, CommandList } from "@/components/ui/command";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { DirectoryCompletionItem } from "@/lib/types";
@@ -62,7 +64,9 @@ type PathPickerProps = {
   items: DirectoryCompletionItem[];
   onSelect: (item: DirectoryCompletionItem) => void;
   onEscape?: () => void;
+  anchorRef: RefObject<HTMLElement | null>;
   caretLeft?: number;
+  preferredPlacement?: FloatingCommandPickerPlacement;
   commandRef?: Ref<HTMLDivElement>;
   fuzzy?: boolean;
 };
@@ -72,7 +76,9 @@ export const PathPicker = memo(function PathPicker({
   items,
   onSelect,
   onEscape,
+  anchorRef,
   caretLeft,
+  preferredPlacement,
   commandRef,
   fuzzy,
 }: PathPickerProps) {
@@ -108,7 +114,12 @@ export const PathPicker = memo(function PathPicker({
   if (!open) return null;
 
   return (
-    <CaretPickerPositioner ref={pickerRef} caretLeft={caretLeft}>
+    <FloatingCommandPicker
+      ref={pickerRef}
+      anchorRef={anchorRef}
+      caretLeft={caretLeft}
+      preferredPlacement={preferredPlacement}
+    >
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -150,6 +161,6 @@ export const PathPicker = memo(function PathPicker({
           })}
         </CommandList>
       </Command>
-    </CaretPickerPositioner>
+    </FloatingCommandPicker>
   );
 });

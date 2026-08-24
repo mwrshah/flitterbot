@@ -33,7 +33,7 @@ export async function handleCreateSwimlaneRoute(
 
   if (prepared) {
     const name = stripStreamNamePrefix(text(body.name));
-    const cwd = text(body.cwd);
+    const cwd = text(body.cwd).replace(/^@(?=\/)/, "");
     const message = text(body.message);
     const sourcePiSessionId = text(body.sourcePiSessionId);
     if (!name || !cwd || !message || !sourcePiSessionId) {

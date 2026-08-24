@@ -10,16 +10,37 @@ import {
   Search,
   SquareTerminal,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CodeBlock } from "@/components/common/code-block";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import {
+  type TextareaCompletionMatch,
+  TextareaCompletionPickers,
+  type TextareaCompletionPlugin,
+  useTextareaCompletions,
+} from "@/hooks/use-textarea-completions";
 import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
+import {
+  escapeJsonStringFragment,
+  isPreparedLaunchCwdTrigger,
+  preparedLaunchCompletionTokenEnd,
+  readPreparedLaunchCwd,
+  stringifyPreparedLaunchForEditing,
+} from "@/lib/prepared-launch-completions";
 import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
 const rootRouteApi = getRouteApi("__root__");
-const preparedLaunchStore = new Map<string, { json?: string; launched?: true }>();
+const preparedLaunchStore = new Map<string, { json: string; launched?: true }>();
+const PREPARED_LAUNCH_SELECTION_KEYS = new Set([
+  "ArrowDown",
+  "ArrowUp",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+]);
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =
   "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
@@ -268,6 +289,110 @@ function ErrorText({ result }: { result?: ToolResult }) {
   ) : null;
 }
 
+function resolvePreparedLaunchCompletion(
+  value: string,
+  cursor: number,
+  triggerIndex: number,
+  trigger: "/" | "@",
+): TextareaCompletionMatch | null {
+  if (
+    cursor < triggerIndex + 1 ||
+    (triggerIndex > 0 && !/[\s"'([{,:]/.test(value[triggerIndex - 1]!))
+  ) {
+    return null;
+  }
+  const rawFilter = value.slice(triggerIndex + 1, cursor);
+  if (/\s/.test(rawFilter)) return null;
+
+  const tokenEnd = preparedLaunchCompletionTokenEnd(value, triggerIndex);
+  if (trigger === "@" && isPreparedLaunchCwdTrigger(value, triggerIndex)) {
+    return {
+      kind: "path",
+      triggerIndex,
+      filter: rawFilter.startsWith("/") ? rawFilter : `/${rawFilter}`,
+      tokenEnd,
+      pathQueryOptions: { directoriesOnly: true },
+    };
+  }
+  if (trigger === "/") return { kind: "skill", triggerIndex, filter: rawFilter, tokenEnd };
+
+  const baseCwd = readPreparedLaunchCwd(value);
+  return baseCwd
+    ? {
+        kind: "path",
+        triggerIndex,
+        filter: rawFilter,
+        tokenEnd,
+        pathQueryOptions: { baseCwd },
+      }
+    : null;
+}
+
+const PREPARED_LAUNCH_COMPLETIONS: TextareaCompletionPlugin = {
+  resolveTrigger: ({ value, cursor, triggerIndex, trigger }) =>
+    resolvePreparedLaunchCompletion(value, cursor, triggerIndex, trigger),
+  continueMatch: ({ value, cursor }, activeMatch) => {
+    const trigger = activeMatch.kind === "skill" ? "/" : "@";
+    if (cursor < activeMatch.triggerIndex + 1 || value[activeMatch.triggerIndex] !== trigger) {
+      return null;
+    }
+    const rawFilter = value.slice(activeMatch.triggerIndex + 1, cursor);
+    if (/\s/.test(rawFilter)) return null;
+    const cwdPath = activeMatch.pathQueryOptions?.directoriesOnly;
+    return {
+      ...activeMatch,
+      filter: cwdPath && !rawFilter.startsWith("/") ? `/${rawFilter}` : rawFilter,
+      tokenEnd: preparedLaunchCompletionTokenEnd(value, activeMatch.triggerIndex),
+    };
+  },
+  resolveSelection: ({ value, cursor }) => {
+    for (let triggerIndex = cursor - 1; triggerIndex >= 0; triggerIndex--) {
+      const character = value[triggerIndex];
+      if (/\s/.test(character!) || character === '"') break;
+      if (character === "/" || character === "@") {
+        const match = resolvePreparedLaunchCompletion(value, cursor, triggerIndex, character);
+        if (match) return match;
+      }
+    }
+    return null;
+  },
+  filterSkill: (skill) => skill.kind !== "command",
+  formatSkillInsertion: (skill) => escapeJsonStringFragment(`/skill:${skill.name} `),
+  formatPathInsertion: (item) =>
+    escapeJsonStringFragment(`@${item.insertText}${item.kind === "directory" ? "" : " "}`),
+};
+
+type PreparedLaunchCardState = {
+  json: string;
+  launched: boolean;
+};
+
+function usePreparedLaunchCardState(launch: unknown, stateKey: string) {
+  const [state, setState] = useState<PreparedLaunchCardState>(() => {
+    const stored = preparedLaunchStore.get(stateKey);
+    return {
+      json: stored?.json ?? stringifyPreparedLaunchForEditing(launch),
+      launched: stored?.launched ?? false,
+    };
+  });
+  const stateRef = useRef(state);
+  const jsonRef = useRef(state.json);
+  const updateState = useCallback(
+    (patch: Partial<PreparedLaunchCardState>) => {
+      const next = { ...stateRef.current, ...patch };
+      stateRef.current = next;
+      jsonRef.current = next.json;
+      preparedLaunchStore.set(stateKey, {
+        json: next.json,
+        ...(next.launched ? { launched: true as const } : {}),
+      });
+      setState(next);
+    },
+    [stateKey],
+  );
+  return { state, jsonRef, updateState };
+}
+
 function PreparedLaunchCard({
   launch,
   piSessionId,
@@ -278,9 +403,9 @@ function PreparedLaunchCard({
   stateKey: string;
 }) {
   const { apiClient } = rootRouteApi.useRouteContext();
-  const stored = preparedLaunchStore.get(stateKey);
-  const [json, setJson] = useState(() => stored?.json ?? JSON.stringify(launch, null, 2));
-  const [launched, setLaunched] = useState(() => stored?.launched ?? false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const completionAnchorRef = useRef<HTMLDivElement>(null);
+  const { state, jsonRef, updateState } = usePreparedLaunchCardState(launch, stateKey);
   const create = useMutation({
     mutationFn: (value: string) =>
       apiClient.createSwimlane({
@@ -288,36 +413,58 @@ function PreparedLaunchCard({
         sourcePiSessionId: piSessionId,
       }),
     onSuccess: ({ streamName, warning }) => {
-      preparedLaunchStore.set(stateKey, { ...preparedLaunchStore.get(stateKey), launched: true });
-      setLaunched(true);
+      updateState({ launched: true });
       warning ? toast.warning(warning) : toast.success(`Started swimlane: ${streamName}`);
     },
+  });
+  const updateJson = useCallback(
+    (value: string) => {
+      updateState({ json: value });
+      if (create.isError) create.reset();
+    },
+    [create.isError, create.reset, updateState],
+  );
+  const completionController = useTextareaCompletions({
+    textareaRef,
+    anchorRef: completionAnchorRef,
+    valueRef: jsonRef,
+    setValue: updateJson,
+    plugin: PREPARED_LAUNCH_COMPLETIONS,
+    preferredPlacement: "bottom",
   });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    create.mutate(json);
+    create.mutate(state.json);
   };
 
   return (
     <form onSubmit={submit}>
-      <div className="relative">
+      <div ref={completionAnchorRef} className="relative">
+        <TextareaCompletionPickers controller={completionController} />
         <label className="relative block min-w-0 before:pointer-events-none before:absolute before:inset-0 before:z-10 before:rounded-xl before:border-2 before:border-border-pop before:opacity-0 before:content-[''] focus-within:before:opacity-100">
           <span className="sr-only">Swimlane launch arguments</span>
           <textarea
-            value={json}
-            onChange={(event) => {
-              setJson(event.target.value);
-              preparedLaunchStore.set(stateKey, {
-                ...preparedLaunchStore.get(stateKey),
-                json: event.target.value,
-              });
-              if (create.isError) create.reset();
+            ref={textareaRef}
+            value={state.json}
+            onChange={(event) =>
+              completionController.handleValueChange(
+                event.target.value,
+                event.nativeEvent as InputEvent,
+              )
+            }
+            onFocus={completionController.activateAtSelection}
+            onPointerUp={completionController.activateAtSelection}
+            onKeyUp={(event) => {
+              if (PREPARED_LAUNCH_SELECTION_KEYS.has(event.key)) {
+                completionController.activateAtSelection();
+              }
             }}
             onKeyDown={(event) => {
+              if (completionController.handleKeyDown(event)) return;
               if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
               event.preventDefault();
-              if (!create.isPending && !launched) event.currentTarget.form?.requestSubmit();
+              if (!create.isPending && !state.launched) event.currentTarget.form?.requestSubmit();
             }}
             spellCheck={false}
             className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none md:pr-12 md:text-xs"
@@ -325,12 +472,12 @@ function PreparedLaunchCard({
         </label>
         <button
           type="submit"
-          disabled={create.isPending || launched}
-          aria-label={launched ? "Swimlane launched" : "Launch prepared swimlane"}
-          title={launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          disabled={create.isPending || state.launched}
+          aria-label={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          title={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}
           className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 enabled:hover:text-text-pop enabled:hover:[&_svg]:stroke-2 focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:stroke-2 disabled:cursor-not-allowed md:size-8"
         >
-          {launched ? (
+          {state.launched ? (
             <Check className="size-4" aria-hidden="true" />
           ) : (
             <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden="true" />

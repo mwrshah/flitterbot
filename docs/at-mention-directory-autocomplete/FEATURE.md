@@ -113,8 +113,8 @@ type DirectoryCompletionsResponse = {
 ### Frontend pseudocode
 
 ```ts
-MessageInput.handleDraftChange(value, inputEvent)
-  save draft
+useTextareaCompletions.handleValueChange(value, inputEvent)
+  save the owning textarea value
   find active @ token before caret
 
   if no active @ token:
@@ -154,7 +154,7 @@ PathPicker.onSelect(item)
 handleBrowserDirectoryCompletionsRoute(request)
   rawQuery = request.query ?? ""
   directoriesOnly = request.directoriesOnly === "true"
-  baseCwd = resolveBaseCwd(request context)
+  baseCwd = resolveBaseCwd(explicit baseCwd or stream context)
 
   directItems = listDirectoryCompletionItems(
     baseCwd,
@@ -183,8 +183,8 @@ handleBrowserDirectoryCompletionsRoute(request)
 ### Production call graph
 
 ```text
-<MessageInput>
-  -> handleDraftChange
+<MessageInput> or <PreparedLaunchCard>
+  -> useTextareaCompletions.handleValueChange
     -> active @ token + normalized filter
       -> 150 ms debounce
         -> directoryCompletionsQueryOptions
@@ -209,32 +209,31 @@ handleBrowserDirectoryCompletionsRoute(request)
 ## Component Tree
 
 ```text
-<MessageInput>
-│ State: draft, atPickerOpen, atPickerFilter,
-│        debouncedAtFilter, caretLeft
-│ Refs: textarea, @ position, expansion guards, path command
-│ Effect: 150 ms debounce with timer cleanup
-│ Query: directory completions keyed by query and context
+<MessageInput> or <PreparedLaunchCard>
+│ State: owning textarea value
+│ Completion: useTextareaCompletions
+│   State: picker filters, active trigger, caret offset
+│   Query: directory completions keyed by query and context
 │
-├── <PathPicker>
-│   Props: open, items, caretLeft, onSelect, onEscape
-│   State: selectedValue
-│   └── <Command>
-│       └── <CommandList>
-│           └── <CommandItem> per directory or file
+├── <TextareaCompletionPickers>
+│   ├── <SkillPicker>
+│   └── <PathPicker>
+│       └── <FloatingCommandPicker portal>
+│           └── <CommandList>
+│               └── <CommandItem> per result
 │
 └── <textarea>
-    Events: change, keydown, paste
+    Events: change, keydown, selection
 ```
 
-`MessageInput` owns token and request state. `PathPicker` owns only the selected result. Server ordering remains authoritative because `Command` disables client-side filtering.
+`useTextareaCompletions` owns token and request state. Each textarea owns its value and supplies its trigger context. `PathPicker` owns only the selected result. Server ordering remains authoritative because `Command` disables client-side filtering.
 
 ## Query and Cache Behavior
 
 The frontend query key is:
 
 ```text
-["directory-completions", query, currentContext, directoriesOnly]
+["directory-completions", query, streamId, explicitBaseCwd, directoriesOnly]
 ```
 
 Behavior:
@@ -245,7 +244,7 @@ Behavior:
 - Empty-query prefetch performs direct directory listing only; it does not create a FileFinder because no fuzzy term exists.
 - Cached results remain fresh for five seconds.
 - `keepPreviousData` retains prior items while a changed query loads.
-- Changing the message-input context changes the cache key and prefetch context.
+- Changing the stream or explicit base-cwd context changes the cache key and prefetch context.
 
 The active flow calls the TanStack server function in `web/src/server/directory-completions.ts`. The older `apiClient.getDirectoryCompletions` method is not part of this flow.
 
@@ -306,7 +305,11 @@ The current browser UI has no visible loading or error state for path search.
 
 ## Files
 
-- `web/src/components/common/message-input.tsx` — owns `@` token recognition, debounce, picker state, keyboard controls, and insertion.
+- `web/src/hooks/use-textarea-completions.tsx` — owns `@` token recognition, debounce, picker state, keyboard controls, and insertion for all textarea consumers.
+- `web/src/lib/prepared-launch-completions.ts` — resolves the prepared cwd marker and proposed cwd only on trigger or selection activation.
+- `web/src/components/common/message-input.tsx` — supplies the normal message-composer value and context.
+- `web/src/components/chat-tool-message.tsx` — supplies proposed-cwd context for prepared launch JSON.
+- `web/src/components/common/floating-command-picker.tsx` — renders the command surface through a portal with preferred placement and collision flipping.
 - `web/src/components/path-picker.tsx` — renders server-ordered path results and owns result selection.
 - `web/src/lib/queries.ts` — defines query keys, caching, enablement, and previous-data behavior.
 - `web/src/server/directory-completions.ts` — proxies requests to the control-surface API and converts transport failures to empty responses.
