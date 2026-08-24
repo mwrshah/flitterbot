@@ -6,6 +6,7 @@ export type {
   AuthFlowSnapshot,
   AuthProvider,
   AuthProvidersResponse,
+  CreateSwimlaneRequest,
   DirectoryCompletionItem,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
@@ -25,6 +26,7 @@ export type {
   StreamSummary,
   StreamsHistoryLimit,
   StreamsHistoryResponse,
+  SwimlaneLaunchArgs,
 } from "../../../src/contracts/control-surface-api.ts";
 export type {
   ChatTimelineItem,

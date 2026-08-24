@@ -1,11 +1,25 @@
-import { Check, Code, Copy, FolderOpen, MessageSquare, Search, SquareTerminal } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import {
+  ArrowRight,
+  Check,
+  Code,
+  Copy,
+  FolderOpen,
+  MessageSquare,
+  Search,
+  SquareTerminal,
+} from "lucide-react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CodeBlock } from "@/components/common/code-block";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
-import type { ChatTimelineTool } from "@/lib/types";
+import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
+const rootRouteApi = getRouteApi("__root__");
+const preparedLaunchStore = new Map<string, { json?: string; launched?: true }>();
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =
   "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
@@ -254,6 +268,84 @@ function ErrorText({ result }: { result?: ToolResult }) {
   ) : null;
 }
 
+function PreparedLaunchCard({
+  launch,
+  piSessionId,
+  stateKey,
+}: {
+  launch: unknown;
+  piSessionId: string;
+  stateKey: string;
+}) {
+  const { apiClient } = rootRouteApi.useRouteContext();
+  const stored = preparedLaunchStore.get(stateKey);
+  const [json, setJson] = useState(() => stored?.json ?? JSON.stringify(launch, null, 2));
+  const [launched, setLaunched] = useState(() => stored?.launched ?? false);
+  const create = useMutation({
+    mutationFn: (value: string) =>
+      apiClient.createSwimlane({
+        ...(JSON.parse(value) as SwimlaneLaunchArgs),
+        sourcePiSessionId: piSessionId,
+      }),
+    onSuccess: ({ streamName, warning }) => {
+      preparedLaunchStore.set(stateKey, { ...preparedLaunchStore.get(stateKey), launched: true });
+      setLaunched(true);
+      warning ? toast.warning(warning) : toast.success(`Started swimlane: ${streamName}`);
+    },
+  });
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    create.mutate(json);
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <div className="relative">
+        <label className="relative block min-w-0 before:pointer-events-none before:absolute before:inset-0 before:z-10 before:rounded-xl before:border-2 before:border-border-pop before:opacity-0 before:content-[''] focus-within:before:opacity-100">
+          <span className="sr-only">Swimlane launch arguments</span>
+          <textarea
+            value={json}
+            onChange={(event) => {
+              setJson(event.target.value);
+              preparedLaunchStore.set(stateKey, {
+                ...preparedLaunchStore.get(stateKey),
+                json: event.target.value,
+              });
+              if (create.isError) create.reset();
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              if (!create.isPending && !launched) event.currentTarget.form?.requestSubmit();
+            }}
+            spellCheck={false}
+            className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none md:pr-12 md:text-xs"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={create.isPending || launched}
+          aria-label={launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          title={launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 enabled:hover:text-text-pop enabled:hover:[&_svg]:stroke-2 focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:stroke-2 disabled:cursor-not-allowed md:size-8"
+        >
+          {launched ? (
+            <Check className="size-4" aria-hidden="true" />
+          ) : (
+            <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      {create.error ? (
+        <p className="mt-1 text-xs text-status-crashed" role="alert">
+          {create.error instanceof Error ? create.error.message : String(create.error)}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function ToolBody({
   name,
   params,
@@ -423,27 +515,46 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
               ? String(p.text ?? p.message ?? "")
               : "";
   const glyph = running ? "↺" : result?.isError ? "✕" : result ? "✓" : "↺";
-  const [open, setOpen] = useState(name === "edit" || name === "write");
+  const launches =
+    name === "prep_launch" && endItem && !endItem.isError ? record(item.args).launches : undefined;
+  const [open, setOpen] = useState(name === "edit" || name === "write" || name === "prep_launch");
   return (
     <details
       className="tool-disclosure overflow-hidden rounded-sm bg-background text-text"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="tool-disclosure-summary group cursor-pointer select-none list-none pb-2">
+      <summary
+        aria-disabled={name === "prep_launch"}
+        onClick={name === "prep_launch" ? (event) => event.preventDefault() : undefined}
+        className="tool-disclosure-summary group cursor-pointer select-none list-none pb-2 aria-disabled:cursor-default"
+      >
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <div className="shrink-0 truncate text-sm font-medium leading-none group-hover:underline select-text">
+            <div className="shrink-0 truncate text-sm font-medium leading-none group-hover:underline group-aria-disabled:no-underline select-text">
               <span className="inline-block w-[1em] text-center">{glyph}</span> {title}
             </div>
-            <div className="min-w-0 truncate text-xs leading-none text-text-muted group-hover:underline select-text">
+            <div className="min-w-0 truncate text-xs leading-none text-text-muted group-hover:underline group-aria-disabled:no-underline select-text">
               {subtitle}
             </div>
           </div>
         </div>
       </summary>
       <div className="pb-3 pt-1">
-        <ToolBody name={name} params={params} result={result} running={running} />
+        {Array.isArray(launches) && launches.length > 0 ? (
+          <div className="space-y-2" role="group" aria-label="Prepared swimlane launches">
+            {launches.map((launch, index) => (
+              <PreparedLaunchCard
+                key={`${toolUseId}:${index}`}
+                stateKey={`${toolUseId}:${index}`}
+                launch={launch}
+                piSessionId={piSessionId}
+              />
+            ))}
+          </div>
+        ) : (
+          <ToolBody name={name} params={params} result={result} running={running} />
+        )}
       </div>
     </details>
   );
