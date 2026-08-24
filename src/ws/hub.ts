@@ -201,6 +201,7 @@ export class WebSocketHub {
     const filter = eventTypes ? new Set(eventTypes) : null;
     if (piSessionId === "*") {
       client.subscriptions.set(piSessionId, filter);
+      this.send(clientId, { type: "subscribed", piSessionId });
       return;
     }
 
@@ -237,6 +238,7 @@ export class WebSocketHub {
     }
     const snapshot = this.conversationSnapshotProviders.get(piSessionId)?.();
     if (snapshot && (!filter || filter.has(snapshot.type))) this.send(clientId, snapshot);
+    this.send(clientId, { type: "subscribed", piSessionId });
   }
 
   unsubscribeClient(clientId: string, piSessionId: string): void {

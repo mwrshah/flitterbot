@@ -169,7 +169,7 @@ export interface TurnEndWebSocketEvent {
 export interface StreamSurfacedWebSocketEvent {
   type: "stream_surfaced";
   message: ChatTimelineMessage;
-  piSessionId?: string;
+  piSessionId: string;
   streamId?: string;
   streamName?: string;
 }
@@ -189,6 +189,11 @@ export interface StatusChangedWebSocketEvent {
 
 export interface PongWebSocketEvent {
   type: "pong";
+}
+
+export interface SubscribedWebSocketEvent {
+  type: "subscribed";
+  piSessionId: string;
 }
 
 export interface ErrorWebSocketEvent {
@@ -297,6 +302,7 @@ type ControlSurfaceWebSocketServerEventPayload =
   | WorktreeChangedWebSocketEvent
   | ResourcesReloadedWebSocketEvent
   | PongWebSocketEvent
+  | SubscribedWebSocketEvent
   | ErrorWebSocketEvent;
 
 export type ControlSurfaceWebSocketServerEvent = ControlSurfaceWebSocketServerEventPayload & {

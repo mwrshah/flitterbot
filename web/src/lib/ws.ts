@@ -327,11 +327,13 @@ export class FlitterbotWsClient {
   }
 
   private acceptsActiveSubscription(message: ControlSurfaceWebSocketServerEvent): boolean {
-    if (message.type === "stream_surfaced" || message.type === "error") return true;
+    if (message.type === "error") return true;
+    const active = this.activeSessionSubscription;
+    if (message.type === "subscribed") return active?.piSessionId === message.piSessionId;
     const piSessionId = "piSessionId" in message ? message.piSessionId : undefined;
     if (!piSessionId) return true;
-    const active = this.activeSessionSubscription;
     if (!active) return false;
+    if (message.type === "stream_surfaced" && active.piSessionId !== "*") return false;
     if (active.piSessionId !== "*" && active.piSessionId !== piSessionId) return false;
     return active.eventTypes === undefined || active.eventTypes.includes(message.type);
   }

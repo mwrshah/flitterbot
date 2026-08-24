@@ -280,7 +280,6 @@ const SwimlaneRow = memo(function SwimlaneRow({
           <Link
             to="/streams/$piSessionId"
             params={{ piSessionId: row.piSessionId }}
-            preload={false}
             onClick={onLinkClick}
             data-search-key={row.key}
             className={cn(
@@ -357,7 +356,6 @@ const SwimlaneRow = memo(function SwimlaneRow({
           <Link
             to="/streams/$piSessionId"
             params={{ piSessionId }}
-            preload={false}
             onClick={onLinkClick}
             data-search-key={row.key}
             className={cn(
@@ -398,7 +396,6 @@ const SwimlaneRow = memo(function SwimlaneRow({
         <Link
           to="/streams/$piSessionId"
           params={{ piSessionId }}
-          preload={false}
           onClick={onLinkClick}
           data-search-key={row.key}
           className={cn(

@@ -1,10 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { FlitterbotWsClient } from "@/lib/ws";
-import { latestHistoryPosition } from "./conversation-history.ts";
+import { latestHistoryPosition, surfaceQueryKey } from "./conversation-history.ts";
 import { conversationState } from "./conversation-state.ts";
 
-const INPUT_SURFACE_EVENT_TYPES = ["stream_surfaced"];
+const INPUT_SURFACE_EVENT_TYPES = ["error", "stream_surfaced"];
 
 type WsMode = "surface" | "pi-session";
 
@@ -64,6 +64,7 @@ export function setupWsRouteSubscriptions(
 
     const shouldRefreshStatus =
       hasAppliedRoute && nextTarget !== null && nextTarget.piSessionId !== "*";
+    const leavingSurface = activeTarget?.piSessionId === "*" && nextTarget?.piSessionId !== "*";
 
     if (activeTarget && activeTarget.piSessionId !== "*") {
       conversationState.clear(activeTarget.piSessionId);
@@ -80,6 +81,9 @@ export function setupWsRouteSubscriptions(
       wsClient.setSessionSubscription(nextTarget.piSessionId, nextTarget.eventTypes);
     } else {
       wsClient.clearSessionSubscription();
+    }
+    if (leavingSurface) {
+      queryClient.removeQueries({ queryKey: surfaceQueryKey, exact: true });
     }
     if (shouldRefreshStatus) {
       void queryClient.invalidateQueries({ queryKey: ["status"] });

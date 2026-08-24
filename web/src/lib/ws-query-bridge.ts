@@ -48,6 +48,13 @@ export function setupWsQueryBridge(deps: {
   };
 
   const unsubscribeMessages = wsClient.subscribe((message) => {
+    if (message.type === "subscribed") {
+      if (message.piSessionId === "*") {
+        void queryClient.resetQueries({ queryKey: surfaceQueryKey, exact: true });
+      }
+      return;
+    }
+
     const piSessionId =
       "piSessionId" in message && message.piSessionId ? message.piSessionId : undefined;
 
@@ -212,14 +219,11 @@ export function setupWsQueryBridge(deps: {
     }
   });
 
-  let previousConnectionState = wsClient.connectionState;
+  let hasConnected = wsClient.connectionState === "connected";
   const unsubscribeConnection = wsClient.subscribeConnection((state) => {
-    const previous = previousConnectionState;
-    previousConnectionState = state;
-    if (state === "connected" && (previous === "disconnected" || previous === "reconnecting")) {
-      queryClient.invalidateQueries({ queryKey: ["status"] });
-      queryClient.invalidateQueries({ queryKey: surfaceQueryKey });
-    }
+    if (state !== "connected") return;
+    if (hasConnected) void queryClient.invalidateQueries({ queryKey: ["status"] });
+    hasConnected = true;
   });
 
   return () => {

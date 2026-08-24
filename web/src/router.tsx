@@ -36,7 +36,7 @@ export function getRouter() {
       sendMessage,
       startRealtime: () => startRealtime(),
     },
-    defaultPreload: "intent",
+    defaultPreload: false,
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
     scrollRestoration: ({ location }) =>

@@ -99,7 +99,6 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
     <Link
       to="/streams/$piSessionId"
       params={{ piSessionId }}
-      preload={false}
       className={`${cls} cursor-pointer transition-colors hover:bg-background-hover`}
     >
       {streamName}
