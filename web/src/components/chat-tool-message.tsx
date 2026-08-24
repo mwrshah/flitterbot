@@ -287,11 +287,8 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
   };
 
   return (
-    <form
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border bg-background-selected p-2"
-      onSubmit={submit}
-    >
-      <label className="min-w-0">
+    <form className="relative" onSubmit={submit}>
+      <label className="block min-w-0">
         <span className="sr-only">Swimlane launch arguments</span>
         <textarea
           value={json}
@@ -300,7 +297,7 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
             if (create.isError) create.reset();
           }}
           spellCheck={false}
-          className="field-sizing-content w-full resize-none overflow-hidden rounded border-0 bg-transparent px-2 py-1.5 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:text-xs"
+          className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-pop md:pr-12 md:text-xs"
         />
       </label>
       <button
@@ -308,7 +305,7 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
         disabled={create.isPending || create.isSuccess}
         aria-label={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
         title={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
-        className="group flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
+        className="group absolute top-2 right-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
       >
         {create.isPending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -322,7 +319,7 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
         )}
       </button>
       {create.error ? (
-        <p className="col-span-2 text-xs text-status-crashed" role="alert">
+        <p className="mt-1 text-xs text-status-crashed" role="alert">
           {create.error instanceof Error ? create.error.message : String(create.error)}
         </p>
       ) : null}
