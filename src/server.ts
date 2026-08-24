@@ -37,6 +37,7 @@ import { handleCronTickRoute } from "./routes/cron-tick.ts";
 import { handleDirectSessionMessageRoute } from "./routes/direct-session-message.ts";
 import { handleForkStreamRoute } from "./routes/fork-stream.ts";
 import { handleHookRoute } from "./routes/hooks.ts";
+import { handleLaunchPreparedSwimlaneRoute } from "./routes/launch-prepared-swimlane.ts";
 import { handleMessageRoute } from "./routes/message.ts";
 import { handlePiSessionInterruptRoute } from "./routes/pi-session-interrupt.ts";
 import {
@@ -298,6 +299,16 @@ async function routeRequest(
   }
   if (method === "POST" && segments[0] === "sessions" && segments[1] && segments[2] === "message") {
     return handleDirectSessionMessageRoute(runtime, req, res, decodeURIComponent(segments[1]));
+  }
+  if (
+    method === "POST" &&
+    segments[0] === "api" &&
+    segments[1] === "pi-sessions" &&
+    segments[2] &&
+    segments[3] === "prepared-swimlanes" &&
+    !segments[4]
+  ) {
+    return handleLaunchPreparedSwimlaneRoute(runtime, req, res, decodeURIComponent(segments[2]));
   }
   if (
     method === "POST" &&

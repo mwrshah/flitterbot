@@ -1,11 +1,32 @@
-import { Check, Code, Copy, FolderOpen, MessageSquare, Search, SquareTerminal } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import {
+  ArrowRight,
+  Check,
+  Code,
+  Copy,
+  FolderOpen,
+  Loader2,
+  MessageSquare,
+  Search,
+  SquareTerminal,
+} from "lucide-react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 import { CodeBlock } from "@/components/common/code-block";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
-import type { ChatTimelineTool } from "@/lib/types";
+import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
+const rootRouteApi = getRouteApi("__root__");
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =
   "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
@@ -254,18 +275,130 @@ function ErrorText({ result }: { result?: ToolResult }) {
   ) : null;
 }
 
+function PreparedLaunchChip({ params, piSessionId }: { params: unknown; piSessionId: string }) {
+  const { apiClient } = rootRouteApi.useRouteContext();
+  const [json, setJson] = useState(() => JSON.stringify(params, null, 2));
+  const [error, setError] = useState("");
+  const launch = useMutation({
+    mutationFn: (args: SwimlaneLaunchArgs) => apiClient.launchPreparedSwimlane(piSessionId, args),
+    onSuccess: ({ streamName }) => toast.success(`Started swimlane: ${streamName}`),
+    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+  });
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    try {
+      launch.mutate(JSON.parse(json) as SwimlaneLaunchArgs);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  const submitFromTextarea = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
+  const launchedName = launch.data?.streamName;
+
+  return (
+    <form
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border bg-background-selected p-2"
+      onSubmit={submit}
+    >
+      <label className="min-w-0">
+        <span className="sr-only">Swimlane launch arguments</span>
+        <textarea
+          name="launchArguments"
+          value={json}
+          onChange={(event) => setJson(event.target.value)}
+          onKeyDown={submitFromTextarea}
+          rows={Math.min(12, Math.max(5, json.split("\n").length))}
+          spellCheck={false}
+          className="w-full resize-y break-words rounded border border-border bg-background px-2 py-1.5 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:text-xs"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={launch.isPending || Boolean(launchedName)}
+        aria-label={
+          launchedName ? `Swimlane launched: ${launchedName}` : "Launch prepared swimlane"
+        }
+        title={launchedName ? `Swimlane launched: ${launchedName}` : "Launch prepared swimlane"}
+        className="flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
+      >
+        {launch.isPending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : launchedName ? (
+          <Check className="size-4" aria-hidden="true" />
+        ) : (
+          <ArrowRight className="size-4" aria-hidden="true" />
+        )}
+      </button>
+      {error && (
+        <p className="col-span-2 text-xs text-status-crashed" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function PreparedLaunchBatch({
+  params,
+  result,
+  piSessionId,
+  toolUseId,
+}: {
+  params: unknown;
+  result?: ToolResult;
+  piSessionId: string;
+  toolUseId: string;
+}) {
+  const launches = record(params).launches;
+  if (!Array.isArray(launches)) {
+    return <ErrorText result={result ?? { text: "No launches prepared", isError: true }} />;
+  }
+  return (
+    <div className="space-y-2" role="group" aria-label="Prepared swimlane launches">
+      {launches.map((launch, index) => {
+        const draftKey = `${piSessionId}:${toolUseId}:${index}`;
+        return <PreparedLaunchChip key={draftKey} params={launch} piSessionId={piSessionId} />;
+      })}
+    </div>
+  );
+}
+
 function ToolBody({
   name,
   params,
   result,
   running,
+  piSessionId,
+  toolUseId,
 }: {
   name: string;
   params: unknown;
   result?: ToolResult;
   running: boolean;
+  piSessionId: string;
+  toolUseId: string;
 }) {
   const p = record(params);
+  if (name === "prep_launch") {
+    return running ? (
+      <ToolHeader icon={<Loader2 className="size-4 animate-spin" aria-hidden="true" />}>
+        Preparing launch…
+      </ToolHeader>
+    ) : (
+      <PreparedLaunchBatch
+        params={params}
+        result={result}
+        piSessionId={piSessionId}
+        toolUseId={toolUseId}
+      />
+    );
+  }
   if (name === "bash") {
     const command = String(p.command ?? "");
     const combined = command
@@ -423,7 +556,7 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
               ? String(p.text ?? p.message ?? "")
               : "";
   const glyph = running ? "↺" : result?.isError ? "✕" : result ? "✓" : "↺";
-  const [open, setOpen] = useState(name === "edit" || name === "write");
+  const [open, setOpen] = useState(name === "edit" || name === "write" || name === "prep_launch");
   return (
     <details
       className="tool-disclosure overflow-hidden rounded-sm bg-background text-text"
@@ -443,7 +576,14 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
         </div>
       </summary>
       <div className="pb-3 pt-1">
-        <ToolBody name={name} params={params} result={result} running={running} />
+        <ToolBody
+          name={name}
+          params={params}
+          result={result}
+          running={running}
+          piSessionId={piSessionId}
+          toolUseId={toolUseId}
+        />
       </div>
     </details>
   );

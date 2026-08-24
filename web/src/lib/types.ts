@@ -25,6 +25,7 @@ export type {
   StreamSummary,
   StreamsHistoryLimit,
   StreamsHistoryResponse,
+  SwimlaneLaunchArgs,
 } from "../../../src/contracts/control-surface-api.ts";
 export type {
   ChatTimelineItem,

@@ -157,6 +157,13 @@ export interface MessageResponse {
   ok: boolean;
 }
 
+export interface SwimlaneLaunchArgs {
+  suggestedName: string;
+  cwd: string;
+  initialMessage: string;
+  additionalContext?: string;
+}
+
 export interface ClaudeHookPayload {
   hook_event_name?: string;
   event_name?: string;

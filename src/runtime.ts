@@ -1373,6 +1373,9 @@ export class ControlSurfaceRuntime {
   async createSwimlaneProgrammatic(input?: {
     name?: string;
     cwd?: string;
+    initialMessage?: string;
+    additionalContext?: string;
+    sourcePiSessionId?: string;
   }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
     const { getStreamByName } = await import("./blackboard/query-streams.ts");
 
@@ -1391,13 +1394,49 @@ export class ControlSurfaceRuntime {
     const effectiveCwd = input?.cwd ?? this.config.projectsDir;
     this.log(`programmatic swimlane create requested name="${name}" cwd=${effectiveCwd}`);
 
+    let streamUser: string | undefined;
+    if (input?.sourcePiSessionId) {
+      const source = this.sessionManager.getByPiSessionId(input.sourcePiSessionId);
+      if (!source) throw new Error("Source Pi session not found");
+      const parentStream = source.streamId ? getStreamById(this.blackboard, source.streamId) : null;
+      const sessionUser = this.blackboard.get<{ session_user: string | null }>(
+        "SELECT session_user FROM pi_sessions WHERE pi_session_id = ?",
+        input.sourcePiSessionId,
+      )?.session_user;
+      streamUser =
+        sessionUser ?? parentStream?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
+    }
+
     const result = await this.spawnStreamWithSession({
       name,
       cwd: effectiveCwd,
+      streamUser,
     });
-    if (!result.ok) {
-      throw result.spawnError;
+    if (!result.ok) throw result.spawnError;
+
+    const initialMessage = input?.initialMessage?.trim();
+    if (initialMessage) {
+      const prompt = this.sessionManager.buildStreamPrompt(
+        initialMessage,
+        result.streamName,
+        result.streamId,
+        input?.additionalContext?.trim() || undefined,
+        resolveTmuxBootstrapMessage(this.config.tmuxEnabled, this.config.tmuxBootstrapMessage),
+      );
+      result.managed.queue.enqueue({
+        id: `ws-init-${result.streamId}`,
+        text: prompt,
+        source: "web",
+        sender: "system",
+        metadata: {
+          stream_id: result.streamId,
+          stream_name: result.streamName,
+          ...(streamUser ? { whatsapp_user_id: streamUser } : {}),
+        },
+        receivedAt: new Date().toISOString(),
+      });
     }
+
     this.log(`programmatic swimlane created "${result.streamName}" (${result.streamId})`);
     return {
       ok: true,
@@ -1907,6 +1946,61 @@ export class ControlSurfaceRuntime {
     const tools: FlitterbotTool[] = [createQueryBlackboardTool(this.blackboard)];
 
     if (role === "default") {
+      let createdForQueueItemId: string | undefined;
+
+      tools.push({
+        name: "prep_launch",
+        label: "Prepare Swimlane Launch",
+        description:
+          "Prepare a batch of editable swimlane launch options without starting them. Use when the user asks to prep one or more launches; the user starts each option separately from the chat UI.",
+        parameters: {
+          type: "object",
+          properties: {
+            launches: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                properties: {
+                  suggestedName: {
+                    type: "string",
+                    description: "A 2-4 word lowercase dash-separated swimlane name.",
+                  },
+                  cwd: {
+                    type: "string",
+                    description: "Absolute working directory for the new swimlane.",
+                  },
+                  initialMessage: {
+                    type: "string",
+                    description: "The complete targeted instruction that starts the new swimlane.",
+                  },
+                  additionalContext: {
+                    type: "string",
+                    description: "Optional concise context that supplements the initial message.",
+                  },
+                },
+                required: ["suggestedName", "cwd", "initialMessage"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["launches"],
+          additionalProperties: false,
+        },
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const launches = params.launches as unknown[];
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${launches.length} swimlane launch${launches.length === 1 ? "" : "es"} prepared for user review.`,
+              },
+            ],
+            details: {},
+          };
+        },
+      });
+
       tools.push({
         name: "create_swimlane",
         label: "Create Swimlane",
@@ -1923,17 +2017,12 @@ export class ControlSurfaceRuntime {
             message: {
               type: "string",
               description:
-                "Optional agent-authored context appended after the passed-through user message. Use for interpretation, constraints, repo/spec paths, or batch-created swimlane instructions. Do not duplicate the user's request here during normal single-swimlane creation — the runtime passes the user's message through automatically.",
+                "Optional agent-authored context appended after the passed-through user message. Use for interpretation, constraints, or repo/spec paths. Do not duplicate the user's request here.",
             },
             cwd: {
               type: "string",
               description:
                 "Absolute path to use as the working directory for the new swimlane's orchestrator and agents.",
-            },
-            skipUserMessage: {
-              type: "boolean",
-              description:
-                "Set true only when batch-creating multiple new swimlanes and the message field contains the targeted full prompt for this swimlane. Leave false/omitted for normal swimlane creation so the runtime can pass through the relevant user messages.",
             },
           },
           required: ["suggested_name", "cwd"],
@@ -1944,28 +2033,31 @@ export class ControlSurfaceRuntime {
             suggested_name: suggestedName,
             message: agentMessage,
             cwd: cwdParam,
-            skipUserMessage: skipUserMessageParam,
           } = params as {
             suggested_name: string;
             message?: string;
             cwd: string;
-            skipUserMessage?: boolean;
           };
           const name = stripStreamNamePrefix(suggestedName);
-          const skipUserMessage = skipUserMessageParam === true;
-          if (skipUserMessage && !agentMessage?.trim()) {
+          const sourceSession = streamId
+            ? this.sessionManager.getByStream(streamId)
+            : this.sessionManager.getDefault();
+          const currentItem = sourceSession?.queue.getCurrentItem();
+          if (currentItem && createdForQueueItemId === currentItem.id) {
             return {
               content: [
                 {
                   type: "text",
-                  text: "Error: skipUserMessage=true is only valid when message contains the targeted batch prompt for this swimlane.",
+                  text: "Error: create_swimlane can create only one swimlane per user turn. Use prep_launch for additional launch options.",
                 },
               ],
               details: { error: true },
             };
           }
+          if (currentItem) createdForQueueItemId = currentItem.id;
 
           if (!fs.existsSync(cwdParam)) {
+            if (currentItem) createdForQueueItemId = undefined;
             return {
               content: [
                 {
@@ -1993,6 +2085,7 @@ export class ControlSurfaceRuntime {
           });
 
           if (!spawn.ok) {
+            if (currentItem) createdForQueueItemId = undefined;
             return {
               content: [
                 {
@@ -2014,10 +2107,6 @@ export class ControlSurfaceRuntime {
           const orchestrator = spawn.managed;
 
           try {
-            const sourceSession = streamId
-              ? this.sessionManager.getByStream(streamId)
-              : this.sessionManager.getDefault();
-            const currentItem = sourceSession?.queue.getCurrentItem();
             const originalText = currentItem?.text;
             const inheritedReplyMetadata = whatsappReplyMetadataFrom(currentItem);
             const inheritedRemoteJid = extractRemoteJid(inheritedReplyMetadata);
@@ -2039,7 +2128,7 @@ export class ControlSurfaceRuntime {
               this.config.tmuxBootstrapMessage,
             );
 
-            if (currentUserText && !skipUserMessage) {
+            if (currentUserText) {
               let prompt: string;
               try {
                 const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
@@ -2131,39 +2220,9 @@ export class ControlSurfaceRuntime {
                 receivedAt: new Date().toISOString(),
               });
               this.log(`enqueued original user message onto swimlane "${ws.name}" (${ws.id})`);
-            } else if (skipUserMessage && agentMessage) {
-              const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
-              const prompt = formatStreamPrompt(
-                [],
-                ws.name,
-                ws.id,
-                agentMessage,
-                tmuxBootstrapMessage,
-              );
-              orchestrator.queue.enqueue({
-                id: `ws-init-${ws.id}`,
-                text: prompt,
-                source: "web",
-                sender: "system",
-                metadata: {
-                  stream_id: ws.id,
-                  stream_name: ws.name,
-                  ...inheritedReplyMetadata,
-                },
-                receivedAt: new Date().toISOString(),
-              });
-              this.log(
-                `enqueued agent-only message onto swimlane "${ws.name}" (${ws.id}) [batch mode]`,
-              );
             }
 
-            const passthroughNote = skipUserMessage
-              ? agentMessage
-                ? " with agent-authored context (batch mode)"
-                : ""
-              : currentUserText
-                ? " and user message passed through"
-                : "";
+            const passthroughNote = currentUserText ? " and user message passed through" : "";
             const normalizationNote =
               suggestedName !== name
                 ? ` Suggested name "${suggestedName}" normalized to canonical "${name}".`

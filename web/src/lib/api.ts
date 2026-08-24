@@ -12,6 +12,7 @@ import type {
   SessionsListResponse,
   SkillsListResponse,
   StatusResponse,
+  SwimlaneLaunchArgs,
   TranscriptPageResponse,
 } from "./types";
 
@@ -35,7 +36,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     const response = await fetch(url, { ...init, headers });
     if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
+      let message = `${response.status} ${response.statusText}`;
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body.error === "string") message = body.error;
+      } catch {}
+      throw new Error(message);
     }
     return response.json() as Promise<T>;
   }
@@ -105,6 +111,12 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
           method: "POST",
           body: JSON.stringify(body ?? {}),
         },
+      ),
+
+    launchPreparedSwimlane: (piSessionId: string, body: SwimlaneLaunchArgs) =>
+      request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
+        `/api/pi-sessions/${encodeURIComponent(piSessionId)}/prepared-swimlanes`,
+        { method: "POST", body: JSON.stringify(body) },
       ),
 
     pruneStreamHistory: (piSessionId: string, entryId: string) =>
