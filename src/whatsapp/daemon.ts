@@ -193,7 +193,7 @@ class WhatsAppDaemon {
       },
       logger,
       printQRInTerminal: false,
-      browser: Browsers.macOS("Flitterbot"),
+      browser: Browsers.macOS("Chrome"),
       markOnlineOnConnect: false,
       syncFullHistory: false,
     });
