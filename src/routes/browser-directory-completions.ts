@@ -25,8 +25,9 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const rawQuery = url.searchParams.get("query") ?? "";
   const streamId = url.searchParams.get("streamId");
+  const requestedBaseCwd = url.searchParams.get("baseCwd");
   const directoriesOnly = url.searchParams.get("directoriesOnly") === "true";
-  const baseCwd = await resolveBaseCwd(runtime, streamId);
+  const baseCwd = await resolveBaseCwd(runtime, streamId, requestedBaseCwd);
   const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery, directoriesOnly);
 
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
@@ -220,7 +221,11 @@ function mergeCompletionItems(
 async function resolveBaseCwd(
   runtime: ControlSurfaceRuntime,
   streamId: string | null,
+  requestedBaseCwd: string | null,
 ): Promise<string> {
+  if (requestedBaseCwd && path.isAbsolute(requestedBaseCwd)) {
+    return path.resolve(requestedBaseCwd);
+  }
   if (streamId) {
     const { getStreamById } = await import("../blackboard/query-streams.ts");
     const stream = getStreamById(runtime.blackboard, streamId);

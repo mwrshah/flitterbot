@@ -10,6 +10,7 @@ export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
       query: string;
       piSessionId?: string;
       streamId?: string;
+      baseCwd?: string;
       directoriesOnly?: boolean;
     }) => input,
   )
@@ -18,6 +19,7 @@ export const fetchDirectoryCompletions = createServerFn({ method: "GET" })
       ["query", data.query],
       ...(data.piSessionId ? [["piSessionId", data.piSessionId] as [string, string]] : []),
       ...(data.streamId ? [["streamId", data.streamId] as [string, string]] : []),
+      ...(data.baseCwd ? [["baseCwd", data.baseCwd] as [string, string]] : []),
       ...(data.directoriesOnly ? [["directoriesOnly", "true"] as [string, string]] : []),
     ]);
 

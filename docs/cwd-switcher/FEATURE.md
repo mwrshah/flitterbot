@@ -72,7 +72,6 @@ Because step 3 rewrites the on-disk header, `start()` → `rehydrateOrchestrator
 
 - `web/src/components/chat-panel.tsx` — header path becomes a click target opening the picker; copy demoted to the `c`/`d` shortcut.
 - `web/src/components/path-picker.tsx` — reused; directories-only items, top input with `@` prefix, right-arrow commit affordance.
-- `web/src/components/common/caret-picker-positioner.tsx` — reused for anchoring.
 - `web/src/lib/queries.ts` / `web/src/lib/api.ts` — directory-completions call with the directories-only flag and no `streamId` (projects-dir root).
 - `src/routes/browser-directory-completions.ts` — add directories-only filtering to `listDirectoryCompletionItems`.
 - `src/routes/` — new commit route (`set-stream-cwd` or similar) → runtime method.

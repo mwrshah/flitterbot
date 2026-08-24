@@ -1,7 +1,5 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
 import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import {
   type ClipboardEvent,
@@ -19,8 +17,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
 import { ModelSelector } from "@/components/model-selector";
-import { PathPicker } from "@/components/path-picker";
-import { SkillPicker } from "@/components/skill-picker";
+import {
+  TextareaCompletionPickers,
+  useTextareaCompletions,
+} from "@/hooks/use-textarea-completions";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   getMessageInputButtonShortcutActionId,
@@ -28,15 +28,9 @@ import {
   registerComposerFocusTarget,
   registerShortcutHandlers,
 } from "@/lib/global-shortcuts";
-import { getInternalCommandsForScope, type InternalCommandScope } from "@/lib/internal-commands";
-import { directoryCompletionsQueryOptions, skillsQueryOptions } from "@/lib/queries";
+import type { InternalCommandScope } from "@/lib/internal-commands";
 import { getTokenDeleteEdit } from "@/lib/text-input";
-import type {
-  DirectoryCompletionItem,
-  ImageAttachment,
-  SkillPickerItem,
-  TurnQueueItemSummary,
-} from "@/lib/types";
+import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const draftStore = new Map<string, string>();
@@ -103,7 +97,6 @@ type MessageInputHoverButtonSlot = {
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
-const EMPTY_PATH_ITEMS: DirectoryCompletionItem[] = [];
 const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
 
 function pretextTextWidth(text: string, font: string, lineHeight: number) {
@@ -133,51 +126,6 @@ function horizontalBox(style: CSSStyleDeclaration) {
 
 function isBlankDraft(value: string) {
   return value.length === 0 || !/\S/.test(value);
-}
-
-function autoExpandedDuplicateSlashIndex(filter: string) {
-  if (filter.startsWith("@//")) return 2;
-  if (filter.startsWith("..//")) return 3;
-
-  const nestedDotDot = "/..//";
-  const nestedIndex = filter.lastIndexOf(nestedDotDot);
-  return nestedIndex >= 0 ? nestedIndex + nestedDotDot.length - 1 : -1;
-}
-
-function collapseSingleFollowingSpace(value: string) {
-  if (value[0] !== " ") return value;
-  const next = value[1];
-  if (next !== undefined && /\s/.test(next)) return value;
-  return value.slice(1);
-}
-
-function normalizePathPickerRemainder(inserted: string, remainder: string) {
-  if (inserted.endsWith("/") && remainder.startsWith(" /"))
-    return { value: remainder.slice(2), closesPicker: true };
-  if (inserted.endsWith(" ") && remainder.startsWith(" "))
-    return { value: remainder.slice(1), closesPicker: true };
-  return { value: remainder, closesPicker: false };
-}
-
-function filterSkillsForPicker(skills: SkillPickerItem[], filter: string) {
-  const lower = filter.toLowerCase();
-  const matched = filter ? skills.filter((s) => s.name.toLowerCase().includes(lower)) : skills;
-  const nonCommands: SkillPickerItem[] = [];
-  const commands: SkillPickerItem[] = [];
-  for (const item of matched) {
-    (item.kind === "command" ? commands : nonCommands).push(item);
-  }
-  const cmp = (a: SkillPickerItem, b: SkillPickerItem) => {
-    const aStarts = a.name.toLowerCase().startsWith(lower);
-    const bStarts = b.name.toLowerCase().startsWith(lower);
-    if (aStarts !== bStarts) return aStarts ? -1 : 1;
-    return a.name.length - b.name.length;
-  };
-  if (filter) {
-    nonCommands.sort(cmp);
-    commands.sort(cmp);
-  }
-  return [...nonCommands, ...commands];
 }
 
 function messageInputButtonShortcutLabel(index: number) {
@@ -440,8 +388,6 @@ type MessageInputProps = {
   removingQueuedTurnId?: string;
 };
 
-const rootRouteApi = getRouteApi("__root__");
-
 export const MessageInput = memo(function MessageInput({
   isSending,
   disabled = false,
@@ -470,14 +416,6 @@ export const MessageInput = memo(function MessageInput({
   removingQueuedTurnId,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, placeholder });
-  const { apiClient } = rootRouteApi.useRouteContext();
-  const { data: baseSkills } = useQuery(skillsQueryOptions(apiClient));
-  const skills = useMemo(() => {
-    const contextualCommands = getInternalCommandsForScope(internalCommandScope).filter(
-      (command) => !(baseSkills ?? []).some((skill) => skill.name === command.name),
-    );
-    return [...(baseSkills ?? []), ...contextualCommands];
-  }, [baseSkills, internalCommandScope]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -493,18 +431,6 @@ export const MessageInput = memo(function MessageInput({
     isBlankDraft(draftKey ? (draftStore.get(draftKey) ?? "") : ""),
   );
   const [hoverSendAction, setHoverSendAction] = useState<HoverSendAction | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerFilter, setPickerFilter] = useState("");
-  const [caretLeft, setCaretLeft] = useState(0);
-  const slashPositionRef = useRef<number>(-1);
-  const skillCommandRef = useRef<HTMLDivElement>(null);
-
-  const [atPickerOpen, setAtPickerOpen] = useState(false);
-  const [atPickerFilter, setAtPickerFilter] = useState("");
-  const pathCommandRef = useRef<HTMLDivElement>(null);
-  const atPositionRef = useRef<number>(-1);
-  const tildeExpandedRef = useRef(false);
-  const dotDotExpandedRef = useRef(false);
 
   useEffect(() => {
     if (autoFocus) {
@@ -541,28 +467,6 @@ export const MessageInput = memo(function MessageInput({
       if (listeners.size === 0) pendingAttachmentListeners.delete(draftKey);
     };
   }, [draftKey]);
-
-  const [debouncedAtFilter, setDebouncedAtFilter] = useState("");
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedAtFilter(atPickerFilter), 150);
-    return () => clearTimeout(id);
-  }, [atPickerFilter]);
-
-  const { data: pathResult } = useQuery(
-    directoryCompletionsQueryOptions(debouncedAtFilter, atPickerOpen, { streamId }),
-  );
-  const filteredSkills = useMemo(
-    () => filterSkillsForPicker(skills, pickerFilter),
-    [skills, pickerFilter],
-  );
-  const pathPickerItems = pathResult?.items ?? EMPTY_PATH_ITEMS;
-  const skillPickerVisible = pickerOpen && filteredSkills.length > 0;
-  const pathPickerVisible = atPickerOpen && pathPickerItems.length > 0;
-
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    queryClient.prefetchQuery(directoryCompletionsQueryOptions("", true, { streamId }));
-  }, [queryClient, streamId]);
 
   const draftRef = useRef(draft);
   const onSubmitRef = useRef(onSubmit);
@@ -632,246 +536,18 @@ export const MessageInput = memo(function MessageInput({
     setIsDraftBlank((current) => (current === nextIsDraftBlank ? current : nextIsDraftBlank));
   }, []);
 
-  const refocusTextarea = useCallback(() => {
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-    });
-  }, []);
+  const clearHoverSendAction = useCallback(() => setHoverSendAction(null), []);
+  const completionController = useTextareaCompletions({
+    textareaRef,
+    anchorRef: containerRef,
+    valueRef: draftRef,
+    setValue: setDraftAndStore,
+    internalCommandScope,
+    streamId,
+    onBeforeValueChange: clearHoverSendAction,
+  });
 
-  const closeSkillPicker = useCallback(() => {
-    setPickerOpen(false);
-    slashPositionRef.current = -1;
-    refocusTextarea();
-  }, [refocusTextarea]);
-
-  const closePathPicker = useCallback(() => {
-    setAtPickerOpen(false);
-    atPositionRef.current = -1;
-    tildeExpandedRef.current = false;
-    dotDotExpandedRef.current = false;
-    refocusTextarea();
-  }, [refocusTextarea]);
-
-  const closeActivePicker = useCallback(() => {
-    if (atPickerOpen || atPositionRef.current >= 0) {
-      closePathPicker();
-      return true;
-    }
-    if (pickerOpen || slashPositionRef.current >= 0) {
-      closeSkillPicker();
-      return true;
-    }
-    return false;
-  }, [atPickerOpen, closePathPicker, closeSkillPicker, pickerOpen]);
-
-  const computeSlashLeft = useCallback((value: string, slashIdx: number) => {
-    const textarea = textareaRef.current;
-    const container = containerRef.current;
-    if (!textarea || !container || slashIdx < 0) return;
-
-    const style = window.getComputedStyle(textarea);
-    const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    const paddingLeft = parseFloat(style.paddingLeft);
-    const paddingRight = parseFloat(style.paddingRight);
-    const contentWidth = textarea.offsetWidth - paddingLeft - paddingRight;
-    const lineHeight = parseFloat(style.lineHeight);
-
-    const textThroughTrigger = value.slice(0, slashIdx + 1);
-    const prepared = prepareWithSegments(textThroughTrigger, font, { whiteSpace: "pre-wrap" });
-    const result = layoutWithLines(prepared, contentWidth, lineHeight);
-
-    const lastLine = result.lines[result.lines.length - 1];
-    const xOffset = lastLine ? lastLine.width : 0;
-
-    setCaretLeft(Math.max(0, paddingLeft + xOffset));
-  }, []);
-
-  const handleDraftChange = useCallback(
-    (rawValue: string, inputEvent?: InputEvent) => {
-      setHoverSendAction(null);
-      let value = rawValue;
-      const cursor = textareaRef.current?.selectionStart ?? value.length;
-
-      const typedTrigger =
-        inputEvent?.inputType === "insertText" &&
-        (inputEvent.data === "/" || inputEvent.data === "@")
-          ? inputEvent.data
-          : null;
-      const triggerBeforeCursor = cursor - 1;
-      const typedTriggerBeforeText =
-        typedTrigger !== null &&
-        value.charAt(triggerBeforeCursor) === typedTrigger &&
-        /\S/.test(value.charAt(cursor)) &&
-        (triggerBeforeCursor === 0 || /\s/.test(value.charAt(triggerBeforeCursor - 1)));
-      if (typedTriggerBeforeText) {
-        value = `${value.slice(0, cursor)} ${value.slice(cursor)}`;
-        requestAnimationFrame(() => {
-          textareaRef.current?.setSelectionRange(cursor, cursor);
-        });
-      }
-      setDraftAndStore(value);
-
-      let slashIdx = -1;
-      for (let i = cursor - 1; i >= 0; i--) {
-        const ch = value[i];
-        if (ch === "/") {
-          if (i === 0 || /\s/.test(value[i - 1]!)) {
-            slashIdx = i;
-          }
-          break;
-        }
-        if (/\s/.test(ch!)) break;
-      }
-
-      let atIdx = -1;
-      for (let i = cursor - 1; i >= 0; i--) {
-        const ch = value[i];
-        if (ch === "@") {
-          if (i === 0 || /\s/.test(value[i - 1]!)) {
-            atIdx = i;
-          }
-          break;
-        }
-        if (/\s/.test(ch!)) break;
-      }
-
-      if (atIdx >= 0) {
-        const filter = value.slice(atIdx + 1, cursor);
-
-        if (filter === "~" && !tildeExpandedRef.current) {
-          tildeExpandedRef.current = true;
-          const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
-          const newCursor = cursor + 1;
-          setDraftAndStore(newValue);
-          atPositionRef.current = atIdx;
-          computeSlashLeft(newValue, atIdx);
-          setAtPickerOpen(true);
-          setAtPickerFilter("@/");
-          slashPositionRef.current = -1;
-          setPickerOpen(false);
-          requestAnimationFrame(() => {
-            textareaRef.current?.setSelectionRange(newCursor, newCursor);
-          });
-          return;
-        }
-
-        if (!filter.startsWith("~")) {
-          tildeExpandedRef.current = false;
-        }
-
-        const trailingDotDot = filter === ".." || filter.endsWith("/..");
-        if (trailingDotDot && !dotDotExpandedRef.current) {
-          dotDotExpandedRef.current = true;
-          const newValue = `${value.slice(0, cursor)}/${value.slice(cursor)}`;
-          const newCursor = cursor + 1;
-          setDraftAndStore(newValue);
-          atPositionRef.current = atIdx;
-          computeSlashLeft(newValue, atIdx);
-          setAtPickerOpen(true);
-          setAtPickerFilter(`${filter}/`);
-          slashPositionRef.current = -1;
-          setPickerOpen(false);
-          requestAnimationFrame(() => {
-            textareaRef.current?.setSelectionRange(newCursor, newCursor);
-          });
-          return;
-        }
-        if (!trailingDotDot) {
-          dotDotExpandedRef.current = false;
-        }
-
-        const extraSlash = autoExpandedDuplicateSlashIndex(filter);
-        if (extraSlash >= 0) {
-          const extra = atIdx + 1 + extraSlash;
-          const newValue = value.slice(0, extra) + value.slice(extra + 1);
-          const newCursor = cursor - 1;
-          setDraftAndStore(newValue);
-          atPositionRef.current = atIdx;
-          computeSlashLeft(newValue, atIdx);
-          setAtPickerOpen(true);
-          setAtPickerFilter(filter.slice(0, extraSlash) + filter.slice(extraSlash + 1));
-          slashPositionRef.current = -1;
-          setPickerOpen(false);
-          requestAnimationFrame(() => {
-            textareaRef.current?.setSelectionRange(newCursor, newCursor);
-          });
-          return;
-        }
-
-        atPositionRef.current = atIdx;
-        computeSlashLeft(value, atIdx);
-        setAtPickerOpen(true);
-        setAtPickerFilter(filter);
-        slashPositionRef.current = -1;
-        setPickerOpen(false);
-      } else if (slashIdx >= 0 && skills?.length) {
-        const filter = value.slice(slashIdx + 1, cursor);
-        slashPositionRef.current = slashIdx;
-        computeSlashLeft(value, slashIdx);
-        setPickerOpen(true);
-        setPickerFilter(filter);
-        atPositionRef.current = -1;
-        setAtPickerOpen(false);
-      } else {
-        slashPositionRef.current = -1;
-        setPickerOpen(false);
-        atPositionRef.current = -1;
-        setAtPickerOpen(false);
-        tildeExpandedRef.current = false;
-        dotDotExpandedRef.current = false;
-      }
-    },
-    [skills, computeSlashLeft, setDraftAndStore],
-  );
-
-  const handleSkillSelect = useCallback(
-    (skill: SkillPickerItem) => {
-      const value = draftRef.current;
-      const slashIdx = slashPositionRef.current;
-      let tokenEnd = slashIdx + 1;
-      while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-      const before = value.slice(0, slashIdx);
-      const after = collapseSingleFollowingSpace(value.slice(tokenEnd));
-      const inserted = skill.kind === "command" ? `/${skill.name} ` : `/skill:${skill.name} `;
-      const newValue = before + inserted + after;
-      setDraftAndStore(newValue);
-      setPickerOpen(false);
-      slashPositionRef.current = -1;
-      const newCursor = before.length + inserted.length;
-      requestAnimationFrame(() => {
-        textareaRef.current?.setSelectionRange(newCursor, newCursor);
-        textareaRef.current?.focus();
-      });
-    },
-    [setDraftAndStore],
-  );
-
-  const handlePathSelect = useCallback(
-    (item: DirectoryCompletionItem) => {
-      const value = draftRef.current;
-      const atIdx = atPositionRef.current;
-      let tokenEnd = atIdx + 1;
-      while (tokenEnd < value.length && !/\s/.test(value[tokenEnd]!)) tokenEnd++;
-      const before = value.slice(0, atIdx);
-      const isDir = item.kind === "directory";
-      const inserted = `@${item.insertText}${isDir ? "" : " "}`;
-      const remainder = normalizePathPickerRemainder(inserted, value.slice(tokenEnd));
-      const newValue = before + inserted + remainder.value;
-      setDraftAndStore(newValue);
-      if (!isDir || remainder.closesPicker) {
-        closePathPicker();
-      }
-      const newCursor = before.length + inserted.length;
-      requestAnimationFrame(() => {
-        textareaRef.current?.setSelectionRange(newCursor, newCursor);
-        textareaRef.current?.focus();
-        if (isDir && !remainder.closesPicker) {
-          handleDraftChange(newValue);
-        }
-      });
-    },
-    [closePathPicker, handleDraftChange, setDraftAndStore],
-  );
+  const handleDraftChange = completionController.handleValueChange;
 
   const submitCurrentDraft = useCallback(() => {
     if (disabled || isSending || isCompacting || recoveryKind) return;
@@ -902,13 +578,10 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (completionController.handleKeyDown(event)) return;
+
       if (event.key === "Escape") {
-        if (closeActivePicker()) {
-          event.preventDefault();
-          event.stopPropagation();
-        } else {
-          textareaRef.current?.blur();
-        }
+        textareaRef.current?.blur();
         return;
       }
 
@@ -937,42 +610,12 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      if (event.key === "Enter" && event.shiftKey && closeActivePicker()) return;
-
-      const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
-      if (skillPickerVisible && slashPositionRef.current >= 0 && navKeys.includes(event.key)) {
-        event.preventDefault();
-        skillCommandRef.current?.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: event.key === "Tab" ? "Enter" : event.key,
-            bubbles: true,
-          }),
-        );
-        return;
-      }
-      if (pathPickerVisible && atPositionRef.current >= 0 && navKeys.includes(event.key)) {
-        event.preventDefault();
-        pathCommandRef.current?.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: event.key === "Tab" ? "Enter" : event.key,
-            bubbles: true,
-          }),
-        );
-        return;
-      }
-
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         submitCurrentDraft();
       }
     },
-    [
-      closeActivePicker,
-      handleDraftChange,
-      pathPickerVisible,
-      skillPickerVisible,
-      submitCurrentDraft,
-    ],
+    [completionController.handleKeyDown, handleDraftChange, submitCurrentDraft],
   );
 
   const handlePaste = useCallback(
@@ -1063,16 +706,19 @@ export const MessageInput = memo(function MessageInput({
         : `${current}\n${slot.button.insertText}`;
       setHoverSendAction({ text: newValue, sourceButtonId: slot.button.id });
       setDraftAndStore(newValue);
-      setPickerOpen(false);
-      setAtPickerOpen(false);
-      slashPositionRef.current = -1;
-      atPositionRef.current = -1;
+      completionController.dismiss();
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
         textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
       });
     },
-    [isCompacting, isSessionBusy, setDraftAndStore, submitCurrentDraft],
+    [
+      completionController.dismiss,
+      isCompacting,
+      isSessionBusy,
+      setDraftAndStore,
+      submitCurrentDraft,
+    ],
   );
 
   const canSend = !disabled && (!isDraftBlank || pendingImages.length > 0);
@@ -1213,23 +859,7 @@ export const MessageInput = memo(function MessageInput({
               Compacting…
             </span>
           )}
-          <SkillPicker
-            open={skillPickerVisible}
-            items={filteredSkills}
-            onSelect={handleSkillSelect}
-            onEscape={closeSkillPicker}
-            caretLeft={caretLeft}
-            commandRef={skillCommandRef}
-          />
-          <PathPicker
-            open={pathPickerVisible}
-            items={pathPickerItems}
-            onSelect={handlePathSelect}
-            onEscape={closePathPicker}
-            caretLeft={caretLeft}
-            commandRef={pathCommandRef}
-            fuzzy
-          />
+          <TextareaCompletionPickers controller={completionController} />
           <textarea
             ref={textareaRef}
             value={draft}

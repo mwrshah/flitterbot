@@ -2,13 +2,15 @@ import {
   type KeyboardEvent,
   memo,
   type Ref,
+  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { CaretPickerPositioner } from "@/components/common/caret-picker-positioner";
+import type { FloatingCommandPickerPlacement } from "@/components/common/floating-command-picker";
+import { FloatingCommandPicker } from "@/components/common/floating-command-picker";
 import { Command, CommandItem, CommandList } from "@/components/ui/command";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { SkillPickerItem } from "@/lib/types";
@@ -18,7 +20,9 @@ type SkillPickerProps = {
   items: SkillPickerItem[];
   onSelect: (skill: SkillPickerItem) => void;
   onEscape?: () => void;
+  anchorRef: RefObject<HTMLElement | null>;
   caretLeft?: number;
+  preferredPlacement?: FloatingCommandPickerPlacement;
   commandRef?: Ref<HTMLDivElement>;
 };
 
@@ -27,7 +31,9 @@ export const SkillPicker = memo(function SkillPicker({
   items,
   onSelect,
   onEscape,
+  anchorRef,
   caretLeft,
+  preferredPlacement,
   commandRef,
 }: SkillPickerProps) {
   useWhyDidYouRender("SkillPicker", {
@@ -69,7 +75,12 @@ export const SkillPicker = memo(function SkillPicker({
   if (!open) return null;
 
   return (
-    <CaretPickerPositioner ref={pickerRef} caretLeft={caretLeft}>
+    <FloatingCommandPicker
+      ref={pickerRef}
+      anchorRef={anchorRef}
+      caretLeft={caretLeft}
+      preferredPlacement={preferredPlacement}
+    >
       <Command
         ref={commandRef}
         shouldFilter={false}
@@ -111,6 +122,6 @@ export const SkillPicker = memo(function SkillPicker({
           )}
         </CommandList>
       </Command>
-    </CaretPickerPositioner>
+    </FloatingCommandPicker>
   );
 });
