@@ -11,6 +11,7 @@ Set $FLITTERBOT_CONFIG to point at a different config file.
 Only lines matching `- CC-situation: body` (with `CC` from [A-Z2-9]{2})
 are considered. Codeless bullets are ignored.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,18 +34,26 @@ def expand_home(value: str) -> Path:
 
 
 def resolve_note_path() -> Path:
-    config_path = expand_home(os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json"))
+    config_path = expand_home(
+        os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json")
+    )
     if not config_path.exists():
         raise RuntimeError(f"Missing Flitterbot config: {config_path}")
     try:
         raw = json.loads(config_path.read_text())
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON in Flitterbot config {config_path}: {exc.msg}") from exc
+        raise RuntimeError(
+            f"Invalid JSON in Flitterbot config {config_path}: {exc.msg}"
+        ) from exc
     if not isinstance(raw, dict):
-        raise RuntimeError(f"Invalid Flitterbot config {config_path}: expected a JSON object")
+        raise RuntimeError(
+            f"Invalid Flitterbot config {config_path}: expected a JSON object"
+        )
     value = raw.get("learningsNotePath")
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(f"Missing required config key learningsNotePath in {config_path}")
+        raise RuntimeError(
+            f"Missing required config key learningsNotePath in {config_path}"
+        )
     return expand_home(value.strip())
 
 
@@ -85,15 +94,21 @@ def cmd_list(_: argparse.Namespace) -> int:
 
 
 def cmd_show(args: argparse.Namespace) -> int:
-    code = args.code.upper()
-    entries = [e for e in parse_entries() if e[0] == code]
-    if not entries:
-        print(f"(no entries for code '{code}')")
-        return 1
-    print(code)
-    for _, situation, body in entries:
-        print(f"  - {situation}: {body}")
-    return 0
+    all_entries = parse_entries()
+    status = 0
+    for index, raw_code in enumerate([args.code, *args.extra_codes]):
+        if index:
+            print()
+        code = raw_code.upper()
+        entries = [entry for entry in all_entries if entry[0] == code]
+        if not entries:
+            print(f"(no entries for code '{code}')")
+            status = 1
+            continue
+        print(code)
+        for _, situation, body in entries:
+            print(f"  - {situation}: {body}")
+    return status
 
 
 def main() -> int:
@@ -105,6 +120,7 @@ def main() -> int:
 
     p_show = sub.add_parser("show", help="show all entries under one code")
     p_show.add_argument("code", help="2-char code, e.g. LB")
+    p_show.add_argument("extra_codes", nargs="*", help=argparse.SUPPRESS)
     p_show.set_defaults(func=cmd_show)
 
     args = p.parse_args()
