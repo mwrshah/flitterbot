@@ -328,12 +328,12 @@ function PreparedLaunchCard({
           disabled={create.isPending || launched}
           aria-label={launched ? "Swimlane launched" : "Launch prepared swimlane"}
           title={launched ? "Swimlane launched" : "Launch prepared swimlane"}
-          className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 enabled:hover:text-text-pop enabled:hover:[&_svg]:[stroke-width:3] focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:[stroke-width:3] disabled:cursor-not-allowed md:size-8"
+          className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 enabled:hover:text-text-pop enabled:hover:[&_svg]:stroke-2 focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:stroke-2 disabled:cursor-not-allowed md:size-8"
         >
           {launched ? (
             <Check className="size-4" aria-hidden="true" />
           ) : (
-            <ArrowRight className="size-4" aria-hidden="true" />
+            <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden="true" />
           )}
         </button>
       </div>
