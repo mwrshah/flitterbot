@@ -524,13 +524,17 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="tool-disclosure-summary group cursor-pointer select-none list-none pb-2">
+      <summary
+        aria-disabled={name === "prep_launch"}
+        onClick={name === "prep_launch" ? (event) => event.preventDefault() : undefined}
+        className="tool-disclosure-summary group cursor-pointer select-none list-none pb-2 aria-disabled:cursor-default"
+      >
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <div className="shrink-0 truncate text-sm font-medium leading-none group-hover:underline select-text">
+            <div className="shrink-0 truncate text-sm font-medium leading-none group-hover:underline group-aria-disabled:no-underline select-text">
               <span className="inline-block w-[1em] text-center">{glyph}</span> {title}
             </div>
-            <div className="min-w-0 truncate text-xs leading-none text-text-muted group-hover:underline select-text">
+            <div className="min-w-0 truncate text-xs leading-none text-text-muted group-hover:underline group-aria-disabled:no-underline select-text">
               {subtitle}
             </div>
           </div>
