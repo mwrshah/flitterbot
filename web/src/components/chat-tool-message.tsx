@@ -299,9 +299,8 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
             setJson(event.target.value);
             if (create.isError) create.reset();
           }}
-          rows={Math.min(12, Math.max(5, json.split("\n").length))}
           spellCheck={false}
-          className="w-full resize-y rounded border border-border bg-background px-2 py-1.5 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:text-xs"
+          className="field-sizing-content w-full resize-none overflow-hidden rounded border-0 bg-transparent px-2 py-1.5 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:text-xs"
         />
       </label>
       <button
@@ -309,14 +308,17 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
         disabled={create.isPending || create.isSuccess}
         aria-label={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
         title={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
-        className="flex size-11 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
+        className="group flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
       >
         {create.isPending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : create.isSuccess ? (
           <Check className="size-4" aria-hidden="true" />
         ) : (
-          <ArrowRight className="size-4" aria-hidden="true" />
+          <ArrowRight
+            className="size-4 transition-colors group-hover:text-text-pop"
+            aria-hidden="true"
+          />
         )}
       </button>
       {create.error ? (
