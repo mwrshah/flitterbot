@@ -6,7 +6,6 @@ import {
   Code,
   Copy,
   FolderOpen,
-  Loader2,
   MessageSquare,
   Search,
   SquareTerminal,
@@ -20,6 +19,7 @@ import { type ActiveToolState, useConversationToolState } from "@/lib/conversati
 import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
 const rootRouteApi = getRouteApi("__root__");
+const preparedLaunchStore = new Map<string, { json?: string; launched?: true }>();
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =
   "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
@@ -268,17 +268,30 @@ function ErrorText({ result }: { result?: ToolResult }) {
   ) : null;
 }
 
-function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessionId: string }) {
+function PreparedLaunchCard({
+  launch,
+  piSessionId,
+  stateKey,
+}: {
+  launch: unknown;
+  piSessionId: string;
+  stateKey: string;
+}) {
   const { apiClient } = rootRouteApi.useRouteContext();
-  const [json, setJson] = useState(() => JSON.stringify(launch, null, 2));
+  const stored = preparedLaunchStore.get(stateKey);
+  const [json, setJson] = useState(() => stored?.json ?? JSON.stringify(launch, null, 2));
+  const [launched, setLaunched] = useState(() => stored?.launched ?? false);
   const create = useMutation({
     mutationFn: (value: string) =>
       apiClient.createSwimlane({
         ...(JSON.parse(value) as SwimlaneLaunchArgs),
         sourcePiSessionId: piSessionId,
       }),
-    onSuccess: ({ streamName, warning }) =>
-      warning ? toast.warning(warning) : toast.success(`Started swimlane: ${streamName}`),
+    onSuccess: ({ streamName, warning }) => {
+      preparedLaunchStore.set(stateKey, { ...preparedLaunchStore.get(stateKey), launched: true });
+      setLaunched(true);
+      warning ? toast.warning(warning) : toast.success(`Started swimlane: ${streamName}`);
+    },
   });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -287,37 +300,46 @@ function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessio
   };
 
   return (
-    <form className="relative" onSubmit={submit}>
-      <label className="block min-w-0">
-        <span className="sr-only">Swimlane launch arguments</span>
-        <textarea
-          value={json}
-          onChange={(event) => {
-            setJson(event.target.value);
-            if (create.isError) create.reset();
-          }}
-          spellCheck={false}
-          className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-pop md:pr-12 md:text-xs"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={create.isPending || create.isSuccess}
-        aria-label={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
-        title={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
-        className="group absolute top-2 right-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
-      >
-        {create.isPending ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        ) : create.isSuccess ? (
-          <Check className="size-4" aria-hidden="true" />
-        ) : (
-          <ArrowRight
-            className="size-4 transition-colors group-hover:text-text-pop"
-            aria-hidden="true"
+    <form onSubmit={submit}>
+      <div className="relative">
+        <label className="block min-w-0">
+          <span className="sr-only">Swimlane launch arguments</span>
+          <textarea
+            value={json}
+            onChange={(event) => {
+              setJson(event.target.value);
+              preparedLaunchStore.set(stateKey, {
+                ...preparedLaunchStore.get(stateKey),
+                json: event.target.value,
+              });
+              if (create.isError) create.reset();
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              if (!create.isPending && !launched) event.currentTarget.form?.requestSubmit();
+            }}
+            spellCheck={false}
+            className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:pr-12 md:text-xs"
           />
-        )}
-      </button>
+        </label>
+        <button
+          type="submit"
+          disabled={create.isPending || launched}
+          aria-label={launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          title={launched ? "Swimlane launched" : "Launch prepared swimlane"}
+          className="group absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed md:size-8"
+        >
+          {launched ? (
+            <Check className="size-4" aria-hidden="true" />
+          ) : (
+            <ArrowRight
+              className="size-4 transition-colors group-hover:text-text-pop"
+              aria-hidden="true"
+            />
+          )}
+        </button>
+      </div>
       {create.error ? (
         <p className="mt-1 text-xs text-status-crashed" role="alert">
           {create.error instanceof Error ? create.error.message : String(create.error)}
@@ -523,6 +545,7 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
             {launches.map((launch, index) => (
               <PreparedLaunchCard
                 key={`${toolUseId}:${index}`}
+                stateKey={`${toolUseId}:${index}`}
                 launch={launch}
                 piSessionId={piSessionId}
               />
