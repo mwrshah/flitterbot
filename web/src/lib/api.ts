@@ -2,6 +2,7 @@ import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type {
   AuthFlowSnapshot,
   AuthProvidersResponse,
+  CreateSwimlaneRequest,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
   ModelsListResponse,
@@ -35,7 +36,10 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
 
     const response = await fetch(url, { ...init, headers });
     if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
+      const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      throw new Error(
+        typeof body?.error === "string" ? body.error : `${response.status} ${response.statusText}`,
+      );
     }
     return response.json() as Promise<T>;
   }
@@ -98,14 +102,17 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
         body: JSON.stringify({ name }),
       }),
 
-    createSwimlane: (body?: { name?: string; cwd?: string }) =>
-      request<{ ok: true; streamId: string; streamName: string; piSessionId: string }>(
-        "/api/streams",
-        {
-          method: "POST",
-          body: JSON.stringify(body ?? {}),
-        },
-      ),
+    createSwimlane: (body?: CreateSwimlaneRequest) =>
+      request<{
+        ok: true;
+        streamId: string;
+        streamName: string;
+        piSessionId: string;
+        warning?: string;
+      }>("/api/streams", {
+        method: "POST",
+        body: JSON.stringify(body ?? {}),
+      }),
 
     pruneStreamHistory: (piSessionId: string, entryId: string) =>
       request<{ ok: true; piSessionId: string; messageCount: number }>("/api/streams/prune", {

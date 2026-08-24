@@ -48,6 +48,7 @@ import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
   WhatsAppDaemonStatus as ControlSurfaceWhatsAppStatus,
+  CreateSwimlaneRequest,
   DaemonCommand,
   DaemonResponse,
   DirectSessionMessageResponse,
@@ -1370,13 +1371,16 @@ export class ControlSurfaceRuntime {
     }
   }
 
-  async createSwimlaneProgrammatic(input?: {
-    name?: string;
-    cwd?: string;
-  }): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
+  async createSwimlaneProgrammatic(input?: CreateSwimlaneRequest): Promise<{
+    ok: true;
+    streamId: string;
+    streamName: string;
+    piSessionId: string;
+    warning?: string;
+  }> {
     const { getStreamByName } = await import("./blackboard/query-streams.ts");
 
-    let name = input?.name ? stripStreamNamePrefix(input.name) : "";
+    let name = input?.name ?? "";
     if (!name) {
       for (let i = 0; i < 5; i++) {
         const candidate = `scratch-${crypto.randomUUID().slice(0, 6)}`;
@@ -1391,19 +1395,61 @@ export class ControlSurfaceRuntime {
     const effectiveCwd = input?.cwd ?? this.config.projectsDir;
     this.log(`programmatic swimlane create requested name="${name}" cwd=${effectiveCwd}`);
 
+    const source = input?.sourcePiSessionId
+      ? this.blackboard.get<{ stream_user: string | null }>(
+          `SELECT COALESCE(pi_sessions.session_user, streams.stream_user) AS stream_user
+           FROM pi_sessions
+           LEFT JOIN streams ON streams.id = pi_sessions.stream_id
+           WHERE pi_sessions.pi_session_id = ?`,
+          input.sourcePiSessionId,
+        )
+      : undefined;
+    if (input?.sourcePiSessionId && !source) throw new Error("Source Pi session not found");
+    const streamUser = input?.sourcePiSessionId
+      ? (source?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined)
+      : undefined;
+
     const result = await this.spawnStreamWithSession({
       name,
       cwd: effectiveCwd,
+      streamUser,
     });
-    if (!result.ok) {
-      throw result.spawnError;
+    if (!result.ok) throw result.spawnError;
+
+    let warning: string | undefined;
+    if (input?.message) {
+      try {
+        result.managed.queue.enqueue({
+          id: `ws-init-${result.streamId}`,
+          text: this.sessionManager.buildStreamPrompt(
+            input.message,
+            result.streamName,
+            result.streamId,
+            undefined,
+            resolveTmuxBootstrapMessage(this.config.tmuxEnabled, this.config.tmuxBootstrapMessage),
+          ),
+          source: "web",
+          sender: "system",
+          metadata: {
+            stream_id: result.streamId,
+            stream_name: result.streamName,
+            ...(streamUser ? { whatsapp_user_id: streamUser } : {}),
+          },
+          receivedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        warning = `Swimlane created, but its initial message was not queued: ${error instanceof Error ? error.message : String(error)}`;
+        this.log(warning);
+      }
     }
+
     this.log(`programmatic swimlane created "${result.streamName}" (${result.streamId})`);
     return {
       ok: true,
       streamId: result.streamId,
       streamName: result.streamName,
       piSessionId: result.managed.piSessionId,
+      ...(warning ? { warning } : {}),
     };
   }
 
@@ -1907,6 +1953,46 @@ export class ControlSurfaceRuntime {
     const tools: FlitterbotTool[] = [createQueryBlackboardTool(this.blackboard)];
 
     if (role === "default") {
+      tools.push({
+        name: "prep_launch",
+        label: "Prepare Swimlane Launches",
+        description:
+          "Return editable swimlane launch cards without creating streams. Use this instead of create_swimlane when the user asks to prepare, stage, or review one or more launches.",
+        parameters: {
+          type: "object",
+          properties: {
+            launches: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  cwd: { type: "string" },
+                  message: { type: "string" },
+                },
+                required: ["name", "cwd", "message"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["launches"],
+          additionalProperties: false,
+        },
+        execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+          const launches = params.launches as unknown[];
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${launches.length} swimlane launch${launches.length === 1 ? "" : "es"} prepared.`,
+              },
+            ],
+            details: undefined,
+          };
+        },
+      });
+
       tools.push({
         name: "create_swimlane",
         label: "Create Swimlane",

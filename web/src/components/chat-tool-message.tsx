@@ -1,11 +1,25 @@
-import { Check, Code, Copy, FolderOpen, MessageSquare, Search, SquareTerminal } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import {
+  ArrowRight,
+  Check,
+  Code,
+  Copy,
+  FolderOpen,
+  Loader2,
+  MessageSquare,
+  Search,
+  SquareTerminal,
+} from "lucide-react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CodeBlock } from "@/components/common/code-block";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
-import type { ChatTimelineTool } from "@/lib/types";
+import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
+const rootRouteApi = getRouteApi("__root__");
 const MAX_EDIT_DIFF_ROWS = 160;
 const HEADER_COPY_BUTTON_CLASS =
   "flex items-center gap-1 rounded px-2 py-0.5 text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background-muted data-[copied=true]:cursor-default data-[copied=true]:text-status-active data-[copied=true]:hover:bg-transparent data-[copied=true]:hover:text-status-active";
@@ -254,6 +268,66 @@ function ErrorText({ result }: { result?: ToolResult }) {
   ) : null;
 }
 
+function PreparedLaunchCard({ launch, piSessionId }: { launch: unknown; piSessionId: string }) {
+  const { apiClient } = rootRouteApi.useRouteContext();
+  const [json, setJson] = useState(() => JSON.stringify(launch, null, 2));
+  const create = useMutation({
+    mutationFn: (value: string) =>
+      apiClient.createSwimlane({
+        ...(JSON.parse(value) as SwimlaneLaunchArgs),
+        sourcePiSessionId: piSessionId,
+      }),
+    onSuccess: ({ streamName, warning }) =>
+      warning ? toast.warning(warning) : toast.success(`Started swimlane: ${streamName}`),
+  });
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    create.mutate(json);
+  };
+
+  return (
+    <form
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border bg-background-selected p-2"
+      onSubmit={submit}
+    >
+      <label className="min-w-0">
+        <span className="sr-only">Swimlane launch arguments</span>
+        <textarea
+          value={json}
+          onChange={(event) => {
+            setJson(event.target.value);
+            if (create.isError) create.reset();
+          }}
+          rows={Math.min(12, Math.max(5, json.split("\n").length))}
+          spellCheck={false}
+          className="w-full resize-y rounded border border-border bg-background px-2 py-1.5 font-mono text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop md:text-xs"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={create.isPending || create.isSuccess}
+        aria-label={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
+        title={create.isSuccess ? "Swimlane launched" : "Launch prepared swimlane"}
+        className="flex size-11 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40 md:size-8"
+      >
+        {create.isPending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : create.isSuccess ? (
+          <Check className="size-4" aria-hidden="true" />
+        ) : (
+          <ArrowRight className="size-4" aria-hidden="true" />
+        )}
+      </button>
+      {create.error ? (
+        <p className="col-span-2 text-xs text-status-crashed" role="alert">
+          {create.error instanceof Error ? create.error.message : String(create.error)}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function ToolBody({
   name,
   params,
@@ -423,7 +497,9 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
               ? String(p.text ?? p.message ?? "")
               : "";
   const glyph = running ? "↺" : result?.isError ? "✕" : result ? "✓" : "↺";
-  const [open, setOpen] = useState(name === "edit" || name === "write");
+  const launches =
+    name === "prep_launch" && endItem && !endItem.isError ? record(item.args).launches : undefined;
+  const [open, setOpen] = useState(name === "edit" || name === "write" || name === "prep_launch");
   return (
     <details
       className="tool-disclosure overflow-hidden rounded-sm bg-background text-text"
@@ -443,7 +519,19 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
         </div>
       </summary>
       <div className="pb-3 pt-1">
-        <ToolBody name={name} params={params} result={result} running={running} />
+        {Array.isArray(launches) && launches.length > 0 ? (
+          <div className="space-y-2" role="group" aria-label="Prepared swimlane launches">
+            {launches.map((launch, index) => (
+              <PreparedLaunchCard
+                key={`${toolUseId}:${index}`}
+                launch={launch}
+                piSessionId={piSessionId}
+              />
+            ))}
+          </div>
+        ) : (
+          <ToolBody name={name} params={params} result={result} running={running} />
+        )}
       </div>
     </details>
   );

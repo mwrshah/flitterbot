@@ -157,6 +157,19 @@ export interface MessageResponse {
   ok: boolean;
 }
 
+export interface SwimlaneLaunchArgs {
+  name: string;
+  cwd: string;
+  message: string;
+}
+
+export interface CreateSwimlaneRequest {
+  name?: string;
+  cwd?: string;
+  message?: string;
+  sourcePiSessionId?: string;
+}
+
 export interface ClaudeHookPayload {
   hook_event_name?: string;
   event_name?: string;
