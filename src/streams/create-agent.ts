@@ -6,6 +6,7 @@ import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
+  createGrepToolDefinition,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -19,6 +20,7 @@ import { createFlitterbotExtension, type FlitterbotTool } from "./flitterbot-ext
 type OrchestratorInput = Omit<OrchestratorContext, "piSessionId" | "cwd">;
 
 const HOME = os.homedir();
+const GREP_DEFAULT_LIMIT = 300;
 
 process.env.PI_CACHE_RETENTION = "long";
 
@@ -163,6 +165,27 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
         : buildDefaultAgentPrompt(piSessionId, config.projectsDir);
 
     const memory = readMemory(config.memoryPath);
+    const grep = createGrepToolDefinition(factoryOpts.cwd);
+    grep.description = grep.description.replace(
+      /truncated to \d+ matches/,
+      `truncated to ${GREP_DEFAULT_LIMIT} matches`,
+    );
+    grep.parameters.properties.limit = {
+      ...grep.parameters.properties.limit,
+      description: `Maximum number of matches to return (default: ${GREP_DEFAULT_LIMIT})`,
+    } as typeof grep.parameters.properties.limit;
+    const grepWithHigherDefault: typeof grep = {
+      ...grep,
+      execute(id, params, signal, onUpdate, context) {
+        return grep.execute(
+          id,
+          { ...params, limit: params.limit ?? GREP_DEFAULT_LIMIT },
+          signal,
+          onUpdate,
+          context,
+        );
+      },
+    };
     const services = await createAgentSessionServices({
       cwd: factoryOpts.cwd,
       agentDir: config.piAgentDir,
@@ -170,7 +193,9 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
       modelRuntime,
       resourceLoaderOptions: {
         additionalSkillPaths,
-        extensionFactories: [createFlitterbotExtension(customTools)],
+        extensionFactories: [
+          createFlitterbotExtension([...customTools, grepWithHigherDefault as FlitterbotTool]),
+        ],
         appendSystemPromptOverride: (base) => [rolePrompt, ...(memory ? [memory] : []), ...base],
       },
     });
