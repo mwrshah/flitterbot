@@ -107,7 +107,7 @@ Stream-backed roles with tailored system prompts and role-gated tools:
 
 **Orchestrators** — ephemeral work sessions, one per work stream. Manage Claude Code sessions. Tools: `set_up_worktree` (inspect/apply stream worktree setup), `close_swimlane` (confirmed merge/noop close flow, cleanup, self-destruct). Cannot write code directly.
 
-Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `grep`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
+Shared: `query_blackboard` (read-only SQL). SDK-provided: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`. Hot-reload of skills/prompts/system-prompt is a user-facing `/reload` command (handled directly in `runtime.enqueue()`), not an LLM tool — routing reloads through the LLM wastes tokens.
 
 Delivery: `followUp` (queue append) or `steer` (bypass queue, interrupt via `streamingBehavior: "steer"`; two-layer bypass at runtime and TurnQueue level).
 

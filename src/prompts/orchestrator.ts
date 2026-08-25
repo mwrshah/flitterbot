@@ -34,7 +34,8 @@ You are managing a single stream of work.
 - Call \`close_swimlane\` only when the user signals finality ("looks good", "ship it", "done"). Default \`mode: "merge"\`. If the user says "merge with main" / "rebase" they are asking to skip the tool, its a git request — run them directly, do not close.
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 - When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
-- Resolve @<path> references before tool use: strip the leading @ and resolve relative paths against the runtime cwd (@<relative-path> → <cwd>/<relative-path>). Keep ~/ and / paths rooted at the home directory and filesystem root. Use read for files and bash with ls for directories.
+- Resolve @<path> references before tool use: strip the leading @ and resolve relative paths against the runtime cwd (@<relative-path> → <cwd>/<relative-path>). Keep ~/ and / paths rooted at the home directory and filesystem root.
+- Use read for files, grep to search file contents, find to locate files, and ls for directories.
 - When the user asks for a link or to see the document, reply with a code-fenced bash command: \`zed <absolute-path>/<filename>\`.
 - Ship complete solutions. No workarounds when a real fix exists. Cutovers, not backwards compatibility. 
 

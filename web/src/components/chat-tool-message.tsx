@@ -573,14 +573,16 @@ function ToolBody({
       </div>
     );
   }
-  if (name === "grep" || name === "ls" || name === "glob") {
-    const grep = name === "grep";
-    const label = grep
-      ? `grep ${String(p.pattern ?? "")} ${String(p.path ?? ".")}`
+  if (name === "grep" || name === "find" || name === "ls" || name === "glob") {
+    const search = name === "grep" || name === "find";
+    const label = search
+      ? `${name} ${String(p.pattern ?? "")} ${String(p.path ?? ".")}`
       : `ls ${String(p.path ?? p.directory ?? ".")}`;
     return (
       <div className="space-y-2">
-        <ToolHeader icon={grep ? <Search className="size-4" /> : <FolderOpen className="size-4" />}>
+        <ToolHeader
+          icon={search ? <Search className="size-4" /> : <FolderOpen className="size-4" />}
+        >
           {label}
         </ToolHeader>
         {result?.text ? (
@@ -588,7 +590,7 @@ function ToolBody({
             {result.text}
           </pre>
         ) : null}
-        {grep ? <ErrorText result={result} /> : null}
+        <ErrorText result={result} />
       </div>
     );
   }
@@ -654,7 +656,7 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
       ? String(p.command ?? "")
       : name === "edit" || name === "write" || name === "read"
         ? pathParam(p)
-        : name === "grep"
+        : name === "grep" || name === "find"
           ? String(p.pattern ?? "")
           : name === "ls" || name === "glob"
             ? String(p.path ?? p.pattern ?? p.directory ?? ".")

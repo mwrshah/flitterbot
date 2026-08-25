@@ -112,6 +112,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     const modelRuntime = await createPiModelRuntime(config.controlSurfaceAgentDir);
     const settingsManager = SettingsManager.inMemory({
       compaction: { keepRecentTokens: 30_000 },
+      defaultTools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
     });
     settingsManager.setTransport(config.piTransport);
 
