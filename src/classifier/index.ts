@@ -1,7 +1,7 @@
-export { type ClassificationResult, classifyMessage } from "./classify.ts";
 export {
+  type ClassificationResult,
   type ClassifyResult,
-  callGroqClassify,
-  resetGroqClient,
-  resolveGroqApiKey,
-} from "./groq-client.ts";
+  classifyMessage,
+} from "./classify.ts";
+export { classifyContextRelevance } from "./context-relevance.ts";
+export { inferClassifierJson } from "./inference.ts";

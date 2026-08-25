@@ -227,9 +227,8 @@ export function Surface() {
   const { data, fetchPreviousPage, hasPreviousPage, isFetching, isFetchPreviousPageError } =
     useInfiniteQuery(surfaceTimelineInfiniteQueryOptions());
   const timeline = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
-  const { data: status } = useQuery(statusQueryOptions(apiClient));
+  useQuery(statusQueryOptions(apiClient));
   const entries = useMemo(() => timelineToEntries(timeline), [timeline]);
-  const surfaceInputDisabled = status?.groqConfigured === false;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
@@ -412,21 +411,14 @@ export function Surface() {
         <HorizontalResizeHandle />
 
         <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
-          {surfaceInputDisabled ? (
-            <div className="flex h-full items-center justify-center px-4 text-center text-sm text-text-muted">
-              Set <code className="mx-1 text-text">GROQ_API_KEY</code> and restart Flitterbot to
-              send messages from the Surface.
-            </div>
-          ) : (
-            <MessageInput
-              draftKey="__surface__"
-              isSending={isSending}
-              onSubmit={handleSubmit}
-              fillHeight
-              showModelSelector={false}
-              internalCommandScope="surface"
-            />
-          )}
+          <MessageInput
+            draftKey="__surface__"
+            isSending={isSending}
+            onSubmit={handleSubmit}
+            fillHeight
+            showModelSelector={false}
+            internalCommandScope="surface"
+          />
         </Panel>
       </PanelGroup>
     </div>

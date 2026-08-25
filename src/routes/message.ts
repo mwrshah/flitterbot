@@ -1,7 +1,6 @@
 import type http from "node:http";
 import { getResumableStreamPiSessionId, getStreamByName } from "../blackboard/query-streams.ts";
 import { classifyMessage } from "../classifier/classify.ts";
-import { resolveGroqApiKey } from "../classifier/groq-client.ts";
 import type {
   MessageMetadata,
   MessageRequest,
@@ -97,12 +96,11 @@ async function routeMessage(
   }
 
   try {
-    const apiKey = resolveGroqApiKey();
-    if (!apiKey) return { metadata: fallback };
     const result = await classifyMessage(
       rawText,
       runtime.blackboard,
-      apiKey,
+      await runtime.resolveModelRuntime(),
+      runtime.config,
       defaultPiSessionId,
       ownerUser,
     );

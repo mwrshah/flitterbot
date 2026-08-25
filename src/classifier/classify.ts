@@ -1,12 +1,14 @@
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import {
   getRecentConversationByWorkstream,
   getRecentDefaultConversation,
 } from "../blackboard/query-messages.ts";
 import { getLatestStreamCreatedAt, listOpenWorkStreams } from "../blackboard/query-streams.ts";
+import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompts } from "../prompts/classifier.ts";
-import { type ClassifyResult, callGroqClassify } from "./groq-client.ts";
+import { inferClassifierJson } from "./inference.ts";
 
 const DEFAULT_AGENT_PATTERNS = [
   /^\s*\/new-stream\b/i,
@@ -50,16 +52,15 @@ function logClassifierResult(result: ClassifyResult, matched: StreamRow | null):
       ? `NO MATCH → model returned unknown stream_id=${result.stream_id}`
       : `NO MATCH → routing to default agent (stream_id=null)`;
   console.log(
-    [
-      `\n┏${bar}`,
-      `┃ [router] CLASSIFIER RESULT`,
-      `┣${bar}`,
-      `┃ ${outcome}`,
-      `┃ reasoning: ${result.reasoning || "(none)"}`,
-      `┗${bar}\n`,
-    ].join("\n"),
+    [`\n┏${bar}`, `┃ [router] CLASSIFIER RESULT`, `┣${bar}`, `┃ ${outcome}`, `┗${bar}\n`].join(
+      "\n",
+    ),
   );
 }
+
+export type ClassifyResult = {
+  stream_id: string | null;
+};
 
 export type ClassificationResult = {
   stream: StreamRow | null;
@@ -69,7 +70,8 @@ export type ClassificationResult = {
 export async function classifyMessage(
   message: string,
   db: BlackboardDatabase,
-  apiKey: string,
+  modelRuntime: ModelRuntime,
+  config: FlitterbotConfig,
   defaultPiSessionId?: string,
   ownerUser?: string,
 ): Promise<ClassificationResult> {
@@ -103,10 +105,20 @@ export async function classifyMessage(
   logClassifierPrompt(prompts);
   let result: ClassifyResult;
   try {
-    result = await callGroqClassify(apiKey, prompts);
+    const inferred = await inferClassifierJson(modelRuntime, config, prompts);
+    if (
+      !inferred ||
+      typeof inferred !== "object" ||
+      Array.isArray(inferred) ||
+      !("stream_id" in inferred) ||
+      (inferred.stream_id !== null && typeof inferred.stream_id !== "string")
+    ) {
+      throw new Error(`Invalid router response: ${JSON.stringify(inferred)}`);
+    }
+    result = { stream_id: inferred.stream_id };
   } catch (error) {
     console.error(
-      `[router] Groq classification failed: ${error instanceof Error ? error.message : String(error)}`,
+      `[router] classification failed: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { stream: null, action: "none" };
   }

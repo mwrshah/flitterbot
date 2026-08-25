@@ -1,12 +1,12 @@
 # Flitterbot — Features Overview
 
-Orchestration layer above Claude Code. A long-running control surface hosts concurrent Pi agent sessions — one default for triage, one orchestrator per active workstream — behind a Groq classifier. State in SQLite; user interaction via WhatsApp and web client (bidirectionally synced); Claude Code sessions report back via hooks; OS-level cron injects periodic health checks.
+Orchestration layer above Claude Code. A long-running control surface hosts concurrent Pi agent sessions — one default for triage and one orchestrator per active workstream — with one-shot Pi inference for inbound routing. State lives in SQLite; users interact through WhatsApp and the web client, Claude Code sessions report through hooks, and OS-level cron injects periodic health checks.
 
 ## How It Works
 
 ### Message Flow
 
-All inbound messages hit the control surface. Web and WhatsApp messages pass through a Groq classifier (`openai/gpt-oss-120b`) that matches against open streams in SQLite. Hook events, cron prompts, and direct-targeted Pi-session messages bypass classification.
+All inbound messages hit the control surface. Untargeted web and WhatsApp messages pass through a classifier that matches against open streams in SQLite. The classifier resolves `config.defaultModel`, finds that model through the shared `ModelRuntime`, and makes one `completeSimple()` call with only a system prompt and user prompt. It supplies no tools or reasoning option and creates no agent session. Hook events, cron prompts, and direct-targeted Pi-session messages bypass classification.
 
 Routing after classification:
 - **Matched stream** → that stream's orchestrator
@@ -15,13 +15,13 @@ Routing after classification:
 - **Hook events** → Pi session owning the Claude Code session (by `pi_session_id`, `stream_id`, worktree path, or default fallback)
 - **Cron** → default agent
 
-Router classifier context is deliberately small and visible in logs. For each run, the control surface logs the exact classifier system prompt and user prompt. The user prompt contains all open streams, the last 4 messages per open stream (no time-window filter), and the last 4 default-agent messages after the most recent stream creation boundary. That boundary prevents default-agent context that led to an already-created stream from leaking into later routing decisions. The current user message is always included separately.
+Router classifier context is deliberately small and visible in logs. For each run, the control surface logs the exact classifier system prompt and user prompt. The user prompt contains all open streams, the last 4 messages per open stream (no time-window filter), and the last 4 default-agent messages after the most recent stream creation boundary. That boundary prevents default-agent context that led to an already-created stream from leaking into later routing decisions. The current user message is always included separately. The model is asked for `{ "stream_id": string | null, "reason": string }`, but routing reads and validates only `stream_id`; malformed output, unknown IDs, non-stop responses, and model errors route conservatively to the default agent.
 
 Each Pi session has a Flitterbot FIFO admission queue for cross-channel metadata and UI projection. Once admitted through `prompt`, `steer`, or `followUp`, Pi owns execution, retry, cancellation, queued continuation, and settlement. All agents process concurrently.
 
 ### Workstream Lifecycle
 
-Default agent creates swimlanes via `create_swimlane` — inserts a SQLite row, spawns a bound orchestrator, and by default passes relevant user context through to the new stream. Stream insertion and rename share one case-insensitive collision contract: the first requested `name` stays `name`, then collisions become `2name`, `3name`, and so on. Forking uses that same insertion contract, while persisted historical names remain unchanged. For normal single-stream creation, the runtime looks at up to 10 recent default-surface real user messages (`web`/`whatsapp`, `sender=user`, no `stream_id`) after the previous stream creation boundary, asks a Groq relevance classifier which messages belong in the new stream, forces the current user message in if missing, and formats those messages as the orchestrator's initial prompt. The relevance classifier sees the stream name, the default agent's optional `message` as the stream purpose/agent context, and the candidate user messages; it is instructed to omit vague default-agent orchestration prompts unless that purpose makes the concrete task clear. If relevance classification fails, it falls back to the current user message only. `skipUserMessage=true` is reserved for batch-created streams where the default agent supplies a targeted full prompt in `message`; that mode skips user-message passthrough entirely.
+Default agent creates swimlanes via `create_swimlane` — inserts a SQLite row, spawns a bound orchestrator, and by default passes relevant user context through to the new stream. Stream insertion and rename share one case-insensitive collision contract: the first requested `name` stays `name`, then collisions become `2name`, `3name`, and so on. Forking uses that same insertion contract, while persisted historical names remain unchanged. For normal single-stream creation, the runtime looks at up to 10 recent default-surface real user messages (`web`/`whatsapp`, `sender=user`, no `stream_id`) after the previous stream creation boundary. The context-relevance classifier uses the same one-shot Pi inference helper and configured default model to select messages for the new stream. It sees the stream name, the default agent's optional `message` as the stream purpose/agent context, and the candidate user messages. It accepts only a boolean array with exactly one entry per candidate, forces the current user message in if missing, and formats the selected messages as the orchestrator's initial prompt. Invalid output or inference failure falls back to the current user message only. `skipUserMessage=true` is reserved for batch-created streams where the default agent supplies a targeted full prompt in `message`; that mode skips user-message passthrough entirely.
 
 The orchestrator enriches the stream (repo, git worktree via `set_up_worktree`), launches Claude Code sessions in tmux, and coordinates waves through prompt-based delegation. On completion, `close_swimlane` merges to the confirmed base branch, pushes when permitted by the close flow, closes the row, and the runtime destroys the orchestrator.
 
@@ -63,7 +63,7 @@ Separate 60s maintenance loop: pings blackboard, refreshes WhatsApp, marks stale
 │                Control Surface (:18820)                    │
 │                                                           │
 │  ┌───────────────────┐  Hook events ─────┐               │
-│  │ Classifier (Groq) │  Cron prompts ────┤               │
+│  │ Classifier (Pi)   │  Cron prompts ────┤               │
 │  │ Routes web/WA to  │                   │               │
 │  │ workstream or     │                   │               │
 │  │ default           │                   │               │
@@ -93,7 +93,7 @@ Separate 60s maintenance loop: pings blackboard, refreshes WhatsApp, marks stale
 
 ### Control Surface
 
-Node.js/TypeScript server on `127.0.0.1:18820`. Hosts `PiSessionManager`, Groq classifier, HTTP/WS API, maintenance loop. Single user, localhost only. Read-only `/api/*` unauthenticated; mutating endpoints require bearer token (auto-generated UUID).
+Node.js/TypeScript server on `127.0.0.1:18820`. Hosts `PiSessionManager`, the one-shot Pi classifiers, HTTP/WS API, and maintenance loop. Single user, localhost only. Read-only `/api/*` endpoints are unauthenticated; mutating endpoints require a bearer token (auto-generated UUID).
 
 Endpoints: `POST /message`, `/hook/:event`, `/cron/tick`, `/stop`, `/sessions/:id/message` (tmux inject), `/runtime/whatsapp/start|stop`, `/api/pi-sessions/:id/interrupt`, `/api/workstreams/:id/reopen`; `GET /status`, `/api/sessions[/:id[/transcript]]`, `/api/pi/history`, `/api/pi-sessions/:id/sessions`, `/api/pi-sessions/:id/workstream`, `/api/skills`, `/api/directory-completions`; `WS /ws`.
 
@@ -167,7 +167,7 @@ Domain-organized, max 2-level nesting (`src/domain/file.ts`):
 ```
 src/
 ├── blackboard/      # SQLite wrapper, migrations, query-*/write-*
-├── classifier/      # Groq LLM routing
+├── classifier/      # One-shot Pi routing and context relevance
 ├── tmux-sessions/   # Agent-neutral tmux inspection + injection
 ├── config/          # FlitterbotConfig loader
 ├── contracts/       # Shared types, schema DDL, enums (SSOT), message.ts
@@ -190,7 +190,7 @@ This overview is the source of truth for feature inventory. Linked feature docs 
 |---|---------|---------|
 | 1 | Installer / Uninstaller | Permission-gated, manifest-tracked deployment of runtime tree and external config modifications |
 | 2 | Blackboard | SQLite state layer (v14). Streams, Claude Code sessions, Pi sessions, unified messages, message ID mapping, WhatsApp tracking, pending actions, health flags |
-| 3 | Control Surface | HTTP/WS server hosting PiSessionManager (default + orchestrators), Groq classifier, maintenance loop |
+| 3 | Control Surface | HTTP/WS server hosting PiSessionManager (default + orchestrators), one-shot Pi classifiers, maintenance loop |
 | 4 | WhatsApp Channel | Bidirectional Baileys daemon with IPC, echo/dedup filtering, reply matching, auth lifecycle |
 | 5 | Web App | Browser client: Input Surface (activity feed), Pi chat with downstream sessions panel, runtime controls |
 | 6 | Cron Scheduler | OS-level timer → health-gated periodic prompt injection for stale/idle session management |
@@ -236,7 +236,7 @@ Installer → Blackboard → WhatsApp Channel ──┐
 ## Design Principles
 
 - **Multi-agent, single runtime** — one process, concurrent Pi sessions with independent turn queues
-- **Classifier routes, Pi acts** — Groq matches to workstreams; hooks and cron bypass classification
+- **One model runtime** — classifiers use the configured default Pi model through the shared `ModelRuntime`; hooks and cron bypass classification
 - **Workstreams are the unit of work** — each gets a worktree, CC sessions, dedicated orchestrator that self-destructs on completion
 - **Unified comms** — Pi responses auto-surface to WhatsApp + web; messages from either surface mirror to both
 - **Push-based** — all delivery event-driven; no polling for message discovery

@@ -40,7 +40,6 @@ import {
   setStreamType,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
-import { resolveGroqApiKey } from "./classifier/groq-client.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
@@ -918,7 +917,6 @@ export class ControlSurfaceRuntime {
         requiresManualAuth: whatsapp.requiresManualAuth,
       },
       blackboard: blackboardStatus,
-      groqConfigured: Boolean(resolveGroqApiKey()?.trim()),
       streams: [
         ...openStreams.map(({ stream: ws, piSession }) => {
           const managed = this.sessionManager.getByStream(ws.id);
@@ -2136,21 +2134,20 @@ export class ControlSurfaceRuntime {
                 const { getPreviousStreamCreatedAt } = await import(
                   "./blackboard/query-streams.ts"
                 );
-                const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
                 const { classifyContextRelevance } = await import(
                   "./classifier/context-relevance.ts"
                 );
                 const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
-                const apiKey = resolveGroqApiKey();
 
                 const boundary = getPreviousStreamCreatedAt(this.blackboard, ws.id);
                 const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
 
-                if (role === "default" && apiKey && recentMessages.length > 1) {
+                if (role === "default" && recentMessages.length > 1) {
                   const relevance = await classifyContextRelevance(
                     recentMessages,
                     ws.name,
-                    apiKey,
+                    await this.resolveModelRuntime(),
+                    this.config,
                     agentMessage,
                     this.log.bind(this),
                   );
@@ -2804,14 +2801,12 @@ export class ControlSurfaceRuntime {
       } else {
         try {
           const { classifyMessage } = await import("./classifier/classify.ts");
-          const { resolveGroqApiKey } = await import("./classifier/groq-client.ts");
-          const apiKey = resolveGroqApiKey();
-          if (!apiKey) throw new Error("No Groq API key available");
           const defaultPiSessionId = this.sessionManager.getDefault()?.piSessionId;
           const result = await classifyMessage(
             payload.text,
             this.blackboard,
-            apiKey,
+            await this.resolveModelRuntime(),
+            this.config,
             defaultPiSessionId,
             loadWhatsAppConfig().defaultUser ?? undefined,
           );

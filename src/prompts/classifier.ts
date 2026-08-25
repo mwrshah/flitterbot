@@ -94,7 +94,7 @@ Rules:
 5. If the message is exactly /clear, /reload, or /compact, including /compact with instructions, return stream_id: null.
 6. When unsure, return stream_id: null to fall back to the default agent.
 
-Respond with ONLY a JSON object containing stream_id and reasoning.`;
+Respond with ONLY a JSON object containing "stream_id" and "reason".`;
 
 export function buildClassificationPrompts(
   message: string,

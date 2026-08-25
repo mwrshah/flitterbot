@@ -20,10 +20,10 @@ node installer/install.mjs
 pnpm --dir web dev
 ```
 
-Step by step: 
-- copying `.env.example` gives you a file for model provider keys and the optional `GROQ_API_KEY`; 
-- `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default. 
-- `flitterbot-wa auth` links WhatsApp and is optional 
+Step by step:
+- copying `.env.example` gives you a file for model provider keys;
+- `installer/install.mjs` deploys `~/.flitterbot/`, wires hooks for installed harnesses, and asks which harness to use by default.
+- `flitterbot-wa auth` links WhatsApp and is optional
 - `pnpm --dir web dev` starts the web UI on port 3188.
 
 
@@ -38,7 +38,7 @@ Step by step:
 
 To use an API key, add the standard Pi environment variable to `.env`, such as `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Restart Flitterbot. When the model appears in the model selector, it is ready to use.
 
-`GROQ_API_KEY` is optional. Set it if you want to use WhatsApp or the Surface at [http://127.0.0.1:3188/](http://127.0.0.1:3188/). Groq routes messages from these inputs to the correct stream. Direct messages at `/streams/<pi-session-id>` do not require Groq.
+Inbound WhatsApp and Surface messages route through one-shot inference with the configured default Pi model. Direct messages at `/streams/<pi-session-id>` bypass classification.
 
 ## Config
 

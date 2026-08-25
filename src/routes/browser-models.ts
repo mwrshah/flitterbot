@@ -167,14 +167,13 @@ const INITIAL_PROVIDER_ORDER = [
   "openai",
   "anthropic",
   "fireworks",
-  "groq",
   "github-copilot",
   "opencode",
 ] as const;
 const INITIAL_PROVIDER_RANK = new Map<string, number>(
   INITIAL_PROVIDER_ORDER.map((provider, index) => [provider, index]),
 );
-const INITIAL_ALL_MODEL_PROVIDERS = new Set(["openai-codex", "groq"]);
+const INITIAL_ALL_MODEL_PROVIDERS = new Set(["openai-codex"]);
 const FIREWORKS_EXCLUDED_MODELS = new Set([
   "accounts/fireworks/models/gpt-oss-20b",
   "accounts/fireworks/models/inkling",
