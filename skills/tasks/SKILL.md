@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: Use the bundled task script to read, mutate, sync, and clean up local tasks. Installed at ~/.flitterbot/skills/tasks/SKILL.md.
+description: Use the bundled task script to read, mutate, periodically sync, and clean up local tasks. Installed at ~/.flitterbot/skills/tasks/SKILL.md.
 argument-hint: "[task request]"
 disable-model-invocation: false
 ---
