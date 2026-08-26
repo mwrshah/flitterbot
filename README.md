@@ -7,7 +7,7 @@ Architecture: [`docs/overview.md`](docs/overview.md). Deep dives: [`docs/<featur
 
 ## Prerequisites
 
-Node.js 22+, pnpm, tmux, sqlite3, and at least one supported downstream harness: Claude Code CLI or Codex CLI.
+Node.js 24.10+, pnpm, tmux, sqlite3, and at least one supported downstream harness: Claude Code CLI or Codex CLI.
 
 ## Install
 

@@ -1,5 +1,42 @@
+import { constants as sqlite } from "node:sqlite";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { BlackboardDatabase } from "./db.ts";
+
+const READ_ACTIONS = new Set([sqlite.SQLITE_SELECT, sqlite.SQLITE_READ, sqlite.SQLITE_RECURSIVE]);
+
+const READ_PRAGMAS = new Set([
+  "application_id",
+  "collation_list",
+  "compile_options",
+  "data_version",
+  "database_list",
+  "encoding",
+  "foreign_keys",
+  "freelist_count",
+  "function_list",
+  "journal_mode",
+  "module_list",
+  "page_count",
+  "page_size",
+  "pragma_list",
+  "query_only",
+  "schema_version",
+  "table_list",
+  "user_version",
+]);
+
+const ARGUMENT_READ_PRAGMAS = new Set([
+  "foreign_key_check",
+  "foreign_key_list",
+  "index_info",
+  "index_list",
+  "index_xinfo",
+  "integrity_check",
+  "quick_check",
+  "table_info",
+  "table_list",
+  "table_xinfo",
+]);
 
 const MODES: Record<string, string> = {
   active_sessions: `
@@ -106,38 +143,53 @@ COMMON GOTCHAS:
   - pi_sessions PK is "pi_session_id", NOT "id"
 
 PARAMETERS:
-  - sql: raw SELECT or PRAGMA statement (required when mode is omitted)
+  - sql: one read-only SQLite statement (required when mode is omitted)
   - mode: optional shortcut — one of: active_sessions, open_streams, session_summary, schema
     When mode is provided, sql is ignored.`;
+
+function authorizeRead(action: number, arg1: string | null, arg2: string | null): number {
+  if (READ_ACTIONS.has(action)) return sqlite.SQLITE_OK;
+  if (action === sqlite.SQLITE_FUNCTION && arg2?.toLowerCase() !== "load_extension") {
+    return sqlite.SQLITE_OK;
+  }
+  if (action === sqlite.SQLITE_PRAGMA) {
+    const pragma = arg1?.toLowerCase() ?? "";
+    if ((arg2 === null && READ_PRAGMAS.has(pragma)) || ARGUMENT_READ_PRAGMAS.has(pragma)) {
+      return sqlite.SQLITE_OK;
+    }
+  }
+  return sqlite.SQLITE_DENY;
+}
 
 function executeQuery(
   db: BlackboardDatabase,
   sql: string | undefined,
   mode: string | undefined,
 ): Array<Record<string, unknown>> {
-  let query: string;
-
-  if (mode) {
-    const built = MODES[mode];
-    if (!built) {
+  const query = mode ? MODES[mode]?.trim() : String(sql ?? "").trim();
+  if (!query) {
+    if (mode) {
       throw new Error(`Unknown mode "${mode}". Valid modes: ${Object.keys(MODES).join(", ")}`);
     }
-    query = built.trim();
-  } else {
-    const normalized = String(sql ?? "")
-      .trim()
-      .replace(/;+\s*$/, "");
-    if (!normalized) throw new Error("Either sql or mode is required");
-    if (!/^(select|pragma)\b/i.test(normalized)) {
-      throw new Error("query_blackboard only allows SELECT and PRAGMA");
-    }
-    if (normalized.includes(";")) {
-      throw new Error("multiple SQL statements are not allowed");
-    }
-    query = normalized;
+    throw new Error("Either sql or mode is required");
   }
+  if (query.includes("\0")) throw new Error("NUL bytes are not allowed in SQL");
 
-  return db.prepare(query).all() as Array<Record<string, unknown>>;
+  db.sqlite.setAuthorizer(authorizeRead);
+  try {
+    const statement = db.prepare(query);
+    const tail = query.slice(statement.sourceSQL.length);
+    try {
+      const trailingStatement = db.prepare(tail);
+      void trailingStatement.sourceSQL;
+      throw new Error("multiple SQL statements are not allowed");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ERR_INVALID_STATE") throw error;
+    }
+    return statement.all() as Array<Record<string, unknown>>;
+  } finally {
+    db.sqlite.setAuthorizer(null);
+  }
 }
 
 export type QueryBlackboardTool = ToolDefinition;
@@ -150,7 +202,7 @@ export function createQueryBlackboardTool(db: BlackboardDatabase): QueryBlackboa
     parameters: {
       type: "object",
       properties: {
-        sql: { type: "string", description: "SELECT or PRAGMA SQL statement" },
+        sql: { type: "string", description: "One read-only SQLite statement" },
         mode: {
           type: "string",
           enum: Object.keys(MODES),
