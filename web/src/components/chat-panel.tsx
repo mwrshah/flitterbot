@@ -636,6 +636,7 @@ export function ChatPanel({
 
   const [isSending, setIsSending] = useState(false);
   const [pruneTarget, setPruneTarget] = useState<string | null>(null);
+  const pruneDeleteButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     pendingPostedScrollClientMessageIdsRef.current.clear();
   }, [piSessionId]);
@@ -792,9 +793,8 @@ export function ChatPanel({
   const confirmPrune = useCallback(() => {
     const entryId = pruneTarget;
     if (!entryId) return;
-    pruneMutation.mutate(entryId, {
-      onSettled: () => setPruneTarget(null),
-    });
+    setPruneTarget(null);
+    pruneMutation.mutate(entryId);
   }, [pruneTarget, pruneMutation]);
 
   const handleSubmit = useCallback(
@@ -993,7 +993,7 @@ export function ChatPanel({
             open={pruneTarget !== null}
             onOpenChange={(open) => !open && setPruneTarget(null)}
           >
-            <DialogContent>
+            <DialogContent initialFocus={pruneDeleteButtonRef}>
               <DialogHeader>
                 <DialogTitle>Delete from here?</DialogTitle>
                 <DialogDescription>
@@ -1009,12 +1009,12 @@ export function ChatPanel({
                   Cancel
                 </DialogClose>
                 <Button
+                  ref={pruneDeleteButtonRef}
                   variant="danger"
-                  autoFocus
                   onClick={confirmPrune}
                   disabled={pruneMutation.isPending}
                 >
-                  {pruneMutation.isPending ? "Deleting…" : "Delete"}
+                  Delete
                 </Button>
               </DialogFooter>
             </DialogContent>
