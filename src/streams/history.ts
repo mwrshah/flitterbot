@@ -285,7 +285,6 @@ export function piMessageToTimelineItems(
   }
   if (role !== "toolResult") return [];
 
-  const resultText = firstText(record.content);
   const toolCallId = record.toolCallId;
   const toolName = record.toolName;
   if (
@@ -297,6 +296,11 @@ export function piMessageToTimelineItems(
     return [];
   }
 
+  const result: Record<string, JsonValue> = {
+    content: record.content as JsonValue,
+  };
+  if (record.details !== undefined) result.details = record.details as JsonValue;
+
   return [
     {
       id: `tool-${toolCallId}-end`,
@@ -305,9 +309,7 @@ export function piMessageToTimelineItems(
       tool: toolName,
       phase: "end",
       toolUseId: toolCallId,
-      result: (toolName === "bash" ? resultText : (record.details ?? resultText)) as
-        | JsonValue
-        | undefined,
+      result,
       isError: Boolean(record.isError),
       createdAt,
     },
