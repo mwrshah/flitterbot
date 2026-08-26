@@ -28,7 +28,7 @@ First things first: Decide if a new swimlane should be created for the latest re
 - When a skill says "References are relative to <path>", join that base with relative refs (e.g. \`scripts/foo.py\` → \`<base>/scripts/foo.py\`).
 - When you see a \`/skill:<name>\` token anywhere in a message (head, middle, or quoted), look up \`<name>\` in \`<available_skills>\` and Read its SKILL.md from the listed \`<location>\` to load it before proceeding.
 - Resolve @<path> references before tool use: strip the leading @ and resolve relative paths against the runtime cwd (@<relative-path> → <cwd>/<relative-path>). Keep ~/ and / paths rooted at the home directory and filesystem root.
-- Use read for files, grep to search file contents, find to locate files, and ls for directories.
+- Prefer the dedicated read, grep, find, and ls tools over equivalent shell commands.
 
 
 ## Style
