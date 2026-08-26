@@ -21,12 +21,30 @@ type GitExecOpts = {
   env?: NodeJS.ProcessEnv;
 };
 
+async function readDiffPathspecs(cwd: string): Promise<string[]> {
+  let ignore: string;
+  try {
+    ignore = await fs.readFile(path.join(cwd, ".ignore"), "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return ["."];
+    throw err;
+  }
+
+  const exclusions = ignore
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*/, ""))
+    .filter((line) => line.trim())
+    .map((pattern) => `:(exclude)${pattern}`);
+  return [".", ...exclusions];
+}
+
 async function prepareDiffIndex(
   execOpts: GitExecOpts,
+  pathspecs: string[],
 ): Promise<{ execOpts: GitExecOpts; cleanup: () => Promise<void> }> {
   const { stdout } = await execFileAsync(
     "git",
-    ["ls-files", "--others", "--exclude-standard", "-z"],
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", ...pathspecs],
     execOpts,
   );
   const untrackedFiles = stdout.split("\0").filter(Boolean);
@@ -117,9 +135,11 @@ export async function handleBrowserPiSessionDiffRoute(
     return sendJson(response, 500, { ok: false, error: "Failed to find merge base" });
   }
 
+  let diffPathspecs: string[];
   let preparedDiffIndex: { execOpts: GitExecOpts; cleanup: () => Promise<void> };
   try {
-    preparedDiffIndex = await prepareDiffIndex(execOpts);
+    diffPathspecs = await readDiffPathspecs(execOpts.cwd);
+    preparedDiffIndex = await prepareDiffIndex(execOpts, diffPathspecs);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     runtime.log(`diff index error: ${message}`);
@@ -131,7 +151,7 @@ export async function handleBrowserPiSessionDiffRoute(
     try {
       const { stdout } = await execFileAsync(
         "git",
-        ["diff", base, "--stat"],
+        ["diff", base, "--stat", "--", ...diffPathspecs],
         preparedDiffIndex.execOpts,
       );
       stat = stdout;
@@ -161,7 +181,11 @@ export async function handleBrowserPiSessionDiffRoute(
 
     let diff: string;
     try {
-      const { stdout } = await execFileAsync("git", ["diff", base], preparedDiffIndex.execOpts);
+      const { stdout } = await execFileAsync(
+        "git",
+        ["diff", base, "--", ...diffPathspecs],
+        preparedDiffIndex.execOpts,
+      );
       diff = stdout;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
