@@ -1,64 +1,50 @@
 # Diff Viewer
 
-Show the git diff of a stream's worktree against the stream's recorded base branch, rendered in the web UI on demand.
+Show a stream worktree's current git changes against its recorded base branch in the web UI on demand.
 
 ## Behavior
 
-- Site banner already shows the active worktree and stream status (top-right, `justify-between gap-1`)
-- Add a depressable "Diff" button next to the stream status
-- Button is *enabled* only when the stream has a `worktree_path` set
-- On click: fetch `git diff <base_branch>` from the worktree directory, render it in an expandable panel (overlay/drawer below the banner)
-- On second click (or close): collapse the panel
+- The session side panel provides Info and Diff views.
+- Diff is enabled only when the stream has a `worktree_path`.
+- Opening Diff fetches the current worktree changes. Selecting Diff again reloads them.
+- The viewer includes tracked changes and untracked files that Git does not ignore.
+- When the worktree root contains `.ignore`, the viewer omits every non-comment, non-blank path listed in that file. The exclusions apply to tracked and untracked changes.
+- An empty result shows that the worktree has no visible changes against its base branch.
+- A result larger than 10,000 changed lines shows a stat summary instead of the full diff.
 
 ## Architecture
 
-```
-[Click "Diff"] → GET /api/streams/:id/diff → backend runs `git diff <base_branch>` in worktree_path → returns unified diff string → frontend renders with diff2html
+```text
+Diff view
+  → GET /api/pi-sessions/:id/diff
+  → resolve the session's stream and worktree
+  → find merge-base(base_branch, HEAD)
+  → apply .ignore exclusions while collecting tracked and untracked changes
+  → return JSON diff or summary
+  → render with react-diff-view
 ```
 
 ### Backend
-- New endpoint: `GET /api/streams/:id/diff`
-- Reads `worktree_path` and `base_branch` from the stream record
-- Runs `git diff <base_branch>` (or `git diff <base_branch>...HEAD`) in that directory
-- If `base_branch` is missing, fall back to `main` only as a display/diff default; `set_up_worktree` should normally record the real merge target.
-- Returns raw unified diff text (plain text response, not JSON)
-- If no worktree or empty diff, return 204
+
+- `GET /api/pi-sessions/:id/diff` resolves `worktree_path` and `base_branch` from the stream linked to the Pi session.
+- The base branch defaults to `main` only when the stream has no recorded base branch.
+- Git compares the worktree with the merge base of the base branch and `HEAD`.
+- The route copies the real Git index to a temporary index and intent-adds visible untracked files. This makes untracked content appear in the diff without changing the worktree's index.
+- If `.ignore` exists at the worktree root, the route removes comments and blank lines, converts each remaining entry to a Git exclusion pathspec, and applies the same pathspec set to untracked-file discovery, diff stats, and the full diff.
+- The route returns `{ mode: "diff", diff }` for a full unified diff.
+- When insertions plus deletions exceed 10,000, it returns `{ mode: "summary", stat, files, insertions, deletions }`.
+- A missing worktree or empty visible diff returns HTTP 204.
 
 ### Frontend
-- diff2html renders the raw string to HTML in one call
-- No client-side diffing — git does all the work
-- Inject the HTML into a collapsible panel
 
-```ts
-import { html } from 'diff2html';
-import 'diff2html/bundles/css/diff2html.min.css';
+- TanStack Query fetches the diff only while the Diff view is open and the stream has a worktree.
+- `react-diff-view` parses the unified diff and renders each file in a unified view.
+- The panel shows loading, failure, empty, summary, and full-diff states.
 
-const rendered = html(diffString, {
-  outputFormat: 'side-by-side',
-  drawFileList: true,
-  matching: 'lines',
-  highlight: true,
-  colorScheme: 'dark',
-});
-```
+## Rendering Library
 
-## Library Choice: diff2html
+`react-diff-view` consumes Git's unified diff output directly and provides the file, hunk, and line components used by the panel. Git remains the source of all change detection and filtering.
 
-We use `git diff` output directly — no client-side diffing needed. diff2html is purpose-built for rendering unified diff format to HTML.
+## Source
 
-- ~30kb gzipped (base bundle)
-- One function call: `parse` + `html`
-- Side-by-side + unified + synchronized scroll
-- Syntax highlighting via highlight.js (pluggable, can use slim/base bundle)
-- 3.3k ⭐, 7k dependents, 87 releases, last release Jan 2026
-
-### Why not the others
-- **@git-diff-view/react** (672 ⭐) — more powerful but builds internal DiffFile data structures client-side. Overkill when we already have the diff string.
-- **react-diff-viewer-continued** (354k/wk npm) — computes diffs client-side from two strings. Wrong tool — we already have the diff.
-- **Monaco** — 2MB bundle. No.
-
-## Sources
-
-- https://github.com/rtfpessoa/diff2html
-- https://github.com/MrWangJustToDo/git-diff-view
-- https://www.npmjs.com/package/react-diff-viewer-continued
+- https://github.com/otakustay/react-diff-view
