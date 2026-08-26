@@ -15,7 +15,8 @@ import {
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { sendJson } from "./_shared.ts";
 
-const MAX_ITEMS = 15;
+const SEARCH_MAX_RESULTS = 20;
+const DIRECTORY_LIST_MAX_RESULTS = 90;
 
 export async function handleBrowserDirectoryCompletionsRoute(
   runtime: ControlSurfaceRuntime,
@@ -28,10 +29,16 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const requestedBaseCwd = url.searchParams.get("baseCwd");
   const directoriesOnly = url.searchParams.get("directoriesOnly") === "true";
   const baseCwd = await resolveBaseCwd(runtime, streamId, requestedBaseCwd);
-  const directoryItems = await listDirectoryCompletionItems(baseCwd, rawQuery, directoriesOnly);
-
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
-  if (directoriesOnly || !resolution?.repoRoot || !resolution.searchTerm) {
+  const isFuzzyQuery = !directoriesOnly && Boolean(resolution?.repoRoot && resolution.searchTerm);
+  const directoryItems = await listDirectoryCompletionItems(
+    baseCwd,
+    rawQuery,
+    directoriesOnly,
+    isFuzzyQuery ? SEARCH_MAX_RESULTS : DIRECTORY_LIST_MAX_RESULTS,
+  );
+
+  if (!isFuzzyQuery || !resolution) {
     runtime.log(
       `[@] directory query="${rawQuery}" cwd=${baseCwd} → ${directoryItems.length} items`,
     );
@@ -44,7 +51,9 @@ export async function handleBrowserDirectoryCompletionsRoute(
 
   try {
     const finder = getOrCreate(resolution.repoRoot);
-    const result = finder.fileSearch(resolution.searchTerm, { pageSize: MAX_ITEMS });
+    const result = finder.fileSearch(resolution.searchTerm, {
+      pageSize: SEARCH_MAX_RESULTS,
+    });
     if (!result.ok) {
       return sendJson(res, 200, {
         items: directoryItems,
@@ -96,7 +105,7 @@ export async function handleBrowserDirectoryCompletionsRoute(
         rawQuery,
       ),
     );
-    const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, MAX_ITEMS);
+    const fuzzyItems = [...matchingDirItems, ...fuzzyFileItems].slice(0, SEARCH_MAX_RESULTS);
     const items = mergeCompletionItems(directoryItems, fuzzyItems);
     runtime.log(
       `[@] fuzzy query="${rawQuery}" repo=${path.basename(resolution.repoRoot)} term="${resolution.searchTerm}" → ${fuzzyFileItems.length} files + ${matchingDirItems.length} dirs (+ ${directoryItems.length} fallback)`,
@@ -126,7 +135,8 @@ function isUnder(child: string, parent: string): boolean {
 async function listDirectoryCompletionItems(
   cwd: string,
   pathParam: string,
-  directoriesOnly = false,
+  directoriesOnly: boolean,
+  maxResults: number,
 ): Promise<DirectoryCompletionItem[]> {
   const isAbsolute = pathParam.startsWith("/");
   const isTilde = pathParam.startsWith("~");
@@ -180,7 +190,7 @@ async function listDirectoryCompletionItems(
   const dirs = filtered.filter((t) => t.entry.isDirectory()).sort(cmp);
   const files = directoriesOnly ? [] : filtered.filter((t) => !t.entry.isDirectory()).sort(cmp);
 
-  const sorted = [...dirs, ...files].slice(0, MAX_ITEMS).map((t) => t.entry);
+  const sorted = [...dirs, ...files].slice(0, maxResults).map((t) => t.entry);
   const displayPrefix = isTilde
     ? pathParam.slice(0, pathParam.lastIndexOf("/") + 1) || "~/"
     : dirPrefix;
@@ -212,7 +222,7 @@ function mergeCompletionItems(
     if (seen.has(item.path)) continue;
     seen.add(item.path);
     merged.push(item);
-    if (merged.length >= MAX_ITEMS) break;
+    if (merged.length >= SEARCH_MAX_RESULTS) break;
   }
 
   return merged;
