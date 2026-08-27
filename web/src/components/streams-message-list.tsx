@@ -15,6 +15,7 @@
  * Scroll restoration is off for /streams (router.tsx).
  */
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
+import { MinusIcon } from "lucide-react";
 import { memo, type Ref, useCallback, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
@@ -32,6 +33,7 @@ export type StreamsMessageListHandle = {
 type StreamsMessageListProps = {
   piSessionId: string;
   rows: ConversationRow[];
+  totalUserMessages: number;
   activeFindRowIndex?: number;
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
@@ -42,9 +44,30 @@ type StreamsMessageListProps = {
   ref?: Ref<StreamsMessageListHandle>;
 };
 
+const UserMessageMarkers = memo(function UserMessageMarkers({ count }: { count: number }) {
+  if (count === 0) return null;
+
+  return (
+    <div
+      role="img"
+      aria-label={`${count} user ${count === 1 ? "message" : "messages"}`}
+      className="pointer-events-none absolute top-1/2 right-2.5 z-10 grid -translate-y-1/2 items-center justify-items-center text-border"
+      style={{
+        height: `min(${count * 20}px, calc(100% - 2rem))`,
+        gridTemplateRows: `repeat(${count}, minmax(0, 1fr))`,
+      }}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <MinusIcon key={index} className="size-5 shrink-0" strokeWidth={3} aria-hidden="true" />
+      ))}
+    </div>
+  );
+});
+
 export const StreamsMessageList = memo(function StreamsMessageList({
   piSessionId,
   rows,
+  totalUserMessages,
   activeFindRowIndex,
   onPruneRequested,
   onForkRequested,
@@ -126,54 +149,59 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   }));
 
   return (
-    <div
-      ref={scrollRef}
-      data-scroll-container="main"
-      className="h-full w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6"
-    >
-      <div className="relative w-full" style={{ minHeight: "2rem" }}>
-        <div
-          ref={virtualizer.containerRef}
-          style={{
-            position: "relative",
-            width: "100%",
-          }}
-        >
-          {virtualizer.getVirtualItems().map((virtualItem) => {
-            const row = rows[virtualItem.index];
-            const active = virtualItem.index === activeFindRowIndex;
-            return (
-              <div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                aria-current={active ? "true" : undefined}
-                ref={virtualizer.measureElement}
-                className={cn(active && "rounded-lg bg-background-selected ring-1 ring-border-pop")}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  width: "100%",
-                }}
-              >
-                {row ? (
-                  <ChatMessageRow
-                    row={row}
-                    piSessionId={piSessionId}
-                    isSessionBusy={isSessionBusy}
-                    onPrune={onPruneRequested}
-                    onFork={onForkRequested}
-                  />
-                ) : (
-                  <StreamingAssistantRow piSessionId={piSessionId} />
-                )}
-              </div>
-            );
-          })}
+    <div className="relative h-full min-h-0">
+      <div
+        ref={scrollRef}
+        data-scroll-container="main"
+        className="h-full w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6"
+      >
+        <div className="relative w-full" style={{ minHeight: "2rem" }}>
+          <div
+            ref={virtualizer.containerRef}
+            style={{
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const row = rows[virtualItem.index];
+              const active = virtualItem.index === activeFindRowIndex;
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  aria-current={active ? "true" : undefined}
+                  ref={virtualizer.measureElement}
+                  className={cn(
+                    active && "rounded-lg bg-background-selected ring-1 ring-border-pop",
+                  )}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    width: "100%",
+                  }}
+                >
+                  {row ? (
+                    <ChatMessageRow
+                      row={row}
+                      piSessionId={piSessionId}
+                      isSessionBusy={isSessionBusy}
+                      onPrune={onPruneRequested}
+                      onFork={onForkRequested}
+                    />
+                  ) : (
+                    <StreamingAssistantRow piSessionId={piSessionId} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
+      <UserMessageMarkers count={totalUserMessages} />
     </div>
   );
 }, areStreamsMessageListPropsEqual);
@@ -185,6 +213,7 @@ function areStreamsMessageListPropsEqual(
   return (
     prev.piSessionId === next.piSessionId &&
     prev.rows === next.rows &&
+    prev.totalUserMessages === next.totalUserMessages &&
     prev.activeFindRowIndex === next.activeFindRowIndex &&
     prev.isSessionBusy === next.isSessionBusy &&
     prev.onLoadPrevious === next.onLoadPrevious &&

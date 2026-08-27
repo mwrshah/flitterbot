@@ -74,10 +74,14 @@ export function applyTurnQueueSnapshot(
   );
 }
 
+function isUserMessage(item: ChatTimelineItem | undefined): boolean {
+  return item?.kind === "message" && item.role === "user";
+}
+
 function updateNewestHistoryPage(
   queryClient: QueryClient,
   sessionId: string,
-  update: (items: ChatTimelineItem[]) => ChatTimelineItem[],
+  update: (page: StreamsHistoryResponse) => StreamsHistoryResponse,
 ): void {
   queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
     historyQueryKey(sessionId),
@@ -85,10 +89,10 @@ function updateNewestHistoryPage(
       if (!current?.pages.length) return current;
       const newestIndex = current.pages.length - 1;
       const newestPage = current.pages[newestIndex]!;
-      const items = update(newestPage.items);
-      if (items === newestPage.items) return current;
+      const nextPage = update(newestPage);
+      if (nextPage === newestPage) return current;
       const pages = [...current.pages];
-      pages[newestIndex] = { ...newestPage, items };
+      pages[newestIndex] = nextPage;
       return { pages, pageParams: current.pageParams };
     },
   );
@@ -184,18 +188,23 @@ export function upsertNewestHistoryItems(
   incoming: ChatTimelineItem[],
 ): void {
   if (!incoming.length) return;
-  updateNewestHistoryPage(queryClient, sessionId, (items) => {
-    const indexes = new Map(items.map((item, index) => [item.id, index]));
-    const next = [...items];
+  updateNewestHistoryPage(queryClient, sessionId, (page) => {
+    const indexes = new Map(page.items.map((item, index) => [item.id, index]));
+    const items = [...page.items];
+    let totalUserMessages = page.totalUserMessages;
+
     for (const item of incoming) {
       const index = indexes.get(item.id);
+      const previous = index === undefined ? undefined : items[index];
+      totalUserMessages += Number(isUserMessage(item)) - Number(isUserMessage(previous));
       if (index === undefined) {
-        indexes.set(item.id, next.length);
-        next.push(item);
+        indexes.set(item.id, items.length);
+        items.push(item);
       } else {
-        next[index] = item;
+        items[index] = item;
       }
     }
-    return next;
+
+    return { ...page, items, totalUserMessages };
   });
 }

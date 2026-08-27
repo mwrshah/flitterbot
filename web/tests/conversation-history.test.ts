@@ -6,6 +6,7 @@ import {
   historyQueryKey,
   refreshHistorySnapshot,
   surfaceQueryKey,
+  upsertNewestHistoryItems,
 } from "../src/lib/conversation-history.ts";
 import type { ChatTimelineMessage, StreamsHistoryResponse } from "../src/lib/types.ts";
 
@@ -17,6 +18,10 @@ function message(id: string, content = id): ChatTimelineMessage {
     content,
     createdAt: "2026-08-06T00:00:00.000Z",
   };
+}
+
+function userMessage(id: string, content = id): ChatTimelineMessage {
+  return { ...message(id, content), role: "user" };
 }
 
 test("history recovery preserves an in-flight initial query", async () => {
@@ -41,6 +46,7 @@ test("history recovery preserves an in-flight initial query", async () => {
   const recovery = refreshHistorySnapshot(queryClient, sessionId);
   resolveRequest?.({
     items: [message("loaded")],
+    totalUserMessages: 0,
     historyPosition: { incarnation: "runtime", sequence: 1 },
   });
 
@@ -58,6 +64,7 @@ test("history recovery discards old pagination before refreshing the newest snap
     queryKey: historyQueryKey(sessionId),
     queryFn: async () => ({
       items: [message(`newest-${++newestVersion}`)],
+      totalUserMessages: 0,
       historyPosition: { incarnation: "runtime", sequence: newestVersion },
       olderPageCursor: "older",
     }),
@@ -68,7 +75,7 @@ test("history recovery discards old pagination before refreshing the newest snap
   queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
     historyQueryKey(sessionId),
     {
-      pages: [{ items: [message("older")] }, initial.pages[0]!],
+      pages: [{ items: [message("older")], totalUserMessages: 0 }, initial.pages[0]!],
       pageParams: ["older", undefined],
     },
   );
@@ -84,6 +91,37 @@ test("history recovery discards old pagination before refreshing the newest snap
   );
   assert.deepEqual(result.pageParams, [undefined]);
   assert.deepEqual(result.pages[0]?.historyPosition, { incarnation: "runtime", sequence: 2 });
+  queryClient.clear();
+});
+
+test("history live upserts update the full user-message total once", () => {
+  const sessionId = "session";
+  const queryClient = new QueryClient();
+  queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+    historyQueryKey(sessionId),
+    {
+      pages: [{ items: [userMessage("loaded-user")], totalUserMessages: 7 }],
+      pageParams: [undefined],
+    },
+  );
+  const total = () =>
+    queryClient
+      .getQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
+        historyQueryKey(sessionId),
+      )!
+      .pages.at(-1)!.totalUserMessages;
+
+  upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user")]);
+  assert.equal(total(), 8);
+
+  upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user", "replacement")]);
+  assert.equal(total(), 8);
+
+  upsertNewestHistoryItems(queryClient, sessionId, [message("new-assistant")]);
+  assert.equal(total(), 8);
+
+  upsertNewestHistoryItems(queryClient, sessionId, [message("new-user", "role replacement")]);
+  assert.equal(total(), 7);
   queryClient.clear();
 });
 
@@ -113,7 +151,7 @@ test("surface live events survive an initial-query race without duplication", as
   await waitFor(() => requests.length === 2);
   const replacement = updater.update(message("live-1", "replacement"));
   const secondEvent = updater.update(message("live-2"));
-  requests[1]!.resolve({ items: [message("server")] });
+  requests[1]!.resolve({ items: [message("server")], totalUserMessages: 0 });
 
   await Promise.all([initialLoad, firstVersion, replacement, secondEvent]);
   const result =

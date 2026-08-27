@@ -22,7 +22,9 @@ export function useStreamsChat(piSessionId: string | undefined) {
     if (data.pages.length === 1) return data.pages[0]!.items;
     return data.pages.flatMap((page) => page.items);
   }, [data]);
-  const turnQueue = data?.pages.at(-1)?.turnQueue ?? { version: 0, items: [] };
+  const newestPage = data?.pages.at(-1);
+  const turnQueue = newestPage?.turnQueue ?? { version: 0, items: [] };
+  const totalUserMessages = newestPage?.totalUserMessages ?? 0;
   const loadPreviousPage = useCallback(() => {
     void fetchPreviousPage();
   }, [fetchPreviousPage]);
@@ -78,6 +80,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     isSessionBusy,
     isSessionCompacting,
     contextUsage,
+    totalUserMessages,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,
