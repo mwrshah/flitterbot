@@ -434,6 +434,10 @@ function isVisibleRow(item: ChatTimelineItem): boolean {
   return item.kind === "message" && (item.role === "user" || item.role === "assistant");
 }
 
+function isUserMessage(item: ChatTimelineItem): boolean {
+  return item.kind === "message" && item.role === "user";
+}
+
 export function encodeHistoryCursor(item: ChatTimelineItem, index: number): string {
   return Buffer.from(JSON.stringify({ v: 1, id: item.id, i: index }), "utf8").toString("base64url");
 }
@@ -468,6 +472,7 @@ export function parseVisibleRowLimit(raw: string | null): StreamsHistoryLimit {
 
 type HistoryPage = {
   items: ChatTimelineItem[];
+  totalUserMessages: number;
   olderPageCursor: string | null;
 };
 
@@ -504,6 +509,7 @@ export function takePageEndingBeforeCursor(
   const hasOlderRows = items.slice(0, firstItemOfPage).some(isVisibleRow);
   return {
     items: items.slice(hasOlderRows ? firstItemOfPage : 0, endExclusive),
+    totalUserMessages: items.filter(isUserMessage).length,
     olderPageCursor: hasOlderRows
       ? encodeHistoryCursor(items[firstItemOfPage]!, firstItemOfPage)
       : null,

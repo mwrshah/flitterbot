@@ -125,6 +125,7 @@ type ChatPanelProps = {
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
   contextUsage: TokenUsage | null;
+  totalUserMessages: number;
   onSendMessage: (
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
@@ -445,6 +446,7 @@ export function ChatPanel({
   isSessionBusy,
   isSessionCompacting,
   contextUsage,
+  totalUserMessages,
   onSendMessage,
   onLoadPrevious,
   hasPreviousPage,
@@ -961,6 +963,7 @@ export function ChatPanel({
               ref={messageListRef}
               piSessionId={piSessionId}
               rows={conversationRows}
+              totalUserMessages={totalUserMessages}
               activeFindRowIndex={activeFindRowIndex}
               onPruneRequested={handlePruneRequested}
               onForkRequested={handleForkRequested}

@@ -88,7 +88,7 @@ export async function handleBrowserStreamsHistoryRoute(
   } catch (err) {
     const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
-    const body: StreamsHistoryResponse = { items: [] };
+    const body: StreamsHistoryResponse = { items: [], totalUserMessages: 0 };
     return sendJson(response, 500, body);
   }
 }
@@ -133,10 +133,7 @@ async function handleBrowserStreamsHistoryRouteInner(
 
     const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
     if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
-    const body: StreamsHistoryResponse = {
-      items: page.items,
-      olderPageCursor: page.olderPageCursor,
-    };
+    const body: StreamsHistoryResponse = page;
     return sendJson(response, 200, body);
   }
 
@@ -160,8 +157,7 @@ async function handleBrowserStreamsHistoryRouteInner(
           if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
           const body: StreamsHistoryResponse = {
             ...(historyPosition ? { historyPosition } : {}),
-            items: page.items,
-            olderPageCursor: page.olderPageCursor,
+            ...page,
           };
           return sendJson(response, 200, body);
         }
@@ -204,8 +200,7 @@ async function handleBrowserStreamsHistoryRouteInner(
   const body: StreamsHistoryResponse = {
     ...(historyPosition ? { historyPosition } : {}),
     ...(!cursor ? { turnQueue: targetSession.queue.getSnapshot() } : {}),
-    items: page.items,
-    olderPageCursor: page.olderPageCursor,
+    ...page,
   };
   return sendJson(response, 200, body);
 }
