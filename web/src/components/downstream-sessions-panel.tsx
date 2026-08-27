@@ -8,6 +8,7 @@ import { CopyableCode } from "@/components/common/copyable-code";
 import { ShortcutHint } from "@/components/common/kbd";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useModifierLabel } from "@/hooks/platform";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
@@ -120,6 +121,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   showSettings?: boolean;
 }) {
   useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, showSettings });
+  const modifierLabel = useModifierLabel();
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
@@ -150,8 +152,12 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   const targetBranchShortcutLabel =
     useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTargetBranch, { compact: true }) ||
     "c then t";
-  const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo);
-  const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff);
+  const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo, {
+    altLabel: modifierLabel,
+  });
+  const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff, {
+    altLabel: modifierLabel,
+  });
 
   const worktreeCopy = useCopyToClipboard(600);
   const repoCopy = useCopyToClipboard(600);

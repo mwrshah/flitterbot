@@ -761,10 +761,10 @@ function registerBuiltInShortcutDefinitions() {
     defaultBindings: [{ spec: "c t", when: "no-input-focus" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.panelViewInfo, {
-    defaultBindings: [{ spec: "Ctrl+KeyI", when: "always" }],
+    defaultBindings: [{ spec: "Alt+KeyI", when: "always" }],
   });
   defineShortcutAction(SHORTCUT_ACTIONS.panelViewDiff, {
-    defaultBindings: [{ spec: "Ctrl+KeyK", when: "always" }],
+    defaultBindings: [{ spec: "Alt+KeyK", when: "always" }],
   });
 
   for (let slot = 0; slot < STREAM_SLOT_DIGIT_CODES.length; slot++) {

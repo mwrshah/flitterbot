@@ -48,8 +48,8 @@ Example value: `{ "nav.surface": "Alt+KeyH", "scroll.top": "Home" }`.
 | `composer.focus` | `i` | Focus the composer input |
 | `stream.copy-tmux-attach` | `c t` | Copy tmux attach command |
 | `stream.copy-worktree-path` | `c w` | Copy worktree path |
-| `panel.view.info` | `Ctrl+I` | Switch to Info panel view |
-| `panel.view.diff` | `Ctrl+K` | Switch to Diff panel view |
+| `panel.view.info` | `Alt+I` | Switch to Info panel view |
+| `panel.view.diff` | `Alt+K` | Switch to Diff panel view |
 | `nav.stream.slot.{1-9}` | `Alt+{1-9}` | Navigate to stream by slot |
 
 ## Scroll Target Resolution
