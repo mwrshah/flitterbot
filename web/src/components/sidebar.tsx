@@ -513,7 +513,7 @@ const SwimlaneRows = memo(function SwimlaneRows({
 const icons = {
   surface: (
     <svg viewBox="0 0 16 16" fill="currentColor" className="size-4">
-      <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h11A1.5 1.5 0 0 1 15 3.5v1A1.5 1.5 0 0 1 13.5 6h-11A1.5 1.5 0 0 1 1 4.5v-1ZM1 8.5A1.5 1.5 0 0 1 2.5 7h11A1.5 1.5 0 0 1 15 8.5v1A1.5 1.5 0 0 1 13.5 11h-11A1.5 1.5 0 0 1 1 9.5v-1ZM2.5 12A1.5 1.5 0 0 0 1 13.5v.5h14v-.5a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
+      <path d="M2.5 3h11a1.5 1.25 0 0 1 0 2.5h-11a1.5 1.25 0 0 1 0-2.5ZM2.5 6.75h11a1.5 1.5 0 0 1 0 3h-11a1.5 1.5 0 0 1 0-3ZM2.5 11A1.5 1.5 0 0 0 1 12.5v.5h14v-.5a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
     </svg>
   ),
 };
