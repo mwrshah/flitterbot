@@ -30,6 +30,15 @@ export function MessageActionsMenu({
       />
       <DropdownMenuContent align="end" className="w-auto min-w-[13rem]">
         <DropdownMenuItem
+          className="px-3 py-1.5 text-xs"
+          onClick={(event) => {
+            event.stopPropagation();
+            onFork();
+          }}
+        >
+          Fork above this message
+        </DropdownMenuItem>
+        <DropdownMenuItem
           variant="destructive"
           className="px-3 py-1.5 text-xs"
           onClick={(event) => {
@@ -38,15 +47,6 @@ export function MessageActionsMenu({
           }}
         >
           Delete (including me)
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="px-3 py-1.5 text-xs"
-          onClick={(event) => {
-            event.stopPropagation();
-            onFork();
-          }}
-        >
-          Fork above this message
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
