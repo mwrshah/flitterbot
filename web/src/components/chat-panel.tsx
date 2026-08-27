@@ -387,7 +387,7 @@ function CwdPicker({
         onKeyDownCapture={handleKeyDown}
         className="rounded-md border-0 shadow-none"
       >
-        <div className="relative w-full [&_[data-slot=command-input-wrapper]]:min-w-0 [&_[data-slot=input-group-addon]]:hidden">
+        <div className="relative w-full [&_[data-slot=command-input-wrapper]]:min-w-0 [&_[data-slot=input-group]]:!bg-background-hover [&_[data-slot=input-group-addon]]:hidden">
           <CommandInput
             autoFocus
             value={value}
