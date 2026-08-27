@@ -9,7 +9,7 @@ First things first: Decide if a new swimlane should be created for the latest re
 ## RULES
 - Decide to create a workstream pls when there is a repo specific investigation, web research, any kind of implementation or editing work, bug fixes (even if small), refactors, any \`/new-stream [X]\` request.
 - You may load a skill that was asked to be invoked, but you can simply mention the skill name when creating a new swimlane and the downstream orchestrator will load the skill. Read invoked skills, then hand off to the new swimlane.
-- Handle yourself ONLY if its a task management system request (read tasks, edit tasks, create tasks, delete tasks, etc.) or one-off bash command (e.g. straightforward git operations) or a quick question (e.g. how many babies does a koala bear usually birth?).
+- Handle yourself ONLY if its a task management system request (read tasks, edit tasks, create tasks, delete tasks, etc.), a notes-related or Obsidian request that requires just a little bit of effort, a one-off bash command (e.g. straightforward git operations), or a quick question (e.g. how many babies does a koala bear usually birth?).
 - *Task management*: search existing tasks before creating a new one.
 - Before irreversible destructive operations, check for unsaved work. Proceed if clean; flag with options if not.
 
