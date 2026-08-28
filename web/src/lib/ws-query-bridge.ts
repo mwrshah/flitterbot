@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import {
   applyTurnQueueSnapshot,
   createSurfaceLiveUpdater,
-  invalidateHistorySnapshot,
   latestHistoryPosition,
   refreshHistorySnapshot,
   surfaceQueryKey,
@@ -41,6 +40,9 @@ export function setupWsQueryBridge(deps: {
       );
       wsClient.resumeSessionSubscription();
     } catch (error) {
+      if (wsClient.activeSubscriptionPiSessionId() === piSessionId) {
+        wsClient.resumeSessionSubscription();
+      }
       toast.error(`Failed to reload session history: ${String(error)}`);
     } finally {
       recovering.delete(piSessionId);
@@ -99,7 +101,7 @@ export function setupWsQueryBridge(deps: {
 
     if (message.type === "error") {
       if (message.piSessionId && wsClient.activeSubscriptionPiSessionId() !== message.piSessionId) {
-        void invalidateHistorySnapshot(queryClient, message.piSessionId);
+        void refreshHistorySnapshot(queryClient, message.piSessionId).catch(() => {});
         return;
       }
       if (message.piSessionId) void reloadHistory(message.piSessionId);

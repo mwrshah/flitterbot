@@ -55,12 +55,13 @@ import {
   mergeFindTimeline,
   moveConversationFindSelection,
 } from "@/lib/conversation-find";
-import { applyTurnQueueSnapshot, invalidateHistorySnapshot } from "@/lib/conversation-history";
+import { applyTurnQueueSnapshot } from "@/lib/conversation-history";
 import { buildConversationRows } from "@/lib/conversation-rows";
 import {
   focusComposerInput,
   isShortcutInput,
   registerShortcutHandlers,
+  resolveShortcutScrollContainer,
   SHORTCUT_ACTIONS,
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
@@ -125,12 +126,12 @@ type ChatPanelProps = {
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
   contextUsage: TokenUsage | null;
-  totalUserMessages: number;
+  userMessageIndex: string[];
   onSendMessage: (
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
   ) => Promise<void>;
-  onLoadPrevious: () => void;
+  onLoadPrevious: () => Promise<void>;
   hasPreviousPage: boolean;
   isFetchingPreviousPage: boolean;
   streamId?: string;
@@ -446,7 +447,7 @@ export function ChatPanel({
   isSessionBusy,
   isSessionCompacting,
   contextUsage,
-  totalUserMessages,
+  userMessageIndex,
   onSendMessage,
   onLoadPrevious,
   hasPreviousPage,
@@ -644,9 +645,6 @@ export function ChatPanel({
   }, [piSessionId]);
   const pruneMutation = useMutation({
     mutationFn: (entryId: string) => apiClient.pruneStreamHistory(piSessionId, entryId),
-    onSuccess: () => {
-      void invalidateHistorySnapshot(queryClient, piSessionId);
-    },
     onError: (error) => {
       toast.error(
         `Failed to delete messages: ${error instanceof Error ? error.message : String(error)}`,
@@ -761,6 +759,14 @@ export function ChatPanel({
           if (findOpen && (event.metaKey || event.ctrlKey)) return false;
           openConversationFind();
           return true;
+        },
+      },
+      {
+        actionId: SHORTCUT_ACTIONS.scrollBottom,
+        priority: 20,
+        handler: () => {
+          if (resolveShortcutScrollContainer()?.dataset.scrollContainer !== "main") return false;
+          return messageListRef.current?.navigateToLatestUserMessage() ?? false;
         },
       },
     ]);
@@ -963,7 +969,7 @@ export function ChatPanel({
               ref={messageListRef}
               piSessionId={piSessionId}
               rows={conversationRows}
-              totalUserMessages={totalUserMessages}
+              userMessageIndex={userMessageIndex}
               activeFindRowIndex={activeFindRowIndex}
               onPruneRequested={handlePruneRequested}
               onForkRequested={handleForkRequested}

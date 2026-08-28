@@ -11,6 +11,7 @@ export type SendUserMessageOptions = {
 };
 
 const rootApi = getRouteApi("__root__");
+const EMPTY_USER_MESSAGE_INDEX: string[] = [];
 
 export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();
@@ -24,9 +25,10 @@ export function useStreamsChat(piSessionId: string | undefined) {
   }, [data]);
   const newestPage = data?.pages.at(-1);
   const turnQueue = newestPage?.turnQueue ?? { version: 0, items: [] };
-  const totalUserMessages = newestPage?.totalUserMessages ?? 0;
-  const loadPreviousPage = useCallback(() => {
-    void fetchPreviousPage();
+  const userMessageIndex = newestPage?.userMessageIndex ?? EMPTY_USER_MESSAGE_INDEX;
+  const loadPreviousPage = useCallback(async () => {
+    const result = await fetchPreviousPage({ cancelRefetch: false });
+    if (result.isError) throw result.error;
   }, [fetchPreviousPage]);
   const connectionState = useWsConnectionState(wsConnectionStore);
 
@@ -69,7 +71,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     [sendMessage, piSessionId],
   );
 
-  if (error) throw error;
+  if (error && !data) throw error;
 
   return {
     timeline,
@@ -80,7 +82,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
     isSessionBusy,
     isSessionCompacting,
     contextUsage,
-    totalUserMessages,
+    userMessageIndex,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,
