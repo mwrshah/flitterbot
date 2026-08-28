@@ -302,6 +302,50 @@
     background: var(--background-contrast);
     color: var(--text-contrast);
   }
+
+  .user-message-marker-line {
+    width: var(--user-message-marker-width, 0.5rem);
+  }
+
+  .user-message-marker:has(
+      + .user-message-marker
+      + .user-message-marker
+      + .user-message-marker:is(:hover, :focus-visible)
+    ) {
+    --user-message-marker-width: 0.625rem;
+  }
+
+  .user-message-marker:has(
+      + .user-message-marker
+      + .user-message-marker:is(:hover, :focus-visible)
+    ) {
+    --user-message-marker-width: 0.75rem;
+  }
+
+  .user-message-marker:has(+ .user-message-marker:is(:hover, :focus-visible)) {
+    --user-message-marker-width: 1rem;
+  }
+
+  .user-message-marker:is(:hover, :focus-visible)
+    + .user-message-marker
+    + .user-message-marker
+    + .user-message-marker {
+    --user-message-marker-width: 0.5625rem;
+  }
+
+  .user-message-marker:is(:hover, :focus-visible)
+    + .user-message-marker
+    + .user-message-marker {
+    --user-message-marker-width: 0.6875rem;
+  }
+
+  .user-message-marker:is(:hover, :focus-visible) + .user-message-marker {
+    --user-message-marker-width: 0.875rem;
+  }
+
+  .user-message-marker:is(:hover, :focus-visible) {
+    --user-message-marker-width: 1.5rem;
+  }
 }
 
 .diff-viewer-panel {

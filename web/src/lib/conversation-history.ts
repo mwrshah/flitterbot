@@ -15,10 +15,6 @@ export function findHistoryQueryKey(sessionId: string) {
   return [...historyQueryKey(sessionId), "find"] as const;
 }
 
-function resetFindHistorySnapshot(queryClient: QueryClient, sessionId: string): void {
-  void queryClient.resetQueries({ queryKey: findHistoryQueryKey(sessionId), exact: true });
-}
-
 export function latestHistoryPosition(
   queryClient: QueryClient,
   sessionId: string,
@@ -35,6 +31,8 @@ export async function refreshHistorySnapshot(
   sessionId: string,
 ): Promise<void> {
   const queryKey = historyQueryKey(sessionId);
+  const previous =
+    queryClient.getQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(queryKey);
   queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
     queryKey,
     (current) => {
@@ -43,16 +41,14 @@ export async function refreshHistorySnapshot(
       return { pages: [newestPage], pageParams: [undefined] };
     },
   );
-  resetFindHistorySnapshot(queryClient, sessionId);
-  await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true });
-}
-
-export async function invalidateHistorySnapshot(
-  queryClient: QueryClient,
-  sessionId: string,
-): Promise<void> {
-  resetFindHistorySnapshot(queryClient, sessionId);
-  await queryClient.invalidateQueries({ queryKey: historyQueryKey(sessionId), exact: true });
+  void queryClient.resetQueries({ queryKey: findHistoryQueryKey(sessionId), exact: true });
+  try {
+    await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true });
+  } catch (error) {
+    if (previous) queryClient.setQueryData(queryKey, previous);
+    await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+    throw error;
+  }
 }
 
 export function applyTurnQueueSnapshot(
@@ -74,8 +70,8 @@ export function applyTurnQueueSnapshot(
   );
 }
 
-function isUserMessage(item: ChatTimelineItem | undefined): boolean {
-  return item?.kind === "message" && item.role === "user";
+function isUserMessage(item: ChatTimelineItem): boolean {
+  return item.kind === "message" && item.role === "user";
 }
 
 function updateNewestHistoryPage(
@@ -191,20 +187,32 @@ export function upsertNewestHistoryItems(
   updateNewestHistoryPage(queryClient, sessionId, (page) => {
     const indexes = new Map(page.items.map((item, index) => [item.id, index]));
     const items = [...page.items];
-    let totalUserMessages = page.totalUserMessages;
+    let userMessageIndex = page.userMessageIndex;
 
     for (const item of incoming) {
       const index = indexes.get(item.id);
-      const previous = index === undefined ? undefined : items[index];
-      totalUserMessages += Number(isUserMessage(item)) - Number(isUserMessage(previous));
       if (index === undefined) {
         indexes.set(item.id, items.length);
         items.push(item);
       } else {
         items[index] = item;
       }
+
+      const userMessagePosition = userMessageIndex?.indexOf(item.id) ?? -1;
+      if (isUserMessage(item)) {
+        if (userMessageIndex && userMessagePosition < 0) {
+          userMessageIndex = [...userMessageIndex, item.id];
+        }
+      } else if (userMessageIndex && userMessagePosition >= 0) {
+        userMessageIndex = [...userMessageIndex];
+        userMessageIndex.splice(userMessagePosition, 1);
+      }
     }
 
-    return { ...page, items, totalUserMessages };
+    return {
+      ...page,
+      items,
+      ...(userMessageIndex ? { userMessageIndex } : {}),
+    };
   });
 }

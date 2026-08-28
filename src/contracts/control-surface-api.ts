@@ -221,7 +221,7 @@ export type StreamsHistoryLimit = number | "all";
 
 export interface StreamsHistoryResponse {
   items: ChatTimelineItem[];
-  totalUserMessages: number;
+  userMessageIndex?: string[];
   historyPosition?: ConversationEventPosition;
   turnQueue?: TurnQueueSnapshot;
   olderPageCursor?: string | null;

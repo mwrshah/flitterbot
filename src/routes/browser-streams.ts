@@ -13,6 +13,7 @@ import type {
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import {
+  buildUserMessageIndex,
   decodeHistoryCursor,
   type HistoryCursor,
   parseVisibleRowLimit,
@@ -59,6 +60,21 @@ function readSessionHistory(
   return items;
 }
 
+function takeSessionHistoryPage(
+  items: ChatTimelineItem[],
+  visibleRowLimit: StreamsHistoryLimit,
+  cursor: HistoryCursor | null,
+): StreamsHistoryResponse | null {
+  const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
+  if (!page) return null;
+  return {
+    ...page,
+    ...(!cursor && visibleRowLimit !== "all"
+      ? { userMessageIndex: buildUserMessageIndex(items) }
+      : {}),
+  };
+}
+
 export async function handleBrowserStreamsHistoryRoute(
   runtime: ControlSurfaceRuntime,
   request: http.IncomingMessage,
@@ -88,7 +104,7 @@ export async function handleBrowserStreamsHistoryRoute(
   } catch (err) {
     const ctx = piSessionId ? `piSessionId=${piSessionId}` : "aggregated";
     console.error("streams-history route error (%s, mode=%s): %O", ctx, historyMode, err);
-    const body: StreamsHistoryResponse = { items: [], totalUserMessages: 0 };
+    const body: StreamsHistoryResponse = { items: [] };
     return sendJson(response, 500, body);
   }
 }
@@ -153,7 +169,7 @@ async function handleBrowserStreamsHistoryRouteInner(
           const formatter =
             runtime.sessionManager.toolDisplayCache.formatterForPiSession(piSessionId);
           const enriched = enrichTimelineToolDisplays(diskItems, formatter);
-          const page = takePageEndingBeforeCursor(enriched, visibleRowLimit, cursor);
+          const page = takeSessionHistoryPage(enriched, visibleRowLimit, cursor);
           if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
           const body: StreamsHistoryResponse = {
             ...(historyPosition ? { historyPosition } : {}),
@@ -195,7 +211,7 @@ async function handleBrowserStreamsHistoryRouteInner(
     );
     items = enrichTimelineToolDisplays(items, formatter);
   }
-  const page = takePageEndingBeforeCursor(items, visibleRowLimit, cursor);
+  const page = takeSessionHistoryPage(items, visibleRowLimit, cursor);
   if (!page) return sendJson(response, 400, { error: "Invalid cursor" });
   const body: StreamsHistoryResponse = {
     ...(historyPosition ? { historyPosition } : {}),

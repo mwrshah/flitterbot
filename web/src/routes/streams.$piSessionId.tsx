@@ -95,7 +95,7 @@ function PiSessionRoute() {
     isSessionBusy,
     isSessionCompacting,
     contextUsage,
-    totalUserMessages,
+    userMessageIndex,
     loadPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,
@@ -117,7 +117,7 @@ function PiSessionRoute() {
           isSessionBusy={isSessionBusy}
           isSessionCompacting={isSessionCompacting}
           contextUsage={contextUsage}
-          totalUserMessages={totalUserMessages}
+          userMessageIndex={userMessageIndex}
           onSendMessage={onSendMessage}
           onLoadPrevious={loadPreviousPage}
           hasPreviousPage={hasPreviousPage}
