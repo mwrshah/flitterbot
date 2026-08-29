@@ -56,7 +56,7 @@ Marker navigation keeps the normal trailing padding. TanStack Virtual clamps sta
 
 The full-width scroll viewport owns its native scrollbar and stable scrollbar gutter. The marker rail overlays the viewport's right padding, clear of the edge-aligned scrollbar. Each ID renders one fixed-height button row. A right-aligned CSS dash sits inside the fixed-width rail, so every width transition preserves the same right endpoint.
 
-The rail renders at most 25 controls: the active marker plus up to 12 IDs on either side. It centers a newly selected navigation target, then follows the active viewport marker. At the beginning or end of history it shows only the available IDs within that 12-marker radius. If the viewport is too short for the window, the rail clips fixed-height rows and keeps its center marker visible instead of compressing controls. The active marker normally represents the conversation turn at the viewport top. A clicked marker overrides it only while that marker's user row remains visible; leaving the viewport restores the topmost turn, and changing Pi sessions clears the click preference. The active marker uses the main text color and `aria-current`; a failed navigation target remains red.
+The rail renders at most 25 fixed-height rows: the active marker, nearby message controls, and a display-only overflow count at either clipped edge. Each count replaces the boundary control, includes every message omitted on that side, uses a zero-padded `+05` style, and has no hover or click behavior. The rail centers a newly selected navigation target, then follows the active viewport marker. If the viewport is too short for the window, it clips fixed-height rows and keeps its center marker visible instead of compressing controls. The active marker normally represents the conversation turn at the viewport top. A clicked marker overrides it only while that marker's user row remains visible; leaving the viewport restores the topmost turn, and changing Pi sessions clears the click preference. The active marker uses the main text color and `aria-current`; a failed navigation target remains red.
 
 CSS sibling selectors create a symmetric hover and `focus-visible` rhythm. The focused dash expands from `0.5rem` to `1.25rem`. On either side, the nearest three dashes expand to `0.875rem`, `0.6875rem`, and `0.5625rem`. Width and highlight color ease in and out over 220ms; reduced-motion preferences disable both transitions.
 
@@ -68,7 +68,7 @@ CSS sibling selectors create a symmetric hover and `focus-visible` rhythm. The f
 - Cursor requests are sequential and never request full assistant or tool history solely for marker navigation.
 - Start alignment runs only after the target row commits and never extends the natural scroll range.
 - A failed marker remains an explicit retry control.
-- Dense rails render no more than 12 markers on either side of the current marker.
+- Dense rails use display-only counts for messages omitted beyond either clipped edge.
 - The conversation turn at the viewport top is exposed visually and through `aria-current`, unless the most recently clicked user row is also visible.
 - The clicked-marker preference never survives a Pi-session change.
 - Hover and keyboard focus use the same CSS-only geometry.

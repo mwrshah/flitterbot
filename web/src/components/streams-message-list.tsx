@@ -106,6 +106,24 @@ type UserMessageMarkersProps = {
   onSelect: (messageId: string) => void;
 };
 
+function MarkerOverflowCount({
+  count,
+  direction,
+}: {
+  count: number;
+  direction: "earlier" | "later";
+}) {
+  return (
+    <span
+      role="img"
+      aria-label={`${count} ${direction} user messages not shown`}
+      className="pointer-events-none flex h-full w-7 select-none items-center justify-end text-[9px] leading-none tabular-nums text-text-muted"
+    >
+      +{String(count).padStart(2, "0")}
+    </span>
+  );
+}
+
 const UserMessageMarkers = memo(function UserMessageMarkers({
   messageIds,
   activeMessageId,
@@ -118,25 +136,33 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     const requestedCenter = windowCenterMessageId ?? activeMessageId ?? messageIds.at(-1);
     const requestedIndex = requestedCenter ? messageIds.indexOf(requestedCenter) : -1;
     const centerIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, messageIds.length - 1);
-    const startIndex = Math.max(0, centerIndex - MARKERS_EACH_SIDE);
+    const windowStart = Math.max(0, centerIndex - MARKERS_EACH_SIDE);
+    const windowEnd = Math.min(messageIds.length, centerIndex + MARKERS_EACH_SIDE + 1);
+    const startIndex = windowStart + Number(windowStart > 0);
+    const endIndex = windowEnd - Number(windowEnd < messageIds.length);
     return {
       centerMessageId: messageIds[centerIndex],
-      messageIds: messageIds.slice(
-        startIndex,
-        Math.min(messageIds.length, centerIndex + MARKERS_EACH_SIDE + 1),
-      ),
+      messageIds: messageIds.slice(startIndex, endIndex),
       startIndex,
+      hiddenBefore: startIndex,
+      hiddenAfter: messageIds.length - endIndex,
     };
   }, [activeMessageId, messageIds, windowCenterMessageId]);
 
   useLayoutEffect(() => {
     const rail = railRef.current;
     if (!rail || !markerWindow.centerMessageId) return;
-    const index = markerWindow.messageIds.indexOf(markerWindow.centerMessageId);
+    const index =
+      markerWindow.messageIds.indexOf(markerWindow.centerMessageId) +
+      Number(markerWindow.hiddenBefore > 0);
     rail.scrollTop = index * MARKER_ROW_HEIGHT - (rail.clientHeight - MARKER_ROW_HEIGHT) / 2;
   }, [markerWindow]);
 
   if (messageIds.length === 0) return null;
+  const markerRowCount =
+    markerWindow.messageIds.length +
+    Number(markerWindow.hiddenBefore > 0) +
+    Number(markerWindow.hiddenAfter > 0);
 
   return (
     <nav
@@ -144,15 +170,18 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       aria-label="User messages"
       className="absolute right-5 top-1/2 z-10 w-7 -translate-y-1/2 overflow-hidden text-border"
       style={{
-        height: `min(${markerWindow.messageIds.length * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
+        height: `min(${markerRowCount * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
     >
       <div
         className="grid w-7 items-center"
         style={{
-          gridTemplateRows: `repeat(${markerWindow.messageIds.length}, ${MARKER_ROW_HEIGHT}px)`,
+          gridTemplateRows: `repeat(${markerRowCount}, ${MARKER_ROW_HEIGHT}px)`,
         }}
       >
+        {markerWindow.hiddenBefore > 0 && (
+          <MarkerOverflowCount count={markerWindow.hiddenBefore} direction="earlier" />
+        )}
         {markerWindow.messageIds.map((messageId, index) => {
           const selected = messageId === activeMessageId;
           const failed = messageId === navigation?.targetMessageId && Boolean(navigation.error);
@@ -178,6 +207,9 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             </button>
           );
         })}
+        {markerWindow.hiddenAfter > 0 && (
+          <MarkerOverflowCount count={markerWindow.hiddenAfter} direction="later" />
+        )}
       </div>
       {navigation?.error && (
         <span className="sr-only" role="status">
