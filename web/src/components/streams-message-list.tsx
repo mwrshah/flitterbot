@@ -14,7 +14,7 @@
  *    re-attaches a stale offset. Init is per attachment, not instance.
  * Scroll restoration is off for /streams (router.tsx).
  */
-import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import {
   memo,
   type Ref,
@@ -56,6 +56,22 @@ function userMessageForRow(
   }
 
   return userMessageIndex.at(-1);
+}
+
+function isUserMessageVisible(
+  rows: ConversationRow[],
+  virtualItems: VirtualItem[],
+  messageId: string | undefined,
+  viewportStart: number,
+  viewportEnd: number,
+): boolean {
+  if (!messageId) return false;
+  return virtualItems.some(
+    (item) =>
+      rows[item.index]?.message?.id === messageId &&
+      item.end > viewportStart &&
+      item.start < viewportEnd,
+  );
 }
 
 export type StreamsMessageListHandle = {
@@ -151,12 +167,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
               title={label}
               onClick={() => onSelect(messageId)}
               className={cn(
-                "user-message-marker flex h-full min-h-0 w-7 items-center justify-end overflow-hidden transition-colors focus-visible:outline-none",
+                "user-message-marker flex h-full min-h-0 w-7 items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
                 failed ? "text-status-crashed" : selected ? "text-text" : undefined,
               )}
             >
               <span
-                className="user-message-marker-line block h-0.5 shrink-0 rounded-full bg-current transition-[width] duration-150 ease-out motion-reduce:transition-none"
+                className="user-message-marker-line block h-0.5 shrink-0 rounded-full bg-current transition-[width] duration-[220ms] ease-in-out motion-reduce:transition-none"
                 aria-hidden="true"
               />
             </button>
@@ -198,7 +214,9 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const [markerNavigation, setMarkerNavigation] = useState<MarkerNavigation>();
   const [markerWindowMessageId, setMarkerWindowMessageId] = useState<string>();
   const [viewportUserMessageId, setViewportUserMessageId] = useState<string>();
+  const [clickedUserMessageId, setClickedUserMessageId] = useState<string>();
   const selectUserMessage = useCallback((targetMessageId: string) => {
+    setClickedUserMessageId(targetMessageId);
     setMarkerWindowMessageId(targetMessageId);
     setMarkerNavigation({ targetMessageId });
   }, []);
@@ -237,7 +255,16 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         (item) => item.index < rows.length && item.end > scrollOffset,
       )?.index;
       if (firstVisibleRowIndex !== undefined) {
-        const messageId = userMessageForRow(rows, userMessageIndex, firstVisibleRowIndex);
+        const topMessageId = userMessageForRow(rows, userMessageIndex, firstVisibleRowIndex);
+        const messageId = isUserMessageVisible(
+          rows,
+          virtualItems,
+          clickedUserMessageId,
+          scrollOffset,
+          scrollOffset + (instance.scrollRect?.height ?? 0),
+        )
+          ? clickedUserMessageId
+          : topMessageId;
         if (viewportUserMessageIdRef.current !== messageId) {
           viewportUserMessageIdRef.current = messageId;
           setMarkerWindowMessageId(messageId);
@@ -268,6 +295,28 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   useLayoutEffect(function rearmInitialFillAfterRouteReveal() {
     didFinishInitialFillRef.current = false; // Suspense replay wipes scrollTop: re-pin
   }, []); // scroll-memory: skip re-arm + snapshot save here
+
+  useEffect(() => {
+    setClickedUserMessageId(undefined);
+  }, [piSessionId]);
+
+  useLayoutEffect(() => {
+    const scrollOffset = virtualizer.scrollOffset ?? 0;
+    if (
+      !isUserMessageVisible(
+        rows,
+        virtualizer.getVirtualItems(),
+        clickedUserMessageId,
+        scrollOffset,
+        scrollOffset + (virtualizer.scrollRect?.height ?? 0),
+      ) ||
+      viewportUserMessageIdRef.current === clickedUserMessageId
+    ) {
+      return;
+    }
+    viewportUserMessageIdRef.current = clickedUserMessageId;
+    setViewportUserMessageId(clickedUserMessageId);
+  }, [clickedUserMessageId, rows, virtualizer]);
 
   useLayoutEffect(function pinToEndAndFillInitialViewport() {
     if (
