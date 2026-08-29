@@ -10,11 +10,14 @@ export function projectSidebarRows<
 ): readonly T[] {
   if (!normalizedQuery) return rows;
 
+  const nameQueryParts = normalizedQuery.split(/\s+/);
+  const nameQueries = [" ", "-", "_"].map((separator) => nameQueryParts.join(separator));
   const openNameMatches: T[] = [];
   const closedNameMatches: T[] = [];
   const contentMatches: T[] = [];
   for (const row of rows) {
-    if (row.name.toLowerCase().includes(normalizedQuery)) {
+    const name = row.name.toLowerCase();
+    if (nameQueries.some((query) => name.includes(query))) {
       (row.section === "open" ? openNameMatches : closedNameMatches).push(row);
     } else if (row.piSessionId && matchCountByPiSessionId.has(row.piSessionId)) {
       contentMatches.push(row);
