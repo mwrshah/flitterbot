@@ -1403,9 +1403,7 @@ export class ControlSurfaceRuntime {
         )
       : undefined;
     if (input?.sourcePiSessionId && !source) throw new Error("Source Pi session not found");
-    const streamUser = input?.sourcePiSessionId
-      ? (source?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined)
-      : undefined;
+    const streamUser = source?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
 
     const result = await this.spawnStreamWithSession({
       name,
