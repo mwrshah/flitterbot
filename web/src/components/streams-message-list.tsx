@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;
-const MARKERS_EACH_SIDE = 12;
+const MARKERS_EACH_SIDE = 10;
 const MARKER_ROW_HEIGHT = 24;
 const STREAMING_ROW_KEY = "streaming";
 const VIRTUALIZER_OVERSCAN = 2;
@@ -136,8 +136,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     const requestedCenter = windowCenterMessageId ?? activeMessageId ?? messageIds.at(-1);
     const requestedIndex = requestedCenter ? messageIds.indexOf(requestedCenter) : -1;
     const centerIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, messageIds.length - 1);
-    const windowStart = Math.max(0, centerIndex - MARKERS_EACH_SIDE);
-    const windowEnd = Math.min(messageIds.length, centerIndex + MARKERS_EACH_SIDE + 1);
+    const windowSize = Math.min(messageIds.length, MARKERS_EACH_SIDE * 2 + 1);
+    const windowStart = Math.min(
+      Math.max(0, centerIndex - MARKERS_EACH_SIDE),
+      messageIds.length - windowSize,
+    );
+    const windowEnd = windowStart + windowSize;
     const startIndex = windowStart + Number(windowStart > 0);
     const endIndex = windowEnd - Number(windowEnd < messageIds.length);
     return {
