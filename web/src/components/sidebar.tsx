@@ -472,6 +472,7 @@ const SwimlaneRows = memo(function SwimlaneRows({
   reopenStream: ReopenStream;
   closeStream: CloseStream;
 }) {
+  const [closedRowsCollapsed, setClosedRowsCollapsed] = useState(false);
   const renderRow = (row: SidebarSwimlaneRow) => (
     <SwimlaneRow
       key={row.key}
@@ -496,10 +497,16 @@ const SwimlaneRows = memo(function SwimlaneRows({
 
       {closedRows.length > 0 && (
         <div className={openRows.length > 0 ? "mt-6" : ""}>
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-            Recently closed
-          </p>
-          <div>{closedRows.map(renderRow)}</div>
+          <button
+            type="button"
+            aria-expanded={!closedRowsCollapsed}
+            onClick={() => setClosedRowsCollapsed((collapsed) => !collapsed)}
+            className="mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+          >
+            <span>Recently closed</span>
+            {closedRowsCollapsed && <span className="ml-auto">+{closedRows.length}</span>}
+          </button>
+          {!closedRowsCollapsed && <div>{closedRows.map(renderRow)}</div>}
         </div>
       )}
 

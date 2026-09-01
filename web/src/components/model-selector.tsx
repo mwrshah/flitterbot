@@ -59,6 +59,7 @@ const THINKING_LEVEL_LABELS: Record<ModelThinkingLevel, string> = {
 export type ModelSelectorProps = {
   compact?: boolean;
   disabled?: boolean;
+  subdued?: boolean;
   piSessionId: string;
   selectedModelId?: string;
   selectedThinkingLevel?: ModelThinkingLevel;
@@ -67,6 +68,7 @@ export type ModelSelectorProps = {
 export const ModelSelector = memo(function ModelSelector({
   compact,
   disabled,
+  subdued,
   piSessionId,
   selectedModelId,
   selectedThinkingLevel,
@@ -265,6 +267,7 @@ export const ModelSelector = memo(function ModelSelector({
   useWhyDidYouRender("ModelSelector", {
     compact,
     disabled,
+    subdued,
     piSessionId,
     selectedModelId,
     selectedThinkingLevel,
@@ -307,6 +310,7 @@ export const ModelSelector = memo(function ModelSelector({
             size="sm"
             className={cn(
               "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
+              subdued && "bg-transparent",
               compact ? "px-1.5" : "px-2",
             )}
             title={
@@ -317,7 +321,15 @@ export const ModelSelector = memo(function ModelSelector({
           />
         }
       >
-        <span className={cn("truncate max-w-[180px]", compact && "sr-only")}>{triggerLabel}</span>
+        <span
+          className={cn(
+            "truncate max-w-[180px]",
+            subdued && "text-border-muted",
+            compact && "sr-only",
+          )}
+        >
+          {triggerLabel}
+        </span>
         <ChevronDownIcon className="size-3 shrink-0" />
       </Popover.Trigger>
       <Popover.Portal>

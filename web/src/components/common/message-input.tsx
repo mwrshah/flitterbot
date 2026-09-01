@@ -912,6 +912,7 @@ export const MessageInput = memo(function MessageInput({
             {!recoveryKind && showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
                 disabled={disabled || isSending || isCompacting}
+                subdued={!shouldShowHoverButtons}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
                 selectedThinkingLevel={selectedThinkingLevel}
