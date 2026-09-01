@@ -309,7 +309,7 @@ export const ModelSelector = memo(function ModelSelector({
             variant="subtle"
             size="sm"
             className={cn(
-              "h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
+              "group h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
               subdued && "bg-transparent",
               compact ? "px-1.5" : "px-2",
             )}
@@ -324,13 +324,13 @@ export const ModelSelector = memo(function ModelSelector({
         <span
           className={cn(
             "truncate max-w-[180px]",
-            subdued && "text-border-muted",
+            subdued && "text-border-muted group-hover:text-text",
             compact && "sr-only",
           )}
         >
           {triggerLabel}
         </span>
-        <ChevronDownIcon className="size-3 shrink-0" />
+        <ChevronDownIcon className={cn("size-3 shrink-0", subdued && "text-border-muted")} />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner
