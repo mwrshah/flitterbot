@@ -501,9 +501,11 @@ const SwimlaneRows = memo(function SwimlaneRows({
             type="button"
             aria-expanded={!closedRowsCollapsed}
             onClick={() => setClosedRowsCollapsed((collapsed) => !collapsed)}
-            className="mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+            className="group mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
           >
-            <span>Recently closed</span>
+            <span className="decoration-dotted underline-offset-2 group-hover:underline">
+              Recently closed
+            </span>
             {closedRowsCollapsed && <span className="ml-auto">+{closedRows.length}</span>}
           </button>
           {!closedRowsCollapsed && <div>{closedRows.map(renderRow)}</div>}
@@ -948,7 +950,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="h-full min-w-0 flex-1 border-0 border-b-2 border-transparent bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted focus:border-border-pop focus:placeholder:opacity-0 data-[search-selected=true]:rounded-sm data-[search-selected=true]:focus:border-transparent data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop"
+            className="h-full min-w-0 flex-1 border-0 border-b-2 border-transparent bg-transparent px-1 py-0 text-[10px] font-medium leading-4 text-text outline-none placeholder:font-medium placeholder:uppercase placeholder:tracking-wider placeholder:text-text-muted hover:placeholder:underline hover:placeholder:decoration-dotted hover:placeholder:underline-offset-2 focus:border-border-pop focus:placeholder:opacity-0 data-[search-selected=true]:rounded-sm data-[search-selected=true]:focus:border-transparent data-[search-selected=true]:ring-1 data-[search-selected=true]:ring-inset data-[search-selected=true]:ring-border-pop"
           />
         </div>
         <span ref={liveRegionRef} className="sr-only" aria-live="polite" aria-atomic="true">
