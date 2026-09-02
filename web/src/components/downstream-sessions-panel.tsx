@@ -349,7 +349,10 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
 
       {showDiff && hasWorktree ? (
         <div className="relative flex-1 min-h-0">
-          <div data-scroll-container="diff" className="h-full overflow-y-auto">
+          <div
+            data-scroll-container="diff"
+            className="h-full overflow-y-auto [scrollbar-gutter:stable]"
+          >
             {diffQuery.isPending && (
               <p className="px-4 py-3 text-[11px] text-text-muted">Loading diff…</p>
             )}
@@ -401,7 +404,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
           <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-text-muted font-medium">
             Active Sessions
           </p>

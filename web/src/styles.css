@@ -268,10 +268,6 @@
     @apply border-border outline-border-pop;
   }
 
-  :where(.overflow-auto, .overflow-y-auto, .overflow-scroll, .overflow-y-scroll) {
-    scrollbar-gutter: stable;
-  }
-
   html {
     height: 100%;
   }

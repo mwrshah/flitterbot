@@ -364,7 +364,7 @@ export function Surface() {
           <div
             ref={scrollRef}
             data-scroll-container="main"
-            className="h-full overflow-auto py-4 pl-2 pr-6"
+            className="h-full overflow-auto py-4 pl-2 pr-6 [scrollbar-gutter:stable]"
             style={{ contain: "strict", overflowAnchor: "none" }}
           >
             {entries.length === 0 ? (

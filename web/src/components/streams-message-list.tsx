@@ -448,7 +448,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       <div
         ref={scrollRef}
         data-scroll-container="main"
-        className="h-full min-h-0 w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6"
+        className="h-full min-h-0 w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6 [scrollbar-gutter:stable]"
       >
         <div className="relative w-full" style={{ minHeight: "2rem" }}>
           <div
