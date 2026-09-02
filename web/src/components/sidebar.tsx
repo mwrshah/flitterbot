@@ -465,7 +465,7 @@ function CollapsibleSwimlaneSection({
         className="group mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
       >
         <span className="decoration-dotted underline-offset-2 group-hover:underline">{title}</span>
-        {collapsed && <span className="ml-auto">+{rows.length}</span>}
+        {collapsed && <span className="ml-auto mr-1.5">+{rows.length}</span>}
       </button>
       {!collapsed && <div>{rows.map(renderRow)}</div>}
     </div>
@@ -900,7 +900,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   return (
     <div
       ref={swimlaneListRef}
-      className="min-h-0 w-[calc(100%+1px)] flex-1 overflow-x-hidden overflow-y-auto border-t border-border pb-3 pl-3 pr-2 pt-2"
+      className="min-h-0 w-[calc(100%+1px)] flex-1 overflow-x-hidden overflow-y-auto border-t border-border pb-3 pl-3 pr-0 pt-2"
     >
       <div className="flex items-center justify-between mb-0.5">
         <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">

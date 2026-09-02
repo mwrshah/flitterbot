@@ -172,7 +172,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     <nav
       ref={railRef}
       aria-label="User messages"
-      className="absolute right-5 top-1/2 z-10 w-7 -translate-y-1/2 overflow-hidden text-border"
+      className="absolute right-3 top-1/2 z-10 w-7 -translate-y-1/2 overflow-hidden text-border"
       style={{
         height: `min(${markerRowCount * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
@@ -448,7 +448,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       <div
         ref={scrollRef}
         data-scroll-container="main"
-        className="h-full min-h-0 w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6 [scrollbar-gutter:stable]"
+        className="h-full min-h-0 w-[calc(100%+1px)] overflow-x-hidden overflow-y-auto px-6"
       >
         <div className="relative w-full" style={{ minHeight: "2rem" }}>
           <div

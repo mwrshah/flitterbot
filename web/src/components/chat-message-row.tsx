@@ -91,12 +91,14 @@ function ThinkingBlock({ content, streaming = false }: { content: string; stream
         >
           Thinking…
         </span>
-        <span className="shrink-0 text-[11px] tracking-[0.16em] text-text-muted uppercase">
+        <span
+          className={`shrink-0 text-[11px] tracking-[0.16em] uppercase ${open ? "text-text-muted" : "text-transparent"}`}
+        >
           {open ? "Hide" : "Show"}
         </span>
       </button>
       {open && (
-        <div className="pt-1 pb-2 pl-2">
+        <div className="ml-1 border-l border-border-muted pt-1 pb-2 pl-1.5">
           <MarkdownContent content={content} streaming={streaming} />
         </div>
       )}

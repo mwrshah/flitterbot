@@ -1953,7 +1953,7 @@ export class ControlSurfaceRuntime {
         name: "prep_launch",
         label: "Prepare Swimlane Launches",
         description:
-          "Return editable swimlane launch cards without creating streams. Use this instead of create_swimlane when the user asks to 'prepare', 'stage', 'review' one or more swimlane launches / swimlane rollouts / task implementations. This is the default tool to use in case of batch swimlane or task fan out",
+          "Return editable swimlane launch cards without creating streams. Use this instead of create_swimlane when the user asks to 'prepare', 'stage', 'review', 'batch launch', 'create many', 'tackle all', or other words implying multiple simultaneoous swimlane creation, rollout or task implementations. This is the default tool to use in case of batch swimlane or task fan out",
         parameters: {
           type: "object",
           properties: {
