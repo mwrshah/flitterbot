@@ -291,8 +291,16 @@ export const ModelSelector = memo(function ModelSelector({
     () =>
       registerShortcutHandlers([
         { actionId: SHORTCUT_ACTIONS.modelSearch, handler: openModelSearch },
+        {
+          actionId: SHORTCUT_ACTIONS.swimlaneSearch,
+          priority: 1,
+          handler: () => {
+            if (open) handleOpenChange(false);
+            return false;
+          },
+        },
       ]),
-    [openModelSearch],
+    [handleOpenChange, open, openModelSearch],
   );
 
   if (catalogPinned.length === 0 && catalogAll.length === 0) {
