@@ -29,6 +29,7 @@ import {
   readPreparedLaunchCwd,
   stringifyPreparedLaunchForEditing,
 } from "@/lib/prepared-launch-completions";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ChatTimelineTool, SwimlaneLaunchArgs } from "@/lib/types";
 
 const rootRouteApi = getRouteApi("__root__");
@@ -462,6 +463,7 @@ function PreparedLaunchCard({
             }}
             onKeyDown={(event) => {
               if (completionController.handleKeyDown(event)) return;
+              if (handleTextInputKeyDown(event)) return;
               if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
               event.preventDefault();
               if (!create.isPending && !state.launched) event.currentTarget.form?.requestSubmit();

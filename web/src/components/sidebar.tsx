@@ -38,6 +38,7 @@ import {
 import { sessionSearchQueryOptions, statusQueryOptions } from "@/lib/queries";
 import { projectSidebarRows } from "@/lib/sidebar-search";
 import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { PiSessionStatus, StreamSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -148,6 +149,7 @@ function StreamContextMenu({
       onBlur={commit}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (handleTextInputKeyDown(e)) return;
         if (e.key === "Enter") {
           e.preventDefault();
           inputRef.current?.blur();
@@ -936,6 +938,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
             onBlur={clearPickerCursor}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
+              if (handleTextInputKeyDown(event)) return;
               if (event.key === "Escape") {
                 event.preventDefault();
                 event.stopPropagation();
