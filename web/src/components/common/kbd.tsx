@@ -12,7 +12,7 @@ type KbdProps = HTMLAttributes<HTMLElement> & {
   size?: KbdSize;
 };
 
-function Kbd({ className, size = "default", ...props }: KbdProps) {
+function Kbd({ className, size = "default", children, ...props }: KbdProps) {
   return (
     <kbd
       className={cn(
@@ -21,7 +21,9 @@ function Kbd({ className, size = "default", ...props }: KbdProps) {
         className,
       )}
       {...props}
-    />
+    >
+      <span className="translate-y-px">{children}</span>
+    </kbd>
   );
 }
 
