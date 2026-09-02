@@ -71,7 +71,7 @@ import {
   streamsWorktreeQueryOptions,
 } from "@/lib/queries";
 import type { StreamRecoveryKind } from "@/lib/stream-recovery";
-import { getTokenDeleteEdit } from "@/lib/text-input";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type {
   ChatTimelineItem,
   ChatTimelineMessage,
@@ -221,6 +221,7 @@ function ConversationFindBar({
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing) return;
+            if (handleTextInputKeyDown(event)) return;
             if (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
               event.stopPropagation();
@@ -338,25 +339,14 @@ function CwdPicker({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      const input = event.target;
-      if (input instanceof HTMLInputElement) {
-        const selectionStart = input.selectionStart ?? value.length;
-        const tokenDeleteEdit = getTokenDeleteEdit(
-          event,
-          value,
-          selectionStart,
-          input.selectionEnd ?? selectionStart,
-        );
-        if (tokenDeleteEdit) {
-          event.preventDefault();
-          event.stopPropagation();
-          handleValueChange(tokenDeleteEdit.value);
-          requestAnimationFrame(() => {
-            const cursor = Math.max(1, tokenDeleteEdit.cursor);
-            input.setSelectionRange(cursor, cursor);
-          });
-          return;
-        }
+      if (
+        handleTextInputKeyDown(event, {
+          target: event.target instanceof HTMLInputElement ? event.target : null,
+          onValueChange: handleValueChange,
+          minCursor: 1,
+        })
+      ) {
+        return;
       }
       if (event.key === "Escape") {
         event.preventDefault();

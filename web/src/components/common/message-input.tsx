@@ -29,7 +29,7 @@ import {
   registerShortcutHandlers,
 } from "@/lib/global-shortcuts";
 import type { InternalCommandScope } from "@/lib/internal-commands";
-import { getTokenDeleteEdit } from "@/lib/text-input";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -585,16 +585,12 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
 
-      const value = draftRef.current;
-      const selectionStart = textareaRef.current?.selectionStart ?? value.length;
-      const selectionEnd = textareaRef.current?.selectionEnd ?? selectionStart;
-      const tokenDeleteEdit = getTokenDeleteEdit(event, value, selectionStart, selectionEnd);
-      if (tokenDeleteEdit) {
-        event.preventDefault();
-        handleDraftChange(tokenDeleteEdit.value);
-        requestAnimationFrame(() => {
-          textareaRef.current?.setSelectionRange(tokenDeleteEdit.cursor, tokenDeleteEdit.cursor);
-        });
+      if (
+        handleTextInputKeyDown(event, {
+          target: textareaRef.current,
+          onValueChange: handleDraftChange,
+        })
+      ) {
         return;
       }
 

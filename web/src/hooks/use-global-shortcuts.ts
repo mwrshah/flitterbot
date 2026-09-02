@@ -10,6 +10,7 @@ import {
   SHORTCUT_ACTIONS,
   setShortcutBindingOverrides,
 } from "@/lib/global-shortcuts";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ShortcutBindingsConfig } from "@/lib/types";
 import { useCreateSwimlane } from "./use-create-swimlane";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
@@ -166,6 +167,7 @@ export function useGlobalShortcuts({
     ]);
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (handleTextInputKeyDown(event)) return;
       handleRegisteredShortcutKeyDown(event);
     }
 

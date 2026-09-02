@@ -31,6 +31,7 @@ import {
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
 import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
+import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -198,6 +199,7 @@ export const ModelSelector = memo(function ModelSelector({
   const firstModel = all[0];
   const initialCommandModel = currentModel ?? firstModel;
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (handleTextInputKeyDown(event)) return;
     if (
       (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
       event.ctrlKey ||
