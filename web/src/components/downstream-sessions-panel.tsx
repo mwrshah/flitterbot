@@ -522,7 +522,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
           {((worktree?.copyPaths?.length ?? 0) > 0 ||
             (worktree?.postCreate?.length ?? 0) > 0 ||
             !!worktree?.configuredBaseRef) && (
-            <div className="px-4 py-3 border-t border-border">
+            <div className="px-4 py-3 border-t-2 border-border-muted">
               <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-1">
                 Bootstrap Config
               </p>
