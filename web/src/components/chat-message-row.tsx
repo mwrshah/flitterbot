@@ -98,7 +98,7 @@ function ThinkingBlock({ content, streaming = false }: { content: string; stream
         </span>
       </button>
       {open && (
-        <div className="ml-1 border-l border-border-muted pt-1 pb-2 pl-1.5">
+        <div className="ml-1 border-l border-border-muted pt-1 pb-2 pl-2.5">
           <MarkdownContent content={content} streaming={streaming} />
         </div>
       )}
