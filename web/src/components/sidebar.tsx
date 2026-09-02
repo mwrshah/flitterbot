@@ -441,9 +441,41 @@ const SwimlaneRow = memo(function SwimlaneRow({
   );
 });
 
+function CollapsibleSwimlaneSection({
+  title,
+  rows,
+  separated,
+  renderRow,
+}: {
+  title: string;
+  rows: readonly SidebarSwimlaneRow[];
+  separated: boolean;
+  renderRow: (row: SidebarSwimlaneRow) => ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className={separated ? "mt-6" : ""}>
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((current) => !current)}
+        className="group mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+      >
+        <span className="decoration-dotted underline-offset-2 group-hover:underline">{title}</span>
+        {collapsed && <span className="ml-auto">+{rows.length}</span>}
+      </button>
+      {!collapsed && <div>{rows.map(renderRow)}</div>}
+    </div>
+  );
+}
+
 const SwimlaneRows = memo(function SwimlaneRows({
   openRows,
   closedRows,
+  pinnedClosedRows,
   emptyQuery,
   currentPiSessionId,
   defaultRouteActive,
@@ -459,6 +491,7 @@ const SwimlaneRows = memo(function SwimlaneRows({
 }: {
   openRows: readonly SidebarSwimlaneRow[];
   closedRows: readonly SidebarSwimlaneRow[];
+  pinnedClosedRows: readonly SidebarSwimlaneRow[];
   emptyQuery?: string;
   currentPiSessionId?: string;
   defaultRouteActive: boolean;
@@ -472,7 +505,6 @@ const SwimlaneRows = memo(function SwimlaneRows({
   reopenStream: ReopenStream;
   closeStream: CloseStream;
 }) {
-  const [closedRowsCollapsed, setClosedRowsCollapsed] = useState(false);
   const renderRow = (row: SidebarSwimlaneRow) => (
     <SwimlaneRow
       key={row.key}
@@ -495,22 +527,19 @@ const SwimlaneRows = memo(function SwimlaneRows({
     <>
       {openRows.length > 0 && <div>{openRows.map(renderRow)}</div>}
 
-      {closedRows.length > 0 && (
-        <div className={openRows.length > 0 ? "mt-6" : ""}>
-          <button
-            type="button"
-            aria-expanded={!closedRowsCollapsed}
-            onClick={() => setClosedRowsCollapsed((collapsed) => !collapsed)}
-            className="group mb-1 flex w-full items-center text-left text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
-          >
-            <span className="decoration-dotted underline-offset-2 group-hover:underline">
-              Recently closed
-            </span>
-            {closedRowsCollapsed && <span className="ml-auto">+{closedRows.length}</span>}
-          </button>
-          {!closedRowsCollapsed && <div>{closedRows.map(renderRow)}</div>}
-        </div>
-      )}
+      <CollapsibleSwimlaneSection
+        title="Recently closed"
+        rows={closedRows}
+        separated={openRows.length > 0}
+        renderRow={renderRow}
+      />
+
+      <CollapsibleSwimlaneSection
+        title="Pinned closed"
+        rows={pinnedClosedRows}
+        separated={openRows.length > 0 || closedRows.length > 0}
+        renderRow={renderRow}
+      />
 
       {emptyQuery && (
         <p className="ml-2 mt-2 text-[11px] text-text-muted">No swimlanes match “{emptyQuery}”.</p>
@@ -715,6 +744,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
     }
 
     const closedRows: SidebarSwimlaneRow[] = [];
+    const pinnedClosedRows: SidebarSwimlaneRow[] = [];
     for (const stream of allStreams ?? []) {
       if (stream.status === "open") {
         openRows.push({
@@ -726,18 +756,19 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
           stream,
         });
       } else if (stream.status === "closed" && stream.piSessionId) {
-        closedRows.push({
+        const row: SidebarSwimlaneRow = {
           key: `stream-${stream.id}`,
           kind: "stream",
           section: "closed",
           name: stream.name,
           piSessionId: stream.piSessionId,
           stream,
-        });
+        };
+        (stream.pinned ? pinnedClosedRows : closedRows).push(row);
       }
     }
 
-    const allRows = [...openRows, ...closedRows];
+    const allRows = [...openRows, ...closedRows, ...pinnedClosedRows];
     const allSearchCandidates = allRows.filter((row): row is PickerCandidate => !!row.piSessionId);
     let nextShortcut = 1;
     const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
@@ -757,7 +788,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
     sessionSearchQuery.data && !sessionSearchQuery.isError
       ? sessionMatchCounts
       : EMPTY_SESSION_MATCH_COUNTS;
-  const { visibleOpenRows, visibleClosedRows } = useMemo(() => {
+  const { visibleOpenRows, visibleClosedRows, visiblePinnedClosedRows } = useMemo(() => {
     const visibleRows = projectSidebarRows(
       allRows,
       normalizedDeferredQuery,
@@ -765,7 +796,12 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
     );
     return {
       visibleOpenRows: visibleRows.filter((row) => row.section === "open"),
-      visibleClosedRows: visibleRows.filter((row) => row.section === "closed"),
+      visibleClosedRows: visibleRows.filter(
+        (row) => row.kind === "stream" && row.section === "closed" && !row.stream.pinned,
+      ),
+      visiblePinnedClosedRows: visibleRows.filter(
+        (row) => row.kind === "stream" && row.section === "closed" && row.stream.pinned,
+      ),
     };
   }, [allRows, currentSessionMatchCounts, normalizedDeferredQuery]);
   const contentSearchFinished =
@@ -777,7 +813,8 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
     !!normalizedDeferredQuery &&
     contentSearchFinished &&
     visibleOpenRows.length === 0 &&
-    visibleClosedRows.length === 0;
+    visibleClosedRows.length === 0 &&
+    visiblePinnedClosedRows.length === 0;
   const currentSearchCandidates = useMemo(
     () =>
       projectSidebarRows(allRows, normalizedQuery, currentSessionMatchCounts).filter(
@@ -787,10 +824,10 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   );
   const displayedSearchCandidates = useMemo(
     () =>
-      [...visibleOpenRows, ...visibleClosedRows].filter(
+      [...visibleOpenRows, ...visibleClosedRows, ...visiblePinnedClosedRows].filter(
         (row): row is PickerCandidate => !!row.piSessionId,
       ),
-    [visibleClosedRows, visibleOpenRows],
+    [visibleClosedRows, visibleOpenRows, visiblePinnedClosedRows],
   );
   const currentPiSessionId = getPiSessionId(pathname);
 
@@ -979,6 +1016,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
       <SwimlaneRows
         openRows={visibleOpenRows}
         closedRows={visibleClosedRows}
+        pinnedClosedRows={visiblePinnedClosedRows}
         emptyQuery={hasNoSearchResults ? deferredQuery.trim() : undefined}
         currentPiSessionId={currentPiSessionId}
         defaultRouteActive={pathname === "/streams" && !currentPiSessionId}
