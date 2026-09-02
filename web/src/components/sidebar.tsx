@@ -902,7 +902,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   return (
     <div
       ref={swimlaneListRef}
-      className="min-h-0 w-[calc(100%+1px)] flex-1 overflow-x-hidden overflow-y-auto border-t border-border pb-3 pl-3 pr-0 pt-2 [scrollbar-gutter:stable]"
+      className="min-h-0 w-[calc(100%+1px)] flex-1 overflow-x-hidden overflow-y-auto border-t-2 border-border-muted pb-3 pl-3 pr-0 pt-2 [scrollbar-gutter:stable]"
     >
       <div className="flex items-center justify-between mb-0.5">
         <div className="-ml-1 flex h-6 min-w-0 flex-1 items-center">

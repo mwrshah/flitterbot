@@ -448,7 +448,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
           )}
 
           {worktree?.worktreePath && (
-            <div className="px-4 py-3 border-t border-border">
+            <div className="px-4 py-3 border-t-2 border-border-muted">
               <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2">
                 Active Worktree
               </p>
