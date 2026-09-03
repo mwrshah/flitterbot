@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
+import { cn } from "cn";
 import { toast } from "sonner";
 import { CopyableCode } from "@/components/common/copyable-code";
 import { ShortcutHint } from "@/components/common/kbd";
@@ -25,7 +26,6 @@ import {
   streamsWorktreeQueryOptions,
 } from "@/lib/queries";
 import type { DownstreamSessionItem, PiSessionStatus } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 function piStatusBanner(
   status: PiSessionStatus | undefined,

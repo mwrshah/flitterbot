@@ -1,5 +1,6 @@
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
+import { cn } from "cn";
 import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import {
   type ClipboardEvent,
@@ -31,7 +32,6 @@ import {
 import type { InternalCommandScope } from "@/lib/internal-commands";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const draftStore = new Map<string, string>();
 const pendingAttachmentStore = new Map<string, ImageAttachment[]>();

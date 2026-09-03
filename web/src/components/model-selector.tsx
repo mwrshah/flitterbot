@@ -2,6 +2,7 @@ import { Popover } from "@base-ui/react/popover";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { cn } from "cn";
 import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon, StarIcon } from "lucide-react";
 import {
   Fragment,
@@ -33,7 +34,6 @@ import {
 import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const rootApi = getRouteApi("__root__");
 
