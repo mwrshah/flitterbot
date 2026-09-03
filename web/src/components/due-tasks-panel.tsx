@@ -44,7 +44,7 @@ export function DueTasksPanel() {
                     key={task.id}
                     className="group/task relative before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
                   >
-                    <summary className="flex list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 outline-none focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-default list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 outline-none focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
                       <span className="select-text text-text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-text">
                         {task.description}
                       </span>
@@ -56,7 +56,7 @@ export function DueTasksPanel() {
                 ) : (
                   <p
                     key={task.id}
-                    className="relative px-5 py-1.5 text-sm leading-4 text-text before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
+                    className="relative cursor-default px-5 py-1.5 text-sm leading-4 text-text-muted before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
                   >
                     {task.description}
                   </p>
