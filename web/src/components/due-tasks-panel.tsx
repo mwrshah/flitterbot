@@ -44,7 +44,7 @@ export function DueTasksPanel() {
                 task.details ? (
                   <details key={task.id} className="group/task">
                     <summary className="flex cursor-pointer list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
-                      <span className="decoration-dotted underline-offset-2 group-hover/task:underline">
+                      <span className="underline decoration-dotted underline-offset-2">
                         {task.description}
                       </span>
                     </summary>
