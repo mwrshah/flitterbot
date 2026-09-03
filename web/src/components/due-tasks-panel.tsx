@@ -39,12 +39,12 @@ export function DueTasksPanel() {
                 {project.tasks.length}
               </span>
             </summary>
-            <div className="ml-2 border-l border-border pl-2">
+            <div className="ml-[9px] pl-[7px]">
               {project.tasks.map((task) =>
                 task.details ? (
                   <details
                     key={task.id}
-                    className="group/task relative before:absolute before:top-0 before:-left-[9px] before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border"
+                    className="group/task relative before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
                   >
                     <summary className="flex cursor-pointer list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
                       <span className="underline decoration-dotted underline-offset-2">
@@ -58,7 +58,7 @@ export function DueTasksPanel() {
                 ) : (
                   <p
                     key={task.id}
-                    className="relative px-5 py-1.5 text-sm leading-4 text-text before:absolute before:top-0 before:-left-[9px] before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border"
+                    className="relative px-5 py-1.5 text-sm leading-4 text-text before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
                   >
                     {task.description}
                   </p>
