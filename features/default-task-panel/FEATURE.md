@@ -6,16 +6,17 @@ The default Flitterbot swimlane cannot have downstream sessions, so its Alt+I in
 
 ## Goals
 
-- Show active tasks whose due time has arrived, grouped by active project.
+- Show active tasks due today or on an earlier local calendar date, grouped by active project.
 - Keep the compact view limited to project names and task descriptions.
 - Reveal only a task's longer `details` text when that task is opened.
 - Preserve the downstream sessions and worktree panel for every non-default swimlane.
 - Reload the due-task query when Info is activated while already selected.
+- Collapse every project to its heading when the Due Tasks heading is clicked.
 - Keep task-store parsing and grouping off the client render path.
 
 ## Architecture
 
-The control-surface backend reads the local `tasks.json` store and returns a small display contract. It filters out completed tasks, future tasks, archived projects, and projects with no due tasks before sending data to the web client.
+The control-surface backend reads the local `tasks.json` store and returns a small display contract. It filters out completed tasks, tasks due after the current local calendar date, archived projects, and projects with no due tasks before sending data to the web client.
 
 The route identifies the default Pi session from status data and tells `DownstreamSessionsPanel` to mount `DueTasksPanel` in its info surface only for that session. Other sessions keep the existing active-session content.
 
@@ -40,7 +41,7 @@ interface DueTasksResponse {
 
 readDueTasks(storePath, now): DueTasksResponse
   parse tasks.json
-  select active, due tasks belonging to active projects
+  select active tasks before tomorrow's local midnight belonging to active projects
   preserve store ordering within alphabetically sorted projects
 ```
 
@@ -75,7 +76,7 @@ PiSessionRoute
     └── non-default session: <DownstreamSessionsPanel>
 ```
 
-Native disclosure elements own expansion state. There is no synchronized component state, client-side grouping, or custom accordion dependency. Clicking Info again or pressing its shortcut while selected refetches the active due-task query, matching the diff panel's reload interaction.
+Native disclosure elements own expansion state. There is no synchronized component state, client-side grouping, or custom accordion dependency. The Due Tasks heading uses the sidebar section-heading affordance and closes every project disclosure in place. Clicking Info again or pressing its shortcut while selected refetches the active due-task query, matching the diff panel's reload interaction.
 
 ## Plan
 

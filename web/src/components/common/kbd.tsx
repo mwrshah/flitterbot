@@ -22,7 +22,7 @@ function Kbd({ className, size = "default", children, ...props }: KbdProps) {
       )}
       {...props}
     >
-      <span className="translate-y-px">{children}</span>
+      <span className="translate-y-0.5">{children}</span>
     </kbd>
   );
 }

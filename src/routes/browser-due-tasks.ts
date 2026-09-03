@@ -22,7 +22,9 @@ export function selectDueTaskProjects(store: TaskStore, now = new Date()): DueTa
     projects.set(value.id, { id: value.id, name: value.name, tasks: [] });
   }
 
-  const nowMs = now.getTime();
+  const tomorrow = new Date(now);
+  tomorrow.setHours(24, 0, 0, 0);
+  const tomorrowMs = tomorrow.getTime();
   for (const value of store.tasks) {
     if (!isRecord(value) || value.status !== "active") continue;
     if (
@@ -34,8 +36,8 @@ export function selectDueTaskProjects(store: TaskStore, now = new Date()): DueTa
       continue;
     }
     const project = projects.get(value.projectId);
-    if (!project || Date.parse(value.dueAt) > nowMs || Number.isNaN(Date.parse(value.dueAt)))
-      continue;
+    const dueAt = Date.parse(value.dueAt);
+    if (!project || dueAt >= tomorrowMs || Number.isNaN(dueAt)) continue;
     project.tasks.push({
       id: value.id,
       description: value.description,
