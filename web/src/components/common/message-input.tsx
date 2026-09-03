@@ -273,8 +273,7 @@ function MessageInputHoverButtons({
         actionId: getMessageInputButtonShortcutActionId(index + 1),
         priority: 10,
         handler: () => {
-          const slotNode = slotRefs.current[index];
-          if (disabled || slot.ghost || !slotNode || slotNode.hidden) return false;
+          if (disabled || slot.ghost) return false;
           onSlotAction(slot, currentVisibleBlockWidth());
           return true;
         },
