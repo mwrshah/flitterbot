@@ -15,6 +15,7 @@
  * Scroll restoration is off for /streams (router.tsx).
  */
 import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { cn } from "cn";
 import {
   memo,
   type Ref,
@@ -29,7 +30,6 @@ import {
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
-import { cn } from "@/lib/utils";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;

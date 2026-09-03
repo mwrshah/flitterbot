@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { cn } from "cn";
 import { PinIcon, PinOffIcon, PlusIcon } from "lucide-react";
 import {
   type MouseEvent,
@@ -40,7 +41,6 @@ import { projectSidebarRows } from "@/lib/sidebar-search";
 import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { PiSessionStatus, StreamSummary } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 function piStatusDotClass(status: PiSessionStatus | undefined): string {
   switch (status) {
