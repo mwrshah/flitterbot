@@ -43,9 +43,10 @@ export function DueTasksPanel() {
               {project.tasks.map((task) =>
                 task.details ? (
                   <details key={task.id} className="group/task">
-                    <summary className="flex cursor-pointer list-none items-start gap-1.5 rounded-md px-1.5 py-1.5 text-sm leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
-                      <ChevronRight className="mt-0.5 size-3 shrink-0 text-text-muted transition-transform group-open/task:rotate-90" />
-                      <span>{task.description}</span>
+                    <summary className="flex cursor-pointer list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
+                      <span className="decoration-dotted underline-offset-2 group-hover/task:underline">
+                        {task.description}
+                      </span>
                     </summary>
                     <p className="mr-1 mb-1 ml-5 whitespace-pre-wrap text-[11px] leading-4 text-text-muted">
                       {task.details}
