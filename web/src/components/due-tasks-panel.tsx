@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
 import { useRef } from "react";
 import { dueTasksQueryOptions } from "@/lib/queries";
 
@@ -31,11 +30,10 @@ export function DueTasksPanel() {
       )}
       <div ref={projectsRef} className="space-y-1">
         {data?.projects.map((project) => (
-          <details key={project.id} open className="group/project">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1 py-1.5 text-xs font-medium text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
-              <ChevronRight className="size-3 shrink-0 text-text-muted transition-transform group-open/project:rotate-90" />
+          <details key={project.id} open>
+            <summary className="flex w-full cursor-pointer touch-manipulation list-none items-center justify-between gap-3 rounded-sm px-1 pb-1 pl-0 text-left text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden">
               <span className="truncate">{project.name}</span>
-              <span className="ml-auto text-[10px] font-normal text-text-muted">
+              <span className="mr-1 ml-auto text-[10px] font-normal text-text-muted">
                 {project.tasks.length}
               </span>
             </summary>
