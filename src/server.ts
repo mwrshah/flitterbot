@@ -14,6 +14,7 @@ import {
 } from "./contracts/index.ts";
 import { InvalidJsonBodyError, sendJson } from "./routes/_shared.ts";
 import { handleBrowserDirectoryCompletionsRoute } from "./routes/browser-directory-completions.ts";
+import { handleBrowserDueTasksRoute } from "./routes/browser-due-tasks.ts";
 import { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./routes/browser-models.ts";
 import { handleBrowserPiSessionDiffRoute } from "./routes/browser-pi-session-diff.ts";
 import { handleBrowserPiSessionStreamRoute } from "./routes/browser-pi-session-stream.ts";
@@ -254,6 +255,9 @@ async function routeRequest(
     pathname === CONTROL_SURFACE_ENDPOINTS.sessionSearch.path
   ) {
     return handleBrowserSessionSearchRoute(runtime, req, res);
+  }
+  if (method === "GET" && pathname === "/api/tasks/due") {
+    return handleBrowserDueTasksRoute(req, res);
   }
   if (
     method === "GET" &&

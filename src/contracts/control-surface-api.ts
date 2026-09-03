@@ -210,6 +210,22 @@ export interface DownstreamSessionsListResponse {
   items: DownstreamSessionItem[];
 }
 
+export interface DueTaskItem {
+  id: string;
+  description: string;
+  details: string | null;
+}
+
+export interface DueTaskProject {
+  id: string;
+  name: string;
+  tasks: DueTaskItem[];
+}
+
+export interface DueTasksResponse {
+  projects: DueTaskProject[];
+}
+
 export interface SessionDetailResponse {
   session: ClaudeSessionListItem;
   tmux?: TmuxSessionInspection | null;

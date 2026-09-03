@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
@@ -6,6 +6,7 @@ import "react-diff-view/style/index.css";
 import { toast } from "sonner";
 import { CopyableCode } from "@/components/common/copyable-code";
 import { ShortcutHint } from "@/components/common/kbd";
+import { DueTasksPanel } from "@/components/due-tasks-panel";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useModifierLabel } from "@/hooks/platform";
@@ -18,6 +19,7 @@ import {
   useShortcutBindingLabel,
 } from "@/lib/global-shortcuts";
 import {
+  DUE_TASKS_QUERY_KEY,
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsWorktreeQueryOptions,
@@ -115,20 +117,28 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   piSessionId,
   piSessionStatus,
   showSettings = false,
+  showDueTasks = false,
 }: {
   piSessionId: string | undefined;
   piSessionStatus?: PiSessionStatus;
   showSettings?: boolean;
+  showDueTasks?: boolean;
 }) {
-  useWhyDidYouRender("DownstreamSessionsPanel", { piSessionId, piSessionStatus, showSettings });
+  useWhyDidYouRender("DownstreamSessionsPanel", {
+    piSessionId,
+    piSessionStatus,
+    showSettings,
+    showDueTasks,
+  });
   const modifierLabel = useModifierLabel();
+  const queryClient = useQueryClient();
   const [panelView, setPanelView] = useState<"info" | "diff">("info");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const statusBanner = piStatusBanner(piSessionStatus);
 
   const { data, isPending, isError } = useQuery(
-    streamsDownstreamSessionsQueryOptions(piSessionId ?? ""),
+    streamsDownstreamSessionsQueryOptions(piSessionId ?? "", !showDueTasks),
   );
 
   const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
@@ -164,10 +174,16 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   const branchCopy = useCopyToClipboard(600);
   const baseBranchCopy = useCopyToClipboard(600);
 
+  const reloadDueTasks = useCallback(() => {
+    if (!showDueTasks) return;
+    void queryClient.refetchQueries({ queryKey: DUE_TASKS_QUERY_KEY, type: "active" });
+  }, [queryClient, showDueTasks]);
+
   const showInfoPanel = useCallback(() => {
     (document.activeElement as HTMLElement)?.blur?.();
+    if (panelView === "info") reloadDueTasks();
     setPanelView("info");
-  }, []);
+  }, [panelView, reloadDueTasks]);
 
   const showDiffPanel = useCallback(() => {
     (document.activeElement as HTMLElement)?.blur?.();
@@ -314,6 +330,9 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
         >
           <ToggleGroupItem
             value="info"
+            onClick={() => {
+              if (panelView === "info") reloadDueTasks();
+            }}
             className="text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
           >
             Info
@@ -403,6 +422,8 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
             )}
           </div>
         </div>
+      ) : showDueTasks ? (
+        <DueTasksPanel />
       ) : (
         <div className="flex-1 overflow-y-auto [scrollbar-gutter:auto] [scrollbar-width:thin]">
           <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wider text-text-muted font-medium">

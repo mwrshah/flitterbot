@@ -11,6 +11,7 @@ export type {
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
   DownstreamSessionItem,
+  DueTasksResponse,
   ModelListItem,
   ModelsListResponse,
   ModelsMutationResponse,

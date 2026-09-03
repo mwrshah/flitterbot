@@ -5,6 +5,7 @@ import { INTERNAL_COMMANDS } from "@/lib/internal-commands";
 import type {
   DirectoryCompletionsResponse,
   DownstreamSessionItem,
+  DueTasksResponse,
   SkillPickerItem,
   StatusQueryData,
 } from "@/lib/types";
@@ -17,6 +18,7 @@ import {
   fetchStreamsWorktree,
   type StreamInfo,
 } from "@/server/streams";
+import { fetchDueTasks } from "@/server/tasks";
 import { fetchUserConfig } from "@/server/user-config";
 
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
@@ -82,12 +84,22 @@ export function conversationFindHistoryQueryOptions(piSessionId: string) {
   });
 }
 
-export function streamsDownstreamSessionsQueryOptions(piSessionId: string) {
+export const DUE_TASKS_QUERY_KEY = ["due-tasks"] as const;
+
+export function dueTasksQueryOptions() {
+  return queryOptions({
+    queryKey: DUE_TASKS_QUERY_KEY,
+    queryFn: (): Promise<DueTasksResponse> => fetchDueTasks(),
+    staleTime: 30_000,
+  });
+}
+
+export function streamsDownstreamSessionsQueryOptions(piSessionId: string, enabled = true) {
   return {
     queryKey: ["streams-downstream-sessions", piSessionId] as const,
     queryFn: (): Promise<DownstreamSessionItem[]> =>
       fetchDownstreamSessions({ data: { piSessionId } }),
-    enabled: !!piSessionId,
+    enabled: !!piSessionId && enabled,
     staleTime: 30_000,
   };
 }

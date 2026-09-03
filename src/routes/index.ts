@@ -1,5 +1,6 @@
 export { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 export { handleBrowserDirectoryCompletionsRoute } from "./browser-directory-completions.ts";
+export { handleBrowserDueTasksRoute } from "./browser-due-tasks.ts";
 export { handleBrowserModelsPinRoute, handleBrowserModelsRoute } from "./browser-models.ts";
 export { handleBrowserSessionSearchRoute } from "./browser-session-search.ts";
 export { handleBrowserSessionDetailRoute, handleBrowserSessionsRoute } from "./browser-sessions.ts";
