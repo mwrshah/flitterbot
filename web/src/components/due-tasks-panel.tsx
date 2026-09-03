@@ -31,7 +31,7 @@ export function DueTasksPanel() {
       <div ref={projectsRef} className="space-y-1 pl-1">
         {data?.projects.map((project) => (
           <details key={project.id} open>
-            <summary className="flex w-full cursor-pointer touch-manipulation list-none items-center justify-between gap-3 rounded-sm px-1 pb-1 pl-0 text-left text-base text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden">
+            <summary className="flex w-full cursor-pointer touch-manipulation list-none items-center justify-between gap-3 rounded-sm px-1 pb-1 pl-0.5 text-left text-sm text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden">
               <span className="truncate">{project.name}</span>
               <span className="mr-1 ml-auto text-[10px] font-normal text-text-muted">
                 {project.tasks.length}
