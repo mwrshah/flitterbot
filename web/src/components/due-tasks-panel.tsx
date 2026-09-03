@@ -12,9 +12,11 @@ export function DueTasksPanel() {
       <button
         type="button"
         onClick={() => {
-          for (const project of projectsRef.current?.children ?? []) {
-            if (project instanceof HTMLDetailsElement) project.open = false;
-          }
+          const projects = Array.from(projectsRef.current?.children ?? []).filter(
+            (project): project is HTMLDetailsElement => project instanceof HTMLDetailsElement,
+          );
+          const open = !projects.every((project) => project.open);
+          for (const project of projects) project.open = open;
         }}
         className="group px-1 pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
       >
@@ -41,7 +43,7 @@ export function DueTasksPanel() {
               {project.tasks.map((task) =>
                 task.details ? (
                   <details key={task.id} className="group/task">
-                    <summary className="flex cursor-pointer list-none items-start gap-1.5 rounded-md px-1.5 py-1.5 text-xs leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-start gap-1.5 rounded-md px-1.5 py-1.5 text-sm leading-4 text-text outline-none hover:bg-background-hover focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
                       <ChevronRight className="mt-0.5 size-3 shrink-0 text-text-muted transition-transform group-open/task:rotate-90" />
                       <span>{task.description}</span>
                     </summary>
@@ -50,7 +52,7 @@ export function DueTasksPanel() {
                     </p>
                   </details>
                 ) : (
-                  <p key={task.id} className="px-5 py-1.5 text-xs leading-4 text-text">
+                  <p key={task.id} className="px-5 py-1.5 text-sm leading-4 text-text">
                     {task.description}
                   </p>
                 ),
