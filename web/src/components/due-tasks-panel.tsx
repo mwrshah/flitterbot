@@ -17,7 +17,7 @@ export function DueTasksPanel() {
           const open = !projects.every((project) => project.open);
           for (const project of projects) project.open = open;
         }}
-        className="group px-1 pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+        className="group pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
       >
         <span className="decoration-dotted underline-offset-2 group-hover:underline">
           Due Tasks
@@ -28,10 +28,10 @@ export function DueTasksPanel() {
       {data?.projects.length === 0 && (
         <p className="px-1 py-3 text-xs text-text-muted">No tasks due</p>
       )}
-      <div ref={projectsRef} className="space-y-1">
+      <div ref={projectsRef} className="space-y-1 pl-1">
         {data?.projects.map((project) => (
           <details key={project.id} open>
-            <summary className="flex w-full cursor-pointer touch-manipulation list-none items-center justify-between gap-3 rounded-sm px-1 pb-1 pl-0 text-left text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden">
+            <summary className="flex w-full cursor-pointer touch-manipulation list-none items-center justify-between gap-3 rounded-sm px-1 pb-1 pl-0 text-left text-base text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden">
               <span className="truncate">{project.name}</span>
               <span className="mr-1 ml-auto text-[10px] font-normal text-text-muted">
                 {project.tasks.length}
