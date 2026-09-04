@@ -42,14 +42,16 @@ export function DueTasksPanel() {
                 task.details ? (
                   <details
                     key={task.id}
-                    className="group/task relative before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
+                    className="group/task relative grid grid-cols-[minmax(0,1fr)_auto] items-start before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
                   >
-                    <summary className="flex cursor-default list-none items-start rounded-md px-5 py-1.5 text-sm leading-4 outline-none focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
-                      <span className="select-text text-text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-text">
-                        {task.description}
-                      </span>
+                    <summary className="order-2 mr-1 cursor-pointer touch-manipulation list-none rounded-sm px-1 py-1.5 text-[11px] leading-4 text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
+                      <span className="group-open/task:hidden">more</span>
+                      <span className="hidden group-open/task:inline">less</span>
                     </summary>
-                    <p className="mr-1 mb-1 ml-5 whitespace-pre-wrap text-[11px] leading-4 text-text-muted">
+                    <p className="order-1 min-w-0 select-text px-5 py-1.5 text-sm leading-4 text-text-muted">
+                      {task.description}
+                    </p>
+                    <p className="order-3 col-span-2 mr-1 mb-1 ml-5 whitespace-pre-wrap text-[11px] leading-4 text-text-muted">
                       {task.details}
                     </p>
                   </details>
