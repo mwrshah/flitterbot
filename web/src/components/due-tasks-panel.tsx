@@ -1,6 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useId, useRef, useState } from "react";
 import { dueTasksQueryOptions } from "@/lib/queries";
+
+function TaskWithDetails({ description, details }: { description: string; details: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+
+  return (
+    <div className="relative before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden">
+      <div className="flex items-start justify-between gap-3 px-5 py-1.5 text-sm leading-4 text-text-muted">
+        <span className="min-w-0 select-text">{description}</span>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded((open) => !open)}
+          className="cursor-pointer touch-manipulation rounded-sm text-sm text-text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+        >
+          {expanded ? "less" : "more"}
+        </button>
+      </div>
+      {expanded && (
+        <p
+          id={detailsId}
+          className="mr-1 mb-1 ml-5 whitespace-pre-wrap text-[11px] leading-4 text-text-muted"
+        >
+          {details}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function DueTasksPanel() {
   const { data, isPending, isError } = useQuery(dueTasksQueryOptions());
@@ -40,21 +70,11 @@ export function DueTasksPanel() {
             <div className="ml-[9px] pl-[7px]">
               {project.tasks.map((task) =>
                 task.details ? (
-                  <details
+                  <TaskWithDetails
                     key={task.id}
-                    className="group/task relative grid grid-cols-[minmax(0,1fr)_auto] items-start before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden"
-                  >
-                    <summary className="order-2 mr-1 cursor-pointer touch-manipulation list-none rounded-sm px-1 py-1.5 text-[11px] leading-4 text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop [&::-webkit-details-marker]:hidden">
-                      <span className="group-open/task:hidden">more</span>
-                      <span className="hidden group-open/task:inline">less</span>
-                    </summary>
-                    <p className="order-1 min-w-0 select-text px-5 py-1.5 text-sm leading-4 text-text-muted">
-                      {task.description}
-                    </p>
-                    <p className="order-3 col-span-2 mr-1 mb-1 ml-5 whitespace-pre-wrap text-[11px] leading-4 text-text-muted">
-                      {task.details}
-                    </p>
-                  </details>
+                    description={task.description}
+                    details={task.details}
+                  />
                 ) : (
                   <p
                     key={task.id}
