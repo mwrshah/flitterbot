@@ -8,8 +8,8 @@ function TaskWithDetails({ description, details }: { description: string; detail
 
   return (
     <div className="relative before:absolute before:top-0 before:-left-2 before:h-3.5 before:w-5 before:rounded-bl-md before:border-b before:border-l before:border-border after:absolute after:top-0 after:bottom-0 after:-left-2 after:border-l after:border-border last:after:hidden">
-      <div className="flex items-start justify-between gap-3 px-5 py-1.5 text-sm leading-4 text-text-muted">
-        <span className="min-w-0 select-text">{description}</span>
+      <p className="px-5 py-1.5 text-sm leading-4 text-text-muted">
+        <span className="select-text">{description}</span>{" "}
         <button
           type="button"
           aria-expanded={expanded}
@@ -19,7 +19,7 @@ function TaskWithDetails({ description, details }: { description: string; detail
         >
           {expanded ? "less" : "more"}
         </button>
-      </div>
+      </p>
       {expanded && (
         <p
           id={detailsId}
