@@ -160,13 +160,10 @@ export function skillsQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["skills"] as const,
     queryFn: async (): Promise<SkillPickerItem[]> => {
-      try {
-        const res = await apiClient.listSkills();
-        return [...INTERNAL_COMMANDS, ...res.items];
-      } catch {
-        return INTERNAL_COMMANDS;
-      }
+      const res = await apiClient.listSkills();
+      return [...INTERNAL_COMMANDS, ...res.items];
     },
+    retry: 5,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   };
