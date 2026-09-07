@@ -968,6 +968,46 @@ export function ChatPanel({
               hasPreviousPage={hasPreviousPage && !findHistoryQuery.data}
               isFetchingPreviousPage={isFetchingPreviousPage}
             />
+            {turnQueue.items.length > 0 && (
+              <div
+                role="status"
+                aria-label="Queued turns"
+                aria-live="polite"
+                className="pointer-events-none absolute inset-x-6 bottom-3 z-10 flex flex-col items-end gap-1.5"
+              >
+                {turnQueue.items.map((turn) => {
+                  const removalPending =
+                    removeQueuedTurnMutation.isPending &&
+                    removeQueuedTurnMutation.variables === turn.id;
+                  return (
+                    <div
+                      key={turn.id}
+                      className="pointer-events-auto grid w-full max-w-[min(44rem,100%)] grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-xs text-text shadow-lg"
+                    >
+                      <div className="max-h-16 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
+                        {turn.text}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Remove queued turn"
+                        className="-my-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
+                        disabled={turn.state === "accepting" || removalPending}
+                        onClick={() => removeQueuedTurnMutation.mutate(turn.id)}
+                      >
+                        {removalPending ? (
+                          <Loader2Icon
+                            className="-translate-y-px size-3.5 animate-spin"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <XIcon className="-translate-y-px size-3.5" aria-hidden="true" />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {findOpen && (
               <ConversationFindBar
                 inputRef={findInputRef}
@@ -1049,11 +1089,6 @@ export function ChatPanel({
                   : "work-stream"
             }
             isRecoverPending={recoverMutation.isPending}
-            queuedTurns={turnQueue.items}
-            onRemoveQueuedTurn={(itemId) => removeQueuedTurnMutation.mutate(itemId)}
-            removingQueuedTurnId={
-              removeQueuedTurnMutation.isPending ? removeQueuedTurnMutation.variables : undefined
-            }
           />
         </Panel>
       </PanelGroup>

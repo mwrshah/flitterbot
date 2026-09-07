@@ -5,7 +5,6 @@ import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "
 import {
   type ClipboardEvent,
   type DragEvent,
-  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -31,7 +30,7 @@ import {
 } from "@/lib/global-shortcuts";
 import type { InternalCommandScope } from "@/lib/internal-commands";
 import { handleTextInputKeyDown } from "@/lib/text-input";
-import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
+import type { ImageAttachment } from "@/lib/types";
 
 const draftStore = new Map<string, string>();
 const pendingAttachmentStore = new Map<string, ImageAttachment[]>();
@@ -382,9 +381,6 @@ type MessageInputProps = {
   hoverButtons?: MessageInputHoverButton[];
   internalCommandScope: InternalCommandScope;
   isRecoverPending?: boolean;
-  queuedTurns?: TurnQueueItemSummary[];
-  onRemoveQueuedTurn?: (itemId: string) => void;
-  removingQueuedTurnId?: string;
 };
 
 export const MessageInput = memo(function MessageInput({
@@ -410,9 +406,6 @@ export const MessageInput = memo(function MessageInput({
   hoverButtons = EMPTY_HOVER_BUTTONS,
   internalCommandScope,
   isRecoverPending = false,
-  queuedTurns = [],
-  onRemoveQueuedTurn,
-  removingQueuedTurnId,
 }: MessageInputProps) {
   useWhyDidYouRender("MessageInput", { isSending, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -786,44 +779,6 @@ export const MessageInput = memo(function MessageInput({
                 </button>
               </div>
             ))}
-          </div>
-        )}
-        {queuedTurns.length > 0 && (
-          <div
-            role="status"
-            aria-label="Queued turns"
-            aria-live="polite"
-            className={cn(
-              "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 border-b-2 border-border-muted px-2 pb-1.5 text-xs text-text",
-              pendingImages.length === 0 && "mt-1.5",
-            )}
-          >
-            {queuedTurns.map((turn) => {
-              const removalPending = removingQueuedTurnId === turn.id;
-              return (
-                <Fragment key={turn.id}>
-                  <div className="max-h-32 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
-                    {turn.text}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Remove queued turn"
-                    className="-my-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
-                    disabled={turn.state === "accepting" || removalPending || !onRemoveQueuedTurn}
-                    onClick={() => onRemoveQueuedTurn?.(turn.id)}
-                  >
-                    {removalPending ? (
-                      <Loader2Icon
-                        className="-translate-y-px size-3.5 animate-spin"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <XIcon className="-translate-y-px size-3.5" aria-hidden="true" />
-                    )}
-                  </button>
-                </Fragment>
-              );
-            })}
           </div>
         )}
         <input
