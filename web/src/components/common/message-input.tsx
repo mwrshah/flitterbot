@@ -761,7 +761,7 @@ export const MessageInput = memo(function MessageInput({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <div className={cn(fillHeight && "flex-1 flex flex-col min-h-0 h-full")}>
+      <div className={cn(fillHeight && "relative flex-1 flex flex-col min-h-0 h-full")}>
         {pendingImages.length > 0 && (
           <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
             {pendingImages.map((img, i) => (
@@ -793,16 +793,13 @@ export const MessageInput = memo(function MessageInput({
             role="status"
             aria-label="Queued turns"
             aria-live="polite"
-            className={cn(
-              "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 border-b-2 border-border-muted px-2 pb-1.5 text-xs text-text",
-              pendingImages.length === 0 && "mt-1.5",
-            )}
+            className="absolute inset-x-0 bottom-[calc(100%+2px)] z-10 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-0.75 border-t-2 border-border-muted bg-background px-2 pt-2.25 pb-1.5 text-xs text-text"
           >
             {queuedTurns.map((turn) => {
               const removalPending = removingQueuedTurnId === turn.id;
               return (
                 <Fragment key={turn.id}>
-                  <div className="max-h-32 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
+                  <div className="max-h-16 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
                     {turn.text}
                   </div>
                   <button
