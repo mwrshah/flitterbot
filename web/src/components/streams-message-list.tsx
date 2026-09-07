@@ -90,6 +90,7 @@ type StreamsMessageListProps = {
   onLoadPrevious: () => Promise<void>;
   hasPreviousPage: boolean;
   isFetchingPreviousPage: boolean;
+  bottomInset?: number;
   ref?: Ref<StreamsMessageListHandle>;
 };
 
@@ -235,9 +236,15 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   onLoadPrevious,
   hasPreviousPage,
   isFetchingPreviousPage,
+  bottomInset = 0,
   ref,
 }: StreamsMessageListProps) {
-  useWhyDidYouRender("StreamsMessageList", { rows, isSessionBusy, activeFindRowIndex });
+  useWhyDidYouRender("StreamsMessageList", {
+    rows,
+    isSessionBusy,
+    activeFindRowIndex,
+    bottomInset,
+  });
   const streamingRowKey = `${STREAMING_ROW_KEY}:${rows.at(-1)?.key ?? "empty"}`;
   const getItemKey = useCallback(
     (index: number) => (index === rows.length ? streamingRowKey : rows[index]!.key),
@@ -246,6 +253,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
   const pendingScrollToEndRef = useRef(false);
+  const wasAtEndRef = useRef(true);
+  const previousBottomInsetRef = useRef(bottomInset);
   const viewportUserMessageIdRef = useRef<string>(undefined);
   const [markerNavigation, setMarkerNavigation] = useState<MarkerNavigation>();
   const [markerWindowMessageId, setMarkerWindowMessageId] = useState<string>();
@@ -279,12 +288,14 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     overscan: VIRTUALIZER_OVERSCAN, // scroll-memory: initialOffset+cache go here
     rangeExtractor,
     paddingStart: 16,
-    paddingEnd: 16,
+    paddingEnd: 16 + bottomInset,
+    scrollPaddingEnd: 16 + bottomInset,
     anchorTo: "end",
     followOnAppend: !markerNavigation || Boolean(markerNavigation.error),
     scrollEndThreshold: 120,
     directDomUpdates: true,
     onChange: (instance, sync) => {
+      wasAtEndRef.current = instance.isAtEnd();
       const virtualItems = instance.getVirtualItems();
       const scrollOffset = instance.scrollOffset ?? 0;
       const firstVisibleRowIndex = virtualItems.find(
@@ -297,7 +308,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
           virtualItems,
           clickedUserMessageId,
           scrollOffset,
-          scrollOffset + (instance.scrollRect?.height ?? 0),
+          scrollOffset + Math.max(0, (instance.scrollRect?.height ?? 0) - bottomInset),
         )
           ? clickedUserMessageId
           : topMessageId;
@@ -328,6 +339,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     },
   });
 
+  useLayoutEffect(() => {
+    if (previousBottomInsetRef.current === bottomInset) return;
+    previousBottomInsetRef.current = bottomInset;
+    if (wasAtEndRef.current) virtualizer.scrollToEnd();
+  }, [bottomInset, virtualizer]);
+
   useLayoutEffect(function rearmInitialFillAfterRouteReveal() {
     didFinishInitialFillRef.current = false; // Suspense replay wipes scrollTop: re-pin
   }, []); // scroll-memory: skip re-arm + snapshot save here
@@ -344,7 +361,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         virtualizer.getVirtualItems(),
         clickedUserMessageId,
         scrollOffset,
-        scrollOffset + (virtualizer.scrollRect?.height ?? 0),
+        scrollOffset + Math.max(0, (virtualizer.scrollRect?.height ?? 0) - bottomInset),
       ) ||
       viewportUserMessageIdRef.current === clickedUserMessageId
     ) {
@@ -352,7 +369,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     }
     viewportUserMessageIdRef.current = clickedUserMessageId;
     setViewportUserMessageId(clickedUserMessageId);
-  }, [clickedUserMessageId, rows, virtualizer]);
+  }, [bottomInset, clickedUserMessageId, rows, virtualizer]);
 
   useLayoutEffect(function pinToEndAndFillInitialViewport() {
     if (

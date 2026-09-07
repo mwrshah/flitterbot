@@ -465,6 +465,7 @@ export function ChatPanel({
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const messageListRef = useRef<StreamsMessageListHandle>(null);
+  const [messageListBottomInset, setMessageListBottomInset] = useState(0);
   const findInputRef = useRef<HTMLInputElement>(null);
   const findPreviousFocusRef = useRef<HTMLElement | null>(null);
   const [findSessionId, setFindSessionId] = useState<string>();
@@ -967,6 +968,7 @@ export function ChatPanel({
               onLoadPrevious={onLoadPrevious}
               hasPreviousPage={hasPreviousPage && !findHistoryQuery.data}
               isFetchingPreviousPage={isFetchingPreviousPage}
+              bottomInset={messageListBottomInset}
             />
             {findOpen && (
               <ConversationFindBar
@@ -1050,6 +1052,7 @@ export function ChatPanel({
             }
             isRecoverPending={recoverMutation.isPending}
             queuedTurns={turnQueue.items}
+            onQueuedTurnsHeightChange={setMessageListBottomInset}
             onRemoveQueuedTurn={(itemId) => removeQueuedTurnMutation.mutate(itemId)}
             removingQueuedTurnId={
               removeQueuedTurnMutation.isPending ? removeQueuedTurnMutation.variables : undefined

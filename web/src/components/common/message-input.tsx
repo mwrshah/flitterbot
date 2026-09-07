@@ -383,6 +383,7 @@ type MessageInputProps = {
   internalCommandScope: InternalCommandScope;
   isRecoverPending?: boolean;
   queuedTurns?: TurnQueueItemSummary[];
+  onQueuedTurnsHeightChange?: (height: number) => void;
   onRemoveQueuedTurn?: (itemId: string) => void;
   removingQueuedTurnId?: string;
 };
@@ -411,6 +412,7 @@ export const MessageInput = memo(function MessageInput({
   internalCommandScope,
   isRecoverPending = false,
   queuedTurns = [],
+  onQueuedTurnsHeightChange,
   onRemoveQueuedTurn,
   removingQueuedTurnId,
 }: MessageInputProps) {
@@ -419,6 +421,7 @@ export const MessageInput = memo(function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const queuedTurnsRef = useRef<HTMLDivElement | null>(null);
   const draftKeyRef = useRef(draftKey);
   const mountedRef = useRef(true);
   const [recoveryButtonWidth, setRecoveryButtonWidth] = useState<number | null>(null);
@@ -755,6 +758,21 @@ export const MessageInput = memo(function MessageInput({
   const recoveryButtonStyle =
     recoveryKind && recoveryButtonWidth !== null ? { width: recoveryButtonWidth } : undefined;
 
+  useLayoutEffect(() => {
+    const queuedTurnsElement = queuedTurnsRef.current;
+    if (!queuedTurnsElement) {
+      onQueuedTurnsHeightChange?.(0);
+      return;
+    }
+
+    const publishHeight = () =>
+      onQueuedTurnsHeightChange?.(queuedTurnsElement.getBoundingClientRect().height);
+    publishHeight();
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(queuedTurnsElement);
+    return () => observer.disconnect();
+  }, [onQueuedTurnsHeightChange, queuedTurns.length]);
+
   return (
     <div
       className={fillHeight ? "h-full flex flex-col min-h-0" : "shrink-0"}
@@ -790,6 +808,7 @@ export const MessageInput = memo(function MessageInput({
         )}
         {queuedTurns.length > 0 && (
           <div
+            ref={queuedTurnsRef}
             role="status"
             aria-label="Queued turns"
             aria-live="polite"
