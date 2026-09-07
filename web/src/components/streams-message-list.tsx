@@ -250,6 +250,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     (index: number) => (index === rows.length ? streamingRowKey : rows[index]!.key),
     [rows, streamingRowKey],
   );
+  const trailingPadding = bottomInset > 0 ? 4 + bottomInset : 16;
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
   const pendingScrollToEndRef = useRef(false);
@@ -288,8 +289,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     overscan: VIRTUALIZER_OVERSCAN, // scroll-memory: initialOffset+cache go here
     rangeExtractor,
     paddingStart: 16,
-    paddingEnd: 16 + bottomInset,
-    scrollPaddingEnd: 16 + bottomInset,
+    paddingEnd: trailingPadding,
+    scrollPaddingEnd: trailingPadding,
     anchorTo: "end",
     followOnAppend: !markerNavigation || Boolean(markerNavigation.error),
     scrollEndThreshold: 120,
