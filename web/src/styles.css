@@ -308,6 +308,7 @@
 
   .user-message-marker-line {
     width: var(--user-message-marker-width, 0.5rem);
+    height: var(--user-message-marker-height, 0.125rem);
   }
 
   .user-message-marker:has(
@@ -316,6 +317,7 @@
       + .user-message-marker:is(:hover, :focus-visible)
     ) {
     --user-message-marker-width: 0.5625rem;
+    --user-message-marker-height: 0.15rem;
   }
 
   .user-message-marker:has(
@@ -323,10 +325,12 @@
       + .user-message-marker:is(:hover, :focus-visible)
     ) {
     --user-message-marker-width: 0.6875rem;
+    --user-message-marker-height: 0.1875rem;
   }
 
   .user-message-marker:has(+ .user-message-marker:is(:hover, :focus-visible)) {
     --user-message-marker-width: 0.875rem;
+    --user-message-marker-height: 0.375rem;
   }
 
   .user-message-marker:is(:hover, :focus-visible)
@@ -334,20 +338,24 @@
     + .user-message-marker
     + .user-message-marker {
     --user-message-marker-width: 0.5625rem;
+    --user-message-marker-height: 0.15rem;
   }
 
   .user-message-marker:is(:hover, :focus-visible)
     + .user-message-marker
     + .user-message-marker {
     --user-message-marker-width: 0.6875rem;
+    --user-message-marker-height: 0.1875rem;
   }
 
   .user-message-marker:is(:hover, :focus-visible) + .user-message-marker {
     --user-message-marker-width: 0.875rem;
+    --user-message-marker-height: 0.375rem;
   }
 
   .user-message-marker:is(:hover, :focus-visible) {
     --user-message-marker-width: 1.25rem;
+    --user-message-marker-height: 0.75rem;
   }
 }
 

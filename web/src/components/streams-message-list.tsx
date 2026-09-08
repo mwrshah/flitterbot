@@ -206,7 +206,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
               )}
             >
               <span
-                className="user-message-marker-line block h-0.5 shrink-0 rounded-full bg-current transition-[width] duration-[220ms] ease-in-out motion-reduce:transition-none"
+                className="user-message-marker-line block shrink-0 rounded-full bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
                 aria-hidden="true"
               />
             </button>
