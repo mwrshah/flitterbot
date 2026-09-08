@@ -29,7 +29,15 @@ function isSingleLine(element: HTMLElement): boolean {
   return element.getBoundingClientRect().height - insets <= lineHeight + SINGLE_LINE_TOLERANCE_PX;
 }
 
-function MessageCopyButton({ text, target }: { text: string; target: HTMLElement | null }) {
+function MessageCopyButton({
+  text,
+  target,
+  messageRole,
+}: {
+  text: string;
+  target: HTMLElement | null;
+  messageRole: "user" | "assistant";
+}) {
   const [singleLine, setSingleLine] = useState(true);
   const { copied, copy } = useCopyToClipboard();
 
@@ -59,7 +67,7 @@ function MessageCopyButton({ text, target }: { text: string; target: HTMLElement
         void copy(text).catch((error) => console.error("Failed to copy message", error))
       }
       data-copied={copied}
-      className="absolute right-1.5 bottom-1.5 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
+      className={`absolute bottom-1.5 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active ${messageRole === "user" ? "right-2" : "right-5"}`}
       title={label}
       aria-label={label}
       aria-live="polite"
@@ -186,7 +194,7 @@ function UserMessageRow({
         <div className="relative">
           <div
             ref={setCopyTarget}
-            className={`user-message-container rounded-xl border py-2 pr-8 pl-4 text-text ${hook ? "border-border bg-background-selected" : "border-border-pop bg-background-pop"}`}
+            className={`user-message-container rounded-xl border py-2 pr-6 pl-4 text-text ${hook ? "border-border bg-background-selected" : "border-border-pop bg-background-pop"}`}
           >
             {message.content && <span className="whitespace-pre-wrap">{message.content}</span>}
             {Boolean(message.images?.length) && (
@@ -202,7 +210,7 @@ function UserMessageRow({
               </div>
             )}
           </div>
-          <MessageCopyButton text={message.content} target={copyTarget} />
+          <MessageCopyButton text={message.content} target={copyTarget} messageRole="user" />
           {message.piEntryId && onFork && onPrune && (
             <MessageActionsMenu
               onFork={() => onFork(message.piEntryId!)}
@@ -228,7 +236,7 @@ function AssistantMessageRow({
         <AssistantContents message={message} tools={row.tools} piSessionId={piSessionId} />
       </div>
       {row.copyText && (!isSessionBusy || !row.isCurrentTurn) && (
-        <MessageCopyButton text={row.copyText} target={copyTarget} />
+        <MessageCopyButton text={row.copyText} target={copyTarget} messageRole="assistant" />
       )}
     </div>
   );

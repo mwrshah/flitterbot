@@ -118,7 +118,7 @@ function MarkerOverflowCount({
     <span
       role="img"
       aria-label={`${count} ${direction} user messages not shown`}
-      className="pointer-events-none flex h-full w-7 select-none items-center justify-end text-[9px] leading-none tabular-nums text-text-muted"
+      className="pointer-events-none flex h-full w-[72px] select-none items-center justify-end pr-5 text-[9px] leading-none tabular-nums text-text-muted"
     >
       +{String(count).padStart(2, "0")}
     </span>
@@ -173,13 +173,13 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     <nav
       ref={railRef}
       aria-label="User messages"
-      className="absolute right-3 top-1/2 z-10 w-7 -translate-y-1/2 overflow-hidden text-border"
+      className="absolute -right-2 top-1/2 z-10 w-[72px] -translate-y-1/2 overflow-hidden text-border"
       style={{
         height: `min(${markerRowCount * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
     >
       <div
-        className="grid w-7 items-center"
+        className="grid w-[72px] items-center"
         style={{
           gridTemplateRows: `repeat(${markerRowCount}, ${MARKER_ROW_HEIGHT}px)`,
         }}
@@ -201,12 +201,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
               title={label}
               onClick={() => onSelect(messageId)}
               className={cn(
-                "user-message-marker flex h-full min-h-0 w-7 items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
+                "user-message-marker flex h-full min-h-0 w-[72px] items-center justify-end overflow-hidden px-5 transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
                 failed ? "text-status-crashed" : selected ? "text-text" : undefined,
               )}
             >
               <span
-                className="user-message-marker-line block shrink-0 rounded-full bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
+                className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
                 aria-hidden="true"
               />
             </button>
