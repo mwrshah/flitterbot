@@ -250,7 +250,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     (index: number) => (index === rows.length ? streamingRowKey : rows[index]!.key),
     [rows, streamingRowKey],
   );
-  const trailingPadding = bottomInset > 0 ? 4 + bottomInset : 16;
+  const trailingPadding = bottomInset > 0 ? 4 + bottomInset : 12;
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
   const pendingScrollToEndRef = useRef(false);
