@@ -421,7 +421,7 @@ export const MessageInput = memo(function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
-  const queuedTurnsRef = useRef<HTMLDivElement | null>(null);
+  const inputOverlayRef = useRef<HTMLDivElement | null>(null);
   const draftKeyRef = useRef(draftKey);
   const mountedRef = useRef(true);
   const [recoveryButtonWidth, setRecoveryButtonWidth] = useState<number | null>(null);
@@ -759,19 +759,19 @@ export const MessageInput = memo(function MessageInput({
     recoveryKind && recoveryButtonWidth !== null ? { width: recoveryButtonWidth } : undefined;
 
   useLayoutEffect(() => {
-    const queuedTurnsElement = queuedTurnsRef.current;
-    if (!queuedTurnsElement) {
+    const inputOverlay = inputOverlayRef.current;
+    if (!inputOverlay) {
       onQueuedTurnsHeightChange?.(0);
       return;
     }
 
     const publishHeight = () =>
-      onQueuedTurnsHeightChange?.(queuedTurnsElement.getBoundingClientRect().height);
+      onQueuedTurnsHeightChange?.(inputOverlay.getBoundingClientRect().height);
     publishHeight();
     const observer = new ResizeObserver(publishHeight);
-    observer.observe(queuedTurnsElement);
+    observer.observe(inputOverlay);
     return () => observer.disconnect();
-  }, [onQueuedTurnsHeightChange, queuedTurns.length]);
+  }, [onQueuedTurnsHeightChange, pendingImages.length, queuedTurns.length]);
 
   return (
     <div
@@ -780,66 +780,74 @@ export const MessageInput = memo(function MessageInput({
       onDragOver={handleDragOver}
     >
       <div className={cn(fillHeight && "relative flex-1 flex flex-col min-h-0 h-full")}>
-        {pendingImages.length > 0 && (
-          <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
-            {pendingImages.map((img, i) => (
-              <div
-                key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
-                className="relative max-h-24 max-w-[min(24rem,100%)]"
-              >
-                <img
-                  src={`data:${img.mimeType};base64,${img.data}`}
-                  alt={`Pending attachment ${i + 1}`}
-                  className="block h-auto max-h-24 w-auto max-w-full rounded-lg border border-border object-contain"
-                />
-                <button
-                  type="button"
-                  disabled={isCompacting}
-                  onClick={() => removeImage(i)}
-                  className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={`Remove pending attachment ${i + 1}`}
-                  title="Remove attachment"
-                >
-                  <XIcon className="size-4" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {queuedTurns.length > 0 && (
+        {(pendingImages.length > 0 || queuedTurns.length > 0) && (
           <div
-            ref={queuedTurnsRef}
-            role="status"
-            aria-label="Queued turns"
-            aria-live="polite"
-            className="absolute inset-x-0 bottom-[calc(100%+2px)] z-10 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-0.75 border-t-2 border-border-muted bg-background px-2 pt-2.25 pb-1.5 text-xs text-text"
+            ref={inputOverlayRef}
+            className="absolute inset-x-0 bottom-[calc(100%+2px)] z-10 min-w-0 bg-background"
           >
-            {queuedTurns.map((turn) => {
-              const removalPending = removingQueuedTurnId === turn.id;
-              return (
-                <Fragment key={turn.id}>
-                  <div className="max-h-16 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
-                    {turn.text}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Remove queued turn"
-                    className="-my-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
-                    disabled={turn.state === "accepting" || removalPending || !onRemoveQueuedTurn}
-                    onClick={() => onRemoveQueuedTurn?.(turn.id)}
+            {pendingImages.length > 0 && (
+              <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
+                {pendingImages.map((img, i) => (
+                  <div
+                    key={`${img.mimeType}:${img.data.length}:${img.data.slice(0, 32)}`}
+                    className="relative max-h-24 max-w-[min(24rem,100%)]"
                   >
-                    {removalPending ? (
-                      <Loader2Icon
-                        className="-translate-y-px size-3.5 animate-spin"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <XIcon className="-translate-y-px size-3.5" aria-hidden="true" />
-                    )}
-                  </button>
-                </Fragment>
-              );
-            })}
+                    <img
+                      src={`data:${img.mimeType};base64,${img.data}`}
+                      alt={`Pending attachment ${i + 1}`}
+                      className="block h-auto max-h-24 w-auto max-w-full rounded-lg border border-border object-contain"
+                    />
+                    <button
+                      type="button"
+                      disabled={isCompacting}
+                      onClick={() => removeImage(i)}
+                      className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Remove pending attachment ${i + 1}`}
+                      title="Remove attachment"
+                    >
+                      <XIcon className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {queuedTurns.length > 0 && (
+              <div
+                role="status"
+                aria-label="Queued turns"
+                aria-live="polite"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-0.75 border-t-2 border-border-muted px-2 pt-2.25 pb-1.5 text-xs text-text"
+              >
+                {queuedTurns.map((turn) => {
+                  const removalPending = removingQueuedTurnId === turn.id;
+                  return (
+                    <Fragment key={turn.id}>
+                      <div className="max-h-16 min-w-0 overflow-hidden whitespace-pre-wrap break-words">
+                        {turn.text}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Remove queued turn"
+                        className="-my-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-40"
+                        disabled={
+                          turn.state === "accepting" || removalPending || !onRemoveQueuedTurn
+                        }
+                        onClick={() => onRemoveQueuedTurn?.(turn.id)}
+                      >
+                        {removalPending ? (
+                          <Loader2Icon
+                            className="-translate-y-px size-3.5 animate-spin"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <XIcon className="-translate-y-px size-3.5" aria-hidden="true" />
+                        )}
+                      </button>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         <input
