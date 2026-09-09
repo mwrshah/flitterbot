@@ -783,7 +783,7 @@ export const MessageInput = memo(function MessageInput({
         {(pendingImages.length > 0 || queuedTurns.length > 0) && (
           <div
             ref={inputOverlayRef}
-            className="absolute inset-x-0 bottom-[calc(100%+2px)] z-10 min-w-0 bg-background"
+            className="absolute inset-x-0 bottom-[calc(100%+2px)] z-10 min-w-0 bg-transparent"
           >
             {pendingImages.length > 0 && (
               <div className="flex w-full min-w-0 flex-wrap items-start gap-2 p-2">
@@ -816,7 +816,7 @@ export const MessageInput = memo(function MessageInput({
                 role="status"
                 aria-label="Queued turns"
                 aria-live="polite"
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-0.75 border-t-2 border-border-muted px-2 pt-2.25 pb-1.5 text-xs text-text"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-0.75 border-t-2 border-border-muted bg-background px-2 pt-2.25 pb-1.5 text-xs text-text"
               >
                 {queuedTurns.map((turn) => {
                   const removalPending = removingQueuedTurnId === turn.id;
