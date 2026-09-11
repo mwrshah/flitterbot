@@ -262,7 +262,7 @@ export interface AutoRetryEndWebSocketEvent {
 export interface HistoryRewrittenWebSocketEvent {
   type: "history_rewritten";
   piSessionId: string;
-  reason: "prune" | "compact";
+  reason: "prune" | "compact" | "recovery";
 }
 
 export interface ConversationResetWebSocketEvent {

@@ -7,6 +7,7 @@ process.on("warning", (warning) => {
 });
 
 import http from "node:http";
+import { handleCloudApi } from "./cloud/api.ts";
 import {
   CONTROL_SURFACE_ENDPOINTS,
   type HookRouteEventName,
@@ -148,6 +149,8 @@ async function routeRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
+  if (await handleCloudApi(runtime, req, res)) return;
+  if (await runtime.cloud?.proxy(req, res)) return;
   const method = req.method ?? "GET";
   const url = new URL(
     req.url ?? "/",

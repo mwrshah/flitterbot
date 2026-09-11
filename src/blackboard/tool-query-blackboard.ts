@@ -161,7 +161,7 @@ function authorizeRead(action: number, arg1: string | null, arg2: string | null)
   return sqlite.SQLITE_DENY;
 }
 
-function executeQuery(
+export function executeBlackboardQuery(
   db: BlackboardDatabase,
   sql: string | undefined,
   mode: string | undefined,
@@ -194,7 +194,12 @@ function executeQuery(
 
 export type QueryBlackboardTool = ToolDefinition;
 
-export function createQueryBlackboardTool(db: BlackboardDatabase): QueryBlackboardTool {
+export function createQueryBlackboardTool(
+  query: (
+    sql?: string,
+    mode?: string,
+  ) => Array<Record<string, unknown>> | Promise<Array<Record<string, unknown>>>,
+): QueryBlackboardTool {
   return {
     name: "query_blackboard",
     label: "Query Blackboard",
@@ -214,8 +219,7 @@ export function createQueryBlackboardTool(db: BlackboardDatabase): QueryBlackboa
     },
     execute: async (_toolCallId: string, params: Record<string, unknown>) => {
       try {
-        const rows = executeQuery(
-          db,
+        const rows = await query(
           params.sql as string | undefined,
           params.mode as string | undefined,
         );

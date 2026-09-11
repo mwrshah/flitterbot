@@ -29,6 +29,16 @@ export async function handleBrowserDirectoryCompletionsRoute(
   const requestedBaseCwd = url.searchParams.get("baseCwd");
   const directoriesOnly = url.searchParams.get("directoriesOnly") === "true";
   const baseCwd = await resolveBaseCwd(runtime, streamId, requestedBaseCwd);
+  return serveDirectoryCompletions(baseCwd, rawQuery, directoriesOnly, res, runtime);
+}
+
+export async function serveDirectoryCompletions(
+  baseCwd: string,
+  rawQuery: string,
+  directoriesOnly: boolean,
+  res: http.ServerResponse,
+  runtime: Pick<ControlSurfaceRuntime, "log">,
+): Promise<void> {
   const resolution = resolveRepoSearch(baseCwd, rawQuery);
   const isFuzzyQuery = !directoriesOnly && Boolean(resolution?.repoRoot && resolution.searchTerm);
   const directoryItems = await listDirectoryCompletionItems(

@@ -113,14 +113,22 @@ export async function handleBrowserPiSessionDiffRoute(
     return;
   }
 
+  return serveRepositoryDiff(ws.worktree_path, ws.base_branch ?? "main", response, runtime);
+}
+
+export async function serveRepositoryDiff(
+  cwd: string,
+  baseBranch: string,
+  response: http.ServerResponse,
+  runtime: Pick<ControlSurfaceRuntime, "log">,
+): Promise<void> {
   const execOpts = {
-    cwd: ws.worktree_path,
+    cwd,
     encoding: "utf8" as const,
     timeout: 10_000,
     maxBuffer: 5 * 1024 * 1024,
   };
 
-  const baseBranch = ws.base_branch ?? "main";
   let base: string;
   try {
     const { stdout: mergeBase } = await execFileAsync(

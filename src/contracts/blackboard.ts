@@ -1,4 +1,6 @@
-export const BLACKBOARD_SCHEMA_VERSION = 25;
+import { CLOUD_SCHEMA } from "../cloud/schema.ts";
+
+export const BLACKBOARD_SCHEMA_VERSION = 26;
 
 export type MessageMetadata = {
   router_action?: string;
@@ -189,7 +191,8 @@ export interface UserConfigRow {
   updated_at: string;
 }
 
-export const BLACKBOARD_SCHEMA_SQL = `
+export const BLACKBOARD_SCHEMA_SQL = `${CLOUD_SCHEMA}
+
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
 PRAGMA foreign_keys=ON;

@@ -6,6 +6,7 @@ import {
   endPiSession,
   reassociateOrphanedSessions,
   replaceDefaultPiSession,
+  touchPiEvent,
   updatePiSessionStatus,
   upsertPiSession,
 } from "../blackboard/pi-sessions.ts";
@@ -107,6 +108,7 @@ export class PiSessionManager {
   private readonly byPiSessionId = new Map<string, ManagedPiSession>();
   private readonly blackboard: BlackboardDatabase;
   private readonly configLoader: () => FlitterbotConfig;
+  private readonly remoteStreams: (streamId: string) => boolean;
   private readonly wsHub: WebSocketHub;
   private readonly runtimeInstanceId: string;
   private readonly startedAt: number;
@@ -123,9 +125,11 @@ export class PiSessionManager {
     processCallback: ProcessQueueItemCallback,
     log: (message: string) => void,
     configLoader: () => FlitterbotConfig = loadConfig,
+    remoteStreams: (streamId: string) => boolean = () => false,
   ) {
     this.blackboard = blackboard;
     this.configLoader = configLoader;
+    this.remoteStreams = remoteStreams;
     this.wsHub = wsHub;
     this.runtimeInstanceId = runtimeInstanceId;
     this.startedAt = startedAt;
@@ -148,6 +152,17 @@ export class PiSessionManager {
 
   getByPiSessionId(piSessionId: string): ManagedPiSession | undefined {
     return this.byPiSessionId.get(piSessionId);
+  }
+
+  releaseRemoteStream(streamId: string): void {
+    if (!this.remoteStreams(streamId))
+      throw new Error("Only remote stream handles can be released");
+    const managed = this.streamSessions.get(streamId);
+    if (!managed) return;
+    managed.unsubscribe();
+    this.streamSessions.delete(streamId);
+    this.byPiSessionId.delete(managed.piSessionId);
+    this.toolDisplayCache.deletePiSession(managed.piSessionId);
   }
 
   listStreamSessions(): ManagedPiSession[] {
@@ -827,18 +842,19 @@ export class PiSessionManager {
 
     this.attachQueue(managed, state, streamId);
 
-    upsertPiSession(this.blackboard, {
-      piSessionId,
-      role: "orchestrator",
-      status: "waiting_for_user",
-      runtimeInstanceId: this.runtimeInstanceId,
-      pid: process.pid,
-      sessionFile: sessionFile ?? undefined,
-      cwd: repoPath ?? this.config.projectsDir,
-      startedAt: createdAt,
-      lastEventAt: new Date().toISOString(),
-      streamId,
-    });
+    if (!this.remoteStreams(streamId) || !getStreamPiSessionRow(this.blackboard, streamId))
+      upsertPiSession(this.blackboard, {
+        piSessionId,
+        role: "orchestrator",
+        status: "waiting_for_user",
+        runtimeInstanceId: this.runtimeInstanceId,
+        pid: process.pid,
+        sessionFile: sessionFile ?? undefined,
+        cwd: repoPath ?? this.config.projectsDir,
+        startedAt: createdAt,
+        lastEventAt: new Date().toISOString(),
+        streamId,
+      });
 
     this.streamSessions.set(streamId, managed);
     this.byPiSessionId.set(piSessionId, managed);
@@ -865,6 +881,8 @@ export class PiSessionManager {
   ): Promise<void> {
     if (managed.runtime) return;
     if (!managed.streamId) throw new Error("Cannot activate pi session without a stream");
+    if (this.remoteStreams(managed.streamId))
+      throw new Error("Cloud stream operations must execute on its assigned VM");
     if (managed.role === "default") throw new Error("Default session is not stream-backed");
 
     managed.queue.freezeAdmission();
@@ -1188,7 +1206,9 @@ export class PiSessionManager {
   async disposeAll(): Promise<void> {
     await Promise.all(
       Array.from(this.streamSessions.entries()).map(([streamId, managed]) =>
-        this.shutdownStreamSession(streamId, managed.piSessionId),
+        this.remoteStreams(streamId)
+          ? managed.queue.stopAndWait()
+          : this.shutdownStreamSession(streamId, managed.piSessionId),
       ),
     );
 
@@ -1359,7 +1379,7 @@ export class PiSessionManager {
     const unsubscribeSession = subscribeToPiSession(
       session,
       state,
-      this.blackboard,
+      (piSessionId, timestamp) => touchPiEvent(this.blackboard, piSessionId, timestamp),
       this.wsHub,
       this.toolDisplayCache,
       managed.streamId,

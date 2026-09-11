@@ -1,7 +1,5 @@
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { touchPiEvent } from "../blackboard/pi-sessions.ts";
 import type {
   ChatTimelineMessage,
   ChatTimelineMessageBlock,
@@ -130,9 +128,9 @@ type PiSessionLifecycleCallbacks = {
 export function subscribeToPiSession(
   session: AgentSession,
   state: PiSessionState,
-  blackboard: BlackboardDatabase,
+  touchEvent: (piSessionId: string, timestamp: string) => void,
   wsHub: WebSocketHub,
-  toolDisplayCache: ToolDisplayContextCache,
+  toolDisplayCache: Pick<ToolDisplayContextCache, "displayArgsForTool">,
   sessionStreamId?: string | null,
   sessionStreamName?: string | null,
   lifecycle: PiSessionLifecycleCallbacks = {},
@@ -468,11 +466,11 @@ export function subscribeToPiSession(
         break;
       }
       case "turn_start":
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchEvent(session.sessionId, now);
         console.log("streams-subscribe: %s (sessionId=%s)", event.type, session.sessionId);
         break;
       case "turn_end": {
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchEvent(session.sessionId, now);
         currentStreamingMessageId = null;
 
         wsHub.broadcast({
@@ -483,7 +481,7 @@ export function subscribeToPiSession(
         break;
       }
       case "agent_start":
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchEvent(session.sessionId, now);
         lastAssistantMessage = null;
         messageEndFired = false;
         wsHub.broadcast({
@@ -493,7 +491,7 @@ export function subscribeToPiSession(
         });
         break;
       case "agent_end": {
-        touchPiEvent(blackboard, session.sessionId, now, "active");
+        touchEvent(session.sessionId, now);
         wsHub.broadcast({
           type: "agent_end",
           piSessionId: session.sessionId,

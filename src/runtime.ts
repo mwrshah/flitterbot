@@ -39,7 +39,11 @@ import {
   setStreamName,
   setStreamType,
 } from "./blackboard/query-streams.ts";
-import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
+import {
+  createQueryBlackboardTool,
+  executeBlackboardQuery,
+} from "./blackboard/tool-query-blackboard.ts";
+import { assertControllerHost, CloudControl } from "./cloud/control.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
@@ -108,6 +112,7 @@ const ACCEPTED_HOOK_EVENTS = new Set(["session-start", "stop", "session-end"]);
 
 export class ControlSurfaceRuntime {
   readonly blackboard: BlackboardDatabase;
+  readonly cloud: CloudControl | null;
   readonly runtimeInstanceId = crypto.randomUUID();
   readonly startedAt = Date.now();
   readonly wsHub: WebSocketHub;
@@ -134,6 +139,10 @@ export class ControlSurfaceRuntime {
 
   constructor() {
     const config = loadConfig();
+    const cloudEnabled =
+      process.argv.includes("--cloud") ||
+      fs.existsSync(path.join(config.controlSurfaceDir, "cloud-controller-host"));
+    if (cloudEnabled) assertControllerHost(config.controlSurfaceDir);
     if (!config.whatsappEnabled) {
       this.whatsappStatusCache = { status: "disabled", managedByControlSurface: true };
     }
@@ -146,8 +155,11 @@ export class ControlSurfaceRuntime {
       this.startedAt,
       this.processQueueItem.bind(this),
       this.log.bind(this),
+      loadConfig,
+      (streamId) => this.cloud?.owns(streamId) ?? false,
     );
     this.providerAuth = new ProviderAuthManager(() => this.resolveModelRuntime());
+    this.cloud = cloudEnabled ? new CloudControl(this) : null;
   }
 
   get config(): FlitterbotConfig {
@@ -171,6 +183,7 @@ export class ControlSurfaceRuntime {
       allowModelNetwork: true,
     });
 
+    await this.cloud?.reconcile();
     this.sessionManager.reconcileAllStreamSessionFiles();
 
     const defaultUser = loadWhatsAppConfig().defaultUser;
@@ -255,6 +268,7 @@ export class ControlSurfaceRuntime {
     this.unwatchWhatsAppStatusSignal();
     this.providerAuth.stop();
     await this.sessionManager.disposeAll();
+    await this.cloud?.dispose();
     try {
       await this.stopWhatsAppDaemon();
       await this.refreshWhatsAppStatus();
@@ -861,7 +875,11 @@ export class ControlSurfaceRuntime {
         streamId: o.streamId!,
         streamName: o.streamName,
         messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
-        busy: o.runtime?.session.isStreaming ?? false,
+        busy:
+          o.runtime?.session.isStreaming ??
+          (o.streamId && this.cloud?.owns(o.streamId)
+            ? getStreamPiSessionRow(this.blackboard, o.streamId)?.status === "active"
+            : false),
         isCompacting: o.runtime?.session?.isCompacting ?? false,
       };
     });
@@ -995,6 +1013,16 @@ export class ControlSurfaceRuntime {
   async closeSwimlaneNoop(
     streamId: string,
   ): Promise<{ ok: true; streamId: string; message: string }> {
+    if (this.cloud?.owns(streamId)) {
+      await this.sessionManager.getByStream(streamId)?.queue.stopAndWait();
+      await this.cloud.close(streamId);
+      this.sessionManager.releaseRemoteStream(streamId);
+      return {
+        ok: true,
+        streamId,
+        message: "Final checkpoint published; cloud VM removed and stream archived.",
+      };
+    }
     const piSessionId = this.sessionManager.getExpectedPiSessionId(streamId);
     if (!piSessionId) {
       throw new Error(`No pi session found for stream ${streamId}`);
@@ -1133,6 +1161,11 @@ export class ControlSurfaceRuntime {
     steered = false,
     onAccepted?: () => void,
   ): Promise<void> {
+    if (managed.streamId && this.cloud?.owns(managed.streamId)) {
+      await this.cloud.deliver(managed.streamId, item);
+      onAccepted?.();
+      return;
+    }
     if (steered) return this.steerQueueItem(managed, item);
 
     await this.sessionReloads.get(managed.piSessionId);
@@ -1331,20 +1364,22 @@ export class ControlSurfaceRuntime {
 
     try {
       const managed =
-        opts.type === "defaultStream"
-          ? await this.sessionManager.createDefaultStream(
-              ws.id,
-              ws.name,
-              opts.cwd,
-              this.createCustomTools("default", ws.id),
-            )
-          : await this.sessionManager.createOrchestrator(
-              ws.id,
-              ws.name,
-              opts.cwd,
-              this.createCustomTools("orchestrator", ws.id),
-              opts.resumeSessionFile,
-            );
+        this.cloud && opts.type !== "defaultStream"
+          ? this.cloud.createSession(ws.id, ws.name, opts.cwd, opts.resumeSessionFile)
+          : opts.type === "defaultStream"
+            ? await this.sessionManager.createDefaultStream(
+                ws.id,
+                ws.name,
+                opts.cwd,
+                this.createCustomTools("default", ws.id),
+              )
+            : await this.sessionManager.createOrchestrator(
+                ws.id,
+                ws.name,
+                opts.cwd,
+                this.createCustomTools("orchestrator", ws.id),
+                opts.resumeSessionFile,
+              );
       this.wsHub.broadcast({
         type: "streams_changed",
         reason: "created",
@@ -1501,7 +1536,7 @@ export class ControlSurfaceRuntime {
       expectedPiSessionId: this.sessionManager.getExpectedPiSessionId(streamId),
     });
 
-    if (shouldReconcileWorktreeOnRecovery(ws.status)) {
+    if (!this.cloud?.owns(streamId) && shouldReconcileWorktreeOnRecovery(ws.status)) {
       const reconciled = clearWorktreePathIfStale(this.blackboard, ws);
       if (reconciled.cleared) {
         this.log(
@@ -1946,7 +1981,9 @@ export class ControlSurfaceRuntime {
     role: "orchestrator" | "default" = "default",
     streamId?: string,
   ): FlitterbotTool[] {
-    const tools: FlitterbotTool[] = [createQueryBlackboardTool(this.blackboard)];
+    const tools: FlitterbotTool[] = [
+      createQueryBlackboardTool((sql, mode) => executeBlackboardQuery(this.blackboard, sql, mode)),
+    ];
 
     if (role === "default") {
       tools.push({
