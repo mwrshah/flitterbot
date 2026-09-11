@@ -1,6 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { Monitor, Moon, Sun, X } from "lucide-react";
-import { memo } from "react";
+import { Eye, EyeOff, Monitor, Moon, Sun, X } from "lucide-react";
+import { memo, useState } from "react";
 import { AuthProvidersSection } from "@/components/auth-providers-section";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
   const settings = useSettings(settingsStore);
   const updateSettings = settingsStore.set;
   const { theme, setTheme } = useTheme();
+  const [showToken, setShowToken] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -100,13 +101,29 @@ export const SettingsDrawer = memo(function SettingsDrawer({
               <label htmlFor="settings-bearer-token" className="text-xs text-text-muted">
                 Bearer token
               </label>
-              <Input
-                id="settings-bearer-token"
-                type="password"
-                value={settings.token}
-                onChange={(e) => updateSettings({ token: e.target.value })}
-                placeholder="controlSurfaceToken"
-              />
+              <div className="relative">
+                <Input
+                  id="settings-bearer-token"
+                  type={showToken ? "text" : "password"}
+                  value={settings.token}
+                  onChange={(e) => updateSettings({ token: e.target.value })}
+                  placeholder="controlSurfaceToken"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken((visible) => !visible)}
+                  aria-label={showToken ? "Hide bearer token" : "Show bearer token"}
+                  aria-pressed={showToken}
+                  className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-lg text-text-muted outline-none hover:text-text focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-pop"
+                >
+                  {showToken ? (
+                    <EyeOff className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="size-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
             <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-muted">
               <input

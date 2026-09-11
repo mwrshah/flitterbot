@@ -586,6 +586,7 @@ async function bootstrapConfig() {
     whatsappDaemonPath: "~/.flitterbot/whatsapp/daemon.js",
     whatsappEnabled: true,
     wipeStreamsOnStart: false,
+    shortcuts: {},
     claudeCliCommand: "claude --dangerously-skip-permissions",
     projectsDir: "~/development",
     defaultAgentFirstMessage: DEFAULT_AGENT_FIRST_MESSAGE,
