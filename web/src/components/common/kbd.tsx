@@ -1,12 +1,8 @@
 import { cn } from "cn";
 import type { HTMLAttributes } from "react";
 
-type KbdSize = "default" | "compact";
-
-const sizeStyles: Record<KbdSize, string> = {
-  default: "h-5 min-w-5 px-1.5 text-[10px]",
-  compact: "h-4 min-w-4 px-1 text-[9px]",
-};
+const keycapClassName =
+  "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border border-border-muted bg-background-muted px-1 font-mono text-[9px] font-medium leading-none text-text-muted";
 
 export function ShortcutHint({
   label,
@@ -16,7 +12,6 @@ export function ShortcutHint({
   actionOnHover = false,
   actionKeycap = false,
   className,
-  kbdSize = "default",
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
@@ -25,7 +20,6 @@ export function ShortcutHint({
   actionActive?: boolean;
   actionOnHover?: boolean;
   actionKeycap?: boolean;
-  kbdSize?: KbdSize;
 }) {
   const steps: string[] = [];
   for (const step of label.split(/\s+then\s+/i)) {
@@ -33,10 +27,6 @@ export function ShortcutHint({
     if (trimmed) steps.push(trimmed);
   }
   const showAction = Boolean(actionText);
-  const keycapClassName = cn(
-    "inline-flex shrink-0 items-center justify-center rounded-[4px] border border-border-muted bg-background-muted font-mono font-medium leading-none text-text-muted",
-    sizeStyles[kbdSize],
-  );
 
   return (
     <span
@@ -63,7 +53,7 @@ export function ShortcutHint({
                     collapseModifiers &&
                       steps.length === 1 &&
                       keyIndex < keys.length - 1 &&
-                      "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-hover/shortcut-hint:opacity-100 group-focus-within/shortcut-hint:opacity-100",
+                      "hidden group-hover:inline-flex group-focus-visible:inline-flex group-hover/shortcut-hint:inline-flex group-focus-within/shortcut-hint:inline-flex",
                   )}
                 >
                   {key}

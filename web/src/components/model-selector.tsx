@@ -370,7 +370,6 @@ export const ModelSelector = memo(function ModelSelector({
                   <ShortcutHint
                     label={modelSearchShortcutHint}
                     className="pointer-events-none absolute top-1 right-4 bottom-0 shrink-0"
-                    kbdSize="compact"
                     aria-hidden="true"
                   />
                 )}

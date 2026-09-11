@@ -71,6 +71,14 @@ function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.streamName ?? "no swimlane";
 }
 
+function CopyShortcutHint({ label, copied }: { label: string | undefined; copied: boolean }) {
+  if (!label) {
+    return copied ? <span className="text-text-muted text-[10px]">Copied!</span> : null;
+  }
+
+  return <ShortcutHint label={label} actionText="Copied!" actionActive={copied} />;
+}
+
 function ActiveSessionTmuxCopy({
   tmuxSession,
   bindShortcut,
@@ -90,11 +98,7 @@ function ActiveSessionTmuxCopy({
   return (
     <>
       <CopyableCode text={command} copied={tmuxCopy.copied} onCopy={copy} />
-      {tmuxCopy.copied ? (
-        <span className="text-text-muted text-[10px]">Copied!</span>
-      ) : (
-        shortcutLabel && <ShortcutHint label={shortcutLabel} />
-      )}
+      <CopyShortcutHint label={shortcutLabel} copied={tmuxCopy.copied} />
     </>
   );
 }
@@ -294,9 +298,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
             className="text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
           >
             Info
-            {infoShortcutLabel && (
-              <ShortcutHint label={infoShortcutLabel} className="ml-1" kbdSize="compact" />
-            )}
+            {infoShortcutLabel && <ShortcutHint label={infoShortcutLabel} className="ml-1" />}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="diff"
@@ -315,7 +317,6 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                 actionOnHover={showDiff}
                 actionKeycap
                 className="ml-1"
-                kbdSize="compact"
               />
             )}
           </ToggleGroupItem>
@@ -446,11 +447,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                       onCopy={() => repoCopy.copy(`${currentRepoPath}/`)}
                     />
                   )}
-                  {repoCopy.copied ? (
-                    <span className="text-text-muted text-[10px]">Copied!</span>
-                  ) : (
-                    repoShortcutLabel && <ShortcutHint label={repoShortcutLabel} />
-                  )}
+                  <CopyShortcutHint label={repoShortcutLabel} copied={repoCopy.copied} />
                 </span>
                 <span className="pl-2 truncate text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Branch:{" "}
@@ -459,11 +456,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                     copied={branchCopy.copied}
                     onCopy={() => currentBranch && branchCopy.copy(currentBranch)}
                   />
-                  {branchCopy.copied ? (
-                    <span className="text-text-muted text-[10px]">Copied!</span>
-                  ) : (
-                    branchShortcutLabel && <ShortcutHint label={branchShortcutLabel} />
-                  )}
+                  <CopyShortcutHint label={branchShortcutLabel} copied={branchCopy.copied} />
                 </span>
                 <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Merge Target:{" "}
@@ -472,11 +465,10 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                     copied={baseBranchCopy.copied}
                     onCopy={() => targetBranch && baseBranchCopy.copy(targetBranch)}
                   />
-                  {baseBranchCopy.copied ? (
-                    <span className="text-text-muted text-[10px]">Copied!</span>
-                  ) : (
-                    targetBranchShortcutLabel && <ShortcutHint label={targetBranchShortcutLabel} />
-                  )}
+                  <CopyShortcutHint
+                    label={targetBranchShortcutLabel}
+                    copied={baseBranchCopy.copied}
+                  />
                 </span>
                 <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
                   Worktree:{" "}
@@ -492,11 +484,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                       currentWorktreePath && worktreeCopy.copy(`${currentWorktreePath}/`)
                     }
                   />
-                  {worktreeCopy.copied ? (
-                    <span className="text-text-muted text-[10px]">Copied!</span>
-                  ) : (
-                    worktreeShortcutLabel && <ShortcutHint label={worktreeShortcutLabel} />
-                  )}
+                  <CopyShortcutHint label={worktreeShortcutLabel} copied={worktreeCopy.copied} />
                 </span>
               </div>
             </div>

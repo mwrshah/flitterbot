@@ -1,7 +1,7 @@
 /**
  * DOM-independent shortcut registry. Native keyboard events satisfy its structural event type.
  * Code and character bindings diverge across layouts, so matching keeps both paths alive.
- * Prefix mode closes the entire buffer on inactivity; an invalid tail suppresses all matches.
+ * Complete leaves execute immediately; prefixes wait for inactivity and invalid tails suppress matches.
  * Ownership changes cancel pending input; callback errors never promote a fallback owner.
  * See docs/shortcuts/FEATURE.md for the public contracts and lifecycle rules.
  */
@@ -617,7 +617,6 @@ export function createShortcutRegistry(options: {
   function resolvesNow(nodes: readonly ShortcutTrieNode[]) {
     for (const node of nodes) {
       if (node.next.size > 0) return false;
-      if (allowPrefixes && node.depth > 1) return false;
     }
     return nodes.some((node) => node.binding !== null);
   }

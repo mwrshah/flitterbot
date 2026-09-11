@@ -202,12 +202,13 @@ test("prefix-free sequences finish at the leaf; held keys do not advance them", 
   assert.equal(runs, 1);
 });
 
-test("prefix mode closes the entire buffer on inactivity, never a shorter match or suffix", (t) => {
+test("prefix mode executes leaves immediately and waits only for ambiguous or unfinished sequences", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const catalog: ShortcutCatalog = {
     short: { bindings: [{ keys: "t a", input: "ignore" }], owners: ["app"] },
     long: { bindings: [{ keys: "t a a", input: "ignore" }], owners: ["app"] },
     tail: { bindings: [{ keys: "b", input: "ignore" }], owners: ["app"] },
+    leaf: { bindings: [{ keys: "c d", input: "ignore" }], owners: ["app"] },
   };
   const registry = createShortcutRegistry({ catalog, allowPrefixes: true, sequenceTimeoutMs: 300 });
   t.after(() => registry.dispose());
@@ -225,22 +226,25 @@ test("prefix mode closes the entire buffer on inactivity, never a shorter match 
       ]),
     ),
   );
-  for (const [input, expected] of [
-    ["ta", ["short"]],
-    ["taa", ["long"]],
-    ["taab", []],
-    ["taxa", []],
+  for (const [input, immediate, afterTimeout] of [
+    ["c", [], []],
+    ["cd", ["leaf"], ["leaf"]],
+    ["t", [], []],
+    ["ta", [], ["short"]],
+    ["taa", ["long"], ["long"]],
+    ["taab", ["long", "tail"], ["long", "tail"]],
+    ["taxab", [], []],
   ] as const) {
     calls.length = 0;
-    for (const character of input) {
+    for (const [index, character] of [...input].entries()) {
       registry.handleKeyDown(key(character));
+      if (index === input.length - 1) assert.deepEqual(calls, immediate);
       t.mock.timers.tick(200);
-      assert.deepEqual(calls, []);
     }
     t.mock.timers.tick(99);
-    assert.deepEqual(calls, []);
+    assert.deepEqual(calls, immediate);
     t.mock.timers.tick(1);
-    assert.deepEqual(calls, expected);
+    assert.deepEqual(calls, afterTimeout);
   }
   registry.handleKeyDown(key("t"));
   registry.handleKeyDown(key("a"));

@@ -4,7 +4,7 @@
 
 Shortcuts dispatch browser-page actions, not OS-global hotkeys. A shared static catalog defines each action's default bindings (each with its own input rule), repeat behavior, and handler owners in fallback order. Components supply implementations through one React registration hook. Registration order and numeric priorities do not affect dispatch.
 
-The registry rejects complete-binding prefixes by default. `allowPrefixes: true` enables exact sequence matching on inactivity-timeout closure. This is a registry policy, not a parser limitation. Flitterbot explicitly opts in to preserve its existing `t a` and `t a a` tmux bindings without terminators. Its sequence timeout is 750 ms.
+The registry rejects complete-binding prefixes by default. `allowPrefixes: true` permits complete bindings that also prefix longer bindings. Those matches wait for inactivity-timeout closure; complete leaves execute immediately. This is a registry policy, not a parser limitation. Flitterbot explicitly opts in to preserve its existing `t a` and `t a a` tmux bindings without terminators. Its sequence timeout is 750 ms.
 
 ## Pseudocode contracts and call graph
 
@@ -128,15 +128,18 @@ Alt+R + Alt+R   rejected duplicate gesture
 
 A complete binding executes immediately. The timeout only discards unfinished sequences.
 
-With `allowPrefixes: true`, sequences close after inactivity:
+With `allowPrefixes: true`, complete leaves execute immediately; sequences with possible continuations wait for inactivity:
 
 ```text
-input: t a       closure: execute exactly t a
-input: t a a     closure: execute exactly t a a
-input: t a a b   closure: execute t a a b only if it exists; otherwise nothing
+input: c         wait for a continuation; discard on timeout
+input: c d       execute immediately; no longer binding extends c d
+input: t a       wait; execute exactly t a on timeout
+input: t a a     execute immediately; no longer binding extends t a a
+input: t a a b   execute t a a immediately; b starts a new gesture
+input: t a x    invalid continuation; discard on timeout without executing t a
 ```
 
-There is no eager sequence-leaf execution, shorter-prefix fallback, suffix restart, or terminator. Each collected key restarts the timeout. A bare single-key binding that prefixes a longer binding waits for closure too. Ordinary unambiguous modifier combinations remain immediate.
+The compiled trie determines whether a sequence can continue; no maximum-depth setting is needed. Each collected key restarts the timeout unless it completes a leaf, which clears pending state and cancels the timer. An invalid continuation suppresses the pending sequence; there is no shorter-prefix fallback, suffix restart, or terminator. A bare single-key binding that prefixes a longer binding waits for closure too. Ordinary unambiguous modifier combinations remain immediate.
 
 Sequence repeats do not advance progress. Modifier-only events neither advance nor terminate a sequence. Focus changes, window blur, teardown, or effective configuration changes cancel pending work. Delayed execution rechecks handler eligibility rather than calling an unmounted or disabled owner. Events that must be consumed are prevented when received, not retroactively at timeout.
 
