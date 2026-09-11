@@ -11,7 +11,7 @@ import {
 import { conversationState } from "@/lib/conversation-state";
 import { streamingUiDebug } from "@/lib/debug-log";
 import { surfaceTimelineInfiniteQueryOptions } from "@/lib/queries";
-import type { ChatTimelineMessage, StatusQueryData } from "@/lib/types";
+import type { ChatTimelineMessage, StatusResponse } from "@/lib/types";
 import type { FlitterbotWsClient } from "@/lib/ws";
 import type { ConversationEventPosition } from "../../../src/contracts/websocket.ts";
 
@@ -68,7 +68,7 @@ export function setupWsQueryBridge(deps: {
     if (message.type === "compaction_start" || message.type === "compaction_end") {
       const isCompacting = message.type === "compaction_start";
       void queryClient.invalidateQueries({ queryKey: ["status"] });
-      queryClient.setQueryData<StatusQueryData>(["status"], (status) => {
+      queryClient.setQueryData<StatusResponse>(["status"], (status) => {
         if (!status?.piAgent) return status;
         if (!message.piSessionId) return status;
         return {

@@ -26,12 +26,8 @@ import {
 } from "@/components/ui/command";
 import { useModifierLabel } from "@/hooks/platform";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
-import {
-  registerShortcutHandlers,
-  SHORTCUT_ACTIONS,
-  useShortcutBindingLabel,
-} from "@/lib/global-shortcuts";
 import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
+import { useShortcutBindingLabel, useShortcuts } from "@/lib/shortcuts";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
 
@@ -199,6 +195,7 @@ export const ModelSelector = memo(function ModelSelector({
   const firstModel = all[0];
   const initialCommandModel = currentModel ?? firstModel;
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.key === "Process") return;
     if (handleTextInputKeyDown(event)) return;
     if (
       (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
@@ -249,18 +246,16 @@ export const ModelSelector = memo(function ModelSelector({
     },
     [pinMutation.mutate],
   );
+  const canOpenModelSearch =
+    !disabled && Boolean(piSessionId) && (catalogPinned.length > 0 || catalogAll.length > 0);
   const openModelSearch = useCallback(() => {
-    if (disabled || !piSessionId || (catalogPinned.length === 0 && catalogAll.length === 0)) {
-      return false;
-    }
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     } else {
       setOpen(true);
     }
-    return true;
-  }, [catalogAll.length, catalogPinned.length, disabled, piSessionId]);
-  const modelSearchShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.modelSearch, {
+  }, []);
+  const modelSearchShortcutHint = useShortcutBindingLabel("model.search", {
     altLabel: modifierLabel,
   });
   const searchPlaceholder = modelSearchShortcutHint
@@ -287,21 +282,21 @@ export const ModelSelector = memo(function ModelSelector({
     thinkingDisabled,
     initialCommandValue: initialCommandModel ? modelCommandValue(initialCommandModel) : undefined,
   });
-  useEffect(
-    () =>
-      registerShortcutHandlers([
-        { actionId: SHORTCUT_ACTIONS.modelSearch, handler: openModelSearch },
-        {
-          actionId: SHORTCUT_ACTIONS.swimlaneSearch,
-          priority: 1,
-          handler: () => {
-            if (open) handleOpenChange(false);
-            return false;
-          },
-        },
-      ]),
-    [handleOpenChange, open, openModelSearch],
-  );
+  useShortcuts("model-selector", {
+    "model.search": { enabled: canOpenModelSearch, run: openModelSearch },
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnSidebarFocus = (event: globalThis.FocusEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("[data-sidebar-interaction]")) {
+        handleOpenChange(false);
+      }
+    };
+    document.addEventListener("focusin", closeOnSidebarFocus);
+    return () => document.removeEventListener("focusin", closeOnSidebarFocus);
+  }, [handleOpenChange, open]);
 
   if (catalogPinned.length === 0 && catalogAll.length === 0) {
     return null;

@@ -4,55 +4,27 @@ import type { HTMLAttributes } from "react";
 type KbdSize = "default" | "compact";
 
 const sizeStyles: Record<KbdSize, string> = {
-  default: "h-5 min-w-5 rounded-md px-1.5 text-[10px]",
-  compact: "h-4 min-w-4 rounded px-1 text-[9px]",
+  default: "h-5 min-w-5 px-1.5 text-[10px]",
+  compact: "h-4 min-w-4 px-1 text-[9px]",
 };
-
-type KbdProps = HTMLAttributes<HTMLElement> & {
-  size?: KbdSize;
-};
-
-function Kbd({ className, size = "default", children, ...props }: KbdProps) {
-  return (
-    <kbd
-      className={cn(
-        "inline-flex items-center justify-center border border-border-muted bg-background-muted font-mono font-medium leading-none text-text-muted",
-        sizeStyles[size],
-        className,
-      )}
-      {...props}
-    >
-      <span className="translate-y-px">{children}</span>
-    </kbd>
-  );
-}
-
-function KbdGroup({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return (
-    <span
-      className={cn("inline-flex items-center gap-0.5 whitespace-nowrap align-middle", className)}
-      {...props}
-    />
-  );
-}
 
 export function ShortcutHint({
   label,
+  collapseModifiers = false,
   actionText,
   actionActive = false,
   actionOnHover = false,
   actionKeycap = false,
   className,
-  kbdClassName,
   kbdSize = "default",
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
+  collapseModifiers?: boolean;
   actionText?: string;
   actionActive?: boolean;
   actionOnHover?: boolean;
   actionKeycap?: boolean;
-  kbdClassName?: string;
   kbdSize?: KbdSize;
 }) {
   const steps: string[] = [];
@@ -61,9 +33,16 @@ export function ShortcutHint({
     if (trimmed) steps.push(trimmed);
   }
   const showAction = Boolean(actionText);
+  const keycapClassName = cn(
+    "inline-flex shrink-0 items-center justify-center rounded-[4px] border border-border-muted bg-background-muted font-mono font-medium leading-none text-text-muted",
+    sizeStyles[kbdSize],
+  );
 
   return (
-    <span className={cn("inline-grid items-center whitespace-nowrap", className)} {...props}>
+    <span
+      className={cn("group/shortcut-hint inline-grid items-center whitespace-nowrap", className)}
+      {...props}
+    >
       <span
         className={cn(
           "col-start-1 row-start-1 inline-flex items-center gap-1",
@@ -75,32 +54,36 @@ export function ShortcutHint({
         {steps.map((step, index) => (
           <span key={step} className="inline-flex items-center gap-1">
             {index > 0 && <span className="text-[10px] text-text-muted">then</span>}
-            <KbdGroup>
-              {step.split("+").map((key) => (
-                <Kbd key={key} size={kbdSize} className={kbdClassName}>
+            <span className="inline-flex items-center gap-0.5">
+              {step.split("+").map((key, keyIndex, keys) => (
+                <kbd
+                  key={key}
+                  className={cn(
+                    keycapClassName,
+                    collapseModifiers &&
+                      steps.length === 1 &&
+                      keyIndex < keys.length - 1 &&
+                      "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-hover/shortcut-hint:opacity-100 group-focus-within/shortcut-hint:opacity-100",
+                  )}
+                >
                   {key}
-                </Kbd>
+                </kbd>
               ))}
-            </KbdGroup>
+            </span>
           </span>
         ))}
       </span>
       {showAction && (
         <span
           className={cn(
-            "col-start-1 row-start-1 inline-flex items-center text-[10px] text-text-muted",
+            "col-start-1 row-start-1 inline-flex items-center justify-self-start text-[10px] leading-none text-text-muted",
+            actionKeycap && keycapClassName,
             !actionActive && "invisible pointer-events-none",
             actionOnHover && "group-hover:visible group-focus-visible:visible",
           )}
           aria-hidden={actionOnHover || !actionActive}
         >
-          {actionKeycap ? (
-            <Kbd size={kbdSize} className={kbdClassName}>
-              {actionText}
-            </Kbd>
-          ) : (
-            actionText
-          )}
+          {actionText}
         </span>
       )}
     </span>

@@ -4,8 +4,10 @@ import { getBestStreamPiSessionId } from "@/lib/stream-route-targets";
 
 export const Route = createFileRoute("/streams/")({
   loader: async ({ context }) => {
-    const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    const piSessionId = getBestStreamPiSessionId(status);
+    const status = await context.queryClient
+      .ensureQueryData(statusQueryOptions(context.apiClient))
+      .catch(() => undefined);
+    const piSessionId = status && getBestStreamPiSessionId(status);
 
     if (piSessionId) {
       throw redirect({ to: "/streams/$piSessionId", params: { piSessionId } });

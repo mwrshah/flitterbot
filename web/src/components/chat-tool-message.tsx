@@ -462,10 +462,17 @@ function PreparedLaunchCard({
               }
             }}
             onKeyDown={(event) => {
+              if (
+                event.defaultPrevented ||
+                event.nativeEvent.isComposing ||
+                event.key === "Process"
+              )
+                return;
               if (completionController.handleKeyDown(event)) return;
               if (handleTextInputKeyDown(event)) return;
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              if (event.key !== "Enter" || event.shiftKey) return;
               event.preventDefault();
+              event.stopPropagation();
               if (!create.isPending && !state.launched) event.currentTarget.form?.requestSubmit();
             }}
             spellCheck={false}

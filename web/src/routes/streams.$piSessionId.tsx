@@ -28,8 +28,10 @@ export const Route = createFileRoute("/streams/$piSessionId")({
     wsMode: "pi-session",
   },
   loader: async ({ params, context }) => {
-    const status = await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
-    if (!isKnownStreamPiSession(status, params.piSessionId)) {
+    const status = await context.queryClient
+      .ensureQueryData(statusQueryOptions(context.apiClient))
+      .catch(() => undefined);
+    if (status && !isKnownStreamPiSession(status, params.piSessionId)) {
       await new Promise((resolve) => setTimeout(resolve, 200));
       throw redirect({ to: "/streams/default" });
     }

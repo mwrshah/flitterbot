@@ -572,6 +572,8 @@ export function useTextareaCompletions({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.defaultPrevented || event.nativeEvent.isComposing || event.key === "Process")
+        return false;
       if (event.key === "Escape") {
         if (!closeActivePicker()) return false;
         event.preventDefault();
@@ -579,34 +581,30 @@ export function useTextareaCompletions({
         return true;
       }
 
-      if (event.key === "Enter" && event.shiftKey && closeActivePicker()) return true;
+      if (event.key === "Enter" && event.shiftKey && closeActivePicker()) {
+        event.stopPropagation();
+        return true;
+      }
 
-      const navigationKeys = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"];
-      if (
-        skillPickerVisible &&
-        slashPositionRef.current >= 0 &&
-        navigationKeys.includes(event.key)
-      ) {
-        event.preventDefault();
-        skillCommandRef.current?.dispatchEvent(
-          new globalThis.KeyboardEvent("keydown", {
-            key: event.key === "Tab" ? "Enter" : event.key,
-            bubbles: true,
-          }),
-        );
-        return true;
-      }
-      if (pathPickerVisible && atPositionRef.current >= 0 && navigationKeys.includes(event.key)) {
-        event.preventDefault();
-        pathCommandRef.current?.dispatchEvent(
-          new globalThis.KeyboardEvent("keydown", {
-            key: event.key === "Tab" ? "Enter" : event.key,
-            bubbles: true,
-          }),
-        );
-        return true;
-      }
-      return false;
+      if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Home", "End"].includes(event.key))
+        return false;
+      const command =
+        skillPickerVisible && slashPositionRef.current >= 0
+          ? skillCommandRef.current
+          : pathPickerVisible && atPositionRef.current >= 0
+            ? pathCommandRef.current
+            : null;
+      if (!command) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      command.dispatchEvent(
+        new globalThis.KeyboardEvent("keydown", {
+          key: event.key === "Tab" ? "Enter" : event.key,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      return true;
     },
     [closeActivePicker, pathPickerVisible, skillPickerVisible],
   );

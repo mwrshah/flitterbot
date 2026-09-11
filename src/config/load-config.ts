@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ShortcutBindingsConfig } from "../contracts/control-surface-api.ts";
+import { SHORTCUT_CATALOG, SHORTCUT_OPTIONS } from "../shortcuts/catalog.ts";
+import { compileShortcutBindings } from "../shortcuts/registry.ts";
 
 export const THINKING_LEVELS = [
   "off",
@@ -245,6 +247,25 @@ function requireConfigObject<T extends Record<string, unknown>>(
   throw new Error(`Missing required object config key: ${String(key)}`);
 }
 
+let validatedShortcuts: { source: string; bindings: ShortcutBindingsConfig } | undefined;
+
+function requireShortcutBindings(raw: RawConfigJson): ShortcutBindingsConfig {
+  const value = requireConfigObject(raw, "shortcuts");
+  const source = JSON.stringify(value);
+  if (validatedShortcuts?.source === source) return validatedShortcuts.bindings;
+  try {
+    compileShortcutBindings(SHORTCUT_CATALOG, value, SHORTCUT_OPTIONS);
+  } catch (error) {
+    throw new Error(
+      `Invalid shortcuts in ${CONFIG_PATH}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  const bindings = value as ShortcutBindingsConfig;
+  validatedShortcuts = { source, bindings };
+  return bindings;
+}
+
 function requireThinkingLevel(raw: RawConfigJson): ModelThinkingLevel {
   const value = raw.defaultThinkingLevel;
   if (isThinkingLevel(value)) return value;
@@ -379,7 +400,7 @@ export function loadConfig(): FlitterbotConfig {
     projectsDir: expandHome(requireConfigString(raw, "projectsDir")),
     wipeStreamsOnStart: requireConfigBoolean(raw, "wipeStreamsOnStart"),
     whatsappEnabled: requireConfigBoolean(raw, "whatsappEnabled"),
-    shortcuts: requireConfigObject<ShortcutBindingsConfig>(raw, "shortcuts"),
+    shortcuts: requireShortcutBindings(raw),
     defaultAgentFirstMessage: requireConfigString(raw, "defaultAgentFirstMessage"),
     tmuxBootstrapMessage: optionalConfigString(raw, "tmuxBootstrapMessage"),
     flitterbotSkillsDir: path.join(FLITTERBOT_DIR, "skills"),

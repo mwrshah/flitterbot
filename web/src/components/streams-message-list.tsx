@@ -76,7 +76,7 @@ function isUserMessageVisible(
 
 export type StreamsMessageListHandle = {
   scrollToEnd(): void;
-  navigateToLatestUserMessage(): boolean;
+  navigateToLatestUserMessage(): void;
 };
 
 type StreamsMessageListProps = {
@@ -453,9 +453,8 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       },
       navigateToLatestUserMessage() {
         const messageId = userMessageIndex.at(-1);
-        if (!messageId) return false;
+        if (!messageId) return;
         selectUserMessage(messageId);
-        return true;
       },
     }),
     [markerNavigation, selectUserMessage, userMessageIndex, virtualizer],

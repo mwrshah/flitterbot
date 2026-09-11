@@ -1,4 +1,4 @@
-import type { SkillListItem, StatusResponse } from "../../../src/contracts/control-surface-api.ts";
+import type { SkillListItem } from "../../../src/contracts/control-surface-api.ts";
 
 export type { PiSessionStatus } from "../../../src/contracts/blackboard.ts";
 export type {
@@ -46,25 +46,6 @@ export type {
 } from "../../../src/contracts/websocket.ts";
 
 export type ConnectionState = "connected" | "connecting" | "reconnecting" | "stub" | "disconnected";
-
-export type OfflineStatus = {
-  source: "offline";
-  ok?: never;
-  pid?: never;
-  uptime: 0;
-  piAgent?: never;
-  blackboard: "";
-  whatsapp: {
-    status: "disconnected";
-    pid?: never;
-    managedByControlSurface?: never;
-    requiresManualAuth?: never;
-  };
-  streams: [];
-  shortcuts: Record<never, never>;
-};
-
-export type StatusQueryData = StatusResponse | OfflineStatus;
 
 export type SkillPickerItem = SkillListItem & {
   kind?: "skill" | "command";

@@ -27,7 +27,7 @@ export function isTokenDeleteShortcut(event: TokenDeleteKeyboardEvent): boolean 
   if (event.defaultPrevented) return false;
   if (!event.ctrlKey) return false;
   if (event.shiftKey || event.altKey || event.metaKey) return false;
-  if (event.isComposing || event.nativeEvent?.isComposing) return false;
+  if (event.isComposing || event.nativeEvent?.isComposing || event.key === "Process") return false;
   const key = event.key;
   if (key === "w" || key === "W" || key === "Backspace") return true;
   if (event.code === "KeyW") return true;

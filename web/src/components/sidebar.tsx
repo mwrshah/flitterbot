@@ -31,16 +31,14 @@ import { useCreateSwimlane } from "@/hooks/use-create-swimlane";
 import { useLastStreamPath } from "@/hooks/use-last-stream-path";
 import { useReopenStream } from "@/hooks/use-reopen-stream";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
-import {
-  registerShortcutHandlers,
-  SHORTCUT_ACTIONS,
-  useShortcutBindingLabel,
-} from "@/lib/global-shortcuts";
 import { sessionSearchQueryOptions, statusQueryOptions } from "@/lib/queries";
+import { useShortcutBindingLabel, useShortcuts } from "@/lib/shortcuts";
 import { projectSidebarRows } from "@/lib/sidebar-search";
 import { getStreamRecoveryKind, type StreamRecoveryKind } from "@/lib/stream-recovery";
+import { getStreamShortcutTargets } from "@/lib/stream-route-targets";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { PiSessionStatus, StreamSummary } from "@/lib/types";
+import { getStreamSlotShortcutActionId } from "../../../src/shortcuts/catalog.ts";
 
 function piStatusDotClass(status: PiSessionStatus | undefined): string {
   switch (status) {
@@ -149,6 +147,7 @@ function StreamContextMenu({
       onBlur={commit}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (e.defaultPrevented || e.nativeEvent.isComposing || e.key === "Process") return;
         if (handleTextInputKeyDown(e)) return;
         if (e.key === "Enter") {
           e.preventDefault();
@@ -273,6 +272,11 @@ const SwimlaneRow = memo(function SwimlaneRow({
   reopenStream: ReopenStream;
   closeStream: CloseStream;
 }) {
+  const modifierLabel = useModifierLabel();
+  const shortcutLabel = useShortcutBindingLabel(
+    shortcut ? getStreamSlotShortcutActionId(shortcut) : undefined,
+    { compact: true, altLabel: modifierLabel },
+  );
   if (row.kind === "default") {
     return (
       <StreamContextMenu
@@ -299,8 +303,13 @@ const SwimlaneRow = memo(function SwimlaneRow({
               )}
             />
             <span className="truncate flex-1">{row.name}</span>
-            {shortcut && (
-              <ShortcutHint label={String(shortcut)} className="ml-2 shrink-0" kbdSize="compact" />
+            {shortcutLabel && (
+              <ShortcutHint
+                label={shortcutLabel}
+                collapseModifiers
+                className="ml-2 shrink-0"
+                kbdSize="compact"
+              />
             )}
           </Link>
         )}
@@ -412,10 +421,11 @@ const SwimlaneRow = memo(function SwimlaneRow({
             className={cn("shrink-0 size-2 rounded-full", piStatusDotClass(stream.piSessionStatus))}
           />
           {label}
-          {shortcut && (
+          {shortcutLabel && (
             <ShortcutHint
-              label={String(shortcut)}
-              className={cn("ml-2 shrink-0", stream.pinned && "group-hover:hidden")}
+              label={shortcutLabel}
+              collapseModifiers
+              className="ml-2 shrink-0"
               kbdSize="compact"
             />
           )}
@@ -424,8 +434,8 @@ const SwimlaneRow = memo(function SwimlaneRow({
               type="button"
               aria-label="Unpin swimlane"
               className={cn(
-                "group/pin ml-2 mr-0.5 hidden size-3 shrink-0 items-center justify-center text-text-muted hover:text-text group-hover:flex",
-                !shortcut && "ml-auto",
+                "group/pin ml-2 mr-0.5 inline-flex size-3 shrink-0 items-center justify-center text-text-muted opacity-0 hover:text-text group-hover:opacity-100 group-focus-within:opacity-100",
+                !shortcutLabel && "ml-auto",
               )}
               onClick={(event) => {
                 event.preventDefault();
@@ -772,14 +782,13 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
 
     const allRows = [...openRows, ...closedRows, ...pinnedClosedRows];
     const allSearchCandidates = allRows.filter((row): row is PickerCandidate => !!row.piSessionId);
-    let nextShortcut = 1;
-    const defaultShortcut = defaultPiSessionId && nextShortcut <= 9 ? nextShortcut++ : null;
-    const streamShortcuts = new Map<string, number>();
-    for (const row of openRows) {
-      if (row.kind === "stream" && row.piSessionId && nextShortcut <= 9) {
-        streamShortcuts.set(row.stream.id, nextShortcut++);
-      }
-    }
+    const shortcutTargets = getStreamShortcutTargets(defaultPiSessionId, allStreams);
+    const defaultShortcut = shortcutTargets.find(({ streamId }) => streamId === null)?.slot ?? null;
+    const streamShortcuts = new Map(
+      shortcutTargets.flatMap(({ streamId, slot }) =>
+        streamId ? [[streamId, slot] as const] : [],
+      ),
+    );
 
     return { allRows, allSearchCandidates, defaultShortcut, streamShortcuts };
   }, [allStreams, defaultPiSessionId]);
@@ -853,7 +862,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
 
   const openStreamPicker = useEffectEvent((direction?: 1 | -1) => {
     const input = searchInputRef.current;
-    if (!input) return false;
+    if (!input) return;
     if (direction) {
       const cursor = pickerCursorRef.current;
       const currentPathname = router.state.location.pathname;
@@ -874,28 +883,27 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
       cursor.originPath = currentPathname;
     }
     input.focus();
-    return true;
+  });
+  const canOpenStreamPicker = () => searchInputRef.current !== null;
+
+  const searchShortcut = { enabled: canOpenStreamPicker, run: () => openStreamPicker() };
+  useShortcuts("sidebar", {
+    "swimlane.search": searchShortcut,
+    "nav.stream.next": { enabled: canOpenStreamPicker, run: () => openStreamPicker(1) },
+    "nav.stream.previous": { enabled: canOpenStreamPicker, run: () => openStreamPicker(-1) },
   });
 
-  useEffect(() => {
-    const unregister = registerShortcutHandlers([
-      { actionId: SHORTCUT_ACTIONS.swimlaneSearch, handler: () => openStreamPicker() },
-      { actionId: SHORTCUT_ACTIONS.streamPickerNext, handler: () => openStreamPicker(1) },
-      { actionId: SHORTCUT_ACTIONS.streamPickerPrevious, handler: () => openStreamPicker(-1) },
-    ]);
-    return () => {
-      unregister();
-      clearPickerCursor();
-    };
-  }, [clearPickerCursor]);
+  useEffect(() => clearPickerCursor, [clearPickerCursor]);
 
-  const newSwimlaneShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneCreate, {
+  const newSwimlaneShortcutHint = useShortcutBindingLabel("swimlane.create", {
     altLabel: modifierLabel,
   });
-  const swimlaneSearchShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.swimlaneSearch, {
+  const swimlaneSearchShortcutHint = useShortcutBindingLabel("swimlane.search", {
     altLabel: modifierLabel,
   });
-  const swimlaneSearchPlaceholder = `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`;
+  const swimlaneSearchPlaceholder = swimlaneSearchShortcutHint
+    ? `Search (${swimlaneSearchShortcutHint.replaceAll("+", " + ")})`
+    : "Search";
 
   if (!defaultPiSessionId && !allStreams?.length) return <div className="flex-1" />;
 
@@ -937,7 +945,12 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
             }}
             onBlur={clearPickerCursor}
             onKeyDown={(event) => {
-              if (event.nativeEvent.isComposing) return;
+              if (
+                event.defaultPrevented ||
+                event.nativeEvent.isComposing ||
+                event.key === "Process"
+              )
+                return;
               if (handleTextInputKeyDown(event)) return;
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -1041,10 +1054,10 @@ export const Sidebar = memo(function Sidebar() {
   const modifierLabel = useModifierLabel();
   const lastStreamPath = useLastStreamPath();
   useWhyDidYouRender("Sidebar", {});
-  const surfaceShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navSurface, {
+  const surfaceShortcutHint = useShortcutBindingLabel("nav.surface", {
     altLabel: modifierLabel,
   });
-  const streamsShortcutHint = useShortcutBindingLabel(SHORTCUT_ACTIONS.navLastStream, {
+  const streamsShortcutHint = useShortcutBindingLabel("nav.last-stream", {
     altLabel: modifierLabel,
   });
 

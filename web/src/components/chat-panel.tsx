@@ -58,18 +58,12 @@ import {
 import { applyTurnQueueSnapshot } from "@/lib/conversation-history";
 import { buildConversationRows } from "@/lib/conversation-rows";
 import {
-  focusComposerInput,
-  isShortcutInput,
-  registerShortcutHandlers,
-  resolveShortcutScrollContainer,
-  SHORTCUT_ACTIONS,
-  useShortcutBindingLabel,
-} from "@/lib/global-shortcuts";
-import {
   conversationFindHistoryQueryOptions,
   directoryCompletionsQueryOptions,
   streamsWorktreeQueryOptions,
 } from "@/lib/queries";
+import { focusComposerInput, resolveShortcutScrollContainer } from "@/lib/shortcut-dom";
+import { useShortcutBindingLabel, useShortcuts } from "@/lib/shortcuts";
 import type { StreamRecoveryKind } from "@/lib/stream-recovery";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type {
@@ -175,24 +169,8 @@ function ConversationFindBar({
       ? `${matchCount ? matchIndex + 1 : 0}/${matchCount}`
       : "";
   const canMove = !loading && !error && matchCount > 0;
-  const [showFocusHint, setShowFocusHint] = useState(false);
   const navigationButtonClass =
     "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-35 sm:size-7";
-
-  useEffect(() => {
-    const updateFocusHint = (target: EventTarget | null) => {
-      setShowFocusHint(!isShortcutInput(target));
-    };
-    const handleFocusIn = (event: globalThis.FocusEvent) => updateFocusHint(event.target);
-    const handleFocusOut = (event: globalThis.FocusEvent) => updateFocusHint(event.relatedTarget);
-
-    document.addEventListener("focusin", handleFocusIn);
-    document.addEventListener("focusout", handleFocusOut);
-    return () => {
-      document.removeEventListener("focusin", handleFocusIn);
-      document.removeEventListener("focusout", handleFocusOut);
-    };
-  }, []);
 
   return (
     <form
@@ -220,7 +198,8 @@ function ConversationFindBar({
           aria-label="Find in conversation"
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return;
+            if (event.defaultPrevented || event.nativeEvent.isComposing || event.key === "Process")
+              return;
             if (handleTextInputKeyDown(event)) return;
             if (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
@@ -230,11 +209,6 @@ function ConversationFindBar({
           }}
           className="min-w-0 flex-1 bg-transparent text-base text-text outline-none placeholder:text-text-muted sm:text-sm"
         />
-        {showFocusHint && (
-          <span className="shrink-0 pl-2 text-xs text-text-muted" aria-hidden="true">
-            Press f to jump here
-          </span>
-        )}
       </div>
       {error && !loading ? (
         <>
@@ -339,6 +313,8 @@ function CwdPicker({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.defaultPrevented || event.nativeEvent.isComposing || event.key === "Process")
+        return;
       if (
         handleTextInputKeyDown(event, {
           target: event.target instanceof HTMLInputElement ? event.target : null,
@@ -506,9 +482,9 @@ export function ChatPanel({
   const activeFindRowIndex = conversationFindRowAt(findResults, selectedFindMatchIndex);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
-  const cwdShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamEditCurrentDirectory, { compact: true }) ||
-    "c then d";
+  const cwdShortcutLabel = useShortcutBindingLabel("stream.edit-current-directory", {
+    compact: true,
+  });
   const [cwdPickerOpen, setCwdPickerOpen] = useState(false);
   const [cwdPickerValue, setCwdPickerValue] = useState("@");
   const cwdPickerHeaderRef = useRef<HTMLDivElement>(null);
@@ -731,37 +707,26 @@ export function ChatPanel({
     return () => window.removeEventListener("keydown", closeOnEscape, true);
   }, [closeConversationFind, findOpen]);
 
-  useEffect(() => {
-    return registerShortcutHandlers([
-      {
-        actionId: SHORTCUT_ACTIONS.streamEditCurrentDirectory,
-        priority: 20,
-        handler: () => {
-          if (!streamId || !cwdAbsolute) return false;
-          openCwdPicker();
-          return true;
-        },
-      },
-      {
-        actionId: SHORTCUT_ACTIONS.conversationFind,
-        priority: 20,
-        handler: (event) => {
-          if (event.isComposing || hasBlockingSurface()) return false;
-          if (findOpen && (event.metaKey || event.ctrlKey)) return false;
-          openConversationFind();
-          return true;
-        },
-      },
-      {
-        actionId: SHORTCUT_ACTIONS.scrollBottom,
-        priority: 20,
-        handler: () => {
-          if (resolveShortcutScrollContainer()?.dataset.scrollContainer !== "main") return false;
-          return messageListRef.current?.navigateToLatestUserMessage() ?? false;
-        },
-      },
-    ]);
-  }, [cwdAbsolute, findOpen, openConversationFind, openCwdPicker, streamId]);
+  useShortcuts("conversation", {
+    "stream.edit-current-directory": {
+      enabled: Boolean(streamId && cwdAbsolute),
+      run: openCwdPicker,
+    },
+    "conversation.find": {
+      enabled: (event) =>
+        !event.isComposing &&
+        !hasBlockingSurface() &&
+        !(findOpen && (event.metaKey || event.ctrlKey)),
+      run: openConversationFind,
+    },
+    "scroll.bottom": {
+      enabled: () =>
+        resolveShortcutScrollContainer()?.dataset.scrollContainer === "main" &&
+        userMessageIndex.length > 0 &&
+        messageListRef.current !== null,
+      run: () => messageListRef.current?.navigateToLatestUserMessage(),
+    },
+  });
 
   useLayoutEffect(() => {
     const pendingScrollIds = pendingPostedScrollClientMessageIdsRef.current;
@@ -917,11 +882,13 @@ export function ChatPanel({
                     {worktree.cwd}
                   </span>
                 </button>
-                <ShortcutHint
-                  label={cwdShortcutLabel}
-                  className="hidden shrink-0 @[30rem]:inline-grid"
-                  aria-hidden="true"
-                />
+                {cwdShortcutLabel && (
+                  <ShortcutHint
+                    label={cwdShortcutLabel}
+                    className="hidden shrink-0 @[30rem]:inline-grid"
+                    aria-hidden="true"
+                  />
+                )}
               </span>
             </>
           )}
