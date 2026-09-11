@@ -1,5 +1,7 @@
 import type { AuthEvent, AuthPrompt, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { Skill } from "@earendil-works/pi-coding-agent";
+import type { ShortcutActionId } from "../shortcuts/catalog.ts";
+import type { ShortcutBinding } from "../shortcuts/registry.ts";
 import type {
   ClaudeSessionStatus,
   PiSessionStatus,
@@ -105,7 +107,7 @@ export interface StreamSummary {
   createdAt: string;
 }
 
-export type ShortcutBindingsConfig = Partial<Record<string, string | string[]>>;
+export type ShortcutBindingsConfig = Partial<Record<ShortcutActionId, ShortcutBinding[]>>;
 
 export interface StatusResponse {
   ok: true;
@@ -115,7 +117,7 @@ export interface StatusResponse {
   whatsapp: WhatsAppRuntimeStatus;
   blackboard: BlackboardHealth;
   streams?: StreamSummary[];
-  shortcuts?: ShortcutBindingsConfig;
+  shortcuts: ShortcutBindingsConfig;
 }
 
 export interface MessageRequest {

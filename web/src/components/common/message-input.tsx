@@ -18,20 +18,20 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
 import { ModelSelector } from "@/components/model-selector";
+import { useModifierLabel } from "@/hooks/platform";
 import {
   TextareaCompletionPickers,
   useTextareaCompletions,
 } from "@/hooks/use-textarea-completions";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
+import type { InternalCommandScope } from "@/lib/internal-commands";
+import { useShortcutBindingLabels, useShortcuts } from "@/lib/shortcuts";
+import { handleTextInputKeyDown } from "@/lib/text-input";
+import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
 import {
   getMessageInputButtonShortcutActionId,
   MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS,
-  registerComposerFocusTarget,
-  registerShortcutHandlers,
-} from "@/lib/global-shortcuts";
-import type { InternalCommandScope } from "@/lib/internal-commands";
-import { handleTextInputKeyDown } from "@/lib/text-input";
-import type { ImageAttachment, TurnQueueItemSummary } from "@/lib/types";
+} from "../../../../src/shortcuts/catalog.ts";
 
 const draftStore = new Map<string, string>();
 const pendingAttachmentStore = new Map<string, ImageAttachment[]>();
@@ -128,9 +128,9 @@ function isBlankDraft(value: string) {
   return value.length === 0 || !/\S/.test(value);
 }
 
-function messageInputButtonShortcutLabel(index: number) {
-  return MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS[index] ?? null;
-}
+const MESSAGE_INPUT_SHORTCUT_ACTIONS = MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.map((_, index) =>
+  getMessageInputButtonShortcutActionId(index + 1),
+);
 
 function MessageInputHoverButtons({
   slots,
@@ -143,12 +143,16 @@ function MessageInputHoverButtons({
   disabled: boolean;
   composerRef: React.RefObject<HTMLDivElement | null>;
   toolbarRef: React.RefObject<HTMLDivElement | null>;
-  onSlotAction: (slot: MessageInputHoverButtonSlot, visibleBlockWidth: number) => void;
+  onSlotAction: (slot: MessageInputHoverButtonSlot) => void;
 }) {
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const visibleBlockWidthRef = useRef(0);
+  const modifierLabel = useModifierLabel();
+  const shortcutLabels = useShortcutBindingLabels(MESSAGE_INPUT_SHORTCUT_ACTIONS, {
+    compact: true,
+    altLabel: modifierLabel,
+  });
   const buttonClassName =
     "pointer-events-auto inline-flex h-10 max-w-full shrink-0 items-center rounded-md border border-border-muted bg-background px-2.5 text-sm text-text-muted transition-colors hover:border-border hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-border-pop sm:h-7";
 
@@ -209,7 +213,7 @@ function MessageInputHoverButtons({
       let visibleCount = 0;
       for (const [index, slot] of slots.entries()) {
         const reserveButton = slot.reserveButton ?? slot.button;
-        const shortcutLabel = messageInputButtonShortcutLabel(index);
+        const shortcutLabel = shortcutLabels[index];
         const shortcutWidth = shortcutLabel
           ? pretextTextWidth(shortcutLabel, font, lineHeight) + shortcutMargin
           : 0;
@@ -221,7 +225,6 @@ function MessageInputHoverButtons({
         visibleCount += 1;
       }
 
-      visibleBlockWidthRef.current = usedWidth;
       renderedSlots.forEach((slotNode, index) => {
         if (slotNode) slotNode.hidden = index >= visibleCount;
       });
@@ -249,47 +252,29 @@ function MessageInputHoverButtons({
       observer?.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [slots, composerRef, toolbarRef]);
+  }, [slots, composerRef, toolbarRef, shortcutLabels]);
 
-  const currentVisibleBlockWidth = () => {
-    const buttonRow = buttonRowRef.current;
-    if (!buttonRow) return visibleBlockWidthRef.current;
-
-    const buttonGap = numericStyleValue(window.getComputedStyle(buttonRow).columnGap);
-    let width = 0;
-    let visibleCount = 0;
-    for (const slotNode of slotRefs.current.slice(0, slots.length)) {
-      if (!slotNode || slotNode.hidden) continue;
-      width += slotNode.getBoundingClientRect().width + (visibleCount > 0 ? buttonGap : 0);
-      visibleCount += 1;
-    }
-    return width || visibleBlockWidthRef.current;
-  };
-
-  useEffect(() => {
-    const handlers = slots
-      .slice(0, MESSAGE_INPUT_BUTTON_SHORTCUT_KEYS.length)
-      .map((slot, index) => ({
-        actionId: getMessageInputButtonShortcutActionId(index + 1),
-        priority: 10,
-        handler: () => {
-          if (disabled || slot.ghost) return false;
-          onSlotAction(slot, currentVisibleBlockWidth());
-          return true;
+  useShortcuts(
+    "composer",
+    Object.fromEntries(
+      slots.slice(0, MESSAGE_INPUT_SHORTCUT_ACTIONS.length).map((slot, index) => [
+        getMessageInputButtonShortcutActionId(index + 1),
+        {
+          enabled: !disabled && !slot.ghost,
+          run: () => onSlotAction(slot),
         },
-      }));
-    const cleanup = registerShortcutHandlers(handlers);
-    return cleanup;
-  }, [slots, disabled, onSlotAction]);
+      ]),
+    ),
+  );
 
   if (slots.length === 0) return null;
 
   const renderButtonContent = (label: string, index: number) => (
     <>
       <span className="truncate">{label}</span>
-      {messageInputButtonShortcutLabel(index) && (
+      {shortcutLabels[index] && (
         <ShortcutHint
-          label={messageInputButtonShortcutLabel(index)!}
+          label={shortcutLabels[index]}
           className="ml-2 shrink-0 text-text-muted"
           kbdSize="compact"
           aria-hidden="true"
@@ -321,11 +306,7 @@ function MessageInputHoverButtons({
               type="button"
               tabIndex={-1}
               disabled={disabled || slot.ghost || isReservedSendSlot}
-              onClick={
-                slot.ghost || isReservedSendSlot
-                  ? undefined
-                  : () => onSlotAction(slot, currentVisibleBlockWidth())
-              }
+              onClick={slot.ghost || isReservedSendSlot ? undefined : () => onSlotAction(slot)}
               className={cn(
                 buttonClassName,
                 (slot.ghost || isReservedSendSlot) && "invisible pointer-events-none",
@@ -344,7 +325,8 @@ function MessageInputHoverButtons({
               <button
                 type="button"
                 tabIndex={-1}
-                onClick={() => onSlotAction(slot, currentVisibleBlockWidth())}
+                disabled={disabled}
+                onClick={() => onSlotAction(slot)}
                 className={cn(buttonClassName, "absolute left-0 top-0")}
                 aria-label="Send inserted message"
                 title="Send inserted message"
@@ -445,10 +427,12 @@ export const MessageInput = memo(function MessageInput({
     }
   }, [autoFocus]);
 
-  useEffect(() => {
-    registerComposerFocusTarget(() => textareaRef.current?.focus());
-    return () => registerComposerFocusTarget(null);
-  }, []);
+  useShortcuts("composer", {
+    "composer.focus": {
+      enabled: () => Boolean(textareaRef.current && !textareaRef.current.disabled),
+      run: () => textareaRef.current?.focus(),
+    },
+  });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -580,9 +564,13 @@ export const MessageInput = memo(function MessageInput({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.defaultPrevented || event.nativeEvent.isComposing || event.key === "Process")
+        return;
       if (completionController.handleKeyDown(event)) return;
 
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         textareaRef.current?.blur();
         return;
       }
@@ -604,12 +592,14 @@ export const MessageInput = memo(function MessageInput({
         !event.metaKey
       ) {
         event.preventDefault();
+        event.stopPropagation();
         handleDraftChange("");
         return;
       }
 
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        event.stopPropagation();
         submitCurrentDraft();
       }
     },
@@ -691,7 +681,7 @@ export const MessageInput = memo(function MessageInput({
   }, [hoverButtons, hoverSendAction, hoverSendSourceExists]);
 
   const handleHoverButtonSlotAction = useCallback(
-    (slot: MessageInputHoverButtonSlot, _visibleBlockWidth: number) => {
+    (slot: MessageInputHoverButtonSlot) => {
       if (slot.ghost) return;
       if (slot.action === "send") {
         if (isSessionBusy || isCompacting) return;
@@ -880,6 +870,7 @@ export const MessageInput = memo(function MessageInput({
           )}
           <TextareaCompletionPickers controller={completionController} />
           <textarea
+            data-shortcut-composer
             ref={textareaRef}
             value={draft}
             disabled={disabled}
@@ -921,7 +912,10 @@ export const MessageInput = memo(function MessageInput({
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
-              disabled={!hoverControlsEnabled}
+              disabled={
+                !hoverControlsEnabled ||
+                (shouldShowHoverSendAction && (isSessionBusy || isCompacting))
+              }
               composerRef={containerRef}
               toolbarRef={toolbarRef}
               onSlotAction={handleHoverButtonSlotAction}

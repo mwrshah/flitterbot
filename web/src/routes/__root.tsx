@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
 import { NotFound } from "@/components/not-found";
@@ -18,7 +18,9 @@ import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { FlitterbotApiClient } from "@/lib/api";
 import { skillsQueryOptions, statusQueryOptions, userConfigQueryOptions } from "@/lib/queries";
 import type { SettingsStore } from "@/lib/settings-store";
-import type { StatusQueryData } from "@/lib/types";
+import { ShortcutsProvider } from "@/lib/shortcuts";
+import { getStreamShortcutTargets } from "@/lib/stream-route-targets";
+import type { StatusResponse } from "@/lib/types";
 import type { FlitterbotWsClient } from "@/lib/ws";
 import type { WsConnectionStore } from "@/lib/ws-connection-store";
 import appCss from "@/styles.css?url";
@@ -35,7 +37,9 @@ export const Route = createRootRouteWithContext<{
 }>()({
   loader: async ({ context }) => {
     await Promise.all([
-      context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient)),
+      context.queryClient
+        .ensureQueryData(statusQueryOptions(context.apiClient))
+        .catch(() => undefined),
       context.queryClient.ensureQueryData(userConfigQueryOptions()).catch(() => ({})),
       context.queryClient.ensureQueryData(skillsQueryOptions(context.apiClient)).catch(() => []),
     ]);
@@ -82,7 +86,7 @@ export const Route = createRootRouteWithContext<{
 });
 
 function useShortcutStatus(apiClient: FlitterbotApiClient) {
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     ...statusQueryOptions(apiClient),
     retry: 1,
     select: (d) => ({
@@ -91,22 +95,28 @@ function useShortcutStatus(apiClient: FlitterbotApiClient) {
       shortcuts: d.shortcuts,
     }),
   });
+
+  useEffect(() => {
+    if (error) toast.error(`Status unavailable: ${error.message}`, { id: "status-error" });
+    else toast.dismiss("status-error");
+  }, [error]);
+
   return data;
 }
 
-function useStreamPaths(
-  status: Pick<StatusQueryData, "piAgent" | "streams"> | undefined,
-): string[] {
-  return useMemo(() => {
-    const paths: string[] = [];
-    if (status?.piAgent?.default?.piSessionId) {
-      paths.push(`/streams/${status.piAgent.default.piSessionId}`);
-    }
-    for (const s of status?.streams ?? []) {
-      if (s.status === "open" && s.piSessionId) paths.push(`/streams/${s.piSessionId}`);
-    }
-    return paths;
-  }, [status?.piAgent, status?.streams]);
+function RootShortcuts({ streamPaths }: { streamPaths: string[] }) {
+  useGlobalShortcuts({ streamPaths });
+  return null;
+}
+
+function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | undefined): string[] {
+  return useMemo(
+    () =>
+      getStreamShortcutTargets(status?.piAgent?.default?.piSessionId, status?.streams).map(
+        ({ path }) => path,
+      ),
+    [status?.piAgent?.default?.piSessionId, status?.streams],
+  );
 }
 
 function RootComponent() {
@@ -115,7 +125,7 @@ function RootComponent() {
   const { resolvedTheme } = useTheme();
   const shortcutStatus = useShortcutStatus(apiClient);
   const streamPaths = useStreamPaths(shortcutStatus);
-  useGlobalShortcuts({ streamPaths, shortcutBindings: shortcutStatus?.shortcuts });
+  const shell = useMemo(() => <AppShell />, []);
 
   useEffect(() => startRealtime(), [startRealtime]);
 
@@ -125,16 +135,14 @@ function RootComponent() {
     }
   }, []);
 
-  const children = useMemo(
-    () => (
-      <>
-        <AppShell />
-      </>
-    ),
-    [],
+  return (
+    <RootDocument resolvedTheme={resolvedTheme}>
+      <ShortcutsProvider overrides={shortcutStatus?.shortcuts}>
+        <RootShortcuts streamPaths={streamPaths} />
+        {shell}
+      </ShortcutsProvider>
+    </RootDocument>
   );
-
-  return <RootDocument resolvedTheme={resolvedTheme}>{children}</RootDocument>;
 }
 
 function RootDocument({

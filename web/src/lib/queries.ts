@@ -7,7 +7,6 @@ import type {
   DownstreamSessionItem,
   DueTasksResponse,
   SkillPickerItem,
-  StatusQueryData,
 } from "@/lib/types";
 import { fetchDirectoryCompletions } from "@/server/directory-completions";
 import {
@@ -24,20 +23,7 @@ import { fetchUserConfig } from "@/server/user-config";
 export function statusQueryOptions(apiClient: FlitterbotApiClient) {
   return {
     queryKey: ["status"] as const,
-    queryFn: async (): Promise<StatusQueryData> => {
-      try {
-        return await apiClient.getStatus();
-      } catch {
-        return {
-          source: "offline",
-          uptime: 0,
-          blackboard: "",
-          whatsapp: { status: "disconnected" },
-          streams: [],
-          shortcuts: {},
-        };
-      }
-    },
+    queryFn: () => apiClient.getStatus(),
     staleTime: 3_000,
   };
 }

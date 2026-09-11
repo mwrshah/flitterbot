@@ -48,6 +48,7 @@ function RuntimePage() {
       </div>
 
       {statusQuery.isPending && <p className="text-sm text-text-muted">Loading status…</p>}
+      {statusQuery.isError && <p role="alert">{statusQuery.error.message}</p>}
 
       {status && (
         <>

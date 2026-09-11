@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import { cn } from "cn";
@@ -14,18 +14,14 @@ import { useModifierLabel } from "@/hooks/platform";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
-  getTmuxAttachShortcutActionId,
-  registerShortcutHandlers,
-  SHORTCUT_ACTIONS,
-  useShortcutBindingLabel,
-} from "@/lib/global-shortcuts";
-import {
   DUE_TASKS_QUERY_KEY,
   streamsDiffQueryOptions,
   streamsDownstreamSessionsQueryOptions,
   streamsWorktreeQueryOptions,
 } from "@/lib/queries";
+import { useShortcutBindingLabel, useShortcuts } from "@/lib/shortcuts";
 import type { DownstreamSessionItem, PiSessionStatus } from "@/lib/types";
+import { getTmuxAttachShortcutActionId } from "../../../src/shortcuts/catalog.ts";
 
 function piStatusBanner(
   status: PiSessionStatus | undefined,
@@ -75,39 +71,29 @@ function sessionDescription(session: DownstreamSessionItem): string {
   return session.taskDescription ?? session.project ?? session.streamName ?? "no swimlane";
 }
 
-function tmuxShortcutHintLabel(tmuxSession: string): string {
-  if (tmuxSession.length === 1) return `t then ${tmuxSession}`;
-  return ["t", ...tmuxSession.split("")].join("+");
-}
-
-function ActiveSessionTmuxCopy({ tmuxSession }: { tmuxSession: string }) {
+function ActiveSessionTmuxCopy({
+  tmuxSession,
+  bindShortcut,
+}: {
+  tmuxSession: string;
+  bindShortcut: boolean;
+}) {
   const tmuxCopy = useCopyToClipboard(600);
-  const actionId = getTmuxAttachShortcutActionId(tmuxSession);
-  const configuredShortcutLabel = useShortcutBindingLabel(actionId, { compact: true });
-  const shortcutLabel =
-    tmuxSession.length === 1 ? configuredShortcutLabel : tmuxShortcutHintLabel(tmuxSession);
   const command = `tmux attach -t ${tmuxSession}`;
-
-  useEffect(() => {
-    return registerShortcutHandlers([
-      {
-        actionId,
-        priority: 20,
-        handler: () => {
-          void tmuxCopy.copy(command).catch(() => toast.error("Failed to copy"));
-          return true;
-        },
-      },
-    ]);
-  }, [actionId, command, tmuxCopy.copy]);
+  const copy = useCallback(() => {
+    void tmuxCopy.copy(command).catch(() => toast.error("Failed to copy"));
+  }, [command, tmuxCopy.copy]);
+  const actionId = bindShortcut ? getTmuxAttachShortcutActionId(tmuxSession) : undefined;
+  const shortcutLabel = useShortcutBindingLabel(actionId, { compact: true });
+  useShortcuts("tmux", actionId ? { [actionId]: { run: copy } } : {});
 
   return (
     <>
-      <CopyableCode text={command} copied={tmuxCopy.copied} onCopy={() => tmuxCopy.copy(command)} />
+      <CopyableCode text={command} copied={tmuxCopy.copied} onCopy={copy} />
       {tmuxCopy.copied ? (
         <span className="text-text-muted text-[10px]">Copied!</span>
       ) : (
-        <ShortcutHint label={shortcutLabel || tmuxShortcutHintLabel(tmuxSession)} />
+        shortcutLabel && <ShortcutHint label={shortcutLabel} />
       )}
     </>
   );
@@ -141,6 +127,16 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
     streamsDownstreamSessionsQueryOptions(piSessionId ?? "", !showDueTasks),
   );
 
+  const shortcutOwningSessionIds = useMemo(() => {
+    const owners = new Map<string, string>();
+    for (const session of data ?? []) {
+      if (session.tmuxSession && !owners.has(session.tmuxSession)) {
+        owners.set(session.tmuxSession, session.sessionId);
+      }
+    }
+    return new Set(owners.values());
+  }, [data]);
+
   const worktreeQuery = useQuery(streamsWorktreeQueryOptions(piSessionId ?? ""));
   const worktree = worktreeQuery.data;
   const hasWorktree = !!worktree?.worktreePath;
@@ -152,20 +148,18 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   const currentRepoPath = worktree?.repoPath ?? null;
   const currentBranch = worktree?.branch ?? null;
   const targetBranch = worktree?.baseBranch ?? (hasWorktree ? "main" : null);
-  const worktreeShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyWorktreePath, { compact: true }) ||
-    "c then w";
-  const repoShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyRepoPath, { compact: true }) || "c then r";
-  const branchShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyBranch, { compact: true }) || "c then b";
-  const targetBranchShortcutLabel =
-    useShortcutBindingLabel(SHORTCUT_ACTIONS.streamCopyTargetBranch, { compact: true }) ||
-    "c then t";
-  const infoShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewInfo, {
+  const worktreeShortcutLabel = useShortcutBindingLabel("stream.copy-worktree-path", {
+    compact: true,
+  });
+  const repoShortcutLabel = useShortcutBindingLabel("stream.copy-repo-path", { compact: true });
+  const branchShortcutLabel = useShortcutBindingLabel("stream.copy-branch", { compact: true });
+  const targetBranchShortcutLabel = useShortcutBindingLabel("stream.copy-target-branch", {
+    compact: true,
+  });
+  const infoShortcutLabel = useShortcutBindingLabel("panel.view.info", {
     altLabel: modifierLabel,
   });
-  const diffShortcutLabel = useShortcutBindingLabel(SHORTCUT_ACTIONS.panelViewDiff, {
+  const diffShortcutLabel = useShortcutBindingLabel("panel.view.diff", {
     altLabel: modifierLabel,
   });
 
@@ -195,78 +189,42 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
     void diffQuery.refetch();
   }, [diffQuery.isFetching, diffQuery.refetch]);
 
-  useEffect(() => {
-    return registerShortcutHandlers([
-      {
-        actionId: SHORTCUT_ACTIONS.streamCopyWorktreePath,
-        priority: 10,
-        handler: () => {
-          if (!currentWorktreePath) return false;
-          void worktreeCopy
-            .copy(`${currentWorktreePath}/`)
-            .catch(() => toast.error("Failed to copy"));
-          return true;
-        },
+  useShortcuts("stream", {
+    "stream.copy-worktree-path": {
+      enabled: Boolean(currentWorktreePath),
+      run: () => {
+        void worktreeCopy
+          .copy(`${currentWorktreePath}/`)
+          .catch(() => toast.error("Failed to copy"));
       },
-      {
-        actionId: SHORTCUT_ACTIONS.streamCopyRepoPath,
-        priority: 10,
-        handler: () => {
-          if (!currentRepoPath) return false;
-          void repoCopy.copy(`${currentRepoPath}/`).catch(() => toast.error("Failed to copy"));
-          return true;
-        },
+    },
+    "stream.copy-repo-path": {
+      enabled: Boolean(currentRepoPath),
+      run: () => {
+        void repoCopy.copy(`${currentRepoPath}/`).catch(() => toast.error("Failed to copy"));
       },
-      {
-        actionId: SHORTCUT_ACTIONS.streamCopyBranch,
-        priority: 10,
-        handler: () => {
-          if (!currentBranch) return false;
-          void branchCopy.copy(currentBranch).catch(() => toast.error("Failed to copy"));
-          return true;
-        },
+    },
+    "stream.copy-branch": {
+      enabled: Boolean(currentBranch),
+      run: () => {
+        void branchCopy.copy(currentBranch!).catch(() => toast.error("Failed to copy"));
       },
-      {
-        actionId: SHORTCUT_ACTIONS.streamCopyTargetBranch,
-        priority: 10,
-        handler: () => {
-          if (!targetBranch) return false;
-          void baseBranchCopy.copy(targetBranch).catch(() => toast.error("Failed to copy"));
-          return true;
-        },
+    },
+    "stream.copy-target-branch": {
+      enabled: Boolean(targetBranch),
+      run: () => {
+        void baseBranchCopy.copy(targetBranch!).catch(() => toast.error("Failed to copy"));
       },
-      {
-        actionId: SHORTCUT_ACTIONS.panelViewInfo,
-        handler: () => {
-          showInfoPanel();
-          return true;
-        },
+    },
+    "panel.view.info": { run: showInfoPanel },
+    "panel.view.diff": {
+      enabled: hasWorktree,
+      run: () => {
+        if (showDiff) reloadDiff();
+        showDiffPanel();
       },
-      {
-        actionId: SHORTCUT_ACTIONS.panelViewDiff,
-        handler: () => {
-          if (!hasWorktree) return false;
-          if (showDiff) reloadDiff();
-          showDiffPanel();
-          return true;
-        },
-      },
-    ]);
-  }, [
-    currentWorktreePath,
-    currentRepoPath,
-    currentBranch,
-    targetBranch,
-    worktreeCopy.copy,
-    repoCopy.copy,
-    branchCopy.copy,
-    baseBranchCopy.copy,
-    hasWorktree,
-    showDiff,
-    showInfoPanel,
-    showDiffPanel,
-    reloadDiff,
-  ]);
+    },
+  });
 
   const diffFiles = useMemo<FileData[]>(() => {
     if (diffQuery.data?.mode !== "diff") return [];
@@ -456,7 +414,11 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
 
                   {session.tmuxSession && (
                     <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
-                      tmux: <ActiveSessionTmuxCopy tmuxSession={session.tmuxSession} />
+                      tmux:{" "}
+                      <ActiveSessionTmuxCopy
+                        tmuxSession={session.tmuxSession}
+                        bindShortcut={shortcutOwningSessionIds.has(session.sessionId)}
+                      />
                     </span>
                   )}
 
@@ -487,7 +449,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   {repoCopy.copied ? (
                     <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
-                    <ShortcutHint label={repoShortcutLabel} />
+                    repoShortcutLabel && <ShortcutHint label={repoShortcutLabel} />
                   )}
                 </span>
                 <span className="pl-2 truncate text-xs text-text-muted flex items-center gap-1 min-w-0">
@@ -500,7 +462,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   {branchCopy.copied ? (
                     <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
-                    <ShortcutHint label={branchShortcutLabel} />
+                    branchShortcutLabel && <ShortcutHint label={branchShortcutLabel} />
                   )}
                 </span>
                 <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
@@ -513,7 +475,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   {baseBranchCopy.copied ? (
                     <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
-                    <ShortcutHint label={targetBranchShortcutLabel} />
+                    targetBranchShortcutLabel && <ShortcutHint label={targetBranchShortcutLabel} />
                   )}
                 </span>
                 <span className="pl-2 text-xs text-text-muted flex items-center gap-1 min-w-0">
@@ -533,7 +495,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   {worktreeCopy.copied ? (
                     <span className="text-text-muted text-[10px]">Copied!</span>
                   ) : (
-                    <ShortcutHint label={worktreeShortcutLabel} />
+                    worktreeShortcutLabel && <ShortcutHint label={worktreeShortcutLabel} />
                   )}
                 </span>
               </div>

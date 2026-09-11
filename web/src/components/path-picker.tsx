@@ -127,6 +127,7 @@ export const PathPicker = memo(function PathPicker({
         value={selectedValue}
         onValueChange={setSelectedValue}
         onKeyDownCapture={handleCommandKeyDownCapture}
+        onKeyDown={(event) => event.stopPropagation()}
         className="rounded-lg border border-border bg-background shadow-lg"
       >
         <CommandList className="max-h-48 overflow-y-auto p-1">

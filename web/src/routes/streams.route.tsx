@@ -4,7 +4,9 @@ import { statusQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/streams")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(statusQueryOptions(context.apiClient));
+    await context.queryClient
+      .ensureQueryData(statusQueryOptions(context.apiClient))
+      .catch(() => undefined);
   },
   errorComponent: ({ error }: ErrorComponentProps) => (
     <div className="flex h-full items-center justify-center p-8 text-status-crashed">
