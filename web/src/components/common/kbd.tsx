@@ -6,7 +6,7 @@ const keycapClassName =
 
 export function ShortcutHint({
   label,
-  collapseModifiers = false,
+  variant = "default",
   actionText,
   actionActive = false,
   actionOnHover = false,
@@ -15,7 +15,7 @@ export function ShortcutHint({
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
   label: string;
-  collapseModifiers?: boolean;
+  variant?: "default" | "compact";
   actionText?: string;
   actionActive?: boolean;
   actionOnHover?: boolean;
@@ -50,7 +50,8 @@ export function ShortcutHint({
                   key={key}
                   className={cn(
                     keycapClassName,
-                    collapseModifiers &&
+                    variant === "compact" && "lowercase rounded-[6px]",
+                    variant === "compact" &&
                       steps.length === 1 &&
                       keyIndex < keys.length - 1 &&
                       "hidden group-hover:inline-flex group-focus-visible:inline-flex group-hover/shortcut-hint:inline-flex group-focus-within/shortcut-hint:inline-flex",

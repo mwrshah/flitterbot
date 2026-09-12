@@ -275,6 +275,7 @@ function MessageInputHoverButtons({
       {shortcutLabels[index] && (
         <ShortcutHint
           label={shortcutLabels[index]}
+          variant="compact"
           className="ml-2 shrink-0 text-text-muted"
           aria-hidden="true"
         />

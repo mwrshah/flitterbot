@@ -84,7 +84,7 @@ function NavItem({
     >
       <span className="shrink-0 size-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
-      {shortcutHint && <ShortcutHint label={shortcutHint} className="ml-auto" />}
+      {shortcutHint && <ShortcutHint label={shortcutHint} variant="compact" className="ml-auto" />}
     </Link>
   );
 }
@@ -304,7 +304,7 @@ const SwimlaneRow = memo(function SwimlaneRow({
             />
             <span className="truncate flex-1">{row.name}</span>
             {shortcutLabel && (
-              <ShortcutHint label={shortcutLabel} collapseModifiers className="ml-2 shrink-0" />
+              <ShortcutHint label={shortcutLabel} variant="compact" className="ml-2 shrink-0" />
             )}
           </Link>
         )}
@@ -417,7 +417,7 @@ const SwimlaneRow = memo(function SwimlaneRow({
           />
           {label}
           {shortcutLabel && (
-            <ShortcutHint label={shortcutLabel} collapseModifiers className="ml-2 shrink-0" />
+            <ShortcutHint label={shortcutLabel} variant="compact" className="ml-2 shrink-0" />
           )}
           {stream.pinned && (
             <button
