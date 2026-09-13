@@ -258,7 +258,10 @@ function MessageInputHoverButtons({
       const sendSlot = renderedSlots[sendIndex];
       if (sendButton && sendSlot && sendIndex < visibleCount) {
         const width = Math.min(
-          measureButton(slots[sendIndex]!.button.label, sendIndex),
+          Math.max(
+            buttonWidths[sendIndex] ?? 0,
+            measureButton(slots[sendIndex]!.button.label, sendIndex),
+          ),
           availableWidth,
         );
         const slotLeft = sendSlot.getBoundingClientRect().left - buttonRowRect.left;
@@ -711,7 +714,7 @@ export const MessageInput = memo(function MessageInput({
     return hoverButtons.map((button) =>
       button.id === hoverSendAction.sourceButtonId
         ? {
-            button: { id: "hover-send", label: "click to send", insertText: "" },
+            button: { id: "hover-send", label: "submit", insertText: "" },
             action: "send",
             reserveButton: button,
           }
