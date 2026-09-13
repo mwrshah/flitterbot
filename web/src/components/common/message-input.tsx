@@ -1,3 +1,4 @@
+import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { cn } from "cn";
 import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
@@ -97,6 +98,11 @@ type MessageInputHoverButtonSlot = {
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
 
+function pretextTextWidth(text: string, font: string, lineHeight: number) {
+  const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
+  return layoutWithLines(prepared, 10_000, lineHeight).lines[0]?.width ?? 0;
+}
+
 function numericStyleValue(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -130,6 +136,7 @@ function MessageInputHoverButtons({
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const modifierLabel = useModifierLabel();
   const shortcutLabels = useShortcutBindingLabels(MESSAGE_INPUT_SHORTCUT_ACTIONS, {
     compact: true,
@@ -175,18 +182,56 @@ function MessageInputHoverButtons({
       const buttonRowRect = buttonRow.getBoundingClientRect();
       const toolbarRect = toolbar.getBoundingClientRect();
       renderedSlots.forEach((slotNode) => {
-        if (slotNode) {
-          slotNode.hidden = false;
-          slotNode.style.width = "";
-        }
+        if (slotNode) slotNode.hidden = false;
       });
 
       const buttonRowStyle = window.getComputedStyle(buttonRow);
       const toolbarStyle = window.getComputedStyle(toolbar);
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
-      const buttonWidths = slots.map(
-        (_, index) => buttonRefs.current[index]?.getBoundingClientRect().width ?? 0,
+      const buttonStyle = window.getComputedStyle(firstButton);
+      const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
+      const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
+      const chrome =
+        numericStyleValue(buttonStyle.paddingLeft) +
+        numericStyleValue(buttonStyle.paddingRight) +
+        numericStyleValue(buttonStyle.borderLeftWidth) +
+        numericStyleValue(buttonStyle.borderRightWidth);
+      const shortcutWidths = slots.map((_, index) => {
+        if (!shortcutLabels[index]) return 0;
+        const hint = buttonRefs.current[index]?.lastElementChild;
+        if (!hint) return 0;
+        const hintStyle = window.getComputedStyle(hint);
+        const keycaps = Array.from(hint.querySelectorAll("kbd"));
+        if (shortcutLabels[index]?.includes(" then ")) {
+          return horizontalMargin(hintStyle) + hint.getBoundingClientRect().width;
+        }
+        const visibleKeys = keycaps.slice(-1);
+        return (
+          horizontalMargin(hintStyle) +
+          visibleKeys.reduce((width, keycap) => {
+            const style = window.getComputedStyle(keycap);
+            const keyFont = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            return (
+              width +
+              Math.max(
+                numericStyleValue(style.minWidth),
+                pretextTextWidth(keycap.textContent ?? "", keyFont, lineHeight) +
+                  numericStyleValue(style.paddingLeft) +
+                  numericStyleValue(style.paddingRight) +
+                  numericStyleValue(style.borderLeftWidth) +
+                  numericStyleValue(style.borderRightWidth),
+              )
+            );
+          }, 0)
+        );
+      });
+      const measureButton = (label: string, index: number) =>
+        Math.ceil(
+          pretextTextWidth(label, font, lineHeight) + chrome + (shortcutWidths[index] ?? 0),
+        );
+      const buttonWidths = slots.map((slot, index) =>
+        measureButton((slot.reserveButton ?? slot.button).label, index),
       );
       const availableWidth = Math.max(
         0,
@@ -208,6 +253,19 @@ function MessageInputHoverButtons({
         slotNode.hidden = index >= visibleCount;
         if (index < visibleCount) slotNode.style.width = `${buttonWidths[index]}px`;
       });
+      const sendIndex = slots.findIndex((slot) => slot.action === "send" && slot.reserveButton);
+      const sendButton = sendButtonRef.current;
+      const sendSlot = renderedSlots[sendIndex];
+      if (sendButton && sendSlot && sendIndex < visibleCount) {
+        const width = Math.min(
+          measureButton(slots[sendIndex]!.button.label, sendIndex),
+          availableWidth,
+        );
+        const slotLeft = sendSlot.getBoundingClientRect().left - buttonRowRect.left;
+        const left = Math.max(0, Math.min(slotLeft, availableWidth - width));
+        sendButton.style.width = `${width}px`;
+        sendButton.style.left = `${left - slotLeft}px`;
+      }
       return true;
     };
 
@@ -266,7 +324,7 @@ function MessageInputHoverButtons({
   return (
     <div
       ref={buttonRowRef}
-      className="pointer-events-none absolute left-2.5 bottom-2 flex items-center gap-1.5 overflow-hidden"
+      className="pointer-events-none absolute left-2.5 bottom-2 flex items-center gap-1.5"
     >
       {slots.map((slot, index) => {
         const reserveButton = slot.reserveButton ?? slot.button;
@@ -303,11 +361,12 @@ function MessageInputHoverButtons({
             </button>
             {isReservedSendSlot && (
               <button
+                ref={sendButtonRef}
                 type="button"
                 tabIndex={-1}
                 disabled={disabled}
                 onClick={() => onSlotAction(slot)}
-                className={cn(buttonClassName, "absolute left-0 top-0")}
+                className={cn(buttonClassName, "absolute left-0 top-0 max-w-none")}
                 aria-label="Send inserted message"
                 title="Send inserted message"
               >
