@@ -76,7 +76,7 @@ function isUserMessageVisible(
 
 export type StreamsMessageListHandle = {
   scrollToEnd(): void;
-  scrollToEndIfNear(threshold: number): void;
+  scrollToEndIfWithinViewport(ratio: number): void;
   navigateToLatestUserMessage(): void;
 };
 
@@ -452,12 +452,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         pendingScrollToEndRef.current = true;
         setMarkerNavigation(undefined);
       },
-      scrollToEndIfNear(threshold: number) {
+      scrollToEndIfWithinViewport(ratio: number) {
         const scrollElement = scrollRef.current;
         if (!scrollElement) return;
         const distanceFromEnd =
           scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
-        if (distanceFromEnd <= threshold) this.scrollToEnd();
+        if (distanceFromEnd <= scrollElement.clientHeight * ratio) this.scrollToEnd();
       },
       navigateToLatestUserMessage() {
         const messageId = userMessageIndex.at(-1);
