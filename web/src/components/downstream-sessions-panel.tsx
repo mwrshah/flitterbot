@@ -300,9 +300,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
             className="text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
           >
             Info
-            {infoShortcutLabel && (
-              <ShortcutHint label={infoShortcutLabel} variant="compact" className="ml-1" />
-            )}
+            {infoShortcutLabel && <ShortcutHint label={infoShortcutLabel} className="ml-1" />}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="diff"
@@ -317,7 +315,6 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
             {diffShortcutLabel && (
               <ShortcutHint
                 label={diffShortcutLabel}
-                variant="compact"
                 actionText="RELOAD"
                 actionOnHover={showDiff}
                 actionKeycap

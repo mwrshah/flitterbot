@@ -84,7 +84,7 @@ function NavItem({
     >
       <span className="shrink-0 size-4 flex items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
-      {shortcutHint && <ShortcutHint label={shortcutHint} variant="compact" className="ml-auto" />}
+      {shortcutHint && <ShortcutHint label={shortcutHint} className="ml-auto" />}
     </Link>
   );
 }

@@ -1,4 +1,3 @@
-import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { cn } from "cn";
 import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
@@ -97,13 +96,6 @@ type MessageInputHoverButtonSlot = {
 
 const EMPTY_HOVER_BUTTONS: MessageInputHoverButton[] = [];
 const EMPTY_HOVER_BUTTON_SLOTS: MessageInputHoverButtonSlot[] = [];
-const HOVER_BUTTON_MEASURE_WIDTH_PX = 10_000;
-
-function pretextTextWidth(text: string, font: string, lineHeight: number) {
-  const prepared = prepareWithSegments(text, font, { whiteSpace: "pre-wrap" });
-  const result = layoutWithLines(prepared, HOVER_BUTTON_MEASURE_WIDTH_PX, lineHeight);
-  return result.lines[0]?.width ?? 0;
-}
 
 function numericStyleValue(value: string) {
   const parsed = Number.parseFloat(value);
@@ -112,16 +104,6 @@ function numericStyleValue(value: string) {
 
 function horizontalMargin(style: CSSStyleDeclaration) {
   return numericStyleValue(style.marginLeft) + numericStyleValue(style.marginRight);
-}
-
-function horizontalBox(style: CSSStyleDeclaration) {
-  return (
-    numericStyleValue(style.paddingLeft) +
-    numericStyleValue(style.paddingRight) +
-    numericStyleValue(style.borderLeftWidth) +
-    numericStyleValue(style.borderRightWidth) +
-    horizontalMargin(style)
-  );
 }
 
 function isBlankDraft(value: string) {
@@ -154,7 +136,7 @@ function MessageInputHoverButtons({
     altLabel: modifierLabel,
   });
   const buttonClassName =
-    "pointer-events-auto inline-flex h-10 max-w-full shrink-0 items-center rounded-md border border-border-muted bg-background px-2.5 text-sm text-text-muted transition-colors hover:border-border hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-border-pop sm:h-7";
+    "pointer-events-auto group inline-flex h-10 w-full min-w-0 max-w-full items-center rounded-md border border-border-muted bg-background px-2.5 text-left text-sm text-text-muted transition-colors hover:border-border hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-border-pop sm:h-7";
 
   useLayoutEffect(() => {
     if (slots.length === 0) return;
@@ -192,18 +174,20 @@ function MessageInputHoverButtons({
 
       const buttonRowRect = buttonRow.getBoundingClientRect();
       const toolbarRect = toolbar.getBoundingClientRect();
-      const buttonStyle = window.getComputedStyle(firstButton);
-      const shortcutStyle = firstButton.lastElementChild
-        ? window.getComputedStyle(firstButton.lastElementChild)
-        : null;
+      renderedSlots.forEach((slotNode) => {
+        if (slotNode) {
+          slotNode.hidden = false;
+          slotNode.style.width = "";
+        }
+      });
+
       const buttonRowStyle = window.getComputedStyle(buttonRow);
       const toolbarStyle = window.getComputedStyle(toolbar);
-      const lineHeight = numericStyleValue(buttonStyle.lineHeight) || 16;
-      const font = `${buttonStyle.fontWeight} ${buttonStyle.fontSize} ${buttonStyle.fontFamily}`;
-      const buttonChrome = horizontalBox(buttonStyle);
-      const shortcutMargin = shortcutStyle ? horizontalMargin(shortcutStyle) : 0;
       const buttonGap = numericStyleValue(buttonRowStyle.columnGap);
       const toolbarGap = numericStyleValue(toolbarStyle.columnGap) || buttonGap;
+      const buttonWidths = slots.map(
+        (_, index) => buttonRefs.current[index]?.getBoundingClientRect().width ?? 0,
+      );
       const availableWidth = Math.max(
         0,
         toolbarRect.left - buttonRowRect.left - horizontalMargin(toolbarStyle) - toolbarGap,
@@ -211,22 +195,18 @@ function MessageInputHoverButtons({
 
       let usedWidth = 0;
       let visibleCount = 0;
-      for (const [index, slot] of slots.entries()) {
-        const reserveButton = slot.reserveButton ?? slot.button;
-        const shortcutLabel = shortcutLabels[index];
-        const shortcutWidth = shortcutLabel
-          ? pretextTextWidth(shortcutLabel, font, lineHeight) + shortcutMargin
-          : 0;
-        const textWidth = pretextTextWidth(reserveButton.label, font, lineHeight) + shortcutWidth;
+      for (const index of slots.keys()) {
         const nextWidth =
-          usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(textWidth + buttonChrome);
+          usedWidth + (visibleCount > 0 ? buttonGap : 0) + Math.ceil(buttonWidths[index] ?? 0);
         if (nextWidth > availableWidth) break;
         usedWidth = nextWidth;
         visibleCount += 1;
       }
 
       renderedSlots.forEach((slotNode, index) => {
-        if (slotNode) slotNode.hidden = index >= visibleCount;
+        if (!slotNode) return;
+        slotNode.hidden = index >= visibleCount;
+        if (index < visibleCount) slotNode.style.width = `${buttonWidths[index]}px`;
       });
       return true;
     };
@@ -271,7 +251,7 @@ function MessageInputHoverButtons({
 
   const renderButtonContent = (label: string, index: number) => (
     <>
-      <span className="truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {shortcutLabels[index] && (
         <ShortcutHint
           label={shortcutLabels[index]}

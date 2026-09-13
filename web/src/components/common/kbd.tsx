@@ -50,7 +50,11 @@ export function ShortcutHint({
                   key={key}
                   className={cn(
                     keycapClassName,
-                    variant === "compact" && "lowercase rounded-[6px]",
+                    variant === "compact" && "rounded-[5px]",
+                    variant === "compact" &&
+                      keys.length > 1 &&
+                      keyIndex === keys.length - 1 &&
+                      "lowercase",
                     variant === "compact" &&
                       steps.length === 1 &&
                       keyIndex < keys.length - 1 &&
