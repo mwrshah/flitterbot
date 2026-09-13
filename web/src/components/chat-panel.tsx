@@ -80,7 +80,7 @@ import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-mes
 
 const CHAT_LAYOUT_KEY = "panel:chat-layout";
 const CHAT_LAYOUT_DEFAULT: Record<string, number> = { feed: 85, input: 15 };
-const POSTED_MESSAGE_SCROLL_THRESHOLD = 400;
+const POSTED_MESSAGE_SCROLL_VIEWPORT_RATIO = 1.8;
 
 const rootApi = getRouteApi("__root__");
 const BLOCKING_SURFACE_SELECTOR = [
@@ -742,7 +742,7 @@ export function ChatPanel({
     }
 
     if (shouldScrollToPostedMessage) {
-      messageListRef.current?.scrollToEndIfNear(POSTED_MESSAGE_SCROLL_THRESHOLD);
+      messageListRef.current?.scrollToEndIfWithinViewport(POSTED_MESSAGE_SCROLL_VIEWPORT_RATIO);
     }
   }, [timeline]);
 
