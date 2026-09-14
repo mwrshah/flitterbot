@@ -191,7 +191,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             const ordinal = markerWindow.startIndex + index + 1;
             const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messageIds.length}`;
             return (
-              <Tooltip key={messageId} content={label} side="left">
+              <Tooltip key={messageId} content={label} delay={0} side="left" sideOffset={-134}>
                 <button
                   type="button"
                   aria-label={label}
@@ -216,7 +216,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <Tooltip content="Go to end of conversation" side="left">
+      <Tooltip content="Go to end of conversation" delay={0} side="left" sideOffset={-134}>
         <button
           type="button"
           aria-label="Go to end of conversation"
