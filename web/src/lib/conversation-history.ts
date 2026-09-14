@@ -1,9 +1,10 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import { toUserMessageIndexEntry } from "../../../src/contracts/user-message-index.ts";
 import type {
   ConversationEventPosition,
   TurnQueueSnapshot,
 } from "../../../src/contracts/websocket.ts";
-import type { ChatTimelineItem, StreamsHistoryResponse } from "./types";
+import type { ChatTimelineItem, ChatTimelineMessage, StreamsHistoryResponse } from "./types";
 
 export const surfaceQueryKey = ["surface-timeline"] as const;
 
@@ -70,7 +71,7 @@ export function applyTurnQueueSnapshot(
   );
 }
 
-function isUserMessage(item: ChatTimelineItem): boolean {
+function isUserMessage(item: ChatTimelineItem): item is ChatTimelineMessage & { role: "user" } {
   return item.kind === "message" && item.role === "user";
 }
 
@@ -198,10 +199,15 @@ export function upsertNewestHistoryItems(
         items[index] = item;
       }
 
-      const userMessagePosition = userMessageIndex?.indexOf(item.id) ?? -1;
-      if (isUserMessage(item)) {
-        if (userMessageIndex && userMessagePosition < 0) {
-          userMessageIndex = [...userMessageIndex, item.id];
+      const userMessagePosition =
+        userMessageIndex?.findIndex((entry) => entry.id === item.id) ?? -1;
+      if (userMessageIndex && isUserMessage(item)) {
+        const entry = toUserMessageIndexEntry(item);
+        if (userMessagePosition < 0) {
+          userMessageIndex = [...userMessageIndex, entry];
+        } else if (userMessageIndex[userMessagePosition]?.content !== entry.content) {
+          userMessageIndex = [...userMessageIndex];
+          userMessageIndex[userMessagePosition] = entry;
         }
       } else if (userMessageIndex && userMessagePosition >= 0) {
         userMessageIndex = [...userMessageIndex];

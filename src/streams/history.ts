@@ -18,6 +18,10 @@ import type {
   JsonValue,
   TokenUsage,
 } from "../contracts/index.ts";
+import {
+  toUserMessageIndexEntry,
+  type UserMessageIndexEntry,
+} from "../contracts/user-message-index.ts";
 import { conversationMessageId } from "./conversation-identity.ts";
 
 export function parseUsage(value: unknown): TokenUsage | undefined {
@@ -434,14 +438,14 @@ function isVisibleRow(item: ChatTimelineItem): boolean {
   return item.kind === "message" && (item.role === "user" || item.role === "assistant");
 }
 
-function isUserMessage(item: ChatTimelineItem): boolean {
+function isUserMessage(item: ChatTimelineItem): item is ChatTimelineMessage {
   return item.kind === "message" && item.role === "user";
 }
 
-export function buildUserMessageIndex(items: ChatTimelineItem[]): string[] {
-  const userMessageIndex: string[] = [];
+export function buildUserMessageIndex(items: ChatTimelineItem[]): UserMessageIndexEntry[] {
+  const userMessageIndex: UserMessageIndexEntry[] = [];
   for (const item of items) {
-    if (isUserMessage(item)) userMessageIndex.push(item.id);
+    if (isUserMessage(item)) userMessageIndex.push(toUserMessageIndexEntry(item));
   }
   return userMessageIndex;
 }

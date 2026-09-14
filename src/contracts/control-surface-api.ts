@@ -14,6 +14,7 @@ import type {
   TmuxDeliveryMethod,
   TmuxSessionInspection,
 } from "./tmux-bridge.ts";
+import type { UserMessageIndexEntry } from "./user-message-index.ts";
 import type { ConversationEventPosition, TurnQueueSnapshot } from "./websocket.ts";
 
 export type BlackboardHealth = "ok" | "error";
@@ -239,7 +240,7 @@ export type StreamsHistoryLimit = number | "all";
 
 export interface StreamsHistoryResponse {
   items: ChatTimelineItem[];
-  userMessageIndex?: string[];
+  userMessageIndex?: UserMessageIndexEntry[];
   historyPosition?: ConversationEventPosition;
   turnQueue?: TurnQueueSnapshot;
   olderPageCursor?: string | null;

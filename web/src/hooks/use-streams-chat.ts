@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 import { statusQueryOptions, streamsHistoryInfiniteQueryOptions } from "@/lib/queries";
-import type { ImageAttachment } from "@/lib/types";
+import type { ImageAttachment, UserMessageIndexEntry } from "@/lib/types";
 import { useWsConnectionState } from "@/lib/ws-connection-store";
 
 export type SendUserMessageOptions = {
@@ -11,7 +11,7 @@ export type SendUserMessageOptions = {
 };
 
 const rootApi = getRouteApi("__root__");
-const EMPTY_USER_MESSAGE_INDEX: string[] = [];
+const EMPTY_USER_MESSAGE_INDEX: UserMessageIndexEntry[] = [];
 
 export function useStreamsChat(piSessionId: string | undefined) {
   const { sendMessage, apiClient, wsConnectionStore } = rootApi.useRouteContext();

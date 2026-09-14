@@ -1,4 +1,5 @@
 import type { ConversationRow } from "./conversation-rows";
+import type { UserMessageIndexEntry } from "./types";
 
 type ViewportItem = {
   index: number;
@@ -8,7 +9,7 @@ type ViewportItem = {
 
 export function activeUserMessageIdForViewport(
   rows: ConversationRow[],
-  userMessageIndex: string[],
+  userMessageIndex: UserMessageIndexEntry[],
   virtualItems: ViewportItem[],
   viewportStart: number,
   viewportEnd: number,
@@ -39,9 +40,9 @@ export function activeUserMessageIdForViewport(
   for (let index = topmostRow.index + 1; index < rows.length; index++) {
     const message = rows[index]?.message;
     if (message?.role !== "user") continue;
-    const nextUserIndex = userMessageIndex.indexOf(message.id);
-    return nextUserIndex > 0 ? userMessageIndex[nextUserIndex - 1] : message.id;
+    const nextUserIndex = userMessageIndex.findIndex((entry) => entry.id === message.id);
+    return nextUserIndex > 0 ? userMessageIndex[nextUserIndex - 1]?.id : message.id;
   }
 
-  return userMessageIndex.at(-1);
+  return userMessageIndex.at(-1)?.id;
 }

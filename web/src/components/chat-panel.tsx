@@ -76,6 +76,7 @@ import type {
   StreamSummary,
   TokenUsage,
   TurnQueueSnapshot,
+  UserMessageIndexEntry,
 } from "@/lib/types";
 import { setStreamCwd } from "@/server/streams";
 import { StreamsMessageList, type StreamsMessageListHandle } from "./streams-message-list";
@@ -125,7 +126,7 @@ type ChatPanelProps = {
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
   contextUsage: TokenUsage | null;
-  userMessageIndex: string[];
+  userMessageIndex: UserMessageIndexEntry[];
   onSendMessage: (
     text: string,
     options?: { images?: ImageAttachment[]; clientMessageId?: string },
