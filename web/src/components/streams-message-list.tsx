@@ -200,7 +200,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                 content={message.content || label}
                 delay={0}
                 side="left"
-                sideOffset={-134}
+                sideOffset={-172}
               >
                 <button
                   type="button"
@@ -226,7 +226,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <Tooltip content="Go to end of conversation" delay={0} side="left" sideOffset={-134}>
+      <Tooltip content="Go to end of conversation" delay={0} side="left" sideOffset={-172}>
         <button
           type="button"
           aria-label="Go to end of conversation"
