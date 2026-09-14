@@ -16,7 +16,7 @@ Native hover hints use the shared Base UI tooltip component. Heading, metadata, 
 
 ```text
 RootDocument
-└── Tooltip.Provider (600ms open delay, 0ms close delay, 400ms instant-peer window)
+└── Tooltip.Provider (300ms open delay, 0ms close delay, 400ms instant-peer window)
     ├── Application and root error content
     ├── Toaster
     └── Tooltip
@@ -29,7 +29,9 @@ RootDocument
 
 ## Behavior and performance
 
-One provider coordinates delays across routes and portaled controls. Keyboard focus, Escape dismissal, hover transfer, and positioning use Base UI. Popups portal outside panel clipping and use the application's existing portal stacking styles. Popup text wraps within the available width and scrolls within the available height. No application-level pointer tracking, custom timer, DOM scan, or synchronized tooltip state runs on the client. Closed popup content stays unmounted.
+One provider coordinates delays across routes and portaled controls. Keyboard focus, Escape dismissal, hover transfer, pointer-rest timing, and positioning use Base UI. Popups portal outside panel clipping and use the application's existing portal stacking styles. Popup text wraps within the available width and scrolls within the available height. Closed popup content stays unmounted.
+
+Compact multi-key `ShortcutHint` labels use a separate, bounded 200ms mouse-rest timer before revealing hidden modifier keys. Meaningful pointer movement restarts that timer; pointer exit cancels it and collapses the hint. Touch pointers do not start it. Only expandable hints mount this interaction state.
 
 Disabled controls with hints use Base UI Button's `focusableWhenDisabled`: they remain focusable without executing disabled actions. Existing menu, popover, and toggle triggers keep their composition and event handling. Noninteractive hint targets use explicit keyboard focus where needed. Marker buttons retain their 420px hover hitboxes and 18×9px activation targets; tooltip composition adds no sibling layout elements.
 
@@ -40,6 +42,7 @@ Disabled controls with hints use Base UI Button's `focusableWhenDisabled`: they 
 - `web/src/components/{auth-providers-section,model-selector,downstream-sessions-panel,sidebar,surface}.tsx` — settings, model, status, and navigation hints.
 - `web/src/components/{chat-panel,chat-tool-message,chat-message-row,message-actions-menu,streams-message-list}.tsx` — conversation and marker hints.
 - `web/src/components/common/{message-input,code-block,copyable-code}.tsx` — input and copy hints.
+- `web/src/components/common/kbd.tsx` — compact shortcut mouse-rest expansion.
 - `web/src/styles.css` — existing portal layering and theme tokens; unchanged.
 - `web/tests/tooltip.test.ts` — native-title migration guard.
 

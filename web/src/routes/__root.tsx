@@ -165,7 +165,7 @@ function RootDocument({
         <HeadContent />
       </head>
       <body>
-        <Tooltip.Provider delay={400} closeDelay={0} timeout={400}>
+        <Tooltip.Provider delay={300} closeDelay={0} timeout={400}>
           {children}
           <Toaster
             theme={resolvedTheme}
