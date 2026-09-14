@@ -428,7 +428,7 @@ const SwimlaneRow = memo(function SwimlaneRow({
               <button
                 type="button"
                 aria-label="Unpin swimlane"
-                className="group/pin absolute inset-y-0 right-0 inline-flex size-3 shrink-0 translate-y-px items-center justify-center text-text-muted opacity-0 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:text-text"
+                className="group/pin absolute inset-0 m-auto inline-flex size-3 shrink-0 items-center justify-center text-text-muted opacity-0 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:text-text"
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
