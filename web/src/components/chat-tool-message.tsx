@@ -1,3 +1,4 @@
+import { Button as BaseButton } from "@base-ui/react/button";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
@@ -14,6 +15,7 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useStat
 import { toast } from "sonner";
 import { CodeBlock } from "@/components/common/code-block";
 import { MarkdownContent } from "@/components/common/markdown-content";
+import { Tooltip } from "@/components/common/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
   type TextareaCompletionMatch,
@@ -131,17 +133,18 @@ function CopyButton({ text }: { text: string }) {
   const { copied, copy } = useCopyToClipboard();
   const label = copied ? "Copied" : "Copy output";
   return (
-    <button
-      type="button"
-      className={HEADER_COPY_BUTTON_CLASS}
-      data-copied={copied}
-      title={label}
-      aria-label={label}
-      aria-live="polite"
-      onClick={() => void copy(text).catch((error) => console.error("Copy failed", error))}
-    >
-      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        className={HEADER_COPY_BUTTON_CLASS}
+        data-copied={copied}
+        aria-label={label}
+        aria-live="polite"
+        onClick={() => void copy(text).catch((error) => console.error("Copy failed", error))}
+      >
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -479,19 +482,21 @@ function PreparedLaunchCard({
             className="field-sizing-content block w-full resize-none overflow-hidden rounded-xl border border-border bg-background-selected py-2 pr-14 pl-4 font-mono text-base text-text focus-visible:outline-none md:pr-12 md:text-xs"
           />
         </label>
-        <button
-          type="submit"
-          disabled={create.isPending || state.launched}
-          aria-label={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}
-          title={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}
-          className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 enabled:hover:text-text-pop enabled:hover:[&_svg]:stroke-2 focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:stroke-2 disabled:cursor-not-allowed md:size-8"
-        >
-          {state.launched ? (
-            <Check className="size-4" aria-hidden="true" />
-          ) : (
-            <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden="true" />
-          )}
-        </button>
+        <Tooltip content={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}>
+          <BaseButton
+            focusableWhenDisabled
+            type="submit"
+            disabled={create.isPending || state.launched}
+            aria-label={state.launched ? "Swimlane launched" : "Launch prepared swimlane"}
+            className="absolute right-2 bottom-2 flex size-11 touch-manipulation items-center justify-center rounded text-text-muted transition-colors after:absolute after:-inset-1 not-aria-disabled:hover:text-text-pop not-aria-disabled:hover:[&_svg]:stroke-2 focus-visible:text-text-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:[&_svg]:stroke-2 aria-disabled:cursor-not-allowed md:size-8"
+          >
+            {state.launched ? (
+              <Check className="size-4" aria-hidden="true" />
+            ) : (
+              <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden="true" />
+            )}
+          </BaseButton>
+        </Tooltip>
       </div>
       {create.error ? (
         <p className="mt-1 text-xs text-status-crashed" role="alert">

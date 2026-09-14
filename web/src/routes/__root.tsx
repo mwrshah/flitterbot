@@ -1,3 +1,4 @@
+import { Tooltip } from "@base-ui/react/tooltip";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -164,19 +165,21 @@ function RootDocument({
         <HeadContent />
       </head>
       <body>
-        {children}
-        <Toaster
-          theme={resolvedTheme}
-          duration={4000}
-          toastOptions={{
-            style: {
-              background: "var(--background)",
-              color: "var(--text)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-            },
-          }}
-        />
+        <Tooltip.Provider delay={600} closeDelay={0} timeout={400}>
+          {children}
+          <Toaster
+            theme={resolvedTheme}
+            duration={4000}
+            toastOptions={{
+              style: {
+                background: "var(--background)",
+                color: "var(--text)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+              },
+            }}
+          />
+        </Tooltip.Provider>
         <Scripts />
       </body>
     </html>

@@ -1,3 +1,4 @@
+import { Button as BaseButton } from "@base-ui/react/button";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -28,6 +29,7 @@ import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "@/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
+import { Tooltip } from "@/components/common/tooltip";
 import {
   Command,
   CommandEmpty,
@@ -105,12 +107,14 @@ const ContextTicker = memo(function ContextTicker({ usage }: { usage: TokenUsage
   const contextTokens = usage ? formatTokens(usage.totalTokens) : "—";
 
   return (
-    <span
-      className="ml-auto shrink-0 text-xs text-text-muted tabular-nums"
-      title="Latest request. Pi reports cache reuse, but not cache misses, age, or expiry time."
-    >
-      cache: {cacheRead}/{contextTokens}
-    </span>
+    <Tooltip content="Latest request. Pi reports cache reuse, but not cache misses, age, or expiry time.">
+      <span
+        tabIndex={0}
+        className="ml-auto shrink-0 rounded text-xs text-text-muted tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+      >
+        cache: {cacheRead}/{contextTokens}
+      </span>
+    </Tooltip>
   );
 });
 
@@ -171,7 +175,7 @@ function ConversationFindBar({
       : "";
   const canMove = !loading && !error && matchCount > 0;
   const navigationButtonClass =
-    "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:opacity-35 sm:size-7";
+    "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop aria-disabled:opacity-35 sm:size-7";
 
   return (
     <form
@@ -233,35 +237,40 @@ function ConversationFindBar({
           {status}
         </span>
       )}
-      <button
-        type="button"
-        disabled={!canMove}
-        onClick={() => onMove(-1)}
-        className={navigationButtonClass}
-        aria-label="Previous match"
-        title="Previous match (Shift+Enter)"
-      >
-        <ChevronUpIcon className="size-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        disabled={!canMove}
-        onClick={() => onMove(1)}
-        className={navigationButtonClass}
-        aria-label="Next match"
-        title="Next match (Enter)"
-      >
-        <ChevronDownIcon className="size-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        onClick={onClose}
-        className="flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop sm:size-7"
-        aria-label="Close find"
-        title="Close find (Escape)"
-      >
-        <XIcon className="size-4" aria-hidden="true" />
-      </button>
+      <Tooltip content="Previous match (Shift+Enter)">
+        <BaseButton
+          focusableWhenDisabled
+          type="button"
+          disabled={!canMove}
+          onClick={() => onMove(-1)}
+          className={navigationButtonClass}
+          aria-label="Previous match"
+        >
+          <ChevronUpIcon className="size-4" aria-hidden="true" />
+        </BaseButton>
+      </Tooltip>
+      <Tooltip content="Next match (Enter)">
+        <BaseButton
+          focusableWhenDisabled
+          type="button"
+          disabled={!canMove}
+          onClick={() => onMove(1)}
+          className={navigationButtonClass}
+          aria-label="Next match"
+        >
+          <ChevronDownIcon className="size-4" aria-hidden="true" />
+        </BaseButton>
+      </Tooltip>
+      <Tooltip content="Close find (Escape)">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex size-9 shrink-0 touch-manipulation items-center justify-center rounded text-text-muted hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop sm:size-7"
+          aria-label="Close find"
+        >
+          <XIcon className="size-4" aria-hidden="true" />
+        </button>
+      </Tooltip>
     </form>
   );
 }
@@ -364,15 +373,18 @@ function CwdPicker({
             placeholder="@../project/"
             className="pr-10 font-mono text-xs"
           />
-          <button
-            type="button"
-            onClick={onCommit}
-            disabled={pending}
-            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sm text-text-muted hover:bg-background-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
-            title="switch cwd to this path"
-          >
-            →
-          </button>
+          <Tooltip content="switch cwd to this path">
+            <BaseButton
+              focusableWhenDisabled
+              aria-label="switch cwd to this path"
+              type="button"
+              onClick={onCommit}
+              disabled={pending}
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-sm text-text-muted hover:bg-background-hover hover:text-text aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            >
+              →
+            </BaseButton>
+          </Tooltip>
         </div>
         <CommandList className="max-h-80 overflow-y-auto p-1">
           {items.length === 0 && (
@@ -870,21 +882,23 @@ export function ChatPanel({
             <>
               <span className="text-text-muted text-sm shrink-0">|</span>
               <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
-                <button
-                  ref={cwdPickerButtonRef}
-                  type="button"
-                  onClick={openCwdPicker}
-                  disabled={!streamId}
-                  aria-label={`Edit path. Current path: ${cwdAbsolute}`}
-                  aria-expanded={cwdPickerOpen}
-                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-default disabled:hover:bg-background-muted disabled:hover:text-text-muted"
-                  title={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}
-                >
-                  <FolderPenIcon className="size-3.5" aria-hidden="true" />
-                  <span className="min-w-0 truncate text-text" aria-hidden="true">
-                    {worktree.cwd}
-                  </span>
-                </button>
+                <Tooltip content={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}>
+                  <BaseButton
+                    focusableWhenDisabled
+                    render={<button ref={cwdPickerButtonRef} />}
+                    type="button"
+                    onClick={openCwdPicker}
+                    disabled={!streamId}
+                    aria-label={`Edit path. Current path: ${cwdAbsolute}`}
+                    aria-expanded={cwdPickerOpen}
+                    className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop aria-disabled:cursor-default aria-disabled:hover:bg-background-muted aria-disabled:hover:text-text-muted"
+                  >
+                    <FolderPenIcon className="size-3.5" aria-hidden="true" />
+                    <span className="min-w-0 truncate text-text" aria-hidden="true">
+                      {worktree.cwd}
+                    </span>
+                  </BaseButton>
+                </Tooltip>
                 {cwdShortcutLabel && (
                   <ShortcutHint
                     label={cwdShortcutLabel}

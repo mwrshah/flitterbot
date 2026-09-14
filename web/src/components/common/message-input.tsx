@@ -1,3 +1,4 @@
+import { Button as BaseButton } from "@base-ui/react/button";
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { cn } from "cn";
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
+import { Tooltip } from "@/components/common/tooltip";
 import { ModelSelector } from "@/components/model-selector";
 import { useModifierLabel } from "@/hooks/platform";
 import {
@@ -340,41 +342,51 @@ function MessageInputHoverButtons({
             }}
             className="relative inline-flex max-w-full shrink-0"
           >
-            <button
-              ref={(node) => {
-                buttonRefs.current[index] = node;
-              }}
-              type="button"
-              tabIndex={-1}
-              disabled={disabled || slot.ghost || isReservedSendSlot}
-              onClick={slot.ghost || isReservedSendSlot ? undefined : () => onSlotAction(slot)}
-              className={cn(
-                buttonClassName,
-                (slot.ghost || isReservedSendSlot) && "invisible pointer-events-none",
-              )}
-              aria-hidden={slot.ghost || isReservedSendSlot ? "true" : undefined}
-              aria-label={
-                slot.ghost || isReservedSendSlot ? undefined : `Insert ${slot.button.label}`
-              }
-              title={
+            <Tooltip
+              content={
                 slot.ghost || isReservedSendSlot ? undefined : `Insert ${slot.button.insertText}`
               }
             >
-              {renderButtonContent(reserveButton.label, index)}
-            </button>
-            {isReservedSendSlot && (
-              <button
-                ref={sendButtonRef}
+              <BaseButton
+                focusableWhenDisabled={!slot.ghost && !isReservedSendSlot}
+                render={
+                  <button
+                    ref={(node) => {
+                      buttonRefs.current[index] = node;
+                    }}
+                  />
+                }
                 type="button"
                 tabIndex={-1}
-                disabled={disabled}
-                onClick={() => onSlotAction(slot)}
-                className={cn(buttonClassName, "absolute left-0 top-0 max-w-none")}
-                aria-label="Send inserted message"
-                title="Send inserted message"
+                disabled={disabled || slot.ghost || isReservedSendSlot}
+                onClick={slot.ghost || isReservedSendSlot ? undefined : () => onSlotAction(slot)}
+                className={cn(
+                  buttonClassName,
+                  (slot.ghost || isReservedSendSlot) && "invisible pointer-events-none",
+                )}
+                aria-hidden={slot.ghost || isReservedSendSlot ? "true" : undefined}
+                aria-label={
+                  slot.ghost || isReservedSendSlot ? undefined : `Insert ${slot.button.label}`
+                }
               >
-                {renderButtonContent(slot.button.label, index)}
-              </button>
+                {renderButtonContent(reserveButton.label, index)}
+              </BaseButton>
+            </Tooltip>
+            {isReservedSendSlot && (
+              <Tooltip content="Send inserted message">
+                <BaseButton
+                  focusableWhenDisabled
+                  render={<button ref={sendButtonRef} />}
+                  type="button"
+                  tabIndex={-1}
+                  disabled={disabled}
+                  onClick={() => onSlotAction(slot)}
+                  className={cn(buttonClassName, "absolute left-0 top-0 max-w-none")}
+                  aria-label="Send inserted message"
+                >
+                  {renderButtonContent(slot.button.label, index)}
+                </BaseButton>
+              </Tooltip>
             )}
           </span>
         );
@@ -829,16 +841,18 @@ export const MessageInput = memo(function MessageInput({
                       alt={`Pending attachment ${i + 1}`}
                       className="block h-auto max-h-24 w-auto max-w-full rounded-lg border border-border object-contain"
                     />
-                    <button
-                      type="button"
-                      disabled={isCompacting}
-                      onClick={() => removeImage(i)}
-                      className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Remove pending attachment ${i + 1}`}
-                      title="Remove attachment"
-                    >
-                      <XIcon className="size-4" aria-hidden="true" />
-                    </button>
+                    <Tooltip content="Remove attachment">
+                      <BaseButton
+                        focusableWhenDisabled
+                        type="button"
+                        disabled={isCompacting}
+                        onClick={() => removeImage(i)}
+                        className="absolute right-1 top-1 flex size-6 touch-manipulation items-center justify-center rounded-full bg-background text-status-crashed shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                        aria-label={`Remove pending attachment ${i + 1}`}
+                      >
+                        <XIcon className="size-4" aria-hidden="true" />
+                      </BaseButton>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
@@ -927,30 +941,33 @@ export const MessageInput = memo(function MessageInput({
               fillHeight && "flex-1 min-h-0",
             )}
           />
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={disabled || isCompacting}
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute left-2.5 top-3 rounded p-0.5 text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
-            title="Attach image"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <Tooltip content="Attach image">
+            <BaseButton
+              focusableWhenDisabled
+              aria-label="Attach image"
+              type="button"
+              tabIndex={-1}
+              disabled={disabled || isCompacting}
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute left-2.5 top-3 rounded p-0.5 text-text-muted transition-colors hover:text-text aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
-              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+            </BaseButton>
+          </Tooltip>
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
@@ -1005,17 +1022,19 @@ export const MessageInput = memo(function MessageInput({
                 </span>
               </Button>
             ) : isSessionBusy ? (
-              <Button
-                type="button"
-                variant="danger"
-                size="sm"
-                disabled={disabled || isInterruptPending || !onInterrupt}
-                onClick={() => onInterrupt?.()}
-                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
-                title="Stop"
-              >
-                <OctagonIcon className="size-4 fill-current" />
-              </Button>
+              <Tooltip content="Stop">
+                <BaseButton
+                  focusableWhenDisabled
+                  render={<Button variant="danger" size="sm" />}
+                  aria-label="Stop"
+                  type="button"
+                  disabled={disabled || isInterruptPending || !onInterrupt}
+                  onClick={() => onInterrupt?.()}
+                  className="h-10 w-10 aria-disabled:opacity-50 sm:h-7 sm:w-auto sm:px-3"
+                >
+                  <OctagonIcon className="size-4 fill-current" />
+                </BaseButton>
+              </Tooltip>
             ) : (
               <Button
                 type="button"

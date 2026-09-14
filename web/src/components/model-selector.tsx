@@ -1,3 +1,4 @@
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { Popover } from "@base-ui/react/popover";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
+import { Tooltip } from "@/components/common/tooltip";
 import {
   Command,
   CommandGroup,
@@ -306,37 +308,45 @@ export const ModelSelector = memo(function ModelSelector({
 
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
-      <Popover.Trigger
-        disabled={disabled || !piSessionId}
-        render={
-          <Button
-            type="button"
-            variant="subtle"
-            size="sm"
-            className={cn(
-              "group h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
-              subdued && "bg-transparent",
-              compact ? "px-1.5" : "px-2",
-            )}
-            title={
-              currentModel
-                ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
-                : "Pick a model"
-            }
-          />
+      <Tooltip
+        content={
+          currentModel
+            ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
+            : "Pick a model"
         }
       >
-        <span
-          className={cn(
-            "truncate max-w-[180px]",
-            subdued && "text-border-muted group-hover:text-text",
-            compact && "sr-only",
-          )}
+        <Popover.Trigger
+          disabled={disabled || !piSessionId}
+          render={
+            <ButtonPrimitive
+              focusableWhenDisabled
+              render={
+                <Button
+                  type="button"
+                  variant="subtle"
+                  size="sm"
+                  className={cn(
+                    "aria-disabled:opacity-50 group h-10 border-border-muted bg-background text-sm text-text-muted hover:border-border hover:bg-background-hover hover:text-text sm:h-7",
+                    subdued && "bg-transparent",
+                    compact ? "px-1.5" : "px-2",
+                  )}
+                />
+              }
+            />
+          }
         >
-          {triggerLabel}
-        </span>
-        <ChevronDownIcon className={cn("size-3 shrink-0", subdued && "text-border-muted")} />
-      </Popover.Trigger>
+          <span
+            className={cn(
+              "truncate max-w-[180px]",
+              subdued && "text-border-muted group-hover:text-text",
+              compact && "sr-only",
+            )}
+          >
+            {triggerLabel}
+          </span>
+          <ChevronDownIcon className={cn("size-3 shrink-0", subdued && "text-border-muted")} />
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Positioner
           side="bottom"
@@ -518,22 +528,24 @@ function ThinkingLevelCommandItem({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      data-checked={selected}
-      aria-pressed={selected}
-      disabled={disabled}
-      onPointerDown={(event) => event.preventDefault()}
-      onClick={onSelect}
-      title={title}
-      className={cn(
-        "w-auto cursor-default rounded-md border border-border-muted px-2 py-1 text-[11px] leading-none text-text-muted outline-none disabled:pointer-events-none disabled:opacity-50",
-        "hover:border-border hover:bg-background-hover hover:text-text focus-visible:border-border focus-visible:bg-background-hover focus-visible:text-text",
-        "data-[checked=true]:border-border data-[checked=true]:bg-background-selected data-[checked=true]:text-text",
-      )}
-    >
-      {THINKING_LEVEL_LABELS[level]}
-    </button>
+    <Tooltip content={title}>
+      <ButtonPrimitive
+        focusableWhenDisabled
+        type="button"
+        data-checked={selected}
+        aria-pressed={selected}
+        disabled={disabled}
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={onSelect}
+        className={cn(
+          "w-auto cursor-default rounded-md border border-border-muted px-2 py-1 text-[11px] leading-none text-text-muted outline-none aria-disabled:opacity-50",
+          "hover:border-border hover:bg-background-hover hover:text-text focus-visible:border-border focus-visible:bg-background-hover focus-visible:text-text",
+          "data-[checked=true]:border-border data-[checked=true]:bg-background-selected data-[checked=true]:text-text",
+        )}
+      >
+        {THINKING_LEVEL_LABELS[level]}
+      </ButtonPrimitive>
+    </Tooltip>
   );
 }
 
@@ -586,21 +598,26 @@ function ModelCommandItem({
         </span>
       </div>
       <AuthBadge model={model} />
-      <button
-        type="button"
-        disabled={pinDisabled}
-        onPointerDown={(event) => event.preventDefault()}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onTogglePin();
-        }}
-        className="shrink-0 self-center rounded p-1 text-border-pop transition-colors hover:bg-background-hover hover:text-border-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label={pinTitle}
-        title={pinTitle}
-      >
-        <StarIcon className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
-      </button>
+      <Tooltip content={pinTitle}>
+        <ButtonPrimitive
+          focusableWhenDisabled
+          type="button"
+          disabled={pinDisabled}
+          onClickCapture={(event) => {
+            if (pinDisabled) event.stopPropagation();
+          }}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onTogglePin();
+          }}
+          className="shrink-0 self-center rounded p-1 text-border-pop transition-colors hover:bg-background-hover hover:text-border-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+          aria-label={pinTitle}
+        >
+          <StarIcon className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
+        </ButtonPrimitive>
+      </Tooltip>
     </CommandItem>
   );
 }
@@ -619,31 +636,37 @@ function matchesModelId(
 function AuthBadge({ model }: { model: ModelListItem }) {
   if (model.authKind === "subscription") {
     return (
-      <span
-        className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
-        title={`Using subscription/OAuth token auth for provider "${model.provider}"`}
-      >
-        subscription
-      </span>
+      <Tooltip content={`Using subscription/OAuth token auth for provider "${model.provider}"`}>
+        <span
+          tabIndex={0}
+          className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+        >
+          subscription
+        </span>
+      </Tooltip>
     );
   }
   if (model.authKind === "api_key") {
     return (
-      <span
-        className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
-        title={`Using API key auth for provider "${model.provider}"`}
-      >
-        api key
-      </span>
+      <Tooltip content={`Using API key auth for provider "${model.provider}"`}>
+        <span
+          tabIndex={0}
+          className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+        >
+          api key
+        </span>
+      </Tooltip>
     );
   }
   return (
-    <span
-      className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
-      title={`No auth configured for provider "${model.provider}"`}
-    >
-      no auth
-    </span>
+    <Tooltip content={`No auth configured for provider "${model.provider}"`}>
+      <span
+        tabIndex={0}
+        className="shrink-0 self-center rounded border border-border-muted bg-background-muted px-1.5 py-0.5 text-[10px] text-text-muted"
+      >
+        no auth
+      </span>
+    </Tooltip>
   );
 }
 

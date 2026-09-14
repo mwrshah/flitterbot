@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { Diff, type FileData, Hunk, type HunkData, parseDiff } from "react-diff-view";
+import { Tooltip } from "@/components/common/tooltip";
 import "react-diff-view/style/index.css";
 import { cn } from "cn";
 import { toast } from "sonner";
@@ -263,15 +264,16 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
     <div className="flex flex-col h-full bg-background">
       <div className="flex justify-between items-center gap-1 mx-3 mt-3 mb-2">
         {showSettings ? (
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="flex size-8 items-center justify-center rounded-lg text-text-muted outline-none hover:bg-background-hover hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
-            title="Settings"
-            aria-label="Open settings"
-          >
-            <SettingsIcon className="size-4" aria-hidden="true" />
-          </button>
+          <Tooltip content="Settings">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="flex size-8 items-center justify-center rounded-lg text-text-muted outline-none hover:bg-background-hover hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
+              aria-label="Open settings"
+            >
+              <SettingsIcon className="size-4" aria-hidden="true" />
+            </button>
+          </Tooltip>
         ) : statusBanner ? (
           <div
             className={cn("px-3 py-1.5 rounded-md text-xs font-medium", statusBanner.colorClass)}
@@ -302,26 +304,27 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
             Info
             {infoShortcutLabel && <ShortcutHint label={infoShortcutLabel} className="ml-1" />}
           </ToggleGroupItem>
-          <ToggleGroupItem
-            value="diff"
-            disabled={!hasWorktree}
-            title={showDiff ? "Reload diff" : undefined}
-            onClick={() => {
-              if (showDiff) reloadDiff();
-            }}
-            className="group text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
-          >
-            Diff
-            {diffShortcutLabel && (
-              <ShortcutHint
-                label={diffShortcutLabel}
-                actionText="RELOAD"
-                actionOnHover={showDiff}
-                actionKeycap
-                className="ml-1"
-              />
-            )}
-          </ToggleGroupItem>
+          <Tooltip content={showDiff ? "Reload diff" : undefined}>
+            <ToggleGroupItem
+              value="diff"
+              disabled={!hasWorktree}
+              onClick={() => {
+                if (showDiff) reloadDiff();
+              }}
+              className="group text-sm aria-pressed:bg-background-selected aria-pressed:text-text"
+            >
+              Diff
+              {diffShortcutLabel && (
+                <ShortcutHint
+                  label={diffShortcutLabel}
+                  actionText="RELOAD"
+                  actionOnHover={showDiff}
+                  actionKeycap
+                  className="ml-1"
+                />
+              )}
+            </ToggleGroupItem>
+          </Tooltip>
         </ToggleGroup>
       </div>
 
@@ -512,9 +515,11 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   <span className="text-[10px] text-text-muted">copyPaths</span>
                   <ul className="mt-0.5 flex flex-col gap-0.5">
                     {worktree?.copyPaths?.map((p) => (
-                      <li key={p} className="text-xs text-text-muted font-mono truncate" title={p}>
-                        {p}
-                      </li>
+                      <Tooltip key={p} content={p}>
+                        <li tabIndex={0} className="text-xs text-text-muted font-mono truncate">
+                          {p}
+                        </li>
+                      </Tooltip>
                     ))}
                   </ul>
                 </div>
@@ -524,9 +529,11 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
                   <span className="text-[10px] text-text-muted">postCreate</span>
                   <ul className="mt-0.5 flex flex-col gap-0.5">
                     {worktree?.postCreate?.map((c) => (
-                      <li key={c} className="text-xs text-text-muted font-mono truncate" title={c}>
-                        {c}
-                      </li>
+                      <Tooltip key={c} content={c}>
+                        <li tabIndex={0} className="text-xs text-text-muted font-mono truncate">
+                          {c}
+                        </li>
+                      </Tooltip>
                     ))}
                   </ul>
                 </div>

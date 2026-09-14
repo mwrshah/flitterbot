@@ -1,8 +1,10 @@
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/common/button";
+import { Tooltip } from "@/components/common/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -139,9 +141,11 @@ function ProviderRow({
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="truncate text-sm font-medium text-text">{provider.name}</span>
           {isConnected && (
-            <span className="size-2.5 shrink-0 rounded-full bg-status-active" title="Connected">
-              <span className="sr-only">Connected</span>
-            </span>
+            <Tooltip content="Connected">
+              <span tabIndex={0} className="size-2.5 shrink-0 rounded-full bg-status-active">
+                <span className="sr-only">Connected</span>
+              </span>
+            </Tooltip>
           )}
         </div>
         {isConnected && (
@@ -363,17 +367,17 @@ function AuthPromptForm({
       {prompt.type === "select" ? (
         <div className="flex flex-col gap-1.5">
           {(prompt.options ?? []).map((opt) => (
-            <Button
-              key={opt.id}
-              type="button"
-              variant="subtle"
-              size="sm"
-              disabled={pending}
-              onClick={() => onSubmit(opt.id)}
-              title={opt.description}
-            >
-              {opt.label}
-            </Button>
+            <Tooltip key={opt.id} content={opt.description}>
+              <ButtonPrimitive
+                focusableWhenDisabled
+                render={<Button variant="subtle" size="sm" className="aria-disabled:opacity-50" />}
+                type="button"
+                disabled={pending}
+                onClick={() => onSubmit(opt.id)}
+              >
+                {opt.label}
+              </ButtonPrimitive>
+            </Tooltip>
           ))}
         </div>
       ) : (

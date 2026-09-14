@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { MessageInput } from "@/components/common/message-input";
 import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
+import { Tooltip } from "@/components/common/tooltip";
 import { RuntimeHealthIndicator } from "@/components/runtime-health-indicator";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -127,20 +128,21 @@ function CopyButton({ text }: { text: string }) {
   const label = copied ? "Copied" : "Copy message";
 
   return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        void copy(text).catch((error) => console.error("Failed to copy message", error));
-      }}
-      title={label}
-      aria-label={label}
-      className={`absolute bottom-1.5 right-1.5 cursor-pointer rounded p-1 transition-colors ${
-        copied ? "text-status-active" : "text-text-muted hover:text-text"
-      }`}
-    >
-      <CopyIcon className="w-3.5 h-3.5" aria-hidden="true" />
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          void copy(text).catch((error) => console.error("Failed to copy message", error));
+        }}
+        aria-label={label}
+        className={`absolute bottom-1.5 right-1.5 cursor-pointer rounded p-1 transition-colors ${
+          copied ? "text-status-active" : "text-text-muted hover:text-text"
+        }`}
+      >
+        <CopyIcon className="w-3.5 h-3.5" aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -339,14 +341,16 @@ export function Surface() {
         </div>
         <div className="flex items-center gap-2">
           <RuntimeHealthIndicator />
-          <button
-            type="button"
-            onClick={openSettings}
-            className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-background-hover hover:text-text"
-            title="Settings"
-          >
-            <SettingsIcon className="size-4" />
-          </button>
+          <Tooltip content="Settings">
+            <button
+              type="button"
+              onClick={openSettings}
+              className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-background-hover hover:text-text"
+              aria-label="Settings"
+            >
+              <SettingsIcon className="size-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 

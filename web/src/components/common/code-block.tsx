@@ -9,6 +9,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import htmlLanguage from "highlight.js/lib/languages/xml";
 import { Check, Copy } from "lucide-react";
 import { useMemo } from "react";
+import { Tooltip } from "@/components/common/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 hljs.registerLanguage("javascript", javascript);
@@ -54,19 +55,24 @@ export function CodeBlock({
     <div className="mt-3 overflow-hidden rounded-lg border border-border pr-1">
       <div className="flex items-center justify-between border-b border-border bg-background-muted px-3 py-1.5">
         <span className="font-mono text-xs text-text-muted">{displayLanguage}</span>
-        <button
-          type="button"
-          onClick={() =>
-            void copy(code).catch((error) => console.error("Failed to copy code", error))
-          }
-          data-copied={copied ? "true" : "false"}
-          className="flex h-7 w-7 items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text"
-          title={copyLabel}
-          aria-label={copyLabel}
-          aria-live="polite"
-        >
-          {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
-        </button>
+        <Tooltip content={copyLabel}>
+          <button
+            type="button"
+            onClick={() =>
+              void copy(code).catch((error) => console.error("Failed to copy code", error))
+            }
+            data-copied={copied ? "true" : "false"}
+            className="flex h-7 w-7 items-center justify-center rounded text-text-muted transition-colors hover:bg-background-hover hover:text-text"
+            aria-label={copyLabel}
+            aria-live="polite"
+          >
+            {copied ? (
+              <Check aria-hidden="true" size={14} />
+            ) : (
+              <Copy aria-hidden="true" size={14} />
+            )}
+          </button>
+        </Tooltip>
       </div>
       <div className="max-h-96 overflow-auto">
         <pre className="m-0 rounded-none border-0 !bg-transparent px-4 pb-4 pt-3 font-mono text-xs text-text">

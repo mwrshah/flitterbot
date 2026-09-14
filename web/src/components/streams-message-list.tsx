@@ -29,6 +29,7 @@ import {
   useState,
 } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
+import { Tooltip } from "@/components/common/tooltip";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
 import { activeUserMessageIdForViewport } from "@/lib/user-message-markers";
@@ -190,24 +191,24 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             const ordinal = markerWindow.startIndex + index + 1;
             const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messageIds.length}`;
             return (
-              <button
-                key={messageId}
-                type="button"
-                aria-label={label}
-                aria-current={selected ? "true" : undefined}
-                title={label}
-                onClick={() => onSelect(messageId)}
-                className={cn(
-                  "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
-                  markerHitboxClassName,
-                  failed ? "text-status-crashed" : selected ? "text-text" : undefined,
-                )}
-              >
-                <span
-                  className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
-                  aria-hidden="true"
-                />
-              </button>
+              <Tooltip key={messageId} content={label} side="left">
+                <button
+                  type="button"
+                  aria-label={label}
+                  aria-current={selected ? "true" : undefined}
+                  onClick={() => onSelect(messageId)}
+                  className={cn(
+                    "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
+                    markerHitboxClassName,
+                    failed ? "text-status-crashed" : selected ? "text-text" : undefined,
+                  )}
+                >
+                  <span
+                    className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
+                </button>
+              </Tooltip>
             );
           })}
           {markerWindow.hiddenAfter > 0 && (
@@ -215,21 +216,22 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <button
-        type="button"
-        aria-label="Go to end of conversation"
-        title="Go to end of conversation"
-        onClick={onScrollToEnd}
-        className={cn(
-          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-6 min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
-          markerHitboxClassName,
-        )}
-      >
-        <span
-          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-hover:left-0.5 motion-reduce:transition-none"
-          aria-hidden="true"
-        />
-      </button>
+      <Tooltip content="Go to end of conversation" side="left">
+        <button
+          type="button"
+          aria-label="Go to end of conversation"
+          onClick={onScrollToEnd}
+          className={cn(
+            "group user-message-marker user-message-end-marker absolute bottom-0 flex h-6 min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
+            markerHitboxClassName,
+          )}
+        >
+          <span
+            className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-hover:left-0.5 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </button>
+      </Tooltip>
       {navigation?.error && (
         <span className="sr-only" role="status">
           {navigation.error}

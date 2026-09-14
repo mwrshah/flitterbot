@@ -1,3 +1,4 @@
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { cn } from "cn";
@@ -20,6 +21,7 @@ import { toast } from "sonner";
 import logoBlack from "@/assets/flitterbot_logo_black_small.png";
 import logoWhite from "@/assets/flitterbot_logo_white_small.png";
 import { ShortcutHint } from "@/components/common/kbd";
+import { Tooltip } from "@/components/common/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -1005,17 +1007,21 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
             if (!createSwimlaneMutation.isPending) createSwimlaneMutation.mutate();
           }}
         >
-          <button
-            type="button"
-            disabled={createSwimlaneMutation.isPending}
-            aria-label="New swimlane"
-            title={
+          <Tooltip
+            content={
               newSwimlaneShortcutHint ? `New swimlane (${newSwimlaneShortcutHint})` : "New swimlane"
             }
-            className="flex size-6 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <PlusIcon className="size-3" aria-hidden />
-          </button>
+            <ButtonPrimitive
+              focusableWhenDisabled
+              type="button"
+              disabled={createSwimlaneMutation.isPending}
+              aria-label="New swimlane"
+              className="flex size-6 items-center justify-center rounded text-sm leading-none text-text-muted transition-colors group-hover:bg-background-hover group-hover:text-text aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+            >
+              <PlusIcon className="size-3" aria-hidden />
+            </ButtonPrimitive>
+          </Tooltip>
         </div>
       </div>
 

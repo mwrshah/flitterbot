@@ -2,6 +2,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useState } from "react";
 import { ToolMessage } from "@/components/chat-tool-message";
 import { MarkdownContent } from "@/components/common/markdown-content";
+import { Tooltip } from "@/components/common/tooltip";
 import { MessageActionsMenu } from "@/components/message-actions-menu";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
@@ -53,19 +54,20 @@ function MessageCopyButton({ text, target }: { text: string; target: HTMLElement
   const label = copied ? "Copied" : "Copy message";
   const Icon = copied ? CheckIcon : CopyIcon;
   return (
-    <button
-      type="button"
-      onClick={() =>
-        void copy(text).catch((error) => console.error("Failed to copy message", error))
-      }
-      data-copied={copied}
-      className="absolute bottom-1.5 right-1.5 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
-      title={label}
-      aria-label={label}
-      aria-live="polite"
-    >
-      <Icon className="size-4" aria-hidden="true" />
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        onClick={() =>
+          void copy(text).catch((error) => console.error("Failed to copy message", error))
+        }
+        data-copied={copied}
+        className="absolute bottom-1.5 right-1.5 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
+        aria-label={label}
+        aria-live="polite"
+      >
+        <Icon className="size-4" aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 
