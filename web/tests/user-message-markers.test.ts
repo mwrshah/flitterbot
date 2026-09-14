@@ -32,7 +32,10 @@ test("active marker ignores mounted user messages above the visible viewport", (
   assert.equal(
     activeUserMessageIdForViewport(
       rows,
-      ["offscreen-user", "visible-user"],
+      [
+        { id: "offscreen-user", content: "Older preview" },
+        { id: "visible-user", content: "Visible preview" },
+      ],
       virtualItems,
       100,
       240,
@@ -42,7 +45,10 @@ test("active marker ignores mounted user messages above the visible viewport", (
   assert.equal(
     activeUserMessageIdForViewport(
       rows,
-      ["offscreen-user", "visible-user"],
+      [
+        { id: "offscreen-user", content: "Older preview" },
+        { id: "visible-user", content: "Visible preview" },
+      ],
       virtualItems,
       100,
       190,
@@ -59,7 +65,16 @@ test("active marker uses the geometrically topmost visible user message", () => 
   ];
 
   assert.equal(
-    activeUserMessageIdForViewport(rows, ["top-user", "lower-user"], virtualItems, 100, 240),
+    activeUserMessageIdForViewport(
+      rows,
+      [
+        { id: "top-user", content: "Top preview" },
+        { id: "lower-user", content: "Lower preview" },
+      ],
+      virtualItems,
+      100,
+      240,
+    ),
     "top-user",
   );
 });

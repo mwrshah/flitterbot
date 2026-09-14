@@ -64,7 +64,7 @@ test("history recovery discards old pagination before refreshing the newest snap
     queryKey: historyQueryKey(sessionId),
     queryFn: async () => ({
       items: [message(`newest-${++newestVersion}`)],
-      userMessageIndex: [`user-${newestVersion}`],
+      userMessageIndex: [{ id: `user-${newestVersion}`, content: "Preview" }],
       historyPosition: { incarnation: "runtime", sequence: newestVersion },
       olderPageCursor: "older",
     }),
@@ -91,7 +91,7 @@ test("history recovery discards old pagination before refreshing the newest snap
   );
   assert.deepEqual(result.pageParams, [undefined]);
   assert.deepEqual(result.pages[0]?.historyPosition, { incarnation: "runtime", sequence: 2 });
-  assert.deepEqual(result.pages[0]?.userMessageIndex, ["user-2"]);
+  assert.deepEqual(result.pages[0]?.userMessageIndex, [{ id: "user-2", content: "Preview" }]);
   queryClient.clear();
 });
 
@@ -124,7 +124,7 @@ test("failed history refresh restores and invalidates the previous pages", async
   queryClient.clear();
 });
 
-test("history live upserts maintain the user-message ID index exactly once", () => {
+test("history live upserts maintain capped previews without duplicate IDs", () => {
   const sessionId = "session";
   const queryClient = new QueryClient();
   queryClient.setQueryData<InfiniteData<StreamsHistoryResponse, string | undefined>>(
@@ -133,7 +133,10 @@ test("history live upserts maintain the user-message ID index exactly once", () 
       pages: [
         {
           items: [userMessage("loaded-user")],
-          userMessageIndex: ["loaded-user"],
+          userMessageIndex: [
+            { id: "unloaded-user", content: "Older message preview" },
+            { id: "loaded-user", content: "loaded-user" },
+          ],
         },
       ],
       pageParams: [undefined],
@@ -146,17 +149,28 @@ test("history live upserts maintain the user-message ID index exactly once", () 
       )!
       .pages.at(-1)!.userMessageIndex;
 
-  upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user")]);
-  assert.deepEqual(userMessageIndex(), ["loaded-user", "new-user"]);
+  const existing = [
+    { id: "unloaded-user", content: "Older message preview" },
+    { id: "loaded-user", content: "loaded-user" },
+  ];
+  upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user", "x".repeat(600))]);
+  assert.deepEqual(userMessageIndex(), [
+    ...existing,
+    { id: "new-user", content: `${"x".repeat(499)}…` },
+  ]);
 
   upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user", "replacement")]);
-  assert.deepEqual(userMessageIndex(), ["loaded-user", "new-user"]);
+  const updated = [...existing, { id: "new-user", content: "replacement" }];
+  assert.deepEqual(userMessageIndex(), updated);
 
+  const unchangedIndex = userMessageIndex();
+  upsertNewestHistoryItems(queryClient, sessionId, [userMessage("new-user", "replacement")]);
+  assert.equal(userMessageIndex(), unchangedIndex);
   upsertNewestHistoryItems(queryClient, sessionId, [message("new-assistant")]);
-  assert.deepEqual(userMessageIndex(), ["loaded-user", "new-user"]);
+  assert.equal(userMessageIndex(), unchangedIndex);
 
   upsertNewestHistoryItems(queryClient, sessionId, [message("new-user", "role replacement")]);
-  assert.deepEqual(userMessageIndex(), ["loaded-user"]);
+  assert.deepEqual(userMessageIndex(), existing);
   queryClient.clear();
 });
 

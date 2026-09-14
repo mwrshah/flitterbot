@@ -40,6 +40,7 @@ export type {
   TokenUsage,
 } from "../../../src/contracts/timeline.ts";
 export type { TranscriptPageResponse } from "../../../src/contracts/transcript.ts";
+export type { UserMessageIndexEntry } from "../../../src/contracts/user-message-index.ts";
 export type {
   TurnQueueItemSummary,
   TurnQueueSnapshot,

@@ -32,6 +32,7 @@ import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message
 import { Tooltip } from "@/components/common/tooltip";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
+import type { UserMessageIndexEntry } from "@/lib/types";
 import { activeUserMessageIdForViewport } from "@/lib/user-message-markers";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
@@ -50,7 +51,7 @@ export type StreamsMessageListHandle = {
 type StreamsMessageListProps = {
   piSessionId: string;
   rows: ConversationRow[];
-  userMessageIndex: string[];
+  userMessageIndex: UserMessageIndexEntry[];
   activeFindRowIndex?: number;
   onPruneRequested?: (entryId: string) => void;
   onForkRequested?: (entryId: string) => void;
@@ -69,7 +70,7 @@ type MarkerNavigation = {
 
 type UserMessageMarkersProps = {
   scrollViewportRef: RefObject<HTMLDivElement | null>;
-  messageIds: string[];
+  messages: UserMessageIndexEntry[];
   activeMessageId?: string;
   windowCenterMessageId?: string;
   navigation?: MarkerNavigation;
@@ -100,7 +101,7 @@ const markerHitboxClassName =
 
 const UserMessageMarkers = memo(function UserMessageMarkers({
   scrollViewportRef,
-  messageIds,
+  messages,
   activeMessageId,
   windowCenterMessageId,
   navigation,
@@ -131,38 +132,40 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     [scrollViewportRef],
   );
   const markerWindow = useMemo(() => {
-    const requestedCenter = windowCenterMessageId ?? activeMessageId ?? messageIds.at(-1);
-    const requestedIndex = requestedCenter ? messageIds.indexOf(requestedCenter) : -1;
-    const centerIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, messageIds.length - 1);
-    const windowSize = Math.min(messageIds.length, MARKERS_EACH_SIDE * 2 + 1);
+    const requestedCenter = windowCenterMessageId ?? activeMessageId ?? messages.at(-1)?.id;
+    const requestedIndex = requestedCenter
+      ? messages.findIndex((entry) => entry.id === requestedCenter)
+      : -1;
+    const centerIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, messages.length - 1);
+    const windowSize = Math.min(messages.length, MARKERS_EACH_SIDE * 2 + 1);
     const windowStart = Math.min(
       Math.max(0, centerIndex - MARKERS_EACH_SIDE),
-      messageIds.length - windowSize,
+      messages.length - windowSize,
     );
     const windowEnd = windowStart + windowSize;
     const startIndex = windowStart + Number(windowStart > 0);
-    const endIndex = windowEnd - Number(windowEnd < messageIds.length);
+    const endIndex = windowEnd - Number(windowEnd < messages.length);
     return {
-      centerMessageId: messageIds[centerIndex],
-      messageIds: messageIds.slice(startIndex, endIndex),
+      centerMessageId: messages[centerIndex]?.id,
+      messages: messages.slice(startIndex, endIndex),
       startIndex,
       hiddenBefore: startIndex,
-      hiddenAfter: messageIds.length - endIndex,
+      hiddenAfter: messages.length - endIndex,
     };
-  }, [activeMessageId, messageIds, windowCenterMessageId]);
+  }, [activeMessageId, messages, windowCenterMessageId]);
 
   useLayoutEffect(() => {
     const rail = railRef.current;
     if (!rail || !markerWindow.centerMessageId) return;
     const index =
-      markerWindow.messageIds.indexOf(markerWindow.centerMessageId) +
+      markerWindow.messages.findIndex((entry) => entry.id === markerWindow.centerMessageId) +
       Number(markerWindow.hiddenBefore > 0);
     rail.scrollTop = index * MARKER_ROW_HEIGHT - (rail.clientHeight - MARKER_ROW_HEIGHT) / 2;
   }, [markerWindow]);
 
-  if (messageIds.length === 0) return null;
+  if (messages.length === 0) return null;
   const markerRowCount =
-    markerWindow.messageIds.length +
+    markerWindow.messages.length +
     Number(markerWindow.hiddenBefore > 0) +
     Number(markerWindow.hiddenAfter > 0);
 
@@ -185,13 +188,20 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           {markerWindow.hiddenBefore > 0 && (
             <MarkerOverflowCount count={markerWindow.hiddenBefore} direction="earlier" />
           )}
-          {markerWindow.messageIds.map((messageId, index) => {
+          {markerWindow.messages.map((message, index) => {
+            const messageId = message.id;
             const selected = messageId === activeMessageId;
             const failed = messageId === navigation?.targetMessageId && Boolean(navigation.error);
             const ordinal = markerWindow.startIndex + index + 1;
-            const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messageIds.length}`;
+            const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messages.length}`;
             return (
-              <Tooltip key={messageId} content={label} side="left">
+              <Tooltip
+                key={messageId}
+                content={message.content || label}
+                delay={0}
+                side="left"
+                sideOffset={-134}
+              >
                 <button
                   type="button"
                   aria-label={label}
@@ -216,7 +226,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <Tooltip content="Go to end of conversation" side="left">
+      <Tooltip content="Go to end of conversation" delay={0} side="left" sideOffset={-134}>
         <button
           type="button"
           aria-label="Go to end of conversation"
@@ -392,7 +402,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   useEffect(() => {
     if (!markerNavigation) return;
     const { targetMessageId } = markerNavigation;
-    if (!userMessageIndex.includes(targetMessageId)) {
+    if (!userMessageIndex.some((entry) => entry.id === targetMessageId)) {
       setMarkerNavigation(undefined);
       return;
     }
@@ -445,7 +455,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         if (distanceFromEnd <= scrollElement.clientHeight * ratio) scrollToEnd();
       },
       navigateToLatestUserMessage() {
-        const messageId = userMessageIndex.at(-1);
+        const messageId = userMessageIndex.at(-1)?.id;
         if (!messageId) return;
         selectUserMessage(messageId);
       },
@@ -508,7 +518,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       </div>
       <UserMessageMarkers
         scrollViewportRef={scrollRef}
-        messageIds={userMessageIndex}
+        messages={userMessageIndex}
         activeMessageId={viewportUserMessageId}
         windowCenterMessageId={markerWindowMessageId}
         navigation={markerNavigation}
