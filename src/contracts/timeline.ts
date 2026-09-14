@@ -65,3 +65,9 @@ export type ChatTimelineTool = {
 };
 
 export type ChatTimelineItem = ChatTimelineMessage | ChatTimelineTool;
+
+export function isUserTimelineMessage(
+  item: ChatTimelineItem,
+): item is ChatTimelineMessage & { role: "user" } {
+  return item.kind === "message" && item.role === "user";
+}

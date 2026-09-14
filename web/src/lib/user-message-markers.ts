@@ -1,3 +1,4 @@
+import { isUserTimelineMessage } from "../../../src/contracts/timeline.ts";
 import type { ConversationRow } from "./conversation-rows";
 import type { UserMessageIndexEntry } from "./types";
 
@@ -23,7 +24,7 @@ export function activeUserMessageIdForViewport(
       topmostRow = { index: item.index, start: item.start };
     }
     const message = rows[item.index]?.message;
-    if (message?.role !== "user") continue;
+    if (!message || !isUserTimelineMessage(message)) continue;
     if (!topmostVisible || item.start < topmostVisible.start) {
       topmostVisible = { id: message.id, start: item.start };
     }
@@ -34,12 +35,12 @@ export function activeUserMessageIdForViewport(
 
   for (let index = Math.min(topmostRow.index, rows.length - 1); index >= 0; index--) {
     const message = rows[index]?.message;
-    if (message?.role === "user") return message.id;
+    if (message && isUserTimelineMessage(message)) return message.id;
   }
 
   for (let index = topmostRow.index + 1; index < rows.length; index++) {
     const message = rows[index]?.message;
-    if (message?.role !== "user") continue;
+    if (!message || !isUserTimelineMessage(message)) continue;
     const nextUserIndex = userMessageIndex.findIndex((entry) => entry.id === message.id);
     return nextUserIndex > 0 ? userMessageIndex[nextUserIndex - 1]?.id : message.id;
   }

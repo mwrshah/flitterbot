@@ -1,5 +1,7 @@
 import type { ChatTimelineItem, ChatTimelineMessage, ChatTimelineTool } from "./types";
 
+export const CONTEXT_COMPACTED_LABEL = "Context compacted";
+
 export type ConversationToolBlock = {
   start: ChatTimelineTool;
   end?: ChatTimelineTool;

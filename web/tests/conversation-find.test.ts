@@ -41,6 +41,23 @@ test("conversation find counts, navigates, and merges route history", () => {
   );
 });
 
+test("conversation find indexes the rendered context-compacted divider", () => {
+  const compactedRow = row("compaction", "Summary without the rendered label");
+  compactedRow.message = {
+    ...compactedRow.message!,
+    role: "user",
+    compaction: true,
+  };
+
+  const results = findConversationMatches(
+    buildConversationFindIndex([row("ordinary", "Ordinary message"), compactedRow]),
+    "CONTEXT COMPACTED",
+  );
+
+  assert.equal(results.matchCount, 1);
+  assert.equal(conversationFindRowAt(results, 0), 1);
+});
+
 test("conversation find indexes tool names and arguments but not results", () => {
   const toolRow: ConversationRow = {
     key: "tool",

@@ -7,6 +7,7 @@ import { MessageActionsMenu } from "@/components/message-actions-menu";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
   buildConversationContentParts,
+  CONTEXT_COMPACTED_LABEL,
   type ConversationRow,
   type ConversationToolBlock,
 } from "@/lib/conversation-rows";
@@ -186,7 +187,7 @@ function UserMessageRow({
       {message.compaction && (
         <div className="mx-4 mt-8 mb-1 flex items-center gap-2 text-[10px] tracking-wide text-text-muted uppercase">
           <hr className="flex-1 border-t border-border" />
-          <span>Context compacted</span>
+          <span>{CONTEXT_COMPACTED_LABEL}</span>
           <hr className="flex-1 border-t border-border" />
         </div>
       )}

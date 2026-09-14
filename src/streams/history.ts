@@ -9,14 +9,15 @@ import {
   STREAMS_HISTORY_MAX_VISIBLE_ROW_LIMIT,
   type StreamsHistoryLimit,
 } from "../contracts/control-surface-api.ts";
-import type {
-  ChatTimelineItem,
-  ChatTimelineMessage,
-  ChatTimelineMessageBlock,
-  ChatTimelineTool,
-  ImageAttachment,
-  JsonValue,
-  TokenUsage,
+import {
+  type ChatTimelineItem,
+  type ChatTimelineMessage,
+  type ChatTimelineMessageBlock,
+  type ChatTimelineTool,
+  type ImageAttachment,
+  isUserTimelineMessage,
+  type JsonValue,
+  type TokenUsage,
 } from "../contracts/index.ts";
 import {
   toUserMessageIndexEntry,
@@ -438,14 +439,10 @@ function isVisibleRow(item: ChatTimelineItem): boolean {
   return item.kind === "message" && (item.role === "user" || item.role === "assistant");
 }
 
-function isUserMessage(item: ChatTimelineItem): item is ChatTimelineMessage {
-  return item.kind === "message" && item.role === "user";
-}
-
 export function buildUserMessageIndex(items: ChatTimelineItem[]): UserMessageIndexEntry[] {
   const userMessageIndex: UserMessageIndexEntry[] = [];
   for (const item of items) {
-    if (isUserMessage(item)) userMessageIndex.push(toUserMessageIndexEntry(item));
+    if (isUserTimelineMessage(item)) userMessageIndex.push(toUserMessageIndexEntry(item));
   }
   return userMessageIndex;
 }

@@ -1,4 +1,8 @@
-import { buildConversationContentParts, type ConversationRow } from "./conversation-rows.ts";
+import {
+  buildConversationContentParts,
+  CONTEXT_COMPACTED_LABEL,
+  type ConversationRow,
+} from "./conversation-rows.ts";
 import type { ChatTimelineItem, JsonValue } from "./types.ts";
 
 export type ConversationFindResults = {
@@ -42,17 +46,16 @@ function jsonSource(value: JsonValue | undefined): string {
 }
 
 export function buildConversationFindIndex(rows: ConversationRow[]): string[][] {
-  return rows.map((row) =>
-    buildConversationContentParts(row.message, row.tools)
-      .flatMap((part) => {
-        if (part.type === "text") return [part.text];
-        if (part.type !== "tool") return [];
-        const { start } = part.tool;
-        return [start.tool, jsonSource(start.displayArgs ?? start.args)];
-      })
-      .filter(Boolean)
-      .map((segment) => segment.toLowerCase()),
-  );
+  return rows.map((row) => {
+    const segments = buildConversationContentParts(row.message, row.tools).flatMap((part) => {
+      if (part.type === "text") return [part.text];
+      if (part.type !== "tool") return [];
+      const { start } = part.tool;
+      return [start.tool, jsonSource(start.displayArgs ?? start.args)];
+    });
+    if (row.message?.compaction) segments.unshift(CONTEXT_COMPACTED_LABEL);
+    return segments.filter(Boolean).map((segment) => segment.toLowerCase());
+  });
 }
 
 export function findConversationMatches(

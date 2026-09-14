@@ -35,23 +35,25 @@ test("the user-message index covers the complete timeline independently of page 
     { ...message("oldest-user", "user"), content: "old preview ".repeat(100) },
     message("oldest-assistant"),
     message("system", "system"),
+    { ...message("compaction", "user"), compaction: true },
     message("newest-user", "user"),
     message("newest-assistant"),
   ];
 
   const expectedIndex: UserMessageIndexEntry[] = [
     { id: "oldest-user", content: `${items[0]!.content.slice(0, 499)}…` },
+    { id: "compaction", content: "compaction" },
     { id: "newest-user", content: "newest-user" },
   ];
   assert.deepEqual(buildUserMessageIndex(items), expectedIndex);
 
   const newestPage = takePageEndingBeforeCursor(items, 1, null);
-  assert.deepEqual(newestPage?.items, [items[4]]);
+  assert.deepEqual(newestPage?.items, [items[5]]);
 
   const cursor = decodeHistoryCursor(newestPage?.olderPageCursor ?? "");
   assert.ok(cursor);
   const olderPage = takePageEndingBeforeCursor(items, 1, cursor);
-  assert.deepEqual(olderPage?.items, [items[3]]);
+  assert.deepEqual(olderPage?.items, [items[4]]);
 
   assert.deepEqual(buildUserMessageIndex(items), expectedIndex);
 });
