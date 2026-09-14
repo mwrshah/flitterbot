@@ -338,7 +338,7 @@
     .user-message-marker-rail:not([data-rested]) .user-message-marker:hover
       .user-message-marker-line {
       width: var(--user-message-marker-width, 10px);
-      height: var(--user-message-marker-height, 4px);
+      height: var(--user-message-marker-height, 3px);
     }
   }
 
