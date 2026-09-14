@@ -418,26 +418,48 @@ const SwimlaneRow = memo(function SwimlaneRow({
             className={cn("shrink-0 size-2 rounded-full", piStatusDotClass(stream.piSessionStatus))}
           />
           {label}
-          {shortcutLabel && (
-            <ShortcutHint label={shortcutLabel} variant="compact" className="ml-2 shrink-0" />
-          )}
-          {stream.pinned && (
-            <button
-              type="button"
-              aria-label="Unpin swimlane"
-              className={cn(
-                "group/pin ml-2 mr-0.5 inline-flex size-3 shrink-0 items-center justify-center text-text-muted opacity-0 hover:text-text group-hover:opacity-100 group-focus-within:opacity-100",
-                !shortcutLabel && "ml-auto",
+          {shortcutLabel && stream.pinned ? (
+            <span className="relative ml-2 shrink-0">
+              <ShortcutHint
+                label={shortcutLabel}
+                variant="compact"
+                className="group-hover:invisible group-focus-within:invisible"
+              />
+              <button
+                type="button"
+                aria-label="Unpin swimlane"
+                className="group/pin absolute inset-y-0 right-0 inline-flex size-3 shrink-0 translate-y-px items-center justify-center text-text-muted opacity-0 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:text-text"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  pinStream({ streamId: stream.id, pinned: false });
+                }}
+              >
+                <PinIcon className="size-3 group-hover/pin:hidden" />
+                <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+              </button>
+            </span>
+          ) : (
+            <>
+              {shortcutLabel && (
+                <ShortcutHint label={shortcutLabel} variant="compact" className="ml-2 shrink-0" />
               )}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                pinStream({ streamId: stream.id, pinned: false });
-              }}
-            >
-              <PinIcon className="size-3 group-hover/pin:hidden" />
-              <PinOffIcon className="hidden size-3 group-hover/pin:block" />
-            </button>
+              {stream.pinned && (
+                <button
+                  type="button"
+                  aria-label="Unpin swimlane"
+                  className="group/pin ml-auto mr-0.5 inline-flex size-3 shrink-0 items-center justify-center text-text-muted hover:text-text"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    pinStream({ streamId: stream.id, pinned: false });
+                  }}
+                >
+                  <PinIcon className="size-3 group-hover/pin:hidden" />
+                  <PinOffIcon className="hidden size-3 group-hover/pin:block" />
+                </button>
+              )}
+            </>
           )}
         </Link>
       )}
