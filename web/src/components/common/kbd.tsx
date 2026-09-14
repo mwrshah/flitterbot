@@ -1,5 +1,6 @@
 import { cn } from "cn";
-import { type HTMLAttributes, type PointerEvent, useEffect, useRef, useState } from "react";
+import type { HTMLAttributes } from "react";
+import { usePointerRest } from "@/hooks/use-pointer-rest";
 
 const SHORTCUT_REST_DELAY_MS = 200;
 const keycapClassName =
@@ -30,50 +31,11 @@ function ShortcutKeys({ keys, variant, expanded = true }: ShortcutKeysProps) {
 }
 
 function RestExpandableShortcutKeys({ keys, variant }: ShortcutKeysProps) {
-  const [expanded, setExpanded] = useState(false);
-  const restTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const clearRestTimer = () => {
-    if (restTimerRef.current !== undefined) clearTimeout(restTimerRef.current);
-    restTimerRef.current = undefined;
-  };
-
-  useEffect(() => clearRestTimer, []);
-
-  const startRestTimer = () => {
-    if (expanded) return;
-    clearRestTimer();
-    restTimerRef.current = setTimeout(() => {
-      restTimerRef.current = undefined;
-      setExpanded(true);
-    }, SHORTCUT_REST_DELAY_MS);
-  };
-
-  const handlePointerEnter = (event: PointerEvent<HTMLSpanElement>) => {
-    if (event.pointerType === "mouse") startRestTimer();
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
-    if (event.pointerType !== "mouse") return;
-    if (restTimerRef.current !== undefined && event.movementX ** 2 + event.movementY ** 2 < 2) {
-      return;
-    }
-    startRestTimer();
-  };
-
-  const handlePointerLeave = () => {
-    clearRestTimer();
-    setExpanded(false);
-  };
+  const { rested, pointerProps } = usePointerRest(SHORTCUT_REST_DELAY_MS);
 
   return (
-    <span
-      className="inline-flex items-center gap-0.5"
-      onPointerEnter={handlePointerEnter}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-    >
-      <ShortcutKeys keys={keys} variant={variant} expanded={expanded} />
+    <span className="inline-flex items-center gap-0.5" {...pointerProps}>
+      <ShortcutKeys keys={keys} variant={variant} expanded={rested} />
     </span>
   );
 }
