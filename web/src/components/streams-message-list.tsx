@@ -30,6 +30,7 @@ import {
 } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
 import { Tooltip } from "@/components/common/tooltip";
+import { usePointerRest } from "@/hooks/use-pointer-rest";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
 import type { UserMessageIndexEntry } from "@/lib/types";
@@ -97,7 +98,7 @@ function MarkerOverflowCount({
 }
 
 const markerHitboxClassName =
-  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[18px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[9px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/marker-rail:pointer-events-auto";
+  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[28px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[24px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-data-[rested]/marker-rail:pointer-events-auto";
 
 const UserMessageMarkers = memo(function UserMessageMarkers({
   scrollViewportRef,
@@ -108,6 +109,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
   onSelect,
   onScrollToEnd,
 }: UserMessageMarkersProps) {
+  const { rested, pointerProps } = usePointerRest(300);
   const railRef = useRef<HTMLDivElement>(null);
   const attachWheelForwarding = useCallback(
     (rail: HTMLElement | null) => {
@@ -173,7 +175,9 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     <nav
       ref={attachWheelForwarding}
       aria-label="User messages"
-      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[138px] [@media(hover:hover)_and_(pointer:fine)]:w-[500px] [@media(hover:hover)_and_(pointer:fine)]:hover:pointer-events-auto"
+      data-rested={rested ? "" : undefined}
+      {...pointerProps}
+      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[138px] [@media(hover:hover)_and_(pointer:fine)]:w-[500px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
       style={{
         height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
@@ -198,7 +202,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
               <Tooltip
                 key={messageId}
                 content={message.content || label}
-                delay={0}
+                delay={300}
                 side="left"
                 sideOffset={({ anchor }) => (anchor.width === 500 ? -312 : -190)}
               >
@@ -228,7 +232,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       </div>
       <Tooltip
         content="Go to end of conversation"
-        delay={0}
+        delay={300}
         side="left"
         sideOffset={({ anchor }) => (anchor.width === 500 ? -314 : -190)}
       >
@@ -242,7 +246,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         >
           <span
-            className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-hover:left-0.5 motion-reduce:transition-none"
+            className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 motion-reduce:transition-none"
             aria-hidden="true"
           />
         </button>
