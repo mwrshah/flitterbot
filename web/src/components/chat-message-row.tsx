@@ -30,7 +30,15 @@ function isSingleLine(element: HTMLElement): boolean {
   return element.getBoundingClientRect().height - insets <= lineHeight + SINGLE_LINE_TOLERANCE_PX;
 }
 
-function MessageCopyButton({ text, target }: { text: string; target: HTMLElement | null }) {
+function MessageCopyButton({
+  text,
+  target,
+  variant,
+}: {
+  text: string;
+  target: HTMLElement | null;
+  variant: "user" | "assistant";
+}) {
   const [singleLine, setSingleLine] = useState(true);
   const { copied, copy } = useCopyToClipboard();
 
@@ -61,7 +69,7 @@ function MessageCopyButton({ text, target }: { text: string; target: HTMLElement
           void copy(text).catch((error) => console.error("Failed to copy message", error))
         }
         data-copied={copied}
-        className="absolute bottom-1.5 right-2 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
+        className={`absolute ${variant === "user" ? "bottom-1.5 right-1" : "-bottom-1 right-0"} cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active`}
         aria-label={label}
         aria-live="polite"
       >
@@ -204,7 +212,7 @@ function UserMessageRow({
               </div>
             )}
           </div>
-          <MessageCopyButton text={message.content} target={copyTarget} />
+          <MessageCopyButton text={message.content} target={copyTarget} variant="user" />
           {message.piEntryId && onFork && onPrune && (
             <MessageActionsMenu
               onFork={() => onFork(message.piEntryId!)}
@@ -230,7 +238,7 @@ function AssistantMessageRow({
         <AssistantContents message={message} tools={row.tools} piSessionId={piSessionId} />
       </div>
       {row.copyText && (!isSessionBusy || !row.isCurrentTurn) && (
-        <MessageCopyButton text={row.copyText} target={copyTarget} />
+        <MessageCopyButton text={row.copyText} target={copyTarget} variant="assistant" />
       )}
     </div>
   );
