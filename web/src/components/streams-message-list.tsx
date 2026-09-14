@@ -89,7 +89,7 @@ function MarkerOverflowCount({
     <span
       role="img"
       aria-label={`${count} ${direction} user messages not shown`}
-      className="pointer-events-none flex h-full w-full select-none items-center justify-end pr-5 text-[9px] leading-none tabular-nums text-text-muted [@media(hover:hover)_and_(pointer:fine)]:pr-[194px]"
+      className="pointer-events-none flex h-full w-full select-none items-center justify-end pr-5 text-[9px] leading-none tabular-nums text-text-muted [@media(hover:hover)_and_(pointer:fine)]:pr-[150px]"
     >
       +{String(count).padStart(2, "0")}
     </span>
@@ -97,7 +97,7 @@ function MarkerOverflowCount({
 }
 
 const markerHitboxClassName =
-  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[194px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[194px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[18px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[9px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/marker-rail:pointer-events-auto";
+  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[150px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[18px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[9px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/marker-rail:pointer-events-auto";
 
 const UserMessageMarkers = memo(function UserMessageMarkers({
   scrollViewportRef,
@@ -173,7 +173,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
     <nav
       ref={attachWheelForwarding}
       aria-label="User messages"
-      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[182px] [@media(hover:hover)_and_(pointer:fine)]:w-[420px] [@media(hover:hover)_and_(pointer:fine)]:hover:pointer-events-auto"
+      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[138px] [@media(hover:hover)_and_(pointer:fine)]:w-[500px] [@media(hover:hover)_and_(pointer:fine)]:hover:pointer-events-auto"
       style={{
         height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
@@ -200,7 +200,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                 content={message.content || label}
                 delay={0}
                 side="left"
-                sideOffset={-172}
+                sideOffset={({ anchor }) => (anchor.width === 500 ? -312 : -190)}
               >
                 <button
                   type="button"
@@ -226,7 +226,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <Tooltip content="Go to end of conversation" delay={0} side="left" sideOffset={-172}>
+      <Tooltip
+        content="Go to end of conversation"
+        delay={0}
+        side="left"
+        sideOffset={({ anchor }) => (anchor.width === 500 ? -314 : -190)}
+      >
         <button
           type="button"
           aria-label="Go to end of conversation"

@@ -306,6 +306,36 @@
     color: var(--text-contrast);
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    .user-message-marker-grid > .user-message-marker:first-of-type::before,
+    .user-message-end-marker::before {
+      content: "";
+      left: 0;
+      width: 100%;
+      height: 150px;
+      pointer-events: none;
+    }
+
+    .user-message-marker-grid > .user-message-marker:first-of-type::before {
+      position: fixed; /* Anchor to rail, bypass row clipping. */
+      top: -150px;
+    }
+
+    .user-message-marker-grid:has(> span:first-child)
+      > .user-message-marker:first-of-type::before {
+      top: -126px;
+    }
+
+    .user-message-end-marker::before {
+      position: absolute;
+      top: 100%;
+    }
+
+    .user-message-marker-rail:hover .user-message-marker::before {
+      pointer-events: auto;
+    }
+  }
+
   .user-message-marker-line {
     width: var(--user-message-marker-width, 0.5rem);
     height: var(--user-message-marker-height, 0.125rem);

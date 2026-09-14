@@ -23,7 +23,7 @@ export function Tooltip({
       ? `${descriptionId} ${popupId}`
       : popupId;
   return (
-    <TooltipPrimitive.Root disabled={disabled}>
+    <TooltipPrimitive.Root disabled={disabled} disableHoverablePopup>
       <TooltipPrimitive.Trigger
         delay={delay}
         render={cloneElement(children, { "aria-describedby": describedBy })}

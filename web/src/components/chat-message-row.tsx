@@ -61,7 +61,7 @@ function MessageCopyButton({ text, target }: { text: string; target: HTMLElement
           void copy(text).catch((error) => console.error("Failed to copy message", error))
         }
         data-copied={copied}
-        className="absolute bottom-1.5 right-1.5 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
+        className="absolute bottom-1.5 right-2 cursor-pointer touch-manipulation rounded p-1 text-text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[copied=false]:hover:text-text data-[copied=true]:cursor-default data-[copied=true]:text-status-active"
         aria-label={label}
         aria-live="polite"
       >
