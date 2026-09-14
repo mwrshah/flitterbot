@@ -923,8 +923,8 @@ export function ChatPanel({
           setConfig(CHAT_LAYOUT_KEY, JSON.stringify(layout))
         }
       >
-        <Panel id="feed" defaultSize="85%" minSize="20%" style={{ overflow: "hidden" }}>
-          <div className="relative isolate h-full">
+        <Panel id="feed" defaultSize="85%" minSize="20%" style={{ overflow: "visible" }}>
+          <div className="relative h-full">
             <StreamsMessageList
               key={piSessionId} // remount per session: re-arms initial pin
               ref={messageListRef}

@@ -51,7 +51,7 @@ export function CodeBlock({
   const copyLabel = copied ? "Copied" : "Copy code";
 
   return (
-    <div className="mt-3 overflow-hidden rounded-lg border border-border">
+    <div className="mt-3 overflow-hidden rounded-lg border border-border pr-1">
       <div className="flex items-center justify-between border-b border-border bg-background-muted px-3 py-1.5">
         <span className="font-mono text-xs text-text-muted">{displayLanguage}</span>
         <button

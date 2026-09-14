@@ -698,7 +698,7 @@ export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
           </div>
         </div>
       </summary>
-      <div className="pb-3 pt-1">
+      <div className="pb-3 pt-1 pr-1">
         {Array.isArray(launches) && launches.length > 0 ? (
           <div className="space-y-2" role="group" aria-label="Prepared swimlane launches">
             {launches.map((launch, index) => (

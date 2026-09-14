@@ -14,11 +14,12 @@
  *    re-attaches a stale offset. Init is per attachment, not instance.
  * Scroll restoration is off for /streams (router.tsx).
  */
-import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "cn";
 import {
   memo,
   type Ref,
+  type RefObject,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -30,6 +31,7 @@ import {
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
+import { activeUserMessageIdForViewport } from "@/lib/user-message-markers";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;
@@ -37,42 +39,6 @@ const MARKERS_EACH_SIDE = 10;
 const MARKER_ROW_HEIGHT = 24;
 const STREAMING_ROW_KEY = "streaming";
 const VIRTUALIZER_OVERSCAN = 2;
-
-function userMessageForRow(
-  rows: ConversationRow[],
-  userMessageIndex: string[],
-  rowIndex: number,
-): string | undefined {
-  for (let index = Math.min(rowIndex, rows.length - 1); index >= 0; index--) {
-    const message = rows[index]?.message;
-    if (message?.role === "user") return message.id;
-  }
-
-  for (let index = Math.max(rowIndex + 1, 0); index < rows.length; index++) {
-    const message = rows[index]?.message;
-    if (message?.role !== "user") continue;
-    const nextUserIndex = userMessageIndex.indexOf(message.id);
-    return nextUserIndex > 0 ? userMessageIndex[nextUserIndex - 1] : message.id;
-  }
-
-  return userMessageIndex.at(-1);
-}
-
-function isUserMessageVisible(
-  rows: ConversationRow[],
-  virtualItems: VirtualItem[],
-  messageId: string | undefined,
-  viewportStart: number,
-  viewportEnd: number,
-): boolean {
-  if (!messageId) return false;
-  return virtualItems.some(
-    (item) =>
-      rows[item.index]?.message?.id === messageId &&
-      item.end > viewportStart &&
-      item.start < viewportEnd,
-  );
-}
 
 export type StreamsMessageListHandle = {
   scrollToEnd(): void;
@@ -101,11 +67,13 @@ type MarkerNavigation = {
 };
 
 type UserMessageMarkersProps = {
+  scrollViewportRef: RefObject<HTMLDivElement | null>;
   messageIds: string[];
   activeMessageId?: string;
   windowCenterMessageId?: string;
   navigation?: MarkerNavigation;
   onSelect: (messageId: string) => void;
+  onScrollToEnd: () => void;
 };
 
 function MarkerOverflowCount({
@@ -119,21 +87,48 @@ function MarkerOverflowCount({
     <span
       role="img"
       aria-label={`${count} ${direction} user messages not shown`}
-      className="pointer-events-none flex h-full w-[72px] select-none items-center justify-end pr-5 text-[9px] leading-none tabular-nums text-text-muted"
+      className="pointer-events-none flex h-full w-full select-none items-center justify-end pr-5 text-[9px] leading-none tabular-nums text-text-muted [@media(hover:hover)_and_(pointer:fine)]:pr-[194px]"
     >
       +{String(count).padStart(2, "0")}
     </span>
   );
 }
 
+const markerHitboxClassName =
+  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[194px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[194px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[18px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[9px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/marker-rail:pointer-events-auto";
+
 const UserMessageMarkers = memo(function UserMessageMarkers({
+  scrollViewportRef,
   messageIds,
   activeMessageId,
   windowCenterMessageId,
   navigation,
   onSelect,
+  onScrollToEnd,
 }: UserMessageMarkersProps) {
-  const railRef = useRef<HTMLElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const attachWheelForwarding = useCallback(
+    (rail: HTMLElement | null) => {
+      const viewport = scrollViewportRef.current;
+      if (!rail || !viewport) return;
+      const style = getComputedStyle(viewport);
+      const lineHeight =
+        Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.2;
+      const forwardWheel = (event: WheelEvent) => {
+        if (event.ctrlKey || event.defaultPrevented) return;
+        const unit = event.deltaMode === 1 ? lineHeight : 1;
+        event.preventDefault(); // Sibling scroller cannot receive native wheel chaining.
+        viewport.scrollBy({
+          left: event.deltaX * (event.deltaMode === 2 ? viewport.clientWidth : unit),
+          top: event.deltaY * (event.deltaMode === 2 ? viewport.clientHeight : unit),
+          behavior: "instant",
+        });
+      };
+      rail.addEventListener("wheel", forwardWheel, { passive: false });
+      return () => rail.removeEventListener("wheel", forwardWheel);
+    },
+    [scrollViewportRef],
+  );
   const markerWindow = useMemo(() => {
     const requestedCenter = windowCenterMessageId ?? activeMessageId ?? messageIds.at(-1);
     const requestedIndex = requestedCenter ? messageIds.indexOf(requestedCenter) : -1;
@@ -172,51 +167,69 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
 
   return (
     <nav
-      ref={railRef}
+      ref={attachWheelForwarding}
       aria-label="User messages"
-      className="absolute -right-2 top-1/2 z-10 w-[72px] -translate-y-1/2 overflow-hidden text-border"
+      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[182px] [@media(hover:hover)_and_(pointer:fine)]:w-[420px] [@media(hover:hover)_and_(pointer:fine)]:hover:pointer-events-auto"
       style={{
-        height: `min(${markerRowCount * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
+        height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
     >
-      <div
-        className="grid w-[72px] items-center"
-        style={{
-          gridTemplateRows: `repeat(${markerRowCount}, ${MARKER_ROW_HEIGHT}px)`,
-        }}
-      >
-        {markerWindow.hiddenBefore > 0 && (
-          <MarkerOverflowCount count={markerWindow.hiddenBefore} direction="earlier" />
-        )}
-        {markerWindow.messageIds.map((messageId, index) => {
-          const selected = messageId === activeMessageId;
-          const failed = messageId === navigation?.targetMessageId && Boolean(navigation.error);
-          const ordinal = markerWindow.startIndex + index + 1;
-          const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messageIds.length}`;
-          return (
-            <button
-              key={messageId}
-              type="button"
-              aria-label={label}
-              aria-current={selected ? "true" : undefined}
-              title={label}
-              onClick={() => onSelect(messageId)}
-              className={cn(
-                "user-message-marker flex h-full min-h-0 w-[72px] items-center justify-end overflow-hidden px-5 transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
-                failed ? "text-status-crashed" : selected ? "text-text" : undefined,
-              )}
-            >
-              <span
-                className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
-                aria-hidden="true"
-              />
-            </button>
-          );
-        })}
-        {markerWindow.hiddenAfter > 0 && (
-          <MarkerOverflowCount count={markerWindow.hiddenAfter} direction="later" />
-        )}
+      <div ref={railRef} className="h-[calc(100%-24px)] overflow-hidden">
+        <div
+          className="user-message-marker-grid grid w-full items-center"
+          style={{
+            gridTemplateRows: `repeat(${markerRowCount}, ${MARKER_ROW_HEIGHT}px)`,
+          }}
+        >
+          {markerWindow.hiddenBefore > 0 && (
+            <MarkerOverflowCount count={markerWindow.hiddenBefore} direction="earlier" />
+          )}
+          {markerWindow.messageIds.map((messageId, index) => {
+            const selected = messageId === activeMessageId;
+            const failed = messageId === navigation?.targetMessageId && Boolean(navigation.error);
+            const ordinal = markerWindow.startIndex + index + 1;
+            const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messageIds.length}`;
+            return (
+              <button
+                key={messageId}
+                type="button"
+                aria-label={label}
+                aria-current={selected ? "true" : undefined}
+                title={label}
+                onClick={() => onSelect(messageId)}
+                className={cn(
+                  "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
+                  markerHitboxClassName,
+                  failed ? "text-status-crashed" : selected ? "text-text" : undefined,
+                )}
+              >
+                <span
+                  className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </button>
+            );
+          })}
+          {markerWindow.hiddenAfter > 0 && (
+            <MarkerOverflowCount count={markerWindow.hiddenAfter} direction="later" />
+          )}
+        </div>
       </div>
+      <button
+        type="button"
+        aria-label="Go to end of conversation"
+        title="Go to end of conversation"
+        onClick={onScrollToEnd}
+        className={cn(
+          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-6 min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
+          markerHitboxClassName,
+        )}
+      >
+        <span
+          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-hover:left-0.5 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </button>
       {navigation?.error && (
         <span className="sr-only" role="status">
           {navigation.error}
@@ -261,9 +274,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const [markerNavigation, setMarkerNavigation] = useState<MarkerNavigation>();
   const [markerWindowMessageId, setMarkerWindowMessageId] = useState<string>();
   const [viewportUserMessageId, setViewportUserMessageId] = useState<string>();
-  const [clickedUserMessageId, setClickedUserMessageId] = useState<string>();
   const selectUserMessage = useCallback((targetMessageId: string) => {
-    setClickedUserMessageId(targetMessageId);
     setMarkerWindowMessageId(targetMessageId);
     setMarkerNavigation({ targetMessageId });
   }, []);
@@ -300,25 +311,17 @@ export const StreamsMessageList = memo(function StreamsMessageList({
       wasAtEndRef.current = instance.isAtEnd();
       const virtualItems = instance.getVirtualItems();
       const scrollOffset = instance.scrollOffset ?? 0;
-      const firstVisibleRowIndex = virtualItems.find(
-        (item) => item.index < rows.length && item.end > scrollOffset,
-      )?.index;
-      if (firstVisibleRowIndex !== undefined) {
-        const topMessageId = userMessageForRow(rows, userMessageIndex, firstVisibleRowIndex);
-        const messageId = isUserMessageVisible(
-          rows,
-          virtualItems,
-          clickedUserMessageId,
-          scrollOffset,
-          scrollOffset + Math.max(0, (instance.scrollRect?.height ?? 0) - bottomInset),
-        )
-          ? clickedUserMessageId
-          : topMessageId;
-        if (viewportUserMessageIdRef.current !== messageId) {
-          viewportUserMessageIdRef.current = messageId;
-          setMarkerWindowMessageId(messageId);
-          setViewportUserMessageId(messageId);
-        }
+      const messageId = activeUserMessageIdForViewport(
+        rows,
+        userMessageIndex,
+        virtualItems,
+        scrollOffset,
+        scrollOffset + Math.max(0, (instance.scrollRect?.height ?? 0) - bottomInset),
+      );
+      if (viewportUserMessageIdRef.current !== messageId) {
+        viewportUserMessageIdRef.current = messageId;
+        if (messageId) setMarkerWindowMessageId(messageId);
+        setViewportUserMessageId(messageId);
       }
 
       if (
@@ -350,28 +353,6 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   useLayoutEffect(function rearmInitialFillAfterRouteReveal() {
     didFinishInitialFillRef.current = false; // Suspense replay wipes scrollTop: re-pin
   }, []); // scroll-memory: skip re-arm + snapshot save here
-
-  useEffect(() => {
-    setClickedUserMessageId(undefined);
-  }, [piSessionId]);
-
-  useLayoutEffect(() => {
-    const scrollOffset = virtualizer.scrollOffset ?? 0;
-    if (
-      !isUserMessageVisible(
-        rows,
-        virtualizer.getVirtualItems(),
-        clickedUserMessageId,
-        scrollOffset,
-        scrollOffset + Math.max(0, (virtualizer.scrollRect?.height ?? 0) - bottomInset),
-      ) ||
-      viewportUserMessageIdRef.current === clickedUserMessageId
-    ) {
-      return;
-    }
-    viewportUserMessageIdRef.current = clickedUserMessageId;
-    setViewportUserMessageId(clickedUserMessageId);
-  }, [bottomInset, clickedUserMessageId, rows, virtualizer]);
 
   useLayoutEffect(function pinToEndAndFillInitialViewport() {
     if (
@@ -441,23 +422,25 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     virtualizer.scrollToEnd();
   }, [markerNavigation, virtualizer]);
 
+  const scrollToEnd = useCallback(() => {
+    if (!markerNavigation) {
+      virtualizer.scrollToEnd();
+      return;
+    }
+    pendingScrollToEndRef.current = true;
+    setMarkerNavigation(undefined);
+  }, [markerNavigation, virtualizer]);
+
   useImperativeHandle(
     ref,
     () => ({
-      scrollToEnd() {
-        if (!markerNavigation) {
-          virtualizer.scrollToEnd();
-          return;
-        }
-        pendingScrollToEndRef.current = true;
-        setMarkerNavigation(undefined);
-      },
+      scrollToEnd,
       scrollToEndIfWithinViewport(ratio: number) {
         const scrollElement = scrollRef.current;
         if (!scrollElement) return;
         const distanceFromEnd =
           scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
-        if (distanceFromEnd <= scrollElement.clientHeight * ratio) this.scrollToEnd();
+        if (distanceFromEnd <= scrollElement.clientHeight * ratio) scrollToEnd();
       },
       navigateToLatestUserMessage() {
         const messageId = userMessageIndex.at(-1);
@@ -465,7 +448,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         selectUserMessage(messageId);
       },
     }),
-    [markerNavigation, selectUserMessage, userMessageIndex, virtualizer],
+    [scrollToEnd, selectUserMessage, userMessageIndex, virtualizer],
   );
 
   return (
@@ -522,11 +505,13 @@ export const StreamsMessageList = memo(function StreamsMessageList({
         </div>
       </div>
       <UserMessageMarkers
+        scrollViewportRef={scrollRef}
         messageIds={userMessageIndex}
         activeMessageId={viewportUserMessageId}
         windowCenterMessageId={markerWindowMessageId}
         navigation={markerNavigation}
         onSelect={selectUserMessage}
+        onScrollToEnd={scrollToEnd}
       />
     </div>
   );
