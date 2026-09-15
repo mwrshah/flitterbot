@@ -396,9 +396,9 @@
   }
 
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible) {
-    --user-message-marker-width: 2rem;
-    --user-message-marker-height: 1.125rem;
-    color: var(--text-pop);
+    --user-message-marker-width: 1.75rem;
+    --user-message-marker-height: 1rem;
+    color: var(--background-selected);
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))
