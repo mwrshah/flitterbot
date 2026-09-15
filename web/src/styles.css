@@ -323,7 +323,7 @@
 
     .user-message-marker-grid:has(> span:first-child)
       > .user-message-marker:first-of-type::before {
-      top: -137px;
+      top: -132px;
     }
 
     .user-message-end-marker::before {
@@ -367,12 +367,12 @@
       + .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible)
     ) {
     --user-message-marker-width: 1rem;
-    --user-message-marker-height: 0.5rem;
+    --user-message-marker-height: 0.625rem;
   }
 
   .user-message-marker:has(+ .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible)) {
     --user-message-marker-width: 1.5rem;
-    --user-message-marker-height: 0.625rem;
+    --user-message-marker-height: 0.875rem;
   }
 
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible)
@@ -387,17 +387,18 @@
     + .user-message-marker
     + .user-message-marker {
     --user-message-marker-width: 1rem;
-    --user-message-marker-height: 0.5rem;
+    --user-message-marker-height: 0.625rem;
   }
 
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible) + .user-message-marker {
     --user-message-marker-width: 1.5rem;
-    --user-message-marker-height: 0.625rem;
+    --user-message-marker-height: 0.875rem;
   }
 
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible) {
     --user-message-marker-width: 2rem;
-    --user-message-marker-height: 0.75rem;
+    --user-message-marker-height: 1.125rem;
+    color: var(--text-pop);
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))
@@ -408,7 +409,7 @@
     )
     .user-message-end-marker {
     --user-message-marker-width: 1.5rem;
-    --user-message-marker-height: 0.625rem;
+    --user-message-marker-height: 0.875rem;
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))
@@ -419,7 +420,7 @@
     )
     .user-message-end-marker {
     --user-message-marker-width: 1rem;
-    --user-message-marker-height: 0.5rem;
+    --user-message-marker-height: 0.625rem;
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))

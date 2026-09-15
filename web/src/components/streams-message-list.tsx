@@ -40,8 +40,8 @@ import { activeUserMessageIdForViewport } from "@/lib/user-message-markers";
 
 const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;
-const MARKERS_EACH_SIDE = 16;
-const MARKER_ROW_HEIGHT = 13;
+const MARKERS_EACH_SIDE = 14;
+const MARKER_ROW_HEIGHT = 18;
 const STREAMING_ROW_KEY = "streaming";
 const VIRTUALIZER_OVERSCAN = 2;
 
@@ -100,7 +100,7 @@ function MarkerOverflowCount({
 }
 
 const markerHitboxClassName =
-  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[100px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[100px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[32px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[13px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-data-[rested]/marker-rail:pointer-events-auto";
+  "pr-5 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:pr-[100px] [@media(hover:hover)_and_(pointer:fine)]:after:absolute [@media(hover:hover)_and_(pointer:fine)]:after:top-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:right-[100px] [@media(hover:hover)_and_(pointer:fine)]:after:w-[32px] [@media(hover:hover)_and_(pointer:fine)]:after:h-[18px] [@media(hover:hover)_and_(pointer:fine)]:after:-translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:after:content-[''] [@media(hover:hover)_and_(pointer:fine)]:after:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-data-[rested]/marker-rail:pointer-events-auto";
 
 const UserMessageMarkers = memo(function UserMessageMarkers({
   scrollViewportRef,
@@ -191,7 +191,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
     >
-      <div ref={railRef} className="h-[calc(100%-13px)] overflow-hidden">
+      <div ref={railRef} className="h-[calc(100%-18px)] overflow-hidden">
         <div
           className="user-message-marker-grid grid w-full items-center"
           style={{
@@ -245,7 +245,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         aria-label="Go to end of conversation"
         onClick={onScrollToEnd}
         className={cn(
-          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[13px] min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
+          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[18px] min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
           markerHitboxClassName,
         )}
       >
