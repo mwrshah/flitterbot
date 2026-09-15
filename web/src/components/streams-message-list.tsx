@@ -113,7 +113,11 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
 }: UserMessageMarkersProps) {
   const { rested, pointerProps } = usePointerRest(300);
   const [tooltipHandle] = useState(() =>
-    TooltipPrimitive.createHandle<{ content: string; desktopOffset: number }>(),
+    TooltipPrimitive.createHandle<{
+      content: string;
+      desktopOffset: number;
+      align: TooltipPrimitive.Positioner.Props["align"];
+    }>(),
   );
   const tooltipId = useId();
   const renderMarkerButton: TooltipPrimitive.Trigger.Props["render"] = (props, { open }) => (
@@ -212,7 +216,11 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
               <TooltipPrimitive.Trigger
                 key={messageId}
                 handle={tooltipHandle}
-                payload={{ content: message.content || label, desktopOffset: -312 }}
+                payload={{
+                  content: message.content || label,
+                  desktopOffset: -312,
+                  align: "start",
+                }}
                 delay={300}
                 render={renderMarkerButton}
                 type="button"
@@ -245,7 +253,11 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       </div>
       <TooltipPrimitive.Trigger
         handle={tooltipHandle}
-        payload={{ content: "Go to end of conversation", desktopOffset: -314 }}
+        payload={{
+          content: "Jump to bottom - Shift + G",
+          desktopOffset: -314,
+          align: "center",
+        }}
         delay={300}
         render={renderMarkerButton}
         type="button"
@@ -257,7 +269,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         )}
       >
         <span
-          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:h-[8px] [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:w-[12px] motion-reduce:transition-none"
+          className="user-message-marker-arrow relative left-px block origin-right scale-100 shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:h-[8px] [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:w-[12px] motion-reduce:transition-none"
           aria-hidden="true"
         />
       </TooltipPrimitive.Trigger>
@@ -266,6 +278,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           <TooltipPopup
             id={tooltipId}
             side="left"
+            align={payload?.align}
             sideOffset={({ anchor }) =>
               anchor.width === 450 ? (payload?.desktopOffset ?? -312) : -190
             }

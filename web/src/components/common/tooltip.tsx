@@ -40,15 +40,22 @@ export function TooltipPopup({
   id,
   side = "top",
   sideOffset = 6,
+  align,
 }: {
   children: ReactNode;
   id: string;
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
+  align?: TooltipPrimitive.Positioner.Props["align"];
 }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Positioner side={side} sideOffset={sideOffset} collisionPadding={8}>
+      <TooltipPrimitive.Positioner
+        side={side}
+        sideOffset={sideOffset}
+        align={align}
+        collisionPadding={8}
+      >
         <TooltipPrimitive.Popup
           id={id}
           role="tooltip"
