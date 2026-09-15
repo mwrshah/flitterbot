@@ -28,17 +28,35 @@ export function Tooltip({
         delay={delay}
         render={cloneElement(children, { "aria-describedby": describedBy })}
       />
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Positioner side={side} sideOffset={sideOffset} collisionPadding={8}>
-          <TooltipPrimitive.Popup
-            id={popupId}
-            role="tooltip"
-            className="max-h-[var(--available-height)] max-w-[min(24rem,var(--available-width))] overflow-y-auto rounded-md border border-border bg-background-muted px-2 py-1 text-xs text-text shadow-md whitespace-pre-wrap [overflow-wrap:anywhere]"
-          >
-            {content}
-          </TooltipPrimitive.Popup>
-        </TooltipPrimitive.Positioner>
-      </TooltipPrimitive.Portal>
+      <TooltipPopup id={popupId} side={side} sideOffset={sideOffset}>
+        {content}
+      </TooltipPopup>
     </TooltipPrimitive.Root>
+  );
+}
+
+export function TooltipPopup({
+  children,
+  id,
+  side = "top",
+  sideOffset = 6,
+}: {
+  children: ReactNode;
+  id: string;
+  side?: TooltipPrimitive.Positioner.Props["side"];
+  sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
+}) {
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Positioner side={side} sideOffset={sideOffset} collisionPadding={8}>
+        <TooltipPrimitive.Popup
+          id={id}
+          role="tooltip"
+          className="max-h-[var(--available-height)] max-w-[min(24rem,var(--available-width))] overflow-y-auto rounded-md border border-border bg-background-muted px-2 py-1 text-xs text-text shadow-md whitespace-pre-wrap [overflow-wrap:anywhere]"
+        >
+          {children}
+        </TooltipPrimitive.Popup>
+      </TooltipPrimitive.Positioner>
+    </TooltipPrimitive.Portal>
   );
 }

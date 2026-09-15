@@ -14,6 +14,7 @@
  *    re-attaches a stale offset. Init is per attachment, not instance.
  * Scroll restoration is off for /streams (router.tsx).
  */
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "cn";
 import {
@@ -22,6 +23,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -29,7 +31,7 @@ import {
   useState,
 } from "react";
 import { ChatMessageRow, StreamingAssistantRow } from "@/components/chat-message-row";
-import { Tooltip } from "@/components/common/tooltip";
+import { TooltipPopup } from "@/components/common/tooltip";
 import { usePointerRest } from "@/hooks/use-pointer-rest";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { ConversationRow } from "@/lib/conversation-rows";
@@ -110,6 +112,13 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
   onScrollToEnd,
 }: UserMessageMarkersProps) {
   const { rested, pointerProps } = usePointerRest(300);
+  const [tooltipHandle] = useState(() =>
+    TooltipPrimitive.createHandle<{ content: string; desktopOffset: number }>(),
+  );
+  const tooltipId = useId();
+  const renderMarkerButton: TooltipPrimitive.Trigger.Props["render"] = (props, { open }) => (
+    <button {...props} aria-describedby={open ? tooltipId : undefined} />
+  );
   const railRef = useRef<HTMLDivElement>(null);
   const attachWheelForwarding = useCallback(
     (rail: HTMLElement | null) => {
@@ -199,30 +208,27 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             const ordinal = markerWindow.startIndex + index + 1;
             const label = `${failed ? "Retry" : "Go to"} user message ${ordinal} of ${messages.length}`;
             return (
-              <Tooltip
+              <TooltipPrimitive.Trigger
                 key={messageId}
-                content={message.content || label}
+                handle={tooltipHandle}
+                payload={{ content: message.content || label, desktopOffset: -312 }}
                 delay={300}
-                side="left"
-                sideOffset={({ anchor }) => (anchor.width === 450 ? -312 : -190)}
+                render={renderMarkerButton}
+                type="button"
+                aria-label={label}
+                aria-current={selected ? "true" : undefined}
+                onClick={() => onSelect(messageId)}
+                className={cn(
+                  "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
+                  markerHitboxClassName,
+                  failed ? "text-status-crashed" : selected ? "text-text" : undefined,
+                )}
               >
-                <button
-                  type="button"
-                  aria-label={label}
-                  aria-current={selected ? "true" : undefined}
-                  onClick={() => onSelect(messageId)}
-                  className={cn(
-                    "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
-                    markerHitboxClassName,
-                    failed ? "text-status-crashed" : selected ? "text-text" : undefined,
-                  )}
-                >
-                  <span
-                    className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
-                    aria-hidden="true"
-                  />
-                </button>
-              </Tooltip>
+                <span
+                  className="user-message-marker-line block shrink-0 bg-current transition-[width,height] duration-[220ms] ease-in-out motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </TooltipPrimitive.Trigger>
             );
           })}
           {markerWindow.hiddenAfter > 0 && (
@@ -230,27 +236,37 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           )}
         </div>
       </div>
-      <Tooltip
-        content="Go to end of conversation"
+      <TooltipPrimitive.Trigger
+        handle={tooltipHandle}
+        payload={{ content: "Go to end of conversation", desktopOffset: -314 }}
         delay={300}
-        side="left"
-        sideOffset={({ anchor }) => (anchor.width === 450 ? -314 : -190)}
+        render={renderMarkerButton}
+        type="button"
+        aria-label="Go to end of conversation"
+        onClick={onScrollToEnd}
+        className={cn(
+          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-6 min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
+          markerHitboxClassName,
+        )}
       >
-        <button
-          type="button"
-          aria-label="Go to end of conversation"
-          onClick={onScrollToEnd}
-          className={cn(
-            "group user-message-marker user-message-end-marker absolute bottom-0 flex h-6 min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
-            markerHitboxClassName,
-          )}
-        >
-          <span
-            className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 motion-reduce:transition-none"
-            aria-hidden="true"
-          />
-        </button>
-      </Tooltip>
+        <span
+          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Root handle={tooltipHandle} disableHoverablePopup>
+        {({ payload }) => (
+          <TooltipPopup
+            id={tooltipId}
+            side="left"
+            sideOffset={({ anchor }) =>
+              anchor.width === 450 ? (payload?.desktopOffset ?? -312) : -190
+            }
+          >
+            {payload?.content}
+          </TooltipPopup>
+        )}
+      </TooltipPrimitive.Root>
       {navigation?.error && (
         <span className="sr-only" role="status">
           {navigation.error}
