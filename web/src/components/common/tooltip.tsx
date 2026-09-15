@@ -1,4 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import { cn } from "cn";
 import { cloneElement, type ReactElement, type ReactNode, useId } from "react";
 
 export function Tooltip({
@@ -41,12 +42,14 @@ export function TooltipPopup({
   side = "top",
   sideOffset = 6,
   align,
+  className,
 }: {
   children: ReactNode;
   id: string;
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
   align?: TooltipPrimitive.Positioner.Props["align"];
+  className?: string;
 }) {
   return (
     <TooltipPrimitive.Portal>
@@ -59,7 +62,10 @@ export function TooltipPopup({
         <TooltipPrimitive.Popup
           id={id}
           role="tooltip"
-          className="max-h-[var(--available-height)] max-w-[min(24rem,var(--available-width))] overflow-y-auto rounded-md border border-border bg-background-muted px-2 py-1 text-xs text-text shadow-md whitespace-pre-wrap [overflow-wrap:anywhere]"
+          className={cn(
+            "max-h-[var(--available-height)] max-w-[min(24rem,var(--available-width))] overflow-y-auto rounded-md border border-border bg-background-muted px-2 py-1 text-xs text-text shadow-md whitespace-pre-wrap [overflow-wrap:anywhere]",
+            className,
+          )}
         >
           {children}
         </TooltipPrimitive.Popup>

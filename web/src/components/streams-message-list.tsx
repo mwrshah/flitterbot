@@ -117,6 +117,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       content: string;
       desktopOffset: number;
       align: TooltipPrimitive.Positioner.Props["align"];
+      popupClassName?: string;
     }>(),
   );
   const tooltipId = useId();
@@ -220,6 +221,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                   content: message.content || label,
                   desktopOffset: -312,
                   align: "start",
+                  popupClassName: "w-[min(20rem,var(--available-width))]",
                 }}
                 delay={300}
                 render={renderMarkerButton}
@@ -257,6 +259,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           content: "Jump to bottom - Shift + G",
           desktopOffset: -314,
           align: "center",
+          popupClassName: "w-[min(20rem,var(--available-width))]",
         }}
         delay={300}
         render={renderMarkerButton}
@@ -279,6 +282,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             id={tooltipId}
             side="left"
             align={payload?.align}
+            className={payload?.popupClassName}
             sideOffset={({ anchor }) =>
               anchor.width === 450 ? (payload?.desktopOffset ?? -312) : -190
             }
