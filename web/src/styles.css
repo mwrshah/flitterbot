@@ -306,6 +306,11 @@
     color: var(--text-contrast);
   }
 
+  .user-message-marker-rail {
+    --user-message-marker-color: color-mix(in oklab, var(--border) 90%, var(--text));
+    color: var(--user-message-marker-color);
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .user-message-marker-grid > .user-message-marker:first-of-type::before,
     .user-message-end-marker::before {
@@ -398,7 +403,7 @@
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible) {
     --user-message-marker-width: 1.75rem;
     --user-message-marker-height: 1rem;
-    color: var(--text-muted);
+    color: var(--user-message-marker-color);
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))
