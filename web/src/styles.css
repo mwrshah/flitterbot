@@ -34,6 +34,7 @@
   --color-text-contrast: var(--text-contrast);
   --color-text-contrast-muted: var(--text-contrast-muted);
   --color-border: var(--border);
+  --color-border-more: var(--border-more);
   --color-border-muted: var(--border-muted);
   --color-border-pop: var(--border-pop);
   --color-scrim: var(--scrim);
@@ -122,6 +123,7 @@
   --text-contrast: var(--background);
   --text-contrast-muted: var(--background-muted);
   --border: oklch(0.89 0.006 95);
+  --border-more: #c9c7c2;
   --border-muted: oklch(0.93 0.004 95);
   --border-pop: rgba(250, 212, 168, 1);
 
@@ -229,6 +231,7 @@
   --text-contrast: var(--background);
   --text-contrast-muted: var(--background-muted);
   --border: oklch(0.38 0.006 130);
+  --border-more: #5b615d;
   --border-muted: oklch(0.3 0.005 130);
   --border-pop: rgb(77 47 24);
 
@@ -304,11 +307,6 @@
   [data-sonner-toast] [data-button] {
     background: var(--background-contrast);
     color: var(--text-contrast);
-  }
-
-  .user-message-marker-rail {
-    --user-message-marker-color: color-mix(in oklab, var(--border) 90%, var(--text));
-    color: var(--user-message-marker-color);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -401,9 +399,10 @@
   }
 
   .user-message-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible) {
+    --color-text: var(--border-more);
     --user-message-marker-width: 1.75rem;
     --user-message-marker-height: 1rem;
-    color: var(--user-message-marker-color);
+    color: var(--border-more);
   }
 
   .user-message-marker-rail:has(.user-message-end-marker:is(:hover:where(.user-message-marker-rail[data-rested] *), :focus-visible))

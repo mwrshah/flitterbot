@@ -186,7 +186,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       aria-label="User messages"
       data-rested={rested ? "" : undefined}
       {...pointerProps}
-      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[88px] [@media(hover:hover)_and_(pointer:fine)]:w-[450px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
+      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[88px] [@media(hover:hover)_and_(pointer:fine)]:w-[450px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
       style={{
         height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
@@ -245,7 +245,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         aria-label="Go to end of conversation"
         onClick={onScrollToEnd}
         className={cn(
-          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[18px] min-h-0 w-full items-center justify-end focus-visible:outline-none",
+          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[18px] min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
           markerHitboxClassName,
         )}
       >
