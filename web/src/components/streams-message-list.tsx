@@ -221,7 +221,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                 className={cn(
                   "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
                   markerHitboxClassName,
-                  failed ? "text-status-crashed" : undefined,
+                  failed ? "text-status-crashed" : selected ? "text-text" : undefined,
                 )}
               >
                 <span
