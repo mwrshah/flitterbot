@@ -21,11 +21,11 @@ export function usePointerRest(delay: number) {
   };
 
   const onPointerEnter = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType === "mouse") startTimer();
+    if (event.pointerType === "mouse" || event.pointerType === "pen") startTimer();
   };
 
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== "mouse") return;
+    if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
     if (timerRef.current !== undefined && event.movementX ** 2 + event.movementY ** 2 < 2) {
       return;
     }
