@@ -185,6 +185,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       ref={attachWheelForwarding}
       aria-label="User messages"
       data-rested={rested ? "" : undefined}
+      data-moving={rested ? undefined : ""}
       {...pointerProps}
       className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[88px] [@media(hover:hover)_and_(pointer:fine)]:w-[450px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
       style={{
@@ -221,6 +222,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                 className={cn(
                   "user-message-marker relative flex h-full min-h-0 w-full items-center justify-end overflow-hidden transition-colors duration-[220ms] ease-in-out motion-reduce:transition-none focus-visible:outline-none",
                   markerHitboxClassName,
+                  index === 0 &&
+                    "[@media(hover:hover)_and_(pointer:fine)]:after:fixed! [@media(hover:hover)_and_(pointer:fine)]:after:h-[42px]! [@media(hover:hover)_and_(pointer:fine)]:after:translate-y-0!",
+                  index === 0 &&
+                    (markerWindow.hiddenBefore > 0
+                      ? "[@media(hover:hover)_and_(pointer:fine)]:after:top-[-6px]!"
+                      : "[@media(hover:hover)_and_(pointer:fine)]:after:top-[-24px]!"),
                   failed ? "text-status-crashed" : selected ? "text-text" : undefined,
                 )}
               >
@@ -245,12 +252,12 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         aria-label="Go to end of conversation"
         onClick={onScrollToEnd}
         className={cn(
-          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[18px] min-h-0 w-full items-center justify-end text-border focus-visible:outline-none",
+          "group user-message-marker user-message-end-marker absolute bottom-0 flex h-[18px] min-h-0 w-full items-center justify-end text-border focus-visible:outline-none [@media(hover:hover)_and_(pointer:fine)]:after:top-0! [@media(hover:hover)_and_(pointer:fine)]:after:h-[42px]! [@media(hover:hover)_and_(pointer:fine)]:after:translate-y-0!",
           markerHitboxClassName,
         )}
       >
         <span
-          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 motion-reduce:transition-none"
+          className="user-message-marker-arrow relative left-px block origin-right scale-[0.9] shrink-0 bg-current transition-[width,height,left] duration-[220ms] ease-in-out group-data-[rested]/marker-rail:group-hover:left-0.5 [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:h-[8px] [@media(hover:hover)_and_(pointer:fine)]:group-data-[moving]/marker-rail:group-hover:w-[12px] motion-reduce:transition-none"
           aria-hidden="true"
         />
       </TooltipPrimitive.Trigger>
