@@ -32,6 +32,7 @@ import type { FlitterbotTool } from "./flitterbot-extension.ts";
 import { formatStreamPrompt } from "./format-stream-prompt.ts";
 import { PiSessionState } from "./pi-session-state.ts";
 import { subscribeToPiSession } from "./pi-subscribe.ts";
+import { rewriteSessionHeaderCwd } from "./session-file-cwd.ts";
 import {
   classifySessionFileTopology,
   reconcileAllStreamSessionFiles,
@@ -87,21 +88,6 @@ export type ProcessQueueItemCallback = (
   onAccepted?: () => void,
 ) => Promise<void>;
 
-function rewriteSessionHeaderCwd(sessionFile: string, cwd: string): string | undefined {
-  const content = fs.readFileSync(sessionFile, "utf8");
-  const lines = content.split("\n");
-  const headerLine = lines[0];
-  if (!headerLine?.trim()) throw new Error(`Session file has no header: ${sessionFile}`);
-  const header = JSON.parse(headerLine) as Record<string, unknown>;
-  if (header.type !== "session")
-    throw new Error(`Session file header is not a session: ${sessionFile}`);
-  const previousCwd = typeof header.cwd === "string" ? header.cwd : undefined;
-  header.cwd = cwd;
-  lines[0] = JSON.stringify(header);
-  fs.writeFileSync(sessionFile, lines.join("\n"));
-  return previousCwd;
-}
-
 export class PiSessionManager {
   private defaultSession?: ManagedPiSession;
   private readonly streamSessions = new Map<string, ManagedPiSession>();
@@ -109,6 +95,7 @@ export class PiSessionManager {
   private readonly blackboard: BlackboardDatabase;
   private readonly configLoader: () => FlitterbotConfig;
   private readonly remoteStreams: (streamId: string) => boolean;
+  private readonly admitRemote: (streamId: string, item: QueueItem) => void;
   private readonly wsHub: WebSocketHub;
   private readonly runtimeInstanceId: string;
   private readonly startedAt: number;
@@ -126,10 +113,12 @@ export class PiSessionManager {
     log: (message: string) => void,
     configLoader: () => FlitterbotConfig = loadConfig,
     remoteStreams: (streamId: string) => boolean = () => false,
+    admitRemote: (streamId: string, item: QueueItem) => void = () => {},
   ) {
     this.blackboard = blackboard;
     this.configLoader = configLoader;
     this.remoteStreams = remoteStreams;
+    this.admitRemote = admitRemote;
     this.wsHub = wsHub;
     this.runtimeInstanceId = runtimeInstanceId;
     this.startedAt = startedAt;
@@ -1289,7 +1278,11 @@ export class PiSessionManager {
       process: (item, onAccepted) => processCallback(managed, item, false, onAccepted),
       steer: (item) => processCallback(managed, item, true),
       canSteer: () => managed.runtime?.session.isStreaming ?? false,
+      onEnqueue: (item) => {
+        if (streamId && this.remoteStreams(streamId)) this.admitRemote(streamId, item);
+      },
       onChanged: (snapshot) => {
+        if (streamId && this.remoteStreams(streamId)) return;
         this.wsHub.broadcast({
           type: "turn_queue_changed",
           piSessionId: managed.piSessionId,
@@ -1297,6 +1290,7 @@ export class PiSessionManager {
         });
       },
       onItemStart: (item) => {
+        if (streamId && this.remoteStreams(streamId)) return;
         state.setBusy(true, item);
         this.wsHub.broadcast({
           type: "status_changed",
@@ -1311,6 +1305,15 @@ export class PiSessionManager {
         });
       },
       onItemEnd: (item, error, steered) => {
+        if (streamId && this.remoteStreams(streamId)) {
+          if (error)
+            this.wsHub.broadcast({
+              type: "error",
+              piSessionId: managed.piSessionId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          return;
+        }
         if (!steered) {
           state.setBusy(false);
           this.wsHub.broadcast({

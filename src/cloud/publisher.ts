@@ -3,9 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Checkpoint } from "./checkpoints.ts";
 
-export class CheckpointPublisher {
+export class DurableOutbox<T extends { version: number } = Checkpoint> {
   private readonly directory: string;
-  private readonly send: (checkpoint: Checkpoint) => Promise<void>;
+  private readonly send: (checkpoint: T) => Promise<void>;
   private readonly report: (error: unknown) => void;
   private tail: Promise<void> = Promise.resolve();
   private retry?: NodeJS.Timeout;
@@ -13,7 +13,7 @@ export class CheckpointPublisher {
 
   constructor(
     directory: string,
-    send: (checkpoint: Checkpoint) => Promise<void>,
+    send: (checkpoint: T) => Promise<void>,
     report: (error: unknown) => void,
   ) {
     this.directory = directory;
@@ -21,7 +21,7 @@ export class CheckpointPublisher {
     this.report = report;
   }
 
-  async stage(checkpoint: Checkpoint): Promise<void> {
+  async stage(checkpoint: T): Promise<void> {
     if (this.stopped) throw new Error("Checkpoint publisher is stopped");
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     const filename = path.join(this.directory, `${checkpoint.version}.json`);
@@ -69,7 +69,7 @@ export class CheckpointPublisher {
           .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10));
         for (const name of versions) {
           const filename = path.join(this.directory, name);
-          const checkpoint = JSON.parse(await fs.readFile(filename, "utf8")) as Checkpoint;
+          const checkpoint = JSON.parse(await fs.readFile(filename, "utf8")) as T;
           await this.send(checkpoint);
           await fs.unlink(filename);
         }

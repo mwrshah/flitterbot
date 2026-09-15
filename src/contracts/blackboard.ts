@@ -1,6 +1,6 @@
 import { CLOUD_SCHEMA } from "../cloud/schema.ts";
 
-export const BLACKBOARD_SCHEMA_VERSION = 26;
+export const BLACKBOARD_SCHEMA_VERSION = 27;
 
 export type MessageMetadata = {
   router_action?: string;

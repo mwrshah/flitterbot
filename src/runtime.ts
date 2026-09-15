@@ -44,6 +44,7 @@ import {
   executeBlackboardQuery,
 } from "./blackboard/tool-query-blackboard.ts";
 import { assertControllerHost, CloudControl } from "./cloud/control.ts";
+import { prepareCloudStart } from "./cloud/workspace.ts";
 import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
 import { persistModelsToConfigFile } from "./config/persist-models.ts";
@@ -157,6 +158,7 @@ export class ControlSurfaceRuntime {
       this.log.bind(this),
       loadConfig,
       (streamId) => this.cloud?.owns(streamId) ?? false,
+      (streamId, item) => this.cloud?.admit(streamId, item),
     );
     this.providerAuth = new ProviderAuthManager(() => this.resolveModelRuntime());
     this.cloud = cloudEnabled ? new CloudControl(this) : null;
@@ -704,6 +706,14 @@ export class ControlSurfaceRuntime {
 
   async setPiSessionModel(piSessionId: string, modelId: string): Promise<PiSessionModelInfo> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (managed?.streamId && this.cloud?.owns(managed.streamId)) {
+      const entry = resolveModelEntry(this.config, modelId);
+      return this.cloud.command(managed.streamId, "control", {
+        operation: "model",
+        id: `${entry.provider}/${entry.modelId}`,
+        level: entry.thinkingLevel ?? this.config.defaultThinkingLevel,
+      });
+    }
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
@@ -801,6 +811,11 @@ export class ControlSurfaceRuntime {
     thinkingLevel: ModelThinkingLevel,
   ): Promise<PiSessionModelInfo> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (managed?.streamId && this.cloud?.owns(managed.streamId))
+      return this.cloud.command(managed.streamId, "control", {
+        operation: "thinking",
+        level: thinkingLevel,
+      });
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
@@ -949,9 +964,10 @@ export class ControlSurfaceRuntime {
             worktreePath: ws.worktree_path ?? undefined,
             piSessionId,
             piSessionStatus: piSession?.status,
-            model: managed
-              ? this.toPiSessionModelInfo(managed.modelInfo)
-              : persistedModelByPiSession.get(piSessionId ?? ""),
+            model:
+              managed && !this.cloud?.owns(ws.id)
+                ? this.toPiSessionModelInfo(managed.modelInfo)
+                : persistedModelByPiSession.get(piSessionId ?? ""),
             sessionCount: sessionCountByStream.get(ws.id) ?? 0,
             createdAt: ws.created_at,
           };
@@ -1053,6 +1069,8 @@ export class ControlSurfaceRuntime {
     limit: number = 50,
   ): Promise<TranscriptPageResponse> {
     const session = getSessionById(this.blackboard, sessionId);
+    if (session?.streamId && session.status !== "ended" && this.cloud?.owns(session.streamId))
+      return this.cloud.command(session.streamId, "transcript", { sessionId, cursor, limit });
     if (!session?.transcriptPath) {
       return {
         sessionId,
@@ -1068,7 +1086,14 @@ export class ControlSurfaceRuntime {
     sessionId: string,
     text: string,
   ): Promise<DirectSessionMessageResponse> {
-    return directSessionMessage(this, sessionId, text);
+    const session = getSessionById(this.blackboard, sessionId);
+    if (session?.streamId && this.cloud?.owns(session.streamId))
+      return this.cloud.command(session.streamId, "direct", { sessionId, text });
+    return directSessionMessage(
+      { getSession: (id) => getSessionById(this.blackboard, id), config: this.config },
+      sessionId,
+      text,
+    );
   }
 
   async startWhatsAppDaemon(): Promise<RuntimeWhatsAppControlResponse> {
@@ -1162,7 +1187,7 @@ export class ControlSurfaceRuntime {
     onAccepted?: () => void,
   ): Promise<void> {
     if (managed.streamId && this.cloud?.owns(managed.streamId)) {
-      await this.cloud.deliver(managed.streamId, item);
+      await this.cloud.deliver(managed.streamId);
       onAccepted?.();
       return;
     }
@@ -1341,6 +1366,7 @@ export class ControlSurfaceRuntime {
     worktreePath?: string;
     baseBranch?: string;
     resumeSessionFile?: string;
+    startFrom?: CreateSwimlaneRequest["startFrom"];
   }): Promise<
     | { ok: true; streamId: string; streamName: string; managed: ManagedPiSession }
     | { ok: false; streamId: null; streamName: string; spawnError: Error }
@@ -1353,16 +1379,26 @@ export class ControlSurfaceRuntime {
       throw new Error(`cwd path "${opts.cwd}" does not exist`);
     }
 
+    const start =
+      this.cloud && opts.type !== "defaultStream"
+        ? await prepareCloudStart(opts.cwd, opts.startFrom, opts.baseBranch)
+        : undefined;
     const ws = insertStream(this.blackboard, opts.name, opts.type ?? "work", opts.streamUser);
     enrichStream(
       this.blackboard,
       ws.id,
-      opts.repoPath ?? opts.cwd,
+      opts.repoPath ?? start?.root ?? opts.cwd,
       opts.worktreePath,
-      opts.baseBranch,
+      opts.baseBranch ?? start?.mergeTarget,
     );
 
     try {
+      if (start)
+        this.blackboard.run(
+          "INSERT INTO cloud_start_options (stream_id, options) VALUES (?, ?)",
+          ws.id,
+          JSON.stringify(start),
+        );
       const managed =
         this.cloud && opts.type !== "defaultStream"
           ? this.cloud.createSession(ws.id, ws.name, opts.cwd, opts.resumeSessionFile)
@@ -1386,6 +1422,7 @@ export class ControlSurfaceRuntime {
         streamId: ws.id,
         streamName: ws.name,
       });
+      this.cloud?.schedule(ws.id);
       return { ok: true, streamId: ws.id, streamName: ws.name, managed };
     } catch (error) {
       const spawnError = error instanceof Error ? error : new Error(String(error));
@@ -1444,6 +1481,8 @@ export class ControlSurfaceRuntime {
       name,
       cwd: effectiveCwd,
       streamUser,
+      startFrom: input?.startFrom,
+      baseBranch: input?.baseRef,
     });
     if (!result.ok) throw result.spawnError;
 
@@ -1488,6 +1527,8 @@ export class ControlSurfaceRuntime {
     streamId: string,
     cwdInput: string,
   ): Promise<{ ok: true; streamId: string; cwd: string; piSessionId: string }> {
+    if (this.cloud?.owns(streamId))
+      return this.cloud.command(streamId, "control", { operation: "cwd", cwd: cwdInput });
     const cwd = this.resolveStreamCwdInput(cwdInput);
     const stat = fs.statSync(cwd, { throwIfNoEntry: false });
     if (!stat?.isDirectory())
@@ -1639,6 +1680,11 @@ export class ControlSurfaceRuntime {
     tokensBefore: number;
   }> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (managed?.streamId && this.cloud?.owns(managed.streamId))
+      return this.cloud.command(managed.streamId, "control", {
+        operation: "compact",
+        customInstructions,
+      });
     if (!managed) throw new Error("Pi session not found");
     if (managed.streamId) {
       return this.sessionManager.withActiveStreamOperation(
@@ -1702,6 +1748,8 @@ export class ControlSurfaceRuntime {
     entryId: string,
   ): Promise<{ ok: true; piSessionId: string; messageCount: number }> {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
+    if (managed?.streamId && this.cloud?.owns(managed.streamId))
+      return this.cloud.command(managed.streamId, "control", { operation: "prune", entryId });
     if (!managed) throw new Error("Pi session not found");
     if (managed.streamId) {
       return this.sessionManager.withActiveStreamOperation(
@@ -1764,6 +1812,8 @@ export class ControlSurfaceRuntime {
   ): Promise<{ ok: true; streamId: string; streamName: string; piSessionId: string }> {
     const managed = this.sessionManager.getByPiSessionId(sourcePiSessionId);
     if (!managed) throw new Error("Pi session not found");
+    if (managed.streamId && this.cloud?.owns(managed.streamId))
+      await this.cloud.command(managed.streamId, "control", { operation: "snapshot" });
     if (managed.streamId) {
       return this.sessionManager.withStreamOperation(
         { streamId: managed.streamId, expectedPiSessionId: sourcePiSessionId },
@@ -1830,7 +1880,11 @@ export class ControlSurfaceRuntime {
     const baseName = stripStreamNamePrefix(
       sourceStream?.name ?? managed.streamName ?? "flitterbot",
     );
-    const cwd = row?.cwd ?? sourceStream?.repo_path ?? this.config.projectsDir;
+    const cwd =
+      (this.cloud?.owns(managed.streamId) ? sourceStream?.worktree_path : undefined) ??
+      row?.cwd ??
+      sourceStream?.repo_path ??
+      this.config.projectsDir;
     const result = await this.spawnStreamWithSession({
       name: baseName,
       cwd,

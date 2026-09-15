@@ -7,6 +7,7 @@ import type { WorkerBootstrap } from "./worker-agent.ts";
 type BootstrapInput = {
   bootstrap: WorkerBootstrap;
   sourceRoot: string;
+  sourceCwd: string;
   sessionContent: string;
   checkpointDirectory?: string;
 };
@@ -18,7 +19,7 @@ const cp = require('node:child_process');
 let text = '';
 process.stdin.on('data', chunk => text += chunk);
 process.stdin.on('end', async () => {
-  const {bootstrap, sourceRoot, checkpointDirectory} = JSON.parse(text);
+  const {bootstrap, sourceRoot, sourceCwd, checkpointDirectory} = JSON.parse(text);
   let {sessionContent} = JSON.parse(text);
   const directory = path.dirname(bootstrap.outbox);
   fs.mkdirSync(directory, {recursive: true, mode: 0o700});
@@ -42,10 +43,23 @@ process.stdin.on('end', async () => {
       fs.rmSync(workspace, {recursive: true, force: true});
       const {restoreRepository} = await import(require('node:url').pathToFileURL(path.join(sourceRoot, 'src/cloud/repository.ts')).href);
       await restoreRepository(checkpointDirectory, workspace);
+      const {hydrateWorkspace} = await import(require('node:url').pathToFileURL(path.join(sourceRoot, 'src/cloud/workspace.ts')).href);
+      await hydrateWorkspace(bootstrap.start?.root || sourceCwd, workspace);
       fs.writeFileSync(marker, 'restored', {mode: 0o600});
     }
-    bootstrap.cwd = workspace;
-    bootstrap.baseRef = JSON.parse(fs.readFileSync(path.join(checkpointDirectory, 'manifest.json'), 'utf8')).workspace.baseRef || bootstrap.baseRef;
+    const manifest = JSON.parse(fs.readFileSync(path.join(checkpointDirectory, 'manifest.json'), 'utf8'));
+    bootstrap.cwd = path.join(workspace, manifest.workspace.cwdRelative || '');
+    fs.mkdirSync(bootstrap.cwd, {recursive: true});
+    bootstrap.baseRef = manifest.workspace.baseRef || bootstrap.baseRef;
+  } else if (bootstrap.start) {
+    const marker = path.join(directory, 'workspace-initialized');
+    if (fs.existsSync(marker)) bootstrap.cwd = fs.readFileSync(marker, 'utf8');
+    else {
+      if (bootstrap.start.mode !== 'workspace') fs.rmSync(path.join(directory, 'workspace'), {recursive: true, force: true});
+      const {initializeWorkspace} = await import(require('node:url').pathToFileURL(path.join(sourceRoot, 'src/cloud/workspace.ts')).href);
+      bootstrap.cwd = await initializeWorkspace(bootstrap.start, directory, bootstrap.streamId);
+      fs.writeFileSync(marker, bootstrap.cwd, {mode: 0o600});
+    }
   }
   if (!fs.existsSync(configPath) || !fs.existsSync(bootstrap.sessionFile)) {
     const lines = sessionContent.split('\n');
@@ -62,8 +76,12 @@ process.stdin.on('end', async () => {
     try { bootstrap.baseRef = cp.execFileSync('git', ['rev-parse', bootstrap.baseRef || 'HEAD'], {cwd: bootstrap.cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']}).trim(); } catch {}
   }
   fs.writeFileSync(configPath, JSON.stringify(bootstrap), {mode: 0o600});
+  const settingsPath = path.join(require('node:os').homedir(), '.flitterbot/config.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  Object.assign(settings, {controlSurfaceHost: '127.0.0.1', controlSurfacePort: 3002, controlSurfaceToken: bootstrap.token, whatsappEnabled: false, wipeStreamsOnStart: false});
+  fs.writeFileSync(settingsPath, JSON.stringify(settings), {mode: 0o600});
   const log = fs.openSync(path.join(directory, 'worker.log'), 'a', 0o600);
-  const child = cp.spawn(process.execPath, [path.join(sourceRoot, 'src/cloud/worker-server.ts'), configPath, '3002'], {
+  const child = cp.spawn('flock', ['-n', '/tmp/flitterbot-worker-writer.lock', process.execPath, path.join(sourceRoot, 'src/cloud/worker-server.ts'), configPath, '3002'], {
     cwd: sourceRoot, detached: true, stdio: ['ignore', log, log]
   });
   fs.writeFileSync(pidPath, String(child.pid), {mode: 0o600});
@@ -105,7 +123,7 @@ async function remote(name: string, command: string, input: string): Promise<voi
     const timeout = setTimeout(() => {
       child.kill();
       reject(new Error("Worker bootstrap SSH timed out"));
-    }, 120_000);
+    }, 600_000);
     child.once("error", (error) => {
       clearTimeout(timeout);
       reject(error);
@@ -135,7 +153,7 @@ export class SshWorkerLifecycle implements WorkerLifecycle {
     await this.origin(assignment);
     await remote(
       assignment.worker.vm_name,
-      `node -e ${quote(WORKER_BOOTSTRAP_SCRIPT)}`,
+      `flock -n /tmp/flitterbot-worker-bootstrap.lock node -e ${quote(WORKER_BOOTSTRAP_SCRIPT)}`,
       JSON.stringify(input),
     );
   }
@@ -229,7 +247,9 @@ export class SshWorkerLifecycle implements WorkerLifecycle {
       headers: { Authorization: `Bearer ${assignment.token}`, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       redirect: "error",
-      signal: AbortSignal.timeout(pathname === "/worker/checkpoint" ? 120_000 : 5_000),
+      signal: AbortSignal.timeout(
+        pathname === "/worker/health" || pathname === "/worker/wake" ? 5_000 : 180_000,
+      ),
     });
   }
 

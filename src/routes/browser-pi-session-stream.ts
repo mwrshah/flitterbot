@@ -2,6 +2,7 @@ import { exec as cpExec } from "node:child_process";
 import type http from "node:http";
 import { promisify } from "node:util";
 import { getStreamForPiSession } from "../blackboard/query-streams.ts";
+import type { StreamRow } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { relativizeProjectsPath } from "../streams/projects-path.ts";
 import {
@@ -41,8 +42,16 @@ export async function handleBrowserPiSessionStreamRoute(
   if (!piSession && !ws) {
     return sendJson(response, 404, { ok: false, error: "Unknown pi session" });
   }
-  const cwdAbsolute = piSession?.cwd ?? null;
-  const cwd = cwdAbsolute ? relativizeProjectsPath(cwdAbsolute, runtime.config.projectsDir) : null;
+  return serveStreamWorkspace(response, ws, piSession?.cwd ?? null, runtime.config.projectsDir);
+}
+
+export async function serveStreamWorkspace(
+  response: http.ServerResponse,
+  ws: Pick<StreamRow, "id" | "name" | "repo_path" | "worktree_path" | "base_branch"> | null,
+  cwdAbsolute: string | null,
+  projectsDir: string,
+) {
+  const cwd = cwdAbsolute ? relativizeProjectsPath(cwdAbsolute, projectsDir) : null;
   const branch = ws?.worktree_path ? await resolveWorktreeBranch(ws.worktree_path) : null;
   const configSource = await resolveBootstrapConfigSource(cwdAbsolute, ws?.worktree_path);
   const repoPath =
@@ -50,7 +59,7 @@ export async function handleBrowserPiSessionStreamRoute(
     (await resolveMainRepoPath(ws?.worktree_path)) ??
     (await resolveMainRepoPath(cwdAbsolute)) ??
     null;
-  const repo = repoPath ? relativizeProjectsPath(repoPath, runtime.config.projectsDir) : null;
+  const repo = repoPath ? relativizeProjectsPath(repoPath, projectsDir) : null;
   const config = configSource
     ? await readWorktreeConfig(configSource)
     : { copyPaths: [], postCreate: [], baseRef: null };

@@ -10,7 +10,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { loadConfig } from "../config/load-config.ts";
+import { isThinkingLevel, loadConfig } from "../config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "../config/models.ts";
 import { createPiModelRuntime } from "../pi-auth.ts";
 import type { OrchestratorContext } from "../prompts/index.ts";
@@ -138,7 +138,17 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     const useConfiguredDefault =
       factoryOpts.sessionStartEvent?.reason === "new" ||
       (!resumeSessionFile && factoryOpts.sessionStartEvent === undefined);
-    const modelEntry = useConfiguredDefault ? resolveModelEntry(config) : undefined;
+    const saved = factoryOpts.sessionManager.buildSessionContext();
+    const selection = factoryOpts.sessionManager
+      .getBranch()
+      .slice()
+      .reverse()
+      .find((entry) => entry.type === "model_change"); // Replies can use upstream IDs instead of catalog IDs.
+    const savedModel = selection?.type === "model_change" ? selection : saved.model;
+    const modelEntry =
+      useConfiguredDefault || !savedModel
+        ? resolveModelEntry(config)
+        : resolveModelEntry(config, `${savedModel.provider}/${savedModel.modelId}`);
     const model = modelEntry
       ? modelRuntime.getModel(modelEntry.provider, modelEntry.modelId)
       : undefined;
@@ -148,9 +158,11 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
           `Not in the built-in catalog or ~/.flitterbot/control-surface/agent/models.json.`,
       );
     }
-    const effectiveThinkingLevel = modelEntry
+    const effectiveThinkingLevel = useConfiguredDefault
       ? (modelEntry.thinkingLevel ?? config.defaultThinkingLevel)
-      : undefined;
+      : isThinkingLevel(saved.thinkingLevel)
+        ? saved.thinkingLevel
+        : (modelEntry.thinkingLevel ?? config.defaultThinkingLevel);
     const piSessionId = factoryOpts.sessionManager.getSessionId();
     const rolePrompt =
       role === "orchestrator"

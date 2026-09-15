@@ -76,7 +76,8 @@ export class CloudCoordinator {
       if (presence === "stopped") throw new CloudConflict("Assigned VM is stopped, not missing");
       if (presence === "running") {
         const assignment = this.assignment(worker);
-        if (worker.phase === "provisioning") await this.lifecycle.boot(assignment);
+        if (worker.phase === "provisioning" || !(await this.lifecycle.ready(assignment)))
+          await this.lifecycle.boot(assignment);
         if (!(await this.lifecycle.ready(assignment))) {
           throw new CloudConflict("Assigned VM exists but is unreachable; replacement is unsafe");
         }
@@ -97,6 +98,7 @@ export class CloudCoordinator {
     if ((await this.provider.presence(name)) !== "absent") {
       throw new CloudConflict("Reserved VM name already exists without an ownership record");
     }
+    await this.provider.prepareFork?.(this.sourceVm);
     worker = this.store.assign(streamId, name, this.token(streamId, generation));
     await this.provider.fork(this.sourceVm, name);
     const assignment = this.assignment(worker);

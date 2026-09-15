@@ -59,6 +59,18 @@ export async function handleCreateSwimlaneRoute(
     };
   }
 
+  if (
+    body.startFrom !== undefined &&
+    !["workspace", "head", "base"].includes(String(body.startFrom))
+  )
+    return sendJson(res, 400, { ok: false, error: "startFrom must be workspace, head, or base" });
+  if (body.baseRef !== undefined && (typeof body.baseRef !== "string" || !body.baseRef.trim()))
+    return sendJson(res, 400, { ok: false, error: "baseRef must name a branch" });
+  if ((body.startFrom !== undefined || body.baseRef !== undefined) && !runtime.cloud)
+    return sendJson(res, 400, { ok: false, error: "Source selection requires cloud mode" });
+  input.startFrom = body.startFrom as CreateSwimlaneRequest["startFrom"];
+  input.baseRef = body.baseRef as string | undefined;
+
   try {
     return sendJson(res, 200, await runtime.createSwimlaneProgrammatic(input));
   } catch (error) {

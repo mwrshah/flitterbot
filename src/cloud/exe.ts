@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import os from "node:os";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -7,6 +8,7 @@ const VM_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export type VmPresence = "running" | "stopped" | "absent";
 export interface VmProvider {
   presence(name: string): Promise<VmPresence>;
+  prepareFork?(source: string): Promise<void>;
   fork(source: string, name: string): Promise<void>;
   remove(name: string): Promise<void>;
 }
@@ -22,12 +24,13 @@ export class ExeVmProvider implements VmProvider {
 
   constructor(
     run: Run = async (args) => {
-      const result = await exec(
+      const operation = exec(
         "ssh",
         ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "exe.dev", ...args],
         { timeout: 120_000, maxBuffer: 4 * 1024 * 1024 },
       );
-      return result.stdout;
+      operation.child.stdin?.end();
+      return (await operation).stdout;
     },
   ) {
     this.run = run;
@@ -54,6 +57,15 @@ export class ExeVmProvider implements VmProvider {
       throw new Error(`VM ${name} has unresolved provider state ${String(vm.status)}`);
     }
     return "absent";
+  }
+
+  async prepareFork(source: string): Promise<void> {
+    validateName(source);
+    if (source !== os.hostname())
+      throw new Error("Cloud forks must originate on the controller host");
+    const flush = exec("sync", [], { timeout: 120_000, maxBuffer: 1024 * 1024 });
+    flush.child.stdin?.end();
+    await flush;
   }
 
   async fork(source: string, name: string): Promise<void> {

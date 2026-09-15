@@ -17,7 +17,10 @@ export function handleRemoveTurnQueueItemRoute(
   const managed = runtime.sessionManager.getByPiSessionId(piSessionId);
   if (!managed) return sendJson(response, 404, { error: "Pi session not found" });
 
-  const result = managed.queue.remove(itemId);
+  const result =
+    managed.streamId && runtime.cloud?.owns(managed.streamId)
+      ? runtime.cloud.removeTurn(managed.streamId, itemId)
+      : managed.queue.remove(itemId);
   const body: RemoveTurnQueueItemResponse = {
     removed: result.removed,
     accepting: result.accepting,

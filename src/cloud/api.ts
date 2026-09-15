@@ -1,9 +1,13 @@
 import type http from "node:http";
 import path from "node:path";
+import { getSessionById, listSessions } from "../blackboard/query-sessions.ts";
 import { executeBlackboardQuery } from "../blackboard/tool-query-blackboard.ts";
+import { isThinkingLevel } from "../config/load-config.ts";
 import { sendJson } from "../routes/_shared.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { type Checkpoint, CheckpointStore } from "./checkpoints.ts";
+import { receiveCloudHook } from "./hook-receiver.ts";
+import { mergeCheckpoint } from "./merge.ts";
 import { projectCheckpoint, serializePublication } from "./projection.ts";
 import { CloudConflict, CloudStore } from "./store.ts";
 
@@ -12,6 +16,10 @@ const MAX_REQUEST = 180 * 1024 * 1024;
 
 type ApiRuntime = Pick<ControlSurfaceRuntime, "blackboard"> & {
   config: Pick<ControlSurfaceRuntime["config"], "controlSurfaceDir">;
+  wsHub?: Pick<ControlSurfaceRuntime["wsHub"], "broadcast">;
+  closeSwimlaneNoop?: ControlSurfaceRuntime["closeSwimlaneNoop"];
+  handleHook?: ControlSurfaceRuntime["handleHook"];
+  cloud?: Pick<NonNullable<ControlSurfaceRuntime["cloud"]>, "queueChanged"> | null;
 };
 
 export async function handleCloudApi(
@@ -46,6 +54,16 @@ export async function handleCloudApi(
   }
   response.setHeader("Cache-Control", "no-store");
   try {
+    if (request.method === "GET" && operation === "sessions") {
+      sendJson(response, 200, {
+        sessions: listSessions(store.db).filter((session) => session.streamId === streamId),
+      });
+      return true;
+    }
+    if (request.method === "GET" && operation === "stream") {
+      sendJson(response, 200, store.db.get("SELECT * FROM streams WHERE id = ?", streamId));
+      return true;
+    }
     if (request.method === "GET" && operation === "assignment") {
       const worker = store.get(streamId)!;
       sendJson(response, 200, {
@@ -72,14 +90,99 @@ export async function handleCloudApi(
       sendJson(response, 405, { error: "Unsupported cloud operation method" });
       return true;
     }
-    const body = await readBody(request, operation === "checkpoint" ? MAX_REQUEST : 1024 * 1024);
+    const body = await readBody(
+      request,
+      ["checkpoint", "hook"].includes(operation) ? MAX_REQUEST : 1024 * 1024,
+    );
     store.authenticate(streamId, generation, token!); // Upload may overlap worker replacement.
     switch (operation) {
+      case "session": {
+        if (typeof body.id !== "string") throw new Error("Session ID required");
+        const session = getSessionById(store.db, body.id);
+        if (session?.streamId !== streamId) throw new Error("Session is not owned by this worker");
+        sendJson(response, 200, session);
+        break;
+      }
+      case "hook": {
+        if (!runtime.handleHook) throw new Error("Controller hook handler unavailable");
+        const result = await serializePublication(store.db, streamId, () =>
+          receiveCloudHook(
+            store,
+            runtime.config.controlSurfaceDir,
+            streamId,
+            generation,
+            body,
+            (event, payload) => runtime.handleHook!(event, payload),
+          ),
+        );
+        runtime.wsHub?.broadcast({
+          type: "status_changed",
+          subsystem: "cloud-hook",
+          timestamp: new Date().toISOString(),
+        });
+        sendJson(response, 200, result);
+        break;
+      }
       case "query": {
         const sql = typeof body.sql === "string" ? body.sql : undefined;
         const mode = typeof body.mode === "string" ? body.mode : undefined;
         const rows = executeBlackboardQuery(runtime.blackboard, sql, mode);
         sendJson(response, 200, { rows });
+        break;
+      }
+      case "workspace": {
+        if (typeof body.baseBranch !== "string" || !body.baseBranch.trim())
+          throw new Error("Named merge target required");
+        store.db.run("UPDATE streams SET base_branch = ? WHERE id = ?", body.baseBranch, streamId);
+        sendJson(response, 200, { ok: true });
+        break;
+      }
+      case "merge": {
+        if (typeof body.baseBranch !== "string") throw new Error("Confirmed merge target required");
+        sendJson(
+          response,
+          200,
+          await mergeCheckpoint(store, streamId, generation, body.baseBranch),
+        );
+        break;
+      }
+      case "close": {
+        if (!runtime.closeSwimlaneNoop) throw new Error("Controller close handler is unavailable");
+        sendJson(response, 202, { ok: true, closing: true });
+        setImmediate(() => {
+          void runtime.closeSwimlaneNoop!(streamId).catch((error) =>
+            runtime.wsHub?.broadcast({
+              type: "error",
+              message: `Cloud close failed: ${error instanceof Error ? error.message : String(error)}`,
+            }),
+          );
+        });
+        break;
+      }
+      case "cwd": {
+        if (typeof body.cwd !== "string" || !path.isAbsolute(body.cwd))
+          throw new Error("Absolute cwd required");
+        store.db.run("UPDATE pi_sessions SET cwd = ? WHERE stream_id = ?", body.cwd, streamId);
+        store.db.run("UPDATE streams SET worktree_path = NULL WHERE id = ?", streamId);
+        runtime.wsHub?.broadcast({ type: "streams_changed", reason: "cwd_changed", streamId });
+        sendJson(response, 200, { ok: true });
+        break;
+      }
+      case "model": {
+        if (
+          typeof body.provider !== "string" ||
+          typeof body.modelId !== "string" ||
+          !isThinkingLevel(body.thinkingLevel)
+        )
+          throw new Error("Valid model and thinking level required");
+        store.db.run(
+          "UPDATE pi_sessions SET model_provider = ?, model_id = ?, thinking_level = ? WHERE stream_id = ? AND ended_at IS NULL",
+          body.provider,
+          body.modelId,
+          body.thinkingLevel,
+          streamId,
+        );
+        sendJson(response, 200, { ok: true });
         break;
       }
       case "state": {
@@ -102,14 +205,41 @@ export async function handleCloudApi(
         sendJson(response, 200, { ok: true });
         break;
       }
+      case "restart": {
+        store.db.run(
+          "UPDATE cloud_commands SET status = 'uncertain', updated_at = ? WHERE stream_id = ? AND generation = ? AND status = 'accepted'",
+          new Date().toISOString(),
+          streamId,
+          generation,
+        );
+        runtime.cloud?.queueChanged(streamId);
+        sendJson(response, 200, { ok: true });
+        break;
+      }
       case "accept": {
         if (typeof body.id !== "string") throw new Error("Command ID required");
-        sendJson(response, 200, { accepted: store.accept(streamId, generation, body.id) });
+        const accepted = store.accept(streamId, generation, body.id);
+        runtime.cloud?.queueChanged(streamId);
+        sendJson(response, 200, { accepted });
+        break;
+      }
+      case "fail": {
+        if (typeof body.id !== "string") throw new Error("Command ID required");
+        store.db.run(
+          "UPDATE cloud_commands SET status = 'uncertain', updated_at = ? WHERE id = ? AND stream_id = ? AND generation = ? AND status = 'accepted'",
+          new Date().toISOString(),
+          body.id,
+          streamId,
+          generation,
+        );
+        runtime.cloud?.queueChanged(streamId);
+        sendJson(response, 200, { ok: true });
         break;
       }
       case "complete": {
         if (typeof body.id !== "string") throw new Error("Command ID required");
         store.complete(streamId, generation, body.id);
+        runtime.cloud?.queueChanged(streamId);
         sendJson(response, 200, { ok: true });
         break;
       }
@@ -121,6 +251,11 @@ export async function handleCloudApi(
         await serializePublication(runtime.blackboard, streamId, async () => {
           await checkpoints.publish(streamId, generation, token!, body as unknown as Checkpoint);
           await projectCheckpoint(runtime.blackboard, runtime.config.controlSurfaceDir, streamId);
+        });
+        runtime.wsHub?.broadcast({
+          type: "status_changed",
+          subsystem: "cloud-checkpoint",
+          timestamp: new Date().toISOString(),
         });
         sendJson(response, 200, { ok: true, version: body.version });
         break;

@@ -20,4 +20,15 @@ CREATE TABLE IF NOT EXISTS cloud_commands (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS cloud_commands_stream ON cloud_commands(stream_id, status);
+CREATE TABLE IF NOT EXISTS cloud_start_options (
+  stream_id TEXT PRIMARY KEY REFERENCES streams(id) ON DELETE CASCADE,
+  options TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cloud_hook_receipts (
+  stream_id TEXT NOT NULL REFERENCES streams(id),
+  generation INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  session_id TEXT NOT NULL,
+  PRIMARY KEY (stream_id, generation, version)
+);
 `;

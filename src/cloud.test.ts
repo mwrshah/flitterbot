@@ -7,15 +7,22 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { BlackboardDatabase } from "./blackboard/db.ts";
+import { insertSession } from "./blackboard/query-sessions.ts";
 import { handleCloudApi } from "./cloud/api.ts";
 import { type Checkpoint, CheckpointStore } from "./cloud/checkpoints.ts";
 import { CloudClient } from "./cloud/client.ts";
 import { CloudCoordinator } from "./cloud/coordinator.ts";
 import type { VmPresence, VmProvider } from "./cloud/exe.ts";
+import { mergeCheckpoint } from "./cloud/merge.ts";
 import { projectCheckpoint } from "./cloud/projection.ts";
-import { CheckpointPublisher } from "./cloud/publisher.ts";
-import { captureRepository, git as repositoryGit, restoreRepository } from "./cloud/repository.ts";
+import { DurableOutbox } from "./cloud/publisher.ts";
+import { captureRepository, restoreRepository } from "./cloud/repository.ts";
 import { CloudStore } from "./cloud/store.ts";
+import { createCloudTools } from "./cloud/tools.ts";
+import type { WorkerBootstrap } from "./cloud/worker-agent.ts";
+import { initializeWorkspace, prepareCloudStart } from "./cloud/workspace.ts";
+import type { StreamRow } from "./contracts/index.ts";
+import { git as repositoryGit } from "./git.ts";
 
 async function fixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "flitterbot-cloud-"));
@@ -59,6 +66,10 @@ class Provider implements VmProvider {
   forks = 0;
   removals = 0;
   failInventory = false;
+  failPreflight = false;
+  async prepareFork() {
+    if (this.failPreflight) throw new Error("flush failed");
+  }
   loseCopyReply = false;
   loseDeleteReply = false;
   async presence(name: string) {
@@ -106,12 +117,23 @@ test("cloud lifecycle: provision, deliver once, reconcile failures, recover, pub
       "controller",
       "x".repeat(64),
     );
+    provider.failPreflight = true;
+    await assert.rejects(coordinator.ensure(f.id), /flush failed/);
+    assert.equal(f.store.get(f.id), undefined);
+    assert.equal(provider.forks, 0);
+    provider.failPreflight = false;
     const assignments = await Promise.all(
       Array.from({ length: 10 }, () => coordinator.ensure(f.id)),
     );
     assert.equal(provider.forks, 1);
     assert.equal(new Set(assignments.map((a) => a.worker.vm_name)).size, 1);
     const first = assignments[0]!;
+    f.store.enqueue(f.id, "discard", { text: "discard", source: "web" });
+    const pending = f.store.queueSnapshot(f.id);
+    assert.equal(pending.items[0]?.id, "discard");
+    assert.equal(f.store.cancel(f.id, "discard").removed, true);
+    assert.ok(f.store.queueSnapshot(f.id).version > pending.version);
+    assert.equal(f.store.accept(f.id, 1, "discard"), false);
     f.store.enqueue(f.id, "command", { text: "run" });
     assert.equal(f.store.accept(f.id, 1, "command"), true);
     assert.equal(f.store.accept(f.id, 1, "command"), false);
@@ -165,6 +187,13 @@ test("repository pipeline preserves native history and complete Git state throug
     await fs.writeFile(path.join(repo, ".gitignore"), "ignored.txt\n");
     await git("add", ".");
     await git("commit", "-m", "fixture");
+    await git("switch", "-c", "alternate");
+    await fs.writeFile(path.join(repo, "file.txt"), "alternate\n");
+    await git("commit", "-am", "alternate base");
+    await git("switch", "main");
+    await git("config", "flitterbot.baseRef", "alternate");
+    await git("config", "flitterbot.copyPath", "ignored.txt");
+    await git("config", "flitterbot.postCreate", "printf hydrated > bootstrap.txt");
     await fs.writeFile(path.join(repo, "file.txt"), "staged\n");
     await git("add", "file.txt");
     await fs.writeFile(path.join(repo, "file.txt"), "unstaged\n");
@@ -173,6 +202,20 @@ test("repository pipeline preserves native history and complete Git state throug
     await fs.writeFile(path.join(repo, "ignored.txt"), "not source\n");
     await fs.symlink("file.txt", path.join(repo, "link"));
     const before = await git("status", "--porcelain");
+    for (const mode of ["workspace", "head", "base"] as const) {
+      const start = await prepareCloudStart(repo, mode);
+      const directory = path.join(f.root, mode);
+      await fs.mkdir(directory);
+      const cwd = await initializeWorkspace(start, directory, f.id);
+      assert.equal(
+        await fs.readFile(path.join(cwd, "file.txt"), "utf8"),
+        mode === "workspace" ? "unstaged\n" : mode === "head" ? "original\n" : "alternate\n",
+      );
+      if (mode !== "workspace") {
+        assert.equal(await fs.readFile(path.join(cwd, "ignored.txt"), "utf8"), "not source\n");
+        assert.equal(await fs.readFile(path.join(cwd, "bootstrap.txt"), "utf8"), "hydrated");
+      }
+    }
     const workspace = await captureRepository(repo);
     assert.equal(await git("status", "--porcelain"), before);
     assert.ok(!workspace.files.some((file) => file.path === "ignored.txt"));
@@ -202,6 +245,71 @@ test("repository pipeline preserves native history and complete Git state throug
     assert.equal(await repositoryGit(published.worktree_path, ["status", "--porcelain"]), before);
     const active = path.join(control, "sessions", `${f.pi}.jsonl`);
     assert.equal(await fs.readFile(active, "utf8"), session(f.pi).sessions[0]!.content);
+    f.store.phase(f.id, 1, "ready");
+    f.db.run("UPDATE streams SET repo_path = ? WHERE id = ?", repo, f.id);
+    await assert.rejects(mergeCheckpoint(f.store, f.id, 1, "main"), /uncommitted/);
+    const canonical = path.join(f.root, "canonical");
+    await repositoryGit(f.root, ["clone", "--", repo, canonical]);
+    f.db.run("UPDATE streams SET repo_path = ? WHERE id = ?", canonical, f.id);
+    await repositoryGit(mirror, ["config", "user.name", "Checkpoint Test"]);
+    await repositoryGit(mirror, ["config", "user.email", "test@example.invalid"]);
+    await repositoryGit(mirror, ["add", "--all"]);
+    await repositoryGit(mirror, ["commit", "-m", "worker result"]);
+    const committed = await captureRepository(mirror);
+    await checkpoints.publish(f.id, 1, "token", { ...session(f.pi, 2), workspace: committed });
+    assert.equal((await mergeCheckpoint(f.store, f.id, 1, "main")).ok, true);
+    const identity = {
+      controllerUrl: "http://localhost",
+      token: "token",
+      streamId: f.id,
+      generation: 1,
+    };
+    const toolClient = new CloudClient(identity);
+    toolClient.request = async <T>() =>
+      f.db.get<StreamRow>("SELECT * FROM streams WHERE id = ?", f.id) as T;
+    const tools = createCloudTools(
+      toolClient,
+      {
+        ...identity,
+        cwd: mirror,
+        controllerVm: "controller",
+        piSessionId: f.pi,
+        streamName: "test",
+        sessionFile: path.join(f.store.get(f.id)!.checkpoint_path!, "sessions", `${f.pi}.jsonl`),
+        checkpointVersion: 2,
+        outbox: path.join(f.root, "outbox"),
+      } as WorkerBootstrap,
+      async () => {
+        throw new Error("Preview must not publish");
+      },
+      async () => {
+        throw new Error("Preview must not settle processes");
+      },
+      () => "same-user-entry",
+    );
+    const close = tools.find((tool) => tool.name === "close_swimlane")!;
+    for (const base_branch of [null, "", "main", "main"]) {
+      const preview = await close.execute(
+        "preview",
+        { mode: "merge", base_branch, commit_message: "worker result" },
+        undefined,
+        undefined,
+        {} as never,
+      );
+      assert.equal((preview.details as { needsConfirmation: boolean }).needsConfirmation, true);
+    }
+    await assert.rejects(
+      close.execute(
+        "noop",
+        { mode: "noop", commit_message: "preview" },
+        undefined,
+        undefined,
+        {} as never,
+      ),
+      /new user response/,
+    );
+    assert.equal((await repositoryGit(canonical, ["rev-parse", "HEAD"])).trim(), committed.head);
+    assert.equal(await repositoryGit(repo, ["status", "--porcelain"]), before);
     f.db.run("UPDATE streams SET status = 'closed' WHERE id = ?", f.id);
     await projectCheckpoint(f.db, control, f.id);
     await assert.rejects(fs.access(active), /ENOENT/);
@@ -217,13 +325,33 @@ test("repository pipeline preserves native history and complete Git state throug
 test("authenticated HTTP pipeline keeps SQLite authoritative and retries durable checkpoints after restart", async () => {
   const f = await fixture();
   let offline = false;
+  let hookCalls = 0;
   const server = http.createServer((req, res) => {
     if (offline) {
       res.writeHead(503);
       res.end();
       return;
     }
-    void handleCloudApi({ blackboard: f.db, config: { controlSurfaceDir: f.root } }, req, res);
+    void handleCloudApi(
+      {
+        blackboard: f.db,
+        config: { controlSurfaceDir: f.root },
+        handleHook: (_event, payload) => {
+          hookCalls++;
+          insertSession(f.db, {
+            session_id: payload.session_id!,
+            stream_id: payload.stream_id,
+            pi_session_id: payload.pi_session_id,
+            transcript_path: payload.transcript_path,
+            cwd: payload.cwd ?? "/workspace",
+            agent_managed: true,
+          });
+          return { ok: true };
+        },
+      },
+      req,
+      res,
+    );
   });
   try {
     f.store.assign(f.id, "worker", "token");
@@ -251,7 +379,7 @@ test("authenticated HTTP pipeline keeps SQLite authoritative and retries durable
     await assert.rejects(new CloudClient({ ...identity, token: "wrong" }).query("SELECT 1"), /401/);
     const outbox = path.join(f.root, "outbox");
     offline = true;
-    const first = new CheckpointPublisher(
+    const first = new DurableOutbox(
       outbox,
       (checkpoint) => client.checkpoint(checkpoint),
       () => {},
@@ -264,7 +392,7 @@ test("authenticated HTTP pipeline keeps SQLite authoritative and retries durable
     }
     assert.ok((await fs.readdir(outbox)).includes("1.json"));
     offline = false;
-    const restarted = new CheckpointPublisher(
+    const restarted = new DurableOutbox(
       outbox,
       (checkpoint) => client.checkpoint(checkpoint),
       () => {},
@@ -295,6 +423,27 @@ test("authenticated HTTP pipeline keeps SQLite authoritative and retries durable
     };
     await assert.rejects(client.checkpoint(hostile));
     assert.equal(f.store.get(f.id)?.checkpoint_version, 2);
+    f.store.phase(f.id, 1, "ready");
+    const downstreamId = crypto.randomUUID();
+    const hook = {
+      version: 1,
+      event: "session-start",
+      payload: { session_id: downstreamId, transcript_path: "/worker/native.jsonl" },
+      content:
+        '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"downstream"}]}}\n',
+    };
+    await client.request("hook", hook);
+    await client.request("hook", hook);
+    assert.equal(hookCalls, 1);
+    const downstream = f.db.get<{ transcript_path: string }>(
+      "SELECT transcript_path FROM sessions WHERE session_id = ?",
+      downstreamId,
+    )!;
+    assert.equal(await fs.readFile(downstream.transcript_path, "utf8"), hook.content);
+    await assert.rejects(
+      client.request("hook", { ...hook, version: 2, payload: { session_id: f.pi } }),
+    );
+    assert.equal(hookCalls, 1);
     f.store.phase(f.id, 1, "absent");
     await assert.rejects(client.query("SELECT 1"), /401/);
   } finally {

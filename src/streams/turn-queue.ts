@@ -101,6 +101,7 @@ type TurnQueueOptions = {
   process: (item: QueueItem, onAccepted: () => void) => Promise<void>;
   steer: (item: QueueItem) => Promise<void>;
   canSteer: () => boolean;
+  onEnqueue?: (item: QueueItem) => void;
   onItemStart?: (item: QueueItem) => void;
   onItemEnd?: (item: QueueItem, error?: unknown, steered?: boolean) => void;
   onChanged?: (snapshot: TurnQueueSnapshot) => void;
@@ -112,6 +113,7 @@ export class TurnQueue {
   private readonly processItem: TurnQueueOptions["process"];
   private readonly steerItem: TurnQueueOptions["steer"];
   private readonly canSteer: TurnQueueOptions["canSteer"];
+  private readonly onEnqueue?: TurnQueueOptions["onEnqueue"];
   private readonly onItemStart?: TurnQueueOptions["onItemStart"];
   private readonly onItemEnd?: TurnQueueOptions["onItemEnd"];
   private readonly onChanged?: TurnQueueOptions["onChanged"];
@@ -131,6 +133,7 @@ export class TurnQueue {
     this.processItem = options.process;
     this.steerItem = options.steer;
     this.canSteer = options.canSteer;
+    this.onEnqueue = options.onEnqueue;
     this.onItemStart = options.onItemStart;
     this.onItemEnd = options.onItemEnd;
     this.onChanged = options.onChanged;
@@ -144,6 +147,7 @@ export class TurnQueue {
 
   enqueue(item: QueueItem): void {
     this.assertAccepting();
+    this.onEnqueue?.(item);
     this.entries.push({ item, state: "open" });
     if (this.holdAfterCurrent && item.sender === "user") this.holdAfterCurrent = false;
     if (!this.processing && !this.paused && !this.holdAfterCurrent) void this.pump();

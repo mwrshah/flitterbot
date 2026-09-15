@@ -10,7 +10,7 @@
     "prepare": "lefthook install",
     "control-surface": "node --experimental-strip-types src/server.ts",
     "cloud:controller": "node --experimental-strip-types src/server.ts --cloud",
-    "cloud:worker": "node --experimental-strip-types src/cloud/worker-server.ts",
+    "cloud:worker": "flock -n /tmp/flitterbot-worker-writer.lock node --experimental-strip-types src/cloud/worker-server.ts",
     "web:dev": "pnpm --dir web run dev",
     "web:build": "pnpm --dir web run build",
     "test:ts": "node --experimental-strip-types --test web/tests/*.test.ts src/*.test.ts",
@@ -40,7 +40,8 @@
     "entry": [
       "src/whatsapp/cli.ts",
       "src/whatsapp/daemon.ts",
-      "src/server.ts"
+      "src/server.ts",
+      "src/cloud/worker-server.ts"
     ],
     "project": [
       "src/**/*.ts"

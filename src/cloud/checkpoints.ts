@@ -17,6 +17,8 @@ export type Checkpoint = {
     head: string;
     branch: string;
     baseRef?: string;
+    cwdRelative?: string;
+    detached?: boolean;
     bundle: string;
     stagedPatch?: string;
     files: CheckpointFile[];
@@ -116,6 +118,8 @@ export class CheckpointStore {
     const files = checkpoint.workspace?.files ?? [];
     if (!Array.isArray(files) || files.length > 100_000)
       throw new Error("Invalid workspace file list");
+    if (checkpoint.workspace?.cwdRelative !== undefined)
+      safeRelativePath(checkpoint.workspace.cwdRelative);
     const paths = new Set<string>();
     const decoded = files.map((file) => {
       safeRelativePath(file.path);
@@ -209,6 +213,8 @@ export class CheckpointStore {
                 head: checkpoint.workspace.head,
                 branch: checkpoint.workspace.branch,
                 baseRef: checkpoint.workspace.baseRef,
+                cwdRelative: checkpoint.workspace.cwdRelative,
+                detached: checkpoint.workspace.detached,
               }
             : null,
         }),

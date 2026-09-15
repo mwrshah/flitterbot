@@ -1,6 +1,7 @@
 import { exec as cpExec } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
+import { git } from "../git.ts";
 
 const execPromise = promisify(cpExec);
 
@@ -12,10 +13,7 @@ export type WorktreeBootstrapConfig = {
 
 async function getAll(repoPath: string, key: string): Promise<string[]> {
   try {
-    const { stdout } = await execPromise(`git config --get-all ${key}`, {
-      cwd: repoPath,
-      timeout: 5_000,
-    });
+    const stdout = await git(repoPath, ["config", "--get-all", key], { timeout: 5_000 });
     return stdout
       .split("\n")
       .map((l) => l.trim())
@@ -42,10 +40,7 @@ export async function readWorktreeConfig(repoPath: string): Promise<WorktreeBoot
 export async function resolveGitRoot(cwd: string | null | undefined): Promise<string | null> {
   if (!cwd) return null;
   try {
-    const { stdout } = await execPromise("git rev-parse --show-toplevel", {
-      cwd,
-      timeout: 5_000,
-    });
+    const stdout = await git(cwd, ["rev-parse", "--show-toplevel"], { timeout: 5_000 });
     return stdout.trim() || null;
   } catch {
     return null;
@@ -55,8 +50,7 @@ export async function resolveGitRoot(cwd: string | null | undefined): Promise<st
 export async function resolveMainRepoPath(cwd: string | null | undefined): Promise<string | null> {
   if (!cwd) return null;
   try {
-    const { stdout } = await execPromise("git rev-parse --path-format=absolute --git-common-dir", {
-      cwd,
+    const stdout = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
       timeout: 5_000,
     });
     const commonGitDir = stdout.trim();

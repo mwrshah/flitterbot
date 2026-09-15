@@ -165,6 +165,8 @@ export interface SwimlaneLaunchArgs {
 }
 
 export interface CreateSwimlaneRequest {
+  startFrom?: "workspace" | "head" | "base";
+  baseRef?: string;
   name?: string;
   cwd?: string;
   message?: string;

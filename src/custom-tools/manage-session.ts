@@ -1,12 +1,13 @@
-import type { BlackboardDatabase } from "../blackboard/db.ts";
-import { getInjectionEligibility, getSessionById } from "../blackboard/query-sessions.ts";
+import { getInjectionEligibility, type getSessionById } from "../blackboard/query-sessions.ts";
 import type { FlitterbotConfig } from "../config/load-config.ts";
 import type { DirectSessionMessageResponse } from "../contracts/index.ts";
 import { sendMessageToAgentSession } from "../tmux-sessions/send-message.ts";
 import { inspectTmuxSession, tmuxSessionExists } from "../tmux-sessions/tmux.ts";
 
 type SessionControlContext = {
-  blackboard: BlackboardDatabase;
+  getSession: (
+    id: string,
+  ) => ReturnType<typeof getSessionById> | Promise<ReturnType<typeof getSessionById>>;
   config: Pick<FlitterbotConfig, "stallMinutes" | "toolTimeoutMinutes">;
 };
 
@@ -15,7 +16,7 @@ export async function directSessionMessage(
   sessionId: string,
   text: string,
 ): Promise<DirectSessionMessageResponse> {
-  const session = getSessionById(context.blackboard, sessionId);
+  const session = await context.getSession(sessionId);
   if (!session) {
     return { ok: false, sessionId, reason: "stale_or_ambiguous" };
   }

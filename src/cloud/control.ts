@@ -40,6 +40,7 @@ export class CloudControl {
   private readonly relays = new Map<string, WebSocket>();
   private readonly relayReady = new Map<string, Promise<void>>();
   private disposed = false;
+  private listening = false;
 
   constructor(runtime: ControlSurfaceRuntime) {
     this.runtime = runtime;
@@ -58,13 +59,20 @@ export class CloudControl {
       const publishedSession = assignment.worker.checkpoint_path
         ? path.join(assignment.worker.checkpoint_path, "sessions", `${row.pi_session_id}.jsonl`)
         : row.session_file;
+      const start = runtime.blackboard.get<{ options: string }>(
+        "SELECT options FROM cloud_start_options WHERE stream_id = ?",
+        stream.id,
+      );
       return {
+        sourceCwd: stream.repo_path ?? row.cwd,
         sourceRoot: fileURLToPath(new URL("../../", import.meta.url)),
         checkpointDirectory: assignment.worker.checkpoint_path ?? undefined,
         sessionContent: fs.readFileSync(publishedSession, "utf8"),
         bootstrap: {
+          start: start ? JSON.parse(start.options) : undefined,
           controllerUrl: "http://127.0.0.1:3003",
           streamId: stream.id,
+          controllerVm: os.hostname(),
           generation: assignment.worker.generation,
           token: assignment.token,
           streamName: stream.name,
@@ -88,6 +96,26 @@ export class CloudControl {
       this.lifecycle,
       os.hostname(),
       runtime.config.controlSurfaceToken,
+    );
+  }
+
+  start(): void {
+    this.listening = true;
+    for (const stream of this.runtime.blackboard.all<{ id: string }>(
+      "SELECT id FROM streams WHERE status = 'open' AND type = 'work'",
+    ))
+      this.schedule(stream.id);
+  }
+
+  schedule(streamId: string): void {
+    if (!this.listening || this.disposed || !this.owns(streamId)) return;
+    void this.execute(streamId, async (assignment) => {
+      const response = await this.lifecycle.request(assignment, "/worker/wake", {});
+      if (!response.ok) throw new Error("Worker did not accept its pending queue");
+    }).catch((error) =>
+      this.runtime.log(
+        `Cloud stream ${streamId} is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      ),
     );
   }
 
@@ -134,7 +162,14 @@ export class CloudControl {
         mode: 0o600,
       });
     const model = resolveModelEntry(this.runtime.config);
-    return this.runtime.sessionManager.rehydrateStreamSession(
+    if (!resumeSessionFile) {
+      const persisted = SessionManager.open(file, this.runtime.config.controlSurfaceSessionsDir);
+      persisted.appendModelChange(model.provider, model.modelId);
+      persisted.appendThinkingLevelChange(
+        model.thinkingLevel ?? this.runtime.config.defaultThinkingLevel,
+      );
+    }
+    const managed = this.runtime.sessionManager.rehydrateStreamSession(
       streamId,
       streamName,
       native.getSessionId(),
@@ -143,11 +178,57 @@ export class CloudControl {
       model.provider,
       model.modelId,
     );
+    this.runtime.blackboard.run(
+      "UPDATE pi_sessions SET cwd = ?, model_provider = ?, model_id = ? WHERE pi_session_id = ?",
+      cwd,
+      model.provider,
+      model.modelId,
+      native.getSessionId(),
+    );
+    return managed;
   }
 
-  async deliver(streamId: string, item: QueueItem): Promise<void> {
+  async command<T>(
+    streamId: string,
+    operation: string,
+    body: Record<string, unknown> = {},
+  ): Promise<T> {
+    const assignment = await this.coordinator.ensure(streamId);
+    await this.relay(assignment);
+    const response = await this.lifecycle.request(assignment, `/worker/${operation}`, body);
+    const result = (await response.json()) as T & { error?: string };
+    if (!response.ok)
+      throw new Error(result.error ?? `Worker operation failed (${response.status})`);
+    return result;
+  }
+
+  queueChanged(streamId: string): void {
+    const pi = this.runtime.blackboard.get<{ pi_session_id: string }>(
+      "SELECT pi_session_id FROM pi_sessions WHERE stream_id = ?",
+      streamId,
+    );
+    if (pi)
+      this.runtime.wsHub.broadcast({
+        type: "turn_queue_changed",
+        piSessionId: pi.pi_session_id,
+        ...this.store.queueSnapshot(streamId),
+      });
+  }
+
+  admit(streamId: string, item: QueueItem): void {
+    item.serverMessageId ??= item.id;
     const { id, receivedAt: _receivedAt, ...payload } = item;
     this.store.enqueue(streamId, item.serverMessageId ?? id, payload);
+    this.queueChanged(streamId);
+  }
+
+  removeTurn(streamId: string, itemId: string) {
+    const result = this.store.cancel(streamId, itemId);
+    this.queueChanged(streamId);
+    return result;
+  }
+
+  async deliver(streamId: string): Promise<void> {
     const response = await this.execute(streamId, (assignment) =>
       this.lifecycle.request(assignment, "/worker/wake", {}),
     );
@@ -291,7 +372,7 @@ export class CloudControl {
     const remote =
       url.pathname === "/api/streams/history" ||
       url.pathname === "/api/directory-completions" ||
-      (parts[1] === "pi-sessions" && ["interrupt", "diff"].includes(parts[3] ?? ""));
+      (parts[1] === "pi-sessions" && ["interrupt", "diff", "stream"].includes(parts[3] ?? ""));
     if (!remote) return false;
     if (!requireBearer(request, this.runtime.config.controlSurfaceToken)) {
       sendJson(response, 401, { error: "Unauthorized" });
@@ -324,8 +405,10 @@ export class CloudControl {
         return true;
       }
       const body = await upstream.json();
-      if (historyPosition && upstream.ok && url.pathname === "/api/streams/history")
+      if (historyPosition && upstream.ok && url.pathname === "/api/streams/history") {
         body.historyPosition = historyPosition;
+        body.turnQueue = this.store.queueSnapshot(streamId);
+      }
       sendJson(response, upstream.status, body);
     } catch (error) {
       sendJson(response, 503, { error: error instanceof Error ? error.message : String(error) });

@@ -97,6 +97,7 @@ try {
     activeRuntime.config.controlSurfacePort,
     activeRuntime.config.controlSurfaceHost,
     () => {
+      activeRuntime.cloud?.start();
       console.log(
         `Flitterbot control surface listening on http://${activeRuntime.config.controlSurfaceHost}:${activeRuntime.config.controlSurfacePort}`,
       );

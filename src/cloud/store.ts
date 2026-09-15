@@ -84,6 +84,11 @@ export class CloudStore {
     if (result.changes !== 1) throw new CloudConflict("Worker generation changed");
     if (phase === "absent") {
       this.db.run(
+        "UPDATE sessions SET status = 'ended', ended_at = ?, session_end_reason = 'worker_removed' WHERE stream_id = ? AND status != 'ended'",
+        new Date().toISOString(),
+        streamId,
+      );
+      this.db.run(
         `UPDATE cloud_commands SET status = 'uncertain', updated_at = ?
         WHERE stream_id = ? AND generation = ? AND status = 'accepted'`,
         new Date().toISOString(),
@@ -129,6 +134,47 @@ export class CloudStore {
       now,
       now,
     );
+  }
+
+  queueSnapshot(streamId: string): import("../streams/turn-queue.ts").TurnQueueSnapshot {
+    const version = this.db.get<{ version: number }>(
+      "SELECT COALESCE(SUM(CASE status WHEN 'pending' THEN 1 WHEN 'accepted' THEN 2 ELSE 3 END), 0) AS version FROM cloud_commands WHERE stream_id = ?",
+      streamId,
+    )!.version;
+    const rows = this.db.all<{ id: string; payload: string; created_at: string }>(
+      "SELECT id, payload, created_at FROM cloud_commands WHERE stream_id = ? AND status = 'pending' ORDER BY created_at, id",
+      streamId,
+    );
+    return {
+      version,
+      items: rows.map((row) => {
+        const item = JSON.parse(row.payload) as import("../streams/turn-queue.ts").QueueItem;
+        return {
+          id: row.id,
+          source: item.source,
+          text: item.text,
+          receivedAt: row.created_at,
+          webClientId: item.webClientId,
+          state: "open",
+        };
+      }),
+    };
+  }
+
+  cancel(streamId: string, id: string) {
+    const removed =
+      this.db
+        .prepare(
+          "UPDATE cloud_commands SET status = 'canceled', updated_at = ? WHERE stream_id = ? AND id = ? AND status = 'pending'",
+        )
+        .run(new Date().toISOString(), streamId, id).changes === 1;
+    const accepting =
+      this.db.get<{ status: string }>(
+        "SELECT status FROM cloud_commands WHERE stream_id = ? AND id = ?",
+        streamId,
+        id,
+      )?.status === "accepted";
+    return { removed, accepting, snapshot: this.queueSnapshot(streamId) };
   }
 
   accept(streamId: string, generation: number, id: string): boolean {

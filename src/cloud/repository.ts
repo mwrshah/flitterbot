@@ -1,19 +1,8 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
+import { git, preserveCloneBranches } from "../git.ts";
 import type { Checkpoint, CheckpointFile } from "./checkpoints.ts";
-
-const exec = promisify(execFile);
-
-export async function git(cwd: string, args: string[]): Promise<string> {
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
-  );
-  return (await exec("git", args, { cwd, env, timeout: 120_000, maxBuffer: 128 * 1024 * 1024 }))
-    .stdout;
-}
 
 export async function captureRepository(
   cwd: string,
@@ -22,7 +11,7 @@ export async function captureRepository(
   if ((await fs.realpath(root)) !== (await fs.realpath(cwd)))
     throw new Error("Checkpoint cwd must be the repository root");
   const head = (await git(cwd, ["rev-parse", "HEAD"])).trim();
-  const branch = (await git(cwd, ["symbolic-ref", "--short", "HEAD"])).trim();
+  const branch = (await git(cwd, ["branch", "--show-current"])).trim() || "HEAD";
   const stagedPatch = await git(cwd, [
     "diff",
     "--cached",
@@ -70,6 +59,7 @@ export async function captureRepository(
     await git(cwd, ["bundle", "create", bundleFile, "--all"]);
     if (
       (await git(cwd, ["rev-parse", "HEAD"])).trim() !== head ||
+      ((await git(cwd, ["branch", "--show-current"])).trim() || "HEAD") !== branch ||
       (await git(cwd, ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"])) !==
         stagedPatch
     ) {
@@ -80,6 +70,7 @@ export async function captureRepository(
     return {
       head,
       branch,
+      detached: branch === "HEAD",
       stagedPatch,
       files,
       bundle: (await fs.readFile(bundleFile)).toString("base64"),
@@ -107,12 +98,12 @@ export async function restoreRepository(
       path.join(checkpointDirectory, "repository.bundle"),
       ".",
     ]);
+    await preserveCloneBranches(destination);
     await git(destination, ["switch", "--detach", manifest.workspace.head]);
-    await git(destination, [
-      "switch",
-      "-c",
-      `checkpoint-${manifest.generation}-${manifest.version}`,
-    ]);
+    if (!manifest.workspace.detached) {
+      await git(destination, ["check-ref-format", "--branch", manifest.workspace.branch]);
+      await git(destination, ["switch", "-C", manifest.workspace.branch, manifest.workspace.head]);
+    }
     const tracked = (await git(destination, ["ls-files", "-z"])).split("\0").filter(Boolean);
     for (const name of tracked) await fs.rm(path.join(destination, name), { force: true });
     await fs.cp(path.join(checkpointDirectory, "workspace"), destination, {

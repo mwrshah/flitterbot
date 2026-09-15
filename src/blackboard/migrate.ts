@@ -866,6 +866,17 @@ export function migrateBlackboard(db: DatabaseSync): number {
     }
   }
 
+  if (getSchemaVersion(db) < 27) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(CLOUD_SCHEMA);
+      db.exec("INSERT INTO schema_migrations(version) VALUES (27)");
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
   ensureCurrentSchemaInvariants(db);
   return getSchemaVersion(db);
 }
