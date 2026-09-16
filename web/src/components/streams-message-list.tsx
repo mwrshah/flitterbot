@@ -192,7 +192,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
       data-rested={rested ? "" : undefined}
       data-moving={rested ? undefined : ""}
       {...pointerProps}
-      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[88px] [@media(hover:hover)_and_(pointer:fine)]:w-[176px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
+      className="user-message-marker-rail group/marker-rail absolute -right-2 top-1/2 z-[15] w-[72px] -translate-y-1/2 text-border [@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:-right-[88px] [@media(hover:hover)_and_(pointer:fine)]:w-[200px] [@media(hover:hover)_and_(pointer:fine)]:data-[rested]:pointer-events-auto"
       style={{
         height: `min(${(markerRowCount + 1) * MARKER_ROW_HEIGHT}px, calc(100% - 2rem))`,
       }}
@@ -219,7 +219,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                 handle={tooltipHandle}
                 payload={{
                   content: message.content || label,
-                  desktopOffset: -38,
+                  desktopOffset: -62,
                   align: "start",
                   popupClassName: "w-[min(20rem,var(--available-width))]",
                 }}
@@ -257,7 +257,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
         handle={tooltipHandle}
         payload={{
           content: "Jump to bottom - Shift + G",
-          desktopOffset: -40,
+          desktopOffset: -64,
           align: "center",
           popupClassName: "w-[min(20rem,var(--available-width))]",
         }}
@@ -284,7 +284,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
             align={payload?.align}
             className={payload?.popupClassName}
             sideOffset={({ anchor }) =>
-              anchor.width === 176 ? (payload?.desktopOffset ?? -38) : -190
+              anchor.width === 200 ? (payload?.desktopOffset ?? -62) : -190
             }
           >
             {payload?.content}
