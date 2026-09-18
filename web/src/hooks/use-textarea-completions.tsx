@@ -45,14 +45,17 @@ function normalizePathPickerRemainder(inserted: string, remainder: string) {
   return { value: remainder, closesPicker: false };
 }
 
-function filterSkillsForPicker(skills: SkillPickerItem[], filter: string) {
+function filterSkillsForPicker(
+  skills: SkillPickerItem[],
+  filter: string,
+  skillsOnly: boolean,
+): SkillPickerItem[] {
   const lower = filter.toLowerCase();
-  const matched = filter
-    ? skills.filter((skill) => skill.name.toLowerCase().includes(lower))
-    : skills;
   const nonCommands: SkillPickerItem[] = [];
   const commands: SkillPickerItem[] = [];
-  for (const item of matched) {
+  for (const item of skills) {
+    if (skillsOnly && item.kind === "command") continue;
+    if (filter && !item.name.toLowerCase().includes(lower)) continue;
     (item.kind === "command" ? commands : nonCommands).push(item);
   }
   const compare = (a: SkillPickerItem, b: SkillPickerItem) => {
@@ -173,6 +176,7 @@ export function useTextareaCompletions({
 
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const [skillPickerFilter, setSkillPickerFilter] = useState("");
+  const [skillPickerSkillsOnly, setSkillPickerSkillsOnly] = useState(false);
   const [caretLeft, setCaretLeft] = useState(0);
   const slashPositionRef = useRef(-1);
   const skillCommandRef = useRef<HTMLDivElement>(null);
@@ -199,8 +203,8 @@ export function useTextareaCompletions({
     }),
   );
   const filteredSkills = useMemo(
-    () => filterSkillsForPicker(skills, skillPickerFilter),
-    [skills, skillPickerFilter],
+    () => filterSkillsForPicker(skills, skillPickerFilter, skillPickerSkillsOnly),
+    [skills, skillPickerFilter, skillPickerSkillsOnly],
   );
   const pathPickerItems = pathResult?.items ?? EMPTY_PATH_ITEMS;
   const skillPickerVisible = skillPickerOpen && filteredSkills.length > 0;
@@ -309,6 +313,7 @@ export function useTextareaCompletions({
         slashPositionRef.current = match.triggerIndex;
         setSkillPickerOpen(true);
         setSkillPickerFilter(filter);
+        setSkillPickerSkillsOnly(false);
         atPositionRef.current = -1;
         setPathPickerOpen(false);
         setPathQueryOptions(undefined);
@@ -459,11 +464,13 @@ export function useTextareaCompletions({
         slashPositionRef.current = -1;
         setSkillPickerOpen(false);
       } else if (slashIndex >= 0 && skills.length) {
-        const filter = value.slice(slashIndex + 1, cursor);
+        const token = value.slice(slashIndex + 1, cursor);
+        const skillsOnly = token.startsWith("skill:");
         slashPositionRef.current = slashIndex;
         computeTriggerLeft(value, slashIndex);
         setSkillPickerOpen(true);
-        setSkillPickerFilter(filter);
+        setSkillPickerFilter(skillsOnly ? token.slice(6) : token);
+        setSkillPickerSkillsOnly(skillsOnly);
         atPositionRef.current = -1;
         setPathPickerOpen(false);
       } else {
