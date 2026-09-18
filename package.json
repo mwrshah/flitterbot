@@ -13,7 +13,7 @@
     "web:build": "pnpm --dir web run build",
     "test:ts": "node --experimental-strip-types --test web/tests/*.test.ts src/*.test.ts",
     "audit": "pnpm run audit:architecture && pnpm run audit:ts && pnpm run audit:shell",
-    "audit:architecture": "uvx codedecorum@0.1.3 .",
+    "audit:architecture": "uvx codedecorum@latest .",
     "audit:ts": "biome check src/ web/src/ web/tests/ && pnpm run test:ts && tsc --noEmit && tsc --noEmit -p web/tsconfig.json && knip --include files,dependencies,unlisted --exclude binaries --no-config-hints && knip --directory web --include files,dependencies,unlisted --exclude binaries --no-config-hints",
     "audit:ts:fix": "biome check --fix src/ web/src/ web/tests/ && pnpm run audit:ts",
     "audit:shell": "find installer skills -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n && bash -n installer/bin/flitterbot-up installer/bin/flitterbot-wa && node --check installer/install.mjs && node --check installer/uninstall.mjs",
