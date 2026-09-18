@@ -90,6 +90,7 @@ function PiSessionRoute() {
   const selectedModel = isDefaultSession ? status?.piAgent?.default?.model : stream?.model;
 
   const {
+    pruneRevision,
     timeline,
     turnQueue,
     onSendMessage,
@@ -115,6 +116,7 @@ function PiSessionRoute() {
         <ChatPanel
           piSessionId={effectivePiSessionId}
           timeline={timeline}
+          pruneRevision={pruneRevision}
           turnQueue={turnQueue}
           isSessionBusy={isSessionBusy}
           isSessionCompacting={isSessionCompacting}

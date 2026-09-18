@@ -74,6 +74,7 @@ export function useStreamsChat(piSessionId: string | undefined) {
   if (error && !data) throw error;
 
   return {
+    pruneRevision: newestPage?.pruneRevision ?? 0,
     timeline,
     turnQueue,
     connectionState,

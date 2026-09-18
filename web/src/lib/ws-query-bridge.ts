@@ -25,14 +25,18 @@ export function setupWsQueryBridge(deps: {
     queryClient.ensureInfiniteQueryData(surfaceTimelineInfiniteQueryOptions()),
   );
 
-  const reloadHistory = async (piSessionId: string, resumePosition?: ConversationEventPosition) => {
+  const reloadHistory = async (
+    piSessionId: string,
+    resumePosition?: ConversationEventPosition,
+    reason?: "prune",
+  ) => {
     if (recovering.has(piSessionId)) return;
     recovering.add(piSessionId);
     wsClient.pauseSessionSubscription(piSessionId);
     conversationState.clear(piSessionId);
 
     try {
-      await refreshHistorySnapshot(queryClient, piSessionId);
+      await refreshHistorySnapshot(queryClient, piSessionId, reason);
       if (wsClient.activeSubscriptionPiSessionId() !== piSessionId) return;
       wsClient.setResumePosition(
         piSessionId,
@@ -124,7 +128,7 @@ export function setupWsQueryBridge(deps: {
     }
 
     if (message.type === "history_rewritten") {
-      void reloadHistory(piSessionId);
+      void reloadHistory(piSessionId, undefined, message.reason === "prune" ? "prune" : undefined);
       return;
     }
 

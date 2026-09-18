@@ -1,6 +1,11 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 import type { FlitterbotApiClient } from "@/lib/api";
-import { findHistoryQueryKey, historyQueryKey, surfaceQueryKey } from "@/lib/conversation-history";
+import {
+  type ConversationHistoryPage,
+  findHistoryQueryKey,
+  historyQueryKey,
+  surfaceQueryKey,
+} from "@/lib/conversation-history";
 import { INTERNAL_COMMANDS } from "@/lib/internal-commands";
 import type {
   DirectoryCompletionsResponse,
@@ -35,8 +40,8 @@ const STREAMS_HISTORY_GC_TIME_MS = 30_000;
 export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefined) {
   return infiniteQueryOptions({
     queryKey: historyQueryKey(piSessionId),
-    queryFn: async ({ pageParam }) => {
-      return fetchStreamsHistory({
+    queryFn: async ({ pageParam, client, queryKey }): Promise<ConversationHistoryPage> => {
+      const snapshot = await fetchStreamsHistory({
         data: {
           ...(piSessionId ? { piSessionId } : {}),
           surface: "agent",
@@ -46,6 +51,8 @@ export function streamsHistoryInfiniteQueryOptions(piSessionId: string | undefin
           ...(pageParam ? { before: pageParam } : {}),
         },
       });
+      const current = client.getQueryData<{ pages: ConversationHistoryPage[] }>(queryKey);
+      return { ...snapshot, pruneRevision: current?.pages.at(-1)?.pruneRevision ?? 0 };
     },
     initialPageParam: undefined as string | undefined,
     getPreviousPageParam: (firstPage) => firstPage.olderPageCursor ?? undefined,

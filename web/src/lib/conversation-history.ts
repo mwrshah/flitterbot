@@ -7,6 +7,8 @@ import type {
 } from "../../../src/contracts/websocket.ts";
 import type { ChatTimelineItem, StreamsHistoryResponse } from "./types";
 
+export type ConversationHistoryPage = StreamsHistoryResponse & { pruneRevision?: number };
+
 export const surfaceQueryKey = ["surface-timeline"] as const;
 
 export function historyQueryKey(sessionId: string | undefined) {
@@ -31,6 +33,7 @@ export function latestHistoryPosition(
 export async function refreshHistorySnapshot(
   queryClient: QueryClient,
   sessionId: string,
+  reason?: "prune",
 ): Promise<void> {
   const queryKey = historyQueryKey(sessionId);
   const previous =
@@ -46,6 +49,19 @@ export async function refreshHistorySnapshot(
   void queryClient.resetQueries({ queryKey: findHistoryQueryKey(sessionId), exact: true });
   try {
     await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true });
+    if (reason === "prune") {
+      queryClient.setQueryData<InfiniteData<ConversationHistoryPage, string | undefined>>(
+        queryKey,
+        (current) => {
+          if (!current?.pages.length) return current;
+          const pages = [...current.pages];
+          const lastIndex = pages.length - 1;
+          const page = pages[lastIndex]!;
+          pages[lastIndex] = { ...page, pruneRevision: (page.pruneRevision ?? 0) + 1 };
+          return { ...current, pages };
+        },
+      );
+    }
   } catch (error) {
     if (previous) queryClient.setQueryData(queryKey, previous);
     await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" });

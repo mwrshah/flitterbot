@@ -54,6 +54,7 @@ export type StreamsMessageListHandle = {
 type StreamsMessageListProps = {
   piSessionId: string;
   rows: ConversationRow[];
+  pruneRevision: number;
   userMessageIndex: UserMessageIndexEntry[];
   activeFindRowIndex?: number;
   onPruneRequested?: (entryId: string) => void;
@@ -303,6 +304,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
 export const StreamsMessageList = memo(function StreamsMessageList({
   piSessionId,
   rows,
+  pruneRevision,
   userMessageIndex,
   activeFindRowIndex,
   onPruneRequested,
@@ -329,6 +331,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const didFinishInitialFillRef = useRef(false);
   const pendingScrollToEndRef = useRef(false);
+  const previousPruneRevisionRef = useRef(pruneRevision);
   const wasAtEndRef = useRef(true);
   const previousBottomInsetRef = useRef(bottomInset);
   const viewportUserMessageIdRef = useRef<string>(undefined);
@@ -491,6 +494,12 @@ export const StreamsMessageList = memo(function StreamsMessageList({
     pendingScrollToEndRef.current = true;
     setMarkerNavigation(undefined);
   }, [markerNavigation, virtualizer]);
+
+  useLayoutEffect(() => {
+    if (previousPruneRevisionRef.current === pruneRevision) return;
+    previousPruneRevisionRef.current = pruneRevision;
+    scrollToEnd();
+  }, [pruneRevision, scrollToEnd]);
 
   useImperativeHandle(
     ref,

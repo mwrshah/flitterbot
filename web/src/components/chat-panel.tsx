@@ -122,6 +122,7 @@ const ContextTicker = memo(function ContextTicker({ usage }: { usage: TokenUsage
 type ChatPanelProps = {
   piSessionId: string;
   timeline: ChatTimelineItem[];
+  pruneRevision: number;
   turnQueue: TurnQueueSnapshot;
   isSessionBusy: boolean;
   isSessionCompacting: boolean;
@@ -423,6 +424,7 @@ function CwdPicker({
 export function ChatPanel({
   piSessionId,
   timeline,
+  pruneRevision,
   turnQueue,
   isSessionBusy,
   isSessionCompacting,
@@ -945,6 +947,7 @@ export function ChatPanel({
               ref={messageListRef}
               piSessionId={piSessionId}
               rows={conversationRows}
+              pruneRevision={pruneRevision}
               userMessageIndex={userMessageIndex}
               activeFindRowIndex={activeFindRowIndex}
               onPruneRequested={handlePruneRequested}
