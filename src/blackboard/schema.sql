@@ -1,4 +1,4 @@
--- Flitterbot blackboard schema (v25)
+-- Flitterbot blackboard schema (v26)
 -- This file is the single source of truth for fresh database creation.
 -- Keep in sync with BLACKBOARD_SCHEMA_SQL in src/contracts/blackboard.ts.
 PRAGMA journal_mode=WAL;
@@ -164,4 +164,20 @@ CREATE TABLE IF NOT EXISTS user_config (
     value TEXT NOT NULL,
     updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (user_id, key)
+);
+
+
+CREATE TABLE IF NOT EXISTS json_documents (
+  id TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)),
+  revision INTEGER NOT NULL CHECK (revision > 0),
+  value_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS json_document_projections (
+  document_id TEXT PRIMARY KEY REFERENCES json_documents(id),
+  file_path TEXT NOT NULL UNIQUE,
+  synced_file_hash TEXT,
+  pending_export_hash TEXT,
+  pending_export_revision INTEGER,
+  CHECK ((pending_export_hash IS NULL) = (pending_export_revision IS NULL))
 );

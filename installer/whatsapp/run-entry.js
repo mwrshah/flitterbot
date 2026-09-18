@@ -1,24 +1,16 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readConfiguration } from '../scripts/config-access.mjs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const flitterbotHome = process.env.FLITTERBOT_HOME || path.join(os.homedir(), '.flitterbot');
-const configPath = path.join(flitterbotHome, 'config.json');
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 
-function readConfig() {
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-
-function resolveEntry(entryName) {
-  const config = readConfig();
+async function resolveEntry(entryName) {
+  const config = await readConfiguration();
   const configuredRoot = typeof config.projectRoot === 'string' && config.projectRoot
     ? config.projectRoot
     : typeof config.sourceRoot === 'string' && config.sourceRoot
@@ -45,8 +37,8 @@ function resolveEntry(entryName) {
   throw new Error(`Unable to locate WhatsApp ${entryName} entrypoint.`);
 }
 
-export function runWhatsAppEntry(entryName, args) {
-  const child = spawn(process.execPath, [...resolveEntry(entryName), ...args], {
+export async function runWhatsAppEntry(entryName, args) {
+  const child = spawn(process.execPath, [...await resolveEntry(entryName), ...args], {
     stdio: 'inherit',
     env: process.env,
   });

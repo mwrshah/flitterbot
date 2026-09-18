@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# ponytail: recall.py duplicates config parsing and entry parsing; share a tiny module.
 """Single entry point for the configured learnings note.
 
 Subcommands:
@@ -9,8 +8,7 @@ Subcommands:
                        the sole grouping key.
     add --new "x: y"   Mint a fresh 2-char code, prepend it, and append.
 
-The note path comes from ~/.flitterbot/config.json key `learningsNotePath`.
-Set $FLITTERBOT_CONFIG to point at a different config file.
+The note path comes from the durable runtime configuration key `learningsNotePath`.
 
 After every add the bullet list is auto-regrouped so all entries sharing
 a code are contiguous (first-seen code order preserved). Codeless legacy
@@ -19,44 +17,19 @@ bullets sink to the end of the list.
 Code alphabet: ABCDEFGHJKLMNPQRSTUVWXYZ23456789 (32 chars, no 0/O/1/I).
 2 chars → 1024 distinct situations.
 """
+
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import re
 import secrets
 import sys
 from collections import OrderedDict
-from pathlib import Path
+from config_note import resolve_note_path
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_PREFIX_RE = re.compile(r"^([A-Z2-9]{2})-")
 BULLET_RE = re.compile(r"^- ([A-Z2-9]{2})-([^:]+):\s*(.*)$")
-
-
-def expand_home(value: str) -> Path:
-    if value == "~":
-        return Path.home()
-    if value.startswith("~/"):
-        return Path.home() / value[2:]
-    return Path(value)
-
-
-def resolve_note_path() -> Path:
-    config_path = expand_home(os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json"))
-    if not config_path.exists():
-        raise RuntimeError(f"Missing Flitterbot config: {config_path}")
-    try:
-        raw = json.loads(config_path.read_text())
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON in Flitterbot config {config_path}: {exc.msg}") from exc
-    if not isinstance(raw, dict):
-        raise RuntimeError(f"Invalid Flitterbot config {config_path}: expected a JSON object")
-    value = raw.get("learningsNotePath")
-    if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(f"Missing required config key learningsNotePath in {config_path}")
-    return expand_home(value.strip())
 
 
 NOTE = resolve_note_path()
@@ -215,8 +188,12 @@ def main() -> int:
     p_codes.set_defaults(func=cmd_codes)
 
     p_add = sub.add_parser("add", help="append a learning")
-    p_add.add_argument("text", help='"CC-situation: body" or, with --new, "situation: body"')
-    p_add.add_argument("--new", action="store_true", help="mint a fresh code and prepend it")
+    p_add.add_argument(
+        "text", help='"CC-situation: body" or, with --new, "situation: body"'
+    )
+    p_add.add_argument(
+        "--new", action="store_true", help="mint a fresh code and prepend it"
+    )
     p_add.set_defaults(func=cmd_add)
 
     args = p.parse_args()

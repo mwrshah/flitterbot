@@ -21,7 +21,7 @@ import {
   setStreamPinned as setStreamPinnedRow,
   updateStreamRepoPath,
 } from "../blackboard/query-streams.ts";
-import { type FlitterbotConfig, loadConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import type { ApiError, MessageMetadata, StreamRow } from "../contracts/blackboard.ts";
 import type { ChatTimelineMessage } from "../contracts/timeline.ts";
 import { InterruptRetryGuard } from "../interrupt-retry-guard.ts";
@@ -122,7 +122,7 @@ export class PiSessionManager {
     startedAt: number,
     processCallback: ProcessQueueItemCallback,
     log: (message: string) => void,
-    configLoader: () => FlitterbotConfig = loadConfig,
+    configLoader: () => FlitterbotConfig,
   ) {
     this.blackboard = blackboard;
     this.configLoader = configLoader;

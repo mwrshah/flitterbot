@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { JSON_DOCUMENT_SCHEMA_SQL } from "../contracts/blackboard.ts";
 import { BLACKBOARD_SCHEMA_SQL, BLACKBOARD_SCHEMA_VERSION } from "../contracts/index.ts";
 
 type MigrationTableRow = { name: string };
@@ -852,6 +853,17 @@ export function migrateBlackboard(db: DatabaseSync): number {
   }
   if (version < 25) {
     applyV25Migration(db);
+  }
+  if (version < 26) {
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.exec(JSON_DOCUMENT_SCHEMA_SQL);
+      db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES (26);");
+      db.exec("COMMIT;");
+    } catch (error) {
+      db.exec("ROLLBACK;");
+      throw error;
+    }
   }
 
   ensureCurrentSchemaInvariants(db);

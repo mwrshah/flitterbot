@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# ponytail: repeated node -e JSON reads across shell scripts could be one small config CLI/helper.
 
 FLITTERBOT_HOME="${FLITTERBOT_HOME:-$HOME/.flitterbot}"
-FLITTERBOT_CONFIG="${FLITTERBOT_CONFIG:-$FLITTERBOT_HOME/config.json}"
 FLITTERBOT_LOG_DIR="${FLITTERBOT_LOG_DIR:-$FLITTERBOT_HOME/logs}"
 FLITTERBOT_ROTATE_BYTES=$((10 * 1024 * 1024))
 
@@ -48,17 +46,8 @@ append_log() {
 config_value() {
   local key="${1#.}"
   local fallback="$2"
-  if [[ ! -f "$FLITTERBOT_CONFIG" ]]; then
-    printf '%s\n' "$fallback"
-    return 0
-  fi
-
   local value
-  value=$(node -e "
-    const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
-    const v = c[process.argv[2]];
-    process.stdout.write(v != null ? String(v) : '');
-  " "$FLITTERBOT_CONFIG" "$key" 2>/dev/null || true)
+  value=$(node "$FLITTERBOT_HOME/scripts/config-access.mjs" read runtime-config "$key") || return $?
 
   if [[ -n "$value" && "$value" != "null" ]]; then
     printf '%s\n' "$value"
@@ -96,12 +85,6 @@ control_surface_port() {
 
 control_surface_base_url() {
   printf 'http://%s:%s\n' "$(control_surface_host)" "$(control_surface_port)"
-}
-
-blackboard_path() {
-  local configured
-  configured=$(config_string '.blackboardPath' "$FLITTERBOT_HOME/blackboard.db")
-  expand_home_path "$configured"
 }
 
 is_pid_running() {

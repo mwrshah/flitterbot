@@ -4,11 +4,11 @@
 import { readFileSync, appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import http from "node:http";
+import { readConfiguration } from '../scripts/config-access.mjs';
 
 const FLITTERBOT_HOME = process.env.FLITTERBOT_HOME || join(process.env.HOME || "~", ".flitterbot");
 const LOG_DIR = process.env.FLITTERBOT_LOG_DIR || join(FLITTERBOT_HOME, "logs");
 const ERROR_LOG = join(LOG_DIR, "hooks-errors.log");
-const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || join(FLITTERBOT_HOME, "config.json");
 const POST_TIMEOUT_MS = 2000;
 const ROTATE_BYTES = 10 * 1024 * 1024;
 
@@ -24,15 +24,6 @@ function logError(message) {
     const ts = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     appendFileSync(ERROR_LOG, `[${ts}] ERROR ${message}\n`);
   } catch {}
-}
-
-function loadConfig() {
-  try {
-    const raw = readFileSync(CONFIG_PATH, "utf8").trim();
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
 }
 
 function enrichPayload(payload, hookHarness) {
@@ -97,7 +88,7 @@ async function main() {
   }
 
   payload = enrichPayload(payload, process.argv[3]);
-  const config = loadConfig();
+  const config = await readConfiguration();
   const result = await postToControlSurface(eventSlug, payload, config);
 
   if (result !== "skip" && result !== 200 && result !== 201) {

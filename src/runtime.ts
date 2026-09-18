@@ -40,9 +40,10 @@ import {
   setStreamType,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
-import { type FlitterbotConfig, loadConfig } from "./config/load-config.ts";
+import { updateConfiguration } from "./config/documents.ts";
+import { loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
-import { persistModelsToConfigFile } from "./config/persist-models.ts";
+import type { FlitterbotConfig } from "./config/schema.ts";
 import type {
   ClaudeHookPayload,
   ControlSurfaceWebSocketClientEvent,
@@ -65,6 +66,7 @@ import type {
 import { executeCloseSwimlane } from "./custom-tools/close-swimlane.ts";
 import { directSessionMessage } from "./custom-tools/manage-session.ts";
 import { executeSetUpWorktree } from "./custom-tools/set-up-worktree.ts";
+import { BLACKBOARD_PATH } from "./paths.ts";
 import { createPiModelRuntime } from "./pi-auth.ts";
 import { formatDatetimeBlock } from "./prompts/datetime.ts";
 import { readPiSessionHeaderId } from "./streams/create-agent.ts";
@@ -84,8 +86,8 @@ import {
 import { fireAndForgetPeriodicTaskSync } from "./tasks/periodic-sync.ts";
 import { killTmuxSession } from "./tmux-sessions/tmux.ts";
 import { readTranscriptPage } from "./transcript/transcript.ts";
-import { loadWhatsAppConfig } from "./whatsapp/config.ts";
 import { sendDaemonCommand } from "./whatsapp/ipc.ts";
+import { loadWhatsAppConfig } from "./whatsapp/load-config.ts";
 import { getWhatsAppStatusSignalPath } from "./whatsapp/paths.ts";
 import {
   getDaemonStatus,
@@ -132,12 +134,14 @@ export class ControlSurfaceRuntime {
     return this.config.whatsappEnabled;
   }
 
-  constructor() {
-    const config = loadConfig();
+  config: FlitterbotConfig;
+
+  constructor(config: FlitterbotConfig) {
+    this.config = config;
     if (!config.whatsappEnabled) {
       this.whatsappStatusCache = { status: "disabled", managedByControlSurface: true };
     }
-    this.blackboard = openBlackboard(config.blackboardPath);
+    this.blackboard = openBlackboard(BLACKBOARD_PATH);
     this.wsHub = new WebSocketHub(this.handleWebSocketMessage.bind(this));
     this.sessionManager = new PiSessionManager(
       this.blackboard,
@@ -146,12 +150,13 @@ export class ControlSurfaceRuntime {
       this.startedAt,
       this.processQueueItem.bind(this),
       this.log.bind(this),
+      () => this.config,
     );
     this.providerAuth = new ProviderAuthManager(() => this.resolveModelRuntime());
   }
 
-  get config(): FlitterbotConfig {
-    return loadConfig();
+  async refreshConfig(): Promise<void> {
+    this.config = await loadConfig();
   }
 
   attachServer(server: http.Server): void {
@@ -173,7 +178,7 @@ export class ControlSurfaceRuntime {
 
     this.sessionManager.reconcileAllStreamSessionFiles();
 
-    const defaultUser = loadWhatsAppConfig().defaultUser;
+    const defaultUser = (await loadWhatsAppConfig()).defaultUser;
     if (defaultUser) {
       const adopted = this.blackboard
         .prepare("UPDATE streams SET stream_user = ? WHERE type = 'work' AND stream_user IS NULL")
@@ -764,7 +769,7 @@ export class ControlSurfaceRuntime {
     );
 
     if (isDefaultSession) {
-      this.persistDefaultModel(modelId);
+      await this.persistDefaultModel(modelId);
       return this.setPiSessionThinkingLevel(
         piSessionId,
         modelEntry.thinkingLevel ?? this.config.defaultThinkingLevel,
@@ -774,11 +779,12 @@ export class ControlSurfaceRuntime {
     return this.toPiSessionModelInfo(managed.modelInfo);
   }
 
-  private persistDefaultModel(modelId: string): void {
-    persistModelsToConfigFile({
-      models: this.config.models,
+  private async persistDefaultModel(modelId: string): Promise<void> {
+    await updateConfiguration("runtime-config", (current) => ({
+      ...current,
       defaultModel: modelId,
-    });
+    }));
+    await this.refreshConfig();
     this.log(`models: defaultModel set to ${modelId}`);
   }
 
@@ -800,10 +806,10 @@ export class ControlSurfaceRuntime {
     return this.setManagedPiSessionThinkingLevel(managed, thinkingLevel);
   }
 
-  private setManagedPiSessionThinkingLevel(
+  private async setManagedPiSessionThinkingLevel(
     managed: ManagedPiSession,
     thinkingLevel: ModelThinkingLevel,
-  ): PiSessionModelInfo {
+  ): Promise<PiSessionModelInfo> {
     const piSessionId = managed.piSessionId;
     const session = managed.runtime?.session;
     if (!session) {
@@ -838,10 +844,11 @@ export class ControlSurfaceRuntime {
     );
 
     if (this.sessionManager.getDefault()?.piSessionId === piSessionId) {
-      persistModelsToConfigFile({
-        models: this.config.models,
+      await updateConfiguration("runtime-config", (current) => ({
+        ...current,
         defaultThinkingLevel: thinkingLevel,
-      });
+      }));
+      await this.refreshConfig();
       this.log(`models: defaultThinkingLevel set to ${thinkingLevel}`);
     }
 
@@ -1403,7 +1410,7 @@ export class ControlSurfaceRuntime {
         )
       : undefined;
     if (input?.sourcePiSessionId && !source) throw new Error("Source Pi session not found");
-    const streamUser = source?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
+    const streamUser = source?.stream_user ?? (await loadWhatsAppConfig()).defaultUser ?? undefined;
 
     const result = await this.spawnStreamWithSession({
       name,
@@ -1820,7 +1827,7 @@ export class ControlSurfaceRuntime {
   private async ensureWhatsAppUserDefaultStreams(): Promise<void> {
     if (!this.whatsappEnabled) return;
 
-    const config = loadWhatsAppConfig();
+    const config = await loadWhatsAppConfig();
     for (const userId of Object.keys(config.users)) {
       if (config.defaultUser === userId) continue;
 
@@ -2070,7 +2077,7 @@ export class ControlSurfaceRuntime {
 
           const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
           const streamUser =
-            parentStream?.stream_user ?? loadWhatsAppConfig().defaultUser ?? undefined;
+            parentStream?.stream_user ?? (await loadWhatsAppConfig()).defaultUser ?? undefined;
 
           const spawn = await this.spawnStreamWithSession({
             name,
@@ -2673,6 +2680,7 @@ export class ControlSurfaceRuntime {
   private startMaintenanceLoop(): void {
     this.maintenanceTimer = setInterval(async () => {
       try {
+        await this.refreshConfig();
         pingBlackboard(this.blackboard);
         await this.refreshWhatsAppStatus();
         markStaleSessions(
@@ -2758,6 +2766,7 @@ export class ControlSurfaceRuntime {
       console.warn("[ws] Dropping non-object WebSocket message (type=%s)", typeof data);
       return;
     }
+    await this.refreshConfig();
     const payload = data as ControlSurfaceWebSocketClientEvent;
     if (payload.type === "ping") {
       this.wsHub.send(client.id, { type: "pong" });
@@ -2806,7 +2815,7 @@ export class ControlSurfaceRuntime {
             await this.resolveModelRuntime(),
             this.config,
             defaultPiSessionId,
-            loadWhatsAppConfig().defaultUser ?? undefined,
+            (await loadWhatsAppConfig()).defaultUser ?? undefined,
           );
           routerMeta = { router_action: result.action };
           if (result.stream) {

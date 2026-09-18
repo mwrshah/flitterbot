@@ -3,13 +3,14 @@ import type http from "node:http";
 import path from "node:path";
 import { type Api, getSupportedThinkingLevels, type Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { ModelConfigEntry } from "../config/load-config.ts";
-import { persistModelsToConfigFile } from "../config/persist-models.ts";
+import { updateConfiguration } from "../config/documents.ts";
+import type { ModelConfigEntry } from "../config/schema.ts";
 import type {
   ModelListItem,
   ModelsListResponse,
   ModelsMutationResponse,
 } from "../contracts/index.ts";
+import { canonicalJson } from "../json-documents/store.ts";
 import { createPiModelRegistry } from "../pi-auth.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
@@ -74,7 +75,16 @@ export async function handleBrowserModelsPinRoute(
     nextDefault = nextList[0]!.id;
   }
 
-  persistModelsToConfigFile({ models: nextList, defaultModel: nextDefault });
+  await updateConfiguration("runtime-config", (current) => {
+    if (
+      canonicalJson(current.models) !== canonicalJson(config.models) ||
+      current.defaultModel !== config.defaultModel
+    ) {
+      throw new Error("Configuration changed; reload before changing pinned models");
+    }
+    return { ...current, models: nextList, defaultModel: nextDefault };
+  });
+  await runtime.refreshConfig();
   runtime.log(
     `models: ${body.pin ? "pinned" : "unpinned"} id=${id}; total=${nextList.length}; default=${nextDefault}`,
   );

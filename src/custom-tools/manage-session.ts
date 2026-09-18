@@ -1,6 +1,6 @@
 import type { BlackboardDatabase } from "../blackboard/db.ts";
 import { getInjectionEligibility, getSessionById } from "../blackboard/query-sessions.ts";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import type { DirectSessionMessageResponse } from "../contracts/index.ts";
 import { sendMessageToAgentSession } from "../tmux-sessions/send-message.ts";
 import { inspectTmuxSession, tmuxSessionExists } from "../tmux-sessions/tmux.ts";

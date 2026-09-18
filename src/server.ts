@@ -7,6 +7,7 @@ process.on("warning", (warning) => {
 });
 
 import http from "node:http";
+import { loadConfig } from "./config/load-config.ts";
 import {
   CONTROL_SURFACE_ENDPOINTS,
   type HookRouteEventName,
@@ -86,7 +87,7 @@ process.on("unhandledRejection", (error) => {
 });
 
 try {
-  runtime = new ControlSurfaceRuntime();
+  runtime = new ControlSurfaceRuntime(await loadConfig());
   const activeRuntime = runtime;
   const server = createServer(activeRuntime);
   activeRuntime.attachServer(server);
@@ -118,6 +119,7 @@ function createServer(runtime: ControlSurfaceRuntime): http.Server {
       return;
     }
     try {
+      await runtime.refreshConfig();
       await routeRequest(runtime, req, res);
     } catch (error) {
       if (error instanceof InvalidJsonBodyError) {
@@ -130,8 +132,15 @@ function createServer(runtime: ControlSurfaceRuntime): http.Server {
   });
 
   server.on("upgrade", (req, socket: import("node:net").Socket, head) => {
-    const handled = runtime.handleUpgrade(req, socket, head);
-    if (!handled) socket.destroy();
+    void runtime
+      .refreshConfig()
+      .then(() => {
+        if (!runtime.handleUpgrade(req, socket, head)) socket.destroy();
+      })
+      .catch((error) => {
+        runtime.log(errorMessage(error));
+        socket.destroy();
+      });
   });
 
   return server;

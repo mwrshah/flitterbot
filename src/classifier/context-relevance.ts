@@ -1,5 +1,5 @@
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import { buildContextRelevancePrompts } from "../prompts/context-relevance.ts";
 import { inferClassifierJson } from "./inference.ts";
 

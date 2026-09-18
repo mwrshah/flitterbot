@@ -13,10 +13,6 @@ export function getWhatsAppAuthBackupDir(): string {
   return path.join(getWhatsAppHome(), "auth-backup");
 }
 
-export function getWhatsAppConfigPath(): string {
-  return path.join(getWhatsAppHome(), "config.json");
-}
-
 export function getWhatsAppSocketPath(): string {
   return path.join(getWhatsAppHome(), "daemon.sock");
 }

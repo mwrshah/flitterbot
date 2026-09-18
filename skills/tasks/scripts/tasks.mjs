@@ -10,8 +10,7 @@ export { TASK_ACTION_NAMES };
 
 const DEFAULT_STORE_PATH = path.join(os.homedir(), ".flitterbot", "data", "tasks", "tasks.json");
 const STORE_PATH = process.env.FLITTERBOT_TASKS_FILE || DEFAULT_STORE_PATH;
-const CONFIG_PATH = process.env.FLITTERBOT_CONFIG || path.join(os.homedir(), ".flitterbot", "config.json");
-const actionImplementations = createTaskActions({ storePath: STORE_PATH, configPath: CONFIG_PATH });
+const actionImplementations = createTaskActions({ storePath: STORE_PATH });
 
 export const TASK_DATA_MODELS = deepFreeze({
   Project: {

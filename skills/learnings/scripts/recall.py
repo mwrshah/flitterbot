@@ -5,8 +5,7 @@ Subcommands:
     list           Print every code and the unique situation labels under it.
     show CC        Print every learning entry under code CC.
 
-The note path comes from ~/.flitterbot/config.json key `learningsNotePath`.
-Set $FLITTERBOT_CONFIG to point at a different config file.
+The note path comes from the durable runtime configuration key `learningsNotePath`.
 
 Only lines matching `- CC-situation: body` (with `CC` from [A-Z2-9]{2})
 are considered. Codeless bullets are ignored.
@@ -15,46 +14,12 @@ are considered. Codeless bullets are ignored.
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import re
 import sys
 from collections import OrderedDict
-from pathlib import Path
+from config_note import resolve_note_path
 
 BULLET_RE = re.compile(r"^- ([A-Z2-9]{2})-([^:]+):\s*(.*)$")
-
-
-def expand_home(value: str) -> Path:
-    if value == "~":
-        return Path.home()
-    if value.startswith("~/"):
-        return Path.home() / value[2:]
-    return Path(value)
-
-
-def resolve_note_path() -> Path:
-    config_path = expand_home(
-        os.environ.get("FLITTERBOT_CONFIG", "~/.flitterbot/config.json")
-    )
-    if not config_path.exists():
-        raise RuntimeError(f"Missing Flitterbot config: {config_path}")
-    try:
-        raw = json.loads(config_path.read_text())
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            f"Invalid JSON in Flitterbot config {config_path}: {exc.msg}"
-        ) from exc
-    if not isinstance(raw, dict):
-        raise RuntimeError(
-            f"Invalid Flitterbot config {config_path}: expected a JSON object"
-        )
-    value = raw.get("learningsNotePath")
-    if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(
-            f"Missing required config key learningsNotePath in {config_path}"
-        )
-    return expand_home(value.strip())
 
 
 NOTE = resolve_note_path()

@@ -13,6 +13,7 @@ import { homedir, platform } from "node:os";
 import { execSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { configurationModule } from './scripts/config-access.mjs';
 
 const HOME = homedir();
 const FLITTERBOT_DIR = join(HOME, ".flitterbot");
@@ -55,7 +56,7 @@ const HOOKS = [
   { event: "SessionEnd", arg: "session-end" },
 ];
 
-const SCRIPT_FILES = ["runtime-common.sh"];
+const SCRIPT_FILES = ["runtime-common.sh", "config-access.mjs"];
 const SOURCE_FILES = ["blackboard/schema.sql"];
 const SCHEDULER_FILES = ["flitterbot-checkin.sh", "com.flitterbot.scheduler.plist"];
 const BIN_FILES = ["flitterbot-up", "flitterbot-wa"];
@@ -520,18 +521,27 @@ function preflight() {
   info("");
 }
 
-async function bootstrapConfig() {
-  const configPath = join(FLITTERBOT_DIR, "config.json");
-  let configBefore = {};
-  let beforeHash = "null";
+async function readInstalledConfiguration(name) {
+  try { return await (await configurationModule()).readConfiguration(name); }
+  catch (error) { if (error.name === 'UninitializedDocument') return null; throw error; }
+}
 
-  if (existsSync(configPath)) {
-    try { configBefore = readJsonFile(configPath); } catch {
-      error(`Config is malformed JSON: ${configPath}`);
-      process.exit(1);
-    }
-    beforeHash = sha256File(configPath);
-  }
+async function saveInstalledConfiguration(name, before, after) {
+  const api = await configurationModule();
+  const normalized = api.configurationDefinitions[name].decode(after);
+  await api.withConfiguration(name, async document => {
+    await document.update(current => {
+      if (canonicalJson(current) !== canonicalJson(before ?? normalized)) throw new Error('Configuration changed during installation; rerun installer');
+      return normalized;
+    });
+    if (before === null) await document.exportToFile();
+  }, before === null ? () => normalized : undefined);
+}
+
+async function bootstrapConfig() {
+  if (DRY_RUN) { info('(dry-run) Would synchronize runtime configuration'); return; }
+  const storedBefore = await readInstalledConfiguration('runtime-config');
+  const configBefore = storedBefore ?? {};
 
   let token = configBefore.controlSurfaceToken || "";
   if (!token) token = generateToken();
@@ -578,7 +588,6 @@ async function bootstrapConfig() {
     piTransport: "websocket-cached",
     stallMinutes: 15,
     toolTimeoutMinutes: 4,
-    blackboardPath: "~/.flitterbot/blackboard.db",
     whatsappAuthDir: "~/.flitterbot/whatsapp/auth",
     whatsappSocketPath: "~/.flitterbot/whatsapp/daemon.sock",
     whatsappPidPath: "~/.flitterbot/whatsapp/daemon.pid",
@@ -614,17 +623,16 @@ async function bootstrapConfig() {
 
   if (canonicalJson(configBefore) !== canonicalJson(configAfter)) {
     info("=== Runtime config changes ===");
-    console.log(showJsonDiff(configPath, configAfter));
+    info('Runtime configuration defaults or installation settings changed (values redacted).');
     info("");
 
     if (await confirm()) {
       if (!DRY_RUN) {
-        writeJsonFile(configPath, configAfter, 0o600);
-        const afterHash = sha256File(configPath);
-        log(`INFO: Bootstrapped config.json before=${beforeHash} after=${afterHash}`);
+        await saveInstalledConfiguration('runtime-config', storedBefore, configAfter);
+        log('INFO: Bootstrapped runtime configuration');
       }
     } else {
-      info("Skipped config bootstrap update.");
+      throw new Error('Configuration update declined; installation stopped');
     }
   }
 
@@ -681,7 +689,7 @@ async function syncWebEnv(config) {
   }
 
   info("=== Web app .env sync ===");
-  console.log(showTextDiff(webEnvPath, desired));
+  info('Web connection settings changed (credentials redacted).');
   info("");
 
   if (await confirm()) {
@@ -732,14 +740,9 @@ async function promptWhatsappPhone(promptText) {
 }
 
 async function bootstrapWhatsappConfig() {
-  const whatsappConfig = join(FLITTERBOT_DIR, "whatsapp", "config.json");
-  let before = {};
-  if (existsSync(whatsappConfig)) {
-    try { before = readJsonFile(whatsappConfig); } catch {
-      error(`WhatsApp config is malformed JSON: ${whatsappConfig}`);
-      process.exit(1);
-    }
-  }
+  if (DRY_RUN) { info('(dry-run) Would synchronize WhatsApp configuration'); return; }
+  const storedBefore = await readInstalledConfiguration('whatsapp-config');
+  const before = storedBefore ?? {};
 
   const after = { ...before };
   delete after.recipientJid;
@@ -760,83 +763,13 @@ async function bootstrapWhatsappConfig() {
   if (canonicalJson(before) === canonicalJson(after)) return;
 
   info("=== WhatsApp config changes ===");
-  console.log(showJsonDiff(whatsappConfig, after));
+  info('WhatsApp configuration defaults changed (values redacted).');
   info("");
 
   if (await confirm()) {
-    if (!DRY_RUN) writeJsonFile(whatsappConfig, after, 0o600);
+    if (!DRY_RUN) await saveInstalledConfiguration('whatsapp-config', storedBefore, after);
   } else {
-    info("Skipped WhatsApp config update.");
-  }
-}
-
-function readBlackboardSchemaVersion(schemaFile) {
-  try {
-    const schema = readFileSync(schemaFile, "utf8");
-    const match = schema.match(/blackboard schema \(v(\d+)\)/i);
-    if (match) return Number.parseInt(match[1], 10);
-  } catch { }
-  return 0;
-}
-
-function initBlackboard() {
-  if (DRY_RUN) {
-    info("(dry-run) Would initialize blackboard.db");
-    return;
-  }
-
-  const schemaFile = resolvePackagedSrcFile("blackboard/schema.sql")
-    || join(FLITTERBOT_DIR, "src", "blackboard", "schema.sql");
-  if (!existsSync(schemaFile)) {
-    warn(`Schema file not found at ${schemaFile}; skipping blackboard initialization`);
-    return;
-  }
-  const schemaVersion = readBlackboardSchemaVersion(schemaFile);
-  if (!schemaVersion) {
-    warn(`Could not determine blackboard schema version from ${schemaFile}; skipping blackboard initialization`);
-    return;
-  }
-
-  let dbPath = join(FLITTERBOT_DIR, "blackboard.db");
-  const configPath = join(FLITTERBOT_DIR, "config.json");
-  if (existsSync(configPath)) {
-    try {
-      const cfg = readJsonFile(configPath);
-      if (cfg.blackboardPath) dbPath = cfg.blackboardPath.replace(/^~/, HOME);
-    } catch { }
-  }
-
-  mkdirSync(dirname(dbPath), { recursive: true });
-
-  const sqlite = (sql) => execSync(
-    `sqlite3 "${dbPath}" "${sql.replace(/"/g, '\\"')}"`,
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
-  ).trim();
-
-  try {
-    let hasSessions = false;
-    if (existsSync(dbPath)) {
-      try {
-        hasSessions = sqlite(
-          "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions';",
-        ) !== "0";
-      } catch { }
-    }
-
-    if (!hasSessions) {
-      execSync(`sqlite3 "${dbPath}" < "${schemaFile}"`, { stdio: "pipe" });
-      sqlite(`INSERT OR IGNORE INTO schema_migrations(version) VALUES (${schemaVersion});`);
-      info(`blackboard.db created at ${dbPath} (schema v${schemaVersion})`);
-    } else {
-      let current = "0";
-      try { current = sqlite("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;"); } catch { }
-      info(`blackboard.db exists at ${dbPath} (schema v${current})`);
-      if (parseInt(current, 10) < schemaVersion) {
-        info(`  note: server will migrate v${current} → v${schemaVersion} on next startup`);
-      }
-    }
-  } catch (e) {
-    warn(`Blackboard initialization reported an error: ${e.message}`);
+    throw new Error('WhatsApp configuration update declined; installation stopped');
   }
 }
 
@@ -987,7 +920,6 @@ async function deployRuntimeFiles() {
 
   await bootstrapConfig();
   await bootstrapWhatsappConfig();
-  initBlackboard();
   recordRuntimeTreeTarget();
 }
 

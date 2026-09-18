@@ -1,5 +1,5 @@
 import type http from "node:http";
-import { isThinkingLevel } from "../config/load-config.ts";
+import { isThinkingLevel } from "../config/schema.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 import { buildModelsMutationResponse } from "./browser-models.ts";

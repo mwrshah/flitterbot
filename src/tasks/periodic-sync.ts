@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 
 export function fireAndForgetPeriodicTaskSync(
   config: FlitterbotConfig,

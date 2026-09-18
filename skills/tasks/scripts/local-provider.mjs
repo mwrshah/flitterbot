@@ -10,7 +10,6 @@ const DEFAULT_COMPLETED_RETENTION_DAYS = 90;
 const ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const ID_LENGTH = 10;
 let STORE_PATH;
-let CONFIG_PATH;
 const MIGRATION_NEEDED = Symbol("migrationNeeded");
 
 function nowIso() {
@@ -230,9 +229,8 @@ export const TASK_ACTION_NAMES = [
   "periodic_sync_and_cleanup",
 ];
 
-export function createTaskActions({ storePath, configPath }) {
+export function createTaskActions({ storePath }) {
   STORE_PATH = storePath;
-  CONFIG_PATH = configPath;
   return {
     async list_projects(input) {
       const { store } = taskContext();
@@ -292,8 +290,8 @@ export function createTaskActions({ storePath, configPath }) {
       const { store, idx } = taskContext();
       const beforeSignature = storeDataSignature(store);
       const syncContext = createSyncContext(store);
-      const todoist = await syncTodoistIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
-      const linear = await syncLinearIntegration(CONFIG_PATH, store, idx, input, providerDeps(syncContext));
+      const todoist = await syncTodoistIntegration(store, idx, input, providerDeps(syncContext));
+      const linear = await syncLinearIntegration(store, idx, input, providerDeps(syncContext));
       const outbound = await propagateInboundTaskChanges(store, idx, syncContext);
       const cleanup = cleanupCompletedTasks(store, input);
       writeStoreIfChanged(store, beforeSignature);
@@ -303,7 +301,7 @@ export function createTaskActions({ storePath, configPath }) {
 }
 
 async function propagateInboundTaskChanges(store, idx, syncContext) {
-  const providers = configuredProviders(CONFIG_PATH, providerDeps());
+  const providers = await configuredProviders(providerDeps());
   const outbound = Object.fromEntries(providers.map((provider) => [provider.system, { created: 0, updated: 0 }]));
   for (const [recordId, sourceProvider] of syncContext.changedByProvider) {
     const task = idx.tasksById.get(recordId);
@@ -462,7 +460,7 @@ async function createProjectWithProviders(store, idx, input) {
   assertProjectNameAvailable(idx, trimmed);
 
   const links = normalizeProjectExternalLinks(input.external_links ?? []);
-  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+  for (const provider of await configuredProviders(providerDeps())) {
     const link = await provider.createProject({ name: trimmed, links });
     if (link) setExternalLink(links, link);
   }
@@ -496,7 +494,7 @@ async function updateProjectWithProviders(store, idx, input) {
     archived: nextArchived,
     externalLinks: projectPatchExternalLinks(project, input),
   };
-  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+  for (const provider of await configuredProviders(providerDeps())) {
     await provider.updateProject({ project, patch });
   }
 
@@ -560,7 +558,7 @@ async function createTaskWithProviders(store, idx, input) {
   const details = nullableTrim(input.details);
   const dueAt = resolveDueAt(input.due_at, input.due_in_days);
   const links = normalizeExternalLinks(input.external_links ?? [], "task");
-  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+  for (const provider of await configuredProviders(providerDeps())) {
     await provider.createTask({ store, idx, project, description, details, dueAt, links });
   }
 
@@ -597,7 +595,7 @@ async function updateTaskWithProviders(store, idx, input) {
     externalLinks: input.external_links !== undefined ? normalizeExternalLinks(input.external_links, "task") : task.externalLinks.map(cloneExternalLink),
   };
 
-  for (const provider of configuredProviders(CONFIG_PATH, providerDeps())) {
+  for (const provider of await configuredProviders(providerDeps())) {
     await provider.updateTask({ store, idx, task, patch });
   }
 

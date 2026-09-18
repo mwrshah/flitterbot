@@ -13,7 +13,7 @@ import {
   resolveInboundContextRef,
 } from "../blackboard/write-whatsapp.ts";
 import { loadConfig } from "../config/load-config.ts";
-import { resolveUserForJid } from "./config.ts";
+import { resolveUserForJid, type WhatsAppConfig } from "./config.ts";
 
 const logger = pino({ level: process.env.FLITTERBOT_WA_LOG_LEVEL ?? "info" });
 const OUTBOUND_ECHO_WINDOW_MS = 5_000;
@@ -92,7 +92,7 @@ function extractQuotedWaMessageId(message: WAMessage): string | undefined {
 
 export function getInboundMessageRejectionReason(
   message: WAMessage,
-  acceptedInboundJids?: Set<string>,
+  acceptedInboundJids: Set<string>,
 ): string | undefined {
   if (message.key.fromMe) {
     return undefined;
@@ -102,7 +102,7 @@ export function getInboundMessageRejectionReason(
   if (!remoteJid) {
     return "missing_remote_jid";
   }
-  const accepted = acceptedInboundJids ?? new Set(resolveUserForJid(remoteJid) ? [remoteJid] : []);
+  const accepted = acceptedInboundJids;
   if (!accepted.has(remoteJid)) {
     return `unexpected_remote_jid:${remoteJid}`;
   }
@@ -114,8 +114,9 @@ async function forwardInboundToControlSurface(input: {
   waMessageId?: string;
   contextRef?: string;
   remoteJid: string;
+  whatsappUserId?: string;
 }): Promise<void> {
-  const config = loadConfig();
+  const config = await loadConfig();
   const url = `http://127.0.0.1:${config.controlSurfacePort}/message`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -136,7 +137,7 @@ async function forwardInboundToControlSurface(input: {
           wa_message_id: input.waMessageId,
           context_ref: input.contextRef,
           remote_jid: input.remoteJid,
-          whatsapp_user_id: resolveUserForJid(input.remoteJid)?.userId,
+          whatsapp_user_id: input.whatsappUserId,
         },
       }),
     });
@@ -187,10 +188,11 @@ async function forwardInboundToControlSurface(input: {
 export async function persistInboundMessage(
   db: SqlDatabase,
   message: WAMessage,
+  config: WhatsAppConfig,
 ): Promise<{ body?: string; contextRef?: string; rowId?: number }> {
   const waMessageId = message.key.id ?? undefined;
   const remoteJid = message.key.remoteJid ?? "";
-  const whatsappUserId = resolveUserForJid(remoteJid)?.userId;
+  const whatsappUserId = resolveUserForJid(remoteJid, config)?.userId;
 
   const body = extractConversationBody(message);
   if (!body) {
@@ -232,7 +234,7 @@ export async function persistInboundMessage(
     );
   }
 
-  await forwardInboundToControlSurface({ body, waMessageId, remoteJid });
+  await forwardInboundToControlSurface({ body, waMessageId, remoteJid, whatsappUserId });
 
   try {
     const quotedWaMessageId = extractQuotedWaMessageId(message);

@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -17,4 +20,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir web install --frozen-lockfile
-      - run: pnpm run audit:ts
+      - run: pnpm run audit:architecture --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - run: pnpm run audit

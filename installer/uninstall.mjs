@@ -477,13 +477,6 @@ const FLITTERBOT_ENV_KEYS = ["VITE_FLITTERBOT_BASE_URL", "VITE_FLITTERBOT_TOKEN"
 const WEB_ENV_MANIFEST_KEY = "web/.env";
 
 function resolveProjectRoot() {
-  const configPath = join(FLITTERBOT_DIR, "config.json");
-  if (existsSync(configPath)) {
-    try {
-      const config = readJsonFile(configPath);
-      if (config.projectRoot) return config.projectRoot;
-    } catch {}
-  }
   const sourceRootPath = join(FLITTERBOT_DIR, "source-root");
   if (existsSync(sourceRootPath)) {
     const root = readFileSync(sourceRootPath, "utf8").trim();

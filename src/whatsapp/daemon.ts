@@ -19,7 +19,7 @@ import {
   markWhatsAppMessageFailed,
   markWhatsAppMessageSent,
 } from "../blackboard/write-whatsapp.ts";
-import { loadConfig } from "../config/load-config.ts";
+import { preflightConfiguration } from "../config/documents.ts";
 import type {
   DaemonCommand,
   DaemonResponse,
@@ -27,6 +27,7 @@ import type {
   WhatsAppConnectionStatus,
   WhatsAppDaemonRuntimeStatus as WhatsAppDaemonStatus,
 } from "../contracts/index.ts";
+import { BLACKBOARD_PATH } from "../paths.ts";
 import {
   backupAuthState,
   ensureAuthDirectories,
@@ -35,12 +36,12 @@ import {
 } from "./auth.ts";
 import {
   ensureWhatsAppHome,
-  loadWhatsAppConfig,
   resolveAcceptedInboundJids,
   resolveBroadcastJidsForUser,
   resolvePairingPhoneNumber,
 } from "./config.ts";
 import { createIpcServer } from "./ipc.ts";
+import { loadWhatsAppConfig } from "./load-config.ts";
 import {
   getWhatsAppAuthDir,
   getWhatsAppLogPath,
@@ -89,7 +90,8 @@ class WhatsAppDaemon {
 
   constructor(options: { authMode: boolean; pairingCode: boolean }) {
     this.options = options;
-    this.db = openBlackboard(loadConfig().blackboardPath);
+    preflightConfiguration();
+    this.db = openBlackboard(BLACKBOARD_PATH);
   }
 
   async start(): Promise<void> {
@@ -168,7 +170,7 @@ class WhatsAppDaemon {
       return;
     }
 
-    const config = loadWhatsAppConfig();
+    const config = await loadWhatsAppConfig();
     this.status = this.reconnectAttempt > 0 ? "reconnecting" : "connecting";
     this.lastError = undefined;
 
@@ -198,19 +200,9 @@ class WhatsAppDaemon {
       syncFullHistory: false,
     });
 
-    const acceptedInboundJids = new Set<string>(resolveAcceptedInboundJids(config));
-    const rebuildAcceptedInboundJids = () => {
-      logger.info(
-        { acceptedInboundJids: [...acceptedInboundJids] },
-        "accepted inbound WhatsApp JIDs",
-      );
-    };
-    rebuildAcceptedInboundJids();
-
     this.socket.ev.on("creds.update", async () => {
       await saveCreds();
       backupAuthState();
-      rebuildAcceptedInboundJids();
     });
 
     this.socket.ev.on("connection.update", async (update) => {
@@ -223,6 +215,14 @@ class WhatsAppDaemon {
         return;
       }
 
+      let inboundConfig: Awaited<ReturnType<typeof loadWhatsAppConfig>>;
+      try {
+        inboundConfig = await loadWhatsAppConfig();
+      } catch (error) {
+        logger.error({ err: error }, "Invalid WhatsApp configuration; inbound batch rejected");
+        return;
+      }
+      const acceptedInboundJids = new Set(resolveAcceptedInboundJids(inboundConfig));
       for (const message of upsert.messages) {
         const rejectionReason = getInboundMessageRejectionReason(message, acceptedInboundJids);
         if (rejectionReason) {
@@ -242,7 +242,7 @@ class WhatsAppDaemon {
           continue;
         }
 
-        await persistInboundMessage(this.db, message);
+        await persistInboundMessage(this.db, message, inboundConfig);
         try {
           await this.socket?.readMessages([message.key]);
         } catch (error) {
@@ -390,7 +390,7 @@ class WhatsAppDaemon {
       };
     }
 
-    const config = loadWhatsAppConfig();
+    const config = await loadWhatsAppConfig();
     const remoteJids = targetJid
       ? [targetJid]
       : targetUserId

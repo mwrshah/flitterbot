@@ -1,11 +1,12 @@
-import fs from "node:fs";
-import { createLinearProvider, emptyLinearInboundStats } from "./linear-provider.mjs";
-import { createTodoistProvider, emptyTodoistInboundStats } from "./todoist-provider.mjs";
+import fs from 'node:fs';
+import { createLinearProvider, emptyLinearInboundStats } from './linear-provider.mjs';
+import { createTodoistProvider, emptyTodoistInboundStats } from './todoist-provider.mjs';
 
-export function loadIntegrations(configPath) {
-  if (!fs.existsSync(configPath)) return {};
-  const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+const installedAccess = new URL('../../../scripts/config-access.mjs', import.meta.url);
+const { readConfiguration } = await import(fs.existsSync(installedAccess) ? installedAccess.href : new URL('../../../installer/scripts/config-access.mjs', import.meta.url).href);
+
+export async function loadIntegrations() {
+  const raw = await readConfiguration();
   const todoistApiKey = configString(raw.todoistApiKey);
   const linearApiKey = configString(raw.linearApiKey);
   return {
@@ -14,26 +15,26 @@ export function loadIntegrations(configPath) {
   };
 }
 
-export function configuredProviders(configPath, deps) {
-  const integrations = loadIntegrations(configPath);
+export async function configuredProviders(deps) {
+  const integrations = await loadIntegrations();
   return [
     ...(integrations.todoist ? [createTodoistProvider(integrations.todoist, deps)] : []),
     ...(integrations.linear ? [createLinearProvider(integrations.linear, deps)] : []),
   ];
 }
 
-export async function syncTodoistIntegration(configPath, store, idx, input, deps) {
-  const integrations = loadIntegrations(configPath);
-  if (!integrations.todoist) return { skipped: true, reason: "no_api_key", direction: "inbound", inbound: emptyTodoistInboundStats() };
+export async function syncTodoistIntegration(store, idx, input, deps) {
+  const integrations = await loadIntegrations();
+  if (!integrations.todoist) return { skipped: true, reason: 'no_api_key', direction: 'inbound', inbound: emptyTodoistInboundStats() };
   return createTodoistProvider(integrations.todoist, deps).syncIn(store, idx, input);
 }
 
-export async function syncLinearIntegration(configPath, store, idx, input, deps) {
-  const integrations = loadIntegrations(configPath);
-  if (!integrations.linear) return { skipped: true, reason: "no_api_key", direction: "inbound", inbound: emptyLinearInboundStats() };
+export async function syncLinearIntegration(store, idx, input, deps) {
+  const integrations = await loadIntegrations();
+  if (!integrations.linear) return { skipped: true, reason: 'no_api_key', direction: 'inbound', inbound: emptyLinearInboundStats() };
   return createLinearProvider(integrations.linear, deps).syncIn(store, idx, input);
 }
 
 function configString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
 }

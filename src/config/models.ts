@@ -1,4 +1,4 @@
-import type { FlitterbotConfig, ModelConfigEntry } from "./load-config.ts";
+import type { FlitterbotConfig, ModelConfigEntry } from "./schema.ts";
 
 export function resolveModelEntryId(
   config: FlitterbotConfig,

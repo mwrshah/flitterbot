@@ -1,4 +1,21 @@
-export const BLACKBOARD_SCHEMA_VERSION = 25;
+export const BLACKBOARD_SCHEMA_VERSION = 26;
+
+export const JSON_DOCUMENT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS json_documents (
+  id TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)),
+  revision INTEGER NOT NULL CHECK (revision > 0),
+  value_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS json_document_projections (
+  document_id TEXT PRIMARY KEY REFERENCES json_documents(id),
+  file_path TEXT NOT NULL UNIQUE,
+  synced_file_hash TEXT,
+  pending_export_hash TEXT,
+  pending_export_revision INTEGER,
+  CHECK ((pending_export_hash IS NULL) = (pending_export_revision IS NULL))
+);
+`;
 
 export type MessageMetadata = {
   router_action?: string;
@@ -190,6 +207,7 @@ export interface UserConfigRow {
 }
 
 export const BLACKBOARD_SCHEMA_SQL = `
+${JSON_DOCUMENT_SCHEMA_SQL}
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
 PRAGMA foreign_keys=ON;

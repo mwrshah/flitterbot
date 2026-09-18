@@ -88,7 +88,7 @@ function validateStreamResumeFile(
 export async function createFlitterbotAgent(options: CreateFlitterbotAgentOptions) {
   const { customTools, role, orchestratorContext, resumeSessionFile, expectedPiSessionId, cwd } =
     options;
-  const initialConfig = loadConfig();
+  const initialConfig = await loadConfig();
   const workingDir = cwd ?? initialConfig.projectsDir;
 
   if (expectedPiSessionId) {
@@ -110,7 +110,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
   let resourceMessages: string[] = [];
 
   const runtimeFactory: CreateAgentSessionRuntimeFactory = async (factoryOpts) => {
-    const config = loadConfig();
+    const config = await loadConfig();
     const modelRuntime = await createPiModelRuntime(config.controlSurfaceAgentDir);
     const settingsManager = SettingsManager.inMemory({
       compaction: { keepRecentTokens: 30_000 },
@@ -250,7 +250,7 @@ export async function createFlitterbotAgent(options: CreateFlitterbotAgentOption
     modelInfo: {
       provider: currentModel.provider,
       id: currentModel.id,
-      entryId: resolveModelEntryId(loadConfig(), currentModel.provider, currentModel.id),
+      entryId: resolveModelEntryId(await loadConfig(), currentModel.provider, currentModel.id),
       thinkingLevel: runtime.session.thinkingLevel,
     },
     resourceMessages,

@@ -5,7 +5,7 @@ import {
   getRecentDefaultConversation,
 } from "../blackboard/query-messages.ts";
 import { getLatestStreamCreatedAt, listOpenWorkStreams } from "../blackboard/query-streams.ts";
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import type { StreamRow } from "../contracts/index.ts";
 import { buildClassificationPrompts } from "../prompts/classifier.ts";
 import { inferClassifierJson } from "./inference.ts";

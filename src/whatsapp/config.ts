@@ -1,6 +1,6 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { getWhatsAppConfigPath, getWhatsAppHome } from "./paths.ts";
+import { chmodSync, mkdirSync } from "node:fs";
+import type { JsonValue } from "../json-documents/store.ts";
+import { getWhatsAppHome } from "./paths.ts";
 
 export type WhatsAppUsersConfig = Record<string, string[]>;
 
@@ -10,14 +10,6 @@ export type WhatsAppConfig = {
   pairingPhoneNumber?: string;
   typingDelayMs: number;
   daemonStartupTimeoutMs: number;
-};
-
-type WhatsAppConfigJson = {
-  defaultUser?: string;
-  users?: Record<string, unknown>;
-  pairingPhoneNumber?: string;
-  typingDelayMs?: number;
-  daemonStartupTimeoutMs?: number;
 };
 
 const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
@@ -32,22 +24,46 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readJsonObject(filePath: string): WhatsAppConfigJson {
-  if (!existsSync(filePath)) {
-    return {};
+export function decodeWhatsAppConfig(input: unknown): Record<string, JsonValue> {
+  if (!isRecord(input)) throw new Error("WhatsApp config must be a JSON object");
+  const raw = { ...input };
+  delete raw.recipientJid;
+  delete raw.allowedJids;
+  const keys = [
+    "defaultUser",
+    "users",
+    "pairingPhoneNumber",
+    "typingDelayMs",
+    "daemonStartupTimeoutMs",
+  ];
+  if (Object.keys(raw).some((key) => !keys.includes(key)))
+    throw new Error("Unknown WhatsApp config key");
+  for (const key of ["defaultUser", "pairingPhoneNumber"]) {
+    if (raw[key] !== undefined && (typeof raw[key] !== "string" || !raw[key].trim()))
+      throw new Error(`Invalid WhatsApp ${key}`);
   }
-
-  const raw = readFileSync(filePath, "utf8").trim();
-  if (!raw) {
-    return {};
+  for (const key of ["typingDelayMs", "daemonStartupTimeoutMs"]) {
+    if (
+      raw[key] !== undefined &&
+      (typeof raw[key] !== "number" || !Number.isInteger(raw[key]) || (raw[key] as number) <= 0)
+    )
+      throw new Error(`Invalid WhatsApp ${key}`);
   }
-
-  const parsed: unknown = JSON.parse(raw);
-  if (!isRecord(parsed)) {
-    throw new Error(`WhatsApp config must be a JSON object: ${filePath}`);
+  if (raw.users !== undefined) {
+    if (!isRecord(raw.users)) throw new Error("Invalid WhatsApp users");
+    for (const jids of Object.values(raw.users)) {
+      if (!Array.isArray(jids) || jids.some((jid) => typeof jid !== "string" || !jid.trim()))
+        throw new Error("Invalid WhatsApp user JIDs");
+    }
   }
-
-  return parsed as WhatsAppConfigJson;
+  const value = deriveWhatsAppConfig(raw);
+  return {
+    users: value.users,
+    typingDelayMs: value.typingDelayMs,
+    daemonStartupTimeoutMs: value.daemonStartupTimeoutMs,
+    ...(value.defaultUser ? { defaultUser: value.defaultUser } : {}),
+    ...(value.pairingPhoneNumber ? { pairingPhoneNumber: value.pairingPhoneNumber } : {}),
+  };
 }
 
 function readString(value: unknown): string | undefined {
@@ -86,7 +102,7 @@ function unique(values: string[]): string[] {
 function normalizePhoneNumber(value: string): string {
   const normalized = value.replace(/[^\d]/g, "");
   if (!normalized) {
-    throw new Error(`Invalid phone number: ${value}`);
+    throw new Error("Invalid WhatsApp phone number");
   }
 
   return normalized;
@@ -107,10 +123,8 @@ export function ensureWhatsAppHome(): string {
   return home;
 }
 
-export function loadWhatsAppConfig(configPath = getWhatsAppConfigPath()): WhatsAppConfig {
-  ensureWhatsAppHome();
-  const raw = readJsonObject(configPath);
-
+export function deriveWhatsAppConfig(raw: Record<string, unknown>): WhatsAppConfig {
+  if (typeof raw.pairingPhoneNumber === "string") normalizePhoneNumber(raw.pairingPhoneNumber);
   return {
     defaultUser: readString(raw.defaultUser),
     users: readUsers(raw.users),
@@ -127,14 +141,14 @@ function resolveSelfJid(config: WhatsAppConfig): string | undefined {
   return config.pairingPhoneNumber ? toWhatsAppJid(config.pairingPhoneNumber) : undefined;
 }
 
-export function resolveAcceptedInboundJids(config = loadWhatsAppConfig()): string[] {
+export function resolveAcceptedInboundJids(config: WhatsAppConfig): string[] {
   const selfJid = config.defaultUser ? resolveSelfJid(config) : undefined;
   return unique([...Object.values(config.users).flat(), ...(selfJid ? [selfJid] : [])]);
 }
 
 export function resolveUserForJid(
   remoteJid: string,
-  config = loadWhatsAppConfig(),
+  config: WhatsAppConfig,
 ): { userId: string; jids: string[] } | undefined {
   const normalized = toWhatsAppJid(remoteJid);
   const selfJid = resolveSelfJid(config);
@@ -150,10 +164,7 @@ export function resolveUserForJid(
   return undefined;
 }
 
-export function resolveBroadcastJidsForUser(
-  userId: string,
-  config = loadWhatsAppConfig(),
-): string[] {
+export function resolveBroadcastJidsForUser(userId: string, config: WhatsAppConfig): string[] {
   const jids = config.users[userId];
   if (!jids?.length) {
     throw new Error(`Unknown WhatsApp user: ${userId}`);
@@ -167,10 +178,10 @@ export function resolveBroadcastJidsForUser(
   return unique(phoneJids);
 }
 
-export function resolvePairingPhoneNumber(config = loadWhatsAppConfig()): string {
+export function resolvePairingPhoneNumber(config: WhatsAppConfig): string {
   if (!config.pairingPhoneNumber) {
     throw new Error(
-      `Missing pairing phone number. Set pairingPhoneNumber in ${path.join(getWhatsAppHome(), "config.json")}.`,
+      "Missing pairing phone number. Set pairingPhoneNumber in WhatsApp configuration.",
     );
   }
 

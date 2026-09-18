@@ -22,16 +22,15 @@ _generate_sessions() {
 DEFAULT_SESSIONS="$(_generate_sessions)"
 SESSIONS="${TMUX2_SESSIONS:-$DEFAULT_SESSIONS}"
 
-CONFIG_PATH="${FLITTERBOT_CONFIG:-$HOME/.flitterbot/config.json}"
 
 _resolve_launch_harness() {
   local explicit="$1"
   if [ -n "$explicit" ]; then echo "$explicit"; return; fi
-  local h=""
-  if [ -f "$CONFIG_PATH" ]; then
-    h=$(sed -n 's/.*"harness"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_PATH" | head -1)
-  fi
-  echo "${h:-claude}"
+  local root access
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+  access="$root/scripts/config-access.mjs"
+  if [ ! -f "$access" ]; then access="$root/installer/scripts/config-access.mjs"; fi
+  node "$access" read runtime-config harness
 }
 
 _validate_harness() {

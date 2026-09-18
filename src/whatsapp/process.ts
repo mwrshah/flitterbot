@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/load-config.ts";
 import type { WhatsAppDaemonRuntimeStatus as WhatsAppDaemonStatus } from "../contracts/index.ts";
-import { loadWhatsAppConfig } from "./config.ts";
 import { sendDaemonCommand } from "./ipc.ts";
+import { loadWhatsAppConfig } from "./load-config.ts";
 import {
   getWhatsAppAuthDir,
   getWhatsAppHome,
@@ -37,8 +37,8 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
-function resolveDaemonLaunch(): { args: string[] } {
-  const config = loadConfig();
+async function resolveDaemonLaunch(): Promise<{ args: string[] }> {
+  const config = await loadConfig();
   if (config.whatsappDaemonPath && existsSync(config.whatsappDaemonPath)) {
     return { args: [config.whatsappDaemonPath] };
   }
@@ -51,14 +51,14 @@ function resolveDaemonLaunch(): { args: string[] } {
   throw new Error("Unable to locate WhatsApp daemon entrypoint.");
 }
 
-function listDaemonPids(): number[] {
+async function listDaemonPids(): Promise<number[]> {
   const candidates = new Set<string>([
     path.join(getWhatsAppHome(), "daemon.js"),
     fileURLToPath(new URL("./daemon.ts", import.meta.url)),
     getWhatsAppSocketPath(),
   ]);
 
-  const config = loadConfig();
+  const config = await loadConfig();
   if (config.whatsappDaemonPath) {
     candidates.add(config.whatsappDaemonPath);
   }
@@ -110,7 +110,7 @@ async function terminateDaemonPids(
 
 export async function stopCompetingDaemonProcesses(excludePids: number[] = []): Promise<number[]> {
   const excluded = new Set(excludePids);
-  const initial = listDaemonPids().filter((pid) => !excluded.has(pid));
+  const initial = (await listDaemonPids()).filter((pid) => !excluded.has(pid));
   const survivors = await terminateDaemonPids(initial, "SIGTERM", 3000);
   const stubborn = survivors.filter((pid) => !excluded.has(pid));
   if (stubborn.length === 0) return initial;
@@ -123,7 +123,7 @@ export async function startDaemonProcess(
 ): Promise<number> {
   await stopCompetingDaemonProcesses();
 
-  const launch = resolveDaemonLaunch();
+  const launch = await resolveDaemonLaunch();
   const args = [...launch.args];
 
   if (options.authMode) {
@@ -145,10 +145,8 @@ export async function startDaemonProcess(
   return child.pid ?? 0;
 }
 
-export async function waitForDaemonReady(
-  timeoutMs = loadWhatsAppConfig().daemonStartupTimeoutMs,
-): Promise<WhatsAppDaemonStatus> {
-  const deadline = Date.now() + timeoutMs;
+export async function waitForDaemonReady(timeoutMs?: number): Promise<WhatsAppDaemonStatus> {
+  const deadline = Date.now() + (timeoutMs ?? (await loadWhatsAppConfig()).daemonStartupTimeoutMs);
   let lastError: Error | undefined;
 
   while (Date.now() < deadline) {
@@ -172,7 +170,7 @@ export async function runForegroundDaemonProcess(
 ): Promise<number> {
   await stopCompetingDaemonProcesses();
 
-  const launch = resolveDaemonLaunch();
+  const launch = await resolveDaemonLaunch();
   const args = [...launch.args, "--auth"];
   if (options.pairingCode) {
     args.push("--pairing-code");

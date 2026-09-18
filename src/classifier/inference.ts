@@ -1,6 +1,6 @@
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import type { FlitterbotConfig } from "../config/load-config.ts";
 import { resolveModelEntry } from "../config/models.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import type { ClassifierPrompts } from "../prompts/classifier.ts";
 
 export async function inferClassifierJson(

@@ -9,7 +9,7 @@ import type {
   StreamRoutingMeta,
 } from "../contracts/index.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
-import { loadWhatsAppConfig } from "../whatsapp/config.ts";
+import { loadWhatsAppConfig } from "../whatsapp/load-config.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
 
 export async function handleMessageRoute(
@@ -73,7 +73,7 @@ async function routeMessage(
       throw new Error("WhatsApp message accepted without whatsapp_user_id metadata");
     }
 
-    const whatsappConfig = loadWhatsAppConfig();
+    const whatsappConfig = await loadWhatsAppConfig();
     ownerUser = whatsappUserId;
 
     if (whatsappConfig.defaultUser !== whatsappUserId) {

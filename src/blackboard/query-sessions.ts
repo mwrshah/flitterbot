@@ -1,4 +1,4 @@
-import type { FlitterbotConfig } from "../config/load-config.ts";
+import type { FlitterbotConfig } from "../config/schema.ts";
 import type {
   ClaudeSessionRow,
   DownstreamSessionItem,
