@@ -7,7 +7,7 @@ import type { Layout as PanelLayout } from "react-resizable-panels";
 import { toast } from "sonner";
 import { MarkdownContent } from "@/components/common/markdown-content";
 import { MessageInput } from "@/components/common/message-input";
-import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
+import { Group, HorizontalSeparator, Panel } from "@/components/common/resizable";
 import { Tooltip } from "@/components/common/tooltip";
 import { RuntimeHealthIndicator } from "@/components/runtime-health-indicator";
 import { SettingsDrawer } from "@/components/settings-drawer";
@@ -356,7 +356,7 @@ export function Surface() {
 
       <SettingsDrawer open={settingsOpen} onClose={closeSettings} />
 
-      <PanelGroup
+      <Group
         orientation="vertical"
         className="flex-1 min-h-0"
         defaultLayout={chatLayout}
@@ -412,7 +412,7 @@ export function Surface() {
           </div>
         </Panel>
 
-        <HorizontalResizeHandle />
+        <HorizontalSeparator />
 
         <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
           <MessageInput
@@ -424,7 +424,7 @@ export function Surface() {
             internalCommandScope="surface"
           />
         </Panel>
-      </PanelGroup>
+      </Group>
     </div>
   );
 }

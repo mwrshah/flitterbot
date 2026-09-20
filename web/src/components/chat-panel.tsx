@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ShortcutHint } from "@/components/common/kbd";
 import { MessageInput, type MessageInputHoverButton } from "@/components/common/message-input";
-import { HorizontalResizeHandle, Panel, PanelGroup } from "@/components/common/resizable";
+import { Group, HorizontalSeparator, Panel } from "@/components/common/resizable";
 import { Tooltip } from "@/components/common/tooltip";
 import {
   Command,
@@ -931,7 +931,7 @@ export function ChatPanel({
         />
       </div>
 
-      <PanelGroup
+      <Group
         orientation="vertical"
         className="flex-1 min-h-0"
         style={{ overflow: "visible" }}
@@ -975,7 +975,7 @@ export function ChatPanel({
           </div>
         </Panel>
 
-        <HorizontalResizeHandle />
+        <HorizontalSeparator />
 
         <Panel id="input" defaultSize="15%" minSize="9%" style={{ overflow: "visible" }}>
           <Dialog
@@ -1047,7 +1047,7 @@ export function ChatPanel({
             }
           />
         </Panel>
-      </PanelGroup>
+      </Group>
     </div>
   );
 }

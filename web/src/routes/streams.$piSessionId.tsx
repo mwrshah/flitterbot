@@ -9,7 +9,7 @@ import {
 import { useEffect, useRef } from "react";
 import type { Layout as PanelLayout } from "react-resizable-panels";
 import { ChatPanel } from "@/components/chat-panel";
-import { Panel, PanelGroup, ResizeHandle } from "@/components/common/resizable";
+import { Group, Panel, VerticalSeparator } from "@/components/common/resizable";
 import { DownstreamSessionsPanel } from "@/components/downstream-sessions-panel";
 import { useStreamsChat } from "@/hooks/use-streams-chat";
 import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
@@ -105,8 +105,9 @@ function PiSessionRoute() {
   } = useStreamsChat(piSessionId);
 
   return (
-    <PanelGroup
+    <Group
       orientation="horizontal"
+      resizePreviewMode="separator"
       className="h-full"
       style={{ overflow: "visible" }}
       defaultLayout={streamsLayout}
@@ -136,7 +137,7 @@ function PiSessionRoute() {
           messageInputDisabled={!isDefaultSession && !stream}
         />
       </Panel>
-      <ResizeHandle />
+      <VerticalSeparator />
       <Panel id="downstream" defaultSize="50%" minSize="25%" collapsible collapsedSize="2px">
         <DownstreamSessionsPanel
           key={effectivePiSessionId}
@@ -146,6 +147,6 @@ function PiSessionRoute() {
           showDueTasks={isDefaultSession}
         />
       </Panel>
-    </PanelGroup>
+    </Group>
   );
 }
