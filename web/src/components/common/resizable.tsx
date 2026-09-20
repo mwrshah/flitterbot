@@ -1,8 +1,17 @@
 import { cn } from "cn";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { type GroupProps, Panel, Group as ResizableGroup, Separator } from "react-resizable-panels";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
-export { Group, Panel };
+const DEFAULT_RESIZE_TARGET_MINIMUM_SIZE = { coarse: 30, fine: 20 };
+
+export { Panel };
+
+export function Group({
+  resizeTargetMinimumSize = DEFAULT_RESIZE_TARGET_MINIMUM_SIZE,
+  ...props
+}: GroupProps) {
+  return <ResizableGroup resizeTargetMinimumSize={resizeTargetMinimumSize} {...props} />;
+}
 
 export function VerticalSeparator({ className }: { className?: string }) {
   useWhyDidYouRender("VerticalSeparator", { className });
