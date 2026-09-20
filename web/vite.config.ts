@@ -1,3 +1,4 @@
+import { hostname } from 'node:os'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { defineConfig } from 'vite'
@@ -9,7 +10,7 @@ const proxy = Object.fromEntries(
 )
 
 export default defineConfig({
-  preview: { host: '0.0.0.0', port: 8000, strictPort: true, proxy },
+  preview: { host: '0.0.0.0', port: 8000, strictPort: true, allowedHosts: [`${hostname()}.exe.xyz`], proxy },
   server: {
     host: '0.0.0.0',
     port: 3188,

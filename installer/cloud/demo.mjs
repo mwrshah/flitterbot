@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
+import { get } from "node:http";
 
 const home = os.homedir();
 const config = JSON.parse(fs.readFileSync(path.join(home, ".flitterbot/config.json"), "utf8"));
@@ -32,7 +33,20 @@ function verify(manifest) {
   return current;
 }
 
+function previewStatus(host) {
+  return new Promise((resolve, reject) => {
+    const request = get("http://127.0.0.1:8000/", { headers: { Host: host }, timeout: 10_000 }, (response) => {
+      response.resume();
+      resolve(response.statusCode);
+    });
+    request.on("timeout", () => request.destroy(new Error("Preview request timed out")));
+    request.on("error", reject);
+  });
+}
+
 try {
+  assert.equal(await previewStatus(`${os.hostname()}.exe.xyz`), 200, "Public controller hostname must serve the demo");
+  assert.equal(await previewStatus("untrusted.example.invalid"), 403, "Unrelated hostnames must remain blocked");
   const action = process.argv[2] ?? "inspect";
   if (action === "create") {
     assert.equal(os.hostname(), fs.readFileSync(path.join(home, ".flitterbot/control-surface/cloud-controller-host"), "utf8").trim());
