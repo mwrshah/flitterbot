@@ -321,17 +321,6 @@ export function resetClosedStreams(db: BlackboardDatabase): number {
   return count?.count ?? 0;
 }
 
-export function getPreviousStreamCreatedAt(
-  db: BlackboardDatabase,
-  excludeId: string,
-): string | undefined {
-  const row = db.get<{ created_at: string }>(
-    `SELECT datetime(created_at) as created_at FROM streams WHERE id != ? AND type = 'work' ORDER BY created_at DESC LIMIT 1`,
-    excludeId,
-  );
-  return row?.created_at;
-}
-
 export function getLatestStreamCreatedAt(
   db: BlackboardDatabase,
   streamUser?: string,

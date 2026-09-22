@@ -16,7 +16,11 @@ import {
   updatePiSessionModelMirror,
 } from "./blackboard/pi-sessions.ts";
 import { clearAllHealthFlags, setHealthFlag } from "./blackboard/query-health-flags.ts";
-import { persistInboundMessage, persistOutboundMessage } from "./blackboard/query-messages.ts";
+import {
+  getRecentDefaultMessages,
+  persistInboundMessage,
+  persistOutboundMessage,
+} from "./blackboard/query-messages.ts";
 import {
   findIdleCleanupCandidates,
   getSessionById,
@@ -28,6 +32,7 @@ import {
 } from "./blackboard/query-sessions.ts";
 import {
   CLOSED_STREAM_LOOKBACK_HOURS,
+  getLatestStreamCreatedAt,
   getStreamById,
   getStreamByName,
   getStreamPiSessionId,
@@ -40,6 +45,7 @@ import {
   setStreamType,
 } from "./blackboard/query-streams.ts";
 import { createQueryBlackboardTool } from "./blackboard/tool-query-blackboard.ts";
+import { classifyContextRelevance } from "./classifier/context-relevance.ts";
 import { updateConfiguration } from "./config/documents.ts";
 import { loadConfig } from "./config/load-config.ts";
 import { resolveModelEntry, resolveModelEntryId } from "./config/models.ts";
@@ -73,6 +79,7 @@ import { readPiSessionHeaderId } from "./streams/create-agent.ts";
 import type { FlitterbotTool } from "./streams/flitterbot-extension.ts";
 import { formatPromptWithContext } from "./streams/format-prompt.ts";
 import {
+  formatStreamPrompt,
   resolveTmuxBootstrapMessage,
   stripInjectedDatetimeBlocks,
 } from "./streams/format-stream-prompt.ts";
@@ -2070,12 +2077,28 @@ export class ControlSurfaceRuntime {
             };
           }
           const effectiveCwd = cwdParam;
+          const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
+          const sourceSession = streamId
+            ? this.sessionManager.getByStream(streamId)
+            : this.sessionManager.getDefault();
+          const currentItem = sourceSession?.queue.getCurrentItem();
+          const currentUserText = currentItem?.text
+            ? stripInjectedDatetimeBlocks(currentItem.text)
+            : undefined;
+          const inheritedReplyMetadata = whatsappReplyMetadataFrom(currentItem);
+          const contextBoundary = getLatestStreamCreatedAt(
+            this.blackboard,
+            parentStream?.stream_user ?? undefined,
+          );
+          const messagesAtInvocation =
+            role === "default" && currentUserText && !skipUserMessage
+              ? getRecentDefaultMessages(this.blackboard, 10, contextBoundary)
+              : [];
 
           const nameTrace =
             suggestedName !== name ? `"${name}" (from "${suggestedName}")` : `"${name}"`;
           this.log(`default agent creating swimlane ${nameTrace} cwd=${effectiveCwd}`);
 
-          const parentStream = streamId ? getStreamById(this.blackboard, streamId) : null;
           const streamUser =
             parentStream?.stream_user ?? (await loadWhatsAppConfig()).defaultUser ?? undefined;
 
@@ -2107,12 +2130,6 @@ export class ControlSurfaceRuntime {
           const orchestrator = spawn.managed;
 
           try {
-            const sourceSession = streamId
-              ? this.sessionManager.getByStream(streamId)
-              : this.sessionManager.getDefault();
-            const currentItem = sourceSession?.queue.getCurrentItem();
-            const originalText = currentItem?.text;
-            const inheritedReplyMetadata = whatsappReplyMetadataFrom(currentItem);
             const inheritedRemoteJid = extractRemoteJid(inheritedReplyMetadata);
             if (inheritedRemoteJid) {
               orchestrator.whatsappRemoteJid = inheritedRemoteJid;
@@ -2123,10 +2140,6 @@ export class ControlSurfaceRuntime {
                 inheritedRemoteJid,
               );
             }
-            const currentUserText = originalText
-              ? stripInjectedDatetimeBlocks(originalText)
-              : undefined;
-
             const tmuxBootstrapMessage = resolveTmuxBootstrapMessage(
               this.config.tmuxEnabled,
               this.config.tmuxBootstrapMessage,
@@ -2135,30 +2148,18 @@ export class ControlSurfaceRuntime {
             if (currentUserText && !skipUserMessage) {
               let prompt: string;
               try {
-                const { getRecentDefaultMessages } = await import("./blackboard/query-messages.ts");
-                const { getPreviousStreamCreatedAt } = await import(
-                  "./blackboard/query-streams.ts"
-                );
-                const { classifyContextRelevance } = await import(
-                  "./classifier/context-relevance.ts"
-                );
-                const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
-
-                const boundary = getPreviousStreamCreatedAt(this.blackboard, ws.id);
-                const recentMessages = getRecentDefaultMessages(this.blackboard, 10, boundary);
-
-                if (role === "default" && recentMessages.length > 1) {
+                if (messagesAtInvocation.length > 1) {
                   const relevance = await classifyContextRelevance(
-                    recentMessages,
+                    messagesAtInvocation,
                     ws.name,
                     await this.resolveModelRuntime(),
                     this.config,
                     agentMessage,
                     this.log.bind(this),
                   );
-                  const relevantTexts = recentMessages
-                    .filter((_, i) => relevance[i])
-                    .map((m) => m.content);
+                  const relevantTexts = messagesAtInvocation
+                    .filter((_, index) => relevance[index])
+                    .map((message) => message.content);
 
                   if (relevantTexts.length > 1) {
                     if (!relevantTexts.includes(currentUserText)) {
@@ -2172,7 +2173,7 @@ export class ControlSurfaceRuntime {
                       tmuxBootstrapMessage,
                     );
                     this.log(
-                      `context classifier: ${relevantTexts.length}/${recentMessages.length} messages relevant for "${ws.name}"`,
+                      `context classifier: ${relevantTexts.length}/${messagesAtInvocation.length} messages relevant for "${ws.name}"`,
                     );
                   } else {
                     prompt = this.sessionManager.buildStreamPrompt(
@@ -2224,7 +2225,6 @@ export class ControlSurfaceRuntime {
               });
               this.log(`enqueued original user message onto swimlane "${ws.name}" (${ws.id})`);
             } else if (skipUserMessage && agentMessage) {
-              const { formatStreamPrompt } = await import("./streams/format-stream-prompt.ts");
               const prompt = formatStreamPrompt(
                 [],
                 ws.name,
