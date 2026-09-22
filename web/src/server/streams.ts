@@ -160,8 +160,6 @@ export const fetchStreamsDiff = createServerFn({ method: "GET" })
       if (res.status === 204) return null;
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       return (await res.json()) as DiffResult;
-    } catch {
-      return null;
     } finally {
       clearTimeout(timeout);
     }

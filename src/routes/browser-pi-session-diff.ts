@@ -32,9 +32,11 @@ async function readDiffPathspecs(cwd: string): Promise<string[]> {
 
   const exclusions = ignore
     .split(/\r?\n/)
-    .map((line) => line.replace(/#.*/, ""))
-    .filter((line) => line.trim())
-    .map((pattern) => `:(exclude)${pattern}`);
+    .map((line) => line.replace(/#.*/, "").trim())
+    .filter(Boolean)
+    .map((pattern) =>
+      pattern.startsWith("/") ? `:(top,exclude)${pattern.slice(1)}` : `:(exclude)${pattern}`,
+    );
   return [".", ...exclusions];
 }
 
