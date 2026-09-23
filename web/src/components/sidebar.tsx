@@ -622,6 +622,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
       element.setAttribute("data-search-selected", "true");
       const frame = requestAnimationFrame(() => {
         element.scrollIntoView({ block: "nearest" });
+        swimlaneListRef.current!.scrollLeft = 0;
         if (cursor.scrollFrame === frame) cursor.scrollFrame = undefined;
       });
       cursor.scrollFrame = frame;
