@@ -20,18 +20,18 @@
     "up:latest": "pnpm update $(jq -r '(.dependencies // {}) + (.devDependencies // {}) | to_entries[] | select(.value == \"latest\") | .key' package.json)"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
-    "@types/node": "^25.9.5",
-    "knip": "^6.29.0",
-    "lefthook": "^2.1.10",
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^26.6.2",
+    "knip": "^6.37.0",
+    "lefthook": "^2.1.14",
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "latest",
-    "@earendil-works/pi-coding-agent": "0.84.2",
-    "@ff-labs/fff-node": "^0.7.2",
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@ff-labs/fff-node": "^0.11.0",
     "@whiskeysockets/baileys": "7.0.0-rc14",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.2",
     "pino": "^10.3.1",
     "qrcode-terminal": "^0.12.0"
   },
