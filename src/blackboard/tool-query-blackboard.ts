@@ -184,7 +184,7 @@ export function executeBlackboardQuery(
       void trailingStatement.sourceSQL;
       throw new Error("multiple SQL statements are not allowed");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ERR_INVALID_STATE") throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ERR_INVALID_ARG_VALUE") throw error;
     }
     return statement.all() as Array<Record<string, unknown>>;
   } finally {

@@ -33,9 +33,9 @@ function verify(manifest) {
   return current;
 }
 
-function previewStatus(host) {
+function previewStatus(host, route = "/") {
   return new Promise((resolve, reject) => {
-    const request = get("http://127.0.0.1:8000/", { headers: { Host: host }, timeout: 10_000 }, (response) => {
+    const request = get(`http://127.0.0.1:8000${route}`, { headers: { Host: host }, timeout: 10_000 }, (response) => {
       response.resume();
       resolve(response.statusCode);
     });
@@ -45,7 +45,9 @@ function previewStatus(host) {
 }
 
 try {
-  assert.equal(await previewStatus(`${os.hostname()}.exe.xyz`), 200, "Public controller hostname must serve the demo");
+  const publicHost = `${os.hostname()}.exe.xyz`;
+  assert.equal(await previewStatus(publicHost), 307, "Unauthenticated requests must start WorkOS sign-in");
+  assert.equal(await previewStatus(publicHost, "/api/auth/sign-in"), 303, "WorkOS sign-in endpoint must redirect");
   assert.equal(await previewStatus("untrusted.example.invalid"), 403, "Unrelated hostnames must remain blocked");
   const action = process.argv[2] ?? "inspect";
   if (action === "create") {

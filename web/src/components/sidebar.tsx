@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import logoBlack from "@/assets/flitterbot_logo_black_small.png";
 import logoWhite from "@/assets/flitterbot_logo_white_small.png";
+import type { AuthUser } from "@/auth/types";
 import { ShortcutHint } from "@/components/common/kbd";
 import {
   ContextMenu,
@@ -1040,10 +1041,10 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
   );
 }
 
-export const Sidebar = memo(function Sidebar() {
+export const Sidebar = memo(function Sidebar({ user }: { user: AuthUser }) {
   const modifierLabel = useModifierLabel();
   const lastStreamPath = useLastStreamPath();
-  useWhyDidYouRender("Sidebar", {});
+  useWhyDidYouRender("Sidebar", { user });
   const surfaceShortcutHint = useShortcutBindingLabel("nav.surface", {
     altLabel: modifierLabel,
   });
@@ -1071,6 +1072,17 @@ export const Sidebar = memo(function Sidebar() {
         />
       </nav>
       <SidebarSwimlanes modifierLabel={modifierLabel} />
+      <div className="flex shrink-0 items-center gap-2 border-t border-border-muted px-3 py-2 text-xs">
+        <span className="min-w-0 flex-1 truncate text-text-muted" title={user.email}>
+          {user.name}
+        </span>
+        <a
+          href="/logout"
+          className="rounded px-2 py-1 text-text-muted outline-none hover:bg-background-hover hover:text-text focus-visible:ring-2 focus-visible:ring-border-pop"
+        >
+          Sign out
+        </a>
+      </div>
     </aside>
   );
 });

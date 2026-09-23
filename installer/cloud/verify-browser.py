@@ -13,6 +13,9 @@ parser.add_argument("--session-id", required=True)
 parser.add_argument("--hostname", required=True)
 parser.add_argument("--model-label", required=True)
 parser.add_argument("--executable")
+parser.add_argument(
+    "--storage-state", help="Playwright storage state from a completed WorkOS sign-in"
+)
 parser.add_argument("--screenshot", required=True)
 args = parser.parse_args()
 nonce = "CLOUD-UI-" + uuid.uuid4().hex[:12]
@@ -20,7 +23,10 @@ nonce = "CLOUD-UI-" + uuid.uuid4().hex[:12]
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True, executable_path=args.executable)
     try:
-        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        context = browser.new_context(
+            viewport={"width": 1440, "height": 1000}, storage_state=args.storage_state
+        )
+        page = context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         settings = json.dumps({"baseUrl": args.api_url, "useStubFallback": False})
@@ -30,6 +36,10 @@ with sync_playwright() as playwright:
             + ")"
         )
         page.goto(f"{args.url.rstrip('/')}/streams/{args.session_id}")
+        if "/api/auth/sign-in" in page.url or "authkit.app" in page.url:
+            raise RuntimeError(
+                "WorkOS sign-in required; pass --storage-state from an authenticated browser context"
+            )
         page.get_by_role("button", name=args.model_label, exact=True).wait_for()
         expect(page.locator("main p").first).to_be_visible()
         editor = page.get_by_role(

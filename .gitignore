@@ -14,6 +14,8 @@ __pycache__/
 *.pfx
 *.cert
 .env
+.env.*
+!.env.example
 .envrc
 
 # Build output

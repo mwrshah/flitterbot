@@ -4,11 +4,15 @@ import {
   createRootRouteWithContext,
   type ErrorComponentProps,
   HeadContent,
+  Outlet,
+  redirect,
   Scripts,
 } from "@tanstack/react-router";
+import { getAuth } from "@workos/authkit-tanstack-react-start";
 import type * as React from "react";
 import { useEffect, useMemo } from "react";
 import { Toaster, toast } from "sonner";
+import type { AuthUser } from "@/auth/types";
 import { AppShell } from "@/components/app-shell";
 import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
 import { NotFound } from "@/components/not-found";
@@ -26,6 +30,8 @@ import type { WsConnectionStore } from "@/lib/ws-connection-store";
 import appCss from "@/styles.css?url";
 import { seo } from "@/utils/seo";
 
+const publicPaths = new Set(["/api/auth/callback", "/api/auth/sign-in", "/sign-in-error"]);
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
   apiClient: FlitterbotApiClient;
@@ -35,7 +41,23 @@ export const Route = createRootRouteWithContext<{
   sendMessage: FlitterbotWsClient["sendMessage"];
   startRealtime: () => () => void;
 }>()({
+  beforeLoad: async ({ location }) => {
+    if (publicPaths.has(location.pathname)) return { user: null as AuthUser | null };
+    const { user } = await getAuth();
+    if (!user) {
+      throw redirect({
+        href: `/api/auth/sign-in?returnPathname=${encodeURIComponent(location.href)}`,
+      });
+    }
+    return {
+      user: {
+        email: user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
+      } satisfies AuthUser,
+    };
+  },
   loader: async ({ context }) => {
+    if (!context.user) return;
     await Promise.all([
       context.queryClient
         .ensureQueryData(statusQueryOptions(context.apiClient))
@@ -85,9 +107,10 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
-function useShortcutStatus(apiClient: FlitterbotApiClient) {
+function useShortcutStatus(apiClient: FlitterbotApiClient, enabled: boolean) {
   const { data, error } = useQuery({
     ...statusQueryOptions(apiClient),
+    enabled,
     retry: 1,
     select: (d) => ({
       piAgent: d.piAgent,
@@ -120,19 +143,28 @@ function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | un
 }
 
 function RootComponent() {
+  const { user } = Route.useRouteContext();
+  useWhyDidYouRender("RootComponent", { user });
+  return user ? (
+    <AuthenticatedRoot user={user} />
+  ) : (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  );
+}
+
+function AuthenticatedRoot({ user }: { user: AuthUser }) {
   const { startRealtime, apiClient } = Route.useRouteContext();
-  useWhyDidYouRender("RootComponent", {});
   const { resolvedTheme } = useTheme();
-  const shortcutStatus = useShortcutStatus(apiClient);
+  const shortcutStatus = useShortcutStatus(apiClient, true);
   const streamPaths = useStreamPaths(shortcutStatus);
-  const shell = useMemo(() => <AppShell />, []);
+  const shell = useMemo(() => <AppShell user={user} />, [user]);
 
   useEffect(() => startRealtime(), [startRealtime]);
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      void import("react-grab");
-    }
+    if (import.meta.env.DEV) void import("react-grab");
   }, []);
 
   return (

@@ -60,7 +60,7 @@ Validation runs with `node --experimental-strip-types --test web/tests/*.test.ts
 
 ## Live demo and validation
 
-The dedicated controller is `fb-cloud-demo-main`; the private surface is [the cloud demo](https://fb-cloud-demo-main.exe.xyz). Existing `flitterbot-base` and `flue-*` VMs are outside this demo. The controller/web systemd units use `ConditionHost` so copies do not start inherited controller services.
+The dedicated controller is `fb-cloud-demo-main`; the private surface is [the cloud demo](https://fb-cloud-demo-main.exe.xyz). WorkOS AuthKit requires a Google, Apple, or email/password session before loading Flitterbot, and the controller installer requires its API key, client ID, cookie password, and exact callback URI through the process environment. Existing `flitterbot-base` and `flue-*` VMs are outside this demo. The controller/web systemd units use `ConditionHost` so copies do not start inherited controller services.
 
 Run these commands on the demo controller from its Flitterbot checkout:
 
@@ -73,11 +73,13 @@ node installer/cloud/verify-tools.mjs
 
 `recover` deliberately deletes only the recorded disposable worker after a fresh acknowledged checkpoint, then verifies replacement and native identity. `verify-controls` forks a disposable stream, checks model/thinking/cwd changes, supplies sufficient synthetic context for real compaction, prunes a branch, and verifies final archival. `verify-tools` checks the actual orchestration tools, a real Claude CLI's hooks/transcript, the preview/confirmation boundary, canonical merge, and worker deletion. Each run retains its manifest on failure; `--resume` is an explicit operator decision, not an automatic retry. Archive completed test manifests before starting another run.
 
-Validation on 2026-09-15 covers those live flows and a headless-browser send/reply/reload against the controller. The browser script uses an isolated test profile and disables stub fallback; it does not change the user's browser. Through an authenticated SSH forward to controller port 8000, run:
+Validation on 2026-09-15 covers those live flows and a headless-browser send/reply/reload against the controller. WorkOS protection was added and validated on 2026-09-23: an unauthenticated application request starts AuthKit, the configured callback is accepted, and the hosted page offers Google and email/password. The browser script uses an isolated test profile, requires Playwright storage state from a completed WorkOS login, and disables stub fallback; it does not change the user's browser. Run:
 
 ```bash
 uv run --with playwright installer/cloud/verify-browser.py \
-  --url http://127.0.0.1:18880 --api-url http://127.0.0.1:18880 \
+  --url https://fb-cloud-demo-main.exe.xyz \
+  --api-url https://fb-cloud-demo-main.exe.xyz \
+  --storage-state <authenticated-storage-state.json> \
   --session-id <demo-pi-session-id> --hostname <current-worker-name> \
   --model-label 'opus 5' --screenshot /tmp/cloud-demo.png
 ```
@@ -86,7 +88,7 @@ Provide `--executable` when using an existing test-browser installation. `instal
 
 ## Proof-of-concept limits
 
-Main remains a single point of failure. Workers inherit the controller environment, including credentials and historical files: these VMs are not a security boundary for untrusted tenants. Generation tokens fence the normal protocol, not a privileged actor with inherited account credentials. Only acknowledged native sessions, downstream transcripts, and repository checkpoints publish back; arbitrary environment/configuration edits and sibling histories do not synchronize. There is no automatic replay of uncertain work, distributed SQLite, shared writable filesystem, or claim of application-consistent live VM copying. Submodules, oversized checkpoints, and ambiguous provider failures stop explicitly and retain recoverable state.
+Main remains a single point of failure. AuthKit protects the TanStack application routes; the exe.dev private proxy and Flitterbot bearer token remain separate defense layers for the demo's proxied HTTP and WebSocket surfaces. Workers inherit the controller environment, including credentials and historical files: these VMs are not a security boundary for untrusted tenants. Generation tokens fence the normal protocol, not a privileged actor with inherited account credentials. Only acknowledged native sessions, downstream transcripts, and repository checkpoints publish back; arbitrary environment/configuration edits and sibling histories do not synchronize. There is no automatic replay of uncertain work, distributed SQLite, shared writable filesystem, or claim of application-consistent live VM copying. Submodules, oversized checkpoints, and ambiguous provider failures stop explicitly and retain recoverable state.
 
 ## Files
 

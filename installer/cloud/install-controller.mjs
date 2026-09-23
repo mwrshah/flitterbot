@@ -10,11 +10,30 @@ if (process.platform !== "linux" || !/^[a-z0-9][a-z0-9-]*$/.test(hostname)) thro
 const home = os.homedir();
 const config = JSON.parse(fs.readFileSync(path.join(home, ".flitterbot/config.json"), "utf8"));
 if (!config.controlSurfaceToken || !config.controlSurfacePort) throw new Error("Configure Flitterbot first");
+const workosNames = [
+  "WORKOS_API_KEY",
+  "WORKOS_CLIENT_ID",
+  "WORKOS_COOKIE_PASSWORD",
+  "WORKOS_REDIRECT_URI",
+];
+const workos = Object.fromEntries(workosNames.map((name) => [name, process.env[name]]));
+if (workosNames.some((name) => !workos[name] || workos[name].includes("\n"))) {
+  throw new Error("Supply valid WorkOS credentials through the installer environment");
+}
 execFileSync("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "exe.dev", "whoami", "--json"], { stdio: "pipe" });
 const built = { ...process.env, VITE_FLITTERBOT_BASE_URL: `https://${hostname}.exe.xyz`, VITE_FLITTERBOT_TOKEN: config.controlSurfaceToken };
 execFileSync("pnpm", ["--dir", "web", "run", "build"], { cwd: root, env: built, stdio: "inherit" });
 const envFile = path.join(home, ".flitterbot/cloud-web.env");
-fs.writeFileSync(envFile, `VITE_FLITTERBOT_BASE_URL=http://127.0.0.1:${config.controlSurfacePort}\nVITE_FLITTERBOT_TOKEN=${config.controlSurfaceToken}\n`, { mode: 0o600 });
+fs.writeFileSync(
+  envFile,
+  [
+    `VITE_FLITTERBOT_BASE_URL=http://127.0.0.1:${config.controlSurfacePort}`,
+    `VITE_FLITTERBOT_TOKEN=${config.controlSurfaceToken}`,
+    ...workosNames.map((name) => `${name}=${workos[name]}`),
+    "",
+  ].join("\n"),
+  { mode: 0o600 },
+);
 fs.chmodSync(envFile, 0o600);
 const units = {
   "flitterbot-cloud-controller": `${process.execPath} ${root}src/server.ts --cloud`,

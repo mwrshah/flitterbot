@@ -12,21 +12,35 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ThemeRouteImport } from './routes/theme'
+import { Route as SignInErrorRouteImport } from './routes/sign-in-error'
 import { Route as RuntimeRouteImport } from './routes/runtime'
+import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as StreamsRouteRouteImport } from './routes/streams.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamsIndexRouteImport } from './routes/streams.index'
 import { Route as StreamsDefaultRouteImport } from './routes/streams.default'
 import { Route as StreamsPiSessionIdRouteImport } from './routes/streams.$piSessionId'
+import { Route as ApiAuthSignInRouteImport } from './routes/api/auth/sign-in'
+import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
 
 const ThemeRoute = ThemeRouteImport.update({
   id: '/theme',
   path: '/theme',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignInErrorRoute = SignInErrorRouteImport.update({
+  id: '/sign-in-error',
+  path: '/sign-in-error',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RuntimeRoute = RuntimeRouteImport.update({
   id: '/runtime',
   path: '/runtime',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogoutRoute = LogoutRouteImport.update({
+  id: '/logout',
+  path: '/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StreamsRouteRoute = StreamsRouteRouteImport.update({
@@ -54,68 +68,106 @@ const StreamsPiSessionIdRoute = StreamsPiSessionIdRouteImport.update({
   path: '/$piSessionId',
   getParentRoute: () => StreamsRouteRoute,
 } as any)
+const ApiAuthSignInRoute = ApiAuthSignInRouteImport.update({
+  id: '/api/auth/sign-in',
+  path: '/api/auth/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
+  id: '/api/auth/callback',
+  path: '/api/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/streams': typeof StreamsRouteRouteWithChildren
+  '/logout': typeof LogoutRoute
   '/runtime': typeof RuntimeRoute
+  '/sign-in-error': typeof SignInErrorRoute
   '/theme': typeof ThemeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
   '/streams/default': typeof StreamsDefaultRoute
   '/streams/': typeof StreamsIndexRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/auth/sign-in': typeof ApiAuthSignInRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/logout': typeof LogoutRoute
   '/runtime': typeof RuntimeRoute
+  '/sign-in-error': typeof SignInErrorRoute
   '/theme': typeof ThemeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
   '/streams/default': typeof StreamsDefaultRoute
   '/streams': typeof StreamsIndexRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/auth/sign-in': typeof ApiAuthSignInRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/streams': typeof StreamsRouteRouteWithChildren
+  '/logout': typeof LogoutRoute
   '/runtime': typeof RuntimeRoute
+  '/sign-in-error': typeof SignInErrorRoute
   '/theme': typeof ThemeRoute
   '/streams/$piSessionId': typeof StreamsPiSessionIdRoute
   '/streams/default': typeof StreamsDefaultRoute
   '/streams/': typeof StreamsIndexRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/auth/sign-in': typeof ApiAuthSignInRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/streams'
+    | '/logout'
     | '/runtime'
+    | '/sign-in-error'
     | '/theme'
     | '/streams/$piSessionId'
     | '/streams/default'
     | '/streams/'
+    | '/api/auth/callback'
+    | '/api/auth/sign-in'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/logout'
     | '/runtime'
+    | '/sign-in-error'
     | '/theme'
     | '/streams/$piSessionId'
     | '/streams/default'
     | '/streams'
+    | '/api/auth/callback'
+    | '/api/auth/sign-in'
   id:
     | '__root__'
     | '/'
     | '/streams'
+    | '/logout'
     | '/runtime'
+    | '/sign-in-error'
     | '/theme'
     | '/streams/$piSessionId'
     | '/streams/default'
     | '/streams/'
+    | '/api/auth/callback'
+    | '/api/auth/sign-in'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StreamsRouteRoute: typeof StreamsRouteRouteWithChildren
+  LogoutRoute: typeof LogoutRoute
   RuntimeRoute: typeof RuntimeRoute
+  SignInErrorRoute: typeof SignInErrorRoute
   ThemeRoute: typeof ThemeRoute
+  ApiAuthCallbackRoute: typeof ApiAuthCallbackRoute
+  ApiAuthSignInRoute: typeof ApiAuthSignInRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -127,11 +179,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThemeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign-in-error': {
+      id: '/sign-in-error'
+      path: '/sign-in-error'
+      fullPath: '/sign-in-error'
+      preLoaderRoute: typeof SignInErrorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runtime': {
       id: '/runtime'
       path: '/runtime'
       fullPath: '/runtime'
       preLoaderRoute: typeof RuntimeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logout': {
+      id: '/logout'
+      path: '/logout'
+      fullPath: '/logout'
+      preLoaderRoute: typeof LogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/streams': {
@@ -169,6 +235,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamsPiSessionIdRouteImport
       parentRoute: typeof StreamsRouteRoute
     }
+    '/api/auth/sign-in': {
+      id: '/api/auth/sign-in'
+      path: '/api/auth/sign-in'
+      fullPath: '/api/auth/sign-in'
+      preLoaderRoute: typeof ApiAuthSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/callback': {
+      id: '/api/auth/callback'
+      path: '/api/auth/callback'
+      fullPath: '/api/auth/callback'
+      preLoaderRoute: typeof ApiAuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -191,18 +271,23 @@ const StreamsRouteRouteWithChildren = StreamsRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StreamsRouteRoute: StreamsRouteRouteWithChildren,
+  LogoutRoute: LogoutRoute,
   RuntimeRoute: RuntimeRoute,
+  SignInErrorRoute: SignInErrorRoute,
   ThemeRoute: ThemeRoute,
+  ApiAuthCallbackRoute: ApiAuthCallbackRoute,
+  ApiAuthSignInRoute: ApiAuthSignInRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

@@ -1,10 +1,11 @@
 import { Outlet } from "@tanstack/react-router";
+import type { AuthUser } from "@/auth/types";
 import { Panel, PanelGroup, ResizeHandle } from "@/components/common/resizable";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { Sidebar } from "./sidebar";
 
-export function AppShell() {
-  useWhyDidYouRender("AppShell", {});
+export function AppShell({ user }: { user: AuthUser }) {
+  useWhyDidYouRender("AppShell", { user });
 
   return (
     <PanelGroup orientation="horizontal" className="h-screen overflow-hidden">
@@ -19,7 +20,7 @@ export function AppShell() {
         groupResizeBehavior="preserve-pixel-size"
         style={{ overflow: "hidden" }}
       >
-        <Sidebar />
+        <Sidebar user={user} />
       </Panel>
       <ResizeHandle />
       <Panel id="main" className="h-full min-h-0" minSize="0px" style={{ overflow: "visible" }}>
