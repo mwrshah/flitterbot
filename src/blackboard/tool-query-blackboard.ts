@@ -178,15 +178,18 @@ export function executeBlackboardQuery(
   db.sqlite.setAuthorizer(authorizeRead);
   try {
     const statement = db.prepare(query);
+    const rows = statement.all() as Array<Record<string, unknown>>;
     const tail = query.slice(statement.sourceSQL.length);
-    try {
-      const trailingStatement = db.prepare(tail);
-      void trailingStatement.sourceSQL;
-      throw new Error("multiple SQL statements are not allowed");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ERR_INVALID_ARG_VALUE") throw error;
+    if (tail.trim()) {
+      try {
+        const trailingStatement = db.prepare(tail);
+        void trailingStatement.sourceSQL;
+        throw new Error("multiple SQL statements are not allowed");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ERR_INVALID_ARG_VALUE") throw error;
+      }
     }
-    return statement.all() as Array<Record<string, unknown>>;
+    return rows;
   } finally {
     db.sqlite.setAuthorizer(null);
   }
