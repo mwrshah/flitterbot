@@ -51,9 +51,9 @@ const TOP_LEVEL_FILES = ["uninstall.mjs", "VERSION"];
 const HOOK_SCRIPT = "hook-post.mjs";
 
 const HOOKS = [
-  { event: "SessionStart", arg: "session-start" },
-  { event: "Stop", arg: "stop" },
-  { event: "SessionEnd", arg: "session-end" },
+  { event: "SessionStart", arg: "session-start", codexTimeout: 15 },
+  { event: "Stop", arg: "stop", codexTimeout: 15 },
+  { event: "SessionEnd", arg: "session-end", codexTimeout: 3 },
 ];
 
 const SCRIPT_FILES = ["runtime-common.sh", "config-access.mjs"];
@@ -1060,11 +1060,11 @@ async function installCodexHooks() {  // writes ~/.codex/hooks.json: { hooks: { 
 
   let changes = false;
   const modifications = [];
-  for (const { event, arg } of HOOKS) {
+  for (const { event, arg, codexTimeout } of HOOKS) {
     const hookCmd = `node ${HOOKS_DIR}/${HOOK_SCRIPT} ${arg} codex`;
     const desiredGroup = {
       matcher: "",
-      hooks: [{ type: "command", command: hookCmd, timeout: 15 }],  // no async: codex skips async hooks
+      hooks: [{ type: "command", command: hookCmd, timeout: codexTimeout }],  // no async: codex skips async hooks
     };
 
     const groups = current.hooks[event] || [];
