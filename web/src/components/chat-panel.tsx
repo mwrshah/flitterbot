@@ -542,7 +542,9 @@ export function ChatPanel({
   }, [cwdPickerValue, switchCwdMutation.mutate]);
 
   const drillCwdPicker = useCallback((item: DirectoryCompletionItem) => {
-    setCwdPickerValue(`@${item.insertText}`);
+    const firstDirectory =
+      item.insertText.endsWith("/") && item.insertText.indexOf("/") === item.insertText.length - 1;
+    setCwdPickerValue(`@${item.insertText}${firstDirectory ? " " : ""}`);
   }, []);
 
   const openCwdPicker = useCallback(() => {
