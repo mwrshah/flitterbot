@@ -88,9 +88,6 @@ export function useGlobalShortcuts({ streamPaths = [] }: { streamPaths?: string[
     "stream.copy-target-branch": {
       run: () => toast.error("No target branch available"),
     },
-    "stream.edit-current-directory": {
-      run: () => toast.error("No current directory available"),
-    },
   };
 
   for (const slot of STREAM_SHORTCUT_SLOTS) {

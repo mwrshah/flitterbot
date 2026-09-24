@@ -498,6 +498,7 @@ export function ChatPanel({
   const activeFindRowIndex = conversationFindRowAt(findResults, selectedFindMatchIndex);
   const { data: worktree } = useQuery(streamsWorktreeQueryOptions(piSessionId));
   const cwdAbsolute = worktree?.cwdAbsolute ?? null;
+  const canEditCwd = streamType === "work" && Boolean(streamId && cwdAbsolute);
   const cwdShortcutLabel = useShortcutBindingLabel("stream.edit-current-directory", {
     compact: true,
   });
@@ -516,7 +517,7 @@ export function ChatPanel({
 
   const switchCwdMutation = useMutation({
     mutationFn: (cwd: string) => {
-      if (!streamId) throw new Error("No swimlane selected");
+      if (!streamId || streamType !== "work") throw new Error("No swimlane selected");
       return setStreamCwd({ data: { streamId, cwd } });
     },
     onSuccess: async () => {
@@ -545,9 +546,10 @@ export function ChatPanel({
   }, []);
 
   const openCwdPicker = useCallback(() => {
+    if (!canEditCwd) return;
     setCwdPickerValue("@");
     setCwdPickerOpen(true);
-  }, []);
+  }, [canEditCwd]);
 
   useLayoutEffect(() => {
     if (!cwdPickerOpen) return;
@@ -702,6 +704,7 @@ export function ChatPanel({
   }, [findOpen]);
 
   useEffect(() => {
+    setCwdPickerOpen(false);
     setFindSessionId(undefined);
     setFindHistorySessionId(undefined);
     setFindValue("");
@@ -725,7 +728,7 @@ export function ChatPanel({
 
   useShortcuts("conversation", {
     "stream.edit-current-directory": {
-      enabled: Boolean(streamId && cwdAbsolute),
+      enabled: canEditCwd,
       run: openCwdPicker,
     },
     "conversation.find": {
@@ -884,32 +887,38 @@ export function ChatPanel({
           {worktree?.cwd && cwdAbsolute && (
             <>
               <span className="text-text-muted text-sm shrink-0">|</span>
-              <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
-                <Tooltip content={streamId ? `Switch cwd from ${cwdAbsolute}` : cwdAbsolute}>
-                  <BaseButton
-                    focusableWhenDisabled
-                    render={<button ref={cwdPickerButtonRef} />}
-                    type="button"
-                    onClick={openCwdPicker}
-                    disabled={!streamId}
-                    aria-label={`Edit path. Current path: ${cwdAbsolute}`}
-                    aria-expanded={cwdPickerOpen}
-                    className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop aria-disabled:cursor-default aria-disabled:hover:bg-background-muted aria-disabled:hover:text-text-muted"
-                  >
-                    <FolderPenIcon className="size-3.5" aria-hidden="true" />
-                    <span className="min-w-0 truncate text-text" aria-hidden="true">
-                      {worktree.cwd}
-                    </span>
-                  </BaseButton>
+              {canEditCwd ? (
+                <span ref={cwdPickerAnchorRef} className="relative flex min-w-0 items-center gap-1">
+                  <Tooltip content={`Switch cwd from ${cwdAbsolute}`}>
+                    <BaseButton
+                      render={<button ref={cwdPickerButtonRef} />}
+                      type="button"
+                      onClick={openCwdPicker}
+                      aria-label={`Edit path. Current path: ${cwdAbsolute}`}
+                      aria-expanded={cwdPickerOpen}
+                      className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 rounded bg-background-muted px-1.5 py-1 text-left text-xs text-text-muted transition-colors hover:bg-background-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-pop"
+                    >
+                      <FolderPenIcon className="size-3.5" aria-hidden="true" />
+                      <span className="min-w-0 truncate text-text" aria-hidden="true">
+                        {worktree.cwd}
+                      </span>
+                    </BaseButton>
+                  </Tooltip>
+                  {cwdShortcutLabel && (
+                    <ShortcutHint
+                      label={cwdShortcutLabel}
+                      className="hidden shrink-0 @[30rem]:inline-grid"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              ) : (
+                <Tooltip content={cwdAbsolute}>
+                  <span className="min-w-0 truncate rounded bg-background-muted px-1.5 py-1 text-xs text-text">
+                    {worktree.cwd}
+                  </span>
                 </Tooltip>
-                {cwdShortcutLabel && (
-                  <ShortcutHint
-                    label={cwdShortcutLabel}
-                    className="hidden shrink-0 @[30rem]:inline-grid"
-                    aria-hidden="true"
-                  />
-                )}
-              </span>
+              )}
             </>
           )}
         </div>
@@ -917,7 +926,7 @@ export function ChatPanel({
         <CwdPicker
           pickerRef={cwdPickerRef}
           pickerStyle={cwdPickerStyle}
-          open={cwdPickerOpen}
+          open={canEditCwd && cwdPickerOpen}
           value={cwdPickerValue}
           items={cwdPickerItems}
           pending={switchCwdMutation.isPending}

@@ -69,7 +69,7 @@ const actions = {
   },
   "stream.edit-current-directory": {
     bindings: [{ keys: "c d", input: "ignore" }],
-    owners: ["conversation", "app"],
+    owners: ["conversation"],
   },
   "stream.copy-branch": { bindings: [{ keys: "c b", input: "ignore" }], owners: ["stream", "app"] },
   "stream.copy-target-branch": {
