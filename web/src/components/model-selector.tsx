@@ -250,13 +250,6 @@ export const ModelSelector = memo(function ModelSelector({
   );
   const canOpenModelSearch =
     !disabled && Boolean(piSessionId) && (catalogPinned.length > 0 || catalogAll.length > 0);
-  const openModelSearch = useCallback(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    } else {
-      setOpen(true);
-    }
-  }, []);
   const modelSearchShortcutHint = useShortcutBindingLabel("model.search", {
     altLabel: modifierLabel,
   });
@@ -285,7 +278,10 @@ export const ModelSelector = memo(function ModelSelector({
     initialCommandValue: initialCommandModel ? modelCommandValue(initialCommandModel) : undefined,
   });
   useShortcuts("model-selector", {
-    "model.search": { enabled: canOpenModelSearch, run: openModelSearch },
+    "model.search": {
+      enabled: open || canOpenModelSearch,
+      run: () => handleOpenChange(!open),
+    },
   });
 
   useEffect(() => {
