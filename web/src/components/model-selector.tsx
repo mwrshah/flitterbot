@@ -349,6 +349,7 @@ export const ModelSelector = memo(function ModelSelector({
       </Tooltip>
       <Popover.Portal>
         <Popover.Positioner
+          positionMethod="fixed"
           side="bottom"
           align="end"
           sideOffset={6}
