@@ -8,7 +8,7 @@
 
 export type ShortcutBinding = {
   keys: string;
-  input?: "allow" | "ignore";
+  input?: "allow" | "ignore" | "only";
 };
 
 export type ShortcutDefinition = {
@@ -72,7 +72,7 @@ export type ShortcutStep = {
 
 export type CompiledBinding = {
   readonly actionId: string;
-  readonly input: "allow" | "ignore";
+  readonly input: "allow" | "ignore" | "only";
   readonly spec: string;
   readonly steps: readonly ShortcutStep[];
 };
@@ -88,7 +88,7 @@ export type CompiledBindings = {
   readonly allowPrefixes: boolean;
   readonly signature: string;
   readonly bindings: ReadonlyMap<string, readonly CompiledBinding[]>;
-  readonly root: ShortcutTrieNode;
+  readonly roots: { readonly input: ShortcutTrieNode; readonly outside: ShortcutTrieNode };
 };
 
 const DEFAULT_SEQUENCE_TIMEOUT_MS = 750;
@@ -260,11 +260,11 @@ function parseGesture(actionId: string, raw: unknown): CompiledBinding {
   const { keys, input = "allow" } = raw as ShortcutBinding;
   if (
     typeof keys !== "string" ||
-    (input !== "allow" && input !== "ignore") ||
+    (input !== "allow" && input !== "ignore" && input !== "only") ||
     Object.keys(raw).some((key) => key !== "keys" && key !== "input")
   ) {
     throw new ShortcutConfigError(
-      `shortcut "${actionId}" binding needs string keys and input "allow" or "ignore"`,
+      `shortcut "${actionId}" binding needs string keys and input "allow", "ignore", or "only"`,
     );
   }
   const tokens = keys.trim().split(/\s+/).filter(Boolean);
@@ -382,8 +382,8 @@ export function compileShortcutBindings(
   }
   const allowPrefixes = options.allowPrefixes === true;
   const overrideSpecs = readOverrides(overrides, catalog);
-  const root = createNode(0);
-  const aliasRoot = createNode(0);
+  const roots = { input: createNode(0), outside: createNode(0) };
+  const aliasRoots = { input: createNode(0), outside: createNode(0) };
   const bindings = new Map<string, readonly CompiledBinding[]>();
   const signatureParts: Array<[string, Array<[string, string[]]>]> = [];
 
@@ -400,7 +400,7 @@ export function compileShortcutBindings(
     for (const spec of specs) {
       const binding = parseGesture(actionId, spec);
       if (
-        binding.input !== "ignore" &&
+        binding.input === "allow" &&
         binding.steps.some((step) => !step.modifiers.some((modifier) => modifier !== "shift"))
       ) {
         throw new ShortcutConfigError(
@@ -418,8 +418,12 @@ export function compileShortcutBindings(
         continue;
       }
       seen.set(matchPath, binding);
-      insertAliasPath(aliasRoot, binding, actionId, allowPrefixes);
-      insertMatchPath(root, binding);
+      for (const domain of binding.input === "allow"
+        ? (["input", "outside"] as const)
+        : ([binding.input === "only" ? "input" : "outside"] as const)) {
+        insertAliasPath(aliasRoots[domain], binding, actionId, allowPrefixes);
+        insertMatchPath(roots[domain], binding);
+      }
       compiled.push(binding);
     }
 
@@ -430,7 +434,7 @@ export function compileShortcutBindings(
     ]);
   }
 
-  return { allowPrefixes, signature: JSON.stringify(signatureParts), bindings, root };
+  return { allowPrefixes, signature: JSON.stringify(signatureParts), bindings, roots };
 }
 
 function formatCodeLabel(code: string) {
@@ -536,7 +540,7 @@ export function createShortcutRegistry(options: {
     const definition = getDefinition(catalog, actionId);
     if (!definition) return null;
     if (event.repeat && definition.repeat !== true) return null;
-    if (inputFocused && binding.input === "ignore") return null;
+    if (inputFocused ? binding.input === "ignore" : binding.input === "only") return null;
     for (const owner of definition.owners) {
       const handler = registrations.get(owner)?.get(actionId);
       if (!handler) continue;
@@ -659,7 +663,7 @@ export function createShortcutRegistry(options: {
   }
 
   function startGesture(event: ShortcutKeyboardEvent, inputFocused: boolean) {
-    const nodes = advance([compiled.root], event);
+    const nodes = advance([inputFocused ? compiled.roots.input : compiled.roots.outside], event);
     if (nodes.length === 0) return false;
 
     if (resolvesNow(nodes)) {
@@ -741,10 +745,6 @@ export function createShortcutRegistry(options: {
         return false;
       }
       if (MODIFIER_ONLY_KEYS.has(event.key)) return false;
-      if (inputFocused && !(event.altKey || event.ctrlKey || event.metaKey)) {
-        cancelPending();
-        return false;
-      }
       if (pending) return continueSequence(event, inputFocused);
       return startGesture(event, inputFocused);
     },
