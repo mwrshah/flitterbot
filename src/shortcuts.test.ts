@@ -188,6 +188,66 @@ test("typing and repeat policies consume only eligible shortcuts", (t) => {
   assert.equal(prefix.defaultPrevented, false);
 });
 
+test("input-only bindings share bare keys with outside-input actions without leaking into other inputs", (t) => {
+  const catalog: ShortcutCatalog = {
+    navigate: { bindings: [{ keys: "ArrowUp", input: "ignore" }], owners: ["app"] },
+    shorten: {
+      bindings: [{ keys: "ArrowUp", input: "only" }],
+      owners: ["editor"],
+      repeat: true,
+    },
+  };
+  const registry = createShortcutRegistry({ catalog });
+  t.after(() => registry.dispose());
+  const calls: string[] = [];
+  let editorEnabled = true;
+  registry.register("app", { navigate: { run: () => calls.push("navigate") } });
+  registry.register("editor", {
+    shorten: { enabled: () => editorEnabled, run: () => calls.push("shorten") },
+  });
+
+  assert.equal(registry.handleKeyDown(key("ArrowUp"), false), true);
+  assert.equal(registry.handleKeyDown(key("ArrowUp", { repeat: true }), true), true);
+  editorEnabled = false;
+  const otherInput = key("ArrowUp");
+  assert.equal(registry.handleKeyDown(otherInput, true), false);
+  assert.equal(otherInput.defaultPrevented, false);
+  editorEnabled = true;
+  assert.equal(registry.handleKeyDown(key("ArrowUp"), true), true);
+  assert.deepEqual(calls, ["navigate", "shorten", "shorten"]);
+
+  registry.setOverrides({ shorten: [{ keys: "ArrowDown", input: "only" }] });
+  assert.equal(registry.handleKeyDown(key("ArrowUp"), true), false);
+  assert.equal(registry.handleKeyDown(key("ArrowDown"), true), true);
+  assert.equal(registry.handleKeyDown(key("ArrowUp"), false), true);
+  assert.deepEqual(calls, ["navigate", "shorten", "shorten", "shorten", "navigate"]);
+});
+
+test("overlapping input domains still reject collisions and prefixes", () => {
+  assert.throws(
+    () =>
+      compileShortcutBindings({
+        a: { bindings: [{ keys: "Alt+KeyA" }], owners: ["app"] },
+        b: { bindings: [{ keys: "Alt+KeyA", input: "only" }], owners: ["editor"] },
+      }),
+    ShortcutConfigError,
+  );
+  assert.throws(
+    () =>
+      compileShortcutBindings({
+        a: { bindings: [{ keys: "ArrowUp", input: "only" }], owners: ["editor"] },
+        b: { bindings: [{ keys: "ArrowUp ArrowDown", input: "only" }], owners: ["editor"] },
+      }),
+    ShortcutConfigError,
+  );
+  assert.doesNotThrow(() =>
+    compileShortcutBindings({
+      a: { bindings: [{ keys: "ArrowUp", input: "ignore" }], owners: ["app"] },
+      b: { bindings: [{ keys: "ArrowUp ArrowDown", input: "only" }], owners: ["editor"] },
+    }),
+  );
+});
+
 test("prefix-free sequences finish at the leaf; held keys do not advance them", (t) => {
   const registry = createShortcutRegistry({ catalog: CATALOG });
   t.after(() => registry.dispose());
