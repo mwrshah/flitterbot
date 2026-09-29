@@ -16,6 +16,7 @@ blockExoticSubdeps: false
 allowBuilds:
   "@google/genai": true
   "@whiskeysockets/baileys": true
+  esbuild: true
   koffi: true
   lefthook: true
   protobufjs: true
