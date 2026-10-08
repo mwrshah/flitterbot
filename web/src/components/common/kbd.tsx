@@ -4,8 +4,12 @@ import { usePointerRest } from "@/hooks/use-pointer-rest";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 const SHORTCUT_REST_DELAY_MS = 200;
-const keycapClassName =
-  "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border border-border-muted bg-background-muted font-mono text-[9px] font-medium text-text-muted";
+function keycapClassName(label: string) {
+  return cn(
+    "inline-flex h-3.75 min-w-3.5 shrink-0 items-center justify-center rounded border border-border-muted bg-background-muted font-mono text-[10px] leading-normal text-text-muted",
+    [...label].length === 1 ? "px-0.5" : "px-1",
+  );
+}
 
 type ShortcutKeysProps = {
   keys: string[];
@@ -19,15 +23,14 @@ function ShortcutKeys({ keys, variant, expanded = true }: ShortcutKeysProps) {
     <kbd
       key={key}
       className={cn(
-        keycapClassName,
-        variant === "compact" && "rounded-[5px]",
+        keycapClassName(key),
         variant === "compact" && keyIndex === keys.length - 1 && "lowercase",
         keyIndex < keys.length - 1 &&
           !expanded &&
           "hidden group-focus-visible:inline-flex group-focus-within/shortcut-hint:inline-flex",
       )}
     >
-      <span className="p-1.25">{key}</span>
+      {key}
     </kbd>
   ));
 }
@@ -98,13 +101,15 @@ export function ShortcutHint({
         <span
           className={cn(
             "col-start-1 row-start-1 inline-flex justify-self-start text-text-muted",
-            actionKeycap ? keycapClassName : "items-center text-[10px] leading-none",
+            actionKeycap
+              ? keycapClassName(actionText ?? "")
+              : "items-center text-[10px] leading-none",
             !actionActive && "invisible pointer-events-none",
             actionOnHover && "group-hover:visible group-focus-visible:visible",
           )}
           aria-hidden={actionOnHover || !actionActive}
         >
-          {actionKeycap ? <span className="p-1.25">{actionText}</span> : actionText}
+          {actionText}
         </span>
       )}
     </span>
