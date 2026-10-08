@@ -5,7 +5,7 @@ import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 const SHORTCUT_REST_DELAY_MS = 200;
 const keycapClassName =
-  "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border border-border-muted bg-background-muted px-1 font-mono text-[9px] font-medium leading-none text-text-muted";
+  "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border border-border-muted bg-background-muted font-mono text-[9px] font-medium text-text-muted";
 
 type ShortcutKeysProps = {
   keys: string[];
@@ -27,7 +27,7 @@ function ShortcutKeys({ keys, variant, expanded = true }: ShortcutKeysProps) {
           "hidden group-focus-visible:inline-flex group-focus-within/shortcut-hint:inline-flex",
       )}
     >
-      {key}
+      <span className="p-1.25">{key}</span>
     </kbd>
   ));
 }
@@ -97,14 +97,14 @@ export function ShortcutHint({
       {showAction && (
         <span
           className={cn(
-            "col-start-1 row-start-1 inline-flex items-center justify-self-start text-[10px] leading-none text-text-muted",
-            actionKeycap && keycapClassName,
+            "col-start-1 row-start-1 inline-flex justify-self-start text-text-muted",
+            actionKeycap ? keycapClassName : "items-center text-[10px] leading-none",
             !actionActive && "invisible pointer-events-none",
             actionOnHover && "group-hover:visible group-focus-visible:visible",
           )}
           aria-hidden={actionOnHover || !actionActive}
         >
-          {actionText}
+          {actionKeycap ? <span className="p-1.25">{actionText}</span> : actionText}
         </span>
       )}
     </span>
