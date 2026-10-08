@@ -5,6 +5,7 @@ import { MarkdownContent } from "@/components/common/markdown-content";
 import { Tooltip } from "@/components/common/tooltip";
 import { MessageActionsMenu } from "@/components/message-actions-menu";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   buildConversationContentParts,
   CONTEXT_COMPACTED_LABEL,
@@ -40,6 +41,7 @@ function MessageCopyButton({
   target: HTMLElement | null;
   variant: "user" | "assistant";
 }) {
+  useWhyDidYouRender?.("MessageCopyButton", {});
   const [singleLine, setSingleLine] = useState(true);
   const { copied, copy } = useCopyToClipboard();
 
@@ -81,6 +83,7 @@ function MessageCopyButton({
 }
 
 function ThinkingBlock({ content, streaming = false }: { content: string; streaming?: boolean }) {
+  useWhyDidYouRender?.("ThinkingBlock", {});
   const [open, setOpen] = useState(streaming);
   useEffect(() => {
     if (streaming) setOpen(true);
@@ -118,6 +121,7 @@ function ThinkingBlock({ content, streaming = false }: { content: string; stream
 }
 
 function ToolBlock({ tool, piSessionId }: { tool: ConversationToolBlock; piSessionId: string }) {
+  useWhyDidYouRender?.("ToolBlock", {});
   return <ToolMessage item={tool.start} endItem={tool.end} piSessionId={piSessionId} />;
 }
 
@@ -132,6 +136,7 @@ function AssistantContents({
   piSessionId: string;
   activeContentIndexes?: ReadonlySet<number>;
 }) {
+  useWhyDidYouRender?.("AssistantContents", {});
   const content: ReactNode[] = [];
   for (const [index, block] of buildConversationContentParts(
     message,
@@ -180,6 +185,7 @@ function UserMessageRow({
   onPrune?: (piEntryId: string) => void;
   onFork?: (piEntryId: string) => void;
 }) {
+  useWhyDidYouRender?.("UserMessageRow", {});
   const [copyTarget, setCopyTarget] = useState<HTMLElement | null>(null);
   const hook = message.source === "hook";
   return (
@@ -231,6 +237,7 @@ function AssistantMessageRow({
   piSessionId,
   isSessionBusy = false,
 }: Pick<ChatMessageRowProps, "row" | "piSessionId" | "isSessionBusy">) {
+  useWhyDidYouRender?.("AssistantMessageRow", {});
   const message = row.message;
   const [copyTarget, setCopyTarget] = useState<HTMLElement | null>(null);
   return (
@@ -252,6 +259,7 @@ export function ChatMessageRow({
   onPrune,
   onFork,
 }: ChatMessageRowProps) {
+  useWhyDidYouRender?.("ChatMessageRow", {});
   return row.message?.role === "user" ? (
     <UserMessageRow message={row.message} onPrune={onPrune} onFork={onFork} />
   ) : (
@@ -266,6 +274,7 @@ function StreamingAssistantContents({
   streaming: ConversationStreamingState;
   piSessionId: string;
 }) {
+  useWhyDidYouRender?.("StreamingAssistantContents", {});
   const indexedBlocks = [...streaming.blocks.entries()].sort(([a], [b]) => a - b);
   const blocks = indexedBlocks.map(([, { block }]) => block);
   const tools = indexedBlocks.flatMap(([, { tool }]) => (tool ? [{ start: tool }] : []));
@@ -308,6 +317,7 @@ function StreamingAssistantContents({
 }
 
 export function StreamingAssistantRow({ piSessionId }: { piSessionId: string }) {
+  useWhyDidYouRender?.("StreamingAssistantRow", {});
   const streaming = useConversationStreaming(piSessionId);
   if (!streaming) return null;
   return (

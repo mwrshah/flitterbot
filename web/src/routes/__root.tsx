@@ -77,14 +77,24 @@ export const Route = createRootRouteWithContext<{
       { rel: "icon", href: "/favicon.ico" },
     ],
   }),
-  errorComponent: (props: ErrorComponentProps) => (
+  errorComponent: RootError,
+  notFoundComponent: RootNotFound,
+  component: RootComponent,
+});
+
+function RootError(props: ErrorComponentProps) {
+  useWhyDidYouRender?.("RootError", {});
+  return (
     <RootDocument>
       <DefaultCatchBoundary {...props} />
     </RootDocument>
-  ),
-  notFoundComponent: () => <NotFound />,
-  component: RootComponent,
-});
+  );
+}
+
+function RootNotFound() {
+  useWhyDidYouRender?.("RootNotFound", {});
+  return <NotFound />;
+}
 
 function useShortcutStatus(apiClient: FlitterbotApiClient) {
   const { data, error } = useQuery({
@@ -106,6 +116,7 @@ function useShortcutStatus(apiClient: FlitterbotApiClient) {
 }
 
 function RootShortcuts({ streamPaths }: { streamPaths: string[] }) {
+  useWhyDidYouRender?.("RootShortcuts", {});
   useGlobalShortcuts({ streamPaths });
   return null;
 }
@@ -122,7 +133,7 @@ function useStreamPaths(status: Pick<StatusResponse, "piAgent" | "streams"> | un
 
 function RootComponent() {
   const { startRealtime, apiClient } = Route.useRouteContext();
-  useWhyDidYouRender("RootComponent", {});
+  useWhyDidYouRender?.("RootComponent", {});
   const { resolvedTheme } = useTheme();
   const shortcutStatus = useShortcutStatus(apiClient);
   const streamPaths = useStreamPaths(shortcutStatus);
@@ -153,7 +164,7 @@ function RootDocument({
   children: React.ReactNode;
   resolvedTheme?: "light" | "dark";
 }) {
-  useWhyDidYouRender("RootDocument", { children });
+  useWhyDidYouRender?.("RootDocument", { children });
   return (
     <html
       lang="en"

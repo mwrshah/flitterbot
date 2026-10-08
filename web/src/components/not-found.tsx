@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function NotFound({ children }: { children?: ReactNode }) {
-  useWhyDidYouRender("NotFound", { children });
+  useWhyDidYouRender?.("NotFound", { children });
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex flex-col gap-4 max-w-sm">

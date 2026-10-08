@@ -256,7 +256,7 @@ export const ModelSelector = memo(function ModelSelector({
   const searchPlaceholder = modelSearchShortcutHint
     ? `Search (${modelSearchShortcutHint.replaceAll("+", " + ")})`
     : "Search";
-  useWhyDidYouRender("ModelSelector", {
+  useWhyDidYouRender?.("ModelSelector", {
     compact,
     disabled,
     subdued,
@@ -463,6 +463,7 @@ const ModelCommandList = memo(function ModelCommandList({
   onSelectModel: (id: string) => void;
   onTogglePin: (model: ModelListItem, isPinned: boolean) => void;
 }) {
+  useWhyDidYouRender?.("ModelCommandList", {});
   return (
     <CommandList className="max-h-none flex-1">
       {searching && models.length === 0 && (
@@ -524,6 +525,7 @@ function ThinkingLevelCommandItem({
   title: string;
   onSelect: () => void;
 }) {
+  useWhyDidYouRender?.("ThinkingLevelCommandItem", {});
   return (
     <Tooltip content={title}>
       <ButtonPrimitive
@@ -563,6 +565,7 @@ function ModelCommandItem({
   onTogglePin: () => void;
   busy: boolean;
 }) {
+  useWhyDidYouRender?.("ModelCommandItem", {});
   const available = model.authKind !== "none";
   const pinDisabled = busy || (isPinned && !canUnpin);
   const pinTitle = isPinned
@@ -631,6 +634,7 @@ function matchesModelId(
 }
 
 function AuthBadge({ model }: { model: ModelListItem }) {
+  useWhyDidYouRender?.("AuthBadge", {});
   if (model.authKind === "subscription") {
     return (
       <Tooltip content={`Using subscription/OAuth token auth for provider "${model.provider}"`}>

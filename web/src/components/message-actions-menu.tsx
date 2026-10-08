@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function MessageActionsMenu({
   onFork,
@@ -14,6 +15,7 @@ export function MessageActionsMenu({
   onFork: () => void;
   onPrune: () => void;
 }) {
+  useWhyDidYouRender?.("MessageActionsMenu", {});
   return (
     <DropdownMenu>
       <Tooltip content="Message actions">

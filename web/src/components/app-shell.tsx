@@ -4,7 +4,7 @@ import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { Sidebar } from "./sidebar";
 
 export function AppShell() {
-  useWhyDidYouRender("AppShell", {});
+  useWhyDidYouRender?.("AppShell", {});
 
   return (
     <Group orientation="horizontal" className="h-screen overflow-hidden">

@@ -82,7 +82,7 @@ export const PathPicker = memo(function PathPicker({
   commandRef,
   fuzzy,
 }: PathPickerProps) {
-  useWhyDidYouRender("PathPicker", { open, items, onEscape, caretLeft, fuzzy });
+  useWhyDidYouRender?.("PathPicker", { open, items, onEscape, caretLeft, fuzzy });
   const [selectedValue, setSelectedValue] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 

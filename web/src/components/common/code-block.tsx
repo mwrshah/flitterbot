@@ -11,6 +11,7 @@ import { Check, Copy } from "lucide-react";
 import { useMemo } from "react";
 import { Tooltip } from "@/components/common/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("typescript", typescript);
@@ -34,6 +35,7 @@ export function CodeBlock({
   language?: string;
   highlight?: boolean;
 }) {
+  useWhyDidYouRender?.("CodeBlock", {});
   const { copied, copy } = useCopyToClipboard(1500);
   const displayLanguage = language || "plaintext";
   const highlighted = useMemo(() => {

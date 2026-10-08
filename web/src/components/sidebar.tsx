@@ -68,7 +68,7 @@ function NavItem({
   icon: React.ReactNode;
   shortcutHint?: string;
 }) {
-  useWhyDidYouRender("NavItem", { to, label, icon, shortcutHint });
+  useWhyDidYouRender?.("NavItem", { to, label, icon, shortcutHint });
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -112,6 +112,7 @@ function StreamContextMenu({
   onClose?: () => void;
   renderTrigger: (label: ReactNode) => ReactElement;
 }) {
+  useWhyDidYouRender?.("StreamContextMenu", {});
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -274,6 +275,7 @@ const SwimlaneRow = memo(function SwimlaneRow({
   reopenStream: ReopenStream;
   closeStream: CloseStream;
 }) {
+  useWhyDidYouRender?.("SwimlaneRow", {});
   const modifierLabel = useModifierLabel();
   const shortcutLabel = useShortcutBindingLabel(
     shortcut ? getStreamSlotShortcutActionId(shortcut) : undefined,
@@ -478,6 +480,7 @@ function CollapsibleSwimlaneSection({
   separated: boolean;
   renderRow: (row: SidebarSwimlaneRow) => ReactNode;
 }) {
+  useWhyDidYouRender?.("CollapsibleSwimlaneSection", {});
   const [collapsed, setCollapsed] = useState(false);
 
   if (rows.length === 0) return null;
@@ -531,6 +534,7 @@ const SwimlaneRows = memo(function SwimlaneRows({
   reopenStream: ReopenStream;
   closeStream: CloseStream;
 }) {
+  useWhyDidYouRender?.("SwimlaneRows", {});
   const renderRow = (row: SidebarSwimlaneRow) => (
     <SwimlaneRow
       key={row.key}
@@ -583,6 +587,7 @@ const icons = {
 };
 
 function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
+  useWhyDidYouRender?.("SidebarSwimlanes", {});
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
@@ -1072,7 +1077,7 @@ function SidebarSwimlanes({ modifierLabel }: { modifierLabel: string }) {
 export const Sidebar = memo(function Sidebar() {
   const modifierLabel = useModifierLabel();
   const lastStreamPath = useLastStreamPath();
-  useWhyDidYouRender("Sidebar", {});
+  useWhyDidYouRender?.("Sidebar", {});
   const surfaceShortcutHint = useShortcutBindingLabel("nav.surface", {
     altLabel: modifierLabel,
   });

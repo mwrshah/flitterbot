@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Tooltip } from "@/components/common/tooltip";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function CopyableCode({
   text,
@@ -15,6 +16,7 @@ export function CopyableCode({
   onCopy?: () => void;
   className?: string;
 }) {
+  useWhyDidYouRender?.("CopyableCode", {});
   const internal = useCopyToClipboard(600);
   const isControlled = onCopy !== undefined;
   const isCopied = isControlled ? (externalCopied ?? false) : internal.copied;

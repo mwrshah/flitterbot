@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { dueTasksQueryOptions } from "@/lib/queries";
 
 function TaskWithDetails({ description, details }: { description: string; details: string }) {
+  useWhyDidYouRender?.("TaskWithDetails", {});
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
 
@@ -33,6 +35,7 @@ function TaskWithDetails({ description, details }: { description: string; detail
 }
 
 export function DueTasksPanel() {
+  useWhyDidYouRender?.("DueTasksPanel", {});
   const { data, isPending, isError } = useQuery(dueTasksQueryOptions());
   const projectsRef = useRef<HTMLDivElement>(null);
 

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Check, CircleAlert, Info, Monitor, Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { type Theme, useTheme } from "@/hooks/use-theme";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export const Route = createFileRoute("/theme")({
   head: () => ({
@@ -193,6 +194,7 @@ const themeOptions: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
 ];
 
 function Code({ children }: { children: ReactNode }) {
+  useWhyDidYouRender?.("Code", {});
   return (
     <code className="rounded-md bg-background-muted px-1.5 py-1 font-mono text-[11px] text-text-muted">
       {children}
@@ -201,6 +203,7 @@ function Code({ children }: { children: ReactNode }) {
 }
 
 function TokenCard({ token, kind }: { token: Token; kind: "background" | "text" | "border" }) {
+  useWhyDidYouRender?.("TokenCard", {});
   const previewClass = token.previewClass ?? "bg-background";
 
   return (
@@ -239,6 +242,7 @@ function TokenCard({ token, kind }: { token: Token; kind: "background" | "text" 
 }
 
 function StatusCard({ token }: { token: StatusToken }) {
+  useWhyDidYouRender?.("StatusCard", {});
   return (
     <article className={`rounded-xl p-4 ${token.surfaceClass}`}>
       <div className="flex items-center gap-2">
@@ -268,6 +272,7 @@ function FamilySection({
   tokens: Token[];
   kind: "background" | "text" | "border";
 }) {
+  useWhyDidYouRender?.("FamilySection", {});
   return (
     <section aria-labelledby={id}>
       <div className="mb-5 max-w-2xl">
@@ -286,6 +291,7 @@ function FamilySection({
 }
 
 function ThemeReferencePage() {
+  useWhyDidYouRender?.("ThemeReferencePage", {});
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (

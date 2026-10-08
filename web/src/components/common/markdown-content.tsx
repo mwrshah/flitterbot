@@ -14,6 +14,7 @@ import {
   useId,
 } from "react";
 import { CodeBlock } from "@/components/common/code-block";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { namespacedFootnoteId, safeMarkdownUrl } from "@/lib/markdown";
 
 const MarkdownFootnoteNamespace = createContext("");
@@ -25,6 +26,7 @@ function MarkdownLink({
   children,
   ...props
 }: MarkdownComponentProps<"a">) {
+  useWhyDidYouRender?.("MarkdownLink", {});
   const namespace = useContext(MarkdownFootnoteNamespace);
   const safeHref = safeMarkdownUrl(href);
   if (!safeHref) return <>{children}</>;
@@ -54,6 +56,7 @@ function MarkdownLink({
 }
 
 function MarkdownFootnoteContainer({ id, children, ...props }: MarkdownComponentProps<"li">) {
+  useWhyDidYouRender?.("MarkdownFootnoteContainer", {});
   const namespace = useContext(MarkdownFootnoteNamespace);
   return (
     <li {...props} id={namespacedFootnoteId(id, namespace)}>
@@ -63,6 +66,7 @@ function MarkdownFootnoteContainer({ id, children, ...props }: MarkdownComponent
 }
 
 function MarkdownFootnoteHeading({ id, children, ...props }: MarkdownComponentProps<"h2">) {
+  useWhyDidYouRender?.("MarkdownFootnoteHeading", {});
   const namespace = useContext(MarkdownFootnoteNamespace);
   return (
     <h2 {...props} id={namespacedFootnoteId(id, namespace)}>
@@ -72,6 +76,7 @@ function MarkdownFootnoteHeading({ id, children, ...props }: MarkdownComponentPr
 }
 
 function MarkdownImage({ src, alt, ...props }: MarkdownComponentProps<"img">) {
+  useWhyDidYouRender?.("MarkdownImage", {});
   const safeSrc = safeMarkdownUrl(src);
   if (!safeSrc) return <>{alt}</>;
 
@@ -114,10 +119,12 @@ function renderMarkdownPre(
 }
 
 function MarkdownPre(props: MarkdownPreProps) {
+  useWhyDidYouRender?.("MarkdownPre", {});
   return renderMarkdownPre(props, true);
 }
 
 function StreamingMarkdownPre(props: MarkdownPreProps) {
+  useWhyDidYouRender?.("StreamingMarkdownPre", {});
   return renderMarkdownPre(props, false);
 }
 
@@ -143,6 +150,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   content: string;
   streaming?: boolean;
 }) {
+  useWhyDidYouRender?.("MarkdownContent", {});
   const namespace = `markdown-${useId().replaceAll(":", "")}`;
   return (
     <MarkdownFootnoteNamespace.Provider value={namespace}>

@@ -3,7 +3,7 @@ import type { HTMLAttributes } from "react";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  useWhyDidYouRender("Card", { className });
+  useWhyDidYouRender?.("Card", { className });
   return (
     <div
       className={cn("rounded-xl border border-border bg-background text-text shadow-sm", className)}
@@ -13,12 +13,12 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  useWhyDidYouRender("CardHeader", { className });
+  useWhyDidYouRender?.("CardHeader", { className });
   return <div className={cn("px-5 pt-5 pb-0", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  useWhyDidYouRender("CardTitle", { className });
+  useWhyDidYouRender?.("CardTitle", { className });
   return (
     <div
       role="heading"
@@ -30,6 +30,6 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLDivElement
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  useWhyDidYouRender("CardContent", { className });
+  useWhyDidYouRender?.("CardContent", { className });
   return <div className={cn("px-5 pb-5 pt-3", className)} {...props} />;
 }

@@ -1,6 +1,7 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { cn } from "cn";
 import { cloneElement, type ReactElement, type ReactNode, useId } from "react";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function Tooltip({
   content,
@@ -15,6 +16,7 @@ export function Tooltip({
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
 }) {
+  useWhyDidYouRender?.("Tooltip", {});
   const popupId = useId();
   const disabled = content == null || content === false || content === "";
   const descriptionId = children.props["aria-describedby"];
@@ -51,6 +53,7 @@ export function TooltipPopup({
   align?: TooltipPrimitive.Positioner.Props["align"];
   className?: string;
 }) {
+  useWhyDidYouRender?.("TooltipPopup", {});
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner

@@ -10,7 +10,7 @@ import type { MouseEvent } from "react";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
-  useWhyDidYouRender("DefaultCatchBoundary", { error });
+  useWhyDidYouRender?.("DefaultCatchBoundary", { error });
   const router = useRouter();
   const isRoot = useMatch({
     strict: false,

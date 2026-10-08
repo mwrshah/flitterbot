@@ -21,6 +21,7 @@ export const Route = createFileRoute("/")({
 });
 
 function SurfacePending() {
+  useWhyDidYouRender?.("SurfacePending", {});
   return (
     <div className="flex h-full items-center justify-center px-6 py-4">
       <p className="text-xs text-text-muted">Loading chat UI…</p>
@@ -29,6 +30,6 @@ function SurfacePending() {
 }
 
 function SurfacePage() {
-  useWhyDidYouRender("SurfacePage", {});
+  useWhyDidYouRender?.("SurfacePage", {});
   return <Surface />;
 }

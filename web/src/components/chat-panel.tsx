@@ -104,6 +104,7 @@ function formatTokens(n: number): string {
 }
 
 const ContextTicker = memo(function ContextTicker({ usage }: { usage: TokenUsage | null }) {
+  useWhyDidYouRender?.("ContextTicker", {});
   const cacheRead = usage ? formatTokens(usage.cacheRead) : "—";
   const contextTokens = usage ? formatTokens(usage.totalTokens) : "—";
 
@@ -170,6 +171,7 @@ function ConversationFindBar({
   onRetry,
   onClose,
 }: ConversationFindBarProps) {
+  useWhyDidYouRender?.("ConversationFindBar", {});
   const status = loading
     ? "Loading…"
     : value
@@ -307,6 +309,7 @@ function CwdPicker({
   onCommit: () => void;
   onEscape: () => void;
 }) {
+  useWhyDidYouRender?.("CwdPicker", {});
   const [selectedValue, setSelectedValue] = useState("");
 
   useLayoutEffect(() => {
@@ -443,7 +446,7 @@ export function ChatPanel({
   recoveryKind,
   messageInputDisabled,
 }: ChatPanelProps) {
-  useWhyDidYouRender("ChatPanel", {
+  useWhyDidYouRender?.("ChatPanel", {
     piSessionId,
     timeline,
     isSessionBusy,

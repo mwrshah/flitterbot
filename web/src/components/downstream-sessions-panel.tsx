@@ -73,6 +73,7 @@ function sessionDescription(session: DownstreamSessionItem): string {
 }
 
 function CopyShortcutHint({ label, copied }: { label: string | undefined; copied: boolean }) {
+  useWhyDidYouRender?.("CopyShortcutHint", {});
   if (!label) {
     return copied ? <span className="text-text-muted text-[10px]">Copied!</span> : null;
   }
@@ -89,6 +90,7 @@ function ActiveSessionTmuxCopy({
   tmuxSession: string;
   bindShortcut: boolean;
 }) {
+  useWhyDidYouRender?.("ActiveSessionTmuxCopy", {});
   const tmuxCopy = useCopyToClipboard(600);
   const command = `tmux attach -t ${tmuxSession}`;
   const copy = useCallback(() => {
@@ -117,7 +119,7 @@ export const DownstreamSessionsPanel = memo(function DownstreamSessionsPanel({
   showSettings?: boolean;
   showDueTasks?: boolean;
 }) {
-  useWhyDidYouRender("DownstreamSessionsPanel", {
+  useWhyDidYouRender?.("DownstreamSessionsPanel", {
     piSessionId,
     piSessionStatus,
     showSettings,

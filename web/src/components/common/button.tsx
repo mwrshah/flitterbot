@@ -33,7 +33,7 @@ export function Button({
   ref,
   ...props
 }: ButtonProps) {
-  useWhyDidYouRender("Button", { className, variant, size });
+  useWhyDidYouRender?.("Button", { className, variant, size });
   return (
     <button
       ref={ref}

@@ -23,6 +23,7 @@ import {
   type TextareaCompletionPlugin,
   useTextareaCompletions,
 } from "@/hooks/use-textarea-completions";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { type ActiveToolState, useConversationToolState } from "@/lib/conversation-state";
 import {
   escapeJsonStringFragment,
@@ -121,6 +122,7 @@ function pretty(value: unknown): { content: string; language: string } {
 }
 
 function ToolHeader({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  useWhyDidYouRender?.("ToolHeader", {});
   return (
     <div className="flex items-center gap-2 text-sm text-text-muted">
       <span className="inline-block text-text">{icon}</span>
@@ -130,6 +132,7 @@ function ToolHeader({ icon, children }: { icon: ReactNode; children: ReactNode }
 }
 
 function CopyButton({ text }: { text: string }) {
+  useWhyDidYouRender?.("chat-tool-message:CopyButton", {});
   const { copied, copy } = useCopyToClipboard();
   const label = copied ? "Copied" : "Copy output";
   return (
@@ -149,6 +152,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function ConsoleBlock({ content, error }: { content: string; error: boolean }) {
+  useWhyDidYouRender?.("ConsoleBlock", {});
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
@@ -238,6 +242,7 @@ function editRows(params: Record<string, unknown>): DiffRow[] {
 }
 
 function Diff({ rows }: { rows: DiffRow[] }) {
+  useWhyDidYouRender?.("Diff", {});
   const visible =
     rows.length <= MAX_EDIT_DIFF_ROWS
       ? rows
@@ -288,6 +293,7 @@ function Diff({ rows }: { rows: DiffRow[] }) {
 }
 
 function ErrorText({ result }: { result?: ToolResult }) {
+  useWhyDidYouRender?.("ErrorText", {});
   return result?.isError && result.text ? (
     <div className="text-xs text-status-crashed">{result.text}</div>
   ) : null;
@@ -406,6 +412,7 @@ function PreparedLaunchCard({
   piSessionId: string;
   stateKey: string;
 }) {
+  useWhyDidYouRender?.("PreparedLaunchCard", {});
   const { apiClient } = rootRouteApi.useRouteContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const completionAnchorRef = useRef<HTMLDivElement>(null);
@@ -518,6 +525,7 @@ function ToolBody({
   result?: ToolResult;
   running: boolean;
 }) {
+  useWhyDidYouRender?.("ToolBody", {});
   const p = record(params);
   if (name === "bash") {
     const command = String(p.command ?? "");
@@ -656,6 +664,7 @@ function pathParam(p: Record<string, unknown>): string {
 }
 
 export function ToolMessage({ item, endItem, piSessionId }: ToolMessageProps) {
+  useWhyDidYouRender?.("ToolMessage", {});
   const toolUseId = item.toolUseId;
   const active = useConversationToolState(piSessionId, toolUseId);
   const result = effectiveResult(endItem, active);

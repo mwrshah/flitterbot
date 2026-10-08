@@ -23,7 +23,7 @@ export const SettingsDrawer = memo(function SettingsDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  useWhyDidYouRender("SettingsDrawer", { open, onClose });
+  useWhyDidYouRender?.("SettingsDrawer", { open, onClose });
 
   const { settingsStore } = rootApi.useRouteContext();
   const settings = useSettings(settingsStore);

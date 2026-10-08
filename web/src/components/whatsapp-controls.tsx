@@ -23,7 +23,7 @@ function statusVariant(status: string): "active" | "waiting" | "ended" | "info" 
 }
 
 export function WhatsAppControls({ status }: { status?: StatusResponse }) {
-  useWhyDidYouRender("WhatsAppControls", { status });
+  useWhyDidYouRender?.("WhatsAppControls", { status });
   const rootApi = getRouteApi("__root__");
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();

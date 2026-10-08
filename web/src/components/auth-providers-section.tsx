@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import type { AuthFlowSnapshot, AuthProvider } from "@/lib/types";
 
 const rootApi = getRouteApi("__root__");
@@ -20,6 +21,7 @@ const rootApi = getRouteApi("__root__");
 const AUTH_PROVIDERS_QUERY_KEY = ["auth-providers"] as const;
 
 export const AuthProvidersSection = memo(function AuthProvidersSection() {
+  useWhyDidYouRender?.("AuthProvidersSection", {});
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
 
@@ -133,6 +135,7 @@ function ProviderRow({
   onLogin: () => void;
   onLogout: () => void;
 }) {
+  useWhyDidYouRender?.("ProviderRow", {});
   const isConnected = provider.connected;
 
   return (
@@ -171,6 +174,7 @@ function ProviderRow({
 }
 
 function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => void }) {
+  useWhyDidYouRender?.("AuthFlowDialog", {});
   const { apiClient } = rootApi.useRouteContext();
   const queryClient = useQueryClient();
   const flowQueryKey = ["auth-flow", flowId] as const;
@@ -277,6 +281,7 @@ function AuthFlowDialog({ flowId, onClose }: { flowId: string; onClose: () => vo
 }
 
 function AuthEventView({ event }: { event: AuthFlowSnapshot["events"][number] }) {
+  useWhyDidYouRender?.("AuthEventView", {});
   if (event.type === "auth_url") {
     return (
       <div className="space-y-1">
@@ -339,6 +344,7 @@ function AuthPromptForm({
   pending: boolean;
   onSubmit: (value: string) => void;
 }) {
+  useWhyDidYouRender?.("AuthPromptForm", {});
   const [value, setValue] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const isSecret = prompt.type === "secret";
@@ -425,6 +431,7 @@ function LogoutConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  useWhyDidYouRender?.("LogoutConfirmDialog", {});
   return (
     <Dialog open={Boolean(provider)} onOpenChange={(next) => !next && onCancel()}>
       <DialogContent className="sm:max-w-sm">

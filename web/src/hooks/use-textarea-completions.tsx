@@ -14,6 +14,7 @@ import {
 import type { FloatingCommandPickerPlacement } from "@/components/common/floating-command-picker";
 import { PathPicker } from "@/components/path-picker";
 import { SkillPicker } from "@/components/skill-picker";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { getInternalCommandsForScope, type InternalCommandScope } from "@/lib/internal-commands";
 import { directoryCompletionsQueryOptions, skillsQueryOptions } from "@/lib/queries";
 import type { DirectoryCompletionItem, SkillPickerItem } from "@/lib/types";
@@ -665,6 +666,7 @@ export const TextareaCompletionPickers = memo(function TextareaCompletionPickers
 }: {
   controller: TextareaCompletionController;
 }) {
+  useWhyDidYouRender?.("TextareaCompletionPickers", {});
   return (
     <>
       <SkillPicker

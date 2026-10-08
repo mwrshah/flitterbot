@@ -42,7 +42,7 @@ export const RuntimeHealthIndicator = memo(function RuntimeHealthIndicator() {
   const waStatusLabel = statusLabel(waStatus);
   const connectionStatusLabel = statusLabel(connectionState);
 
-  useWhyDidYouRender("RuntimeHealthIndicator", { waStatus, connectionState });
+  useWhyDidYouRender?.("RuntimeHealthIndicator", { waStatus, connectionState });
 
   return (
     <button

@@ -10,11 +10,12 @@ export function Group({
   resizeTargetMinimumSize = DEFAULT_RESIZE_TARGET_MINIMUM_SIZE,
   ...props
 }: GroupProps) {
+  useWhyDidYouRender?.("Group", {});
   return <ResizableGroup resizeTargetMinimumSize={resizeTargetMinimumSize} {...props} />;
 }
 
 export function VerticalSeparator({ className }: { className?: string }) {
-  useWhyDidYouRender("VerticalSeparator", { className });
+  useWhyDidYouRender?.("VerticalSeparator", { className });
   return (
     <Separator
       className={cn(
@@ -26,7 +27,7 @@ export function VerticalSeparator({ className }: { className?: string }) {
 }
 
 export function HorizontalSeparator({ className }: { className?: string }) {
-  useWhyDidYouRender("HorizontalSeparator", { className });
+  useWhyDidYouRender?.("HorizontalSeparator", { className });
   return (
     <Separator
       className={cn(

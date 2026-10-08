@@ -16,7 +16,7 @@ export const Route = createFileRoute("/runtime")({
 });
 
 function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  useWhyDidYouRender("MetaItem", { label, value, mono });
+  useWhyDidYouRender?.("MetaItem", { label, value, mono });
 
   return (
     <div>
@@ -36,7 +36,7 @@ function RuntimePage() {
 
   const status = statusQuery.data;
 
-  useWhyDidYouRender("RuntimePage", { apiClient, statusQuery, status });
+  useWhyDidYouRender?.("RuntimePage", { apiClient, statusQuery, status });
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-4">

@@ -36,7 +36,7 @@ export const SkillPicker = memo(function SkillPicker({
   preferredPlacement,
   commandRef,
 }: SkillPickerProps) {
-  useWhyDidYouRender("SkillPicker", {
+  useWhyDidYouRender?.("SkillPicker", {
     open,
     items,
     onSelect,

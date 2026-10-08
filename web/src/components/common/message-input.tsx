@@ -135,6 +135,7 @@ function MessageInputHoverButtons({
   toolbarRef: React.RefObject<HTMLDivElement | null>;
   onSlotAction: (slot: MessageInputHoverButtonSlot) => void;
 }) {
+  useWhyDidYouRender?.("MessageInputHoverButtons", {});
   const buttonRowRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -452,7 +453,7 @@ export const MessageInput = memo(function MessageInput({
   onRemoveQueuedTurn,
   removingQueuedTurnId,
 }: MessageInputProps) {
-  useWhyDidYouRender("MessageInput", { isSending, placeholder });
+  useWhyDidYouRender?.("MessageInput", { isSending, placeholder });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

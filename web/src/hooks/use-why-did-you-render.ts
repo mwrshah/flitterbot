@@ -132,10 +132,18 @@ function useWhyDidYouRenderImpl(
   componentName: string,
   trackedValues: Record<string, unknown>,
 ): void {
-  const prevRef = useRef<Record<string, unknown>>(trackedValues);
+  const prevRef = useRef<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     const prev = prevRef.current;
+    if (prev === trackedValues) return; // Ignore Strict Mode effect replay.
+    if (shouldLog(componentName, "VALUE")) {
+      console.log(`[WDYR] ${componentName} COMMIT | ${prev === null ? "mount" : "update"}`);
+    }
+    if (prev === null) {
+      prevRef.current = trackedValues;
+      return;
+    }
     const allKeys = new Set([...Object.keys(prev), ...Object.keys(trackedValues)]);
     const verbose = getConfig().verbose ?? false;
 
@@ -159,10 +167,7 @@ function useWhyDidYouRenderImpl(
   });
 }
 
-function noop(_componentName: string, _trackedValues: Record<string, unknown>): void {}
-
-export const useWhyDidYouRender: (
-  componentName: string,
-  trackedValues: Record<string, unknown>,
-) => void =
-  import.meta.env.DEV && import.meta.env.VITE_DEBUG_WDYR === "true" ? useWhyDidYouRenderImpl : noop;
+export const useWhyDidYouRender =
+  import.meta.env.DEV && import.meta.env.VITE_DEBUG_WDYR === "true"
+    ? useWhyDidYouRenderImpl
+    : undefined;

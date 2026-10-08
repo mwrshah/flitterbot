@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import type { HTMLAttributes } from "react";
 import { usePointerRest } from "@/hooks/use-pointer-rest";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 const SHORTCUT_REST_DELAY_MS = 200;
 const keycapClassName =
@@ -13,6 +14,7 @@ type ShortcutKeysProps = {
 };
 
 function ShortcutKeys({ keys, variant, expanded = true }: ShortcutKeysProps) {
+  useWhyDidYouRender?.("ShortcutKeys", {});
   return keys.map((key, keyIndex) => (
     <kbd
       key={key}
@@ -31,6 +33,7 @@ function ShortcutKeys({ keys, variant, expanded = true }: ShortcutKeysProps) {
 }
 
 function RestExpandableShortcutKeys({ keys, variant }: ShortcutKeysProps) {
+  useWhyDidYouRender?.("RestExpandableShortcutKeys", {});
   const { rested, pointerProps } = usePointerRest(SHORTCUT_REST_DELAY_MS);
 
   return (
@@ -57,6 +60,7 @@ export function ShortcutHint({
   actionOnHover?: boolean;
   actionKeycap?: boolean;
 }) {
+  useWhyDidYouRender?.("ShortcutHint", {});
   const steps: string[] = [];
   for (const step of label.split(/\s+then\s+/i)) {
     const trimmed = step.trim();

@@ -17,7 +17,7 @@ type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 export function Badge({ className, variant = "info", ...props }: BadgeProps) {
-  useWhyDidYouRender("Badge", { className, variant });
+  useWhyDidYouRender?.("Badge", { className, variant });
   return (
     <span
       className={cn(

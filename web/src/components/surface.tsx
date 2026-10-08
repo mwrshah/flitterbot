@@ -13,6 +13,7 @@ import { RuntimeHealthIndicator } from "@/components/runtime-health-indicator";
 import { SettingsDrawer } from "@/components/settings-drawer";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { parsePanelLayout, useUserConfig } from "@/hooks/use-user-config";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { statusQueryOptions, surfaceTimelineInfiniteQueryOptions } from "@/lib/queries";
 import type { ChatTimelineItem, ImageAttachment, StatusResponse } from "@/lib/types";
 
@@ -83,6 +84,7 @@ function formatTime(iso: string): string {
 }
 
 function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?: string }) {
+  useWhyDidYouRender?.("StreamBadge", {});
   const queryClient = useQueryClient();
   if (!streamName) return null;
 
@@ -108,6 +110,7 @@ function StreamBadge({ streamId, streamName }: { streamId?: string; streamName?:
 }
 
 function ImageStack({ images }: { images: ImageAttachment[] }) {
+  useWhyDidYouRender?.("ImageStack", {});
   return (
     <div className="flex flex-col gap-2 mt-2">
       {images.map((img, i) => (
@@ -124,6 +127,7 @@ function ImageStack({ images }: { images: ImageAttachment[] }) {
 }
 
 function CopyButton({ text }: { text: string }) {
+  useWhyDidYouRender?.("surface:CopyButton", {});
   const { copied, copy } = useCopyToClipboard();
   const label = copied ? "Copied" : "Copy message";
 
@@ -155,6 +159,7 @@ function EntryRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  useWhyDidYouRender?.("EntryRow", {});
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [overflowing, setOverflowing] = useState(
     () => entry.content.length > LIKELY_OVERFLOWS_CHAR_THRESHOLD,
@@ -219,6 +224,7 @@ function EntryRow({
 }
 
 export function Surface() {
+  useWhyDidYouRender?.("Surface", {});
   const { apiClient, sendMessage } = rootApi.useRouteContext();
   const { config, setConfig } = useUserConfig();
   const chatLayout = parsePanelLayout(config, CHAT_LAYOUT_KEY, CHAT_LAYOUT_DEFAULT);

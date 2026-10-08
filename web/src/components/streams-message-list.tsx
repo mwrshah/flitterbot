@@ -89,6 +89,7 @@ function MarkerOverflowCount({
   count: number;
   direction: "earlier" | "later";
 }) {
+  useWhyDidYouRender?.("MarkerOverflowCount", {});
   return (
     <span
       role="img"
@@ -112,6 +113,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
   onSelect,
   onScrollToEnd,
 }: UserMessageMarkersProps) {
+  useWhyDidYouRender?.("UserMessageMarkers", {});
   const { rested, pointerProps } = usePointerRest(300);
   const [tooltipHandle] = useState(() =>
     TooltipPrimitive.createHandle<{
@@ -316,7 +318,7 @@ export const StreamsMessageList = memo(function StreamsMessageList({
   bottomInset = 0,
   ref,
 }: StreamsMessageListProps) {
-  useWhyDidYouRender("StreamsMessageList", {
+  useWhyDidYouRender?.("StreamsMessageList", {
     rows,
     isSessionBusy,
     activeFindRowIndex,

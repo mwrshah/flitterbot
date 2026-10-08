@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { toast } from "sonner";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import {
   SHORTCUT_CATALOG,
   SHORTCUT_OPTIONS,
@@ -45,6 +46,7 @@ export function ShortcutsProvider({
   overrides?: ShortcutBindingsConfig;
   children: ReactNode;
 }) {
+  useWhyDidYouRender?.("ShortcutsProvider", {});
   const [registry] = useState(() =>
     createShortcutRegistry({
       catalog: SHORTCUT_CATALOG,

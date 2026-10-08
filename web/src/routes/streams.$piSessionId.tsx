@@ -47,19 +47,24 @@ export const Route = createFileRoute("/streams/$piSessionId")({
   head: () => ({
     meta: [{ title: "Flitterbot" }],
   }),
-  errorComponent: ({ error }: ErrorComponentProps) => (
+  errorComponent: SessionHistoryError,
+  component: PiSessionRoute,
+});
+
+function SessionHistoryError({ error }: ErrorComponentProps) {
+  useWhyDidYouRender?.("SessionHistoryError", {});
+  return (
     <div className="flex h-full items-center justify-center p-8 text-status-crashed">
       <p>Failed to load session history: {String(error)}</p>
     </div>
-  ),
-  component: PiSessionRoute,
-});
+  );
+}
 
 const STREAMS_MAIN_KEY = "panel:streams-main";
 const STREAMS_MAIN_DEFAULT: Record<string, number> = { chat: 50, downstream: 50 };
 
 function PiSessionRoute() {
-  useWhyDidYouRender("PiSessionRoute", {});
+  useWhyDidYouRender?.("PiSessionRoute", {});
   const { config, setConfig } = useUserConfig();
   const streamsLayout = parsePanelLayout(config, STREAMS_MAIN_KEY, STREAMS_MAIN_DEFAULT);
   const { piSessionId } = Route.useParams();

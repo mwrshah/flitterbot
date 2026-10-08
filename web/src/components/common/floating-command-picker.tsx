@@ -1,5 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { forwardRef, type ReactNode, type RefObject } from "react";
+import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 
 export type FloatingCommandPickerPlacement = "top" | "bottom";
 
@@ -15,6 +16,7 @@ export const FloatingCommandPicker = forwardRef<HTMLDivElement, FloatingCommandP
     { anchorRef, caretLeft = 0, preferredPlacement = "top", children },
     ref,
   ) {
+    useWhyDidYouRender?.("FloatingCommandPicker", {});
     return (
       <Popover.Root open>
         <Popover.Portal>
