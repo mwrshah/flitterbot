@@ -743,9 +743,11 @@ export const MessageInput = memo(function MessageInput({
         return;
       }
       const current = draftRef.current;
-      const newValue = isBlankDraft(current)
-        ? slot.button.insertText
-        : `${current}\n${slot.button.insertText}`;
+      const insertText =
+        isSessionBusy && !slot.button.insertText.startsWith("/")
+          ? `When you are done: ${slot.button.insertText}`
+          : slot.button.insertText;
+      const newValue = isBlankDraft(current) ? insertText : `${current}\n${insertText}`;
       setHoverSendAction({ text: newValue, sourceButtonId: slot.button.id });
       setDraftAndStore(newValue);
       completionController.dismiss();
@@ -754,7 +756,7 @@ export const MessageInput = memo(function MessageInput({
         textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
       });
     },
-    [completionController.dismiss, setDraftAndStore, submitCurrentDraft],
+    [completionController.dismiss, isSessionBusy, setDraftAndStore, submitCurrentDraft],
   );
 
   const canSend = !disabled && (!isDraftBlank || pendingImages.length > 0);
