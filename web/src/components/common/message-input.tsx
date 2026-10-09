@@ -739,7 +739,6 @@ export const MessageInput = memo(function MessageInput({
     (slot: MessageInputHoverButtonSlot) => {
       if (slot.ghost) return;
       if (slot.action === "send") {
-        if (isSessionBusy || isCompacting) return;
         submitCurrentDraft();
         return;
       }
@@ -755,13 +754,7 @@ export const MessageInput = memo(function MessageInput({
         textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
       });
     },
-    [
-      completionController.dismiss,
-      isCompacting,
-      isSessionBusy,
-      setDraftAndStore,
-      submitCurrentDraft,
-    ],
+    [completionController.dismiss, setDraftAndStore, submitCurrentDraft],
   );
 
   const canSend = !disabled && (!isDraftBlank || pendingImages.length > 0);
@@ -972,10 +965,7 @@ export const MessageInput = memo(function MessageInput({
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
-              disabled={
-                !hoverControlsEnabled ||
-                (shouldShowHoverSendAction && (isSessionBusy || isCompacting))
-              }
+              disabled={!hoverControlsEnabled || (shouldShowHoverSendAction && isCompacting)}
               composerRef={containerRef}
               toolbarRef={toolbarRef}
               onSlotAction={handleHoverButtonSlotAction}
