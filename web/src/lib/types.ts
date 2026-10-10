@@ -12,6 +12,7 @@ export type {
   DirectSessionMessageResponse,
   DownstreamSessionItem,
   DueTasksResponse,
+  ModelChangeAcceptedResponse,
   ModelListItem,
   ModelsListResponse,
   ModelsMutationResponse,

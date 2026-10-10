@@ -5,6 +5,7 @@ import type {
   CreateSwimlaneRequest,
   DirectoryCompletionsResponse,
   DirectSessionMessageResponse,
+  ModelChangeAcceptedResponse,
   ModelsListResponse,
   ModelsMutationResponse,
   RemoveTurnQueueItemResponse,
@@ -153,13 +154,13 @@ export function createFlitterbotApiClient(getSettings: () => ControlSurfaceSetti
       }),
 
     setPiSessionModel: (piSessionId: string, id: string) =>
-      request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/model`, {
+      request<ModelChangeAcceptedResponse>(`/api/pi-sessions/${piSessionId}/model`, {
         method: "PUT",
         body: JSON.stringify({ id }),
       }),
 
     setPiSessionThinkingLevel: (piSessionId: string, level: ModelThinkingLevel) =>
-      request<ModelsMutationResponse>(`/api/pi-sessions/${piSessionId}/thinking-level`, {
+      request<ModelChangeAcceptedResponse>(`/api/pi-sessions/${piSessionId}/thinking-level`, {
         method: "PUT",
         body: JSON.stringify({ level }),
       }),

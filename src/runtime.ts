@@ -700,22 +700,71 @@ export class ControlSurfaceRuntime {
     return models;
   }
 
-  async setPiSessionModel(piSessionId: string, modelId: string): Promise<PiSessionModelInfo> {
+  requestPiSessionModelChange(
+    piSessionId: string,
+    change: { modelId: string } | { thinkingLevel: ModelThinkingLevel },
+  ): void {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
-    if (!managed) {
-      throw new Error(`Pi session not found: ${piSessionId}`);
-    }
-    if (managed.runtime?.session.isCompacting) {
-      return this.setManagedPiSessionModel(managed, modelId);
-    }
-    if (managed.streamId) {
-      return this.sessionManager.withIdleActiveStreamOperation(
-        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
-        this.createStreamSessionTools(managed.streamId),
-        (active) => this.setManagedPiSessionModel(active, modelId),
+    if (!managed) throw new Error(`Pi session not found: ${piSessionId}`);
+
+    const isModelChange = "modelId" in change;
+    if (isModelChange) resolveModelEntry(this.config, change.modelId);
+    const request = isModelChange ? { id: change.modelId } : { level: change.thinkingLevel };
+    const label = isModelChange ? "Model" : "Thinking level";
+    const clearPending = () => {
+      if (isModelChange) {
+        if (managed.pendingModelRequest === request) managed.pendingModelRequest = undefined;
+      } else if (managed.pendingThinkingRequest === request) {
+        managed.pendingThinkingRequest = undefined;
+      }
+      this.broadcastStatusChanged("pi_session");
+    };
+    const reportError = (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log(`${label.toLowerCase()} change failed for ${piSessionId}: ${message}`);
+      this.wsHub.broadcast({
+        type: "error",
+        piSessionId,
+        message: `${label} change failed: ${message}`,
+      });
+      clearPending();
+    };
+
+    if (isModelChange) managed.pendingModelRequest = request as { id: string };
+    else managed.pendingThinkingRequest = request as { level: ModelThinkingLevel };
+    try {
+      managed.queue.runAfterDrain(
+        async () => {
+          try {
+            if (this.sessionManager.getByPiSessionId(piSessionId) !== managed) {
+              throw new Error("Pi session changed before model update");
+            }
+            if (managed.closeRequested) throw new Error("Pi session is closing");
+            const apply = (active: ManagedPiSession) =>
+              isModelChange
+                ? this.setManagedPiSessionModel(active, change.modelId)
+                : this.setManagedPiSessionThinkingLevel(active, change.thinkingLevel);
+            if (managed.streamId) {
+              await this.sessionManager.withActiveStreamOperation(
+                { streamId: managed.streamId, expectedPiSessionId: piSessionId },
+                this.createStreamSessionTools(managed.streamId),
+                apply,
+              );
+            } else {
+              await apply(managed);
+            }
+            clearPending();
+          } catch (error) {
+            reportError(error);
+          }
+        },
+        () => reportError(new Error("Pi session closed before model update")),
       );
+      this.broadcastStatusChanged("pi_session");
+    } catch (error) {
+      clearPending();
+      throw error;
     }
-    return this.setManagedPiSessionModel(managed, modelId);
   }
 
   private async setManagedPiSessionModel(
@@ -780,8 +829,8 @@ export class ControlSurfaceRuntime {
 
     if (isDefaultSession) {
       await this.persistDefaultModel(modelId);
-      return this.setPiSessionThinkingLevel(
-        piSessionId,
+      return this.setManagedPiSessionThinkingLevel(
+        managed,
         modelEntry.thinkingLevel ?? this.config.defaultThinkingLevel,
       );
     }
@@ -796,27 +845,6 @@ export class ControlSurfaceRuntime {
     }));
     await this.refreshConfig();
     this.log(`models: defaultModel set to ${modelId}`);
-  }
-
-  async setPiSessionThinkingLevel(
-    piSessionId: string,
-    thinkingLevel: ModelThinkingLevel,
-  ): Promise<PiSessionModelInfo> {
-    const managed = this.sessionManager.getByPiSessionId(piSessionId);
-    if (!managed) {
-      throw new Error(`Pi session not found: ${piSessionId}`);
-    }
-    if (managed.runtime?.session.isCompacting) {
-      return this.setManagedPiSessionThinkingLevel(managed, thinkingLevel);
-    }
-    if (managed.streamId) {
-      return this.sessionManager.withIdleActiveStreamOperation(
-        { streamId: managed.streamId, expectedPiSessionId: piSessionId },
-        this.createStreamSessionTools(managed.streamId),
-        (active) => this.setManagedPiSessionThinkingLevel(active, thinkingLevel),
-      );
-    }
-    return this.setManagedPiSessionThinkingLevel(managed, thinkingLevel);
   }
 
   private async setManagedPiSessionThinkingLevel(
@@ -883,6 +911,8 @@ export class ControlSurfaceRuntime {
         messageCount: o.runtime?.session?.messages?.length ?? snap.messageCount,
         busy: o.runtime?.session.isStreaming ?? false,
         isCompacting: o.runtime?.session?.isCompacting ?? false,
+        pendingModelId: o.pendingModelRequest?.id,
+        pendingThinkingLevel: o.pendingThinkingRequest?.level,
       };
     });
 
@@ -926,6 +956,8 @@ export class ControlSurfaceRuntime {
               busy: def!.runtime?.session.isStreaming ?? false,
               isCompacting: def!.runtime?.session?.isCompacting ?? false,
               model: this.toPiSessionModelInfo(def!.modelInfo),
+              pendingModelId: def!.pendingModelRequest?.id,
+              pendingThinkingLevel: def!.pendingThinkingRequest?.level,
             }
           : null,
         orchestrators: orchestratorStatuses,

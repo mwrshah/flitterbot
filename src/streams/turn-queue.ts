@@ -119,6 +119,10 @@ export class TurnQueue {
   private accepting = false;
   private readonly idleWaiters = new Set<() => void>();
   private readonly settlementWaiters = new Set<() => void>();
+  private readonly afterDrain: Array<{
+    run: () => Promise<void>;
+    cancel: () => void;
+  }> = [];
   private stopped = false;
   private admissionFreezeDepth = 0;
   private drainAcceptedAfterStop = false;
@@ -148,6 +152,12 @@ export class TurnQueue {
     if (this.holdAfterCurrent && item.sender === "user") this.holdAfterCurrent = false;
     if (!this.processing && !this.paused && !this.holdAfterCurrent) void this.pump();
     else this.changed();
+  }
+
+  runAfterDrain(run: () => Promise<void>, cancel: () => void): void {
+    this.assertAccepting();
+    this.afterDrain.push({ run, cancel });
+    if (!this.processing && !this.paused && !this.holdAfterCurrent) void this.pump();
   }
 
   getDepth(): number {
@@ -295,6 +305,7 @@ export class TurnQueue {
 
   async stopAndWait(): Promise<void> {
     this.stopped = true;
+    for (const operation of this.afterDrain.splice(0)) operation.cancel();
     this.admissionFreezeDepth++;
     this.drainAcceptedAfterStop = true;
     this.paused = false;
@@ -319,7 +330,16 @@ export class TurnQueue {
     if (this.processing || !this.canProcessAcceptedItems() || this.paused) return;
     this.processing = true;
     try {
-      while (this.canProcessAcceptedItems() && !this.paused && this.entries.length > 0) {
+      while (
+        this.canProcessAcceptedItems() &&
+        !this.paused &&
+        (this.entries.length > 0 || this.afterDrain.length > 0)
+      ) {
+        if (this.entries.length === 0) {
+          const operation = this.afterDrain.shift()!;
+          await operation.run();
+          continue;
+        }
         const entry = this.entries[0]!;
         if (entry.state !== "open") break;
         entry.state = "accepting";
@@ -375,7 +395,7 @@ export class TurnQueue {
   }
 
   private isIdle(): boolean {
-    return this.entries.length === 0 && this.isSettled();
+    return this.entries.length === 0 && this.afterDrain.length === 0 && this.isSettled();
   }
 
   private resolveWaiters(): void {

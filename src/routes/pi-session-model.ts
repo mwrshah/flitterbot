@@ -2,7 +2,6 @@ import type http from "node:http";
 import { isThinkingLevel } from "../config/schema.ts";
 import type { ControlSurfaceRuntime } from "../runtime.ts";
 import { readJsonBody, requireBearer, sendJson } from "./_shared.ts";
-import { buildModelsMutationResponse } from "./browser-models.ts";
 
 export async function handlePiSessionModelRoute(
   runtime: ControlSurfaceRuntime,
@@ -20,8 +19,8 @@ export async function handlePiSessionModelRoute(
   }
 
   try {
-    await runtime.setPiSessionModel(piSessionId, body.id.trim());
-    return sendJson(res, 200, await buildModelsMutationResponse(runtime));
+    runtime.requestPiSessionModelChange(piSessionId, { modelId: body.id.trim() });
+    return sendJson(res, 202, { ok: true, queued: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = /not found/i.test(message) ? 404 : 400;
@@ -48,8 +47,8 @@ export async function handlePiSessionThinkingLevelRoute(
   }
 
   try {
-    await runtime.setPiSessionThinkingLevel(piSessionId, body.level);
-    return sendJson(res, 200, await buildModelsMutationResponse(runtime));
+    runtime.requestPiSessionModelChange(piSessionId, { thinkingLevel: body.level });
+    return sendJson(res, 202, { ok: true, queued: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = /not found/i.test(message) ? 404 : 400;
