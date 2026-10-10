@@ -591,7 +591,7 @@ export const MessageInput = memo(function MessageInput({
   const handleDraftChange = completionController.handleValueChange;
 
   const submitCurrentDraft = useCallback(() => {
-    if (disabled || isSending || isCompacting || recoveryKind) return;
+    if (disabled || isSending || recoveryKind) return;
     const text = draftRef.current.trim();
     if (!text && pendingImages.length === 0) return;
     const submittedImages = pendingImages;
@@ -609,7 +609,6 @@ export const MessageInput = memo(function MessageInput({
     setDraftAndStore("");
   }, [
     disabled,
-    isCompacting,
     isSending,
     pendingImages,
     recoveryKind,
@@ -663,7 +662,7 @@ export const MessageInput = memo(function MessageInput({
 
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLTextAreaElement>) => {
-      if (disabled || isCompacting) return;
+      if (disabled) return;
       const items = event.clipboardData?.items;
       if (!items) return;
       const imageFiles: File[] = [];
@@ -678,18 +677,18 @@ export const MessageInput = memo(function MessageInput({
         addImageFiles(imageFiles);
       }
     },
-    [addImageFiles, disabled, isCompacting],
+    [addImageFiles, disabled],
   );
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      if (disabled || isCompacting) return;
+      if (disabled) return;
       if (event.dataTransfer?.files?.length) {
         addImageFiles(Array.from(event.dataTransfer.files));
       }
     },
-    [addImageFiles, disabled, isCompacting],
+    [addImageFiles, disabled],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -915,10 +914,28 @@ export const MessageInput = memo(function MessageInput({
             <span
               role="status"
               aria-live="polite"
-              className="absolute right-2 top-2 z-10 text-xs font-medium text-text-muted"
+              className={cn(
+                "absolute top-2 z-10 text-xs font-medium text-text-muted",
+                isSessionBusy ? "right-16" : "right-2",
+              )}
             >
               Compacting…
             </span>
+          )}
+          {isSessionBusy && !recoveryKind && (
+            <Tooltip content="Stop">
+              <BaseButton
+                focusableWhenDisabled
+                render={<Button variant="danger" size="sm" />}
+                aria-label="Stop"
+                type="button"
+                disabled={disabled || isInterruptPending || !onInterrupt}
+                onClick={() => onInterrupt?.()}
+                className="absolute right-2 top-2 z-10 h-10 w-10 aria-disabled:opacity-50 sm:h-7 sm:w-auto sm:px-3"
+              >
+                <OctagonIcon className="size-4 fill-current" />
+              </BaseButton>
+            </Tooltip>
           )}
           <TextareaCompletionPickers controller={completionController} />
           <textarea
@@ -933,7 +950,13 @@ export const MessageInput = memo(function MessageInput({
             placeholder={placeholder}
             className={cn(
               "w-full resize-none bg-transparent pl-10 pt-3 text-sm text-text placeholder:text-text-muted focus:outline-none",
-              isCompacting ? "pr-28" : "pr-4",
+              isCompacting
+                ? isSessionBusy
+                  ? "pr-40"
+                  : "pr-28"
+                : isSessionBusy && !recoveryKind
+                  ? "pr-16"
+                  : "pr-4",
               fillHeight && "flex-1 min-h-0",
             )}
           />
@@ -943,7 +966,7 @@ export const MessageInput = memo(function MessageInput({
               aria-label="Attach image"
               type="button"
               tabIndex={-1}
-              disabled={disabled || isCompacting}
+              disabled={disabled}
               onClick={() => fileInputRef.current?.click()}
               className="absolute left-2.5 top-3 rounded p-0.5 text-text-muted transition-colors hover:text-text aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
@@ -967,7 +990,7 @@ export const MessageInput = memo(function MessageInput({
           {(shouldShowHoverButtons || shouldShowHoverSendAction) && (
             <MessageInputHoverButtons
               slots={shouldShowHoverSendAction ? hoverSendSlots : hoverButtonSlots}
-              disabled={!hoverControlsEnabled || (shouldShowHoverSendAction && isCompacting)}
+              disabled={!hoverControlsEnabled}
               composerRef={containerRef}
               toolbarRef={toolbarRef}
               onSlotAction={handleHoverButtonSlotAction}
@@ -976,24 +999,14 @@ export const MessageInput = memo(function MessageInput({
           <div ref={toolbarRef} className="absolute right-2 bottom-2 flex items-center gap-1.5">
             {!recoveryKind && showModelSelector && modelSelectorPiSessionId && (
               <ModelSelector
-                disabled={disabled || isSending || isCompacting}
+                disabled={disabled || isSending}
                 subdued={!shouldShowHoverButtons}
                 piSessionId={modelSelectorPiSessionId}
                 selectedModelId={selectedModelId}
                 selectedThinkingLevel={selectedThinkingLevel}
               />
             )}
-            {isCompacting ? (
-              <Button
-                type="button"
-                size="sm"
-                disabled
-                aria-label="Send unavailable while compacting"
-                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
-              >
-                <ArrowRightIcon className="size-4" />
-              </Button>
-            ) : recoveryKind ? (
+            {recoveryKind ? (
               <Button
                 type="button"
                 variant="subtle"
@@ -1014,25 +1027,12 @@ export const MessageInput = memo(function MessageInput({
                       : "Reopen"}
                 </span>
               </Button>
-            ) : isSessionBusy ? (
-              <Tooltip content="Stop">
-                <BaseButton
-                  focusableWhenDisabled
-                  render={<Button variant="danger" size="sm" />}
-                  aria-label="Stop"
-                  type="button"
-                  disabled={disabled || isInterruptPending || !onInterrupt}
-                  onClick={() => onInterrupt?.()}
-                  className="h-10 w-10 aria-disabled:opacity-50 sm:h-7 sm:w-auto sm:px-3"
-                >
-                  <OctagonIcon className="size-4 fill-current" />
-                </BaseButton>
-              </Tooltip>
             ) : (
               <Button
                 type="button"
                 size="sm"
                 disabled={disabled || isSending || !canSend}
+                aria-label="Send"
                 onClick={submitCurrentDraft}
                 className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
               >

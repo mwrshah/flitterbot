@@ -53,6 +53,8 @@ export interface PiSessionRuntimeStatus {
   busy: boolean;
   isCompacting: boolean;
   model?: PiSessionModelInfo;
+  pendingModelId?: string;
+  pendingThinkingLevel?: ModelThinkingLevel;
 }
 
 export interface ClaudeSessionListItem {
@@ -85,6 +87,8 @@ export interface PiOrchestratorStatus {
   messageCount: number;
   busy: boolean;
   isCompacting: boolean;
+  pendingModelId?: string;
+  pendingThinkingLevel?: ModelThinkingLevel;
 }
 
 export interface PiMultiSessionStatus {
@@ -153,6 +157,11 @@ export interface ModelsListResponse {
 
 export interface ModelsMutationResponse extends ModelsListResponse {
   ok: true;
+}
+
+export interface ModelChangeAcceptedResponse {
+  ok: true;
+  queued: true;
 }
 
 export interface MessageResponse {

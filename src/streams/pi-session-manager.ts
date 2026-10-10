@@ -75,6 +75,8 @@ export interface ManagedPiSession {
   unsubscribe: () => void;
   closeRequested?: CloseRequest;
   pendingAssistantMessage?: ChatTimelineMessage;
+  pendingModelRequest?: { id: string };
+  pendingThinkingRequest?: { level: ModelThinkingLevel };
   interruptRetryGuard: InterruptRetryGuard;
   whatsappRemoteJid?: string;
 }
