@@ -705,6 +705,9 @@ export class ControlSurfaceRuntime {
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
     }
+    if (managed.runtime?.session.isCompacting) {
+      return this.setManagedPiSessionModel(managed, modelId);
+    }
     if (managed.streamId) {
       return this.sessionManager.withIdleActiveStreamOperation(
         { streamId: managed.streamId, expectedPiSessionId: piSessionId },
@@ -802,6 +805,9 @@ export class ControlSurfaceRuntime {
     const managed = this.sessionManager.getByPiSessionId(piSessionId);
     if (!managed) {
       throw new Error(`Pi session not found: ${piSessionId}`);
+    }
+    if (managed.runtime?.session.isCompacting) {
+      return this.setManagedPiSessionThinkingLevel(managed, thinkingLevel);
     }
     if (managed.streamId) {
       return this.sessionManager.withIdleActiveStreamOperation(
