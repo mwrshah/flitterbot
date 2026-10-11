@@ -42,6 +42,7 @@ const LOAD_PREVIOUS_ROW_THRESHOLD = 2;
 const ESTIMATED_ROW_HEIGHT = 280;
 const MARKERS_EACH_SIDE = 14;
 const MARKER_ROW_HEIGHT = 18;
+const MARKER_ACTIVATION_DELAY_MS = 150;
 const STREAMING_ROW_KEY = "streaming";
 const VIRTUALIZER_OVERSCAN = 2;
 
@@ -114,7 +115,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
   onScrollToEnd,
 }: UserMessageMarkersProps) {
   useWhyDidYouRender?.("UserMessageMarkers", {});
-  const { rested, pointerProps } = usePointerRest(300);
+  const { rested, pointerProps } = usePointerRest(MARKER_ACTIVATION_DELAY_MS);
   const [tooltipHandle] = useState(() =>
     TooltipPrimitive.createHandle<{
       content: string;
@@ -226,7 +227,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
                   align: "start",
                   popupClassName: "w-[min(20rem,var(--available-width))]",
                 }}
-                delay={300}
+                delay={MARKER_ACTIVATION_DELAY_MS}
                 render={renderMarkerButton}
                 type="button"
                 aria-label={label}
@@ -264,7 +265,7 @@ const UserMessageMarkers = memo(function UserMessageMarkers({
           align: "center",
           popupClassName: "w-[min(20rem,var(--available-width))]",
         }}
-        delay={300}
+        delay={MARKER_ACTIVATION_DELAY_MS}
         render={renderMarkerButton}
         type="button"
         aria-label="Go to end of conversation"
