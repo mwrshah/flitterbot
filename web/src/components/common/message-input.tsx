@@ -2,7 +2,14 @@ import { Button as BaseButton } from "@base-ui/react/button";
 import { layoutWithLines, prepareWithSegments } from "@chenglou/pretext";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { cn } from "cn";
-import { ArrowRightIcon, Loader2Icon, OctagonIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  ChevronUpIcon,
+  Loader2Icon,
+  OctagonIcon,
+  RotateCcwIcon,
+  XIcon,
+} from "lucide-react";
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -922,21 +929,25 @@ export const MessageInput = memo(function MessageInput({
               Compacting…
             </span>
           )}
-          {isSessionBusy && !recoveryKind && (
-            <Tooltip content="Stop">
-              <BaseButton
-                focusableWhenDisabled
-                render={<Button variant="danger" size="sm" />}
-                aria-label="Stop"
-                type="button"
-                disabled={disabled || isInterruptPending || !onInterrupt}
-                onClick={() => onInterrupt?.()}
-                className="absolute right-2 top-2 z-10 h-10 w-10 aria-disabled:opacity-50 sm:h-7 sm:w-auto sm:px-3"
-              >
-                <OctagonIcon className="size-4 fill-current" />
-              </BaseButton>
-            </Tooltip>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            disabled={disabled || isSending || !canSend || !isSessionBusy || !!recoveryKind}
+            tabIndex={isSessionBusy && !recoveryKind ? undefined : -1}
+            aria-hidden={isSessionBusy && !recoveryKind ? undefined : true}
+            aria-label={isSessionBusy && !recoveryKind ? "Send" : undefined}
+            onClick={submitCurrentDraft}
+            className={cn(
+              "absolute right-2 top-2 z-10 h-10 w-10 sm:h-7 sm:w-auto sm:px-3",
+              (!isSessionBusy || recoveryKind) && "invisible pointer-events-none",
+            )}
+          >
+            {isSending ? (
+              <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ChevronUpIcon className="size-4" aria-hidden="true" />
+            )}
+          </Button>
           <TextareaCompletionPickers controller={completionController} />
           <textarea
             data-shortcut-composer
@@ -1028,20 +1039,29 @@ export const MessageInput = memo(function MessageInput({
                 </span>
               </Button>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                disabled={disabled || isSending || !canSend}
-                aria-label="Send"
-                onClick={submitCurrentDraft}
-                className="h-10 w-10 sm:h-7 sm:w-auto sm:px-3"
-              >
-                {isSending ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <ArrowRightIcon className="size-4" />
-                )}
-              </Button>
+              <Tooltip content={isSessionBusy ? "Stop" : undefined}>
+                <BaseButton
+                  focusableWhenDisabled={isSessionBusy}
+                  render={<Button variant={isSessionBusy ? "danger" : "default"} size="sm" />}
+                  aria-label={isSessionBusy ? "Stop" : "Send"}
+                  type="button"
+                  disabled={
+                    isSessionBusy
+                      ? disabled || isInterruptPending || !onInterrupt
+                      : disabled || isSending || !canSend
+                  }
+                  onClick={isSessionBusy ? () => onInterrupt?.() : submitCurrentDraft}
+                  className="h-10 w-10 aria-disabled:opacity-50 sm:h-7 sm:w-auto sm:px-3"
+                >
+                  {isSessionBusy ? (
+                    <OctagonIcon className="size-4 fill-current" aria-hidden="true" />
+                  ) : isSending ? (
+                    <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ArrowRightIcon className="size-4" aria-hidden="true" />
+                  )}
+                </BaseButton>
+              </Tooltip>
             )}
           </div>
         </div>
