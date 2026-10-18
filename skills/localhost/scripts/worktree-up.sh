@@ -368,7 +368,7 @@ write_state() {
 
 PLAN_PIDS=()
 do_launch() {
-    local name wt_path file i service dir command port scope op_env env_line env_name env_value log_path pid all_listening all_running startup_attempt startup_wait
+    local name wt_path file i service dir command port scope op_env env_line env_name env_value log_path pid
     validate_config; validate_overrides
     name="$(resolve_worktree "$TARGET")"; wt_path="$(worktree_path "$name")"; file="$(state_file "$name")"
     build_plan "$name" "$file" true
@@ -402,9 +402,9 @@ do_launch() {
             [[ -z "$port" ]] || runtime_env+=("PORT=$port")
             if [[ -n "$op_env" ]]; then
                 if [[ ${#runtime_env[@]} -gt 0 ]]; then
-                    exec python3 "$SCRIPT_DIR/detach.py" "$dir" op run --environment "$op_env" -- env "${runtime_env[@]}" bash -lc "$command"
+                    exec python3 "$SCRIPT_DIR/detach.py" "$dir" op run --environment "$op_env" -- env -u OP_SERVICE_ACCOUNT_TOKEN "${runtime_env[@]}" bash -lc "$command"
                 else
-                    exec python3 "$SCRIPT_DIR/detach.py" "$dir" op run --environment "$op_env" -- bash -lc "$command"
+                    exec python3 "$SCRIPT_DIR/detach.py" "$dir" op run --environment "$op_env" -- env -u OP_SERVICE_ACCOUNT_TOKEN bash -lc "$command"
                 fi
             elif [[ ${#runtime_env[@]} -gt 0 ]]; then
                 exec python3 "$SCRIPT_DIR/detach.py" "$dir" env "${runtime_env[@]}" bash -lc "$command"
@@ -417,32 +417,13 @@ do_launch() {
     write_state "$file" "$wt_path"
     rm -f "$(legacy_state_file "$name")"
 
-    startup_wait=5
-    for service in "${PLAN_SERVICES[@]}"; do
-        [[ -z "$(service_get "$service" op-env)" ]] || startup_wait=120
-    done
-    [[ "$startup_wait" -eq 5 ]] || log "Waiting up to ${startup_wait}s for 1Password approval and service readiness."
-    for ((startup_attempt=1; startup_attempt<=startup_wait; startup_attempt++)); do
-        all_listening=true; all_running=true
-        for ((i=0; i<${#PLAN_SERVICES[@]}; i++)); do
-            pid="${PLAN_PIDS[$i]}"; port="${PLAN_PORTS[$i]}"
-            kill -0 "$pid" 2>/dev/null || all_running=false
-            [[ -z "$port" || -n "$(port_pids "$port")" ]] || all_listening=false
-        done
-        $all_listening && break
-        $all_running || break
-        sleep 1
-    done
-    local failed=false
+    log "Launched $name; services may still be starting."
     for ((i=0; i<${#PLAN_SERVICES[@]}; i++)); do
-        pid="${PLAN_PIDS[$i]}"; port="${PLAN_PORTS[$i]}"
-        if ! kill -0 "$pid" 2>/dev/null || [[ -n "$port" && -z "$(port_pids "$port")" ]]; then
-            err "${PLAN_SERVICES[$i]} failed to become ready. See $(log_dir)/${name}-${PLAN_SERVICES[$i]}.log"; failed=true
-        fi
+        service="${PLAN_SERVICES[$i]}"; port="${PLAN_PORTS[$i]}"
+        echo "  $service: ${PLAN_SCOPES[$i]}${port:+ at http://localhost:$port}"
+        echo "    Log: $(log_dir)/${name}-${service}.log"
     done
-    if $failed; then do_stop "$name" || true; return 1; fi
-    log "Running $name."
-    for ((i=0; i<${#PLAN_SERVICES[@]}; i++)); do echo "  ${PLAN_SERVICES[$i]}: ${PLAN_SCOPES[$i]}${PLAN_PORTS[$i]:+ on http://localhost:${PLAN_PORTS[$i]}}"; done
+    echo "  Status: localhost --status '$name'"
     echo "  Stop: localhost --stop '$name'"
 }
 
