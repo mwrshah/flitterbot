@@ -53,6 +53,7 @@ Per-service keys:
 
 - `dir` and `command` are required.
 - `port` is optional for watchers and other portless services. `{port}` inserts the resolved port; `PORT` is also exported.
+- `scheme` defaults to `http`; set `flitterbot.localhost.<name>.scheme` to `https` for a TLS listener. Printed launch URLs and `{service.<name>.url}` use this scheme.
 - `op-env` is optional. When present, the service runs through that 1Password Environment.
 - repeated `env` entries use `NAME=value`. Values may reference `{port}`, `{worktree}`, `{worktree.path}`, `{service.<name>.port}`, or `{service.<name>.url}`.
 - `scope` defaults to `worktree`. Numbered worktrees receive `base port + worktree number`; unnumbered worktrees use a stable hash-derived slot. Set `scope` to `shared` only when the service cannot be isolated. Shared services use the configured canonical port and the selected worktree's code, so only one such instance can run at a time.

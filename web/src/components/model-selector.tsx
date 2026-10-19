@@ -29,7 +29,6 @@ import {
 import { useModifierLabel } from "@/hooks/platform";
 import { useWhyDidYouRender } from "@/hooks/use-why-did-you-render";
 import { createModelSearchIndex, searchModelIndex } from "@/lib/model-search";
-import { statusQueryOptions } from "@/lib/queries";
 import { useShortcutBindingLabel, useShortcuts } from "@/lib/shortcuts";
 import { handleTextInputKeyDown } from "@/lib/text-input";
 import type { ModelListItem, ModelsListResponse, ModelsMutationResponse } from "@/lib/types";
@@ -83,13 +82,6 @@ export const ModelSelector = memo(function ModelSelector({
     queryFn: ({ signal }) => apiClient.listModels(signal),
     staleTime: 0,
   });
-  const { data: status } = useQuery(statusQueryOptions(apiClient));
-  const sessionStatus =
-    status?.piAgent.default?.piSessionId === piSessionId
-      ? status.piAgent.default
-      : status?.piAgent.orchestrators.find((session) => session.piSessionId === piSessionId);
-  const pendingModelId = sessionStatus?.pendingModelId;
-  const pendingThinkingLevel = sessionStatus?.pendingThinkingLevel;
 
   const catalogPinned = data?.pinned ?? [];
   const catalogAll = data?.all ?? [];
@@ -307,25 +299,14 @@ export const ModelSelector = memo(function ModelSelector({
   }
 
   const triggerLabel = currentModel?.label ?? "Select model";
-  const pendingModelLabel = pendingModelId
-    ? (modelsById.get(pendingModelId)?.label ?? pendingModelId)
-    : undefined;
-  const pendingDescription = [
-    pendingModelLabel ? `model ${pendingModelLabel}` : undefined,
-    pendingThinkingLevel ? `thinking ${pendingThinkingLevel}` : undefined,
-  ]
-    .filter(Boolean)
-    .join(" and ");
 
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Tooltip
         content={
-          pendingDescription
-            ? `Pending ${pendingDescription} until the turn queue drains`
-            : currentModel
-              ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
-              : "Pick a model"
+          currentModel
+            ? `${currentModel.label} (${currentModel.provider}/${currentModel.modelId})`
+            : "Pick a model"
         }
       >
         <Popover.Trigger
@@ -349,7 +330,6 @@ export const ModelSelector = memo(function ModelSelector({
           }
         >
           <span
-            aria-live="polite"
             className={cn(
               "truncate max-w-[180px]",
               subdued && "text-border-muted group-hover:text-text",
@@ -357,7 +337,6 @@ export const ModelSelector = memo(function ModelSelector({
             )}
           >
             {triggerLabel}
-            {pendingDescription ? " · pending" : ""}
           </span>
           <ChevronDownIcon className={cn("size-3 shrink-0", subdued && "text-border-muted")} />
         </Popover.Trigger>
@@ -383,11 +362,6 @@ export const ModelSelector = memo(function ModelSelector({
               label="Search models"
               className="h-full rounded-lg border border-border bg-background text-text shadow-lg"
             >
-              {pendingDescription && (
-                <div role="status" className="px-3 pt-2 text-xs text-text-muted">
-                  Pending {pendingDescription} until the turn queue drains.
-                </div>
-              )}
               <div className="relative">
                 <CommandInput
                   ref={searchInputRef}

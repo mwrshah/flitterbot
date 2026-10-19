@@ -132,7 +132,7 @@ service_get_all() { local_get_all "flitterbot.localhost.$1.$2"; }
 
 validate_name() { [[ "$1" =~ ^[a-z][a-z0-9-]*$ ]]; }
 validate_config() {
-    local seen="" service dir command port scope failed=false
+    local seen="" service dir command port scope scheme failed=false
     [[ -n "$(services)" ]] || { err "No localhost services configured in this repository's local .git/config."; return 1; }
     while IFS= read -r service; do
         if ! validate_name "$service"; then err "Invalid service name '$service' (use lowercase letters, numbers, and hyphens)."; failed=true; fi
@@ -144,6 +144,8 @@ validate_config() {
         [[ -n "$command" ]] || { err "Missing flitterbot.localhost.$service.command"; failed=true; }
         [[ -z "$port" || "$port" =~ ^[0-9]+$ && "$port" -ge 1 && "$port" -le 65535 ]] || { err "Invalid flitterbot.localhost.$service.port '$port'."; failed=true; }
         [[ "$scope" == worktree || "$scope" == shared ]] || { err "Invalid flitterbot.localhost.$service.scope '$scope'."; failed=true; }
+        scheme="$(service_get "$service" scheme)"; scheme="${scheme:-http}"
+        [[ "$scheme" == http || "$scheme" == https ]] || { err "Invalid flitterbot.localhost.$service.scheme '$scheme' (use http or https)."; failed=true; }
     done < <(services)
     $failed && return 1
     return 0
@@ -287,13 +289,19 @@ build_plan() {
     done < <(services)
 }
 
+service_url() {
+    local service="$1" port="$2" scheme
+    scheme="$(service_get "$service" scheme)"
+    printf '%s://localhost:%s\n' "${scheme:-http}" "$port"
+}
+
 expand_value() {
     local value="$1" name="$2" wt_path="$3" current_port="${4:-}" service token ref port
     value="${value//\{port\}/$current_port}"; value="${value//\{worktree\}/$name}"; value="${value//\{worktree.path\}/$wt_path}"
     while [[ "$value" =~ \{service\.([a-z][a-z0-9-]*)\.(port|url)\} ]]; do
         token="${BASH_REMATCH[0]}"; ref="${BASH_REMATCH[1]}"; port="$(plan_port "$ref" || true)"
         [[ -n "$port" ]] || { err "Environment template references portless/unknown service '$ref'."; return 1; }
-        [[ "${BASH_REMATCH[2]}" == url ]] && port="http://localhost:$port"
+        [[ "${BASH_REMATCH[2]}" == url ]] && port="$(service_url "$ref" "$port")"
         value="${value//$token/$port}"
     done
     echo "$value"
@@ -420,7 +428,7 @@ do_launch() {
     log "Launched $name; services may still be starting."
     for ((i=0; i<${#PLAN_SERVICES[@]}; i++)); do
         service="${PLAN_SERVICES[$i]}"; port="${PLAN_PORTS[$i]}"
-        echo "  $service: ${PLAN_SCOPES[$i]}${port:+ at http://localhost:$port}"
+        echo "  $service: ${PLAN_SCOPES[$i]}${port:+ at $(service_url "$service" "$port")}"
         echo "    Log: $(log_dir)/${name}-${service}.log"
     done
     echo "  Status: localhost --status '$name'"
