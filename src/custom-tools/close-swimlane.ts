@@ -175,7 +175,7 @@ export async function executeCloseSwimlane(
   streamId: string,
   mode: "merge" | "noop",
   commitMessage: string,
-  baseBranchOverride?: string,
+  baseBranchOverride?: string | null,
 ): Promise<CloseSwimlaneResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
@@ -185,7 +185,8 @@ export async function executeCloseSwimlane(
     return { ok: false, streamId, message: `Swimlane ${streamId} is already closed` };
   }
 
-  if (mode === "merge" && baseBranchOverride === undefined) {
+  const targetBranch = baseBranchOverride?.trim() || null;
+  if (mode === "merge" && !targetBranch) {
     const currentBranch = stream.worktree_path
       ? await inferBranchFromWorktree(stream.worktree_path)
       : null;
@@ -204,7 +205,7 @@ export async function executeCloseSwimlane(
   let pushed = false;
   let resolvedTargetBranch: string | undefined;
 
-  if (mode === "merge") {
+  if (mode === "merge" && targetBranch) {
     const worktreePath = stream.worktree_path;
     const repoPath = stream.repo_path;
 
@@ -233,15 +234,6 @@ export async function executeCloseSwimlane(
       };
     }
 
-    const targetBranch = baseBranchOverride ?? stream.base_branch ?? null;
-    if (!targetBranch) {
-      return {
-        ok: false,
-        streamId,
-        message:
-          "Swimlane has no base_branch recorded. Cannot merge. Set base_branch on the swimlane record, pass base_branch to close_swimlane, or call close_swimlane with mode:noop.",
-      };
-    }
     resolvedTargetBranch = targetBranch;
     const commitResult = await commitUncommittedChanges(worktreePath, commitMessage);
     if (commitResult.hasChanges && !commitResult.ok) {

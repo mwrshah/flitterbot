@@ -2536,7 +2536,7 @@ export class ControlSurfaceRuntime {
         name: "close_swimlane",
         label: "Close Swimlane",
         description:
-          'Close the current swimlane. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the swimlane; "noop" skips all git operations and just closes the swimlane record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the swimlane stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_swimlane again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
+          'Close the current swimlane. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the swimlane; "noop" skips all git operations and just closes the swimlane record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first with base_branch omitted or null to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the swimlane stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_swimlane again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
         parameters: {
           type: "object",
           properties: {
@@ -2544,7 +2544,7 @@ export class ControlSurfaceRuntime {
               type: "string",
               enum: ["merge", "noop"],
               description:
-                '"merge" commits uncommitted changes, merges branch to the swimlane\'s base branch, and pushes. On the first merge call without base_branch, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the swimlane and ends the session.',
+                '"merge" commits uncommitted changes, merges branch to the swimlane\'s base branch, and pushes. On the first merge call with base_branch omitted or null, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the swimlane and ends the session.',
             },
             commit_message: {
               type: "string",
@@ -2552,9 +2552,10 @@ export class ControlSurfaceRuntime {
                 'Commit message used when auto-committing any uncommitted in-flight work in the worktree before the merge. Required. Must describe the actual work in this swimlane — do NOT use placeholder/chore filler. Ignored for noop mode and on preview calls, but still required (write a short reason like "closing: <why>").',
             },
             base_branch: {
-              type: "string",
+              type: ["string", "null"],
+              pattern: "\\S",
               description:
-                "Target branch to merge into. Supersedes the swimlane's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
+                "Target branch to merge into. Omit this field or pass null on the first call to preview the swimlane's recorded base branch. Pass an explicit nonblank branch name on the confirming call to execute; this overrides the recorded base branch and skips the preview. Do not pass an empty string. Ignored in noop mode.",
             },
           },
           required: ["mode", "commit_message"],
@@ -2564,7 +2565,7 @@ export class ControlSurfaceRuntime {
           const { mode, commit_message, base_branch } = params as {
             mode: "merge" | "noop";
             commit_message: string;
-            base_branch?: string;
+            base_branch?: string | null;
           };
           if (!closeSwimlaneId) {
             return {
