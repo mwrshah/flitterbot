@@ -41,7 +41,7 @@ export function formatStreamPrompt(
   }
 
   const bootstrapSection = bootstrapMessage?.trim()
-    ? `\n---\nStream setup:\n${bootstrapMessage.trim()}`
+    ? `\n---\nSwimlane setup:\n${bootstrapMessage.trim()}`
     : "";
 
   const datetime = formatDatetimeBlock();

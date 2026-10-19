@@ -1972,7 +1972,7 @@ export class ControlSurfaceRuntime {
     streamName: string,
     piSessionId: string | undefined,
     remoteJid: string,
-    content = "WhatsApp stream owner set.",
+    content = "WhatsApp swimlane owner set.",
   ): void {
     try {
       persistInboundMessage(this.blackboard, {
@@ -2005,7 +2005,7 @@ export class ControlSurfaceRuntime {
         name: "prep_launch",
         label: "Prepare Swimlane Launches",
         description:
-          "Return editable swimlane launch cards without creating streams. Use this instead of create_swimlane when the user asks to 'prepare', 'stage', 'review', 'batch launch', 'create many', 'tackle all', or other words implying multiple simultaneoous swimlane creation, rollout or task implementations. This is the default tool to use in case of batch swimlane or task fan out",
+          "Return editable swimlane launch cards without creating swimlanes. Use this instead of create_swimlane when the user asks to 'prepare', 'stage', 'review', 'batch launch', 'create many', 'tackle all', or other words implying multiple simultaneoous swimlane creation, rollout or task implementations. This is the default tool to use in case of batch swimlane or task fan out",
         parameters: {
           type: "object",
           properties: {
@@ -2336,13 +2336,13 @@ export class ControlSurfaceRuntime {
         name: "enqueue_message",
         label: "Enqueue Message",
         description:
-          "Send a message to an existing orchestrator or stream. Use ONLY when the intended target is clearly the existing stream based on context, or explicit call out. Can be used to nudge an orchestrator or provide additional context that was missing the first time around. Note that even for connected matters, the user's intent is likely to create a stream or spawn an orchestrator — use create_swimlane for that. You can default to creating a new swimlane unless it is very clearly meant for the same stream",
+          "Send a follow-up or clarification to an existing swimlane when the user amends instructions for a recently created swimlane, clarifies an existing ask, or explicitly requests communication with that swimlane. Ask the user to identify the target if needed. Create a new swimlane for each new ask, even in the same repository, unless it clearly amends the prior ask. Treat additional requirements even if on related topic in the same repo as new work by default, for which you can create_swimlane for parallel implementation.",
         parameters: {
           type: "object",
           properties: {
             stream_id: {
               type: "string",
-              description: "ID of the target stream",
+              description: "ID of the target swimlane",
             },
             message: {
               type: "string",
@@ -2359,13 +2359,13 @@ export class ControlSurfaceRuntime {
           const ws = getStreamById(this.blackboard, stream_id);
           if (!ws) {
             return {
-              content: [{ type: "text", text: `Stream not found: ${stream_id}` }],
+              content: [{ type: "text", text: `Swimlane not found: ${stream_id}` }],
               details: { error: true },
             };
           }
           if (ws.status !== "open") {
             return {
-              content: [{ type: "text", text: `Stream is closed: ${ws.name}` }],
+              content: [{ type: "text", text: `Swimlane is closed: ${ws.name}` }],
               details: { error: true },
             };
           }
@@ -2376,7 +2376,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `No running orchestrator for stream: ${ws.name}`,
+                  text: `No running orchestrator for swimlane: ${ws.name}`,
                 },
               ],
               details: { error: true },
@@ -2414,7 +2414,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Failed to enqueue message to stream "${ws.name}": ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+                  text: `Failed to enqueue message to swimlane "${ws.name}": ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
                 },
               ],
               details: { error: true },
@@ -2429,7 +2429,7 @@ export class ControlSurfaceRuntime {
             content: [
               {
                 type: "text",
-                text: `Message enqueued to stream "${ws.name}" (queue depth: ${orchestrator.queue.getDepth()}).`,
+                text: `Message enqueued to swimlane "${ws.name}" (queue depth: ${orchestrator.queue.getDepth()}).`,
               },
             ],
             details: {
@@ -2447,7 +2447,7 @@ export class ControlSurfaceRuntime {
         name: "set_up_worktree",
         label: "Set Up Worktree",
         description:
-          "Inspect or apply the current stream's git worktree setup. mode is required. mode:'inspect' accepts no other args and reports the current repo, stream worktree, [flitterbot] config, resolved create base, planned create path, and discovery advisory when config is missing. mode:'apply' creates a new worktree when path is omitted, or attaches an existing worktree when path is provided. Applying requires [flitterbot] bootstrap config; if config is missing, no worktree is created and the agent should run inspect. base_ref chooses the create base, or updates only the recorded merge target when the stream already has a worktree; it never rebases/resets/moves the checkout. Attaching with path requires base_ref so the merge target is explicit. force:true means delink the current stream worktree association and mint a fresh new worktree; force cannot be combined with path. Stream and repo are ambient: the tool is bound to the current stream, and repo is resolved from the orchestrator cwd then anchored on the repo's main worktree.",
+          "Inspect or apply the current swimlane's git worktree setup. mode is required. mode:'inspect' accepts no other args and reports the current repo, swimlane worktree, [flitterbot] config, resolved create base, planned create path, and discovery advisory when config is missing. mode:'apply' creates a new worktree when path is omitted, or attaches an existing worktree when path is provided. Applying requires [flitterbot] bootstrap config; if config is missing, no worktree is created and the agent should run inspect. base_ref chooses the create base, or updates only the recorded merge target when the swimlane already has a worktree; it never rebases/resets/moves the checkout. Attaching with path requires base_ref so the merge target is explicit. force:true means delink the current swimlane worktree association and mint a fresh new worktree; force cannot be combined with path. Swimlane and repo are ambient: the tool is bound to the current swimlane, and repo is resolved from the orchestrator cwd then anchored on the repo's main worktree.",
 
         parameters: {
           type: "object",
@@ -2456,7 +2456,7 @@ export class ControlSurfaceRuntime {
               type: "string",
               enum: ["inspect", "apply"],
               description:
-                "Required. inspect reports config/discovery and makes no changes; apply creates, attaches, or retargets the stream worktree.",
+                "Required. inspect reports config/discovery and makes no changes; apply creates, attaches, or retargets the swimlane worktree.",
             },
             path: {
               type: "string",
@@ -2471,7 +2471,7 @@ export class ControlSurfaceRuntime {
             force: {
               type: "boolean",
               description:
-                "Only valid with mode:'apply' and no path. Delink the current stream worktree association and mint a fresh new worktree; old worktree is left on disk.",
+                "Only valid with mode:'apply' and no path. Delink the current swimlane worktree association and mint a fresh new worktree; old worktree is left on disk.",
             },
           },
           required: ["mode"],
@@ -2487,7 +2487,7 @@ export class ControlSurfaceRuntime {
           if (!streamId) {
             return {
               content: [
-                { type: "text", text: "Error: set_up_worktree is only available on a stream." },
+                { type: "text", text: "Error: set_up_worktree is only available on a swimlane." },
               ],
               details: { ok: false },
             };
@@ -2501,7 +2501,7 @@ export class ControlSurfaceRuntime {
               content: [
                 {
                   type: "text",
-                  text: `Error: no orchestrator pi_session found for stream ${stream_id} — cannot resolve repo_path / base_ref defaults.`,
+                  text: `Error: no orchestrator pi_session found for swimlane ${stream_id} — cannot resolve repo_path / base_ref defaults.`,
                 },
               ],
               details: { ok: false, streamId: stream_id },
@@ -2536,7 +2536,7 @@ export class ControlSurfaceRuntime {
         name: "close_swimlane",
         label: "Close Swimlane",
         description:
-          'Close the current stream. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the stream; "noop" skips all git operations and just closes the stream record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the stream stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_swimlane again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
+          'Close the current swimlane. ONLY call when the user explicitly signals finality (e.g., "looks good", "ship it", "done"). Requests like "merge with main" or "rebase" are NOT close signals — run those as git commands directly. Mode is required: "merge" merges the branch and closes the swimlane; "noop" skips all git operations and just closes the swimlane record (use only when the user explicitly says don\'t merge). commit_message is required: it is used to commit any uncommitted in-flight work in the worktree before the merge — author it from `git log <base>..HEAD --oneline` and `git diff HEAD` so it describes the actual work, not a placeholder. The merge commit itself uses git\'s default message ("Merge branch \'X\' into Y"). Merge uses a two-call flow: call first without base_branch to get a non-destructive preview (returns current branch + resolved base branch); relay to user as "Merge <current> → <base>. Confirm, or name a different branch." If resolved base is null, ask the user for a branch first. Call again with explicit base_branch to execute. On merge conflicts the tool aborts cleanly, leaves the repo untouched, returns the conflict list, and the swimlane stays open; resolve each file intelligently (retain both sides when additive/non-overlapping, pick the superseding side when one replaces the other, stop and ask the user if ambiguous — never silently discard), then call close_swimlane again. Don\'t autonomously open PRs. Don\'t autonomously merge into main unless the user named it.',
         parameters: {
           type: "object",
           properties: {
@@ -2544,17 +2544,17 @@ export class ControlSurfaceRuntime {
               type: "string",
               enum: ["merge", "noop"],
               description:
-                '"merge" commits uncommitted changes, merges branch to the stream\'s base branch, and pushes. On the first merge call without base_branch, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the stream and ends the session.',
+                '"merge" commits uncommitted changes, merges branch to the swimlane\'s base branch, and pushes. On the first merge call without base_branch, returns a non-destructive preview with the current branch and resolved base branch for user confirmation; pass explicit base_branch on the follow-up call to actually execute. "noop" skips all git operations — just closes the swimlane and ends the session.',
             },
             commit_message: {
               type: "string",
               description:
-                'Commit message used when auto-committing any uncommitted in-flight work in the worktree before the merge. Required. Must describe the actual work in this stream — do NOT use placeholder/chore filler. Ignored for noop mode and on preview calls, but still required (write a short reason like "closing: <why>").',
+                'Commit message used when auto-committing any uncommitted in-flight work in the worktree before the merge. Required. Must describe the actual work in this swimlane — do NOT use placeholder/chore filler. Ignored for noop mode and on preview calls, but still required (write a short reason like "closing: <why>").',
             },
             base_branch: {
               type: "string",
               description:
-                "Target branch to merge into. Supersedes the stream's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
+                "Target branch to merge into. Supersedes the swimlane's recorded base_branch AND skips the preview step — passing this executes the merge directly. Omit it on the first call to get a preview; pass it on the confirming call to execute. Ignored in noop mode.",
             },
           },
           required: ["mode", "commit_message"],
@@ -2568,7 +2568,7 @@ export class ControlSurfaceRuntime {
           };
           if (!closeSwimlaneId) {
             return {
-              content: [{ type: "text", text: "Error: close_swimlane is not bound to a stream" }],
+              content: [{ type: "text", text: "Error: close_swimlane is not bound to a swimlane" }],
               details: { ok: false },
             };
           }
@@ -2582,7 +2582,7 @@ export class ControlSurfaceRuntime {
           }
           if (managed.closeRequested) {
             return {
-              content: [{ type: "text", text: "Stream close is already in progress" }],
+              content: [{ type: "text", text: "Swimlane close is already in progress" }],
               details: { ok: false, streamId: closeSwimlaneId },
             };
           }

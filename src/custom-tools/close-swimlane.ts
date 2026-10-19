@@ -179,10 +179,10 @@ export async function executeCloseSwimlane(
 ): Promise<CloseSwimlaneResult> {
   const stream = getStreamById(blackboard, streamId);
   if (!stream) {
-    return { ok: false, streamId, message: `Stream ${streamId} not found` };
+    return { ok: false, streamId, message: `Swimlane ${streamId} not found` };
   }
   if (stream.status !== "open") {
-    return { ok: false, streamId, message: `Stream ${streamId} is already closed` };
+    return { ok: false, streamId, message: `Swimlane ${streamId} is already closed` };
   }
 
   if (mode === "merge" && baseBranchOverride === undefined) {
@@ -213,14 +213,14 @@ export async function executeCloseSwimlane(
         ok: false,
         streamId,
         message:
-          "Stream has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the stream (use set_up_worktree with mode:apply, path, and base_ref for an existing worktree, or mode:apply to create one fresh) and try again, or call close_swimlane with mode:noop to close without merging.",
+          "Swimlane has no worktree_path/repo_path recorded. Cannot merge. Set the worktree path on the swimlane (use set_up_worktree with mode:apply, path, and base_ref for an existing worktree, or mode:apply to create one fresh) and try again, or call close_swimlane with mode:noop to close without merging.",
       };
     }
     if (!fs.existsSync(worktreePath)) {
       return {
         ok: false,
         streamId,
-        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or repoint stream.worktree_path via set_up_worktree with mode:apply, path, and base_ref) and try again, or call close_swimlane with mode:noop to close without merging.`,
+        message: `Worktree at ${worktreePath} no longer exists on disk. Restore the worktree (or update the swimlane's worktree_path via set_up_worktree with mode:apply, path, and base_ref) and try again, or call close_swimlane with mode:noop to close without merging.`,
       };
     }
 
@@ -239,7 +239,7 @@ export async function executeCloseSwimlane(
         ok: false,
         streamId,
         message:
-          "Stream has no base_branch recorded. Cannot merge. Set base_branch on the stream record, pass base_branch to close_swimlane, or call close_swimlane with mode:noop.",
+          "Swimlane has no base_branch recorded. Cannot merge. Set base_branch on the swimlane record, pass base_branch to close_swimlane, or call close_swimlane with mode:noop.",
       };
     }
     resolvedTargetBranch = targetBranch;
@@ -267,14 +267,14 @@ export async function executeCloseSwimlane(
       return {
         ok: false,
         streamId,
-        message: `Branch merged to ${targetBranch}, but push to origin failed. The stream remains open; retry close after the push succeeds.`,
+        message: `Branch merged to ${targetBranch}, but push to origin failed. The swimlane remains open; retry close after the push succeeds.`,
         merged: true,
         pushed: false,
       };
     }
   }
 
-  const parts = [`Stream "${stream.name}" close prepared.`];
+  const parts = [`Swimlane "${stream.name}" close prepared.`];
   if (mode === "noop") parts.push("Git operations skipped (noop mode).");
   if (merged && resolvedTargetBranch) parts.push(`Branch merged to ${resolvedTargetBranch}.`);
   if (pushed) parts.push("Pushed to origin.");

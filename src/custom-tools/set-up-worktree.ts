@@ -237,7 +237,7 @@ async function buildInspectMessage(
   const configLines = [
     `Inspect: set_up_worktree`,
     `Repo: ${repoPath}`,
-    `Stream worktree: ${stream.worktree_path ?? "none"}`,
+    `Swimlane worktree: ${stream.worktree_path ?? "none"}`,
     `Recorded base_ref: ${stream.base_branch ?? "none"}`,
     `Configured baseRef: ${config.baseRef ?? "none"}`,
     `copyPath: ${config.copyPaths.join(", ") || "none"}`,
@@ -258,7 +258,7 @@ async function buildInspectMessage(
       branch,
     );
     configLines.push(
-      `Apply with no path would ${stream.worktree_path && existsSync(stream.worktree_path) ? "refuse because the stream already has a worktree" : "create a new worktree"}.`,
+      `Apply with no path would ${stream.worktree_path && existsSync(stream.worktree_path) ? "refuse because the swimlane already has a worktree" : "create a new worktree"}.`,
       `Planned branch: ${branch}`,
       `Planned path: ${worktreePath}`,
     );
@@ -288,14 +288,14 @@ export async function executeSetUpWorktree(
     return {
       ok: false,
       streamId,
-      message: `Stream ${streamId} not found`,
+      message: `Swimlane ${streamId} not found`,
     };
   }
   if (stream.status !== "open") {
     return {
       ok: false,
       streamId,
-      message: `Stream ${streamId} is not open`,
+      message: `Swimlane ${streamId} is not open`,
     };
   }
 
@@ -361,7 +361,7 @@ export async function executeSetUpWorktree(
     return {
       ok: false,
       streamId,
-      message: `Attaching an existing worktree requires base_ref so the stream's merge target is explicit. No changes made.`,
+      message: `Attaching an existing worktree requires base_ref so the swimlane's merge target is explicit. No changes made.`,
     };
   }
 
@@ -377,7 +377,7 @@ export async function executeSetUpWorktree(
         return {
           ok: false,
           streamId,
-          message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. Refusing to replace it with ${attachPath}.`,
+          message: `Swimlane '${stream.name}' already has a worktree at ${stream.worktree_path}. Refusing to replace it with ${attachPath}.`,
         };
       }
     }
@@ -406,7 +406,7 @@ export async function executeSetUpWorktree(
         ok: true,
         streamId,
         worktreePath: stream.worktree_path,
-        message: `Updated stream '${stream.name}' base branch to ${normalizedBase}. Worktree checkout was not changed.`,
+        message: `Updated swimlane '${stream.name}' base branch to ${normalizedBase}. Worktree checkout was not changed.`,
       };
     }
     if (!force) {
@@ -414,7 +414,7 @@ export async function executeSetUpWorktree(
         ok: false,
         streamId,
         worktreePath: stream.worktree_path,
-        message: `Stream '${stream.name}' already has a worktree at ${stream.worktree_path}. No changes made. Pass force:true to mint a fresh worktree, or pass base_ref to update only the recorded merge target.`,
+        message: `Swimlane '${stream.name}' already has a worktree at ${stream.worktree_path}. No changes made. Pass force:true to mint a fresh worktree, or pass base_ref to update only the recorded merge target.`,
       };
     }
     cleanupMessage = `Old worktree delinked at ${stream.worktree_path} (left on disk). `;

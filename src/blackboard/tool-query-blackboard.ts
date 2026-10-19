@@ -75,11 +75,13 @@ const MODES: Record<string, string> = {
 
 const SCHEMA_DESCRIPTION = `Run read-only SQL against the Flitterbot blackboard database (SQLite).
 
+Swimlanes are stored in the streams table. SQL names, column names, and mode values below are literal database/API identifiers.
+
 SCHEMA — every table, column, type, and key:
 
 streams
   id TEXT PK, name TEXT, type TEXT ('work'|'defaultStream'), repo_path TEXT, worktree_path TEXT,
-  base_branch TEXT (branch this stream was forked from; required for close_swimlane merge mode),
+  base_branch TEXT (branch this swimlane was forked from; required for close_swimlane merge mode),
   pinned BOOLEAN, status TEXT ('open'|'closed'), created_at DATETIME, closed_at TEXT
 
 sessions
