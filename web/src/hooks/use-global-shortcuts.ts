@@ -8,6 +8,7 @@ import {
 } from "../../../src/shortcuts/catalog.ts";
 import { useCreateSwimlane } from "./use-create-swimlane";
 import { getLastStreamPath, useLastStreamPath } from "./use-last-stream-path.ts";
+import { useShortcutScroller } from "./use-shortcut-scroller";
 
 type ScrollMode = "half-up" | "half-down" | "full-up" | "full-down" | "small-up" | "small-down";
 
@@ -24,22 +25,21 @@ function hasScrollContainer() {
   return Boolean(resolveShortcutScrollContainer());
 }
 
-function scrollByPage(mode: ScrollMode) {
-  const container = resolveShortcutScrollContainer();
-  if (!container) return;
-  container.scrollBy({ top: container.clientHeight * SCROLL_FRACTIONS[mode], behavior: "smooth" });
-}
-
-function scrollToEdge(edge: "top" | "bottom") {
-  const container = resolveShortcutScrollContainer();
-  if (!container) return;
-  container.scrollTo({ top: edge === "top" ? 0 : container.scrollHeight, behavior: "auto" });
-}
-
 export function useGlobalShortcuts({ streamPaths = [] }: { streamPaths?: string[] } = {}) {
   const navigate = useNavigate();
   const createSwimlaneMutation = useCreateSwimlane();
   useLastStreamPath();
+  const scroller = useShortcutScroller();
+
+  function scrollByPage(mode: ScrollMode) {
+    const container = resolveShortcutScrollContainer();
+    if (container) scroller.scrollByPage(container, SCROLL_FRACTIONS[mode]);
+  }
+
+  function scrollToEdge(edge: "top" | "bottom") {
+    const container = resolveShortcutScrollContainer();
+    if (container) scroller.scrollToEdge(container, edge);
+  }
 
   const handlers: ShortcutActionHandlers = {
     "nav.surface": { run: () => navigate({ to: "/" }) },
