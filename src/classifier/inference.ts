@@ -1,3 +1,4 @@
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { resolveModelEntry } from "../config/models.ts";
 import type { FlitterbotConfig } from "../config/schema.ts";
@@ -16,10 +17,15 @@ export async function inferClassifierJson(
     );
   }
 
-  const response = await modelRuntime.completeSimple(model, {
-    systemPrompt: prompts.systemPrompt,
-    messages: [{ role: "user", content: prompts.userPrompt, timestamp: Date.now() }],
-  });
+  const reasoning = getSupportedThinkingLevels(model).find((level) => level !== "off");
+  const response = await modelRuntime.completeSimple(
+    model,
+    {
+      systemPrompt: prompts.systemPrompt,
+      messages: [{ role: "user", content: prompts.userPrompt, timestamp: Date.now() }],
+    },
+    reasoning ? { reasoning } : undefined,
+  );
 
   if (response.errorMessage) {
     throw new Error(`Classifier inference failed: ${response.errorMessage}`);
