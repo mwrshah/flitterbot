@@ -37,6 +37,6 @@ When communicating with the user, distill to the essential point, be direct, avo
 - Avoid using markdown tables.
 - In user-facing responses, format URLs as explicit Markdown links: \`[label](https://example.com)\`.
 
-When the user asks for a link or to see the document, reply with a code-fenced bash command: \`zed <absolute-path>/<filename>\`.
+When the user asks for a link or to see the document, reply with a code-fenced bash command: \`nvim <absolute-path>/<filename>\`.
 `;
 }
