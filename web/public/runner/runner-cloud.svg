@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Runner</title>
+  <desc id="desc">A bold, round-headed figure running above a cloud.</desc>
+  <g transform="translate(10 0) scale(.92)">
+  <g fill="currentColor" transform="translate(8 -3) scale(.94)">
+    <circle cx="155" cy="42" r="18"/>
+    <path d="M139 67C130 63 122 65 112 69L89 80C84 82 81 85 78 90L65 112C61 119 63 125 68 128C74 131 80 128 84 122L98 101L119 94L108 119C103 131 105 140 115 148L139 166L148 185C151 192 157 194 163 191C169 188 170 182 167 175L156 149C155 146 152 143 149 141L132 127L146 96L157 112C161 118 165 121 172 121H194C202 121 206 117 206 111C206 105 201 101 194 101H177L160 78C154 71 148 68 139 67Z"/>
+    <path d="M110 130L122 154L103 175C98 181 93 183 85 181L56 174C49 172 46 167 48 161C50 155 55 153 62 155L87 160L103 137Z"/>
+  </g>
+  <path d="M70 206C69 193 79 183 92 183C106 183 116 192 117 205C124 200 133 199 141 203C145 192 154 186 166 186C180 186 191 196 193 209H197C210 209 220 219 220 231C220 243 210 249 197 249H61C47 249 36 239 36 226C36 213 46 204 59 204C63 204 67 205 70 206Z" stroke="currentColor" stroke-width="11" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="currentColor" role="img" aria-labelledby="title desc">
+  <title id="title">Runner</title>
+  <desc id="desc">A large solid cloud with a small running figure cut out of its center.</desc>
+  <defs>
+    <mask id="runner-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
+      <path fill="white" d="M0 0H256V256H0Z"/>
+      <g transform="translate(0 14) rotate(-10 128 140)" fill="black" stroke="black" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="145" cy="99" r="15" stroke="none"/>
+        <path d="M126.4 119.2L141.6 128.8L114.5 167.4L103.3 160.9Z" stroke="none"/>
+        <path d="M122 143L142 160L148 181M109 164L86 160M110 112L160 137" fill="none"/>
+      </g>
+    </mask>
+  </defs>
+  <path mask="url(#runner-cutout)" d="M49 126C45 103 61 84 83 84C92 84 100 87 106 92C116 74 133 64 154 64C186 64 211 89 211 119C231 124 243 141 243 163C243 197 219 220 187 220H64C34 220 13 200 13 173C13 149 27 131 49 126Z"/>
+</svg>
